@@ -21,14 +21,20 @@ extern crate rustfmt;
 fn idempotent_tests() {
     println!("Idempotent tests:");
 
-    // Get all files in the tests/idem directory
-    let files = fs::read_dir("tests/idem").unwrap();
-    // For each file, run rustfmt and collect the output
     let mut count = 0;
     let mut fails = 0;
-    for entry in files {
+
+    // Get all files in the tests directory
+    let files = fs::read_dir("tests/idem").unwrap();
+    let files2 = fs::read_dir("tests").unwrap();
+    let files3 = fs::read_dir("src/bin").unwrap();
+    // For each file, run rustfmt and collect the output
+    for entry in files2.chain(files).chain(files3) {
         let path = entry.unwrap().path();
         let file_name = path.to_str().unwrap();
+        if !file_name.ends_with(".rs") {
+            continue;
+        }
         println!("Testing '{}'...", file_name);
         match idempotent_check(vec!["rustfmt".to_owned(), file_name.to_owned()]) {
             Ok(()) => {},
@@ -39,7 +45,7 @@ fn idempotent_tests() {
         }
         count += 1;
     }
-    // And also dogfood ourselves!
+    // And also dogfood rustfmt!
     println!("Testing 'src/lib.rs'...");
     match idempotent_check(vec!["rustfmt".to_owned(), "src/lib.rs".to_owned()]) {
         Ok(()) => {},
