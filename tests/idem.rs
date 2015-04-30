@@ -1,0 +1,64 @@
+// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
+// file at the top-level directory of this distribution and at
+// http://rust-lang.org/COPYRIGHT.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+use std::collections::HashMap;
+use std::fs;
+use rustfmt::idempotent_check;
+
+extern crate rustfmt;
+
+// For now, the only supported regression tests are idempotent tests - the input and
+// output must match exactly.
+// FIXME(#28) would be good to check for error messages and fail on them, or at least report.
+#[test]
+fn idempotent_tests() {
+    println!("Idempotent tests:");
+
+    // Get all files in the tests/idem directory
+    let files = fs::read_dir("tests/idem").unwrap();
+    // For each file, run rustfmt and collect the output
+    let mut count = 0;
+    let mut fails = 0;
+    for entry in files {
+        let path = entry.unwrap().path();
+        let file_name = path.to_str().unwrap();
+        println!("Testing '{}'...", file_name);
+        match idempotent_check(vec!["rustfmt".to_owned(), file_name.to_owned()]) {
+            Ok(()) => {},
+            Err(m) => {
+                handle_result(m);
+                fails += 1;
+            },
+        }
+        count += 1;
+    }
+    // And also dogfood ourselves!
+    println!("Testing 'src/lib.rs'...");
+    match idempotent_check(vec!["rustfmt".to_owned(), "src/lib.rs".to_owned()]) {
+        Ok(()) => {},
+        Err(m) => {
+            handle_result(m);
+            fails += 1;
+        },
+    }
+    count += 1;
+
+    // Display results
+    println!("Ran {} idempotent tests; {} failures.", count, fails);
+    assert!(fails == 0, "{} idempotent tests failed", fails);
+}
+
+// Compare output to input.
+fn handle_result(result: HashMap<String, String>) {
+    for (file_name, fmt_text) in result {
+        println!("Mismatch in {}.", file_name);
+        println!("{}", fmt_text);
+    }
+}

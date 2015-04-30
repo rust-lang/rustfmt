@@ -11,7 +11,3 @@ license = "Apache-2.0/MIT"
 [dependencies.strings]
 strings = "0.0.1"
 git = "https://github.com/nrc/strings.rs.git"
-
-[[bin]]
-name = "rustfmt"
-path = "src/mod.rs"

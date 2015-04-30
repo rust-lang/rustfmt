@@ -13,8 +13,7 @@
 #![feature(rustc_private)]
 #![feature(collections)]
 #![feature(str_char)]
-
-#![cfg_attr(not(test), feature(exit_status))]
+#![feature(std_misc)]
 
 // TODO we're going to allocate a whole bunch of temp Strings, is it worth
 // keeping some scratch mem for this and running our own StrPool?
@@ -254,96 +253,37 @@ fn run(args: Vec<String>, write_mode: WriteMode) {
     rustc_driver::run_compiler(&args, &mut call_ctxt);
 }
 
-#[cfg(not(test))]
-fn main() {
-    let args: Vec<_> = std::env::args().collect();
-    //run(args, WriteMode::Display);
+pub fn format(args: Vec<String>) {
     run(args, WriteMode::Overwrite);
-    std::env::set_exit_status(0);
-
-    // TODO unit tests
-    // let fmt = ListFormatting {
-    //     tactic: ListTactic::Horizontal,
-    //     separator: ",",
-    //     trailing_separator: SeparatorTactic::Vertical,
-    //     indent: 2,
-    //     h_width: 80,
-    //     v_width: 100,
-    // };
-    // let inputs = vec![(format!("foo"), String::new()),
-    //                   (format!("foo"), String::new()),
-    //                   (format!("foo"), String::new()),
-    //                   (format!("foo"), String::new()),
-    //                   (format!("foo"), String::new()),
-    //                   (format!("foo"), String::new()),
-    //                   (format!("foo"), String::new()),
-    //                   (format!("foo"), String::new())];
-    // let s = write_list(&inputs, &fmt);
-    // println!("  {}", s);
 }
 
-
-#[cfg(test)]
-mod test {
-    use std::collections::HashMap;
+pub fn idempotent_check(args: Vec<String>) -> Result<(), HashMap<String, String>> {
+    use std::thread;
     use std::fs;
     use std::io::Read;
-    use std::sync::atomic;
-    use super::*;
-    use super::run;
-
-    // For now, the only supported regression tests are idempotent tests - the input and
-    // output must match exactly.
-    // FIXME(#28) would be good to check for error messages and fail on them, or at least report.
-    #[test]
-    fn idempotent_tests() {
-        println!("Idempotent tests:");
-        FAILURES.store(0, atomic::Ordering::Relaxed);
-
-        // Get all files in the tests/idem directory
-        let files = fs::read_dir("tests/idem").unwrap();
-        // For each file, run rustfmt and collect the output
-        let mut count = 0;
-        for entry in files {
-            let path = entry.unwrap().path();
-            let file_name = path.to_str().unwrap();
-            println!("Testing '{}'...", file_name);
-            run(vec!["rustfmt".to_owned(), file_name.to_owned()], WriteMode::Return(HANDLE_RESULT));
-            count += 1;
-        }
-        // And also dogfood ourselves!
-        println!("Testing 'src/mod.rs'...");
-        run(vec!["rustfmt".to_owned(), "src/mod.rs".to_owned()], WriteMode::Return(HANDLE_RESULT));
-        count += 1;
-
-        // Display results
-        let fails = FAILURES.load(atomic::Ordering::Relaxed);
-        println!("Ran {} idempotent tests; {} failures.", count, fails);
-        assert!(fails == 0, "{} idempotent tests failed", fails);
-    }
-
-    // 'global' used by sys_tests and handle_result.
-    static FAILURES: atomic::AtomicUsize = atomic::ATOMIC_USIZE_INIT;
-    // Ick, just needed to get a &'static to handle_result.
-    static HANDLE_RESULT: &'static Fn(HashMap<String, String>) = &handle_result;
-
-    // Compare output to input.
-    fn handle_result(result: HashMap<String, String>) {
-        let mut fails = 0;
-
-        for file_name in result.keys() {
-            let mut f = fs::File::open(file_name).unwrap();
-            let mut text = String::new();
-            f.read_to_string(&mut text).unwrap();
-            if result[file_name] != text {
-                fails += 1;
-                println!("Mismatch in {}.", file_name);
-                println!("{}", result[file_name]);
+    let child = thread::spawn(move || {
+        run(args, WriteMode::Return(HANDLE_RESULT));
+        static HANDLE_RESULT: &'static Fn(HashMap<String, String>) = &handle_result;
+        fn handle_result(result: HashMap<String, String>) {
+            let mut failures = HashMap::new();
+            for (file_name, fmt_text) in result {
+                let mut f = fs::File::open(&file_name).unwrap();
+                let mut text = String::new();
+                // TODO: speedup by running through bytes iterator
+                f.read_to_string(&mut text).unwrap();
+                if fmt_text != text {
+                    failures.insert(file_name, fmt_text);
+                }
+            }
+            if !failures.is_empty() {
+                panic!(failures);
             }
         }
-
-        if fails > 0 {
-            FAILURES.fetch_add(1, atomic::Ordering::Relaxed);
-        }
-    }
+    });
+    child.join().map_err(|mut any|
+        any.downcast_mut::<HashMap<String, String>>()
+           .unwrap() // i know it is a hashmap
+           .drain() // i only get a reference :(
+           .collect() // so i need to turn it into an iter and then back
+    )
 }
