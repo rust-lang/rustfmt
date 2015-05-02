@@ -158,7 +158,9 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
                     ast::ViewPath_::ViewPathGlob(_) => {
                         // FIXME convert to list?
                     }
-                    _ => {}
+                    ast::ViewPath_::ViewPathSimple(_, _) => {
+                        // FIXME fix indentation
+                    }
                 }
                 visit::walk_item(self, item);
             }

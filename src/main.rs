@@ -340,6 +340,8 @@ mod test {
                 fails += 1;
                 println!("Mismatch in {}.", file_name);
                 println!("{}", result[file_name]);
+                println!("--- Expected:");
+                println!("{}", text);
             }
         }
 

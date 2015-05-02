@@ -89,6 +89,7 @@ impl<'a> FmtVisitor<'a> {
                 ast::PathListItem_::PathListMod{ .. } => None,
             }
         })).collect();
+
         if path_str.len() == 0 {
             format!("{}use {{{}}};", vis, write_list(&items, &fmt))
         } else {
