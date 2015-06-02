@@ -261,6 +261,11 @@ impl<'a> FmtVisitor<'a> {
             ast::Expr_::ExprTup(ref items) => {
                 return self.rewrite_tuple_lit(items, width, offset);
             }
+            ast::Expr_::ExprPath(Some(ref q_self), ref path) => {
+                return format!("<{} as {}",
+                               pprust::ty_to_string(&q_self.ty),
+                               self.snippet(path.span));
+            }
             _ => {}
         }
 
