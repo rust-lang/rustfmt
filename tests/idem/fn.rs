@@ -16,6 +16,11 @@ fn foo(a: AAA)
 
 }
 
+fn header_name<T: Header>() -> &'static str {
+    let name = <T as Header>::header_name();
+    name
+}
+
 fn foo(a: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,
        b: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB)
        -> RetType
