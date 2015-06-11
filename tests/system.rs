@@ -152,7 +152,7 @@ fn handle_result(result: HashMap<String, String>) {
     for (file_name, fmt_text) in result {
         // If file is in tests/source, compare to file with same name in tests/target
         let target_file_name = get_target(&file_name);
-        let mut f = fs::File::open(&target_file_name).ok().expect("Couldn't open target.");
+        let mut f = fs::File::open(&target_file_name).ok().expect(&format!("Couldn't open target: {}", target_file_name));
 
         let mut text = String::new();
         // TODO: speedup by running through bytes iterator
