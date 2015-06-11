@@ -251,7 +251,8 @@ impl<'a> FmtVisitor<'a> {
                 return self.rewrite_tuple_lit(items, width, offset);
             }
             ast::Expr_::ExprLoop(ref block, _) => {
-                return self.rewrite_loop(block);
+                self.rewrite_loop(block);
+                return "".to_string();
             }
             _ => {}
         }
@@ -259,7 +260,7 @@ impl<'a> FmtVisitor<'a> {
         self.snippet(expr.span)
     }
 
-    fn rewrite_loop(&mut self, block: &ast::Block) -> String {
+    fn rewrite_loop(&mut self, block: &ast::Block) {
         self.changes.push_str_span(block.span, "loop {");
 
         self.last_pos = block.span.lo + BytePos(1);
@@ -277,7 +278,5 @@ impl<'a> FmtVisitor<'a> {
         self.format_missing_with_indent(block.span.hi - BytePos(1));
 
         self.changes.push_str_span(block.span, "}");
-
-        return "".to_string()
     }
 }
