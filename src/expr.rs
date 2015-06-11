@@ -262,22 +262,21 @@ impl<'a> FmtVisitor<'a> {
     fn rewrite_loop(&mut self, block: &ast::Block) -> String {
         self.changes.push_str_span(block.span, "loop {");
 
-        self.block_indent += config!(tab_spaces);
         self.last_pos = block.span.lo + BytePos(1);
+        self.block_indent += config!(tab_spaces);
 
         visit::walk_block(self, block);
 
         self.block_indent -= config!(tab_spaces);
 
-        let mut close_block = String::new();
-        if block.stmts.len() > 0 {
-            close_block.push_str(";");
+        if let Some(stmt) = block.stmts.last() {
+            self.changes.push_str_span(stmt.span, ";");
+            self.last_pos = stmt.span.hi;
         }
-        close_block.push_str("\n");
-        close_block.push_str(&make_indent(self.block_indent));
-        close_block.push_str("}");
 
-        self.changes.push_str_span(block.span, &close_block);
+        self.format_missing_with_indent(block.span.hi - BytePos(1));
+
+        self.changes.push_str_span(block.span, "}");
 
         return "".to_string()
     }
