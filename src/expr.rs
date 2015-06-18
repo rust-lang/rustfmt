@@ -12,8 +12,8 @@ use visitor::FmtVisitor;
 use utils::*;
 use lists::{write_list, ListFormatting, SeparatorTactic, ListTactic};
 
-use syntax::{ast, ptr};
-use syntax::codemap::{Pos, Span};
+use syntax::{ast, ptr, visit};
+use syntax::codemap::{Pos, Span, BytePos};
 use syntax::parse::token;
 use syntax::print::pprust;
 
@@ -255,9 +255,33 @@ impl<'a> FmtVisitor<'a> {
             ast::Expr_::ExprTup(ref items) => {
                 return self.rewrite_tuple_lit(items, width, offset);
             }
+            ast::Expr_::ExprLoop(ref block, _) => {
+                self.rewrite_loop(block);
+                return "".to_string();
+            }
             _ => {}
         }
 
         self.snippet(expr.span)
+    }
+
+    fn rewrite_loop(&mut self, block: &ast::Block) {
+        self.changes.push_str_span(block.span, "loop {");
+
+        self.last_pos = block.span.lo + BytePos(1);
+        self.block_indent += config!(tab_spaces);
+
+        visit::walk_block(self, block);
+
+        self.block_indent -= config!(tab_spaces);
+
+        if let Some(stmt) = block.stmts.last() {
+            self.changes.push_str_span(stmt.span, ";");
+            self.last_pos = stmt.span.hi;
+        }
+
+        self.format_missing_with_indent(block.span.hi - BytePos(1));
+
+        self.changes.push_str_span(block.span, "}");
     }
 }
