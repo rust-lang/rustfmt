@@ -12,6 +12,9 @@
 
 use std::env;
 use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::convert::AsRef;
+use std::io::Read;
 
 fn main() {
     let in_file = Path::new("src/default.toml");
@@ -21,5 +24,20 @@ fn main() {
     out_file.push(manifest_dir);
     out_file.push("default.toml");
 
-    std::fs::copy(in_file, out_file).unwrap();
+    if !files_identical(&out_file, in_file) {
+        std::fs::copy(in_file, out_file).unwrap();
+    }
+}
+
+fn files_identical<P: AsRef<Path>, Q: AsRef<Path>>(lhs: P, rhs: Q) -> bool {
+    match (File::open(lhs), File::open(rhs)) {
+        (Ok(mut f1), Ok(mut f2)) => {
+            let mut buf1 = Vec::new();
+            let mut buf2 = Vec::new();
+            f1.read_to_end(&mut buf1).unwrap();
+            f2.read_to_end(&mut buf2).unwrap();
+            buf1 == buf2
+        },
+        _ => false
+    }
 }
