@@ -34,9 +34,9 @@ fn get_path_string(dir_entry: io::Result<fs::DirEntry>) -> String {
 // least report.
 #[test]
 fn system_tests() {
-    // Get all files in the tests/source directory
+    // Get all files in the tests/source directory.
     let files = fs::read_dir("tests/source").ok().expect("Couldn't read source dir.");
-    // turn a DirEntry into a String that represents the relative path to the file
+    // turn a DirEntry into a String that represents the relative path to the file.
     let files = files.map(get_path_string);
 
     let (count, fails) = check_files(files);
@@ -50,13 +50,13 @@ fn system_tests() {
 // rustfmt.
 #[test]
 fn idempotence_tests() {
-    // Get all files in the tests/target directory
+    // Get all files in the tests/target directory.
     let files = fs::read_dir("tests/target").ok().expect("Couldn't read target dir.");
     let files = files.chain(fs::read_dir("tests").ok().expect("Couldn't read tests dir."));
     let files = files.chain(fs::read_dir("src/bin").ok().expect("Couldn't read src dir."));
-    // turn a DirEntry into a String that represents the relative path to the file
+    // turn a DirEntry into a String that represents the relative path to the file.
     let files = files.map(get_path_string);
-    // hack because there's no `IntoIterator` impl for `[T; N]`
+    // hack because there's no `IntoIterator` impl for `[T; N]`.
     let files = files.chain(Some("src/lib.rs".to_owned()).into_iter());
 
     let (count, fails) = check_files(files);
@@ -65,6 +65,27 @@ fn idempotence_tests() {
     println!("Ran {} idempotent tests.", count);
     assert!(fails == 0, "{} idempotent tests failed", fails);
 }
+
+// Run rustfmt in tidy mode and check we don't modify the file.
+#[test]
+fn tidy_tests() {
+    // Get all files in all the directories.
+    let files = fs::read_dir("tests/source").ok().expect("Couldn't read source dir.");
+    let files = files.chain(fs::read_dir("tests/target").ok().expect("Couldn't read target dir."));
+    let files = files.chain(fs::read_dir("tests").ok().expect("Couldn't read tests dir."));
+    let files = files.chain(fs::read_dir("src/bin").ok().expect("Couldn't read src dir."));
+    // turn a DirEntry into a String that represents the relative path to the file.
+    let files = files.map(get_path_string);
+    // hack because there's no `IntoIterator` impl for `[T; N]`.
+    let files = files.chain(Some("src/lib.rs".to_owned()).into_iter());
+
+    let (count, fails) = check_files_tidy(files);
+
+    // Display results
+    println!("Ran {} tidy tests.", count);
+    assert!(fails == 0, "{} tidy tests failed", fails);
+}
+
 
 // For each file, run rustfmt and collect the output.
 // Returns the number of files checked and the number of failures.
@@ -86,6 +107,24 @@ fn check_files<I>(files: I) -> (u32, u32)
     (count, fails)
 }
 
+fn check_files_tidy<I>(files: I) -> (u32, u32)
+    where I: Iterator<Item = String>
+{
+    let mut count = 0;
+    let mut fails = 0;
+
+    for file_name in files.filter(|f| f.ends_with(".rs")) {
+        println!("Testing '{}'...", file_name);
+        if let Err(msg) = tidy_check(file_name) {
+            print_mismatches(msg);
+            fails += 1;
+        }
+        count += 1;
+    }
+
+    (count, fails)
+}
+
 fn print_mismatches(result: HashMap<String, String>) {
     for (_, fmt_text) in result {
         println!("{}", fmt_text);
@@ -94,16 +133,34 @@ fn print_mismatches(result: HashMap<String, String>) {
 
 // Ick, just needed to get a &'static to handle_result.
 static HANDLE_RESULT: &'static Fn(HashMap<String, String>) = &handle_result;
+static HANDLE_RESULT_TIDY: &'static Fn(HashMap<String, String>) = &handle_result_tidy;
 
 pub fn idempotent_check(filename: String) -> Result<(), HashMap<String, String>> {
     let config = get_config(&filename);
+    let config = config::Config::from_toml(&config);
     let args = vec!["rustfmt".to_owned(), filename];
     // this thread is not used for concurrency, but rather to workaround the issue that the passed
     // function handle needs to have static lifetime. Instead of using a global RefCell, we use
     // panic to return a result in case of failure. This has the advantage of smoothing the road to
     // multithreaded rustfmt
     thread::catch_panic(move || {
-        run(args, WriteMode::Return(HANDLE_RESULT), &config);
+        run(args, WriteMode::Return(HANDLE_RESULT), config);
+    }).map_err(|any|
+        *any.downcast().ok().expect("Downcast failed.")
+    )
+}
+
+pub fn tidy_check(filename: String) -> Result<(), HashMap<String, String>> {
+    let config = get_config(&filename);
+    let mut config = config::Config::from_toml(&config);
+    config.features = vec![config::Feature::Tidy];
+    let args = vec!["rustfmt".to_owned(), filename];
+    // this thread is not used for concurrency, but rather to workaround the issue that the passed
+    // function handle needs to have static lifetime. Instead of using a global RefCell, we use
+    // panic to return a result in case of failure. This has the advantage of smoothing the road to
+    // multithreaded rustfmt
+    thread::catch_panic(move || {
+        run(args, WriteMode::Return(HANDLE_RESULT_TIDY), config);
     }).map_err(|any|
         *any.downcast().ok().expect("Downcast failed.")
     )
@@ -169,6 +226,26 @@ fn handle_result(result: HashMap<String, String>) {
     }
 }
 
+// Compare output to input.
+fn handle_result_tidy(result: HashMap<String, String>) {
+    let mut failures = HashMap::new();
+
+    for (file_name, fmt_text) in result {
+        let target_file_name = file_name.to_owned();
+        let mut f = fs::File::open(&target_file_name).ok().expect("Couldn't open target.");
+
+        let mut text = String::new();
+        // TODO: speedup by running through bytes iterator
+        f.read_to_string(&mut text).ok().expect("Failed reading target.");
+        if fmt_text != text {
+            let diff_str = make_diff(&file_name, &fmt_text, &text);
+            failures.insert(file_name, diff_str);
+        }
+    }
+    if !failures.is_empty() {
+        panic!(failures);
+    }
+}
 // Map source file paths to their target paths.
 fn get_target(file_name: &str) -> String {
     if file_name.starts_with("tests/source/") {

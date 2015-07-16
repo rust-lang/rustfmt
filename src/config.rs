@@ -10,9 +10,9 @@
 
 extern crate toml;
 
-use {NewlineStyle, BraceStyle, ReturnIndent, StructLitStyle};
 use lists::SeparatorTactic;
 use issues::ReportTactic;
+
 
 #[derive(RustcDecodable, Clone)]
 pub struct Config {
@@ -31,6 +31,7 @@ pub struct Config {
     pub report_todo: ReportTactic,
     pub report_fixme: ReportTactic,
     pub reorder_imports: bool, // Alphabetically, case sensitive.
+    pub features: Vec<Feature>,
 }
 
 impl Config {
@@ -46,4 +47,60 @@ impl Config {
             }
         }
     }
+
+    pub fn feature(&self, f: Feature) -> bool {
+        self.features.len() == 0 || self.features.contains(&f)
+    }
 }
+
+
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum NewlineStyle {
+    Windows, // \r\n
+    Unix, // \n
+}
+
+impl_enum_decodable!(NewlineStyle, Windows, Unix);
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum BraceStyle {
+    AlwaysNextLine,
+    PreferSameLine,
+    // Prefer same line except where there is a where clause, in which case force
+    // the brace to the next line.
+    SameLineWhere,
+}
+
+impl_enum_decodable!(BraceStyle, AlwaysNextLine, PreferSameLine, SameLineWhere);
+
+// How to indent a function's return type.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum ReturnIndent {
+    // Aligned with the arguments
+    WithArgs,
+    // Aligned with the where clause
+    WithWhereClause,
+}
+
+impl_enum_decodable!(ReturnIndent, WithArgs, WithWhereClause);
+
+// Which features to run.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum Feature {
+    // Check for overlong lines, trailing whitespace, TODOs, etc.
+    Tidy,
+    // Trim trailing whitespace.
+    Trim,
+
+    FnDecls,
+    // Also covers statements and blocks.
+    Expressions,
+    // Also covers trait and impl items (and imports).
+    // FIXME would be good to split out imports.
+    Items,
+
+    Comments,
+}
+
+impl_enum_decodable!(Feature, Tidy, Trim, FnDecls, Expressions, Items, Comments);

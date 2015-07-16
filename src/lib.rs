@@ -49,10 +49,11 @@ use changes::ChangeSet;
 use visitor::FmtVisitor;
 use config::Config;
 
-#[macro_use]
-mod config;
+pub use config::{NewlineStyle, BraceStyle, ReturnIndent, Feature};
+
 #[macro_use]
 mod utils;
+pub mod config;
 mod changes;
 mod visitor;
 mod items;
@@ -81,35 +82,6 @@ pub enum WriteMode {
     Return(&'static Fn(HashMap<String, String>)),
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum NewlineStyle {
-    Windows, // \r\n
-    Unix, // \n
-}
-
-impl_enum_decodable!(NewlineStyle, Windows, Unix);
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum BraceStyle {
-    AlwaysNextLine,
-    PreferSameLine,
-    // Prefer same line except where there is a where clause, in which case force
-    // the brace to the next line.
-    SameLineWhere,
-}
-
-impl_enum_decodable!(BraceStyle, AlwaysNextLine, PreferSameLine, SameLineWhere);
-
-// How to indent a function's return type.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum ReturnIndent {
-    // Aligned with the arguments
-    WithArgs,
-    // Aligned with the where clause
-    WithWhereClause,
-}
-
-impl_enum_decodable!(ReturnIndent, WithArgs, WithWhereClause);
 
 // How to stle a struct literal.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -216,6 +188,7 @@ fn fmt_lines(changes: &mut ChangeSet, config: &Config) -> FormatReport {
         let mut last_wspace: Option<usize> = None;
         let mut line_len = 0;
         let mut cur_line = 1;
+        // Number of newlines since the last non-empty line.
         let mut newline_count = 0;
         let mut errors = vec![];
         let mut issue_seeker = BadIssueSeeker::new(config.report_todo,
@@ -225,11 +198,13 @@ fn fmt_lines(changes: &mut ChangeSet, config: &Config) -> FormatReport {
             if c == '\r' { continue; }
 
             // Add warnings for bad todos/ fixmes
-            if let Some(issue) = issue_seeker.inspect(c) {
-                errors.push(FormattingError {
-                    line: cur_line,
-                    kind: ErrorKind::BadIssue(issue)
-                });
+            if config.feature(Feature::Tidy) {
+                if let Some(issue) = issue_seeker.inspect(c) {
+                    errors.push(FormattingError {
+                        line: cur_line,
+                        kind: ErrorKind::BadIssue(issue)
+                    });
+                }
             }
 
             if c == '\n' {
@@ -239,7 +214,7 @@ fn fmt_lines(changes: &mut ChangeSet, config: &Config) -> FormatReport {
                     line_len -= b - lw;
                 }
                 // Check for any line width errors we couldn't correct.
-                if line_len > config.max_width {
+                if config.feature(Feature::Tidy) && line_len > config.max_width {
                     errors.push(FormattingError {
                         line: cur_line,
                         kind: ErrorKind::LineOverflow
@@ -262,21 +237,32 @@ fn fmt_lines(changes: &mut ChangeSet, config: &Config) -> FormatReport {
             }
         }
 
+        // FIXME(so gross): we end up with an extra blank line from somewhere
+        // (I think it is codemap's fault, but it could be us), so in order to
+        // do nothing we need to trim one line from each file. We only trim more
+        // lines if the Trim feature is enabled.
         if newline_count > 1 {
             debug!("track truncate: {} {} {}", f, text.len, newline_count);
-            truncate_todo.push((f.to_owned(), text.len - newline_count + 1))
+            if config.feature(Feature::Trim) {
+                truncate_todo.push((f.to_owned(), text.len - newline_count + 1))
+            } else {
+                truncate_todo.push((f.to_owned(), text.len - 1))
+            }
         }
 
-        for &(l, _, _) in trims.iter() {
-            errors.push(FormattingError {
-                line: l,
-                kind: ErrorKind::TrailingWhitespace
-            });
+        if config.feature(Feature::Tidy) {
+            for &(l, _, _) in trims.iter() {
+                errors.push(FormattingError {
+                    line: l,
+                    kind: ErrorKind::TrailingWhitespace
+                });
+            }
         }
 
         report.file_error_map.insert(f.to_owned(), errors);
     }
 
+    // Trim the file to get rid of any blank lines at the end.
     for (f, l) in truncate_todo {
         changes.get_mut(&f).truncate(l);
     }
@@ -371,8 +357,8 @@ impl<'a> CompilerCalls<'a> for RustFmtCalls {
 // write_mode determines what happens to the result of running rustfmt, see
 // WriteMode.
 // default_config is a string of toml data to be used to configure rustfmt.
-pub fn run(args: Vec<String>, write_mode: WriteMode, default_config: &str) {
-    let config = Some(Box::new(config::Config::from_toml(default_config)));
+pub fn run(args: Vec<String>, write_mode: WriteMode, default_config: config::Config) {
+    let config = Some(Box::new(default_config));
     let mut call_ctxt = RustFmtCalls { input_path: None, write_mode: write_mode, config: config };
     rustc_driver::run_compiler(&args, &mut call_ctxt);
 }
