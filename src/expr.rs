@@ -63,6 +63,17 @@ impl Rewrite for ast::Expr {
                     format!("loop {}", result)
                 })
             }
+            ast::Expr_::ExprBlock(ref block) => {
+                block.rewrite(context, width, offset)
+            }
+            ast::Expr_::ExprIf(ref cond, ref if_block, ref else_block) => {
+                rewrite_if_else(context,
+                                cond,
+                                if_block,
+                                else_block.as_ref().map(|e| &**e),
+                                width,
+                                offset)
+            }
             _ => context.codemap.span_to_snippet(self.span).ok()
         }
     }
@@ -85,6 +96,29 @@ impl Rewrite for ast::Block {
         let string_buffer = visitor.changes.get(&file_name);
 
         Some(string_buffer.to_string())
+    }
+}
+
+fn rewrite_if_else(context: &RewriteContext,
+                   cond: &ast::Expr,
+                   if_block: &ast::Block,
+                   else_block: Option<&ast::Expr>,
+                   width: usize,
+                   offset: usize)
+                   -> Option<String> {
+    // FIXME: missing comments between control statements and blocks
+    let cond_string = try_opt!(cond.rewrite(context, width - 3 - 2, offset + 3));
+    let if_block_string = try_opt!(if_block.rewrite(context, width, offset));
+
+    match else_block {
+        Some(else_block) => {
+            else_block.rewrite(context, width, offset).map(|else_block_string| {
+                format!("if {} {} else {}", cond_string, if_block_string, else_block_string)
+            })
+        }
+        None => {
+            Some(format!("if {} {}", cond_string, if_block_string))
+        }
     }
 }
 
@@ -209,6 +243,8 @@ fn rewrite_struct_lit<'a>(context: &RewriteContext,
     let field_iter = fields.into_iter().map(StructLitField::Regular)
                            .chain(base.into_iter().map(StructLitField::Base));
 
+    let inner_context = &RewriteContext { block_indent: indent, ..*context };
+
     let items = itemize_list(context.codemap,
                              Vec::new(),
                              field_iter,
@@ -230,13 +266,13 @@ fn rewrite_struct_lit<'a>(context: &RewriteContext,
                              |item| {
                                  match *item {
                                      StructLitField::Regular(ref field) => {
-                                         rewrite_field(context, &field, h_budget, indent)
+                                         rewrite_field(inner_context, &field, h_budget, indent)
                                             .unwrap_or(context.codemap.span_to_snippet(field.span)
                                                                       .unwrap())
                                      },
                                      StructLitField::Base(ref expr) => {
                                          // 2 = ..
-                                         expr.rewrite(context, h_budget - 2, indent + 2)
+                                         expr.rewrite(inner_context, h_budget - 2, indent + 2)
                                              .map(|s| format!("..{}", s))
                                              .unwrap_or(context.codemap.span_to_snippet(expr.span)
                                                                        .unwrap())
