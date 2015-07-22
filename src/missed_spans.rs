@@ -8,6 +8,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use Feature;
+
 use utils::make_indent;
 use visitor::FmtVisitor;
 
@@ -24,7 +26,12 @@ impl<'a> FmtVisitor<'a> {
 
     pub fn format_missing_with_indent(&mut self, end: BytePos) {
         self.format_missing_inner(end, |this, last_snippet, file_name, snippet| {
-            this.changes.push_str(file_name, last_snippet.trim_right());
+            let trimmed_snippet = if this.config.feature(Feature::Trim) {
+                last_snippet.trim_right()
+            } else {
+                last_snippet
+            };
+            this.changes.push_str(file_name, trimmed_snippet);
             if last_snippet == snippet {
                 // No new lines in the snippet.
                 this.changes.push_str(file_name, "\n");
@@ -79,11 +86,14 @@ impl<'a> FmtVisitor<'a> {
         let mut last_wspace = None;
         for (i, c) in snippet.char_indices() {
             if c == '\n' {
-                if let Some(lw) = last_wspace {
-                    self.changes.push_str(file_name, &snippet[line_start..lw]);
-                    self.changes.push_str(file_name, "\n");
-                } else {
-                    self.changes.push_str(file_name, &snippet[line_start..i+1]);
+                match last_wspace {
+                    Some(lw) if self.config.feature(Feature::Trim) => {
+                        self.changes.push_str(file_name, &snippet[line_start..lw]);
+                        self.changes.push_str(file_name, "\n");
+                    }
+                    _ => {
+                        self.changes.push_str(file_name, &snippet[line_start..i+1]);
+                    }
                 }
 
                 line_start = i + 1;

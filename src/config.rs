@@ -10,9 +10,10 @@
 
 extern crate toml;
 
-use {NewlineStyle, BraceStyle, ReturnIndent, StructLitStyle};
 use lists::SeparatorTactic;
 use issues::ReportTactic;
+
+use std::str::FromStr;
 
 #[derive(RustcDecodable, Clone)]
 pub struct Config {
@@ -31,6 +32,7 @@ pub struct Config {
     pub report_todo: ReportTactic,
     pub report_fixme: ReportTactic,
     pub reorder_imports: bool, // Alphabetically, case sensitive.
+    pub features: Vec<Feature>,
 }
 
 impl Config {
@@ -44,6 +46,92 @@ impl Config {
                 println!("\n\nParsed:\n{:?}", parsed);
                 panic!();
             }
+        }
+    }
+
+    pub fn feature(&self, f: Feature) -> bool {
+        self.features.len() == 0 || self.features.contains(&f)
+    }
+}
+
+
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum NewlineStyle {
+    Windows, // \r\n
+    Unix, // \n
+}
+
+impl_enum_decodable!(NewlineStyle, Windows, Unix);
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum BraceStyle {
+    AlwaysNextLine,
+    PreferSameLine,
+    // Prefer same line except where there is a where clause, in which case force
+    // the brace to the next line.
+    SameLineWhere,
+}
+
+impl_enum_decodable!(BraceStyle, AlwaysNextLine, PreferSameLine, SameLineWhere);
+
+// How to indent a function's return type.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum ReturnIndent {
+    // Aligned with the arguments
+    WithArgs,
+    // Aligned with the where clause
+    WithWhereClause,
+}
+
+impl_enum_decodable!(ReturnIndent, WithArgs, WithWhereClause);
+
+// Which features to run.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum Feature {
+    // Check for overlong lines, trailing whitespace, TODOs, etc.
+    Tidy,
+    // Trim trailing whitespace.
+    Trim,
+
+    FnDecls,
+    // Also covers statements and blocks (and items inside blocks, which are a
+    // a kind of statement).
+    Expressions,
+    // Also covers trait and impl items (and imports).
+    // FIXME would be good to split out imports.
+    Items,
+
+    Comments,
+}
+
+impl_enum_decodable!(Feature, Tidy, Trim, FnDecls, Expressions, Items, Comments);
+
+// How to stle a struct literal.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum StructLitStyle {
+    // First line on the same line as the opening brace, all lines aligned with
+    // the first line.
+    VisualIndent,
+    // First line is on a new line and all lines align with block indent.
+    BlockIndent,
+    // FIXME Maybe we should also have an option to align types.
+}
+
+impl_enum_decodable!(StructLitStyle, VisualIndent, BlockIndent);
+
+impl FromStr for Feature {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Feature, ()> {
+        match s {
+            "Tidy" => Ok(Feature::Tidy),
+            "Trim" => Ok(Feature::Trim),
+            "FnDecls" => Ok(Feature::FnDecls),
+            "Expressions" => Ok(Feature::Expressions),
+            "Items" => Ok(Feature::Items),
+            "Comments" => Ok(Feature::Comments),
+            _ => Err(())
         }
     }
 }

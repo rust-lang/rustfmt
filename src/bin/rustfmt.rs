@@ -12,18 +12,20 @@
 
 extern crate rustfmt;
 
-use rustfmt::{WriteMode, run};
+use rustfmt::{WriteMode, run, config};
 
 use std::fs::File;
 use std::io::Read;
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
+
     let mut def_config_file = File::open("default.toml").unwrap();
     let mut def_config = String::new();
     def_config_file.read_to_string(&mut def_config).unwrap();
+    let mut def_config = config::Config::from_toml(&def_config);
 
-    run(args, WriteMode::Overwrite, &def_config);
+    run(args, WriteMode::Overwrite, def_config);
 
     std::process::exit(0);
 }

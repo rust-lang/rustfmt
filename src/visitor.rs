@@ -21,6 +21,7 @@ use comment::FindUncommented;
 
 use changes::ChangeSet;
 use rewrite::{Rewrite, RewriteContext};
+use Feature;
 
 pub struct FmtVisitor<'a> {
     pub codemap: &'a CodeMap,
@@ -36,6 +37,11 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
         debug!("visit_expr: {:?} {:?}",
                self.codemap.lookup_char_pos(ex.span.lo),
                self.codemap.lookup_char_pos(ex.span.hi));
+
+        if !self.config.feature(Feature::Expressions) {
+            return;
+        }
+
         self.format_missing(ex.span.lo);
         let offset = self.changes.cur_offset_span(ex.span);
         let context = RewriteContext {
@@ -52,6 +58,10 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
     }
 
     fn visit_stmt(&mut self, stmt: &'v ast::Stmt) {
+        if !self.config.feature(Feature::Expressions) {
+            return;
+        }
+
         // If the stmt is actually an item, then we'll handle any missing spans
         // there. This is important because of annotations.
         // Although it might make more sense for the statement span to include
@@ -75,6 +85,12 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
         debug!("visit_block: {:?} {:?}",
                self.codemap.lookup_char_pos(b.span.lo),
                self.codemap.lookup_char_pos(b.span.hi));
+
+        if !self.config.feature(Feature::Expressions) {
+            visit::walk_block(self, b);
+            return;
+        }
+
         self.format_missing(b.span.lo);
 
         self.changes.push_str_span(b.span, "{");
@@ -107,10 +123,24 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
                 b: &'v ast::Block,
                 s: Span,
                 _: ast::NodeId) {
-        self.format_missing_with_indent(s.lo);
+        if !self.config.feature(Feature::FnDecls) {
+            self.format_missing(s.lo);
+            self.visit_block(b);
+            return;
+        }
+
+        let indent;
+        // If we haven't been formatting items, we can't expect block_indent to
+        // be correct.
+        if self.config.feature(Feature::Items) {
+            self.format_missing_with_indent(s.lo);
+            indent = self.block_indent;
+        } else {
+            indent = self.codemap.lookup_char_pos(s.lo).col.0;
+            self.format_missing(s.lo);
+        }
         self.last_pos = s.lo;
 
-        let indent = self.block_indent;
         match fk {
             visit::FkItemFn(ident,
                             ref generics,
@@ -147,6 +177,7 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
         }
 
         self.last_pos = b.span.lo;
+
         self.visit_block(b)
     }
 
@@ -156,12 +187,26 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
         // doesn't distinguish. FIXME This is overly conservative and means we miss
         // attributes on inline modules.
         match item.node {
-            ast::Item_::ItemMod(_) => {}
+            ast::Item_::ItemMod(ref module) => {
+                if self.config.feature(Feature::Items) {
+                    self.format_missing_with_indent(item.span.lo);
+                } else {
+                    self.format_missing(item.span.lo);
+                }
+                self.format_mod(module, item.span, item.ident, &item.attrs);
+                return;
+            }
             _ => {
                 if self.visit_attrs(&item.attrs) {
                     return;
                 }
             }
+        }
+
+        if !self.config.feature(Feature::Items) {
+            visit::walk_item(self, item);
+            self.format_missing(item.span.hi);
+            return;
         }
 
         match item.node {
@@ -234,9 +279,8 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
                                 item.span);
                 self.last_pos = item.span.hi;
             }
-            ast::Item_::ItemMod(ref module) => {
-                self.format_missing_with_indent(item.span.lo);
-                self.format_mod(module, item.span, item.ident, &item.attrs);
+            ast::Item_::ItemMod(_) => {
+                unreachable!("Should have been caught above");
             }
             _ => {
                 visit::walk_item(self, item);
@@ -246,6 +290,12 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
 
     fn visit_trait_item(&mut self, ti: &'v ast::TraitItem) {
         if self.visit_attrs(&ti.attrs) {
+            return;
+        }
+
+        if !self.config.feature(Feature::Items) {
+            visit::walk_trait_item(self, ti);
+            self.format_missing(ti.span.hi);
             return;
         }
 
@@ -277,8 +327,13 @@ impl<'a, 'v> visit::Visitor<'v> for FmtVisitor<'a> {
         visit::walk_mac(self, mac)
     }
 
-    fn visit_mod(&mut self, m: &'v ast::Mod, s: Span, _: ast::NodeId) {
-        // This is only called for the root module
+    fn visit_mod(&mut self, m: &'v ast::Mod, s: Span, id: ast::NodeId) {
+        assert!(id == 0, "visit_mod should only be called on the root mod");
+
+        // This is only called for the root module. This invariant is enforced by
+        // not walking an item's contents if it is a module (in visit_item). That
+        // is not the case if we return early, because we're not formatting items
+        // which is why we have the early return for items above.
         let filename = self.codemap.span_to_filename(s);
         self.format_separate_mod(m, &filename);
     }
@@ -319,6 +374,10 @@ impl<'a> FmtVisitor<'a> {
         if utils::contains_skip(attrs) {
             true
         } else {
+            if !self.config.feature(Feature::Items) {
+                return false;
+            }
+
             let rewrite = self.rewrite_attrs(attrs, self.block_indent);
             self.changes.push_str_span(first.span, &rewrite);
             let last = attrs.last().unwrap();
@@ -422,7 +481,7 @@ impl<'a> FmtVisitor<'a> {
                     secondary_path
                 } else {
                     // Should never appens since rustc parsed everything sucessfully
-                    panic!("Didn't found module {}", mod_string);
+                    panic!("Couldn't find module {}", mod_string);
                 }
             }
         }
