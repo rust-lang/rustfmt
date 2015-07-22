@@ -1,5 +1,5 @@
-// rustfmt-features: Trim, Items, FnDecls, Expressions
-// Tests different fns
+// rustfmt-features: Trim, FnDecls
+// Test that fn decl formatting works with just that feature.
 
 fn foo(a: AAAA, b: BBB, c: CCC) -> RetType {
 
@@ -15,25 +15,27 @@ fn foo(a: AAA /* (comment) */)
     where T: Blah
 {
 
-}
 
-fn foo(a: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,
-       b: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB)
-       -> RetType
-    where T: Blah
-{
 
 }
 
-
-fn foo<U, T>(a: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,
+      fn foo(a: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,
              b: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB)
              -> RetType
-    where T: Blah,
-          U: dsfasdfasdfasd
-{
+          where T: Blah
+      {
 
-}
+      }
+
+
+  fn foo<U, T>(a: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,
+               b: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB)
+               -> RetType
+      where T: Blah,
+            U: dsfasdfasdfasd
+  {
+
+  }
 
 fn foo<U: Fn(A) -> B /* paren inside generics */>() {
 }
@@ -59,7 +61,7 @@ pub fn render<'a,
     (g: &'a G,
      w: &mut W)
      -> io::Result<()> {
-    render_opts(g, w, &[])
+  render_opts(g, w, &[])
 }
 
 const fn foo() {
@@ -77,6 +79,7 @@ impl Foo {
 }
 
 fn main() {
-    let _ = function(move || 5);
-    let _ = move || 42;
+    let _ =   foo ();
+  let _ =
+    whatever.  bar(    );
 }

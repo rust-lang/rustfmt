@@ -1,4 +1,4 @@
-// Imports.
+// rustfmt-features: Items, Trim, Expressions
 
 // Long import.
 use syntax::ast::{ItemForeignMod, ItemImpl, ItemMac, ItemMod, ItemStatic, ItemDefaultImpl};

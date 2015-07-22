@@ -13,6 +13,7 @@ extern crate toml;
 use lists::SeparatorTactic;
 use issues::ReportTactic;
 
+use std::str::FromStr;
 
 #[derive(RustcDecodable, Clone)]
 pub struct Config {
@@ -94,7 +95,8 @@ pub enum Feature {
     Trim,
 
     FnDecls,
-    // Also covers statements and blocks.
+    // Also covers statements and blocks (and items inside blocks, which are a
+    // a kind of statement).
     Expressions,
     // Also covers trait and impl items (and imports).
     // FIXME would be good to split out imports.
@@ -104,3 +106,19 @@ pub enum Feature {
 }
 
 impl_enum_decodable!(Feature, Tidy, Trim, FnDecls, Expressions, Items, Comments);
+
+impl FromStr for Feature {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Feature, ()> {
+        match s {
+            "Tidy" => Ok(Feature::Tidy),
+            "Trim" => Ok(Feature::Trim),
+            "FnDecls" => Ok(Feature::FnDecls),
+            "Expressions" => Ok(Feature::Expressions),
+            "Items" => Ok(Feature::Items),
+            "Comments" => Ok(Feature::Comments),
+            _ => Err(())
+        }
+    }
+}

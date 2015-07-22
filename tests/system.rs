@@ -9,6 +9,7 @@
 // except according to those terms.
 
 #![feature(catch_panic)]
+#![feature(result_expect)]
 
 extern crate rustfmt;
 extern crate diff;
@@ -137,12 +138,18 @@ static HANDLE_RESULT_TIDY: &'static Fn(HashMap<String, String>) = &handle_result
 
 pub fn idempotent_check(filename: String) -> Result<(), HashMap<String, String>> {
     let config = get_config(&filename);
-    let config = config::Config::from_toml(&config);
+    let mut config = config::Config::from_toml(&config);
+    let features = get_features(&filename);
+    if let Some(fs) = features {
+        config.features = fs;
+    }
+
     let args = vec!["rustfmt".to_owned(), filename];
-    // this thread is not used for concurrency, but rather to workaround the issue that the passed
-    // function handle needs to have static lifetime. Instead of using a global RefCell, we use
-    // panic to return a result in case of failure. This has the advantage of smoothing the road to
-    // multithreaded rustfmt
+    // this thread is not used for concurrency, but rather to workaround the
+    // issue that the passed function handle needs to have static lifetime.
+    // Instead of using a global RefCell, we use panic to return a result in
+    // case of failure. This has the advantage of smoothing the road to
+    // multithreaded rustfmt.
     thread::catch_panic(move || {
         run(args, WriteMode::Return(HANDLE_RESULT), config);
     }).map_err(|any|
@@ -155,10 +162,11 @@ pub fn tidy_check(filename: String) -> Result<(), HashMap<String, String>> {
     let mut config = config::Config::from_toml(&config);
     config.features = vec![config::Feature::Tidy];
     let args = vec!["rustfmt".to_owned(), filename];
-    // this thread is not used for concurrency, but rather to workaround the issue that the passed
-    // function handle needs to have static lifetime. Instead of using a global RefCell, we use
-    // panic to return a result in case of failure. This has the advantage of smoothing the road to
-    // multithreaded rustfmt
+    // this thread is not used for concurrency, but rather to workaround the
+    // issue that the passed function handle needs to have static lifetime.
+    // Instead of using a global RefCell, we use panic to return a result in
+    // case of failure. This has the advantage of smoothing the road to
+    // multithreaded rustfmt.
     thread::catch_panic(move || {
         run(args, WriteMode::Return(HANDLE_RESULT_TIDY), config);
     }).map_err(|any|
@@ -166,7 +174,7 @@ pub fn tidy_check(filename: String) -> Result<(), HashMap<String, String>> {
     )
 }
 
-// Reads test config file from comments and loads it
+// Reads test config file from comments and loads it.
 fn get_config(file_name: &str) -> String {
     let config_file_name = read_significant_comment(file_name, "config")
         .map(|file_name| {
@@ -183,22 +191,36 @@ fn get_config(file_name: &str) -> String {
     def_config
 }
 
+// Check a files comments for a feature list.
+fn get_features(file_name: &str) -> Option<Vec<config::Feature>> {
+    let comment = read_significant_comment(file_name, "features");
+    comment.map(|comment| {
+        comment.split(',').map(|i| {
+            let f = i.trim().parse::<config::Feature>();
+            f.expect(&format!("Couldn't parse feature string: {}", i))
+        }).collect()
+    })
+}
+
+// FIXME: It is unfortunate we re-open the file each time we check for a comment,
+// would be nice to use the file rather than the file name and/or cache the
+// comments at the head of the file.
 fn read_significant_comment(file_name: &str, option: &str) -> Option<String> {
     let file = fs::File::open(file_name).ok().expect("Couldn't read file for comment.");
     let reader = BufReader::new(file);
-    let pattern = format!("^\\s*//\\s*rustfmt-{}:\\s*(\\S+)", option);
-    let regex = regex::Regex::new(&pattern).ok().expect("Failed creating pattern 1.");
+    let pattern = format!("^\\s*//\\s*rustfmt-{}:\\s*(.+)$", option);
+    let regex = regex::Regex::new(&pattern).ok().expect("Failed creating pattern");
 
     // matches exactly the lines containing significant comments or whitespace
-    let line_regex = regex::Regex::new(r"(^\s*$)|(^\s*//\s*rustfmt-[:alpha:]+:\s*\S+)")
-        .ok().expect("Failed creating pattern 2.");
+    let line_regex = regex::Regex::new(r"(^\s*$)|(^\s*//\s*rustfmt-[:alpha:]+:\s*.+)$")
+        .ok().expect("Failed creating regex");
 
     reader.lines()
           .map(|line| line.ok().expect("Failed getting line."))
           .take_while(|line| line_regex.is_match(&line))
           .filter_map(|line| {
               regex.captures_iter(&line).next().map(|capture| {
-                  capture.at(1).expect("Couldn't unwrap capture.").to_owned()
+                  capture.at(1).expect("Couldn't unwrap capture.").trim().to_owned()
               })
           })
           .next()
@@ -246,6 +268,7 @@ fn handle_result_tidy(result: HashMap<String, String>) {
         panic!(failures);
     }
 }
+
 // Map source file paths to their target paths.
 fn get_target(file_name: &str) -> String {
     if file_name.starts_with("tests/source/") {
@@ -290,6 +313,13 @@ fn make_diff(file_name: &str, expected: &str, actual: &str) -> String {
                 prev_both = true;
             }
         }
+    }
+
+    if text.len() == 0 {
+        // This is a weird situaton that shouldn't happen but occasionally does.
+        println!("Could not diff test results for {}; equal: {}", file_name, expected == actual);
+        println!("expected: `{}`", expected);
+        println!("\n\nactual: `{}`", actual);
     }
 
     text
