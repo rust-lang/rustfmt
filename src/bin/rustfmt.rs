@@ -25,10 +25,7 @@ fn main() {
     def_config_file.read_to_string(&mut def_config).unwrap();
     let mut def_config = config::Config::from_toml(&def_config);
 
-    // TODO remove
-    def_config.features = vec![config::Feature::Tidy];
-
-    run(args, WriteMode::Display, def_config);
+    run(args, WriteMode::Overwrite, def_config);
 
     std::process::exit(0);
 }

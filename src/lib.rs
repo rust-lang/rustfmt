@@ -49,7 +49,7 @@ use changes::ChangeSet;
 use visitor::FmtVisitor;
 use config::Config;
 
-pub use config::{NewlineStyle, BraceStyle, ReturnIndent, Feature};
+pub use config::{NewlineStyle, BraceStyle, ReturnIndent, StructLitStyle, Feature};
 
 #[macro_use]
 mod utils;
@@ -81,20 +81,6 @@ pub enum WriteMode {
     // Return the result as a mapping from filenames to StringBuffers.
     Return(&'static Fn(HashMap<String, String>)),
 }
-
-
-// How to stle a struct literal.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum StructLitStyle {
-    // First line on the same line as the opening brace, all lines aligned with
-    // the first line.
-    VisualIndent,
-    // First line is on a new line and all lines align with block indent.
-    BlockIndent,
-    // FIXME Maybe we should also have an option to align types.
-}
-
-impl_enum_decodable!(StructLitStyle, VisualIndent, BlockIndent);
 
 enum ErrorKind {
     // Line has exceeded character limit
