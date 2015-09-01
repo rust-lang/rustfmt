@@ -828,6 +828,11 @@ fn rewrite_string_lit(context: &RewriteContext,
     if l_loc.line == r_loc.line && r_loc.col.to_usize() <= context.config.max_width {
         return Some(context.snippet(span));
     }
+
+    // It already contains newlines it is formatted manually
+    if s.to_string().contains("\n") {
+        return Some(context.snippet(span));
+    }
     let fmt = StringFormat {
         opener: "\"",
         closer: "\"",
