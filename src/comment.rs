@@ -68,7 +68,7 @@ pub fn rewrite_comment(orig: &str, block_style: bool, width: usize, offset: usiz
             }
 
             if line.len() > max_chars {
-                acc.push_str(&rewrite_string(line, &fmt));
+                acc.push_str(&rewrite_string(line, &fmt).unwrap());
             } else {
                 acc.push_str(line);
             }
