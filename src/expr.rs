@@ -842,7 +842,7 @@ fn rewrite_string_lit(context: &RewriteContext,
         trim_end: false,
     };
 
-    Some(rewrite_string(&s.escape_default(), &fmt))
+    rewrite_string(&s.escape_default(), &fmt)
 }
 
 fn rewrite_call(context: &RewriteContext,
