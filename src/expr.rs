@@ -262,13 +262,40 @@ impl Rewrite for ast::Block {
                 // Extract comment between unsafe and block start.
                 let trimmed = &snippet[6..open_pos].trim();
 
-                if !trimmed.is_empty() {
+                let prefix = if !trimmed.is_empty() {
                     // 9 = "unsafe  {".len(), 7 = "unsafe ".len()
                     let budget = try_opt!(width.checked_sub(9));
                     format!("unsafe {} ", rewrite_comment(trimmed, true, budget, offset + 7))
                 } else {
                     "unsafe ".to_owned()
+                };
+
+                if is_simplish_block(self, context.codemap) && prefix.len() < width {
+                    let body = match self.expr {
+                        Some(ref e) => e.rewrite(context, width - prefix.len(), offset),
+                        None => {
+                            let stmt = &self.stmts[0];
+                            let mut visitor = FmtVisitor::from_codemap(context.codemap,
+                                                                       context.config);
+                            visitor.last_pos = stmt.span.lo;
+                            visitor.visit_stmt(stmt);
+                            // The trim is a hack - the visitor seems to aquire
+                            // a newline some times.
+                            // FIXME maybe extract out some of the statement
+                            // rewrite code so we don't need a visitor or this
+                            // hack
+                            Some(visitor.buffer.to_string().trim().to_owned())
+                        }
+                    };
+                    if let Some(ref expr_str) = body {
+                        let result = format!("{}{{ {} }}", prefix, expr_str);
+                        if result.len() <= width && !result.contains('\n') {
+                            return Some(result);
+                        }
+                    }
                 }
+
+                prefix
             }
             ast::BlockCheckMode::PopUnsafeBlock(..) |
             ast::BlockCheckMode::DefaultBlock => {
@@ -524,6 +551,22 @@ fn is_simple_block(block: &ast::Block, codemap: &CodeMap) -> bool {
     let snippet = codemap.span_to_snippet(block.span).unwrap();
 
     !contains_comment(&snippet)
+}
+
+// Checks that a block contains no comments and either an expression only or one
+// statementsand no expression.
+fn is_simplish_block(block: &ast::Block, codemap: &CodeMap) -> bool {
+    let snippet = codemap.span_to_snippet(block.span).unwrap();
+
+    if contains_comment(&snippet) {
+        return false;
+    }
+
+    match block.expr {
+        None if block.stmts.len() == 1 => true,
+        Some(_) if block.stmts.is_empty() => true,
+        _ => false,
+    }
 }
 
 fn rewrite_match(context: &RewriteContext,
