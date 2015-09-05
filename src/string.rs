@@ -25,7 +25,7 @@ pub struct StringFormat<'a> {
 }
 
 // TODO: simplify this!
-pub fn rewrite_string<'a>(s: &str, fmt: &StringFormat<'a>) -> String {
+pub fn rewrite_string<'a>(s: &str, fmt: &StringFormat<'a>) -> Option<String> {
     // FIXME I bet this stomps unicode escapes in the source string
     // TODO if lo.col > IDEAL - 10, start a new line (need cur indent for that)
 
@@ -86,5 +86,8 @@ pub fn rewrite_string<'a>(s: &str, fmt: &StringFormat<'a>) -> String {
     }
     result.push_str(fmt.closer);
 
-    result
+    match result.len() {
+        0 => None,
+        _ =>Some(result)
+    }
 }
