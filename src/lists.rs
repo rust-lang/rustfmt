@@ -14,7 +14,7 @@ use std::iter::Peekable;
 use syntax::codemap::{self, CodeMap, BytePos};
 
 use utils::{round_up_to_power_of_two, make_indent, wrap_str};
-use comment::{FindUncommented, rewrite_comment, find_comment_end};
+use comment::{CommentFinder, rewrite_comment, find_comment_end};
 
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum ListTactic {
