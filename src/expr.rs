@@ -19,7 +19,7 @@ use utils::{span_after, make_indent, extra_offset, first_line_width, last_line_w
             binary_search};
 use visitor::FmtVisitor;
 use config::MultilineStyle;
-use comment::{FindUncommented, rewrite_comment, contains_comment};
+use comment::{CommentFinder, rewrite_comment, contains_comment};
 use types::rewrite_path;
 use items::{span_lo_for_arg, span_hi_for_arg};
 use chains::rewrite_chain;
@@ -118,7 +118,7 @@ impl Rewrite for ast::Expr {
                               offset)
             }
             ast::Expr_::ExprMatch(ref cond, ref arms, _) => {
-                rewrite_match(context, cond, arms, width, offset)
+                rewrite_match(context, cond, arms, self.span, width, offset)
             }
             ast::Expr_::ExprPath(ref qself, ref path) => {
                 rewrite_path(context, qself.as_ref(), path, width, offset)
@@ -621,6 +621,7 @@ fn is_simple_block(block: &ast::Block, codemap: &CodeMap) -> bool {
 fn rewrite_match(context: &RewriteContext,
                  cond: &ast::Expr,
                  arms: &[ast::Arm],
+                 span: Span,
                  width: usize,
                  offset: usize)
                  -> Option<String> {
@@ -680,10 +681,16 @@ fn rewrite_match(context: &RewriteContext,
             result.push_str(&snippet);
         }
     }
+    // Last arm and the end of the match expression.
+    let last_str = context.snippet(mk_sp(arm_end_pos(arms.last().unwrap()), span.hi));
+    let last_com = last_str.find_commented();
 
-    // We'll miss any comments etc. between the last arm and the end of the
-    // match expression, but meh.
-
+    if let Some(last_com) = last_com {
+        let fmt_com = rewrite_comment(last_com, true, width, arm_indent);
+        result.push('\n');
+        result.push_str(&arm_indent_str);
+        result.push_str(&fmt_com);
+    }
     result.push('\n');
     result.push_str(&make_indent(context.block_indent + context.overflow_indent));
     result.push('}');

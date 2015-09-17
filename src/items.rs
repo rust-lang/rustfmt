@@ -15,7 +15,7 @@ use utils::{format_mutability, format_visibility, make_indent, contains_skip, sp
             end_typaram, wrap_str};
 use lists::{write_list, itemize_list, ListItem, ListFormatting, SeparatorTactic, ListTactic};
 use expr::rewrite_assign_rhs;
-use comment::FindUncommented;
+use comment::CommentFinder;
 use visitor::FmtVisitor;
 use rewrite::{Rewrite, RewriteContext};
 use config::{Config, BlockIndentStyle, Density};

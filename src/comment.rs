@@ -14,6 +14,7 @@ use std::iter;
 
 use string::{StringFormat, rewrite_string};
 use utils::make_indent;
+use regex::Regex;
 
 pub fn rewrite_comment(orig: &str, block_style: bool, width: usize, offset: usize) -> String {
     let s = orig.trim();
@@ -97,11 +98,12 @@ fn left_trim_comment_line(line: &str) -> &str {
     }
 }
 
-pub trait FindUncommented {
+pub trait CommentFinder {
     fn find_uncommented(&self, pat: &str) -> Option<usize>;
+    fn find_commented(&self) -> Option<&str>;
 }
 
-impl FindUncommented for str {
+impl CommentFinder for str {
     fn find_uncommented(&self, pat: &str) -> Option<usize> {
         let mut needle_iter = pat.chars();
         for (kind, (i, b)) in CharClasses::new(self.char_indices()) {
@@ -123,6 +125,16 @@ impl FindUncommented for str {
             Some(_) => None,
             None => Some(self.len() - pat.len()),
         }
+    }
+
+    // Returns the first comment in a code string
+    // It'll not work with string literals
+    fn find_commented(&self) -> Option<&str> {
+        let re = Regex::new(r"((?s)/\*.*?\*/)|((?-s)//.*)").unwrap();
+        if let Some((lo, hi)) = re.find(self) {
+            return Some(&self[lo..hi]);
+        }
+        None
     }
 }
 
@@ -286,7 +298,7 @@ impl<T> Iterator for CharClasses<T> where T: Iterator, T::Item: RichChar {
 
 #[cfg(test)]
 mod test {
-    use super::{CharClasses, CodeCharKind, contains_comment, rewrite_comment, FindUncommented};
+    use super::{CharClasses, CodeCharKind, contains_comment, rewrite_comment, CommentFinder};
 
     // TODO(#217): prevent string literal from going over the limit.
     #[test]
@@ -360,5 +372,17 @@ mod test {
         check("/**/abc/* */", "abc", Some(4));
         check("\"/* abc */\"", "abc", Some(4));
         check("\"/* abc", "abc", Some(4));
+    }
+
+    #[test]
+    fn test_find_commented() {
+        assert_eq!("asdf".find_commented(), None);
+        assert_eq!("asdf /* comment /* /* */".find_commented(), Some("/* comment /* /* */"));
+        assert_eq!("asdf /* comment \n * line 2 */".find_commented(),
+            Some("/* comment \n * line 2 */"));
+        assert_eq!("asdf /* comment \n\n\n //asdf */".find_commented(),
+            Some("/* comment \n\n\n //asdf */"));
+        assert_eq!("asdf // comment\n".find_commented(), Some("// comment"));
+        assert_eq!("asdf // comment\n\n\n".find_commented(), Some("// comment"));
     }
 }

@@ -13,7 +13,7 @@ use std::cmp::Ordering;
 use syntax::ast::{self, Visibility, Attribute, MetaItem, MetaItem_};
 use syntax::codemap::{CodeMap, Span, BytePos};
 
-use comment::FindUncommented;
+use comment::CommentFinder;
 use rewrite::{Rewrite, RewriteContext};
 
 use SKIP_ANNOTATION;
