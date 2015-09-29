@@ -64,10 +64,7 @@ pub fn rewrite_string<'a>(s: &str, fmt: &StringFormat<'a>) -> Option<String> {
             if cur_end - cur_start < MIN_STRING {
                 // We can't break at whitespace, fall back to splitting
                 // anywhere that doesn't break an escape sequence.
-                cur_end = cur_start + max_chars;
-                while graphemes[cur_end - 1] == "\\" {
-                    cur_end -= 1;
-                }
+                cur_end = backwards_find_whole_non_escaped(&graphemes, cur_start + max_chars);
                 break;
             }
         }
@@ -94,6 +91,58 @@ pub fn rewrite_string<'a>(s: &str, fmt: &StringFormat<'a>) -> Option<String> {
     result.push_str(fmt.closer);
 
     Some(result)
+}
+
+fn backwards_find_whole_non_escaped(graphemes: &Vec<&str>, end: usize) -> usize {
+    // Trivial: \n \r \t \" \'
+    // Hard: \x## \u{######}
+    // Hardest:\\\\\\\\ <- break at the even gap of one of these
+    use std::cmp;
+    // At worst, an escape sequence can begin 9 characters before end:
+    //              \u{ABCDEF}
+    // window_start ^        ^ end
+    let window_start: usize = cmp::max((end as isize)-9, 0) as usize;
+    graphemes[window_start..end]
+        .iter()
+        .rposition(|s| *s == "\\")
+        .map(|eidx| window_start + eidx)
+        .map(|escape_idx| { // Shift the start idx if it has an odd number of \\ escapes
+            if graphemes[escape_idx - 1] == "\\" {
+                match graphemes[..escape_idx]
+                          .iter()
+                          .rposition(|s| *s != "\\")
+                          .map(|i| i + 1)
+                          .unwrap_or(0) {
+                    i if (escape_idx - i) % 2 == 1 => escape_idx - 1,
+                    _ => escape_idx,
+                }
+            } else {
+                escape_idx
+            }
+        })
+        .map(|escape_idx| { // convert the true idx to the end of the escape sequence
+            if escape_idx == end - 1 {
+                (escape_idx, 2) // Escape char is beyond end, break at end always
+            } else {
+                match graphemes[escape_idx + 1].chars().next().unwrap() {
+                    'x' => (escape_idx, 4),
+                    'u' => (escape_idx,
+                            graphemes[escape_idx..]
+                                .iter()
+                                .position(|s| *s == "}")
+                                .unwrap_or(end) + 1),
+                    _ => (escape_idx, 2),
+                }
+            }
+        })
+        .map(|(escape_idx, escape_len)| {
+            if escape_idx + escape_len > end {
+                escape_idx // Break before this escape sequence
+            } else {
+                end // This sequence doesnt reach end, break at end
+            }
+        })
+        .unwrap_or(end) // No escape char was found in the window, safe to break at end
 }
 
 #[cfg(test)]
