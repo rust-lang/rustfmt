@@ -22,7 +22,7 @@ if let (some_very_large, tuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
     } else {
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     }
-    
+
 unsafe /* very looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong comment */ {}
 
 unsafe // So this is a very long comment.
@@ -40,7 +40,7 @@ fn generic<T>(arg: T) -> &SomeType
         A,
         // Second argument
         B, C, D, /* pre comment */ E /* last comment */) -> &SomeType {
-    arg(a, b, c, d, e)    
+    arg(a, b, c, d, e)
 }
 
     loong_func().quux(move || {
@@ -61,7 +61,7 @@ fn generic<T>(arg: T) -> &SomeType
     a.b
      .c
      .d();
-    
+
     x().y(|| {
         match cond() {
             true => (),

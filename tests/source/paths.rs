@@ -1,4 +1,3 @@
-
 fn main() {
    let constellation_chan = Constellation::<layout::layout_task::LayoutTask,  script::script_task::ScriptTask> ::start(
      compositor_proxy,

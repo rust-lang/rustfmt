@@ -110,7 +110,7 @@ fn main() {
                    abcd  abcd abcd abcd abcd abcd abcd abcd abcd abcd \
                     abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd abcd";
            let s = expand(a
-    ,    
+    ,
     b); }
 
 fn deconstruct() -> (SocketAddr, Method, Headers,

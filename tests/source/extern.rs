@@ -1,4 +1,3 @@
-
  extern  "C" {
   fn c_func(x: *mut *mut libc::c_void);
 
@@ -12,7 +11,7 @@ pub fn bar() ;
 
 extern {
         fn DMR_GetDevice(pHDev: *mut HDEV, searchMode: DeviceSearchMode, pSearchString: *const c_char, devNr: c_uint, wildcard: c_char) -> TDMR_ERROR;
-        
+
     fn quux() -> (); // Post comment
 }
 
@@ -27,7 +26,7 @@ extern "C" {
 libc::c_long;
         }
 
-   extern    {  
+   extern    {
                        pub fn freopen(filename: *const c_char, mode: *const c_char
                                , mode2: *const c_char
                                , mode3: *const c_char,

@@ -24,7 +24,7 @@ fn main() {
 
     Quux { x: if cond { bar(); }, y: baz() };
 
-    A { 
+    A {
     // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a diam lectus. Sed sit amet ipsum mauris. Maecenas congue ligula ac quam viverra nec consectetur ante hendrerit. Donec et mollis dolor.
     first: item(),
         // Praesent et diam eget libero egestas mattis sit amet vitae augue.
@@ -39,9 +39,9 @@ fn main() {
         decl_id: Some(decl_id),
     }));
 
-    Diagram { /*                 o        This graph demonstrates how                  
-               *                / \       significant whitespace is           
-               *               o   o      preserved.  
+    Diagram { /*                 o        This graph demonstrates how
+               *                / \       significant whitespace is
+               *               o   o      preserved.
                *              /|\   \
                *             o o o   o */
               graph: G, }
@@ -72,13 +72,13 @@ fn issue201_2() {
 fn issue278() {
     let s = S {
         a: 0,
-        //       
+        //
         b: 0,
     };
     let s1 = S {
         a: 0,
         // foo
-        //      
+        //
         // bar
         b: 0,
     };

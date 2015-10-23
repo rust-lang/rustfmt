@@ -23,7 +23,7 @@ fn main() {
                                             .with(|root| {
                                                         *root.borrow_mut()  =   Some(&script_task);
                                                     });
-                                        });                                        
+                                        });
 
     let suuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuum = xxxxxxx
         .map(|x| x + 5)

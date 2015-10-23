@@ -2,8 +2,8 @@
 
 #[atrr]
 pub enum Test {
-    A, B(u32, 
-         A /* comment */, 
+    A, B(u32,
+         A /* comment */,
          SomeType),
     /// Doc comment
     C,

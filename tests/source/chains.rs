@@ -43,7 +43,7 @@ fn main() {
                                             .with(|root| {
                                                 *root.borrow_mut()  =   Some(&script_task);
                                             });
-                                        });                                        
+                                        });
 
     let suuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuum = xxxxxxx
         .map(|x| x + 5)
@@ -91,13 +91,13 @@ fn floaters() {
         .bar()
         .baz();
 
-    Foo { x: val } .baz(|| { /*force multiline    */    }) .quux(); 
+    Foo { x: val } .baz(|| { /*force multiline    */    }) .quux();
 
     Foo { y: i_am_multi_line, z: ok }
         .baz(|| {
             // force multiline
         })
-        .quux(); 
+        .quux();
 
     a + match x { true => "yay!", false => "boo!" }.bar()
 }

@@ -1,4 +1,3 @@
-
 extern {
     fn c_func(x: *mut *mut libc::c_void);
 

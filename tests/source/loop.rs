@@ -1,6 +1,5 @@
-
 fn main() {
-    loop    
+    loop
     {   return some_val;}
 
 let x = loop { do_forever(); };

@@ -26,7 +26,7 @@ fn main() {
         10
     };
 
-    let d   = if  let  Some(val)  =  turbo 
+    let d   = if  let  Some(val)  =  turbo
     { "cool" } else {
      "beans" };
 
@@ -37,7 +37,7 @@ fn main() {
     }
 
     let x = if veeeeeeeeery_loooooong_condition() { aaaaaaaaaaaaaaaaaaaaaaaaaaa } else { bbbbbbbbbb };
-  
+
     let x = if veeeeeeeeery_loooooong_condition()     {    aaaaaaaaaaaaaaaaaaaaaaaaa }   else  {
         bbbbbbbbbb };
 

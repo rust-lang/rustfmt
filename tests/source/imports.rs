@@ -23,10 +23,10 @@ use syntax::some::{};
 mod Foo {
     pub use syntax::ast::{
         ItemForeignMod,
-        ItemImpl, 
+        ItemImpl,
         ItemMac,
         ItemMod,
-        ItemStatic, 
+        ItemStatic,
         ItemDefaultImpl
     };
 
