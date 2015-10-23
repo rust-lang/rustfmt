@@ -1,4 +1,3 @@
-
 /// A Doc comment
 #[AnAttribute]
 pub struct Foo {

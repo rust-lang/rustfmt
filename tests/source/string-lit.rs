@@ -24,7 +24,7 @@ formatting"#;
 
     let xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx =
         funktion("yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy");
-        
+
     let unicode = "a̐éö̲\r\n";
     let unicode2 = "Löwe 老虎 Léopard";
     let unicode3 = "中华Việt Nam";

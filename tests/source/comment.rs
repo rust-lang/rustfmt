@@ -33,7 +33,7 @@ fn doc_comment() {
 }
 
 fn chains() {
-                foo.bar(|| { 
+                foo.bar(|| {
                 let x = 10;
                 /* comment */ x })
 }

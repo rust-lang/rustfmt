@@ -1,4 +1,3 @@
-
                                                                        /// A Doc comment
 #[AnAttribute]
 pub struct Foo {
@@ -31,7 +30,7 @@ struct Qux<'a,
 (
     AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA, // Comment
     BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB,
-    #[AnAttr]    
+    #[AnAttr]
     // Comment
     /// Testdoc
     G,
@@ -76,7 +75,7 @@ struct Baz {
 
 
 
-    
+
     d: D
 
 }
@@ -85,7 +84,7 @@ struct Baz
 {
     // Comment A
     a: A,
-    
+
     // Comment B
 b: B,
     // Comment C

@@ -1,5 +1,4 @@
-
-fn simple(/*pre-comment on a function!?*/ i: i32/*yes, it's possible!  */   
+fn simple(/*pre-comment on a function!?*/ i: i32/*yes, it's possible!  */
                                         ,response: NoWay /* hose */) {"cool"}
 
 
@@ -15,7 +14,7 @@ fn generic<T>(arg: T) -> &SomeType
         A,
         // Second argument
         B, C, D, /* pre comment */ E /* last comment */) -> &SomeType {
-    arg(a, b, c, d, e)    
+    arg(a, b, c, d, e)
 }
 
 fn foo()  ->  !  {}

@@ -131,7 +131,7 @@ fn issue339() {
         // }
         // l => {
         //     // comment with ws below
-        //     
+        //
         // }
         m => {
         } n => { } o =>
