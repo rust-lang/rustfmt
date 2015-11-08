@@ -167,6 +167,10 @@ fn determine_operation<I>(opts: &Options, args: I) -> Operation
 
     // if no file argument is supplied, read from stdin
     if matches.free.len() == 0 {
+        if matches.opt_present("write-mode") {
+            return Operation::InvalidInput("When reading from stdin, --write-mode has no effect"
+                                               .into());
+        }
 
         let mut buffer = String::new();
         match io::stdin().read_to_string(&mut buffer) {
