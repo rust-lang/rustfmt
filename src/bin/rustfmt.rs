@@ -179,6 +179,10 @@ fn determine_operation<I>(opts: &Options, args: I) -> Operation
         return Operation::Stdin(buffer, WriteMode::Plain);
     }
 
+    if matches.free.len() > 1 {
+        return Operation::InvalidInput("rustfmt accepts at most one file argument".into());
+    }
+
     let write_mode = match matches.opt_str("write-mode") {
         Some(mode) => {
             match mode.parse() {
