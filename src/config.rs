@@ -26,6 +26,7 @@ macro_rules! configuration_option_enum{
 configuration_option_enum! { NewlineStyle:
     Windows, // \r\n
     Unix, // \n
+    Native, // \r\n in Windows, \n on other platforms
 }
 
 configuration_option_enum! { BraceStyle:
@@ -257,6 +258,7 @@ macro_rules! create_config {
 }
 
 create_config! {
+    verbose: bool, false, "Use verbose output";
     max_width: usize, 100, "Maximum width of each line";
     ideal_width: usize, 80, "Ideal width of each line";
     tab_spaces: usize, 4, "Number of spaces per tab";
@@ -294,6 +296,7 @@ create_config! {
     report_fixme: ReportTactic, ReportTactic::Never,
         "Report all, none or unnumbered occurrences of FIXME in source file comments";
     chain_base_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indent on chain base";
+    chain_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indentation of chain";
     reorder_imports: bool, false, "Reorder import statements alphabetically";
     single_line_if_else: bool, false, "Put else on same line as closing brace for if statements";
     format_strings: bool, true, "Format string literals, or leave as is";

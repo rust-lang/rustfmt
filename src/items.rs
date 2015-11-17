@@ -727,14 +727,14 @@ impl<'a> FmtVisitor<'a> {
             result.push_str(&indent.to_string(self.config));
         }
 
-        let variant_body = match *field.node.data {
+        let variant_body = match field.node.data {
             ast::VariantData::Tuple(..) |
             ast::VariantData::Struct(..) => {
                 // FIXME: Should limit the width, as we have a trailing comma
                 self.format_struct("",
                                    field.node.name,
                                    ast::Visibility::Inherited,
-                                   &*field.node.data,
+                                   &field.node.data,
                                    None,
                                    field.span,
                                    indent)
@@ -793,7 +793,8 @@ impl<'a> FmtVisitor<'a> {
         let header_str = self.format_header(item_name, ident, vis);
         result.push_str(&header_str);
         result.push(';');
-        return Some(result);
+
+        Some(result)
     }
 
     fn format_struct_struct(&self,
@@ -968,8 +969,8 @@ impl<'a> FmtVisitor<'a> {
                                                                       terminator,
                                                                       Some(span.hi)));
             result.push_str(&where_clause_str);
-            result.push_str(&self.block_indent.to_string(self.config));
             result.push('\n');
+            result.push_str(&self.block_indent.to_string(self.config));
             result.push_str(opener);
         } else {
             result.push(' ');

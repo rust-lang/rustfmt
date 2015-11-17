@@ -24,7 +24,8 @@ multirust run nightly cargo install --git https://github.com/rust-lang-nursery/r
 
 ## Running Rustfmt from your editor
 
-* [Vim](http://johannh.me/blog/rustfmt-vim.html),
+* [Vim](http://johannh.me/blog/rustfmt-vim.html)
+* [Emacs](https://github.com/fbergroth/emacs-rustfmt)
 * [Atom](atom.md).
 
 
@@ -55,7 +56,7 @@ screen, for example.
 
 Rustfmt is designed to be very configurable. You can create a TOML file called
 rustfmt.toml, place it in the project directory and it will apply the options
-in that file. See `cargo run --help-config` for the options which are available,
+in that file. See `cargo run -- --config-help` for the options which are available,
 or if you prefer to see source code, [src/config.rs].
 
 By default, Rustfmt uses a style which (mostly) confirms to the

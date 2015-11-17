@@ -25,12 +25,12 @@ use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
-use getopts::Options;
+use getopts::{Matches, Options};
 
 /// Rustfmt operations.
 enum Operation {
-    /// Format a file and its child modules.
-    Format(PathBuf, WriteMode),
+    /// Format files and their child modules.
+    Format(Vec<PathBuf>, WriteMode),
     /// Print the help message.
     Help,
     /// Print detailed configuration help.
@@ -75,9 +75,14 @@ fn lookup_and_read_project_file(input_file: &Path) -> io::Result<(PathBuf, Strin
     Ok((path, toml))
 }
 
+fn update_config(config: &mut Config, matches: &Matches) {
+    config.verbose = matches.opt_present("verbose");
+}
+
 fn execute() -> i32 {
     let mut opts = Options::new();
     opts.optflag("h", "help", "show this message");
+    opts.optflag("v", "verbose", "show progress");
     opts.optopt("",
                 "write-mode",
                 "mode to write in (not usable when piping from stdin)",
@@ -87,7 +92,15 @@ fn execute() -> i32 {
                  "config-help",
                  "show details of rustfmt configuration options");
 
-    let operation = determine_operation(&opts, env::args().skip(1));
+    let matches = match opts.parse(env::args().skip(1)) {
+        Ok(m) => m,
+        Err(e) => {
+            print_usage(&opts, &e.to_string());
+            return 1;
+        }
+    };
+
+    let operation = determine_operation(&matches);
 
     match operation {
         Operation::InvalidInput(reason) => {
@@ -114,16 +127,21 @@ fn execute() -> i32 {
             run_from_stdin(input, write_mode, &config);
             0
         }
-        Operation::Format(file, write_mode) => {
-            let config = match lookup_and_read_project_file(&file) {
-                Ok((path, toml)) => {
-                    println!("Using rustfmt config file: {}", path.display());
-                    Config::from_toml(&toml)
-                }
-                Err(_) => Default::default(),
-            };
+        Operation::Format(files, write_mode) => {
+            for file in files {
+                let mut config = match lookup_and_read_project_file(&file) {
+                    Ok((path, toml)) => {
+                        println!("Using rustfmt config file {} for {}",
+                                 path.display(),
+                                 file.display());
+                        Config::from_toml(&toml)
+                    }
+                    Err(_) => Default::default(),
+                };
 
-            run(&file, write_mode, &config);
+                update_config(&mut config, &matches);
+                run(&file, write_mode, &config);
+            }
             0
         }
     }
@@ -144,20 +162,13 @@ fn main() {
 }
 
 fn print_usage(opts: &Options, reason: &str) {
-    let reason = format!("{}\nusage: {} [options] <file>",
+    let reason = format!("{}\nusage: {} [options] <file>...",
                          reason,
                          env::current_exe().unwrap().display());
     println!("{}", opts.usage(&reason));
 }
 
-fn determine_operation<I>(opts: &Options, args: I) -> Operation
-    where I: Iterator<Item = String>
-{
-    let matches = match opts.parse(args) {
-        Ok(m) => m,
-        Err(e) => return Operation::InvalidInput(e.to_string()),
-    };
-
+fn determine_operation(matches: &Matches) -> Operation {
     if matches.opt_present("h") {
         return Operation::Help;
     }
@@ -189,5 +200,7 @@ fn determine_operation<I>(opts: &Options, args: I) -> Operation
         None => WriteMode::Replace,
     };
 
-    Operation::Format(PathBuf::from(&matches.free[0]), write_mode)
+    let files: Vec<_> = matches.free.iter().map(|a| PathBuf::from(a)).collect();
+
+    Operation::Format(files, write_mode)
 }

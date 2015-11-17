@@ -15,7 +15,7 @@ use lists::{format_item_list, itemize_list};
 use expr::{rewrite_unary_prefix, rewrite_pair, rewrite_tuple};
 use types::rewrite_path;
 
-use syntax::ast::{PatWildKind, BindingMode, Pat, Pat_};
+use syntax::ast::{BindingMode, Pat, Pat_};
 
 // FIXME(#18): implement pattern formatting.
 impl Rewrite for Pat {
@@ -33,19 +33,15 @@ impl Rewrite for Pat {
                 let result = format!("{}{}{}", prefix, mut_infix, ident.node);
                 wrap_str(result, context.config.max_width, width, offset)
             }
-            Pat_::PatWild(kind) => {
-                let result = match kind {
-                    PatWildKind::PatWildSingle => "_",
-                    PatWildKind::PatWildMulti => "..",
-                };
-                if result.len() <= width {
-                    Some(result.to_owned())
+            Pat_::PatWild => {
+                if 1 <= width {
+                    Some("_".to_owned())
                 } else {
                     None
                 }
             }
             Pat_::PatQPath(ref q_self, ref path) => {
-                rewrite_path(context, Some(q_self), path, width, offset)
+                rewrite_path(context, true, Some(q_self), path, width, offset)
             }
             Pat_::PatRange(ref lhs, ref rhs) => {
                 rewrite_pair(&**lhs, &**rhs, "", "...", "", context, width, offset)
@@ -58,7 +54,12 @@ impl Rewrite for Pat {
                 rewrite_tuple(context, items, self.span, width, offset)
             }
             Pat_::PatEnum(ref path, Some(ref pat_vec)) => {
-                let path_str = try_opt!(::types::rewrite_path(context, None, path, width, offset));
+                let path_str = try_opt!(::types::rewrite_path(context,
+                                                              true,
+                                                              None,
+                                                              path,
+                                                              width,
+                                                              offset));
 
                 if pat_vec.is_empty() {
                     Some(path_str)

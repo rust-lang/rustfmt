@@ -56,7 +56,15 @@ pub fn rewrite_chain(mut expr: &ast::Expr,
     } else if is_block_expr(parent, &parent_rewrite) {
         (parent_block_indent, false)
     } else {
-        (offset + Indent::new(context.config.tab_spaces, 0), false)
+        match context.config.chain_indent {
+            BlockIndentStyle::Inherit => (context.block_indent, false),
+            BlockIndentStyle::Tabbed => {
+                (context.block_indent.block_indent(context.config), false)
+            }
+            BlockIndentStyle::Visual => {
+                (offset + Indent::new(context.config.tab_spaces, 0), false)
+            }
+        }
     };
 
     let max_width = try_opt!((width + offset.width()).checked_sub(indent.width()));
@@ -217,15 +225,17 @@ fn rewrite_method_call(method_name: ast::Ident,
                        width: usize,
                        offset: Indent)
                        -> Option<String> {
-    let type_str = if types.is_empty() {
-        String::new()
+    let (lo, type_str) = if types.is_empty() {
+        (args[0].span.hi, String::new())
     } else {
         let type_list = types.iter().map(|ty| pprust::ty_to_string(ty)).collect::<Vec<_>>();
-        format!("::<{}>", type_list.join(", "))
+
+        (types.last().unwrap().span.hi,
+         format!("::<{}>", type_list.join(", ")))
     };
 
     let callee_str = format!(".{}{}", method_name, type_str);
-    let span = mk_sp(args[0].span.hi, span.hi);
+    let span = mk_sp(lo, span.hi);
 
     rewrite_call(context, &callee_str, &args[1..], span, width, offset)
 }

@@ -300,6 +300,9 @@ fn fmt_ast(krate: &ast::Crate,
     let mut file_map = FileMap::new();
     for (path, module) in modules::list_files(krate, parse_session.codemap()) {
         let path = path.to_str().unwrap();
+        if config.verbose {
+            println!("Formatting {}", path);
+        }
         let mut visitor = FmtVisitor::from_codemap(parse_session, config, Some(mode));
         visitor.format_separate_mod(module, path);
         file_map.insert(path.to_owned(), visitor.buffer);
@@ -440,7 +443,7 @@ pub fn format(file: &Path, config: &Config, mode: WriteMode) -> FileMap {
 pub fn run(file: &Path, write_mode: WriteMode, config: &Config) {
     let mut result = format(file, config, write_mode);
 
-    println!("{}", fmt_lines(&mut result, config));
+    print!("{}", fmt_lines(&mut result, config));
 
     let write_result = filemap::write_all_files(&result, write_mode, config);
 

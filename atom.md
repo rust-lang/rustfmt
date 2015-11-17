@@ -3,9 +3,9 @@
 You'll need to install [Beautify](https://atom.io/packages/atom-beautify), you
 can do this by running `apm install atom-beautify`.
 
-There are 2 setting that need to be configured in the atom beautifier configuration. 
+There are 2 setting that need to be configured in the atom beautifier configuration.
 
--  Install rustfmt as per the [readme](README.md). 
+-  Install rustfmt as per the [readme](README.md).
 -  Open the atom beautifier settings
 
    Go to Edit->Preferences. Click the packages on the left side and click on setting for atom-beautifier
