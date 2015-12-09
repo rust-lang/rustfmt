@@ -1,0 +1,6 @@
+[submodule "lib/diff.rs"]
+	path = lib/diff.rs
+	url = git@github.com:utkarshkukreti/diff.rs.git
+[submodule "lib/strings.rs"]
+	path = lib/strings.rs
+	url = git@github.com:nrc/strings.rs.git
