@@ -517,8 +517,7 @@ mod test {
     #[test]
     fn test_uncommented() {
         assert_eq!(&uncommented("abc/*...*/"), "abc");
-        assert_eq!(&uncommented("// .... /* \n../* /* *** / */ */a/* // */c\n"),
-                   "..ac\n");
+        assert_eq!(&uncommented("// .... /* \n../* /* *** / */ */a/* // */c\n"), "..ac\n");
         assert_eq!(&uncommented("abc \" /* */\" qsdf"), "abc \" /* */\" qsdf");
     }
 
@@ -539,9 +538,7 @@ mod test {
         check("/*/ */test", "test", Some(6));
         check("//test\ntest", "test", Some(7));
         check("/* comment only */", "whatever", None);
-        check("/* comment */ some text /* more commentary */ result",
-              "result",
-              Some(46));
+        check("/* comment */ some text /* more commentary */ result", "result", Some(46));
         check("sup // sup", "p", Some(2));
         check("sup", "x", None);
         check(r#"π? /**/ π is nice!"#, r#"π is nice"#, Some(9));

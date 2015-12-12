@@ -1234,7 +1234,8 @@ fn rewrite_call_inner<R>(context: &RewriteContext,
 
     let tactic = definitive_tactic(&item_vec,
                                    ListTactic::LimitedHorizontalVertical(context.config
-                                                                                .fn_call_width),
+                                                                                .fn_call_width,
+                                                                         10),
                                    remaining_width);
 
     // Replace the stub with the full overflowing last argument if the rewrite
@@ -1370,7 +1371,8 @@ fn rewrite_struct_lit<'a>(context: &RewriteContext,
         };
 
         if prelim_tactic == ListTactic::HorizontalVertical && fields.len() > 1 {
-            prelim_tactic = ListTactic::LimitedHorizontalVertical(context.config.struct_lit_width);
+            prelim_tactic = ListTactic::LimitedHorizontalVertical(context.config.struct_lit_width,
+                                                                  3);
         }
 
         definitive_tactic(&item_vec, prelim_tactic, h_budget)

@@ -137,8 +137,7 @@ fn print_mismatches(result: HashMap<String, Vec<Mismatch>>) {
     let mut t = term::stdout().unwrap();
 
     for (file_name, diff) in result {
-        print_diff(diff,
-                   |line_num| format!("\nMismatch at {}:{}:", file_name, line_num));
+        print_diff(diff, |line_num| format!("\nMismatch at {}:{}:", file_name, line_num));
     }
 
     assert!(t.reset().unwrap());

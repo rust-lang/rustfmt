@@ -28,8 +28,10 @@ pub enum ListTactic {
     Horizontal,
     // Try Horizontal layout, if that fails then vertical.
     HorizontalVertical,
-    // HorizontalVertical with a soft limit of n characters.
-    LimitedHorizontalVertical(usize),
+    // HorizontalVertical(n, m) with a soft limit of n characters.
+    // May allow horizontal mode when either init or tail of list consists of
+    // items no longer than m characters.
+    LimitedHorizontalVertical(usize, usize),
     // Pack as many items as possible per row over (possibly) many rows.
     Mixed,
 }
@@ -74,7 +76,7 @@ pub fn format_fn_args<I>(items: I, width: usize, offset: Indent, config: &Config
                 width,
                 offset,
                 config,
-                ListTactic::LimitedHorizontalVertical(config.fn_call_width))
+                ListTactic::LimitedHorizontalVertical(config.fn_call_width, 10))
 }
 
 pub fn format_item_list<I>(items: I,
@@ -167,21 +169,35 @@ pub fn definitive_tactic<'t, I, T>(items: I,
                                  .into_iter()
                                  .any(|item| item.as_ref().has_line_pre_comment());
 
-    let limit = match tactic {
+    match tactic {
         _ if pre_line_comments => return DefinitiveListTactic::Vertical,
         ListTactic::Mixed => return DefinitiveListTactic::Mixed,
         ListTactic::Horizontal => return DefinitiveListTactic::Horizontal,
         ListTactic::Vertical => return DefinitiveListTactic::Vertical,
-        ListTactic::LimitedHorizontalVertical(limit) => ::std::cmp::min(width, limit),
-        ListTactic::HorizontalVertical => width,
-    };
+        ListTactic::LimitedHorizontalVertical(..) | ListTactic::HorizontalVertical => {}
+    }
 
-    let (sep_count, total_width) = calculate_width(items.clone());
+    let item_width_vec = items.clone()
+                              .into_iter()
+                              .map(|item| total_item_width(item.as_ref()))
+                              .collect::<Vec<_>>();
+    let total_width = item_width_vec.iter().fold(0, |acc, x| acc + x);
+    let sep_count = item_width_vec.len();
+
     let sep_len = ", ".len(); // FIXME: make more generic?
     let total_sep_len = sep_len * sep_count.checked_sub(1).unwrap_or(0);
     let real_total = total_width + total_sep_len;
 
-    if real_total <= limit && !pre_line_comments &&
+    let horizont_check = match tactic {
+        ListTactic::LimitedHorizontalVertical(limit, l) => {
+            item_width_vec.iter().skip(1).all(|&w| w <= l) ||
+            item_width_vec.iter().rev().skip(1).all(|&w| w <= l) || real_total <= limit
+        }
+        ListTactic::HorizontalVertical => true,
+        _ => unreachable!(),
+    };
+
+    if horizont_check && real_total <= width && !pre_line_comments &&
        !items.into_iter().any(|item| item.as_ref().is_multiline()) {
         DefinitiveListTactic::Horizontal
     } else {
@@ -190,7 +206,7 @@ pub fn definitive_tactic<'t, I, T>(items: I,
 }
 
 // Format a list of commented items into a string.
-// TODO: add unit tests
+// FIXME: add unit tests
 pub fn write_list<I, T>(items: I, formatting: &ListFormatting) -> Option<String>
     where I: IntoIterator<Item = T>,
           T: AsRef<ListItem>
@@ -490,16 +506,6 @@ fn needs_trailing_separator(separator_tactic: SeparatorTactic,
         SeparatorTactic::Vertical => list_tactic == DefinitiveListTactic::Vertical,
         SeparatorTactic::Never => false,
     }
-}
-
-/// Returns the count and total width of the list items.
-fn calculate_width<'li, I, T>(items: I) -> (usize, usize)
-    where I: IntoIterator<Item = T>,
-          T: AsRef<ListItem>
-{
-    items.into_iter()
-         .map(|item| total_item_width(item.as_ref()))
-         .fold((0, 0), |acc, l| (acc.0 + 1, acc.1 + l))
 }
 
 fn total_item_width(item: &ListItem) -> usize {

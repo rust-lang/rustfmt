@@ -233,3 +233,15 @@ fn blocks() {
         println!("yay arithmetix!");
     };
 }
+
+fn issue371() {
+    {
+        {
+            copysign(0.5 * P2_HI - (2.0 * s * r_ - (P2_LO - 2.0 * c) - (0.5 * P2_HI - 2.0 * f)),
+                     i);
+
+            format!("\n{}",
+                    offset.block_indent(context.config).to_string(context.config));
+        }
+    }
+}
