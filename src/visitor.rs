@@ -21,14 +21,14 @@ use config::Config;
 use rewrite::{Rewrite, RewriteContext};
 use comment::rewrite_comment;
 use macros::rewrite_macro;
-use items::rewrite_static;
+use items::{rewrite_static, rewrite_type_alias, format_impl};
 
 pub struct FmtVisitor<'a> {
     pub parse_session: &'a ParseSess,
     pub codemap: &'a CodeMap,
     pub buffer: StringBuffer,
     pub last_pos: BytePos,
-    // TODO: RAII util for indenting
+    // FIXME: use an RAII util or closure for indenting
     pub block_indent: Indent,
     pub config: &'a Config,
     pub write_mode: Option<WriteMode>,
@@ -38,31 +38,24 @@ impl<'a> FmtVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         match stmt.node {
             ast::Stmt_::StmtDecl(ref decl, _) => {
-                match decl.node {
-                    ast::Decl_::DeclLocal(ref local) => {
-                        let rewrite = {
-                            let context = self.get_context();
-                            local.rewrite(&context, self.config.max_width, self.block_indent)
-                        };
-                        self.push_rewrite(stmt.span, rewrite);
-                    }
-                    ast::Decl_::DeclItem(ref item) => self.visit_item(item),
+                if let ast::Decl_::DeclItem(ref item) = decl.node {
+                    self.visit_item(item);
+                } else {
+                    let rewrite = stmt.rewrite(&self.get_context(),
+                                               self.config.max_width - self.block_indent.width(),
+                                               self.block_indent);
+
+                    self.push_rewrite(stmt.span, rewrite);
                 }
             }
-            ast::Stmt_::StmtExpr(ref ex, _) | ast::Stmt_::StmtSemi(ref ex, _) => {
-                let suffix = if semicolon_for_stmt(stmt) {
-                    ";"
-                } else {
-                    ""
-                };
-                let rewrite = ex.rewrite(&self.get_context(),
-                                         self.config.max_width - self.block_indent.width() -
-                                         suffix.len(),
-                                         self.block_indent)
-                                .map(|s| s + suffix);
+            ast::Stmt_::StmtExpr(..) | ast::Stmt_::StmtSemi(..) => {
+                let rewrite = stmt.rewrite(&self.get_context(),
+                                           self.config.max_width - self.block_indent.width(),
+                                           self.block_indent);
+
                 self.push_rewrite(stmt.span, rewrite);
             }
-            ast::Stmt_::StmtMac(ref mac, _macro_style) => {
+            ast::Stmt_::StmtMac(ref mac, _macro_style, _) => {
                 self.format_missing_with_indent(stmt.span.lo);
                 self.visit_mac(mac);
             }
@@ -76,7 +69,7 @@ impl<'a> FmtVisitor<'a> {
 
         // Check if this block has braces.
         let snippet = self.snippet(b.span);
-        let has_braces = &snippet[..1] == "{" || &snippet[..6] == "unsafe";
+        let has_braces = snippet.starts_with("{") || snippet.starts_with("unsafe");
         let brace_compensation = if has_braces {
             BytePos(1)
         } else {
@@ -101,17 +94,22 @@ impl<'a> FmtVisitor<'a> {
             self.buffer.push_str(&rewrite);
             self.last_pos = e.span.hi;
 
-            if semicolon_for_expr(e) {
+            if utils::semicolon_for_expr(e) {
                 self.buffer.push_str(";");
             }
         }
 
-        // TODO: we should compress any newlines here to just one
+        // FIXME: we should compress any newlines here to just one
         self.format_missing_with_indent(b.span.hi - brace_compensation);
-        // FIXME: this is a terrible hack to indent the comments between the last
-        // item in the block and the closing brace to the block's level.
-        // The closing brace itself, however, should be indented at a shallower
-        // level.
+        self.close_block();
+        self.last_pos = b.span.hi;
+    }
+
+    // FIXME: this is a terrible hack to indent the comments between the last
+    // item in the block and the closing brace to the block's level.
+    // The closing brace itself, however, should be indented at a shallower
+    // level.
+    fn close_block(&mut self) {
         let total_len = self.buffer.len;
         let chars_too_many = if self.config.hard_tabs {
             1
@@ -120,7 +118,6 @@ impl<'a> FmtVisitor<'a> {
         };
         self.buffer.truncate(total_len - chars_too_many);
         self.buffer.push_str("}");
-        self.last_pos = b.span.hi;
         self.block_indent = self.block_indent.block_unindent(self.config);
     }
 
@@ -144,7 +141,8 @@ impl<'a> FmtVisitor<'a> {
                                 constness,
                                 abi,
                                 vis,
-                                codemap::mk_sp(s.lo, b.span.lo))
+                                codemap::mk_sp(s.lo, b.span.lo),
+                                &b)
             }
             visit::FnKind::Method(ident, ref sig, vis) => {
                 self.rewrite_fn(indent,
@@ -156,7 +154,8 @@ impl<'a> FmtVisitor<'a> {
                                 sig.constness,
                                 sig.abi,
                                 vis.unwrap_or(ast::Visibility::Inherited),
-                                codemap::mk_sp(s.lo, b.span.lo))
+                                codemap::mk_sp(s.lo, b.span.lo),
+                                &b)
             }
             visit::FnKind::Closure => None,
         };
@@ -164,6 +163,12 @@ impl<'a> FmtVisitor<'a> {
         if let Some(fn_str) = rewrite {
             self.format_missing_with_indent(s.lo);
             self.buffer.push_str(&fn_str);
+            if let Some(c) = fn_str.chars().last() {
+                if c == '}' {
+                    self.last_pos = b.span.hi;
+                    return;
+                }
+            }
         } else {
             self.format_missing(b.span.lo);
         }
@@ -173,14 +178,20 @@ impl<'a> FmtVisitor<'a> {
     }
 
     fn visit_item(&mut self, item: &ast::Item) {
-        // Don't look at attributes for modules.
+        // Don't look at attributes for modules (except for rustfmt_skip).
         // We want to avoid looking at attributes in another file, which the AST
-        // doesn't distinguish. FIXME This is overly conservative and means we miss
-        // attributes on inline modules.
+        // doesn't distinguish.
+        // FIXME This is overly conservative and means we miss attributes on
+        // inline modules.
         match item.node {
-            ast::Item_::ItemMod(_) => {}
+            ast::Item_::ItemMod(_) => {
+                if utils::contains_skip(&item.attrs) {
+                    return;
+                }
+            }
             _ => {
                 if self.visit_attrs(&item.attrs) {
+                    self.push_rewrite(item.span, None);
                     return;
                 }
             }
@@ -190,14 +201,12 @@ impl<'a> FmtVisitor<'a> {
             ast::Item_::ItemUse(ref vp) => {
                 self.format_import(item.vis, vp, item.span);
             }
-            // FIXME(#78): format impl definitions.
-            ast::Item_::ItemImpl(_, _, _, _, _, ref impl_items) => {
+            ast::Item_::ItemImpl(..) => {
                 self.format_missing_with_indent(item.span.lo);
-                self.block_indent = self.block_indent.block_indent(self.config);
-                for item in impl_items {
-                    self.visit_impl_item(&item);
+                if let Some(impl_str) = format_impl(&self.get_context(), item, self.block_indent) {
+                    self.buffer.push_str(&impl_str);
+                    self.last_pos = item.span.hi;
                 }
-                self.block_indent = self.block_indent.block_unindent(self.config);
             }
             // FIXME(#78): format traits.
             ast::Item_::ItemTrait(_, _, _, ref trait_items) => {
@@ -215,20 +224,24 @@ impl<'a> FmtVisitor<'a> {
                 self.last_pos = item.span.hi;
             }
             ast::Item_::ItemStruct(ref def, ref generics) => {
-                let indent = self.block_indent;
-                let rewrite = self.format_struct("struct ",
-                                                 item.ident,
-                                                 item.vis,
-                                                 def,
-                                                 Some(generics),
-                                                 item.span,
-                                                 indent)
-                                  .map(|s| {
-                                      match **def {
-                                          ast::VariantData::Tuple(..) => s + ";",
-                                          _ => s,
-                                      }
-                                  });
+                let rewrite = {
+                    let indent = self.block_indent;
+                    let context = self.get_context();
+                    ::items::format_struct(&context,
+                                           "struct ",
+                                           item.ident,
+                                           item.vis,
+                                           def,
+                                           Some(generics),
+                                           item.span,
+                                           indent)
+                        .map(|s| {
+                            match *def {
+                                ast::VariantData::Tuple(..) => s + ";",
+                                _ => s,
+                            }
+                        })
+                };
                 self.push_rewrite(item.span, rewrite);
             }
             ast::Item_::ItemEnum(ref def, ref generics) => {
@@ -238,7 +251,7 @@ impl<'a> FmtVisitor<'a> {
             }
             ast::Item_::ItemMod(ref module) => {
                 self.format_missing_with_indent(item.span.lo);
-                self.format_mod(module, item.span, item.ident);
+                self.format_mod(module, item.vis, item.span, item.ident);
             }
             ast::Item_::ItemMac(..) => {
                 self.format_missing_with_indent(item.span.lo);
@@ -287,8 +300,15 @@ impl<'a> FmtVisitor<'a> {
                               item.span,
                               item.id)
             }
-            ast::Item_::ItemTy(..) => {
-                // FIXME(#486): format type aliases.
+            ast::Item_::ItemTy(ref ty, ref generics) => {
+                let rewrite = rewrite_type_alias(&self.get_context(),
+                                                 self.block_indent,
+                                                 item.ident,
+                                                 ty,
+                                                 generics,
+                                                 item.vis,
+                                                 item.span);
+                self.push_rewrite(item.span, rewrite);
             }
         }
     }
@@ -320,26 +340,27 @@ impl<'a> FmtVisitor<'a> {
         }
     }
 
-    fn visit_impl_item(&mut self, ii: &ast::ImplItem) {
+    pub fn visit_impl_item(&mut self, ii: &ast::ImplItem) {
         if self.visit_attrs(&ii.attrs) {
             return;
         }
 
         match ii.node {
-            ast::MethodImplItem(ref sig, ref body) => {
+            ast::ImplItemKind::Method(ref sig, ref body) => {
                 self.visit_fn(visit::FnKind::Method(ii.ident, sig, Some(ii.vis)),
                               &sig.decl,
                               body,
                               ii.span,
                               ii.id);
             }
-            ast::ConstImplItem(..) => {
+            ast::ImplItemKind::Const(..) => {
                 // FIXME: Implement
             }
-            ast::TypeImplItem(_) => {
+            ast::ImplItemKind::Type(_) => {
                 // FIXME: Implement
             }
-            ast::MacImplItem(ref mac) => {
+            ast::ImplItemKind::Macro(ref mac) => {
+                self.format_missing_with_indent(ii.span.lo);
                 self.visit_mac(mac);
             }
         }
@@ -358,11 +379,9 @@ impl<'a> FmtVisitor<'a> {
 
     fn push_rewrite(&mut self, span: Span, rewrite: Option<String>) {
         self.format_missing_with_indent(span.lo);
-
-        if let Some(res) = rewrite {
-            self.buffer.push_str(&res);
-            self.last_pos = span.hi;
-        }
+        let result = rewrite.unwrap_or_else(|| self.snippet(span));
+        self.buffer.push_str(&result);
+        self.last_pos = span.hi;
     }
 
     pub fn from_codemap(parse_session: &'a ParseSess,
@@ -397,17 +416,13 @@ impl<'a> FmtVisitor<'a> {
 
     // Returns true if we should skip the following item.
     pub fn visit_attrs(&mut self, attrs: &[ast::Attribute]) -> bool {
-        if attrs.is_empty() {
-            return false;
-        }
-
         if utils::contains_skip(attrs) {
             return true;
         }
 
         let outers: Vec<_> = attrs.iter()
                                   .filter(|a| a.node.style == ast::AttrStyle::Outer)
-                                  .map(|a| a.clone())
+                                  .cloned()
                                   .collect();
         if outers.is_empty() {
             return false;
@@ -432,28 +447,31 @@ impl<'a> FmtVisitor<'a> {
         }
     }
 
-    fn format_mod(&mut self, m: &ast::Mod, s: Span, ident: ast::Ident) {
-        debug!("FmtVisitor::format_mod: ident: {:?}, span: {:?}", ident, s);
-
+    fn format_mod(&mut self, m: &ast::Mod, vis: ast::Visibility, s: Span, ident: ast::Ident) {
         // Decide whether this is an inline mod or an external mod.
         let local_file_name = self.codemap.span_to_filename(s);
         let is_internal = local_file_name == self.codemap.span_to_filename(m.inner);
 
-        // TODO: Should rewrite properly `mod X;`
+        self.buffer.push_str(utils::format_visibility(vis));
+        self.buffer.push_str("mod ");
+        self.buffer.push_str(&ident.to_string());
 
         if is_internal {
+            self.buffer.push_str(" {");
+            self.last_pos = ::utils::span_after(s, "{", self.codemap);
             self.block_indent = self.block_indent.block_indent(self.config);
             self.walk_mod_items(m);
-            self.block_indent = self.block_indent.block_unindent(self.config);
-
             self.format_missing_with_indent(m.inner.hi - BytePos(1));
-            self.buffer.push_str("}");
+            self.close_block();
             self.last_pos = m.inner.hi;
+        } else {
+            self.buffer.push_str(";");
+            self.last_pos = s.hi;
         }
     }
 
-    pub fn format_separate_mod(&mut self, m: &ast::Mod, filename: &str) {
-        let filemap = self.codemap.get_filemap(filename);
+    pub fn format_separate_mod(&mut self, m: &ast::Mod) {
+        let filemap = self.codemap.lookup_char_pos(m.inner.lo).file;
         self.last_pos = filemap.start_pos;
         self.block_indent = Indent::empty();
         self.walk_mod_items(m);
@@ -501,31 +519,6 @@ impl<'a> FmtVisitor<'a> {
     }
 }
 
-fn semicolon_for_stmt(stmt: &ast::Stmt) -> bool {
-    match stmt.node {
-        ast::Stmt_::StmtSemi(ref expr, _) => {
-            match expr.node {
-                ast::Expr_::ExprWhile(..) |
-                ast::Expr_::ExprWhileLet(..) |
-                ast::Expr_::ExprLoop(..) |
-                ast::Expr_::ExprForLoop(..) => false,
-                _ => true,
-            }
-        }
-        ast::Stmt_::StmtExpr(..) => false,
-        _ => true,
-    }
-}
-
-fn semicolon_for_expr(expr: &ast::Expr) -> bool {
-    match expr.node {
-        ast::Expr_::ExprRet(..) |
-        ast::Expr_::ExprAgain(..) |
-        ast::Expr_::ExprBreak(..) => true,
-        _ => false,
-    }
-}
-
 impl<'a> Rewrite for [ast::Attribute] {
     fn rewrite(&self, context: &RewriteContext, _: usize, offset: Indent) -> Option<String> {
         let mut result = String::new();
@@ -537,6 +530,7 @@ impl<'a> Rewrite for [ast::Attribute] {
         for (i, a) in self.iter().enumerate() {
             let a_str = context.snippet(a.span);
 
+            // Write comments and blank lines between attributes.
             if i > 0 {
                 let comment = context.snippet(codemap::mk_sp(self[i - 1].span.hi, a.span.lo));
                 // This particular horror show is to preserve line breaks in between doc
@@ -560,6 +554,7 @@ impl<'a> Rewrite for [ast::Attribute] {
                 result.push_str(&indent);
             }
 
+            // Write the attribute itself.
             result.push_str(&a_str);
 
             if i < self.len() - 1 {

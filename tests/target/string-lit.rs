@@ -25,6 +25,8 @@ not
 remove
 formatting"#;
 
+    filename.replace(" ", "\\");
+
     let xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = funktion("yyyyyyyyyyyyyyyyyyyyy\
                                                                             yyyyyyyyyyyyyyyyyyyyy\
                                                                             yyyyyyyyyyyyyyyyyyyyy\
@@ -37,4 +39,9 @@ formatting"#;
                     ☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃☃";
 
     "stuffin'"
+}
+
+fn issue682() {
+    let a = "hello \\ o/";
+    let b = a.replace("\\ ", "\\");
 }

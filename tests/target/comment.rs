@@ -2,6 +2,9 @@
 
 //! Doc comment
 fn test() {
+    //! Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a diam
+    //! lectus. Sed sit amet ipsum mauris. Maecenas congue ligula ac quam
+
     // comment
     // comment2
 
@@ -32,8 +35,7 @@ fn test() {
 }
 
 /// test123
-fn doc_comment() {
-}
+fn doc_comment() {}
 
 fn chains() {
     foo.bar(|| {
@@ -42,3 +44,5 @@ fn chains() {
         x
     })
 }
+
+// random comment

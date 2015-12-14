@@ -1,6 +1,9 @@
 
 fn simple(/*pre-comment on a function!?*/ i: i32/*yes, it's possible!  */   
-                                        ,response: NoWay /* hose */) {"cool"}
+                                        ,response: NoWay /* hose */) {
+fn op(x: Typ, key : &[u8], upd : Box<Fn(Option<&memcache::Item>) -> (memcache::Status, Result<memcache::Item, Option<String>>)>) -> MapResult {}
+
+        "cool"}
 
 
 fn weird_comment(/* /*/ double level */ comment */ x: Hello /*/*/* tripple, even */*/*/,
@@ -29,3 +32,14 @@ fn zzzzzzzzzzzzzzzzzzzz<Type, NodeType>
                        (selff: Type, mut handle: node::Handle<IdRef<'id, Node<K, V>>, Type, NodeType>)
                         -> SearchStack<'a, K, V, Type, NodeType>{
 }
+
+unsafe fn generic_call(cx: *mut JSContext, argc: libc::c_uint, vp: *mut JSVal,
+    is_lenient: bool,
+                       call: unsafe extern fn(*const JSJitInfo, *mut JSContext,
+                                              HandleObject, *mut libc::c_void, u32,
+                                              *mut JSVal)
+                                              -> u8) {
+    let f:  fn  ( _ , _  ) ->  _   =  panic!()  ;
+}
+
+pub fn start_export_thread<C: CryptoSchemee + 'static>(database: &Database, crypto_scheme: &C, block_size: usize, source_path: &Path) -> BonzoResult<mpsc::Consumer<'static, FileInstruction>> {}

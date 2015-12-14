@@ -32,7 +32,7 @@ struct Qux<'a,
 (
     AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA, // Comment
     BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB,
-    #[AnAttr]    
+    #[AnAttr]
     // Comment
     /// Testdoc
     G,
@@ -140,4 +140,14 @@ mod m {
     struct X<T> where T: Sized {
         a: T,
     }
+}
+
+struct Foo<T>(TTTTTTTTTTTTTTTTTTT,
+              /// Qux
+    UUUUUUUUUUUUUUUUUUU);
+
+struct Issue677 {
+    pub ptr: *const libc::c_void,
+    pub trace: fn(  obj: 
+          *const libc::c_void, tracer   : *mut   JSTracer   ),
 }

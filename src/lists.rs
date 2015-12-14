@@ -14,7 +14,6 @@ use std::iter::Peekable;
 use syntax::codemap::{self, CodeMap, BytePos};
 
 use Indent;
-use utils::wrap_str;
 use comment::{FindUncommented, rewrite_comment, find_comment_end};
 use config::Config;
 
@@ -192,7 +191,7 @@ pub fn definitive_tactic<'t, I, T>(items: I,
 
 // Format a list of commented items into a string.
 // TODO: add unit tests
-pub fn write_list<'b, I, T>(items: I, formatting: &ListFormatting<'b>) -> Option<String>
+pub fn write_list<I, T>(items: I, formatting: &ListFormatting) -> Option<String>
     where I: IntoIterator<Item = T>,
           T: AsRef<ListItem>
 {
@@ -280,12 +279,7 @@ pub fn write_list<'b, I, T>(items: I, formatting: &ListFormatting<'b>) -> Option
             }
         }
 
-        // Make sure that string actually fits.
-        let item_str = try_opt!(wrap_str(&inner_item[..],
-                                         formatting.config.max_width,
-                                         formatting.width,
-                                         formatting.indent));
-        result.push_str(&item_str);
+        result.push_str(&inner_item[..]);
 
         // Post-comments
         if tactic != DefinitiveListTactic::Vertical && item.post_comment.is_some() {
@@ -392,9 +386,7 @@ impl<'a, T, I, F1, F2, F3> Iterator for ListItems<'a, I, F1, F2, F3>
                     match (block_open_index, newline_index) {
                         // Separator before comment, with the next item on same line.
                         // Comment belongs to next item.
-                        (Some(i), None) if i > separator_index => {
-                            separator_index + 1
-                        }
+                        (Some(i), None) if i > separator_index => separator_index + 1,
                         // Block-style post-comment before the separator.
                         (Some(i), None) => {
                             cmp::max(find_comment_end(&post_snippet[i..]).unwrap() + i,

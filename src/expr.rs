@@ -11,15 +11,18 @@
 use std::cmp::Ordering;
 use std::borrow::Borrow;
 use std::mem::swap;
+use std::ops::Deref;
+use std::iter::ExactSizeIterator;
 
 use {Indent, Spanned};
 use rewrite::{Rewrite, RewriteContext};
 use lists::{write_list, itemize_list, ListFormatting, SeparatorTactic, ListTactic,
             DefinitiveListTactic, definitive_tactic, ListItem, format_fn_args};
 use string::{StringFormat, rewrite_string};
-use utils::{span_after, extra_offset, last_line_width, wrap_str, binary_search, first_line_width};
+use utils::{span_after, extra_offset, last_line_width, wrap_str, binary_search, first_line_width,
+            semicolon_for_stmt};
 use visitor::FmtVisitor;
-use config::{StructLitStyle, MultilineStyle};
+use config::{Config, StructLitStyle, MultilineStyle};
 use comment::{FindUncommented, rewrite_comment, contains_comment};
 use types::rewrite_path;
 use items::{span_lo_for_arg, span_hi_for_arg};
@@ -57,9 +60,7 @@ impl Rewrite for ast::Expr {
                 let inner_span = mk_sp(callee.span.hi, self.span.hi);
                 rewrite_call(context, &**callee, args, inner_span, width, offset)
             }
-            ast::Expr_::ExprParen(ref subexpr) => {
-                rewrite_paren(context, subexpr, width, offset)
-            }
+            ast::Expr_::ExprParen(ref subexpr) => rewrite_paren(context, subexpr, width, offset),
             ast::Expr_::ExprBinary(ref op, ref lhs, ref rhs) => {
                 rewrite_binary_op(context, op, lhs, rhs, width, offset)
             }
@@ -76,7 +77,11 @@ impl Rewrite for ast::Expr {
                                    offset)
             }
             ast::Expr_::ExprTup(ref items) => {
-                rewrite_tuple(context, items, self.span, width, offset)
+                rewrite_tuple(context,
+                              items.iter().map(|x| &**x),
+                              self.span,
+                              width,
+                              offset)
             }
             ast::Expr_::ExprWhile(ref cond, ref block, label) => {
                 Loop::new_while(None, cond, block, label).rewrite(context, width, offset)
@@ -90,9 +95,7 @@ impl Rewrite for ast::Expr {
             ast::Expr_::ExprLoop(ref block, label) => {
                 Loop::new_loop(block, label).rewrite(context, width, offset)
             }
-            ast::Expr_::ExprBlock(ref block) => {
-                block.rewrite(context, width, offset)
-            }
+            ast::Expr_::ExprBlock(ref block) => block.rewrite(context, width, offset),
             ast::Expr_::ExprIf(ref cond, ref if_block, ref else_block) => {
                 rewrite_if_else(context,
                                 cond,
@@ -144,9 +147,7 @@ impl Rewrite for ast::Expr {
             }
             ast::Expr_::ExprField(..) |
             ast::Expr_::ExprTupField(..) |
-            ast::Expr_::ExprMethodCall(..) => {
-                rewrite_chain(self, context, width, offset)
-            }
+            ast::Expr_::ExprMethodCall(..) => rewrite_chain(self, context, width, offset),
             ast::Expr_::ExprMac(ref mac) => {
                 // Failure to rewrite a marco should not imply failure to
                 // rewrite the expression.
@@ -475,6 +476,33 @@ impl Rewrite for ast::Block {
     }
 }
 
+impl Rewrite for ast::Stmt {
+    fn rewrite(&self, context: &RewriteContext, _width: usize, offset: Indent) -> Option<String> {
+        match self.node {
+            ast::Stmt_::StmtDecl(ref decl, _) => {
+                if let ast::Decl_::DeclLocal(ref local) = decl.node {
+                    local.rewrite(context, context.config.max_width, offset)
+                } else {
+                    None
+                }
+            }
+            ast::Stmt_::StmtExpr(ref ex, _) | ast::Stmt_::StmtSemi(ref ex, _) => {
+                let suffix = if semicolon_for_stmt(self) {
+                    ";"
+                } else {
+                    ""
+                };
+
+                ex.rewrite(context,
+                           context.config.max_width - offset.width() - suffix.len(),
+                           offset)
+                  .map(|s| s + suffix)
+            }
+            ast::Stmt_::StmtMac(..) => None,
+        }
+    }
+}
+
 // Abstraction over for, while and loop expressions
 struct Loop<'a> {
     cond: Option<&'a ast::Expr>,
@@ -543,13 +571,15 @@ impl<'a> Rewrite for Loop<'a> {
         let inner_offset = offset + self.keyword.len() + label_string.len();
 
         let pat_expr_string = match self.cond {
-            Some(cond) => try_opt!(rewrite_pat_expr(context,
-                                                    self.pat,
-                                                    cond,
-                                                    self.matcher,
-                                                    self.connector,
-                                                    inner_width,
-                                                    inner_offset)),
+            Some(cond) => {
+                try_opt!(rewrite_pat_expr(context,
+                                          self.pat,
+                                          cond,
+                                          self.matcher,
+                                          self.connector,
+                                          inner_width,
+                                          inner_offset))
+            }
             None => String::new(),
         };
 
@@ -677,15 +707,35 @@ fn single_line_if_else(context: &RewriteContext,
     None
 }
 
-// Checks that a block contains no statements, an expression and no comments.
-fn is_simple_block(block: &ast::Block, codemap: &CodeMap) -> bool {
-    if !block.stmts.is_empty() || block.expr.is_none() {
-        return false;
-    }
-
+fn block_contains_comment(block: &ast::Block, codemap: &CodeMap) -> bool {
     let snippet = codemap.span_to_snippet(block.span).unwrap();
+    contains_comment(&snippet)
+}
 
-    !contains_comment(&snippet)
+// Checks that a block contains no statements, an expression and no comments.
+// FIXME: incorrectly returns false when comment is contained completely within
+// the expression.
+pub fn is_simple_block(block: &ast::Block, codemap: &CodeMap) -> bool {
+    block.stmts.is_empty() && block.expr.is_some() && !block_contains_comment(block, codemap)
+}
+
+/// Checks whether a block contains at most one statement or expression, and no comments.
+pub fn is_simple_block_stmt(block: &ast::Block, codemap: &CodeMap) -> bool {
+    (block.stmts.is_empty() || (block.stmts.len() == 1 && block.expr.is_none())) &&
+    !block_contains_comment(block, codemap)
+}
+
+/// Checks whether a block contains no statements, expressions, or comments.
+pub fn is_empty_block(block: &ast::Block, codemap: &CodeMap) -> bool {
+    block.stmts.is_empty() && block.expr.is_none() && !block_contains_comment(block, codemap)
+}
+
+fn is_unsafe_block(block: &ast::Block) -> bool {
+    if let ast::BlockCheckMode::UnsafeBlock(..) = block.rules {
+        true
+    } else {
+        false
+    }
 }
 
 // inter-match-arm-comment-rules:
@@ -779,7 +829,7 @@ fn rewrite_match(context: &RewriteContext,
             // We couldn't format the arm, just reproduce the source.
             let snippet = context.snippet(mk_sp(arm_start_pos(arm), arm_end_pos(arm)));
             result.push_str(&snippet);
-            result.push_str(arm_comma(&arm.body));
+            result.push_str(arm_comma(&context.config, &arm.body));
         }
     }
     // BytePos(1) = closing match brace.
@@ -810,8 +860,10 @@ fn arm_end_pos(arm: &ast::Arm) -> BytePos {
     arm.body.span.hi
 }
 
-fn arm_comma(body: &ast::Expr) -> &'static str {
-    if let ast::ExprBlock(ref block) = body.node {
+fn arm_comma(config: &Config, body: &ast::Expr) -> &'static str {
+    if config.match_block_trailing_comma {
+        ","
+    } else if let ast::ExprBlock(ref block) = body.node {
         if let ast::DefaultBlock = block.rules {
             ""
         } else {
@@ -869,7 +921,7 @@ impl Rewrite for ast::Arm {
         }
 
         let pats_width = if vertical {
-            pat_strs[pat_strs.len() - 1].len()
+            pat_strs.last().unwrap().len()
         } else {
             total_width
         };
@@ -896,65 +948,71 @@ impl Rewrite for ast::Arm {
             line_start += offset.width();
         }
 
-        let comma = arm_comma(body);
+        let body = match **body {
+            ast::Expr { node: ast::ExprBlock(ref block), .. } if !is_unsafe_block(block) &&
+                                                                 is_simple_block(block,
+                                                                                 context.codemap) &&
+                                                                 context.config.wrap_match_arms => {
+                block.expr.as_ref().map(|e| &**e).unwrap()
+            }
+            ref x => x,
+        };
+
+        let comma = arm_comma(&context.config, body);
 
         // Let's try and get the arm body on the same line as the condition.
         // 4 = ` => `.len()
-        let same_line_body = if context.config.max_width > line_start + comma.len() + 4 {
+        if context.config.max_width > line_start + comma.len() + 4 {
             let budget = context.config.max_width - line_start - comma.len() - 4;
             let offset = Indent::new(offset.block_indent, line_start + 4 - offset.block_indent);
             let rewrite = nop_block_collapse(body.rewrite(context, budget, offset), budget);
+            let is_block = if let ast::ExprBlock(..) = body.node {
+                true
+            } else {
+                false
+            };
 
             match rewrite {
-                Some(ref body_str) if body_str.len() <= budget || comma.is_empty() =>
+                Some(ref body_str) if !body_str.contains('\n') || !context.config.wrap_match_arms ||
+                                      is_block => {
                     return Some(format!("{}{} => {}{}",
                                         attr_str.trim_left(),
                                         pats_str,
                                         body_str,
-                                        comma)),
-                _ => rewrite,
+                                        comma));
+                }
+                _ => {}
             }
-        } else {
-            None
-        };
-
-        if let ast::ExprBlock(_) = body.node {
-            // We're trying to fit a block in, but it still failed, give up.
-            return None;
         }
 
+        // FIXME: we're doing a second rewrite of the expr; This may not be
+        // necessary.
         let body_budget = try_opt!(width.checked_sub(context.config.tab_spaces));
         let indent = context.block_indent.block_indent(context.config);
         let inner_context = &RewriteContext { block_indent: indent, ..*context };
-        let next_line_body = nop_block_collapse(body.rewrite(inner_context, body_budget, indent),
-                                                body_budget);
-
-        let body_str = try_opt!(match_arm_heuristic(same_line_body.as_ref().map(|x| &x[..]),
-                                                    next_line_body.as_ref().map(|x| &x[..])));
-
-        let spacer = match same_line_body {
-            Some(ref body) if body == body_str => " ".to_owned(),
-            _ => format!("\n{}",
-                         offset.block_indent(context.config).to_string(context.config)),
+        let next_line_body = try_opt!(nop_block_collapse(body.rewrite(inner_context,
+                                                                      body_budget,
+                                                                      indent),
+                                                         body_budget));
+        let indent_str = offset.block_indent(context.config).to_string(context.config);
+        let (body_prefix, body_suffix) = if context.config.wrap_match_arms {
+            if context.config.match_block_trailing_comma {
+                (" {", "},")
+            } else {
+                (" {", "}")
+            }
+        } else {
+            ("", "")
         };
 
-        Some(format!("{}{} =>{}{},",
+        Some(format!("{}{} =>{}\n{}{}\n{}{}",
                      attr_str.trim_left(),
                      pats_str,
-                     spacer,
-                     body_str))
-    }
-}
-
-// Takes two possible rewrites for the match arm body and chooses the "nicest".
-fn match_arm_heuristic<'a>(former: Option<&'a str>, latter: Option<&'a str>) -> Option<&'a str> {
-    match (former, latter) {
-        (f @ Some(..), None) => f,
-        (Some(f), Some(l)) if f.chars().filter(|&c| c == '\n').count() <=
-                              l.chars().filter(|&c| c == '\n').count() => {
-            Some(f)
-        }
-        (_, l) => l,
+                     body_prefix,
+                     indent_str,
+                     next_line_body,
+                     offset.to_string(context.config),
+                     body_suffix))
     }
 }
 
@@ -967,7 +1025,7 @@ fn rewrite_guard(context: &RewriteContext,
                  // the arm (excludes offset).
                  pattern_width: usize)
                  -> Option<String> {
-    if let &Some(ref guard) = guard {
+    if let Some(ref guard) = *guard {
         // First try to fit the guard string on the same line as the pattern.
         // 4 = ` if `, 5 = ` => {`
         let overhead = pattern_width + 4 + 5;
@@ -1247,9 +1305,7 @@ fn rewrite_struct_lit<'a>(context: &RewriteContext,
     // Foo { a: Foo } - indent is +3, width is -5.
     let h_budget = width.checked_sub(path_str.len() + 5).unwrap_or(0);
     let (indent, v_budget) = match context.config.struct_lit_style {
-        StructLitStyle::Visual => {
-            (offset + path_str.len() + 3, h_budget)
-        }
+        StructLitStyle::Visual => (offset + path_str.len() + 3, h_budget),
         StructLitStyle::Block => {
             // If we are all on one line, then we'll ignore the indent, and we
             // have a smaller budget.
@@ -1325,6 +1381,9 @@ fn rewrite_struct_lit<'a>(context: &RewriteContext,
         _ => v_budget,
     };
 
+    let ends_with_newline = context.config.struct_lit_style != StructLitStyle::Visual &&
+                            tactic == DefinitiveListTactic::Vertical;
+
     let fmt = ListFormatting {
         tactic: tactic,
         separator: ",",
@@ -1335,7 +1394,7 @@ fn rewrite_struct_lit<'a>(context: &RewriteContext,
         },
         indent: indent,
         width: budget,
-        ends_with_newline: false,
+        ends_with_newline: ends_with_newline,
         config: context.config,
     };
     let fields_str = try_opt!(write_list(&item_vec, &fmt));
@@ -1354,8 +1413,9 @@ fn rewrite_struct_lit<'a>(context: &RewriteContext,
 
     match (context.config.struct_lit_style,
            context.config.struct_lit_multiline_style) {
-        (StructLitStyle::Block, _) if fields_str.contains('\n') || fields_str.len() > h_budget =>
-            format_on_newline(),
+        (StructLitStyle::Block, _) if fields_str.contains('\n') || fields_str.len() > h_budget => {
+            format_on_newline()
+        }
         (StructLitStyle::Block, MultilineStyle::ForceMulti) => format_on_newline(),
         _ => Some(format!("{} {{ {} }}", path_str, fields_str)),
     }
@@ -1377,25 +1437,27 @@ fn rewrite_field(context: &RewriteContext,
     expr.map(|s| format!("{}: {}", name, s))
 }
 
-pub fn rewrite_tuple<'a, R>(context: &RewriteContext,
-                            items: &'a [ptr::P<R>],
+pub fn rewrite_tuple<'a, I>(context: &RewriteContext,
+                            mut items: I,
                             span: Span,
                             width: usize,
                             offset: Indent)
                             -> Option<String>
-    where R: Rewrite + Spanned + 'a
+    where I: ExactSizeIterator,
+          <I as Iterator>::Item: Deref,
+          <I::Item as Deref>::Target: Rewrite + Spanned + 'a
 {
-    debug!("rewrite_tuple_lit: width: {}, offset: {:?}", width, offset);
     let indent = offset + 1;
     // In case of length 1, need a trailing comma
     if items.len() == 1 {
         // 3 = "(" + ",)"
         let budget = try_opt!(width.checked_sub(3));
-        return items[0].rewrite(context, budget, indent).map(|s| format!("({},)", s));
+        return items.next().unwrap().rewrite(context, budget, indent).map(|s| format!("({},)", s));
     }
 
+    let list_lo = span_after(span, "(", context.codemap);
     let items = itemize_list(context.codemap,
-                             items.iter(),
+                             items,
                              ")",
                              |item| item.span().lo,
                              |item| item.span().hi,
@@ -1406,7 +1468,7 @@ pub fn rewrite_tuple<'a, R>(context: &RewriteContext,
                                                                                 1));
                                  item.rewrite(context, inner_width, indent)
                              },
-                             span.lo + BytePos(1), // Remove parens
+                             list_lo,
                              span.hi - BytePos(1));
     let budget = try_opt!(width.checked_sub(2));
     let list_str = try_opt!(format_fn_args(items, budget, indent, context.config));

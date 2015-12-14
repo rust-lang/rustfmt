@@ -94,19 +94,22 @@ impl<'a> FmtVisitor<'a> {
         fn replace_chars(string: &str) -> String {
             string.chars()
                   .map(|ch| {
-                      match ch.is_whitespace() {
-                          true => ch,
-                          false => 'X',
+                      if ch.is_whitespace() {
+                          ch
+                      } else {
+                          'X'
                       }
                   })
                   .collect()
         }
 
         let replaced = match self.write_mode {
-            Some(mode) => match mode {
-                WriteMode::Coverage => replace_chars(old_snippet),
-                _ => old_snippet.to_owned(),
-            },
+            Some(mode) => {
+                match mode {
+                    WriteMode::Coverage => replace_chars(old_snippet),
+                    _ => old_snippet.to_owned(),
+                }
+            }
             None => old_snippet.to_owned(),
         };
         let snippet = &*replaced;
@@ -143,11 +146,12 @@ impl<'a> FmtVisitor<'a> {
                     line_start = offset + subslice.len();
 
                     if let Some('/') = subslice.chars().skip(1).next() {
+                        // Add a newline after line comments
                         self.buffer.push_str("\n");
                     } else if line_start < snippet.len() {
-                        let x = (&snippet[line_start..]).chars().next().unwrap() != '\n';
-
-                        if x {
+                        // For other comments add a newline if there isn't one at the end already
+                        let c = snippet[line_start..].chars().next().unwrap();
+                        if c != '\n' && c != '\r' {
                             self.buffer.push_str("\n");
                         }
                     }

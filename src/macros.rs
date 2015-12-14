@@ -20,7 +20,7 @@
 // and those with brackets will be formatted as array literals.
 
 use syntax::ast;
-use syntax::parse::token::{Eof, Comma, Token};
+use syntax::parse::token::Token;
 use syntax::parse::tts_to_parser;
 use syntax::codemap::{mk_sp, BytePos};
 
@@ -77,7 +77,7 @@ pub fn rewrite_macro(mac: &ast::Mac,
     let mut expr_vec = Vec::new();
 
     loop {
-        expr_vec.push(match parser.parse_expr_nopanic() {
+        expr_vec.push(match parser.parse_expr() {
             Ok(expr) => expr,
             Err(..) => return None,
         });

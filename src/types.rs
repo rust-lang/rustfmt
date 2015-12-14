@@ -8,11 +8,15 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use syntax::ast::{self, Mutability};
+use std::ops::Deref;
+use std::iter::ExactSizeIterator;
+
+use syntax::ast::{self, Mutability, FunctionRetTy};
 use syntax::print::pprust;
 use syntax::codemap::{self, Span, BytePos};
+use syntax::abi;
 
-use Indent;
+use {Indent, Spanned};
 use lists::{format_item_list, itemize_list, format_fn_args};
 use rewrite::{Rewrite, RewriteContext};
 use utils::{extra_offset, span_after, format_mutability, wrap_str};
@@ -137,9 +141,7 @@ impl<'a> Rewrite for SegmentParam<'a> {
                          width,
                          offset)
             }
-            SegmentParam::Type(ref ty) => {
-                ty.rewrite(context, width, offset)
-            }
+            SegmentParam::Type(ref ty) => ty.rewrite(context, width, offset),
             SegmentParam::Binding(ref binding) => {
                 let mut result = format!("{} = ", binding.ident);
                 let budget = try_opt!(width.checked_sub(result.len()));
@@ -202,11 +204,7 @@ fn rewrite_segment(expr_context: bool,
                                      ">",
                                      |param| param.get_span().lo,
                                      |param| param.get_span().hi,
-                                     |seg| {
-                                         seg.rewrite(context,
-                                                     context.config.max_width,
-                                                     offset + extra_offset)
-                                     },
+                                     |seg| seg.rewrite(context, list_width, offset + extra_offset),
                                      list_lo,
                                      span_hi);
             let list_str = try_opt!(format_item_list(items,
@@ -221,34 +219,66 @@ fn rewrite_segment(expr_context: bool,
         }
         ast::PathParameters::ParenthesizedParameters(ref data) => {
             let output = match data.output {
-                Some(ref ty) => {
-                    let type_str = try_opt!(ty.rewrite(context, width, offset));
-                    format!(" -> {}", type_str)
-                }
-                None => String::new(),
+                Some(ref ty) => FunctionRetTy::Return(ty.clone()),
+                None => FunctionRetTy::DefaultReturn(codemap::DUMMY_SP),
             };
-
-            // 2 for ()
-            let budget = try_opt!(width.checked_sub(output.len() + 2));
-            // 1 for (
-            let offset = offset + 1;
-            let list_lo = span_after(data.span, "(", context.codemap);
-            let items = itemize_list(context.codemap,
-                                     data.inputs.iter(),
-                                     ")",
-                                     |ty| ty.span.lo,
-                                     |ty| ty.span.hi,
-                                     |ty| ty.rewrite(context, budget, offset),
-                                     list_lo,
-                                     span_hi);
-            let list_str = try_opt!(format_fn_args(items, budget, offset, context.config));
-
-            format!("({}){}", list_str, output)
+            try_opt!(format_function_type(data.inputs.iter().map(|x| &**x),
+                                          &output,
+                                          data.span,
+                                          context,
+                                          width,
+                                          offset))
         }
         _ => String::new(),
     };
 
     Some(format!("{}{}", segment.identifier, params))
+}
+
+fn format_function_type<'a, I>(inputs: I,
+                               output: &FunctionRetTy,
+                               span: Span,
+                               context: &RewriteContext,
+                               width: usize,
+                               offset: Indent)
+                               -> Option<String>
+    where I: ExactSizeIterator,
+          <I as Iterator>::Item: Deref,
+          <I::Item as Deref>::Target: Rewrite + Spanned + 'a
+{
+    // 2 for ()
+    let budget = try_opt!(width.checked_sub(2));
+    // 1 for (
+    let offset = offset + 1;
+    let list_lo = span_after(span, "(", context.codemap);
+    let items = itemize_list(context.codemap,
+                             inputs,
+                             ")",
+                             |ty| ty.span().lo,
+                             |ty| ty.span().hi,
+                             |ty| ty.rewrite(context, budget, offset),
+                             list_lo,
+                             span.hi);
+
+    let list_str = try_opt!(format_fn_args(items, budget, offset, context.config));
+
+    let output = match *output {
+        FunctionRetTy::Return(ref ty) => {
+            let budget = try_opt!(width.checked_sub(4));
+            let type_str = try_opt!(ty.rewrite(context, budget, offset + 4));
+            format!(" -> {}", type_str)
+        }
+        FunctionRetTy::NoReturn(..) => " -> !".to_owned(),
+        FunctionRetTy::DefaultReturn(..) => String::new(),
+    };
+
+    let infix = if output.len() + list_str.len() > width {
+        format!("\n{}", (offset - 1).to_string(context.config))
+    } else {
+        String::new()
+    };
+
+    Some(format!("({}){}{}", list_str, infix, output))
 }
 
 impl Rewrite for ast::WherePredicate {
@@ -412,17 +442,19 @@ impl Rewrite for ast::PolyTraitRef {
             // 6 is "for<> ".len()
             let extra_offset = lifetime_str.len() + 6;
             let max_path_width = try_opt!(width.checked_sub(extra_offset));
-            let path_str = try_opt!(rewrite_path(context,
-                                                 false,
-                                                 None,
-                                                 &self.trait_ref.path,
-                                                 max_path_width,
-                                                 offset + extra_offset));
+            let path_str = try_opt!(self.trait_ref
+                                        .rewrite(context, max_path_width, offset + extra_offset));
 
             Some(format!("for<{}> {}", lifetime_str, path_str))
         } else {
-            rewrite_path(context, false, None, &self.trait_ref.path, width, offset)
+            self.trait_ref.rewrite(context, width, offset)
         }
+    }
+}
+
+impl Rewrite for ast::TraitRef {
+    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+        rewrite_path(context, false, None, &self.path, width, offset)
     }
 }
 
@@ -480,7 +512,11 @@ impl Rewrite for ast::Ty {
                 ty.rewrite(context, budget, offset + 1).map(|ty_str| format!("[{}]", ty_str))
             }
             ast::TyTup(ref items) => {
-                rewrite_tuple(context, items, self.span, width, offset)
+                rewrite_tuple(context,
+                              items.iter().map(|x| &**x),
+                              self.span,
+                              width,
+                              offset)
             }
             ast::TyPolyTraitRef(ref trait_ref) => trait_ref.rewrite(context, width, offset),
             ast::TyPath(ref q_self, ref path) => {
@@ -496,13 +532,41 @@ impl Rewrite for ast::Ty {
                     None
                 }
             }
-            ast::TyBareFn(..) => {
-                wrap_str(pprust::ty_to_string(self),
-                         context.config.max_width,
-                         width,
-                         offset)
+            ast::TyBareFn(ref bare_fn) => {
+                rewrite_bare_fn(bare_fn, self.span, context, width, offset)
             }
             ast::TyMac(..) | ast::TyTypeof(..) => unreachable!(),
         }
     }
+}
+
+fn rewrite_bare_fn(bare_fn: &ast::BareFnTy,
+                   span: Span,
+                   context: &RewriteContext,
+                   width: usize,
+                   offset: Indent)
+                   -> Option<String> {
+    let mut result = String::with_capacity(128);
+
+    result.push_str(&::utils::format_unsafety(bare_fn.unsafety));
+
+    if bare_fn.abi != abi::Rust {
+        result.push_str(&::utils::format_abi(bare_fn.abi));
+    }
+
+    result.push_str("fn");
+
+    let budget = try_opt!(width.checked_sub(result.len()));
+    let indent = offset + result.len();
+
+    let rewrite = try_opt!(format_function_type(bare_fn.decl.inputs.iter(),
+                                                &bare_fn.decl.output,
+                                                span,
+                                                context,
+                                                budget,
+                                                indent));
+
+    result.push_str(&rewrite);
+
+    Some(result)
 }

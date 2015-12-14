@@ -268,6 +268,9 @@ create_config! {
         "Maximum width in the body of a struct lit before falling back to vertical formatting";
     newline_style: NewlineStyle, NewlineStyle::Unix, "Unix or Windows line endings";
     fn_brace_style: BraceStyle, BraceStyle::SameLineWhere, "Brace style for functions";
+    item_brace_style: BraceStyle, BraceStyle::SameLineWhere, "Brace style for structs and enums";
+    fn_empty_single_line: bool, true, "Put empty-body functions on a single line";
+    fn_single_line: bool, false, "Put single-expression functions on a single line";
     fn_return_indent: ReturnIndent, ReturnIndent::WithArgs,
         "Location of return type in function declaration";
     fn_args_paren_newline: bool, true, "If function argument parenthesis goes on a newline";
@@ -304,4 +307,8 @@ create_config! {
     take_source_hints: bool, true, "Retain some formatting characteristics from the source code";
     hard_tabs: bool, false, "Use tab characters for indentation, spaces for alignment";
     wrap_comments: bool, false, "Break comments to fit on the line";
+    normalise_comments: bool, true, "Convert /* */ comments to // comments where possible";
+    wrap_match_arms: bool, true, "Wrap multiline match arms in blocks";
+    match_block_trailing_comma: bool, false,
+        "Put a trailing comma after a block based match arm (non-block arms are not affected)";
 }

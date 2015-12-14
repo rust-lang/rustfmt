@@ -2,6 +2,9 @@
 
 //! Doc comment
 fn test() {
+            /*!
+             * Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a diam lectus. Sed sit amet ipsum mauris. Maecenas congue ligula ac quam */
+
 // comment
         // comment2
 
@@ -39,3 +42,6 @@ fn chains() {
                 let x = 10;
                 /* comment */ x })
 }
+
+/*
+ * random comment */

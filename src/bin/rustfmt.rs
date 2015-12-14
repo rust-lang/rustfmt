@@ -33,6 +33,8 @@ enum Operation {
     Format(Vec<PathBuf>, WriteMode),
     /// Print the help message.
     Help,
+    // Print version information
+    Version,
     /// Print detailed configuration help.
     ConfigHelp,
     /// Invalid program input, including reason.
@@ -82,6 +84,7 @@ fn update_config(config: &mut Config, matches: &Matches) {
 fn execute() -> i32 {
     let mut opts = Options::new();
     opts.optflag("h", "help", "show this message");
+    opts.optflag("V", "version", "show version information");
     opts.optflag("v", "verbose", "show progress");
     opts.optopt("",
                 "write-mode",
@@ -111,6 +114,10 @@ fn execute() -> i32 {
             print_usage(&opts, "");
             0
         }
+        Operation::Version => {
+            print_version();
+            0
+        }
         Operation::ConfigHelp => {
             Config::print_docs();
             0
@@ -118,9 +125,7 @@ fn execute() -> i32 {
         Operation::Stdin(input, write_mode) => {
             // try to read config from local directory
             let config = match lookup_and_read_project_file(&Path::new(".")) {
-                Ok((_, toml)) => {
-                    Config::from_toml(&toml)
-                }
+                Ok((_, toml)) => Config::from_toml(&toml),
                 Err(_) => Default::default(),
             };
 
@@ -164,8 +169,16 @@ fn main() {
 fn print_usage(opts: &Options, reason: &str) {
     let reason = format!("{}\nusage: {} [options] <file>...",
                          reason,
-                         env::current_exe().unwrap().display());
+                         env::args_os().next().unwrap().to_string_lossy());
     println!("{}", opts.usage(&reason));
+}
+
+fn print_version() {
+    println!("{}.{}.{}{}",
+             option_env!("CARGO_PKG_VERSION_MAJOR").unwrap_or("X"),
+             option_env!("CARGO_PKG_VERSION_MINOR").unwrap_or("X"),
+             option_env!("CARGO_PKG_VERSION_PATCH").unwrap_or("X"),
+             option_env!("CARGO_PKG_VERSION_PRE").unwrap_or(""));
 }
 
 fn determine_operation(matches: &Matches) -> Operation {
@@ -177,8 +190,12 @@ fn determine_operation(matches: &Matches) -> Operation {
         return Operation::ConfigHelp;
     }
 
+    if matches.opt_present("version") {
+        return Operation::Version;
+    }
+
     // if no file argument is supplied, read from stdin
-    if matches.free.len() == 0 {
+    if matches.free.is_empty() {
 
         let mut buffer = String::new();
         match io::stdin().read_to_string(&mut buffer) {
@@ -200,7 +217,7 @@ fn determine_operation(matches: &Matches) -> Operation {
         None => WriteMode::Replace,
     };
 
-    let files: Vec<_> = matches.free.iter().map(|a| PathBuf::from(a)).collect();
+    let files: Vec<_> = matches.free.iter().map(PathBuf::from).collect();
 
     Operation::Format(files, write_mode)
 }

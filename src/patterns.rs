@@ -15,15 +15,13 @@ use lists::{format_item_list, itemize_list};
 use expr::{rewrite_unary_prefix, rewrite_pair, rewrite_tuple};
 use types::rewrite_path;
 
-use syntax::ast::{PatWildKind, BindingMode, Pat, Pat_};
+use syntax::ast::{BindingMode, Pat, Pat_};
 
 // FIXME(#18): implement pattern formatting.
 impl Rewrite for Pat {
     fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
         match self.node {
-            Pat_::PatBox(ref pat) => {
-                rewrite_unary_prefix(context, "box ", &**pat, width, offset)
-            }
+            Pat_::PatBox(ref pat) => rewrite_unary_prefix(context, "box ", &**pat, width, offset),
             Pat_::PatIdent(binding_mode, ident, None) => {
                 let (prefix, mutability) = match binding_mode {
                     BindingMode::BindByRef(mutability) => ("ref ", mutability),
@@ -33,13 +31,9 @@ impl Rewrite for Pat {
                 let result = format!("{}{}{}", prefix, mut_infix, ident.node);
                 wrap_str(result, context.config.max_width, width, offset)
             }
-            Pat_::PatWild(kind) => {
-                let result = match kind {
-                    PatWildKind::PatWildSingle => "_",
-                    PatWildKind::PatWildMulti => "..",
-                };
-                if result.len() <= width {
-                    Some(result.to_owned())
+            Pat_::PatWild => {
+                if 1 <= width {
+                    Some("_".to_owned())
                 } else {
                     None
                 }
@@ -55,7 +49,11 @@ impl Rewrite for Pat {
                 rewrite_unary_prefix(context, &prefix, &**pat, width, offset)
             }
             Pat_::PatTup(ref items) => {
-                rewrite_tuple(context, items, self.span, width, offset)
+                rewrite_tuple(context,
+                              items.iter().map(|x| &**x),
+                              self.span,
+                              width,
+                              offset)
             }
             Pat_::PatEnum(ref path, Some(ref pat_vec)) => {
                 let path_str = try_opt!(::types::rewrite_path(context,

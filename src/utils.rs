@@ -12,6 +12,7 @@ use std::cmp::Ordering;
 
 use syntax::ast::{self, Visibility, Attribute, MetaItem, MetaItem_};
 use syntax::codemap::{CodeMap, Span, BytePos};
+use syntax::abi;
 
 use Indent;
 use comment::FindUncommented;
@@ -46,11 +47,25 @@ pub fn format_visibility(vis: Visibility) -> &'static str {
 }
 
 #[inline]
+pub fn format_unsafety(unsafety: ast::Unsafety) -> &'static str {
+    match unsafety {
+        ast::Unsafety::Unsafe => "unsafe ",
+        ast::Unsafety::Normal => "",
+    }
+}
+
+#[inline]
 pub fn format_mutability(mutability: ast::Mutability) -> &'static str {
     match mutability {
         ast::Mutability::MutMutable => "mut ",
         ast::Mutability::MutImmutable => "",
     }
+}
+
+#[inline]
+// FIXME(#451): include "C"?
+pub fn format_abi(abi: abi::Abi) -> String {
+    format!("extern {} ", abi)
 }
 
 // The width of the first line in s.
@@ -75,9 +90,7 @@ pub fn last_line_width(s: &str) -> usize {
 fn is_skip(meta_item: &MetaItem) -> bool {
     match meta_item.node {
         MetaItem_::MetaWord(ref s) => *s == SKIP_ANNOTATION,
-        MetaItem_::MetaList(ref s, ref l) => {
-            *s == "cfg_attr" && l.len() == 2 && is_skip(&l[1])
-        }
+        MetaItem_::MetaList(ref s, ref l) => *s == "cfg_attr" && l.len() == 2 && is_skip(&l[1]),
         _ => false,
     }
 }
@@ -100,6 +113,44 @@ pub fn end_typaram(typaram: &ast::TyParam) -> BytePos {
            })
            .unwrap_or(typaram.span)
            .hi
+}
+
+#[inline]
+pub fn semicolon_for_expr(expr: &ast::Expr) -> bool {
+    match expr.node {
+        ast::Expr_::ExprRet(..) |
+        ast::Expr_::ExprAgain(..) |
+        ast::Expr_::ExprBreak(..) => true,
+        _ => false,
+    }
+}
+
+#[inline]
+pub fn semicolon_for_stmt(stmt: &ast::Stmt) -> bool {
+    match stmt.node {
+        ast::Stmt_::StmtSemi(ref expr, _) => {
+            match expr.node {
+                ast::Expr_::ExprWhile(..) |
+                ast::Expr_::ExprWhileLet(..) |
+                ast::Expr_::ExprLoop(..) |
+                ast::Expr_::ExprForLoop(..) => false,
+                _ => true,
+            }
+        }
+        ast::Stmt_::StmtExpr(..) => false,
+        _ => true,
+    }
+}
+
+#[inline]
+pub fn trim_newlines(input: &str) -> &str {
+    match input.find(|c| c != '\n' && c != '\r') {
+        Some(start) => {
+            let end = input.rfind(|c| c != '\n' && c != '\r').unwrap_or(0) + 1;
+            &input[start..end]
+        }
+        None => "",
+    }
 }
 
 #[inline]

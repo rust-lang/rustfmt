@@ -26,7 +26,7 @@ extern crate diff;
 extern crate term;
 
 use syntax::ast;
-use syntax::codemap::Span;
+use syntax::codemap::{mk_sp, Span};
 use syntax::diagnostic::{EmitterWriter, Handler};
 use syntax::parse::{self, ParseSess};
 
@@ -85,6 +85,16 @@ impl Spanned for ast::Pat {
 impl Spanned for ast::Ty {
     fn span(&self) -> Span {
         self.span
+    }
+}
+
+impl Spanned for ast::Arg {
+    fn span(&self) -> Span {
+        if items::is_named_arg(self) {
+            mk_sp(self.pat.span.lo, self.ty.span.hi)
+        } else {
+            self.ty.span
+        }
     }
 }
 
@@ -225,15 +235,9 @@ pub enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            ErrorKind::LineOverflow => {
-                write!(fmt, "line exceeded maximum length")
-            }
-            ErrorKind::TrailingWhitespace => {
-                write!(fmt, "left behind trailing whitespace")
-            }
-            ErrorKind::BadIssue(issue) => {
-                write!(fmt, "found {}", issue)
-            }
+            ErrorKind::LineOverflow => write!(fmt, "line exceeded maximum length"),
+            ErrorKind::TrailingWhitespace => write!(fmt, "left behind trailing whitespace"),
+            ErrorKind::BadIssue(issue) => write!(fmt, "found {}", issue),
         }
     }
 }
@@ -304,7 +308,7 @@ fn fmt_ast(krate: &ast::Crate,
             println!("Formatting {}", path);
         }
         let mut visitor = FmtVisitor::from_codemap(parse_session, config, Some(mode));
-        visitor.format_separate_mod(module, path);
+        visitor.format_separate_mod(module);
         file_map.insert(path.to_owned(), visitor.buffer);
     }
     file_map
@@ -410,13 +414,13 @@ pub fn format_string(input: String, config: &Config, mode: WriteMode) -> FileMap
 
     // do the actual formatting
     let mut visitor = FmtVisitor::from_codemap(&parse_session, config, Some(mode));
-    visitor.format_separate_mod(&krate.module, path);
+    visitor.format_separate_mod(&krate.module);
 
     // append final newline
     visitor.buffer.push_str("\n");
     file_map.insert(path.to_owned(), visitor.buffer);
 
-    return file_map;
+    file_map
 }
 
 pub fn format(file: &Path, config: &Config, mode: WriteMode) -> FileMap {
@@ -433,7 +437,7 @@ pub fn format(file: &Path, config: &Config, mode: WriteMode) -> FileMap {
     // newlines so we must add one on for each file. This is sad.
     filemap::append_newlines(&mut file_map);
 
-    return file_map;
+    file_map
 }
 
 // args are the arguments passed on the command line, generally passed through
