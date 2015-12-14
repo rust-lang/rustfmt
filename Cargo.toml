@@ -8,6 +8,10 @@ repository = "https://github.com/nick29581/rustfmt"
 readme = "README.md"
 license = "Apache-2.0/MIT"
 
+[features]
+default = ["cargo-fmt"]
+cargo-fmt = ["walkdir"]
+
 [dependencies]
 toml = "0.1.20"
 rustc-serialize = "0.3.14"
@@ -20,5 +24,7 @@ syntex_syntax = { git = "https://github.com/serde-rs/syntex" }
 log = "0.3.2"
 env_logger = "0.3.1"
 getopts = "0.2"
+
+walkdir = {version = "0.1.5", optional = true}
 
 [dev-dependencies]
