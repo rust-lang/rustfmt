@@ -550,24 +550,10 @@ pub fn format_struct(context: &RewriteContext,
     match *struct_def {
         ast::VariantData::Unit(..) => format_unit_struct(item_name, ident, vis),
         ast::VariantData::Tuple(ref fields, _) => {
-            format_tuple_struct(context,
-                                item_name,
-                                ident,
-                                vis,
-                                fields,
-                                generics,
-                                span,
-                                offset)
+            format_tuple_struct(context, item_name, ident, vis, fields, generics, span, offset)
         }
         ast::VariantData::Struct(ref fields, _) => {
-            format_struct_struct(context,
-                                 item_name,
-                                 ident,
-                                 vis,
-                                 fields,
-                                 generics,
-                                 span,
-                                 offset)
+            format_struct_struct(context, item_name, ident, vis, fields, generics, span, offset)
         }
     }
 }
