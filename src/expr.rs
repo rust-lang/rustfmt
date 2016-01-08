@@ -20,7 +20,7 @@ use lists::{write_list, itemize_list, ListFormatting, SeparatorTactic, ListTacti
             DefinitiveListTactic, definitive_tactic, ListItem, format_fn_args};
 use string::{StringFormat, rewrite_string};
 use utils::{span_after, extra_offset, last_line_width, wrap_str, binary_search, first_line_width,
-            semicolon_for_stmt};
+            semicolon_for_stmt, contains_skip};
 use visitor::FmtVisitor;
 use config::{Config, StructLitStyle, MultilineStyle};
 use comment::{FindUncommented, rewrite_comment, contains_comment};
@@ -820,9 +820,13 @@ fn rewrite_match(context: &RewriteContext,
         result.push('\n');
         result.push_str(&arm_indent_str);
 
-        let arm_str = arm.rewrite(&nested_context,
-                                  context.config.max_width - arm_indent.width(),
-                                  arm_indent);
+        let arm_str = if contains_skip(&arm.attrs) {
+            None
+        } else {
+            arm.rewrite(&nested_context,
+                        context.config.max_width - arm_indent.width(),
+                        arm_indent)
+        };
         if let Some(ref arm_str) = arm_str {
             result.push_str(arm_str);
         } else {
