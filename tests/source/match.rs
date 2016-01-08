@@ -266,3 +266,11 @@ fn issue494() {
         }
     }
 }
+
+fn issue737() {
+    let _ = match Some(1) {
+        #[rustfmt_skip]
+        Some(n) => n,
+        None => 1,
+    };
+}
