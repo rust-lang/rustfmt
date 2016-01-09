@@ -296,6 +296,39 @@ pub fn rewrite_array<'a, I>(expr_iter: I,
     Some(format!("[{}]", list_str))
 }
 
+pub fn rewrite_array_block<'a, I>(context: &RewriteContext,
+                                  expr_iter: I,
+                                  span: Span,
+                                  offset: Indent)
+                                  -> Option<String>
+    where I: Iterator<Item = &'a ast::Expr>
+{
+    let item_indent = offset.block_indent(context.config);
+    // 1 = ","
+    let item_width = try_opt!(context.config.max_width.checked_sub(item_indent.width() + 1));
+    let items = itemize_list(context.codemap,
+                             expr_iter,
+                             "]",
+                             |item| item.span.lo,
+                             |item| item.span.hi,
+                             |item| item.rewrite(context, item_width, item_indent),
+                             span.lo,
+                             span.hi);
+    let fmt = ListFormatting {
+        tactic: DefinitiveListTactic::Vertical,
+        separator: ",",
+        trailing_separator: SeparatorTactic::Always,
+        indent: item_indent,
+        width: item_width,
+        ends_with_newline: true,
+        config: context.config,
+    };
+    Some(format!("[\n{}{}\n{}]",
+                 item_indent.to_string(context.config),
+                 try_opt!(write_list(items, &fmt)),
+                 offset.to_string(context.config)))
+}
+
 // This functions is pretty messy because of the wrapping and unwrapping of
 // expressions into and from blocks. See rust issue #27872.
 fn rewrite_closure(capture: ast::CaptureClause,
@@ -1582,7 +1615,7 @@ fn rewrite_assignment(context: &RewriteContext,
                           try_opt!(lhs.rewrite(context, max_width, offset)),
                           operator_str);
 
-    rewrite_assign_rhs(&context, lhs_str, rhs, width, offset)
+    rewrite_assign_rhs(&context, lhs_str, rhs, width, offset, false)
 }
 
 // The left hand side must contain everything up to, and including, the
@@ -1591,7 +1624,8 @@ pub fn rewrite_assign_rhs<S: Into<String>>(context: &RewriteContext,
                                            lhs: S,
                                            ex: &ast::Expr,
                                            width: usize,
-                                           offset: Indent)
+                                           offset: Indent,
+                                           try_block: bool)
                                            -> Option<String> {
     let mut result = lhs.into();
     let last_line_width = last_line_width(&result) -
@@ -1602,7 +1636,17 @@ pub fn rewrite_assign_rhs<S: Into<String>>(context: &RewriteContext,
     };
     // 1 = space between operator and rhs.
     let max_width = try_opt!(width.checked_sub(last_line_width + 1));
-    let rhs = ex.rewrite(&context, max_width, offset + last_line_width + 1);
+    let mut rhs = ex.rewrite(&context, max_width, offset + last_line_width + 1);
+
+    if let ast::ExprVec(ref exprs) = ex.node {
+        if try_block && max_width < context.config.max_width / 2 {
+            let span = mk_sp(span_after(ex.span, "[", context.codemap), ex.span.hi);
+            rhs = rewrite_array_block(context,
+                                      exprs.iter().map(|e| &**e),
+                                      span,
+                                      context.block_indent);
+        }
+    }
 
     match rhs {
         Some(new_str) => {

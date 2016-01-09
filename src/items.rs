@@ -70,7 +70,8 @@ impl Rewrite for ast::Local {
                                                  result,
                                                  ex,
                                                  budget,
-                                                 context.block_indent));
+                                                 context.block_indent,
+                                                 false));
         }
 
         result.push(';');
@@ -874,7 +875,13 @@ pub fn rewrite_static(prefix: &str,
 
     // 1 = ;
     let remaining_width = context.config.max_width - context.block_indent.width() - 1;
-    rewrite_assign_rhs(context, lhs, expr, remaining_width, context.block_indent).map(|s| s + ";")
+    let result = rewrite_assign_rhs(context,
+                                    lhs,
+                                    expr,
+                                    remaining_width,
+                                    context.block_indent,
+                                    true);
+    result.map(|s| s + ";")
 }
 
 impl Rewrite for ast::FunctionRetTy {
