@@ -499,7 +499,13 @@ pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -
             BraceStyle::PreferSameLine => result.push(' '),
             BraceStyle::SameLineWhere => {
                 if !where_clause_str.is_empty() {
-                    result.push('\n')
+                    if where_clause_str.contains('\n') ||
+                       result.len() + where_clause_str.len() + offset.width() >
+                       context.config.max_width {
+                        result.push('\n')
+                    } else {
+                        result.push(' ')
+                    }
                 } else {
                     result.push(' ')
                 }
