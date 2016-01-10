@@ -1,6 +1,19 @@
+// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
+// file at the top-level directory of this distribution and at
+// http://rust-lang.org/COPYRIGHT.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+//! Produce and print diffs
+
 use std::collections::VecDeque;
 use diff;
 use term;
+use libc;
 
 #[derive(Debug, PartialEq)]
 pub enum DiffLine {
@@ -24,7 +37,7 @@ impl Mismatch {
     }
 }
 
-// Produces a diff between the expected output and actual output of rustfmt.
+/// Produces a diff between the expected output and actual output of rustfmt.
 pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Mismatch> {
     let mut line_number = 1;
     let mut context_queue: VecDeque<&str> = VecDeque::with_capacity(context_size);
@@ -88,6 +101,7 @@ pub fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F)
     where F: Fn(u32) -> String
 {
     let mut t = term::stdout().unwrap();
+    let isatty = unsafe { libc::isatty(libc::STDOUT_FILENO) } != 0;
 
     for mismatch in diff {
         let title = get_section_title(mismatch.line_number);
@@ -96,19 +110,27 @@ pub fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F)
         for line in mismatch.lines {
             match line {
                 DiffLine::Context(ref str) => {
-                    t.reset().unwrap();
+                    if isatty {
+                        t.reset().unwrap();
+                    }
                     writeln!(t, " {}⏎", str).unwrap();
                 }
                 DiffLine::Expected(ref str) => {
-                    t.fg(term::color::GREEN).unwrap();
+                    if isatty {
+                        t.fg(term::color::GREEN).unwrap();
+                    }
                     writeln!(t, "+{}⏎", str).unwrap();
                 }
                 DiffLine::Resulting(ref str) => {
-                    t.fg(term::color::RED).unwrap();
+                    if isatty {
+                        t.fg(term::color::RED).unwrap();
+                    }
                     writeln!(t, "-{}⏎", str).unwrap();
                 }
             }
         }
-        t.reset().unwrap();
+        if isatty {
+            t.reset().unwrap();
+        }
     }
 }

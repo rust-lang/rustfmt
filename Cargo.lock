@@ -5,6 +5,7 @@ dependencies = [
  "diff 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
