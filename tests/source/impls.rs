@@ -64,3 +64,9 @@ impl X { fn do_parse(  mut  self : X ) {} }
 impl Y5000 {
     fn bar(self: X< 'a ,  'b >, y: Y) {}
 }
+
+pub impl<T> Foo for Bar<T> where X: Foo
+{
+    fn foo() { "hi" }
+}
+
