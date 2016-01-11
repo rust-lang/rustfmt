@@ -23,7 +23,7 @@ use utils::{extra_offset, span_after, format_mutability, wrap_str};
 use expr::{rewrite_unary_prefix, rewrite_pair, rewrite_tuple};
 
 // Does not wrap on simple segments.
-pub fn rewrite_path(context: &RewriteContext,
+pub fn rewrite_path(context: &mut RewriteContext,
                     expr_context: bool,
                     qself: Option<&ast::QSelf>,
                     path: &ast::Path,
@@ -83,7 +83,7 @@ fn rewrite_path_segments<'a, I>(expr_context: bool,
                                 iter: I,
                                 mut span_lo: BytePos,
                                 span_hi: BytePos,
-                                context: &RewriteContext,
+                                context: &mut RewriteContext,
                                 width: usize,
                                 offset: Indent)
                                 -> Option<String>
@@ -133,7 +133,11 @@ impl<'a> SegmentParam<'a> {
 }
 
 impl<'a> Rewrite for SegmentParam<'a> {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         match *self {
             SegmentParam::LifeTime(ref lt) => lt.rewrite(context, width, offset),
             SegmentParam::Type(ref ty) => ty.rewrite(context, width, offset),
@@ -162,7 +166,7 @@ fn rewrite_segment(expr_context: bool,
                    segment: &ast::PathSegment,
                    span_lo: &mut BytePos,
                    span_hi: BytePos,
-                   context: &RewriteContext,
+                   context: &mut RewriteContext,
                    width: usize,
                    offset: Indent)
                    -> Option<String> {
@@ -233,7 +237,7 @@ fn rewrite_segment(expr_context: bool,
 fn format_function_type<'a, I>(inputs: I,
                                output: &FunctionRetTy,
                                span: Span,
-                               context: &RewriteContext,
+                               context: &mut RewriteContext,
                                width: usize,
                                offset: Indent)
                                -> Option<String>
@@ -246,16 +250,19 @@ fn format_function_type<'a, I>(inputs: I,
     // 1 for (
     let offset = offset + 1;
     let list_lo = span_after(span, "(", context.codemap);
-    let items = itemize_list(context.codemap,
-                             inputs,
-                             ")",
-                             |ty| ty.span().lo,
-                             |ty| ty.span().hi,
-                             |ty| ty.rewrite(context, budget, offset),
-                             list_lo,
-                             span.hi);
 
-    let list_str = try_opt!(format_fn_args(items, budget, offset, context.config));
+
+    let list_str = {
+        let items = itemize_list(context.codemap,
+                                 inputs,
+                                 ")",
+                                 |ty| ty.span().lo,
+                                 |ty| ty.span().hi,
+                                 |ty| ty.rewrite(context, budget, offset),
+                                 list_lo,
+                                 span.hi);
+        try_opt!(format_fn_args(items, budget, offset, context.config))
+    };
 
     let output = match *output {
         FunctionRetTy::Return(ref ty) => {
@@ -277,7 +284,11 @@ fn format_function_type<'a, I>(inputs: I,
 }
 
 impl Rewrite for ast::WherePredicate {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         // TODO: dead spans?
         let result = match *self {
             ast::WherePredicate::BoundPredicate(ast::WhereBoundPredicate { ref bound_lifetimes,
@@ -349,14 +360,18 @@ impl Rewrite for ast::WherePredicate {
 }
 
 impl Rewrite for ast::LifetimeDef {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         rewrite_bounded_lifetime(&self.lifetime, self.bounds.iter(), context, width, offset)
     }
 }
 
 fn rewrite_bounded_lifetime<'b, I>(lt: &ast::Lifetime,
                                    bounds: I,
-                                   context: &RewriteContext,
+                                   context: &mut RewriteContext,
                                    width: usize,
                                    offset: Indent)
                                    -> Option<String>
@@ -376,7 +391,11 @@ fn rewrite_bounded_lifetime<'b, I>(lt: &ast::Lifetime,
 }
 
 impl Rewrite for ast::TyParamBound {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         match *self {
             ast::TyParamBound::TraitTyParamBound(ref tref, ast::TraitBoundModifier::None) => {
                 tref.rewrite(context, width, offset)
@@ -391,7 +410,11 @@ impl Rewrite for ast::TyParamBound {
 }
 
 impl Rewrite for ast::Lifetime {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         wrap_str(pprust::lifetime_to_string(self),
                  context.config.max_width,
                  width,
@@ -400,7 +423,11 @@ impl Rewrite for ast::Lifetime {
 }
 
 impl Rewrite for ast::TyParamBounds {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         let strs: Vec<_> = try_opt!(self.iter()
                                         .map(|b| b.rewrite(context, width, offset))
                                         .collect());
@@ -409,7 +436,11 @@ impl Rewrite for ast::TyParamBounds {
 }
 
 impl Rewrite for ast::TyParam {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         let mut result = String::with_capacity(128);
         result.push_str(&self.ident.to_string());
         if !self.bounds.is_empty() {
@@ -435,7 +466,11 @@ impl Rewrite for ast::TyParam {
 }
 
 impl Rewrite for ast::PolyTraitRef {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         if !self.bound_lifetimes.is_empty() {
             let lifetime_str = try_opt!(self.bound_lifetimes
                                             .iter()
@@ -456,13 +491,21 @@ impl Rewrite for ast::PolyTraitRef {
 }
 
 impl Rewrite for ast::TraitRef {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         rewrite_path(context, false, None, &self.path, width, offset)
     }
 }
 
 impl Rewrite for ast::Ty {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         match self.node {
             ast::TyObjectSum(ref ty, ref bounds) => {
                 let ty_str = try_opt!(ty.rewrite(context, width, offset));
@@ -548,7 +591,7 @@ impl Rewrite for ast::Ty {
 
 fn rewrite_bare_fn(bare_fn: &ast::BareFnTy,
                    span: Span,
-                   context: &RewriteContext,
+                   context: &mut RewriteContext,
                    width: usize,
                    offset: Indent)
                    -> Option<String> {

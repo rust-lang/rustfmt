@@ -22,7 +22,11 @@ use syntax::codemap::Span;
 
 impl Rewrite for ast::ViewPath {
     // Returns an empty string when the ViewPath is empty (like foo::bar::{})
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         match self.node {
             ast::ViewPath_::ViewPathList(_, ref path_list) if path_list.is_empty() => {
                 Some(String::new())
@@ -98,7 +102,7 @@ pub fn rewrite_use_list(width: usize,
                         path: &ast::Path,
                         path_list: &[ast::PathListItem],
                         span: Span,
-                        context: &RewriteContext)
+                        context: &mut RewriteContext)
                         -> Option<String> {
     // 1 = {}
     let budget = try_opt!(width.checked_sub(1));

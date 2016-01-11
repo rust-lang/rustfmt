@@ -15,7 +15,7 @@ use syntax::visit;
 
 use strings::string_buffer::StringBuffer;
 
-use {Indent, WriteMode};
+use {Indent, WriteMode, FormatReport};
 use utils;
 use config::Config;
 use rewrite::{Rewrite, RewriteContext};
@@ -32,6 +32,7 @@ pub struct FmtVisitor<'a> {
     pub block_indent: Indent,
     pub config: &'a Config,
     pub write_mode: Option<WriteMode>,
+    pub format_report: &'a mut FormatReport,
 }
 
 impl<'a> FmtVisitor<'a> {
@@ -41,17 +42,17 @@ impl<'a> FmtVisitor<'a> {
                 if let ast::Decl_::DeclItem(ref item) = decl.node {
                     self.visit_item(item);
                 } else {
-                    let rewrite = stmt.rewrite(&self.get_context(),
-                                               self.config.max_width - self.block_indent.width(),
-                                               self.block_indent);
+                    let width = self.config.max_width - self.block_indent.width();
+                    let block_indent = self.block_indent;
+                    let rewrite = stmt.rewrite(&mut self.get_context(), width, block_indent);
 
                     self.push_rewrite(stmt.span, rewrite);
                 }
             }
             ast::Stmt_::StmtExpr(..) | ast::Stmt_::StmtSemi(..) => {
-                let rewrite = stmt.rewrite(&self.get_context(),
-                                           self.config.max_width - self.block_indent.width(),
-                                           self.block_indent);
+                let width = self.config.max_width - self.block_indent.width();
+                let block_indent = self.block_indent;
+                let rewrite = stmt.rewrite(&mut self.get_context(), width, block_indent);
 
                 self.push_rewrite(stmt.span, rewrite);
             }
@@ -86,9 +87,9 @@ impl<'a> FmtVisitor<'a> {
 
         if let Some(ref e) = b.expr {
             self.format_missing_with_indent(e.span.lo);
-            let rewrite = e.rewrite(&self.get_context(),
-                                    self.config.max_width - self.block_indent.width(),
-                                    self.block_indent)
+            let width = self.config.max_width - self.block_indent.width();
+            let block_indent = self.block_indent;
+            let rewrite = e.rewrite(&mut self.get_context(), width, block_indent)
                            .unwrap_or_else(|| self.snippet(e.span));
 
             self.buffer.push_str(&rewrite);
@@ -203,7 +204,8 @@ impl<'a> FmtVisitor<'a> {
             }
             ast::Item_::ItemImpl(..) => {
                 self.format_missing_with_indent(item.span.lo);
-                if let Some(impl_str) = format_impl(&self.get_context(), item, self.block_indent) {
+                let block_indent = self.block_indent;
+                if let Some(impl_str) = format_impl(&mut self.get_context(), item, block_indent) {
                     self.buffer.push_str(&impl_str);
                     self.last_pos = item.span.hi;
                 }
@@ -226,8 +228,8 @@ impl<'a> FmtVisitor<'a> {
             ast::Item_::ItemStruct(ref def, ref generics) => {
                 let rewrite = {
                     let indent = self.block_indent;
-                    let context = self.get_context();
-                    ::items::format_struct(&context,
+                    let mut context = self.get_context();
+                    ::items::format_struct(&mut context,
                                            "struct ",
                                            item.ident,
                                            item.vis,
@@ -272,7 +274,7 @@ impl<'a> FmtVisitor<'a> {
                                              ty,
                                              mutability,
                                              expr,
-                                             &self.get_context());
+                                             &mut self.get_context());
                 self.push_rewrite(item.span, rewrite);
             }
             ast::Item_::ItemConst(ref ty, ref expr) => {
@@ -282,7 +284,7 @@ impl<'a> FmtVisitor<'a> {
                                              ty,
                                              ast::Mutability::MutImmutable,
                                              expr,
-                                             &self.get_context());
+                                             &mut self.get_context());
                 self.push_rewrite(item.span, rewrite);
             }
             ast::Item_::ItemDefaultImpl(..) => {
@@ -301,8 +303,9 @@ impl<'a> FmtVisitor<'a> {
                               item.id)
             }
             ast::Item_::ItemTy(ref ty, ref generics) => {
-                let rewrite = rewrite_type_alias(&self.get_context(),
-                                                 self.block_indent,
+                let block_indent = self.block_indent;
+                let rewrite = rewrite_type_alias(&mut self.get_context(),
+                                                 block_indent,
                                                  item.ident,
                                                  ty,
                                                  generics,
@@ -369,7 +372,8 @@ impl<'a> FmtVisitor<'a> {
     fn visit_mac(&mut self, mac: &ast::Mac) {
         // 1 = ;
         let width = self.config.max_width - self.block_indent.width() - 1;
-        let rewrite = rewrite_macro(mac, &self.get_context(), width, self.block_indent);
+        let block_indent = self.block_indent;
+        let rewrite = rewrite_macro(mac, &mut self.get_context(), width, block_indent);
 
         if let Some(res) = rewrite {
             self.buffer.push_str(&res);
@@ -386,7 +390,8 @@ impl<'a> FmtVisitor<'a> {
 
     pub fn from_codemap(parse_session: &'a ParseSess,
                         config: &'a Config,
-                        mode: Option<WriteMode>)
+                        mode: Option<WriteMode>,
+                        format_report: &'a mut FormatReport)
                         -> FmtVisitor<'a> {
         FmtVisitor {
             parse_session: parse_session,
@@ -399,6 +404,7 @@ impl<'a> FmtVisitor<'a> {
             },
             config: config,
             write_mode: mode,
+            format_report: format_report,
         }
     }
 
@@ -431,9 +437,9 @@ impl<'a> FmtVisitor<'a> {
         let first = &outers[0];
         self.format_missing_with_indent(first.span.lo);
 
-        let rewrite = outers.rewrite(&self.get_context(),
-                                     self.config.max_width - self.block_indent.width(),
-                                     self.block_indent)
+        let width = self.config.max_width - self.block_indent.width();
+        let block_indent = self.block_indent;
+        let rewrite = outers.rewrite(&mut self.get_context(), width, block_indent)
                             .unwrap();
         self.buffer.push_str(&rewrite);
         let last = outers.last().unwrap();
@@ -483,9 +489,8 @@ impl<'a> FmtVisitor<'a> {
         let mut offset = self.block_indent;
         offset.alignment += vis.len() + "use ".len();
         // 1 = ";"
-        match vp.rewrite(&self.get_context(),
-                         self.config.max_width - offset.width() - 1,
-                         offset) {
+        let width = self.config.max_width - offset.width() - 1;
+        match vp.rewrite(&mut self.get_context(), width, offset) {
             Some(ref s) if s.is_empty() => {
                 // Format up to last newline
                 let prev_span = codemap::mk_sp(self.last_pos, span.lo);
@@ -509,18 +514,19 @@ impl<'a> FmtVisitor<'a> {
         }
     }
 
-    pub fn get_context(&self) -> RewriteContext {
+    pub fn get_context(&mut self) -> RewriteContext {
         RewriteContext {
             parse_session: self.parse_session,
             codemap: self.codemap,
             config: self.config,
             block_indent: self.block_indent,
+            format_report: self.format_report,
         }
     }
 }
 
 impl<'a> Rewrite for [ast::Attribute] {
-    fn rewrite(&self, context: &RewriteContext, _: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self, context: &mut RewriteContext, _: usize, offset: Indent) -> Option<String> {
         let mut result = String::new();
         if self.is_empty() {
             return Some(result);

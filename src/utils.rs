@@ -288,7 +288,11 @@ pub fn wrap_str<S: AsRef<str>>(s: S, max_width: usize, width: usize, offset: Ind
 }
 
 impl Rewrite for String {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         wrap_str(self, context.config.max_width, width, offset).map(ToOwned::to_owned)
     }
 }
@@ -298,8 +302,8 @@ impl Rewrite for String {
 // The callback takes an integer and returns either an Ok, or an Err indicating
 // whether the `guess' was too high (Ordering::Less), or too low.
 // This function is guaranteed to try to the hi value first.
-pub fn binary_search<C, T>(mut lo: usize, mut hi: usize, callback: C) -> Option<T>
-    where C: Fn(usize) -> Result<T, Ordering>
+pub fn binary_search<C, T>(mut lo: usize, mut hi: usize, mut callback: C) -> Option<T>
+    where C: FnMut(usize) -> Result<T, Ordering>
 {
     let mut middle = hi;
 
