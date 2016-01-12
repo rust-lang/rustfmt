@@ -51,7 +51,7 @@ impl MacroStyle {
 }
 
 pub fn rewrite_macro(mac: &ast::Mac,
-                     context: &RewriteContext,
+                     context: &mut RewriteContext,
                      width: usize,
                      offset: Indent)
                      -> Option<String> {
@@ -124,7 +124,7 @@ pub fn rewrite_macro(mac: &ast::Mac,
     }
 }
 
-fn macro_style(mac: &ast::Mac, context: &RewriteContext) -> MacroStyle {
+fn macro_style(mac: &ast::Mac, context: &mut RewriteContext) -> MacroStyle {
     let snippet = context.snippet(mac.span);
     let paren_pos = snippet.find_uncommented("(").unwrap_or(usize::max_value());
     let bracket_pos = snippet.find_uncommented("[").unwrap_or(usize::max_value());

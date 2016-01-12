@@ -19,7 +19,11 @@ use syntax::ast::{BindingMode, Pat, Pat_};
 
 // FIXME(#18): implement pattern formatting.
 impl Rewrite for Pat {
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String> {
         match self.node {
             Pat_::PatBox(ref pat) => rewrite_unary_prefix(context, "box ", &**pat, width, offset),
             Pat_::PatIdent(binding_mode, ident, None) => {

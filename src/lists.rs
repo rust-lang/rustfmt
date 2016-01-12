@@ -340,9 +340,9 @@ pub struct ListItems<'a, I, F1, F2, F3>
 
 impl<'a, T, I, F1, F2, F3> Iterator for ListItems<'a, I, F1, F2, F3>
     where I: Iterator<Item = T>,
-          F1: Fn(&T) -> BytePos,
-          F2: Fn(&T) -> BytePos,
-          F3: Fn(&T) -> Option<String>
+          F1: FnMut(&T) -> BytePos,
+          F2: FnMut(&T) -> BytePos,
+          F3: FnMut(&T) -> Option<String>
 {
     type Item = ListItem;
 
@@ -462,9 +462,9 @@ pub fn itemize_list<'a, T, I, F1, F2, F3>(codemap: &'a CodeMap,
                                           next_span_start: BytePos)
                                           -> ListItems<'a, I, F1, F2, F3>
     where I: Iterator<Item = T>,
-          F1: Fn(&T) -> BytePos,
-          F2: Fn(&T) -> BytePos,
-          F3: Fn(&T) -> Option<String>
+          F1: FnMut(&T) -> BytePos,
+          F2: FnMut(&T) -> BytePos,
+          F3: FnMut(&T) -> Option<String>
 {
     ListItems {
         codemap: codemap,

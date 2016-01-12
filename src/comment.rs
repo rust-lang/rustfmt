@@ -515,7 +515,7 @@ impl<'a> Iterator for CommentCodeSlices<'a> {
 /// (if it fits in the width/offset, else return None), else return `new`
 pub fn recover_comment_removed(new: String,
                                span: Span,
-                               context: &RewriteContext,
+                               context: &mut RewriteContext,
                                width: usize,
                                offset: Indent)
                                -> Option<String> {

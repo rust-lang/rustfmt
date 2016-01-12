@@ -13,7 +13,7 @@
 use syntax::codemap::{CodeMap, Span};
 use syntax::parse::ParseSess;
 
-use Indent;
+use {FormatReport, Indent};
 use config::Config;
 
 pub trait Rewrite {
@@ -24,7 +24,11 @@ pub trait Rewrite {
     /// `width` is the maximum number of characters on the last line
     /// (excluding offset). The width of other lines is not limited by
     /// `width`.
-    fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String>;
+    fn rewrite(&self,
+               context: &mut RewriteContext,
+               width: usize,
+               offset: Indent)
+               -> Option<String>;
 }
 
 pub struct RewriteContext<'a> {
@@ -33,15 +37,17 @@ pub struct RewriteContext<'a> {
     pub config: &'a Config,
     // Indentation due to nesting of blocks.
     pub block_indent: Indent,
+    pub format_report: &'a mut FormatReport,
 }
 
 impl<'a> RewriteContext<'a> {
-    pub fn nested_context(&self) -> RewriteContext<'a> {
+    pub fn nested_context<'b>(&'b mut self) -> RewriteContext<'b> {
         RewriteContext {
             parse_session: self.parse_session,
             codemap: self.codemap,
             config: self.config,
             block_indent: self.block_indent.block_indent(self.config),
+            format_report: self.format_report,
         }
     }
 

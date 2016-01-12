@@ -272,6 +272,10 @@ pub struct FormatReport {
 }
 
 impl FormatReport {
+    fn new() -> FormatReport {
+        FormatReport { file_error_map: HashMap::new() }
+    }
+
     pub fn warning_count(&self) -> usize {
         self.file_error_map.iter().map(|(_, ref errors)| errors.len()).fold(0, |acc, x| acc + x)
     }
@@ -303,6 +307,7 @@ fn fmt_ast(krate: &ast::Crate,
            mode: WriteMode)
            -> FileMap {
     let mut file_map = FileMap::new();
+    let mut format_report = FormatReport::new();
     for (path, module) in modules::list_files(krate, parse_session.codemap()) {
         if config.skip_children && path.as_path() != main_file {
             continue;
@@ -311,7 +316,10 @@ fn fmt_ast(krate: &ast::Crate,
         if config.verbose {
             println!("Formatting {}", path);
         }
-        let mut visitor = FmtVisitor::from_codemap(parse_session, config, Some(mode));
+        let mut visitor = FmtVisitor::from_codemap(parse_session,
+                                                   config,
+                                                   Some(mode),
+                                                   &mut format_report);
         visitor.format_separate_mod(module);
         file_map.insert(path.to_owned(), visitor.buffer);
     }
@@ -416,9 +424,13 @@ pub fn format_string(input: String, config: &Config, mode: WriteMode) -> FileMap
     // FIXME: we still use a FileMap even though we only have
     // one file, because fmt_lines requires a FileMap
     let mut file_map = FileMap::new();
+    let mut format_report = FormatReport::new();
 
     // do the actual formatting
-    let mut visitor = FmtVisitor::from_codemap(&parse_session, config, Some(mode));
+    let mut visitor = FmtVisitor::from_codemap(&parse_session,
+                                               config,
+                                               Some(mode),
+                                               &mut format_report);
     visitor.format_separate_mod(&krate.module);
 
     // append final newline

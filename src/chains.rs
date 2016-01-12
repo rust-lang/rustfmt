@@ -29,7 +29,7 @@ use syntax::{ast, ptr};
 use syntax::codemap::{mk_sp, Span};
 
 pub fn rewrite_chain(mut expr: &ast::Expr,
-                     context: &RewriteContext,
+                     context: &mut RewriteContext,
                      width: usize,
                      offset: Indent)
                      -> Option<String> {
@@ -46,9 +46,18 @@ pub fn rewrite_chain(mut expr: &ast::Expr,
         BlockIndentStyle::Inherit => context.block_indent,
         BlockIndentStyle::Tabbed => context.block_indent.block_indent(context.config),
     };
-    let parent_context = &RewriteContext { block_indent: parent_block_indent, ..*context };
+
     let parent = subexpr_list.pop().unwrap();
-    let parent_rewrite = try_opt!(expr.rewrite(parent_context, width, offset));
+    let parent_rewrite = {
+        let mut parent_context = RewriteContext {
+            parse_session: context.parse_session,
+            codemap: context.codemap,
+            config: context.config,
+            block_indent: parent_block_indent,
+            format_report: context.format_report,
+        };
+        try_opt!(expr.rewrite(&mut parent_context, width, offset))
+    };
     let (indent, extend) = if !parent_rewrite.contains('\n') && is_continuable(parent) ||
                               parent_rewrite.len() <= context.config.tab_spaces {
         (offset + Indent::new(0, parent_rewrite.len()), true)
@@ -178,18 +187,24 @@ fn pop_expr_chain(expr: &ast::Expr) -> Option<&ast::Expr> {
 
 fn rewrite_chain_expr(expr: &ast::Expr,
                       span: Span,
-                      context: &RewriteContext,
+                      context: &mut RewriteContext,
                       width: usize,
                       offset: Indent)
                       -> Option<String> {
     match expr.node {
         ast::Expr_::ExprMethodCall(ref method_name, ref types, ref expressions) => {
-            let inner = &RewriteContext { block_indent: offset, ..*context };
+            let mut inner = RewriteContext {
+                parse_session: context.parse_session,
+                codemap: context.codemap,
+                config: context.config,
+                block_indent: offset,
+                format_report: context.format_report,
+            };
             rewrite_method_call(method_name.node,
                                 types,
                                 expressions,
                                 span,
-                                inner,
+                                &mut inner,
                                 width,
                                 offset)
         }
@@ -225,7 +240,7 @@ fn rewrite_method_call(method_name: ast::Ident,
                        types: &[ptr::P<ast::Ty>],
                        args: &[ptr::P<ast::Expr>],
                        span: Span,
-                       context: &RewriteContext,
+                       context: &mut RewriteContext,
                        width: usize,
                        offset: Indent)
                        -> Option<String> {
