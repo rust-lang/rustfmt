@@ -19,6 +19,7 @@ extern crate getopts;
 
 use rustfmt::{run, run_from_stdin};
 use rustfmt::config::{Config, WriteMode};
+use rustfmt::run_config::RunConfig;
 
 use std::env;
 use std::fs::{self, File};
@@ -78,6 +79,10 @@ fn lookup_and_read_project_file(input_file: &Path) -> io::Result<(PathBuf, Strin
     Ok((path, toml))
 }
 
+fn run_config_from_options(_matches: &Matches) -> RunConfig {
+    RunConfig::default()
+}
+
 fn update_config(config: &mut Config, matches: &Matches) {
     config.verbose = matches.opt_present("verbose");
     config.skip_children = matches.opt_present("skip-children");
@@ -131,8 +136,9 @@ fn execute() -> i32 {
                 Ok((_, toml)) => Config::from_toml(&toml),
                 Err(_) => Default::default(),
             };
+            let run_config = run_config_from_options(&matches);
 
-            run_from_stdin(input, write_mode, &config);
+            run_from_stdin(input, write_mode, &config, &run_config);
             0
         }
         Operation::Format(files, write_mode) => {
@@ -146,9 +152,10 @@ fn execute() -> i32 {
                     }
                     Err(_) => Default::default(),
                 };
+                let run_config = run_config_from_options(&matches);
 
                 update_config(&mut config, &matches);
-                run(&file, write_mode, &config);
+                run(&file, write_mode, &config, &run_config);
             }
             0
         }

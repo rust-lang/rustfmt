@@ -427,7 +427,10 @@ impl Rewrite for ast::Block {
             return Some(user_str);
         }
 
-        let mut visitor = FmtVisitor::from_codemap(context.parse_session, context.config, None);
+        let mut visitor = FmtVisitor::from_codemap(context.parse_session,
+                                                   context.config,
+                                                   context.run_config,
+                                                   None);
         visitor.block_indent = context.block_indent;
 
         let prefix = match self.rules {
@@ -956,6 +959,7 @@ impl Rewrite for ast::Arm {
             // more?
             let mut attr_visitor = FmtVisitor::from_codemap(context.parse_session,
                                                             context.config,
+                                                            context.run_config,
                                                             None);
             attr_visitor.block_indent = context.block_indent;
             attr_visitor.last_pos = attrs[0].span.lo;
