@@ -79,13 +79,12 @@ fn lookup_and_read_project_file(input_file: &Path) -> io::Result<(PathBuf, Strin
     Ok((path, toml))
 }
 
-fn run_config_from_options(_matches: &Matches) -> RunConfig {
-    RunConfig::default()
-}
-
-fn update_config(config: &mut Config, matches: &Matches) {
-    config.verbose = matches.opt_present("verbose");
-    config.skip_children = matches.opt_present("skip-children");
+fn run_config_from_options(matches: &Matches) -> RunConfig {
+    RunConfig {
+        skip_children: matches.opt_present("skip-children"),
+        verbose: matches.opt_present("verbose"),
+        ..RunConfig::default()
+    }
 }
 
 fn execute() -> i32 {
@@ -143,7 +142,7 @@ fn execute() -> i32 {
         }
         Operation::Format(files, write_mode) => {
             for file in files {
-                let mut config = match lookup_and_read_project_file(&file) {
+                let config = match lookup_and_read_project_file(&file) {
                     Ok((path, toml)) => {
                         println!("Using rustfmt config file {} for {}",
                                  path.display(),
@@ -154,7 +153,6 @@ fn execute() -> i32 {
                 };
                 let run_config = run_config_from_options(&matches);
 
-                update_config(&mut config, &matches);
                 run(&file, write_mode, &config, &run_config);
             }
             0

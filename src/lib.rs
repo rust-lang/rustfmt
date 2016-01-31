@@ -272,11 +272,11 @@ fn fmt_ast(krate: &ast::Crate,
            -> FileMap {
     let mut file_map = FileMap::new();
     for (path, module) in modules::list_files(krate, parse_session.codemap()) {
-        if config.skip_children && path.as_path() != main_file {
+        if run_config.skip_children && path.as_path() != main_file {
             continue;
         }
         let path = path.to_str().unwrap();
-        if config.verbose {
+        if run_config.verbose {
             println!("Formatting {}", path);
         }
         let mut visitor = FmtVisitor::from_codemap(parse_session, config, run_config, Some(mode));

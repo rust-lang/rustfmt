@@ -10,5 +10,8 @@
 
 /// Contains configuration specific to a single run of `rustfmt`.
 impl_default_and_override! {
-    pub struct RunConfig {}
+    pub struct RunConfig {
+        pub skip_children: bool = false,
+        pub verbose: bool = false,
+    }
 }
