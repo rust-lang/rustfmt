@@ -199,6 +199,136 @@ pub fn round_up_to_power_of_two(mut x: usize) -> usize {
     x.wrapping_add(1)
 }
 
+/// Helper macro to allow defining an empty struct with braces.
+macro_rules! def_struct {
+    ($(#[$attr:meta])* pub struct $sname:ident {}) => (
+        $(#[$attr])*
+        pub struct $sname;
+    );
+    ($(#[$attr:meta])* pub struct $sname:ident { $(pub $field:ident: $ty:ty),+ $(,)* }) => (
+        $(#[$attr])*
+        pub struct $sname {
+            $(pub $field: $ty),+
+        }
+    );
+}
+
+/// Helper macro to allow defining `Default::default()` on an empty struct with braces.
+macro_rules! def_default {
+    ($sname:ident {}) => (
+        fn default() -> $sname {
+            $sname
+        }
+    );
+    ($sname:ident { $($field:ident: $def:expr),+ }) => (
+        fn default() -> $sname {
+            $sname {
+                $($field: $def),+
+            }
+        }
+    );
+}
+
+/// Macro for creating structs that implement `Default`.
+///
+/// # Limitations
+///
+/// All structs and all fields must be `pub`.
+macro_rules! impl_default {
+    ($($(#[$attr:meta])*
+        pub struct $sname:ident {
+            $(pub $field:ident: $ty:ty = $def:expr),* $(,)*
+        })*) => ($(
+
+        def_struct! {
+            $(#[$attr])*
+            pub struct $sname {
+                $(pub $field: $ty),*
+            }
+        }
+
+        impl ::std::default::Default for $sname {
+            def_default! {
+                $sname {
+                    $($field: $def),*
+                }
+            }
+        }
+    )*)
+}
+
+/// Macro for implementing an `override_value(&mut self, key: &str, val: &str)` method.
+///
+/// # Limitations
+///
+/// All field types must implement `FromStr`.
+macro_rules! impl_override_value {
+    ($sname:ident { $($field:ident: $ty:ty),* $(,)* }) => (
+        impl $sname {
+            #[allow(unused_variables)]
+            pub fn override_value(&mut self, key: &str, val: &str) {
+                match key {
+                    $(
+                        stringify!($field) => {
+                            self.$field = val.parse::<$ty>().unwrap();
+                        }
+                    )*
+                    _ => panic!("Not a field of {}: {:?}", stringify!($sname), key)
+                }
+            }
+        }
+    )
+}
+
+/// Macro for creating structs that implement `Default` and an
+/// `override_value(&mut self, key: &str, val: &str)` method.
+///
+/// # Limitations
+///
+/// - All structs and all fields must be `pub`;
+/// - all field types must implement `FromStr`; and
+/// - empty structs must be defined with braces.
+///
+/// # Example
+///
+/// ```ignore
+/// impl_default_and_override! {
+///     #[derive(Eq, PartialEq)]
+///     pub struct Foo {
+///         pub b: u32 = 42,
+///         pub z: i8 = -1
+///     }
+///
+///     #[derive(Debug)]
+///     pub struct Bar {}
+///
+///     #[derive(Debug)]
+///     pub struct Baz {
+///         pub a: bool = true,
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! impl_default_and_override {
+    ($($(#[$attr:meta])*
+        pub struct $sname:ident {
+            $(pub $field:ident: $ty:ty = $def:expr),* $(,)*
+        })*) => ($(
+        impl_default!{
+            $(#[$attr])*
+            pub struct $sname {
+                $(pub $field:$ty = $def),*
+            }
+        }
+
+        impl_override_value! {
+            $sname {
+                $($field: $ty),*
+            }
+        }
+    )*)
+}
+
 // Macro for deriving implementations of Decodable for enums
 #[macro_export]
 macro_rules! impl_enum_decodable {
