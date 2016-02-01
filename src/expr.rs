@@ -491,16 +491,24 @@ impl Rewrite for ast::Stmt {
                 }
             }
             ast::Stmt_::StmtExpr(ref ex, _) | ast::Stmt_::StmtSemi(ref ex, _) => {
-                let suffix = if semicolon_for_stmt(self) {
-                    ";"
+                // case of comment between expression and semicolon
+                let old_suffix = context.snippet(mk_sp(ex.span.hi, self.span.hi));
+                let suffix: &str = if old_suffix.trim() == ";" {
+                    if semicolon_for_stmt(self) {
+                        ";"
+                    } else {
+                        ""
+                    }
                 } else {
-                    ""
+                    &old_suffix
                 };
-
-                ex.rewrite(context,
-                           context.config.max_width - offset.width() - suffix.len(),
-                           offset)
-                  .map(|s| s + suffix)
+                let rewrite = ex.rewrite(context,
+                                         try_opt!(context.config
+                                                         .max_width
+                                                         .checked_sub(offset.width() +
+                                                                      suffix.len())),
+                                         offset);
+                rewrite.map(|s| format!("{}{}", s, suffix))
             }
             ast::Stmt_::StmtMac(..) => None,
         };
