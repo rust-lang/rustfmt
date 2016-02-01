@@ -15,6 +15,7 @@ use syntax::parse::ParseSess;
 
 use Indent;
 use config::Config;
+use run_config::RunConfig;
 
 pub trait Rewrite {
     /// Rewrite self into offset and width.
@@ -31,6 +32,7 @@ pub struct RewriteContext<'a> {
     pub parse_session: &'a ParseSess,
     pub codemap: &'a CodeMap,
     pub config: &'a Config,
+    pub run_config: &'a RunConfig,
     // Indentation due to nesting of blocks.
     pub block_indent: Indent,
 }
@@ -41,6 +43,7 @@ impl<'a> RewriteContext<'a> {
             parse_session: self.parse_session,
             codemap: self.codemap,
             config: self.config,
+            run_config: self.run_config,
             block_indent: self.block_indent.block_indent(self.config),
         }
     }

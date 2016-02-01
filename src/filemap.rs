@@ -18,6 +18,7 @@ use std::fs::{self, File};
 use std::io::{self, Write, Read, stdout, BufWriter};
 
 use config::{NewlineStyle, Config, WriteMode};
+use run_config::RunConfig;
 use rustfmt_diff::{make_diff, print_diff, Mismatch};
 use checkstyle::{output_header, output_footer, output_checkstyle_file};
 
@@ -34,13 +35,19 @@ pub fn append_newlines(file_map: &mut FileMap) {
 pub fn write_all_files<T>(file_map: &FileMap,
                           mut out: T,
                           mode: WriteMode,
-                          config: &Config)
+                          config: &Config,
+                          run_config: &RunConfig)
                           -> Result<(), io::Error>
     where T: Write
 {
     output_header(&mut out, mode).ok();
     for filename in file_map.keys() {
-        try!(write_file(&file_map[filename], filename, &mut out, mode, config));
+        try!(write_file(&file_map[filename],
+                        filename,
+                        &mut out,
+                        mode,
+                        config,
+                        run_config));
     }
     output_footer(&mut out, mode).ok();
 
@@ -51,7 +58,8 @@ pub fn write_all_files<T>(file_map: &FileMap,
 // Prints all newlines either as `\n` or as `\r\n`.
 pub fn write_system_newlines<T>(writer: T,
                                 text: &StringBuffer,
-                                config: &Config)
+                                config: &Config,
+                                _run_config: &RunConfig)
                                 -> Result<(), io::Error>
     where T: Write
 {
@@ -88,35 +96,38 @@ pub fn write_file<T>(text: &StringBuffer,
                      filename: &str,
                      out: &mut T,
                      mode: WriteMode,
-                     config: &Config)
+                     config: &Config,
+                     run_config: &RunConfig)
                      -> Result<Option<String>, io::Error>
     where T: Write
 {
 
     fn source_and_formatted_text(text: &StringBuffer,
                                  filename: &str,
-                                 config: &Config)
+                                 config: &Config,
+                                 run_config: &RunConfig)
                                  -> Result<(String, String), io::Error> {
         let mut f = try!(File::open(filename));
         let mut ori_text = String::new();
         try!(f.read_to_string(&mut ori_text));
         let mut v = Vec::new();
-        try!(write_system_newlines(&mut v, text, config));
+        try!(write_system_newlines(&mut v, text, config, run_config));
         let fmt_text = String::from_utf8(v).unwrap();
         Ok((ori_text, fmt_text))
     }
 
     fn create_diff(filename: &str,
                    text: &StringBuffer,
-                   config: &Config)
+                   config: &Config,
+                   run_config: &RunConfig)
                    -> Result<Vec<Mismatch>, io::Error> {
-        let (ori, fmt) = try!(source_and_formatted_text(text, filename, config));
+        let (ori, fmt) = try!(source_and_formatted_text(text, filename, config, run_config));
         Ok(make_diff(&ori, &fmt, 3))
     }
 
     match mode {
         WriteMode::Replace => {
-            if let Ok((ori, fmt)) = source_and_formatted_text(text, filename, config) {
+            if let Ok((ori, fmt)) = source_and_formatted_text(text, filename, config, run_config) {
                 if fmt != ori {
                     // Do a little dance to make writing safer - write to a temp file
                     // rename the original to a .bk, then rename the temp file to the
@@ -126,7 +137,7 @@ pub fn write_file<T>(text: &StringBuffer,
                     {
                         // Write text to temp file
                         let tmp_file = try!(File::create(&tmp_name));
-                        try!(write_system_newlines(tmp_file, text, config));
+                        try!(write_system_newlines(tmp_file, text, config, run_config));
                     }
 
                     try!(fs::rename(filename, bk_name));
@@ -137,22 +148,22 @@ pub fn write_file<T>(text: &StringBuffer,
         WriteMode::Overwrite => {
             // Write text directly over original file.
             let file = try!(File::create(filename));
-            try!(write_system_newlines(file, text, config));
+            try!(write_system_newlines(file, text, config, run_config));
         }
         WriteMode::Plain => {
             let stdout = stdout();
             let stdout = stdout.lock();
-            try!(write_system_newlines(stdout, text, config));
+            try!(write_system_newlines(stdout, text, config, run_config));
         }
         WriteMode::Display | WriteMode::Coverage => {
             println!("{}:\n", filename);
             let stdout = stdout();
             let stdout = stdout.lock();
-            try!(write_system_newlines(stdout, text, config));
+            try!(write_system_newlines(stdout, text, config, run_config));
         }
         WriteMode::Diff => {
             println!("Diff of {}:\n", filename);
-            if let Ok((ori, fmt)) = source_and_formatted_text(text, filename, config) {
+            if let Ok((ori, fmt)) = source_and_formatted_text(text, filename, config, run_config) {
                 print_diff(make_diff(&ori, &fmt, 3),
                            |line_num| format!("\nDiff at line {}:", line_num));
             }
@@ -161,7 +172,7 @@ pub fn write_file<T>(text: &StringBuffer,
             unreachable!("The WriteMode should NEVER Be default at this point!");
         }
         WriteMode::Checkstyle => {
-            let diff = try!(create_diff(filename, text, config));
+            let diff = try!(create_diff(filename, text, config, run_config));
             try!(output_checkstyle_file(out, filename, diff));
         }
     }

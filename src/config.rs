@@ -191,9 +191,11 @@ impl ConfigHelpItem {
 
 macro_rules! create_config {
     ($($i:ident: $ty:ty, $def:expr, $( $dstring:expr ),+ );+ $(;)*) => (
-        #[derive(RustcDecodable, Clone)]
-        pub struct Config {
-            $(pub $i: $ty),+
+        impl_default_and_override! {
+            #[derive(RustcDecodable, Clone)]
+            pub struct Config {
+                $(pub $i: $ty = $def),+
+            }
         }
 
         // Just like the Config struct but with each property wrapped
@@ -231,17 +233,6 @@ macro_rules! create_config {
                 Config::default().fill_from_parsed_config(parsed_config)
             }
 
-            pub fn override_value(&mut self, key: &str, val: &str) {
-                match key {
-                    $(
-                        stringify!($i) => {
-                            self.$i = val.parse::<$ty>().unwrap();
-                        }
-                    )+
-                    _ => panic!("Bad config key!")
-                }
-            }
-
             pub fn print_docs() {
                 use std::cmp;
                 let max = 0;
@@ -268,17 +259,6 @@ macro_rules! create_config {
                     )+
                     println!("");
                 )+
-            }
-        }
-
-        // Template for the default configuration
-        impl Default for Config {
-            fn default() -> Config {
-                Config {
-                    $(
-                        $i: $def,
-                    )+
-                }
             }
         }
     )

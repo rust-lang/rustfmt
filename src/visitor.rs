@@ -19,6 +19,7 @@ use Indent;
 use utils;
 use config::{Config, WriteMode};
 use rewrite::{Rewrite, RewriteContext};
+use run_config::RunConfig;
 use comment::rewrite_comment;
 use macros::rewrite_macro;
 use items::{rewrite_static, rewrite_type_alias, format_impl};
@@ -31,6 +32,7 @@ pub struct FmtVisitor<'a> {
     // FIXME: use an RAII util or closure for indenting
     pub block_indent: Indent,
     pub config: &'a Config,
+    pub run_config: &'a RunConfig,
     pub write_mode: Option<WriteMode>,
 }
 
@@ -382,6 +384,7 @@ impl<'a> FmtVisitor<'a> {
 
     pub fn from_codemap(parse_session: &'a ParseSess,
                         config: &'a Config,
+                        run_config: &'a RunConfig,
                         mode: Option<WriteMode>)
                         -> FmtVisitor<'a> {
         FmtVisitor {
@@ -395,6 +398,7 @@ impl<'a> FmtVisitor<'a> {
             },
             config: config,
             write_mode: mode,
+            run_config: run_config,
         }
     }
 
@@ -518,6 +522,7 @@ impl<'a> FmtVisitor<'a> {
             parse_session: self.parse_session,
             codemap: self.codemap,
             config: self.config,
+            run_config: self.run_config,
             block_indent: self.block_indent,
         }
     }
