@@ -196,39 +196,98 @@ macro_rules! create_config {
             $(pub $i: $ty),+
         }
 
-        // Just like the Config struct but with each property wrapped
-        // as Option<T>. This is used to parse a rustfmt.toml that doesn't
-        // specity all properties of `Config`.
-        // We first parse into `ParsedConfig`, then create a default `Config`
-        // and overwrite the properties with corresponding values from `ParsedConfig`
+        /// Equivalent to `Config` except that each field is wrapped in an `Option`.
+        ///
+        /// This can be decoded into from TOML, and then later merged into a `Config` or another
+        /// `PartialConfig`.
+        ///
+        /// # Examples
+        ///
+        /// Decode a TOML value into a `PartialConfig`:
+        ///
+        /// ```ignore
+        /// extern crate toml;
+        /// use config::{Config, PartialConfig};
+        /// let toml_str = r#"
+        ///     ideal_width = 72
+        /// "#;
+        ///
+        /// let partial: PartialConfig = toml::decode_str(toml_str);
+        /// ```
+        ///
+        /// Later, merge the `PartialConfig` into the default `Config`:
+        ///
+        /// ```ignore
+        /// # extern crate toml;
+        /// # use config::{Config, PartialConfig};
+        /// # let toml_str = r#"
+        /// #     ideal_width = 72
+        /// # "#;
+        ///
+        /// let partial: PartialConfig = toml::decode_str(toml_str);
+        /// let config = Config::Default().merge(partial);
+        /// assert_eq!(72, config.ideal_width);
+        /// ```
         #[derive(RustcDecodable, Clone)]
-        pub struct ParsedConfig {
+        pub struct PartialConfig {
             $(pub $i: Option<$ty>),+
+        }
+
+        impl PartialConfig {
+
+            /// Create a `PartialConfig` with all fields set to `None`.
+            pub fn new() -> PartialConfig {
+                PartialConfig {
+                $(
+                    $i: None,
+                )+
+                }
+
+            }
+
+            /// Merge `other` into `self, overwriting fields in `self` with any non-`None` fields
+            /// in `other`.
+            pub fn merge(&mut self, other: &PartialConfig) -> &mut PartialConfig {
+            $(
+                if other.$i.is_some() {
+                    self.$i = other.$i.clone();
+                }
+             )+
+                self
+            }
+        }
+
+        impl Default for PartialConfig {
+            fn default() -> PartialConfig {
+                PartialConfig::new()
+            }
+        }
+
+        /// Applies settings in `partial` on top of the default `Config`.
+        impl From<PartialConfig> for Config {
+            fn from(partial: PartialConfig) -> Config {
+                Config::default().merge(&partial)
+            }
+        }
+
+        /// Applies settings in `partial` on top of the default `Config`.
+        impl<'a> From<&'a PartialConfig> for Config {
+            fn from(partial: &'a PartialConfig) -> Config {
+                Config::default().merge(partial)
+            }
         }
 
         impl Config {
 
-            fn fill_from_parsed_config(mut self, parsed: ParsedConfig) -> Config {
+            /// Merge `partial` into `self, overwriting fields in `self` with any non-`None` fields
+            /// in `partial`.
+            pub fn merge(mut self, partial: &PartialConfig) -> Config {
             $(
-                if let Some(val) = parsed.$i {
+                if let Some(val) = partial.$i {
                     self.$i = val;
                 }
             )+
                 self
-            }
-
-            pub fn from_toml(toml: &str) -> Config {
-                let parsed = toml.parse().unwrap();
-                let parsed_config:ParsedConfig = match toml::decode(parsed) {
-                    Some(decoded) => decoded,
-                    None => {
-                        println!("Decoding config file failed. Config:\n{}", toml);
-                        let parsed: toml::Value = toml.parse().unwrap();
-                        println!("\n\nParsed:\n{:?}", parsed);
-                        panic!();
-                    }
-                };
-                Config::default().fill_from_parsed_config(parsed_config)
             }
 
             pub fn override_value(&mut self, key: &str, val: &str) {
@@ -346,4 +405,38 @@ create_config! {
     match_wildcard_trailing_comma: bool, true, "Put a trailing comma after a wildcard arm";
     write_mode: WriteMode, WriteMode::Default,
         "What Write Mode to use when none is supplied: Replace, Overwrite, Display, Diff, Coverage";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_config_merge_overrides() {
+        let config = Config::default().merge(&PartialConfig {
+            ideal_width: Some(37),
+            ..PartialConfig::default()
+        });
+        assert_eq!(37, config.ideal_width);
+    }
+
+    #[test]
+    fn test_partial_config_merge_overrides() {
+        let mut config = PartialConfig::default();
+        config.merge(&PartialConfig { ideal_width: Some(37), ..PartialConfig::default() });
+        assert_eq!(Some(37), config.ideal_width);
+    }
+
+    #[test]
+    fn test_config_merge_does_not_override_if_none() {
+        let mut config = Config { ideal_width: 37, ..Config::default() };
+        config = config.merge(&PartialConfig::new());
+        assert_eq!(37, config.ideal_width);
+    }
+
+    #[test]
+    fn test_partial_config_merge_does_not_override_if_none() {
+        let mut config = PartialConfig { ideal_width: Some(37), ..PartialConfig::default() };
+        config.merge(&PartialConfig::new());
+        assert_eq!(Some(37), config.ideal_width);
+    }
 }

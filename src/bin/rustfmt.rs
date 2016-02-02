@@ -18,7 +18,7 @@ extern crate env_logger;
 extern crate getopts;
 
 use rustfmt::{run, run_from_stdin};
-use rustfmt::config::{Config, WriteMode};
+use rustfmt::config::{Config, PartialConfig, WriteMode};
 
 use std::env;
 use std::fs::{self, File};
@@ -92,7 +92,8 @@ fn resolve_config(dir: &Path) -> io::Result<(Config, Option<PathBuf>)> {
     let mut file = try!(File::open(&path));
     let mut toml = String::new();
     try!(file.read_to_string(&mut toml));
-    Ok((Config::from_toml(&toml), Some(path)))
+    let parsed_config: PartialConfig = toml::decode_str(&toml).expect("Failed to parse config");
+    Ok((Config::from(parsed_config), Some(path)))
 }
 
 fn update_config(config: &mut Config, matches: &Matches) {
