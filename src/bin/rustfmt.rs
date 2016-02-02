@@ -30,7 +30,7 @@ use getopts::{Matches, Options};
 /// Rustfmt operations.
 enum Operation {
     /// Format files and their child modules.
-    Format(Vec<PathBuf>, WriteMode),
+    Format(Vec<PathBuf>),
     /// Print the help message.
     Help,
     // Print version information
@@ -40,7 +40,7 @@ enum Operation {
     /// Invalid program input, including reason.
     InvalidInput(String),
     /// No file specified, read from stdin
-    Stdin(String, WriteMode),
+    Stdin(String),
 }
 
 /// Try to find a project file in the given directory and its parents. Returns the path of a the
@@ -104,6 +104,10 @@ fn partial_config_from_options(matches: &Matches) -> PartialConfig {
     if matches.opt_present("verbose") {
         config.verbose = Some(true);
     }
+    if let Some(mode) = matches.opt_str("write-mode") {
+        config.write_mode = Some(mode.parse()
+                                     .expect(&format!("Unrecognized write mode: {}", mode)));
+    }
 
     config
 }
@@ -150,15 +154,18 @@ fn execute() -> i32 {
             Config::print_docs();
             0
         }
-        Operation::Stdin(input, write_mode) => {
+        Operation::Stdin(input) => {
             // try to read config from local directory
-            let (config, _) = resolve_config(&env::current_dir().unwrap())
-                                  .expect("Error resolving config");
+            let (mut config, _) = resolve_config(&env::current_dir().unwrap())
+                                      .expect("Error resolving config");
 
-            run_from_stdin(input, write_mode, &config);
+            // WriteMode is always Plain for Stdin.
+            config = config.merge(&PartialConfig::from(WriteMode::Plain));
+
+            run_from_stdin(input, &config);
             0
         }
-        Operation::Format(files, write_mode) => {
+        Operation::Format(files) => {
             for file in files {
                 let (mut config, path) = resolve_config(file.parent().unwrap())
                                              .expect(&format!("Error resolving config for {}",
@@ -170,7 +177,7 @@ fn execute() -> i32 {
                              file.display());
                 }
 
-                run(&file, write_mode, &config);
+                run(&file, &config);
             }
             0
         }
@@ -228,21 +235,11 @@ fn determine_operation(matches: &Matches) -> Operation {
             Err(e) => return Operation::InvalidInput(e.to_string()),
         }
 
-        // WriteMode is always plain for Stdin
-        return Operation::Stdin(buffer, WriteMode::Plain);
+        return Operation::Stdin(buffer);
     }
 
-    let write_mode = match matches.opt_str("write-mode") {
-        Some(mode) => {
-            match mode.parse() {
-                Ok(mode) => mode,
-                Err(..) => return Operation::InvalidInput("Unrecognized write mode".into()),
-            }
-        }
-        None => WriteMode::Default,
-    };
 
     let files: Vec<_> = matches.free.iter().map(PathBuf::from).collect();
 
-    Operation::Format(files, write_mode)
+    Operation::Format(files)
 }
