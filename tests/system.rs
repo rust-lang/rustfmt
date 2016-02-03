@@ -12,6 +12,7 @@ extern crate rustfmt;
 extern crate diff;
 extern crate regex;
 extern crate term;
+extern crate toml;
 
 use std::collections::HashMap;
 use std::fs;
@@ -20,7 +21,7 @@ use std::path::Path;
 
 use rustfmt::*;
 use rustfmt::filemap::{write_system_newlines, FileMap};
-use rustfmt::config::{Config, ReportTactic, WriteMode};
+use rustfmt::config::{Config, PartialConfig, ReportTactic, WriteMode};
 use rustfmt::rustfmt_diff::*;
 
 static DIFF_CONTEXT_SIZE: usize = 3;
@@ -232,10 +233,11 @@ fn get_config(config_file: Option<&str>) -> Config {
     };
 
     let mut def_config_file = fs::File::open(config_file_name).expect("Couldn't open config");
-    let mut def_config = String::new();
-    def_config_file.read_to_string(&mut def_config).expect("Couldn't read config");
+    let mut buf = String::new();
+    def_config_file.read_to_string(&mut buf).expect("Couldn't read config");
 
-    Config::from_toml(&def_config)
+    let def_config: PartialConfig = toml::decode_str(&buf).expect("Failed to parse config");
+    Config::from(def_config)
 }
 
 // Reads significant comments of the form: // rustfmt-key: value

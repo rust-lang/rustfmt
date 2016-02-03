@@ -18,7 +18,7 @@ extern crate env_logger;
 extern crate getopts;
 
 use rustfmt::{run, run_from_stdin};
-use rustfmt::config::{Config, WriteMode};
+use rustfmt::config::{Config, PartialConfig, WriteMode};
 
 use std::env;
 use std::fs::{self, File};
@@ -92,12 +92,20 @@ fn resolve_config(dir: &Path) -> io::Result<(Config, Option<PathBuf>)> {
     let mut file = try!(File::open(&path));
     let mut toml = String::new();
     try!(file.read_to_string(&mut toml));
-    Ok((Config::from_toml(&toml), Some(path)))
+    let parsed_config: PartialConfig = toml::decode_str(&toml).expect("Failed to parse config");
+    Ok((Config::from(parsed_config), Some(path)))
 }
 
-fn update_config(config: &mut Config, matches: &Matches) {
-    config.verbose = matches.opt_present("verbose");
-    config.skip_children = matches.opt_present("skip-children");
+fn partial_config_from_options(matches: &Matches) -> PartialConfig {
+    let mut config = PartialConfig::new();
+    if matches.opt_present("skip_children") {
+        config.skip_children = Some(true);
+    }
+    if matches.opt_present("verbose") {
+        config.verbose = Some(true);
+    }
+
+    config
 }
 
 fn execute() -> i32 {
@@ -155,13 +163,13 @@ fn execute() -> i32 {
                 let (mut config, path) = resolve_config(file.parent().unwrap())
                                              .expect(&format!("Error resolving config for {}",
                                                               file.display()));
+                config = config.merge(&partial_config_from_options(&matches));
                 if let Some(path) = path {
                     println!("Using rustfmt config file {} for {}",
                              path.display(),
                              file.display());
                 }
 
-                update_config(&mut config, &matches);
                 run(&file, write_mode, &config);
             }
             0
