@@ -12,13 +12,19 @@
 
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate nom;
+
 extern crate rustfmt;
 extern crate toml;
 extern crate env_logger;
 extern crate getopts;
 
+use nom::IResult;
+
 use rustfmt::{run, run_from_stdin};
 use rustfmt::config::{Config, WriteMode};
+use rustfmt::config::{FileLinesMap, LineRanges};
 
 use std::env;
 use std::fs::{self, File};
@@ -49,6 +55,10 @@ enum Operation {
     Stdin {
         input: String,
         config_path: Option<PathBuf>,
+    },
+    /// Format a set of line ranges.
+    FormatLineRanges {
+        file_lines_map: FileLinesMap,
     },
 }
 
@@ -120,7 +130,9 @@ fn match_cli_path_or_file(config_path: Option<PathBuf>,
 
 fn update_config(config: &mut Config, matches: &Matches) -> Result<(), String> {
     config.verbose = matches.opt_present("verbose");
-    config.skip_children = matches.opt_present("skip-children");
+    // `file-lines` implies `skip-children`.
+    config.skip_children = matches.opt_present("skip-children") ||
+                           (file_lines_enabled() && matches.opt_present("file-lines"));
 
     let write_mode = matches.opt_str("write-mode");
     match matches.opt_str("write-mode").map(|wm| WriteMode::from_str(&wm)) {
@@ -130,6 +142,13 @@ fn update_config(config: &mut Config, matches: &Matches) -> Result<(), String> {
             Ok(())
         }
         Some(Err(_)) => Err(format!("Invalid write-mode: {}", write_mode.expect("cannot happen"))),
+    }
+}
+
+fn file_lines_enabled() -> bool {
+    match env::var("RUSTFMT_EXPERIMENTAL_FILE_LINES") {
+        Ok(ref v) if v == "1" => true,
+        _ => false,
     }
 }
 
@@ -152,6 +171,13 @@ fn execute() -> i32 {
                 "Recursively searches the given path for the rustfmt.toml config file. If not \
                  found reverts to the input file path",
                 "[Path for the configuration file]");
+    if file_lines_enabled() {
+        opts.optmulti("",
+                      "file-lines",
+                      "Format specified line RANGEs in FILE. RANGEs are inclusive of both \
+                       endpoints. May be specified multiple times.",
+                      "FILE:RANGE,RANGE,...");
+    }
 
     let matches = match opts.parse(env::args().skip(1)) {
         Ok(m) => m,
@@ -228,6 +254,27 @@ fn execute() -> i32 {
             }
             0
         }
+        // TODO: figure out what to do with config_path.
+        Operation::FormatLineRanges { file_lines_map } => {
+            for (file, line_ranges) in file_lines_map {
+                let (mut config, config_path) = resolve_config(file.parent().unwrap())
+                                                    .expect(&format!("Error resolving config \
+                                                                      for {}",
+                                                                     file.display()));
+                if let Some(path) = config_path.as_ref() {
+                    println!("Using rustfmt config file {} for {}",
+                             path.display(),
+                             file.display());
+                }
+                if let Err(e) = update_config(&mut config, &matches) {
+                    print_usage(&opts, &e);
+                    return 1;
+                }
+                config.line_ranges = line_ranges;
+                run(&file, &config);
+            }
+            0
+        }
     }
 }
 
@@ -283,6 +330,29 @@ fn determine_operation(matches: &Matches) -> Operation {
                                                   Some(dir)
                                               });
 
+    if file_lines_enabled() && matches.opt_present("file-lines") {
+        let file_lines = matches.opt_strs("file-lines");
+        let mut file_lines_map = FileLinesMap::new();
+        for range_spec in file_lines {
+            let invalid = || {
+                Operation::InvalidInput {
+                    reason: format!("invalid file-lines argument: {}", range_spec),
+                }
+            };
+
+            let (file, line_ranges) = match parse::file_lines_arg(&range_spec) {
+                IResult::Error(_) |
+                IResult::Incomplete(_) => return invalid(),
+                IResult::Done(remaining, _) if !remaining.is_empty() => return invalid(),
+                IResult::Done(_, (file, line_ranges)) => (file, line_ranges),
+            };
+
+            let entry = file_lines_map.entry(file).or_insert(LineRanges(Vec::new()));
+            entry.0.extend(line_ranges.0);
+        }
+        return Operation::FormatLineRanges { file_lines_map: file_lines_map };
+    }
+
     // if no file argument is supplied, read from stdin
     if matches.free.is_empty() {
 
@@ -304,4 +374,60 @@ fn determine_operation(matches: &Matches) -> Operation {
         files: files,
         config_path: config_path,
     }
+}
+
+
+/// Parser for the `file-lines` argument.
+mod parse {
+    use std::path::PathBuf;
+    use std::str::FromStr;
+    use rustfmt::config::{LineRange, LineRanges};
+
+    use nom::digit;
+
+    named!(pub file_lines_arg<&str, (PathBuf, LineRanges)>,
+           chain!(
+               file: map!(
+                   is_not_s!(":"),
+                   PathBuf::from
+               ) ~
+               tag_s!(":") ~
+               line_ranges: line_ranges,
+               || (file, line_ranges)
+           )
+    );
+
+    named!(usize_digit<&str, usize>,
+           map_res!(
+               digit,
+               FromStr::from_str
+           )
+    );
+
+    named!(line_range<&str, LineRange>,
+           map_res!(
+               separated_pair!(
+                   usize_digit,
+                   tag_s!("-"),
+                   usize_digit
+               ),
+               |pair| {
+                   let (lo, hi) = pair;
+                   if lo < hi {
+                       return Err(format!("empty line range: {}-{}", lo, hi));
+                   }
+                   Ok(LineRange { lo: lo, hi: hi })
+               }
+           )
+    );
+
+    named!(line_ranges<&str, LineRanges>,
+           map!(
+               separated_nonempty_list!(
+                   tag_s!(","),
+                   line_range
+               ),
+               LineRanges
+           )
+    );
 }
