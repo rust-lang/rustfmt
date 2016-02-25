@@ -186,8 +186,18 @@ impl ConfigHelpItem {
     }
 }
 
+/// Controls if a config field is printed in docs.
+enum ConfigDoc {
+    /// Include in docs.
+    Doc,
+    /// Do not include in docs.
+    #[allow(dead_code)]
+    NoDoc,
+}
+use self::ConfigDoc::*;
+
 macro_rules! create_config {
-    ($($i:ident: $ty:ty, $def:expr, $( $dstring:expr ),+ );+ $(;)*) => (
+    ($($doc:ident $i:ident: $ty:ty, $def:expr, $( $dstring:expr ),+ );+ $(;)*) => (
         #[derive(RustcDecodable, Clone)]
         pub struct Config {
             $(pub $i: $ty),+
@@ -253,21 +263,23 @@ macro_rules! create_config {
                 }
                 println!("Configuration Options:");
                 $(
-                    let name_raw = stringify!($i);
-                    let mut name_out = String::with_capacity(max);
-                    for _ in name_raw.len()..max-1 {
-                        name_out.push(' ')
+                    if let ConfigDoc::Doc = $doc {
+                        let name_raw = stringify!($i);
+                        let mut name_out = String::with_capacity(max);
+                        for _ in name_raw.len()..max-1 {
+                            name_out.push(' ')
+                        }
+                        name_out.push_str(name_raw);
+                        name_out.push(' ');
+                        println!("{}{} Default: {:?}",
+                                 name_out,
+                                 <$ty>::get_variant_names(),
+                                 $def);
+                        $(
+                            println!("{}{}", space_str, $dstring);
+                        )+
+                        println!("");
                     }
-                    name_out.push_str(name_raw);
-                    name_out.push(' ');
-                    println!("{}{} Default: {:?}",
-                             name_out,
-                             <$ty>::get_variant_names(),
-                             $def);
-                    $(
-                        println!("{}{}", space_str, $dstring);
-                    )+
-                    println!("");
                 )+
             }
         }
@@ -286,66 +298,69 @@ macro_rules! create_config {
 }
 
 create_config! {
-    verbose: bool, false, "Use verbose output";
-    skip_children: bool, false, "Don't reformat out of line modules";
-    max_width: usize, 100, "Maximum width of each line";
-    ideal_width: usize, 80, "Ideal width of each line";
-    tab_spaces: usize, 4, "Number of spaces per tab";
-    fn_call_width: usize, 60,
+    Doc verbose: bool, false, "Use verbose output";
+    Doc skip_children: bool, false, "Don't reformat out of line modules";
+    Doc max_width: usize, 100, "Maximum width of each line";
+    Doc ideal_width: usize, 80, "Ideal width of each line";
+    Doc tab_spaces: usize, 4, "Number of spaces per tab";
+    Doc fn_call_width: usize, 60,
         "Maximum width of the args of a function call before falling back to vertical formatting";
-    struct_lit_width: usize, 16,
+    Doc struct_lit_width: usize, 16,
         "Maximum width in the body of a struct lit before falling back to vertical formatting";
-    newline_style: NewlineStyle, NewlineStyle::Unix, "Unix or Windows line endings";
-    fn_brace_style: BraceStyle, BraceStyle::SameLineWhere, "Brace style for functions";
-    item_brace_style: BraceStyle, BraceStyle::SameLineWhere, "Brace style for structs and enums";
-    impl_empty_single_line: bool, true, "Put empty-body implementations on a single line";
-    fn_empty_single_line: bool, true, "Put empty-body functions on a single line";
-    fn_single_line: bool, false, "Put single-expression functions on a single line";
-    fn_return_indent: ReturnIndent, ReturnIndent::WithArgs,
+    Doc newline_style: NewlineStyle, NewlineStyle::Unix, "Unix or Windows line endings";
+    Doc fn_brace_style: BraceStyle, BraceStyle::SameLineWhere, "Brace style for functions";
+    Doc item_brace_style: BraceStyle, BraceStyle::SameLineWhere,
+        "Brace style for structs and enums";
+    Doc impl_empty_single_line: bool, true, "Put empty-body implementations on a single line";
+    Doc fn_empty_single_line: bool, true, "Put empty-body functions on a single line";
+    Doc fn_single_line: bool, false, "Put single-expression functions on a single line";
+    Doc fn_return_indent: ReturnIndent, ReturnIndent::WithArgs,
         "Location of return type in function declaration";
-    fn_args_paren_newline: bool, true, "If function argument parenthesis goes on a newline";
-    fn_args_density: Density, Density::Tall, "Argument density in functions";
-    fn_args_layout: StructLitStyle, StructLitStyle::Visual, "Layout of function arguments";
-    fn_arg_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indent on function arguments";
-    type_punctuation_density: TypeDensity, TypeDensity::Wide,
+    Doc fn_args_paren_newline: bool, true, "If function argument parenthesis goes on a newline";
+    Doc fn_args_density: Density, Density::Tall, "Argument density in functions";
+    Doc fn_args_layout: StructLitStyle, StructLitStyle::Visual, "Layout of function arguments";
+    Doc fn_arg_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indent on function arguments";
+    Doc type_punctuation_density: TypeDensity, TypeDensity::Wide,
         "Determines if '+' or '=' are wrapped in spaces in the punctuation of types";
     // Should we at least try to put the where clause on the same line as the rest of the
     // function decl?
-    where_density: Density, Density::CompressedIfEmpty, "Density of a where clause";
+    Doc where_density: Density, Density::CompressedIfEmpty, "Density of a where clause";
     // Visual will be treated like Tabbed
-    where_indent: BlockIndentStyle, BlockIndentStyle::Tabbed, "Indentation of a where clause";
-    where_layout: ListTactic, ListTactic::Vertical, "Element layout inside a where clause";
-    where_pred_indent: BlockIndentStyle, BlockIndentStyle::Visual,
+    Doc where_indent: BlockIndentStyle, BlockIndentStyle::Tabbed, "Indentation of a where clause";
+    Doc where_layout: ListTactic, ListTactic::Vertical, "Element layout inside a where clause";
+    Doc where_pred_indent: BlockIndentStyle, BlockIndentStyle::Visual,
         "Indentation style of a where predicate";
-    where_trailing_comma: bool, false, "Put a trailing comma on where clauses";
-    generics_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indentation of generics";
-    struct_trailing_comma: SeparatorTactic, SeparatorTactic::Vertical,
+    Doc where_trailing_comma: bool, false, "Put a trailing comma on where clauses";
+    Doc generics_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indentation of generics";
+    Doc struct_trailing_comma: SeparatorTactic, SeparatorTactic::Vertical,
         "If there is a trailing comma on structs";
-    struct_lit_trailing_comma: SeparatorTactic, SeparatorTactic::Vertical,
+    Doc struct_lit_trailing_comma: SeparatorTactic, SeparatorTactic::Vertical,
         "If there is a trailing comma on literal structs";
-    struct_lit_style: StructLitStyle, StructLitStyle::Block, "Style of struct definition";
-    struct_lit_multiline_style: MultilineStyle, MultilineStyle::PreferSingle,
+    Doc struct_lit_style: StructLitStyle, StructLitStyle::Block, "Style of struct definition";
+    Doc struct_lit_multiline_style: MultilineStyle, MultilineStyle::PreferSingle,
         "Multiline style on literal structs";
-    enum_trailing_comma: bool, true, "Put a trailing comma on enum declarations";
-    report_todo: ReportTactic, ReportTactic::Never,
+    Doc enum_trailing_comma: bool, true, "Put a trailing comma on enum declarations";
+    Doc report_todo: ReportTactic, ReportTactic::Never,
         "Report all, none or unnumbered occurrences of TODO in source file comments";
-    report_fixme: ReportTactic, ReportTactic::Never,
+    Doc report_fixme: ReportTactic, ReportTactic::Never,
         "Report all, none or unnumbered occurrences of FIXME in source file comments";
-    chain_base_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indent on chain base";
-    chain_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indentation of chain";
-    reorder_imports: bool, false, "Reorder import statements alphabetically";
-    single_line_if_else: bool, false, "Put else on same line as closing brace for if statements";
-    format_strings: bool, true, "Format string literals where necessary";
-    force_format_strings: bool, false, "Always format string literals";
-    chains_overflow_last: bool, true, "Allow last call in method chain to break the line";
-    take_source_hints: bool, true, "Retain some formatting characteristics from the source code";
-    hard_tabs: bool, false, "Use tab characters for indentation, spaces for alignment";
-    wrap_comments: bool, false, "Break comments to fit on the line";
-    normalise_comments: bool, true, "Convert /* */ comments to // comments where possible";
-    wrap_match_arms: bool, true, "Wrap multiline match arms in blocks";
-    match_block_trailing_comma: bool, false,
+    Doc chain_base_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indent on chain base";
+    Doc chain_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indentation of chain";
+    Doc reorder_imports: bool, false, "Reorder import statements alphabetically";
+    Doc single_line_if_else: bool, false,
+        "Put else on same line as closing brace for if statements";
+    Doc format_strings: bool, true, "Format string literals where necessary";
+    Doc force_format_strings: bool, false, "Always format string literals";
+    Doc chains_overflow_last: bool, true, "Allow last call in method chain to break the line";
+    Doc take_source_hints: bool, true,
+        "Retain some formatting characteristics from the source code";
+    Doc hard_tabs: bool, false, "Use tab characters for indentation, spaces for alignment";
+    Doc wrap_comments: bool, false, "Break comments to fit on the line";
+    Doc normalise_comments: bool, true, "Convert /* */ comments to // comments where possible";
+    Doc wrap_match_arms: bool, true, "Wrap multiline match arms in blocks";
+    Doc match_block_trailing_comma: bool, false,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
-    match_wildcard_trailing_comma: bool, true, "Put a trailing comma after a wildcard arm";
-    write_mode: WriteMode, WriteMode::Replace,
+    Doc match_wildcard_trailing_comma: bool, true, "Put a trailing comma after a wildcard arm";
+    Doc write_mode: WriteMode, WriteMode::Replace,
         "What Write Mode to use when none is supplied: Replace, Overwrite, Display, Diff, Coverage";
 }
