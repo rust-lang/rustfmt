@@ -10,6 +10,10 @@
 
 extern crate toml;
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::str;
+
 use lists::{SeparatorTactic, ListTactic};
 
 macro_rules! configuration_option_enum{
@@ -79,6 +83,40 @@ configuration_option_enum! { TypeDensity:
     // Spaces around " = " and " + "
     Wide,
 }
+
+/// A range of lines, inclusive of both ends.
+#[derive(Clone, Debug, RustcDecodable)]
+pub struct LineRange {
+    pub lo: usize,
+    pub hi: usize,
+}
+
+// Newtype required to implement ConfigType and FromStr for the `create_config` macro.
+#[derive(Clone, Debug, RustcDecodable)]
+pub struct LineRanges(pub Vec<LineRange>);
+
+impl LineRanges {
+    pub fn new() -> LineRanges {
+        LineRanges(Vec::new())
+    }
+}
+
+// This impl is needed by the `create_config` macro.
+impl str::FromStr for LineRanges {
+    type Err = ();
+    fn from_str(_: &str) -> Result<LineRanges, ()> {
+        unimplemented!();
+    }
+}
+
+// This impl is needed by the `create_config` macro.
+impl ConfigType for LineRanges {
+    fn get_variant_names() -> String {
+        String::from("<ranges>")
+    }
+}
+
+pub type FileLinesMap = HashMap<PathBuf, LineRanges>;
 
 impl Density {
     pub fn to_list_tactic(self) -> ListTactic {
@@ -300,6 +338,7 @@ macro_rules! create_config {
 create_config! {
     Doc verbose: bool, false, "Use verbose output";
     Doc skip_children: bool, false, "Don't reformat out of line modules";
+    NoDoc line_ranges: LineRanges, LineRanges::new(), "Ranges of lines to format";
     Doc max_width: usize, 100, "Maximum width of each line";
     Doc ideal_width: usize, 80, "Ideal width of each line";
     Doc tab_spaces: usize, 4, "Number of spaces per tab";
