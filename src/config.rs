@@ -346,6 +346,6 @@ create_config! {
     match_block_trailing_comma: bool, false,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
     match_wildcard_trailing_comma: bool, true, "Put a trailing comma after a wildcard arm";
-    write_mode: WriteMode, WriteMode::Replace,
+    write_mode: WriteMode, WriteMode::Overwrite,
         "What Write Mode to use when none is supplied: Replace, Overwrite, Display, Diff, Coverage";
 }
