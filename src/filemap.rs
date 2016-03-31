@@ -110,7 +110,7 @@ pub fn write_file<T>(text: &StringBuffer,
     }
 
     match config.write_mode {
-        WriteMode::Replace => {
+        WriteMode::Backup => {
             if let Ok((ori, fmt)) = source_and_formatted_text(text, filename, config) {
                 if fmt != ori {
                     // Do a little dance to make writing safer - write to a temp file

@@ -127,19 +127,24 @@ fn match_cli_path_or_file(config_path: Option<PathBuf>,
     resolve_config(input_file)
 }
 
+fn parse_write_mode(write_mode: &str) -> Result<WriteMode, String> {
+    // Allow `replace` as a synonym for `backup` for backward compatibility.
+    if let "replace" = write_mode {
+        return Ok(WriteMode::Backup);
+    }
+
+    WriteMode::from_str(write_mode).map_err(|_| format!("Invalid write-mode: {}", write_mode))
+}
+
 fn update_config(config: &mut Config, matches: &Matches) -> Result<(), String> {
     config.verbose = matches.opt_present("verbose");
     config.skip_children = matches.opt_present("skip-children");
 
-    let write_mode = matches.opt_str("write-mode");
-    match matches.opt_str("write-mode").map(|wm| WriteMode::from_str(&wm)) {
-        None => Ok(()),
-        Some(Ok(write_mode)) => {
-            config.write_mode = write_mode;
-            Ok(())
-        }
-        Some(Err(_)) => Err(format!("Invalid write-mode: {}", write_mode.expect("cannot happen"))),
+    if let Some(ref write_mode) = matches.opt_str("write-mode") {
+        config.write_mode = try!(parse_write_mode(write_mode));
     }
+
+    Ok(())
 }
 
 fn execute() -> i32 {
