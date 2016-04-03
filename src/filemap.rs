@@ -80,6 +80,51 @@ pub fn write_system_newlines<T>(writer: T,
     }
 }
 
+fn source_and_formatted_text(text: &StringBuffer,
+                             filename: &str,
+                             config: &Config)
+                             -> Result<(String, String), io::Error> {
+    let mut f = try!(File::open(filename));
+    let mut ori_text = String::new();
+    try!(f.read_to_string(&mut ori_text));
+    let mut v = Vec::new();
+    try!(write_system_newlines(&mut v, text, config));
+    let fmt_text = String::from_utf8(v).unwrap();
+    Ok((ori_text, fmt_text))
+}
+
+fn create_diff(filename: &str,
+               text: &StringBuffer,
+               config: &Config)
+               -> Result<Vec<Mismatch>, io::Error> {
+    let (ori, fmt) = try!(source_and_formatted_text(text, filename, config));
+    Ok(make_diff(&ori, &fmt, 3))
+}
+
+pub fn check_all_files<T>(file_map: &FileMap, mut out: T, config: &Config) -> usize
+    where T: Write
+{
+    let mut error_count = 0;
+    for filename in file_map.keys() {
+        let diff = create_diff(filename, &file_map[filename], config);
+        match diff {
+            Ok(result) => {
+                let file_errors = result.len();
+                if file_errors > 0 {
+                    error_count += file_errors;
+                    let _ = write!(out, "{} contains {} errors\n", filename, file_errors);
+                }
+            }
+            Err(error) => {
+                error_count += 1;
+                let _ = write!(out, "Error processing {}: {}", filename, error);
+            }
+        };
+    }
+
+    error_count
+}
+
 pub fn write_file<T>(text: &StringBuffer,
                      filename: &str,
                      out: &mut T,
@@ -87,28 +132,6 @@ pub fn write_file<T>(text: &StringBuffer,
                      -> Result<Option<String>, io::Error>
     where T: Write
 {
-
-    fn source_and_formatted_text(text: &StringBuffer,
-                                 filename: &str,
-                                 config: &Config)
-                                 -> Result<(String, String), io::Error> {
-        let mut f = try!(File::open(filename));
-        let mut ori_text = String::new();
-        try!(f.read_to_string(&mut ori_text));
-        let mut v = Vec::new();
-        try!(write_system_newlines(&mut v, text, config));
-        let fmt_text = String::from_utf8(v).unwrap();
-        Ok((ori_text, fmt_text))
-    }
-
-    fn create_diff(filename: &str,
-                   text: &StringBuffer,
-                   config: &Config)
-                   -> Result<Vec<Mismatch>, io::Error> {
-        let (ori, fmt) = try!(source_and_formatted_text(text, filename, config));
-        Ok(make_diff(&ori, &fmt, 3))
-    }
-
     match config.write_mode {
         WriteMode::Replace => {
             if let Ok((ori, fmt)) = source_and_formatted_text(text, filename, config) {
