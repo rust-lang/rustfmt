@@ -17,7 +17,7 @@ extern crate toml;
 extern crate env_logger;
 extern crate getopts;
 
-use rustfmt::{run, run_from_stdin};
+use rustfmt::{run, run_from_stdin, check};
 use rustfmt::config::{Config, WriteMode};
 
 use std::env;
@@ -53,6 +53,11 @@ enum Operation {
     /// Invalid program input.
     InvalidInput {
         reason: String,
+    },
+    /// Check for any style issues, returning non-zero error code if any problems are found
+    Check {
+        files: Vec<PathBuf>,
+        config_path: Option<PathBuf>,
     },
     /// No file specified, read from stdin
     Stdin {
@@ -147,6 +152,7 @@ fn execute() -> i32 {
     opts.optflag("h", "help", "show this message");
     opts.optflag("V", "version", "show version information");
     opts.optflag("v", "verbose", "show progress");
+    opts.optflag("c", "check", "check for style errors, don't modify files");
     opts.optopt("",
                 "write-mode",
                 "mode to write in (not usable when piping from stdin)",
@@ -200,11 +206,12 @@ fn execute() -> i32 {
             run_from_stdin(input, &config);
             0
         }
-        Operation::Format { files, config_path } => {
+        Operation::Format { ref files, ref config_path } |
+        Operation::Check { ref files, ref config_path } => {
             let mut config = Config::default();
             let mut path = None;
             // Load the config path file if provided
-            if let Some(config_file) = config_path {
+            if let Some(ref config_file) = *config_path {
                 let (cfg_tmp, path_tmp) = resolve_config(config_file.as_ref())
                                               .expect(&format!("Error resolving config for {:?}",
                                                                config_file));
@@ -214,6 +221,9 @@ fn execute() -> i32 {
             if let Some(path) = path.as_ref() {
                 println!("Using rustfmt config file {}", path.display());
             }
+
+            let mut error_result: i32 = 0;
+
             for file in files {
                 // Check the file directory if the config-path could not be read or not provided
                 if path.is_none() {
@@ -233,9 +243,15 @@ fn execute() -> i32 {
                     print_usage(&opts, &e);
                     return 1;
                 }
-                run(&file, &config);
+
+                if let Operation::Check { files: _, config_path: _ } = operation {
+                    error_result += check(&file, &config);
+                } else {
+                    run(&file, &config);
+                }
             }
-            0
+
+            error_result
         }
     }
 }
@@ -308,6 +324,13 @@ fn determine_operation(matches: &Matches) -> Operation {
     }
 
     let files: Vec<_> = matches.free.iter().map(PathBuf::from).collect();
+
+    if matches.opt_present("check") {
+        return Operation::Check {
+            files: files,
+            config_path: config_path,
+        };
+    }
 
     Operation::Format {
         files: files,

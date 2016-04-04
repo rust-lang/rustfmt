@@ -440,6 +440,13 @@ pub fn run(file: &Path, config: &Config) {
     }
 }
 
+pub fn check(file: &Path, config: &Config) -> i32 {
+    let mut result = format(file, config);
+    print!("{}", fmt_lines(&mut result, config));
+    let out = stdout();
+    filemap::check_all_files(&result, out, config) as i32
+}
+
 // Similar to run, but takes an input String instead of a file to format
 pub fn run_from_stdin(input: String, config: &Config) {
     let mut result = format_string(input, config);
