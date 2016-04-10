@@ -18,7 +18,7 @@ extern crate env_logger;
 extern crate getopts;
 
 use rustfmt::{run, Input, Summary};
-use rustfmt::config::{Config, ConfigType, WriteMode};
+use rustfmt::config::{self, Config, ConfigType, FileLinesMap, WriteMode};
 
 use std::{env, error};
 use std::fs::{self, File};
@@ -56,6 +56,7 @@ struct CliOptions {
     skip_children: bool,
     verbose: bool,
     write_mode: Option<WriteMode>,
+    file_lines_map: Option<FileLinesMap>,
 }
 
 impl CliOptions {
@@ -72,12 +73,25 @@ impl CliOptions {
             }
         }
 
+        if matches.opt_present("experimental-file-lines") {
+            let specs = matches.opt_strs("experimental-file-lines");
+            let file_lines_map = try!(specs.iter()
+                                           .map(|ref s| {
+                                               config::parse_file_lines_spec(s)
+                                                   .map_err(FmtError::from)
+                                           })
+                                           .collect());
+
+            options.file_lines_map = Some(file_lines_map);
+        }
+
         Ok(options)
     }
 
-    fn apply_to(&self, config: &mut Config) {
+    fn apply_to(self, config: &mut Config) {
         config.skip_children = self.skip_children;
         config.verbose = self.verbose;
+        config.file_lines_map = self.file_lines_map;
         if let Some(write_mode) = self.write_mode {
             config.write_mode = write_mode;
         }
@@ -167,6 +181,11 @@ fn make_opts() -> Options {
                 "Recursively searches the given path for the rustfmt.toml config file. If not \
                  found reverts to the input file path",
                 "[Path for the configuration file]");
+    opts.optmulti("",
+                  "experimental-file-lines",
+                  "Format specified line RANGEs in FILE. RANGEs are inclusive of both endpoints. \
+                  May be specified multiple times.",
+                  "FILE:RANGE,RANGE,...");
 
     opts
 }
@@ -229,7 +248,7 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
                     config = config_tmp;
                 }
 
-                options.apply_to(&mut config);
+                options.clone().apply_to(&mut config);
                 error_summary.add(run(Input::File(file), &config));
             }
             Ok(error_summary)
