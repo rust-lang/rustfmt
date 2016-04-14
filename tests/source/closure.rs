@@ -57,3 +57,17 @@ fn issue863() {
         _ => false,
     } == true;
 }
+
+fn issue934() {
+    let hash: &Fn(&&Block) -> u64 = &|block| -> u64 {
+        let mut h = SpanlessHash::new(cx);
+        h.hash_block(block);
+        h.finish()
+    };
+
+    let hash: &Fn(&&Block) -> u64 = &|block| -> u64 {
+        let mut h = SpanlessHash::new(cx);
+        h.hash_block(block);
+        h.finish();
+    };
+}
