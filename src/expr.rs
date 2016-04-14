@@ -440,7 +440,9 @@ fn rewrite_closure(capture: ast::CaptureBy,
     if try_single_line && !prefix.contains('\n') {
         let inner_expr = inner_block.expr.as_ref().unwrap();
         // 4 = braces and spaces.
-        let mut rewrite = inner_expr.rewrite(context, budget - 4, offset + extra_offset);
+        let mut rewrite = inner_expr.rewrite(context,
+                                             try_opt!(budget.checked_sub(4)),
+                                             offset + extra_offset);
 
         // Checks if rewrite succeeded and fits on a single line.
         rewrite = and_one_line(rewrite);
