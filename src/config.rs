@@ -10,6 +10,7 @@
 
 extern crate toml;
 
+use std::str;
 use lists::{SeparatorTactic, ListTactic};
 use std::io::Write;
 
@@ -171,26 +172,48 @@ configuration_option_enum! { WriteMode:
 
 /// Trait for types that can be used in `Config`.
 pub trait ConfigType: Sized {
+    /// The error type for `parse()`.
+    type ParseErr;
     /// Returns hint text for use in `Config::print_docs()`. For enum types, this is a
     /// pipe-separated list of variants; for other types it returns "<type>".
     fn doc_hint() -> String;
+    /// Parses a string for use as an override in `Config::override_value()`.
+    fn parse(s: &str) -> Result<Self, Self::ParseErr>;
 }
 
 impl ConfigType for bool {
+    type ParseErr = <bool as str::FromStr>::Err;
+
     fn doc_hint() -> String {
         String::from("<boolean>")
+    }
+
+    fn parse(s: &str) -> Result<Self, Self::ParseErr> {
+        s.parse()
     }
 }
 
 impl ConfigType for usize {
+    type ParseErr = <usize as str::FromStr>::Err;
+
     fn doc_hint() -> String {
         String::from("<unsigned integer>")
+    }
+
+    fn parse(s: &str) -> Result<Self, Self::ParseErr> {
+        s.parse()
     }
 }
 
 impl ConfigType for String {
+    type ParseErr = <String as str::FromStr>::Err;
+
     fn doc_hint() -> String {
         String::from("<string>")
+    }
+
+    fn parse(s: &str) -> Result<Self, Self::ParseErr> {
+        s.parse()
     }
 }
 
@@ -275,7 +298,7 @@ macro_rules! create_config {
                 match key {
                     $(
                         stringify!($i) => {
-                            self.$i = val.parse::<$ty>()
+                            self.$i = <$ty>::parse(val)
                                 .expect(&format!("Failed to parse override for {} (\"{}\") as a {}",
                                                  stringify!($i),
                                                  val,

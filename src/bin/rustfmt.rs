@@ -18,13 +18,12 @@ extern crate env_logger;
 extern crate getopts;
 
 use rustfmt::{run, Input, Summary};
-use rustfmt::config::{Config, WriteMode};
+use rustfmt::config::{Config, ConfigType, WriteMode};
 
 use std::{env, error};
 use std::fs::{self, File};
 use std::io::{self, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use getopts::{Matches, Options};
 
@@ -66,7 +65,7 @@ impl CliOptions {
         options.verbose = matches.opt_present("verbose");
 
         if let Some(ref write_mode) = matches.opt_str("write-mode") {
-            if let Ok(write_mode) = WriteMode::from_str(write_mode) {
+            if let Ok(write_mode) = WriteMode::parse(write_mode) {
                 options.write_mode = Some(write_mode);
             } else {
                 return Err(FmtError::from(format!("Invalid write-mode: {}", write_mode)));

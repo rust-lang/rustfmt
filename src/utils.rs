@@ -207,10 +207,18 @@ macro_rules! impl_enum_decodable {
             }
         }
 
-        impl ::std::str::FromStr for $e {
-            type Err = &'static str;
+        impl ::config::ConfigType for $e {
+            type ParseErr = &'static str;
 
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
+            fn doc_hint() -> String {
+                let mut variants = Vec::new();
+                $(
+                    variants.push(stringify!($x));
+                )*
+                format!("[{}]", variants.join("|"))
+            }
+
+            fn parse(s: &str) -> Result<Self, Self::ParseErr> {
                 use std::ascii::AsciiExt;
                 $(
                     if stringify!($x).eq_ignore_ascii_case(s) {
@@ -218,16 +226,6 @@ macro_rules! impl_enum_decodable {
                     }
                 )*
                 Err("Bad variant")
-            }
-        }
-
-        impl ::config::ConfigType for $e {
-            fn doc_hint() -> String {
-                let mut variants = Vec::new();
-                $(
-                    variants.push(stringify!($x));
-                )*
-                format!("[{}]", variants.join("|"))
             }
         }
     };
