@@ -10,7 +10,12 @@
 
 extern crate toml;
 
-use std::str;
+use std::{iter, str};
+use std::collections::HashMap;
+
+use nom::IResult;
+
+use codemap::LineSet;
 use lists::{SeparatorTactic, ListTactic};
 use std::io::Write;
 
@@ -109,6 +114,112 @@ configuration_option_enum! { TypeDensity:
     Compressed,
     // Spaces around " = " and " + "
     Wide,
+}
+
+// Newtype needed to have impls for `create_config` macro.
+#[derive(Clone, Debug, Default, RustcDecodable)]
+pub struct FileLinesMap(pub HashMap<String, LineSet>);
+
+impl ConfigType for Option<FileLinesMap> {
+    type ParseErr = String;
+
+    fn doc_hint() -> String {
+        unimplemented!();
+    }
+
+    fn parse(s: &str) -> Result<Self, String> {
+        let mut map = HashMap::new();
+        let (file, lines) = try!(parse_file_lines_spec(s));
+        map.insert(file, lines);
+
+        Ok(Some(FileLinesMap(map)))
+    }
+}
+
+pub fn parse_file_lines_spec(s: &str) -> Result<(String, LineSet), String> {
+    let err = || Err(format!("invalid experimental-file-lines argument: {}", s));
+
+    match file_lines_spec_parser::file_lines_spec(&s) {
+        IResult::Error(_) |
+        IResult::Incomplete(_) => return err(),
+        IResult::Done(remaining, _) if !remaining.is_empty() => return err(),
+        IResult::Done(_, (file, line_ranges)) => Ok((file, line_ranges)),
+    }
+}
+
+impl iter::FromIterator<(String, LineSet)> for FileLinesMap {
+    fn from_iter<I: IntoIterator<Item = (String, LineSet)>>(iter: I) -> FileLinesMap {
+        let mut ret = FileLinesMap(HashMap::new());
+        ret.extend(iter);
+        ret
+    }
+}
+
+impl Extend<(String, LineSet)> for FileLinesMap {
+    fn extend<I>(&mut self, iter: I)
+        where I: IntoIterator<Item = (String, LineSet)>
+    {
+        let map = &mut self.0;
+
+        for (file, line_set) in iter {
+            map.entry(file).or_insert(LineSet::new()).extend(line_set);
+        }
+    }
+}
+
+mod file_lines_spec_parser {
+    use std::iter::FromIterator;
+    use std::str::FromStr;
+
+    use nom::digit;
+
+    use codemap::{LineRange, LineSet};
+
+    named!(pub file_lines_spec<&str, (String, LineSet)>,
+           chain!(
+               file: map!(
+                   is_not_s!(":"),
+                   String::from
+               ) ~
+               tag_s!(":") ~
+               line_set: line_set,
+               || (file, line_set)
+           )
+    );
+
+    named!(usize_digit<&str, usize>,
+           map_res!(
+               digit,
+               usize::from_str
+           )
+    );
+
+    named!(line_range<&str, LineRange>,
+           map_res!(
+               separated_pair!(
+                   usize_digit,
+                   tag_s!("-"),
+                   usize_digit
+               ),
+               |pair| {
+                   let (lo, hi) = pair;
+                   if lo > hi {
+                       return Err(format!("empty line range: {}-{}", lo, hi));
+                   }
+                   Ok(LineRange { lo: lo, hi: hi })
+               }
+           )
+    );
+
+    named!(line_set<&str, LineSet>,
+           map!(
+               separated_nonempty_list!(
+                   tag_s!(","),
+                   line_range
+               ),
+               LineSet::from_iter
+           )
+    );
 }
 
 impl Density {
@@ -356,6 +467,8 @@ macro_rules! create_config {
 create_config! {
     Doc verbose: bool, false, "Use verbose output";
     Doc skip_children: bool, false, "Don't reformat out of line modules";
+    NoDoc file_lines_map: Option<FileLinesMap>, None::<FileLinesMap>,
+        "Lines to format for each file";
     Doc max_width: usize, 100, "Maximum width of each line";
     Doc ideal_width: usize, 80, "Ideal width of each line";
     Doc tab_spaces: usize, 4, "Number of spaces per tab";

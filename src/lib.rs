@@ -14,6 +14,8 @@
 
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate nom;
 
 extern crate syntex_syntax as syntax;
 extern crate rustc_serialize;

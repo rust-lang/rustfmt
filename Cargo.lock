@@ -7,6 +7,7 @@ dependencies = [
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nom 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.63 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "strings 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -83,6 +84,11 @@ dependencies = [
 [[package]]
 name = "mempool"
 version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "nom"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
