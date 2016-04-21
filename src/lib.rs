@@ -433,6 +433,7 @@ pub fn format_input(input: Input, config: &Config) -> (Summary, FileMap, FormatR
     (summary, file_map, report)
 }
 
+#[derive(Debug)]
 pub enum Input {
     File(PathBuf),
     Text(String),
