@@ -48,6 +48,7 @@ pub use self::summary::Summary;
 #[macro_use]
 mod utils;
 pub mod config;
+pub mod codemap;
 pub mod filemap;
 mod visitor;
 mod checkstyle;
