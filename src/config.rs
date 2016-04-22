@@ -90,6 +90,8 @@ configuration_option_enum! { BlockIndentStyle:
     Tabbed,
     // Aligned with block open.
     Visual,
+    // Two levels deeper than parent.
+    TabbedTwice,
 }
 
 configuration_option_enum! { Density:
