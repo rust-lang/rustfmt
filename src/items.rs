@@ -1568,6 +1568,9 @@ fn rewrite_args(context: &RewriteContext,
         BlockIndentStyle::Inherit => indent,
         BlockIndentStyle::Tabbed => indent.block_indent(context.config),
         BlockIndentStyle::Visual => arg_indent,
+        BlockIndentStyle::TabbedTwice => {
+            indent.block_indent(context.config).block_indent(context.config)
+        }
     };
 
     let tactic = definitive_tactic(&arg_items,
@@ -1674,6 +1677,9 @@ fn rewrite_generics(context: &RewriteContext,
     let offset = match context.config.generics_indent {
         BlockIndentStyle::Inherit => offset,
         BlockIndentStyle::Tabbed => offset.block_indent(context.config),
+        BlockIndentStyle::TabbedTwice => {
+            offset.block_indent(context.config).block_indent(context.config)
+        }
         // 1 = <
         BlockIndentStyle::Visual => generics_offset + 1,
     };
@@ -1750,11 +1756,16 @@ fn rewrite_where_clause(context: &RewriteContext,
     let extra_indent = match context.config.where_indent {
         BlockIndentStyle::Inherit => Indent::empty(),
         BlockIndentStyle::Tabbed | BlockIndentStyle::Visual => Indent::new(config.tab_spaces, 0),
+        BlockIndentStyle::TabbedTwice => Indent::new(config.tab_spaces * 2, 0),
     };
 
     let offset = match context.config.where_pred_indent {
         BlockIndentStyle::Inherit => indent + extra_indent,
         BlockIndentStyle::Tabbed => indent + extra_indent.block_indent(config),
+        BlockIndentStyle::TabbedTwice => {
+            extra_indent.block_indent(config);
+            indent + extra_indent.block_indent(config)
+        }
         // 6 = "where ".len()
         BlockIndentStyle::Visual => indent + extra_indent + 6,
     };

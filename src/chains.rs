@@ -45,6 +45,9 @@ pub fn rewrite_chain(mut expr: &ast::Expr,
         BlockIndentStyle::Visual => offset,
         BlockIndentStyle::Inherit => context.block_indent,
         BlockIndentStyle::Tabbed => context.block_indent.block_indent(context.config),
+        BlockIndentStyle::TabbedTwice => {
+            context.block_indent.block_indent(context.config).block_indent(context.config)
+        }
     };
     let parent_context = &RewriteContext { block_indent: parent_block_indent, ..*context };
     let parent = subexpr_list.pop().unwrap();
@@ -59,6 +62,10 @@ pub fn rewrite_chain(mut expr: &ast::Expr,
             BlockIndentStyle::Inherit => (context.block_indent, false),
             BlockIndentStyle::Tabbed => (context.block_indent.block_indent(context.config), false),
             BlockIndentStyle::Visual => (offset + Indent::new(context.config.tab_spaces, 0), false),
+            BlockIndentStyle::TabbedTwice => {
+                (context.block_indent.block_indent(context.config).block_indent(context.config),
+                 false)
+            }
         }
     };
 
