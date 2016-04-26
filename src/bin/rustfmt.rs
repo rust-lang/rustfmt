@@ -73,8 +73,8 @@ impl CliOptions {
             }
         }
 
-        if matches.opt_present("experimental-file-lines") {
-            let specs = matches.opt_strs("experimental-file-lines");
+        if matches.opt_present("file-lines") {
+            let specs = matches.opt_strs("file-lines");
             let file_lines_map = try!(specs.iter()
                                            .map(|ref s| {
                                                config::parse_file_lines_spec(s)
@@ -182,7 +182,7 @@ fn make_opts() -> Options {
                  found reverts to the input file path",
                 "[Path for the configuration file]");
     opts.optmulti("",
-                  "experimental-file-lines",
+                  "file-lines",
                   "Format specified line RANGEs in FILE. RANGEs are inclusive of both endpoints. \
                   May be specified multiple times.",
                   "FILE:RANGE,RANGE,...");

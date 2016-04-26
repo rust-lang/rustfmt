@@ -137,7 +137,7 @@ impl ConfigType for Option<FileLinesMap> {
 }
 
 pub fn parse_file_lines_spec(s: &str) -> Result<(String, LineSet), String> {
-    let err = || Err(format!("invalid experimental-file-lines argument: {}", s));
+    let err = || Err(format!("invalid file-lines argument: {}", s));
 
     match file_lines_spec_parser::file_lines_spec(&s) {
         IResult::Error(_) |
