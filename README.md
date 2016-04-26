@@ -65,6 +65,19 @@ the command line. For example `rustfmt --write-mode=display src/filename.rs`
 
 `cargo fmt` uses `--write-mode=replace` by default.
 
+If you want to restrict reformatting to specific sets of lines, you can use the
+`--file-lines` option. It can be specified multiple times, and takes
+`FILE:RANGE,RANGE,...` as an argument. `FILE` is a file name, and each `RANGE`
+is an inclusive range of lines like `7-13`. For example,
+
+```
+rustfmt src/lib.rs --file-lines src/lib.rs:7-13,21-29 --file-lines src/foo.rs:10-11,15-15
+```
+
+would format lines `7-13` and `21-29` for `src/lib.rs`, and lines `10-11`, and
+`15` of `src/foo.rs`. No other files would be formatted, even if they are
+included as out of line modules from `src/lib.rs`.
+
 If `rustfmt` successfully reformatted the code it will exit with `0` exit
 status. Exit status `1` signals some unexpected error, like an unknown option or
 a failure to read a file. Exit status `2` is returned if there are syntax errors
