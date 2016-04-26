@@ -11,50 +11,13 @@
 use std::cmp::Ordering;
 
 use syntax::ast::{self, Visibility, Attribute, MetaItem, MetaItemKind};
-use syntax::codemap::{CodeMap, Span, BytePos};
+use syntax::codemap::BytePos;
 use syntax::abi;
 
 use Indent;
-use comment::FindUncommented;
 use rewrite::{Rewrite, RewriteContext};
 
 use SKIP_ANNOTATION;
-
-pub trait CodeMapSpanUtils {
-    fn span_after(&self, original: Span, needle: &str) -> BytePos;
-    fn span_after_last(&self, original: Span, needle: &str) -> BytePos;
-    fn span_before(&self, original: Span, needle: &str) -> BytePos;
-}
-
-impl CodeMapSpanUtils for CodeMap {
-    #[inline]
-    fn span_after(&self, original: Span, needle: &str) -> BytePos {
-        let snippet = self.span_to_snippet(original).unwrap();
-        let offset = snippet.find_uncommented(needle).unwrap() + needle.len();
-
-        original.lo + BytePos(offset as u32)
-    }
-
-    #[inline]
-    fn span_after_last(&self, original: Span, needle: &str) -> BytePos {
-        let snippet = self.span_to_snippet(original).unwrap();
-        let mut offset = 0;
-
-        while let Some(additional_offset) = snippet[offset..].find_uncommented(needle) {
-            offset += additional_offset + needle.len();
-        }
-
-        original.lo + BytePos(offset as u32)
-    }
-
-    #[inline]
-    fn span_before(&self, original: Span, needle: &str) -> BytePos {
-        let snippet = self.span_to_snippet(original).unwrap();
-        let offset = snippet.find_uncommented(needle).unwrap();
-
-        original.lo + BytePos(offset as u32)
-    }
-}
 
 // Computes the length of a string's last line, minus offset.
 #[inline]
@@ -207,10 +170,18 @@ macro_rules! impl_enum_decodable {
             }
         }
 
-        impl ::std::str::FromStr for $e {
-            type Err = &'static str;
+        impl ::config::ConfigType for $e {
+            type ParseErr = &'static str;
 
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
+            fn doc_hint() -> String {
+                let mut variants = Vec::new();
+                $(
+                    variants.push(stringify!($x));
+                )*
+                format!("[{}]", variants.join("|"))
+            }
+
+            fn parse(s: &str) -> Result<Self, Self::ParseErr> {
                 use std::ascii::AsciiExt;
                 $(
                     if stringify!($x).eq_ignore_ascii_case(s) {
@@ -218,16 +189,6 @@ macro_rules! impl_enum_decodable {
                     }
                 )*
                 Err("Bad variant")
-            }
-        }
-
-        impl ::config::ConfigType for $e {
-            fn doc_hint() -> String {
-                let mut variants = Vec::new();
-                $(
-                    variants.push(stringify!($x));
-                )*
-                format!("[{}]", variants.join("|"))
             }
         }
     };

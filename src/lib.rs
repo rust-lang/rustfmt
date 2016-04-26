@@ -14,6 +14,8 @@
 
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate nom;
 
 extern crate syntex_syntax as syntax;
 extern crate rustc_serialize;
@@ -24,6 +26,7 @@ extern crate unicode_segmentation;
 extern crate regex;
 extern crate diff;
 extern crate term;
+extern crate itertools;
 
 use syntax::ast;
 use syntax::codemap::{mk_sp, CodeMap, Span};
@@ -48,6 +51,7 @@ pub use self::summary::Summary;
 #[macro_use]
 mod utils;
 pub mod config;
+pub mod codemap;
 pub mod filemap;
 mod visitor;
 mod checkstyle;
@@ -433,6 +437,7 @@ pub fn format_input(input: Input, config: &Config) -> (Summary, FileMap, FormatR
     (summary, file_map, report)
 }
 
+#[derive(Debug)]
 pub enum Input {
     File(PathBuf),
     Text(String),

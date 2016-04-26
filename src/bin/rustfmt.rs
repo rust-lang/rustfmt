@@ -18,13 +18,12 @@ extern crate env_logger;
 extern crate getopts;
 
 use rustfmt::{run, Input, Summary};
-use rustfmt::config::{Config, WriteMode};
+use rustfmt::config::{self, Config, ConfigType, FileLinesMap, WriteMode};
 
 use std::{env, error};
 use std::fs::{self, File};
 use std::io::{self, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use getopts::{Matches, Options};
 
@@ -57,6 +56,7 @@ struct CliOptions {
     skip_children: bool,
     verbose: bool,
     write_mode: Option<WriteMode>,
+    file_lines_map: Option<FileLinesMap>,
 }
 
 impl CliOptions {
@@ -66,19 +66,32 @@ impl CliOptions {
         options.verbose = matches.opt_present("verbose");
 
         if let Some(ref write_mode) = matches.opt_str("write-mode") {
-            if let Ok(write_mode) = WriteMode::from_str(write_mode) {
+            if let Ok(write_mode) = WriteMode::parse(write_mode) {
                 options.write_mode = Some(write_mode);
             } else {
                 return Err(FmtError::from(format!("Invalid write-mode: {}", write_mode)));
             }
         }
 
+        if matches.opt_present("file-lines") {
+            let specs = matches.opt_strs("file-lines");
+            let file_lines_map = try!(specs.iter()
+                                           .map(|ref s| {
+                                               config::parse_file_lines_spec(s)
+                                                   .map_err(FmtError::from)
+                                           })
+                                           .collect());
+
+            options.file_lines_map = Some(file_lines_map);
+        }
+
         Ok(options)
     }
 
-    fn apply_to(&self, config: &mut Config) {
+    fn apply_to(self, config: &mut Config) {
         config.skip_children = self.skip_children;
         config.verbose = self.verbose;
+        config.file_lines_map = self.file_lines_map;
         if let Some(write_mode) = self.write_mode {
             config.write_mode = write_mode;
         }
@@ -168,6 +181,11 @@ fn make_opts() -> Options {
                 "Recursively searches the given path for the rustfmt.toml config file. If not \
                  found reverts to the input file path",
                 "[Path for the configuration file]");
+    opts.optmulti("",
+                  "file-lines",
+                  "Format specified line RANGEs in FILE. RANGEs are inclusive of both endpoints. \
+                  May be specified multiple times.",
+                  "FILE:RANGE,RANGE,...");
 
     opts
 }
@@ -230,7 +248,7 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
                     config = config_tmp;
                 }
 
-                options.apply_to(&mut config);
+                options.clone().apply_to(&mut config);
                 error_summary.add(run(Input::File(file), &config));
             }
             Ok(error_summary)

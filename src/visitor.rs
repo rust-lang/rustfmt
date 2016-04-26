@@ -15,7 +15,8 @@ use syntax::parse::ParseSess;
 use strings::string_buffer::StringBuffer;
 
 use Indent;
-use utils::{self, CodeMapSpanUtils};
+use utils;
+use codemap::{LineRangeUtils, SpanUtils};
 use config::Config;
 use rewrite::{Rewrite, RewriteContext};
 use comment::rewrite_comment;
@@ -34,6 +35,21 @@ pub struct FmtVisitor<'a> {
 
 impl<'a> FmtVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        debug!("visit_stmt: {:?} {:?}",
+               self.codemap.lookup_char_pos(stmt.span.lo),
+               self.codemap.lookup_char_pos(stmt.span.hi));
+
+        let line_range = self.codemap.lookup_line_range(stmt.span);
+        let file_name = self.codemap.span_to_filename(stmt.span);
+
+        // TODO(#434): Move this check to somewhere more central, eg Rewrite.
+        if let Some(ref file_lines_map) = self.config.file_lines_map {
+            match file_lines_map.0.get(&*file_name) {
+                Some(ref line_set) if line_set.contains(line_range) => (),
+                _ => return,
+            }
+        }
+
         match stmt.node {
             ast::StmtKind::Decl(ref decl, _) => {
                 if let ast::DeclKind::Item(ref item) = decl.node {
