@@ -196,6 +196,15 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
             // write_mode is always Plain for Stdin.
             config.write_mode = WriteMode::Plain;
 
+            let options = try!(CliOptions::from_matches(&matches));
+            options.apply_to(&mut config);
+            if config.write_mode != WriteMode::Plain {
+                return Err(FmtError::from(format!("When reading from stdin, only the \"Plain\" \
+                                                   write mode is supported (\"{:?}\" was \
+                                                   specified)",
+                                                  config.write_mode)));
+            }
+
             Ok(run(Input::Text(input), &config))
         }
         Operation::Format { files, config_path } => {
