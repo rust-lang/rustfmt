@@ -70,7 +70,6 @@ pub fn extra_offset(text: &str, offset: Indent) -> usize {
 }
 
 // Uses Cow to avoid allocating in the common cases.
-#[inline]
 pub fn format_visibility(vis: &Visibility) -> Cow<'static, str> {
     match *vis {
         Visibility::Public => Cow::from("pub "),
