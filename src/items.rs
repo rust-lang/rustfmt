@@ -302,11 +302,7 @@ impl<'a> FmtVisitor<'a> {
                       enum_def: &ast::EnumDef,
                       generics: &ast::Generics,
                       span: Span) {
-        let header_str = match format_header("enum ", ident, vis) {
-            Some(s) => s,
-            None => return,
-        };
-        self.buffer.push_str(&header_str);
+        self.buffer.push_str(&format_header("enum ", ident, vis));
 
         let enum_snippet = self.snippet(span);
         let body_start = span.lo + BytePos(enum_snippet.find_uncommented("{").unwrap() as u32 + 1);
@@ -590,7 +586,7 @@ pub fn format_struct(context: &RewriteContext,
                      one_line_width: Option<usize>)
                      -> Option<String> {
     match *struct_def {
-        ast::VariantData::Unit(..) => format_unit_struct(item_name, ident, vis),
+        ast::VariantData::Unit(..) => Some(format_unit_struct(item_name, ident, vis)),
         ast::VariantData::Tuple(ref fields, _) => {
             format_tuple_struct(context,
                                 item_name,
@@ -741,14 +737,8 @@ pub fn format_trait(context: &RewriteContext, item: &ast::Item, offset: Indent) 
     }
 }
 
-fn format_unit_struct(item_name: &str, ident: ast::Ident, vis: &ast::Visibility) -> Option<String> {
-    let mut result = String::with_capacity(1024);
-
-    let header_str = try_opt!(format_header(item_name, ident, vis));
-    result.push_str(&header_str);
-    result.push(';');
-
-    Some(result)
+fn format_unit_struct(item_name: &str, ident: ast::Ident, vis: &ast::Visibility) -> String {
+    format!("{};", format_header(item_name, ident, vis))
 }
 
 fn format_struct_struct(context: &RewriteContext,
@@ -763,7 +753,7 @@ fn format_struct_struct(context: &RewriteContext,
                         -> Option<String> {
     let mut result = String::with_capacity(1024);
 
-    let header_str = try_opt!(format_header(item_name, ident, vis));
+    let header_str = format_header(item_name, ident, vis);
     result.push_str(&header_str);
 
     let body_lo = context.codemap.span_after(span, "{");
@@ -856,7 +846,7 @@ fn format_tuple_struct(context: &RewriteContext,
                        -> Option<String> {
     let mut result = String::with_capacity(1024);
 
-    let header_str = try_opt!(format_header(item_name, ident, vis));
+    let header_str = format_header(item_name, ident, vis);
     result.push_str(&header_str);
 
     // FIXME(#919): don't lose comments on empty tuple structs.
@@ -1813,8 +1803,8 @@ fn rewrite_where_clause(context: &RewriteContext,
     }
 }
 
-fn format_header(item_name: &str, ident: ast::Ident, vis: &ast::Visibility) -> Option<String> {
-    Some(format!("{}{}{}", format_visibility(vis), item_name, ident))
+fn format_header(item_name: &str, ident: ast::Ident, vis: &ast::Visibility) -> String {
+    format!("{}{}{}", format_visibility(vis), item_name, ident)
 }
 
 fn format_generics(context: &RewriteContext,
