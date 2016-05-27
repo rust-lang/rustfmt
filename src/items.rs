@@ -139,10 +139,7 @@ impl<'a> FmtVisitor<'a> {
             ast::ForeignItemKind::Static(ref ty, is_mutable) => {
                 // FIXME(#21): we're dropping potential comments in between the
                 // function keywords here.
-                let vis = match format_visibility(&item.vis) {
-                    Some(s) => s,
-                    None => return,
-                };
+                let vis = format_visibility(&item.vis);
                 let mut_str = if is_mutable {
                     "mut "
                 } else {
@@ -453,7 +450,7 @@ pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -
                                ref self_ty,
                                ref items) = item.node {
         let mut result = String::new();
-        result.push_str(try_opt!(format_visibility(&item.vis)));
+        result.push_str(&*format_visibility(&item.vis));
         result.push_str(format_unsafety(unsafety));
         result.push_str("impl");
 
@@ -623,7 +620,7 @@ pub fn format_trait(context: &RewriteContext, item: &ast::Item, offset: Indent) 
            item.node {
         let mut result = String::new();
         let header = format!("{}{}trait {}",
-                             try_opt!(format_visibility(&item.vis)),
+                             format_visibility(&item.vis),
                              format_unsafety(unsafety),
                              item.ident);
 
@@ -945,7 +942,7 @@ pub fn rewrite_type_alias(context: &RewriteContext,
                           -> Option<String> {
     let mut result = String::new();
 
-    result.push_str(&try_opt!(format_visibility(&vis)));
+    result.push_str(&format_visibility(&vis));
     result.push_str("type ");
     result.push_str(&ident.to_string());
 
@@ -1013,7 +1010,7 @@ impl Rewrite for ast::StructField {
         }
 
         let name = self.ident;
-        let vis = try_opt!(format_visibility(&self.vis));
+        let vis = format_visibility(&self.vis);
         let mut attr_str = try_opt!(self.attrs
             .rewrite(context, context.config.max_width - offset.width(), offset));
         if !attr_str.is_empty() {
@@ -1042,7 +1039,7 @@ pub fn rewrite_static(prefix: &str,
                       context: &RewriteContext)
                       -> Option<String> {
     let prefix = format!("{}{} {}{}: ",
-                         try_opt!(format_visibility(vis)),
+                         format_visibility(vis),
                          prefix,
                          format_mutability(mutability),
                          ident);
@@ -1260,7 +1257,7 @@ fn rewrite_fn_base(context: &RewriteContext,
 
     let mut result = String::with_capacity(1024);
     // Vis unsafety abi.
-    result.push_str(try_opt!(format_visibility(vis)));
+    result.push_str(&*format_visibility(vis));
 
     if let ast::Constness::Const = constness {
         result.push_str("const ");
@@ -1817,7 +1814,7 @@ fn rewrite_where_clause(context: &RewriteContext,
 }
 
 fn format_header(item_name: &str, ident: ast::Ident, vis: &ast::Visibility) -> Option<String> {
-    Some(format!("{}{}{}", try_opt!(format_visibility(vis)), item_name, ident))
+    Some(format!("{}{}{}", format_visibility(vis), item_name, ident))
 }
 
 fn format_generics(context: &RewriteContext,
