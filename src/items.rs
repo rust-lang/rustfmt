@@ -1052,7 +1052,6 @@ pub fn rewrite_associated_type(ident: ast::Ident,
         let bounds: &[_] = &ty_param_bounds;
         let bound_str = bounds.iter()
             .filter_map(|ty_bound| ty_bound.rewrite(context, context.config.max_width, indent))
-            .collect::<Vec<String>>()
             .join(" + ");
         if bounds.len() > 0 {
             format!(": {}", bound_str)
@@ -1693,7 +1692,6 @@ fn rewrite_trait_bounds(context: &RewriteContext,
 
     let bound_str = bounds.iter()
         .filter_map(|ty_bound| ty_bound.rewrite(&context, width, indent))
-        .collect::<Vec<String>>()
         .join(" + ");
 
     let mut result = String::new();
