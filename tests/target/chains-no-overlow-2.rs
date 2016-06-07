@@ -1,4 +1,5 @@
 // rustfmt-chains_overflow_last: false
+// rustfmt-chain_indent: Tabbed
 
 fn main() {
     reader.lines()

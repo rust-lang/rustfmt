@@ -388,7 +388,7 @@ create_config! {
     report_fixme: ReportTactic, ReportTactic::Never,
         "Report all, none or unnumbered occurrences of FIXME in source file comments";
     chain_base_indent: BlockIndentStyle, BlockIndentStyle::Tabbed, "Indent on chain base";
-    chain_indent: BlockIndentStyle, BlockIndentStyle::Tabbed, "Indentation of chain";
+    chain_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indentation of chain";
     chains_overflow_last: bool, true, "Allow last call in method chain to break the line";
     reorder_imports: bool, false, "Reorder import statements alphabetically";
     single_line_if_else_max_width: usize, 50, "Maximum line length for single line if-else \
