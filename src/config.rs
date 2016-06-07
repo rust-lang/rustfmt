@@ -404,8 +404,8 @@ create_config! {
     match_block_trailing_comma: bool, false,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
     match_wildcard_trailing_comma: bool, true, "Put a trailing comma after a wildcard arm";
-    closure_block_indent_threshold: isize, 5, "How many lines a closure must have before it is \
-                                               block indented. -1 means never use block indent.";
+    closure_block_indent_threshold: isize, 10, "How many lines a closure must have before it is \
+                                                block indented. -1 means never use block indent.";
     use_try_shorthand: bool, false, "Replace uses of the try! macro by the ? shorthand";
     write_mode: WriteMode, WriteMode::Replace,
         "What Write Mode to use when none is supplied: Replace, Overwrite, Display, Diff, Coverage";
