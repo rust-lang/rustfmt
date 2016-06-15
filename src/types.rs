@@ -95,12 +95,8 @@ fn rewrite_path_segments<'a, I>(expr_context: bool,
                                 -> Option<String>
     where I: Iterator<Item = &'a ast::PathSegment>
 {
-    let mut first = true;
-
-    for segment in iter {
-        if first {
-            first = false;
-        } else {
+    for (index, segment) in iter.enumerate() {
+        if index > 0 {
             buffer.push_str("::");
         }
 
