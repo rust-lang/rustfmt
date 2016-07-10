@@ -440,6 +440,7 @@ pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -
                                ref self_ty,
                                ref items) = item.node {
         let mut result = String::new();
+
         result.push_str(&*format_visibility(&item.vis));
         result.push_str(format_unsafety(unsafety));
         result.push_str("impl");
@@ -470,7 +471,7 @@ pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -
             result.push_str(" for ");
         }
 
-        let budget = try_opt!(context.config.max_width.checked_sub(result.len()));
+        let budget = try_opt!(context.config.max_width.checked_sub(result.len() + 1));
         let indent = offset + result.len();
         result.push_str(&*try_opt!(self_ty.rewrite(context, budget, indent)));
 
