@@ -8,6 +8,7 @@ pub fn merge(mut X: Abcdef)
 }
 
 impl Handle {
-    pub fn merge(a: Abcd) -> Handle<NodeRef<marker::Mut<'a>, K, V, marker::Internal>, marker::Edge> {
+    pub fn merge(a: Abcd)
+                 -> Handle<NodeRef<marker::Mut<'a>, K, V, marker::Internal>, marker::Edge> {
     }
 }
