@@ -151,16 +151,17 @@ impl<'a> iter::Iterator for Files<'a> {
     }
 }
 
-fn canonicalize_path_string(s: &str) -> String
-{
+fn canonicalize_path_string(s: &str) -> String {
     use std::path;
     use std::fs;
 
     match fs::canonicalize(path::PathBuf::from(s)) {
-        Ok(canonicalized) => match canonicalized.to_str() {
-            Some(c) => c.to_string(),
-            _ => String::new(),    
-        },
+        Ok(canonicalized) => {
+            match canonicalized.to_str() {
+                Some(c) => c.to_string(),
+                _ => String::new(),
+            }
+        }
         _ => String::new(),
     }
 }
