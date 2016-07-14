@@ -119,7 +119,7 @@ impl FileLines {
             Some(ref map) => map,
         };
 
-        match map.get_vec(range.file_name()) {
+        match map.get_vec(&canonicalize_path_string(range.file_name())) {
             None => false,
             Some(ranges) => ranges.iter().any(|r| r.contains(Range::from(range))),
         }
@@ -151,6 +151,20 @@ impl<'a> iter::Iterator for Files<'a> {
     }
 }
 
+fn canonicalize_path_string(s: &str) -> String
+{
+    use std::path;
+    use std::fs;
+
+    match fs::canonicalize(path::PathBuf::from(s)) {
+        Ok(canonicalized) => match canonicalized.to_str() {
+            Some(c) => c.to_string(),
+            _ => String::new(),    
+        },
+        _ => String::new(),
+    }
+}
+
 // This impl is needed for `Config::override_value` to work for use in tests.
 impl str::FromStr for FileLines {
     type Err = String;
@@ -173,7 +187,7 @@ impl JsonSpan {
     // To allow `collect()`ing into a `MultiMap`.
     fn into_tuple(self) -> (String, Range) {
         let (lo, hi) = self.range;
-        (self.file, Range::new(lo, hi))
+        (canonicalize_path_string(&self.file), Range::new(lo, hi))
     }
 }
 
