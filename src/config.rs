@@ -170,6 +170,27 @@ configuration_option_enum! { WriteMode:
     Checkstyle,
 }
 
+// How to reorder use statements.
+configuration_option_enum! { ImportReordering:
+    // Don't change `use` statements at all.
+    None,
+    // Just order `use` statements by their path.
+    Lines,
+    // Just order items within `use` statements by their name.
+    Items,
+    // Order `use` statements by their path and items within `use` statements by their name.
+    LinesAndItems
+}
+
+impl ImportReordering {
+    pub fn reorder_items(self) -> bool {
+        (self == ImportReordering::Items) || (self == ImportReordering::LinesAndItems)
+    }
+    pub fn reorder_lines(self) -> bool {
+        (self == ImportReordering::Lines) || (self == ImportReordering::LinesAndItems)
+    }
+}
+
 /// Trait for types that can be used in `Config`.
 pub trait ConfigType: Sized {
     /// Returns hint text for use in `Config::print_docs()`. For enum types, this is a
@@ -390,7 +411,8 @@ create_config! {
     chain_base_indent: BlockIndentStyle, BlockIndentStyle::Tabbed, "Indent on chain base";
     chain_indent: BlockIndentStyle, BlockIndentStyle::Tabbed, "Indentation of chain";
     chains_overflow_last: bool, true, "Allow last call in method chain to break the line";
-    reorder_imports: bool, false, "Reorder import statements alphabetically";
+    reorder_imports: ImportReordering, ImportReordering::None,
+        "Reorder import statements alphabetically";
     single_line_if_else_max_width: usize, 50, "Maximum line length for single line if-else \
                                                 expressions. A value of zero means always break \
                                                 if-else expressions.";
