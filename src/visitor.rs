@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use syntax::{ast, visit};
+use syntax::{ast, ptr, visit};
 use syntax::codemap::{self, CodeMap, Span, BytePos};
 use syntax::parse::ParseSess;
 
@@ -22,12 +22,84 @@ use rewrite::{Rewrite, RewriteContext};
 use comment::rewrite_comment;
 use macros::rewrite_macro;
 use items::{rewrite_static, rewrite_associated_type, rewrite_type_alias, format_impl, format_trait};
+use std::cmp::Ordering;
 
 // For format_missing and last_pos, need to use the source callsite (if applicable).
 // Required as generated code spans aren't guaranteed to follow on from the last span.
 macro_rules! source {
     ($this:ident, $sp: expr) => {
         $this.codemap.source_callsite($sp)
+    }
+}
+
+fn path_of(a: &ast::ViewPath_) -> &ast::Path {
+    match a {
+        &ast::ViewPath_::ViewPathSimple(_, ref p) => p,
+        &ast::ViewPath_::ViewPathGlob(ref p) => p,
+        &ast::ViewPath_::ViewPathList(ref p, _) => p,
+    }
+}
+
+fn compare_path_segments(a: &ast::PathSegment, b: &ast::PathSegment) -> Ordering {
+    a.identifier.name.as_str().cmp(&b.identifier.name.as_str())
+}
+
+fn compare_paths(a: &ast::Path, b: &ast::Path) -> Ordering {
+    for segment in a.segments.iter().zip(b.segments.iter()) {
+        let ord = compare_path_segments(segment.0, segment.1);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+    }
+    a.segments.len().cmp(&b.segments.len())
+}
+
+fn compare_view_path_types(a: &ast::ViewPath_, b: &ast::ViewPath_) -> Ordering {
+    match a {
+        &ast::ViewPath_::ViewPathSimple(_, _) => {
+            match b {
+                &ast::ViewPath_::ViewPathSimple(_, _) => Ordering::Equal,
+                _ => Ordering::Less,
+            }
+        }
+        &ast::ViewPath_::ViewPathGlob(_) => {
+            match b {
+                &ast::ViewPath_::ViewPathSimple(_, _) => Ordering::Greater,
+                &ast::ViewPath_::ViewPathGlob(_) => Ordering::Equal,
+                &ast::ViewPath_::ViewPathList(_, _) => Ordering::Less,
+            }
+        }
+        &ast::ViewPath_::ViewPathList(_, _) => {
+            match b {
+                &ast::ViewPath_::ViewPathList(_, _) => Ordering::Equal,
+                _ => Ordering::Greater,
+            }
+        }
+    }
+}
+
+fn compare_view_paths(a: &ast::ViewPath_, b: &ast::ViewPath_) -> Ordering {
+    match compare_paths(path_of(a), path_of(b)) {
+        Ordering::Equal => compare_view_path_types(a, b),
+        cmp => cmp,
+    }
+}
+
+fn is_use_item(item: &ast::Item) -> bool {
+    match item.node {
+        ast::ItemKind::Use(_) => true,
+        _ => false,
+    }
+}
+fn compare_use_items(a: &ast::Item, b: &ast::Item) -> Option<Ordering> {
+    match a.node {
+        ast::ItemKind::Use(ref a_vp) => {
+            match b.node {
+                ast::ItemKind::Use(ref b_vp) => Some(compare_view_paths(&a_vp.node, &b_vp.node)),
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 
@@ -502,8 +574,21 @@ impl<'a> FmtVisitor<'a> {
     }
 
     fn walk_mod_items(&mut self, m: &ast::Mod) {
-        for item in &m.items {
-            self.visit_item(&item);
+        let mut items_left: &[ptr::P<ast::Item>] = &m.items;
+        while !items_left.is_empty() {
+            if self.config.reorder_imports.reorder_lines() && is_use_item(&*items_left[0]) {
+                let use_item_length =
+                    items_left.iter().take_while(|ppi| is_use_item(&***ppi)).count();
+                let (use_items, rest) = items_left.split_at(use_item_length);
+                self.format_imports(use_items);
+                items_left = rest;
+            } else {
+                // `unwrap()` is safe here because we know `items_left`
+                // has elements from the loop condition
+                let (item, rest) = items_left.split_first().unwrap();
+                self.visit_item(&item);
+                items_left = rest;
+            }
         }
     }
 
@@ -545,6 +630,30 @@ impl<'a> FmtVisitor<'a> {
         self.block_indent = Indent::empty();
         self.walk_mod_items(m);
         self.format_missing(filemap.end_pos);
+    }
+
+    fn format_imports(&mut self, use_items: &[ptr::P<ast::Item>]) {
+        let mut last_pos =
+            use_items.first().map(|p_i| p_i.span.lo - BytePos(1)).unwrap_or(self.last_pos);
+        let prefix = codemap::mk_sp(self.last_pos, last_pos);
+        let mut ordered_use_items = use_items.iter()
+            .map(|p_i| {
+                let new_item = (&*p_i, last_pos);
+                last_pos = p_i.span.hi;
+                new_item
+            })
+            .collect::<Vec<_>>();
+        // Order the imports by view-path & other import path properties
+        ordered_use_items.sort_by(|a, b| compare_use_items(a.0, b.0).unwrap());
+        // First, output the span before the first import
+        self.format_missing(prefix.hi);
+        for ordered in ordered_use_items {
+            // Fake out the formatter by setting `self.last_pos` to the appropriate location before
+            // each item before visiting it.
+            self.last_pos = ordered.1;
+            self.visit_item(&ordered.0);
+        }
+        self.last_pos = last_pos;
     }
 
     fn format_import(&mut self, vis: &ast::Visibility, vp: &ast::ViewPath, span: Span) {
