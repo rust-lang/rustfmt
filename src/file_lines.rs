@@ -9,7 +9,7 @@
 // except according to those terms.
 
 //! This module contains types and functions to support formatting specific line ranges.
-use std::{cmp, fs, iter, path, str};
+use std::{cmp, iter, path, str};
 
 use itertools::Itertools;
 use multimap::MultiMap;
@@ -119,7 +119,8 @@ impl FileLines {
             Some(ref map) => map,
         };
 
-        match map.get_vec(&canonicalize_path_string(range.file_name())) {
+        match canonicalize_path_string(range.file_name())
+            .and_then(|canonical| map.get_vec(&canonical)) {
             None => false,
             Some(ranges) => ranges.iter().any(|r| r.contains(Range::from(range))),
         }
@@ -151,15 +152,10 @@ impl<'a> iter::Iterator for Files<'a> {
     }
 }
 
-fn canonicalize_path_string(s: &str) -> String {
-    match fs::canonicalize(path::PathBuf::from(s)) {
-        Ok(canonicalized) => {
-            match canonicalized.to_str() {
-                Some(c) => c.to_string(),
-                _ => String::new(),
-            }
-        }
-        _ => String::new(),
+fn canonicalize_path_string(s: &str) -> Option<String> {
+    match path::PathBuf::from(s).canonicalize() {
+        Ok(canonicalized) => canonicalized.to_str().map(str::to_string),
+        _ => None,
     }
 }
 
@@ -169,7 +165,7 @@ impl str::FromStr for FileLines {
 
     fn from_str(s: &str) -> Result<FileLines, String> {
         let v: Vec<JsonSpan> = try!(json::decode(s).map_err(|e| e.to_string()));
-        let m = v.into_iter().map(JsonSpan::into_tuple).collect();
+        let m = try!(v.into_iter().map(JsonSpan::into_tuple).collect());
         Ok(FileLines::from_multimap(m))
     }
 }
@@ -183,9 +179,11 @@ struct JsonSpan {
 
 impl JsonSpan {
     // To allow `collect()`ing into a `MultiMap`.
-    fn into_tuple(self) -> (String, Range) {
+    fn into_tuple(self) -> Result<(String, Range), String> {
         let (lo, hi) = self.range;
-        (canonicalize_path_string(&self.file), Range::new(lo, hi))
+        let canonical = try!(canonicalize_path_string(&self.file)
+            .ok_or("Can't canonicalize ".to_string() + &self.file));
+        Ok((canonical, Range::new(lo, hi)))
     }
 }
 
