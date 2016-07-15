@@ -9,7 +9,7 @@
 // except according to those terms.
 
 //! This module contains types and functions to support formatting specific line ranges.
-use std::{cmp, iter, str};
+use std::{cmp, fs, iter, path, str};
 
 use itertools::Itertools;
 use multimap::MultiMap;
@@ -152,9 +152,6 @@ impl<'a> iter::Iterator for Files<'a> {
 }
 
 fn canonicalize_path_string(s: &str) -> String {
-    use std::path;
-    use std::fs;
-
     match fs::canonicalize(path::PathBuf::from(s)) {
         Ok(canonicalized) => {
             match canonicalized.to_str() {
