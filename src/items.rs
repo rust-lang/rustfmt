@@ -1278,7 +1278,6 @@ fn rewrite_fn_base(context: &RewriteContext,
 
     let multi_line_ret_str = ret_str.contains('\n');
     let ret_str_len = if multi_line_ret_str { 0 } else { ret_str.len() };
-    println!("ret: \"{}\"", ret_str);
 
     // Args.
     let (mut one_line_budget, mut multi_line_budget, mut arg_indent) =
