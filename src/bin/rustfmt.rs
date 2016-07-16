@@ -109,27 +109,37 @@ fn lookup_project_file(dir: &Path) -> FmtResult<Option<PathBuf>> {
 
     current = try!(fs::canonicalize(current));
 
+
+    let config_file_names = [".rustfmt.toml", "rustfmt.toml"];
+
     loop {
-        let config_file = current.join("rustfmt.toml");
-        match fs::metadata(&config_file) {
-            // Only return if it's a file to handle the unlikely situation of a directory named
-            // `rustfmt.toml`.
-            Ok(ref md) if md.is_file() => return Ok(Some(config_file)),
-            // Return the error if it's something other than `NotFound`; otherwise we didn't find
-            // the project file yet, and continue searching.
-            Err(e) => {
-                if e.kind() != ErrorKind::NotFound {
-                    return Err(FmtError::from(e));
+        for config_file_name in &config_file_names {
+            println!("{}", config_file_name);
+            let config_file = current.join(config_file_name);
+            // println!("{}", config_file);
+            match fs::metadata(&config_file) {
+                // Only return if it's a file to handle the unlikely situation of a directory named
+                // `rustfmt.toml`.
+                Ok(ref md) if md.is_file() => return Ok(Some(config_file)),
+                // Return the error if it's something other than `NotFound`; otherwise we didn't
+                // find the project file yet, and continue searching.
+                Err(e) => {
+                    if e.kind() != ErrorKind::NotFound {
+                        return Err(FmtError::from(e));
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
 
         // If the current directory has no parent, we're done searching.
         if !current.pop() {
-            return Ok(None);
+            break;
+            // return Ok(None);
         }
     }
+
+    return Ok(None);
 }
 
 /// Resolve the config for input in `dir`.
