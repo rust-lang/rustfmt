@@ -1358,9 +1358,9 @@ fn rewrite_fn_base(context: &RewriteContext,
             FnArgLayoutStyle::BlockAlways => false,
             _ => {
                 // If we've already gone multi-line, or the return type would push over the max
-                // width, then put the return type on a new line. The +1 for the signature length
-                // is to consider an additional space between the closing brace of the argument and
-                // the arrow '->'.
+                // width, then put the return type on a new line. With the +1 for the signature
+                // length an additional space between the closing brace of the argument and the
+                // arrow '->' is considered.
                 let mut sig_length = result.len() + indent.width() + ret_str_len + 1;
 
                 // If there is no where clause, take into account the space after the return type
