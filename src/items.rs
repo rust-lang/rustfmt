@@ -1278,6 +1278,7 @@ fn rewrite_fn_base(context: &RewriteContext,
 
     let multi_line_ret_str = ret_str.contains('\n');
     let ret_str_len = if multi_line_ret_str { 0 } else { ret_str.len() };
+    println!("ret: \"{}\"", ret_str);
 
     // Args.
     let (mut one_line_budget, mut multi_line_budget, mut arg_indent) =
@@ -1357,11 +1358,21 @@ fn rewrite_fn_base(context: &RewriteContext,
             FnArgLayoutStyle::Block if put_args_in_block => false,
             FnArgLayoutStyle::BlockAlways => false,
             _ => {
-                // If we've already gone multi-line, or the return type would push
-                // over the max width, then put the return type on a new line.
-                let overlong_ret = result.len() + indent.width() + ret_str_len >
-                                   context.config.max_width - 1;
-                result.contains("\n") || multi_line_ret_str || overlong_ret
+                // If we've already gone multi-line, or the return type would push over the max
+                // width, then put the return type on a new line. The +1 for the signature length
+                // is to consider an additional space between the closing brace of the argument and
+                // the arrow '->'.
+                let mut sig_length = result.len() + indent.width() + ret_str_len + 1;
+
+                // If there is no where clause, take into account the space after the return type
+                // and the brace.
+                if where_clause.predicates.is_empty() {
+                    sig_length += 2;
+                }
+
+                let overlong_sig = sig_length > context.config.max_width;
+
+                result.contains("\n") || multi_line_ret_str || overlong_sig
             }
         };
         let ret_indent = if ret_should_indent {

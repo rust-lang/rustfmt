@@ -1,4 +1,4 @@
-// Test issue-1049
+// Test overlong function signature
 pub unsafe fn reborrow_mut(&mut X: Abcde) -> Handle<NodeRef<marker::Mut, K, V, NodeType>, HandleType> {
 }
 
