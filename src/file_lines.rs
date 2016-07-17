@@ -120,9 +120,9 @@ impl FileLines {
         };
 
         match canonicalize_path_string(range.file_name())
-            .and_then(|canonical| map.get_vec(&canonical)) {
-            None => false,
-            Some(ranges) => ranges.iter().any(|r| r.contains(Range::from(range))),
+            .and_then(|canonical| map.get_vec(&canonical).ok_or(())) {
+            Ok(ranges) => ranges.iter().any(|r| r.contains(Range::from(range))),
+            Err(_) => false,
         }
     }
 
@@ -152,10 +152,10 @@ impl<'a> iter::Iterator for Files<'a> {
     }
 }
 
-fn canonicalize_path_string(s: &str) -> Option<String> {
+fn canonicalize_path_string(s: &str) -> Result<String, ()> {
     match path::PathBuf::from(s).canonicalize() {
-        Ok(canonicalized) => canonicalized.to_str().map(str::to_string),
-        _ => None,
+        Ok(canonicalized) => canonicalized.to_str().map(|s| s.to_string()).ok_or(()),
+        _ => Err(()),
     }
 }
 
@@ -182,7 +182,7 @@ impl JsonSpan {
     fn into_tuple(self) -> Result<(String, Range), String> {
         let (lo, hi) = self.range;
         let canonical = try!(canonicalize_path_string(&self.file)
-            .ok_or(format!("Can't canonicalize {}", &self.file)));
+            .map_err(|_| format!("Can't canonicalize {}", &self.file)));
         Ok((canonical, Range::new(lo, hi)))
     }
 }
