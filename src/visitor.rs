@@ -54,6 +54,57 @@ fn compare_paths(a: &ast::Path, b: &ast::Path) -> Ordering {
     a.segments.len().cmp(&b.segments.len())
 }
 
+fn compare_path_list_items(a: &ast::PathListItem, b: &ast::PathListItem) -> Ordering {
+    let name_ordering = match a.node.name() {
+        Some(a_name) => {
+            match b.node.name() {
+                Some(b_name) => a_name.name.as_str().cmp(&b_name.name.as_str()),
+                None => Ordering::Greater,
+            }
+        }
+        None => {
+            match b.node.name() {
+                Some(_) => Ordering::Less,
+                None => Ordering::Equal,
+            }
+        }
+    };
+    if name_ordering == Ordering::Equal {
+        match a.node.rename() {
+            Some(a_rename) => {
+                match b.node.rename() {
+                    Some(b_rename) => a_rename.name.as_str().cmp(&b_rename.name.as_str()),
+                    None => Ordering::Greater,
+                }
+            }
+            None => {
+                match b.node.name() {
+                    Some(_) => Ordering::Less,
+                    None => Ordering::Equal,
+                }
+            }
+        }
+    } else {
+        name_ordering
+    }
+}
+
+fn compare_path_list_item_lists(a_items: &Vec<ast::PathListItem>,
+                                b_items: &Vec<ast::PathListItem>)
+                                -> Ordering {
+    let mut a = a_items.clone();
+    let mut b = b_items.clone();
+    a.sort_by(|a, b| compare_path_list_items(a, b));
+    b.sort_by(|a, b| compare_path_list_items(a, b));
+    for comparison_pair in a.iter().zip(b.iter()) {
+        let ord = compare_path_list_items(comparison_pair.0, comparison_pair.1);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+    }
+    a.len().cmp(&b.len())
+}
+
 fn compare_view_path_types(a: &ast::ViewPath_, b: &ast::ViewPath_) -> Ordering {
     use syntax::ast::ViewPath_::*;
     match (a, b) {
@@ -62,7 +113,9 @@ fn compare_view_path_types(a: &ast::ViewPath_, b: &ast::ViewPath_) -> Ordering {
         (&ViewPathGlob(_), &ViewPathSimple(..)) => Ordering::Greater,
         (&ViewPathGlob(_), &ViewPathGlob(_)) => Ordering::Equal,
         (&ViewPathGlob(_), &ViewPathList(..)) => Ordering::Less,
-        (&ViewPathList(..), &ViewPathList(..)) => Ordering::Equal,
+        (&ViewPathList(_, ref a_items), &ViewPathList(_, ref b_items)) => {
+            compare_path_list_item_lists(a_items, b_items)
+        }
         (&ViewPathList(..), _) => Ordering::Greater,
     }
 }
