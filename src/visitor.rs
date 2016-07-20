@@ -55,26 +55,15 @@ fn compare_paths(a: &ast::Path, b: &ast::Path) -> Ordering {
 }
 
 fn compare_view_path_types(a: &ast::ViewPath_, b: &ast::ViewPath_) -> Ordering {
-    match a {
-        &ast::ViewPath_::ViewPathSimple(_, _) => {
-            match b {
-                &ast::ViewPath_::ViewPathSimple(_, _) => Ordering::Equal,
-                _ => Ordering::Less,
-            }
-        }
-        &ast::ViewPath_::ViewPathGlob(_) => {
-            match b {
-                &ast::ViewPath_::ViewPathSimple(_, _) => Ordering::Greater,
-                &ast::ViewPath_::ViewPathGlob(_) => Ordering::Equal,
-                &ast::ViewPath_::ViewPathList(_, _) => Ordering::Less,
-            }
-        }
-        &ast::ViewPath_::ViewPathList(_, _) => {
-            match b {
-                &ast::ViewPath_::ViewPathList(_, _) => Ordering::Equal,
-                _ => Ordering::Greater,
-            }
-        }
+    use syntax::ast::ViewPath_::*;
+    match (a, b) {
+        (&ViewPathSimple(..), &ViewPathSimple(..)) => Ordering::Equal,
+        (&ViewPathSimple(..), _) => Ordering::Less,
+        (&ViewPathGlob(_), &ViewPathSimple(..)) => Ordering::Greater,
+        (&ViewPathGlob(_), &ViewPathGlob(_)) => Ordering::Equal,
+        (&ViewPathGlob(_), &ViewPathList(..)) => Ordering::Less,
+        (&ViewPathList(..), &ViewPathList(..)) => Ordering::Equal,
+        (&ViewPathList(..), _) => Ordering::Greater,
     }
 }
 
@@ -92,12 +81,9 @@ fn is_use_item(item: &ast::Item) -> bool {
     }
 }
 fn compare_use_items(a: &ast::Item, b: &ast::Item) -> Option<Ordering> {
-    match a.node {
-        ast::ItemKind::Use(ref a_vp) => {
-            match b.node {
-                ast::ItemKind::Use(ref b_vp) => Some(compare_view_paths(&a_vp.node, &b_vp.node)),
-                _ => None,
-            }
+    match (&a.node, &b.node) {
+        (&ast::ItemKind::Use(ref a_vp), &ast::ItemKind::Use(ref b_vp)) => {
+            Some(compare_view_paths(&a_vp.node, &b_vp.node))
         }
         _ => None,
     }
