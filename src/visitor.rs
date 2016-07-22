@@ -22,123 +22,11 @@ use rewrite::{Rewrite, RewriteContext};
 use comment::rewrite_comment;
 use macros::rewrite_macro;
 use items::{rewrite_static, rewrite_associated_type, rewrite_type_alias, format_impl, format_trait};
-use std::cmp::Ordering;
-
-// For format_missing and last_pos, need to use the source callsite (if applicable).
-// Required as generated code spans aren't guaranteed to follow on from the last span.
-macro_rules! source {
-    ($this:ident, $sp: expr) => {
-        $this.codemap.source_callsite($sp)
-    }
-}
-
-fn path_of(a: &ast::ViewPath_) -> &ast::Path {
-    match a {
-        &ast::ViewPath_::ViewPathSimple(_, ref p) => p,
-        &ast::ViewPath_::ViewPathGlob(ref p) => p,
-        &ast::ViewPath_::ViewPathList(ref p, _) => p,
-    }
-}
-
-fn compare_path_segments(a: &ast::PathSegment, b: &ast::PathSegment) -> Ordering {
-    a.identifier.name.as_str().cmp(&b.identifier.name.as_str())
-}
-
-fn compare_paths(a: &ast::Path, b: &ast::Path) -> Ordering {
-    for segment in a.segments.iter().zip(b.segments.iter()) {
-        let ord = compare_path_segments(segment.0, segment.1);
-        if ord != Ordering::Equal {
-            return ord;
-        }
-    }
-    a.segments.len().cmp(&b.segments.len())
-}
-
-fn compare_path_list_items(a: &ast::PathListItem, b: &ast::PathListItem) -> Ordering {
-    let name_ordering = match a.node.name() {
-        Some(a_name) => {
-            match b.node.name() {
-                Some(b_name) => a_name.name.as_str().cmp(&b_name.name.as_str()),
-                None => Ordering::Greater,
-            }
-        }
-        None => {
-            match b.node.name() {
-                Some(_) => Ordering::Less,
-                None => Ordering::Equal,
-            }
-        }
-    };
-    if name_ordering == Ordering::Equal {
-        match a.node.rename() {
-            Some(a_rename) => {
-                match b.node.rename() {
-                    Some(b_rename) => a_rename.name.as_str().cmp(&b_rename.name.as_str()),
-                    None => Ordering::Greater,
-                }
-            }
-            None => {
-                match b.node.name() {
-                    Some(_) => Ordering::Less,
-                    None => Ordering::Equal,
-                }
-            }
-        }
-    } else {
-        name_ordering
-    }
-}
-
-fn compare_path_list_item_lists(a_items: &Vec<ast::PathListItem>,
-                                b_items: &Vec<ast::PathListItem>)
-                                -> Ordering {
-    let mut a = a_items.clone();
-    let mut b = b_items.clone();
-    a.sort_by(|a, b| compare_path_list_items(a, b));
-    b.sort_by(|a, b| compare_path_list_items(a, b));
-    for comparison_pair in a.iter().zip(b.iter()) {
-        let ord = compare_path_list_items(comparison_pair.0, comparison_pair.1);
-        if ord != Ordering::Equal {
-            return ord;
-        }
-    }
-    a.len().cmp(&b.len())
-}
-
-fn compare_view_path_types(a: &ast::ViewPath_, b: &ast::ViewPath_) -> Ordering {
-    use syntax::ast::ViewPath_::*;
-    match (a, b) {
-        (&ViewPathSimple(..), &ViewPathSimple(..)) => Ordering::Equal,
-        (&ViewPathSimple(..), _) => Ordering::Less,
-        (&ViewPathGlob(_), &ViewPathSimple(..)) => Ordering::Greater,
-        (&ViewPathGlob(_), &ViewPathGlob(_)) => Ordering::Equal,
-        (&ViewPathGlob(_), &ViewPathList(..)) => Ordering::Less,
-        (&ViewPathList(_, ref a_items), &ViewPathList(_, ref b_items)) => {
-            compare_path_list_item_lists(a_items, b_items)
-        }
-        (&ViewPathList(..), _) => Ordering::Greater,
-    }
-}
-
-fn compare_view_paths(a: &ast::ViewPath_, b: &ast::ViewPath_) -> Ordering {
-    match compare_paths(path_of(a), path_of(b)) {
-        Ordering::Equal => compare_view_path_types(a, b),
-        cmp => cmp,
-    }
-}
 
 fn is_use_item(item: &ast::Item) -> bool {
     match item.node {
         ast::ItemKind::Use(_) => true,
         _ => false,
-    }
-}
-fn compare_use_items(a: &ast::Item, b: &ast::Item) -> Option<Ordering> {
-    match (&a.node, &b.node) {
-        (&ast::ItemKind::Use(ref a_vp), &ast::ItemKind::Use(ref b_vp)) => {
-            Some(compare_view_paths(&a_vp.node, &b_vp.node))
-        }
-        _ => None,
     }
 }
 
@@ -302,7 +190,7 @@ impl<'a> FmtVisitor<'a> {
         self.visit_block(b)
     }
 
-    fn visit_item(&mut self, item: &ast::Item) {
+    pub fn visit_item(&mut self, item: &ast::Item) {
         // This is where we bail out if there is a skip attribute. This is only
         // complex in the module case. It is complex because the module could be
         // in a seperate file and there might be attributes in both files, but
@@ -669,61 +557,6 @@ impl<'a> FmtVisitor<'a> {
         self.block_indent = Indent::empty();
         self.walk_mod_items(m);
         self.format_missing(filemap.end_pos);
-    }
-
-    fn format_imports(&mut self, use_items: &[ptr::P<ast::Item>]) {
-        let mut last_pos =
-            use_items.first().map(|p_i| p_i.span.lo - BytePos(1)).unwrap_or(self.last_pos);
-        let prefix = codemap::mk_sp(self.last_pos, last_pos);
-        let mut ordered_use_items = use_items.iter()
-            .map(|p_i| {
-                let new_item = (&*p_i, last_pos);
-                last_pos = p_i.span.hi;
-                new_item
-            })
-            .collect::<Vec<_>>();
-        // Order the imports by view-path & other import path properties
-        ordered_use_items.sort_by(|a, b| compare_use_items(a.0, b.0).unwrap());
-        // First, output the span before the first import
-        self.format_missing(prefix.hi);
-        for ordered in ordered_use_items {
-            // Fake out the formatter by setting `self.last_pos` to the appropriate location before
-            // each item before visiting it.
-            self.last_pos = ordered.1;
-            self.visit_item(&ordered.0);
-        }
-        self.last_pos = last_pos;
-    }
-
-    fn format_import(&mut self, vis: &ast::Visibility, vp: &ast::ViewPath, span: Span) {
-        let vis = utils::format_visibility(vis);
-        let mut offset = self.block_indent;
-        offset.alignment += vis.len() + "use ".len();
-        // 1 = ";"
-        match vp.rewrite(&self.get_context(),
-                         self.config.max_width - offset.width() - 1,
-                         offset) {
-            Some(ref s) if s.is_empty() => {
-                // Format up to last newline
-                let prev_span = codemap::mk_sp(self.last_pos, source!(self, span).lo);
-                let span_end = match self.snippet(prev_span).rfind('\n') {
-                    Some(offset) => self.last_pos + BytePos(offset as u32),
-                    None => source!(self, span).lo,
-                };
-                self.format_missing(span_end);
-                self.last_pos = source!(self, span).hi;
-            }
-            Some(ref s) => {
-                let s = format!("{}use {};", vis, s);
-                self.format_missing_with_indent(source!(self, span).lo);
-                self.buffer.push_str(&s);
-                self.last_pos = source!(self, span).hi;
-            }
-            None => {
-                self.format_missing_with_indent(source!(self, span).lo);
-                self.format_missing(source!(self, span).hi);
-            }
-        }
     }
 
     pub fn get_context(&self) -> RewriteContext {
