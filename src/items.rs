@@ -471,18 +471,18 @@ pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -
             result.push_str(" for ");
         }
 
-        let mut space_left = result.len();
+        let mut used_space = result.len();
         if generics.where_clause.predicates.is_empty() {
             // If there is no where clause adapt budget for type formatting to take space and curly
             // brace into account.
             match context.config.item_brace_style {
                 BraceStyle::AlwaysNextLine => {}
-                BraceStyle::PreferSameLine => space_left += 2,
-                BraceStyle::SameLineWhere => space_left += 2,
+                BraceStyle::PreferSameLine => used_space += 2,
+                BraceStyle::SameLineWhere => used_space += 2,
             }
         }
 
-        let budget = try_opt!(context.config.max_width.checked_sub(space_left));
+        let budget = try_opt!(context.config.max_width.checked_sub(used_space));
         let indent = offset + result.len();
         result.push_str(&*try_opt!(self_ty.rewrite(context, budget, indent)));
 
