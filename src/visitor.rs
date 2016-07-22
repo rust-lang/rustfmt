@@ -503,6 +503,9 @@ impl<'a> FmtVisitor<'a> {
     fn walk_mod_items(&mut self, m: &ast::Mod) {
         let mut items_left: &[ptr::P<ast::Item>] = &m.items;
         while !items_left.is_empty() {
+            // If the next item is a `use` declaration, then extract it and any subsequent `use`s
+            // to be potentially reordered within `format_imports`. Otherwise, just format the
+            // next item for output.
             if self.config.reorder_imports.reorder_lines() && is_use_item(&*items_left[0]) {
                 let use_item_length =
                     items_left.iter().take_while(|ppi| is_use_item(&***ppi)).count();
