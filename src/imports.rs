@@ -302,7 +302,7 @@ pub fn rewrite_use_list(width: usize,
     let has_self = move_self_to_front(&mut items);
     let first_index = if has_self { 0 } else { 1 };
 
-    if context.config.reorder_imports.reorder_items() {
+    if context.config.reorder_imported_names {
         items[1..].sort_by(|a, b| a.item.cmp(&b.item));
     }
 

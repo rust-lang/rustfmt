@@ -1,4 +1,5 @@
-// rustfmt-reorder_imports: LinesAndItems
+// rustfmt-reorder_imports: true
+// rustfmt-reorder_imported_names: true
 
 use std::cmp::{a, b, c, d};
 use std::ddd::{a, b, c as g, d as p};

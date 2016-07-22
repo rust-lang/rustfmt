@@ -1,4 +1,5 @@
-// rustfmt-reorder_imports: LinesAndItems
+// rustfmt-reorder_imports: true
+// rustfmt-reorder_imported_names: true
 
 use std::str;
 use std::cmp::{d, c, b, a};
