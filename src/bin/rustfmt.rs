@@ -110,10 +110,10 @@ fn lookup_project_file(dir: &Path) -> FmtResult<Option<PathBuf>> {
     current = try!(fs::canonicalize(current));
 
 
-    let config_file_names = [".rustfmt.toml", "rustfmt.toml"];
+    const CONFIG_FILE_NAMES: [&'static str; 2] = [".rustfmt.toml", "rustfmt.toml"];
 
     loop {
-        for config_file_name in &config_file_names {
+        for config_file_name in &CONFIG_FILE_NAMES {
             let config_file = current.join(config_file_name);
             match fs::metadata(&config_file) {
                 // Only return if it's a file to handle the unlikely situation of a directory named
