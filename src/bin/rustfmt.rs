@@ -109,7 +109,6 @@ fn lookup_project_file(dir: &Path) -> FmtResult<Option<PathBuf>> {
 
     current = try!(fs::canonicalize(current));
 
-
     const CONFIG_FILE_NAMES: [&'static str; 2] = [".rustfmt.toml", "rustfmt.toml"];
 
     loop {
