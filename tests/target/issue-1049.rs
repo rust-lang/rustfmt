@@ -12,3 +12,6 @@ impl Handle {
                  -> Handle<NodeRef<marker::Mut<'a>, K, V, marker::Internal>, marker::Edge> {
     }
 }
+
+// Long function without return type that should not be reformated.
+fn veeeeeeeeeeeeeeeeeeeeery_long_name(a: FirstTypeeeeeeeeee, b: SecondTypeeeeeeeeeeeeeeeeeeeeeee) {}
