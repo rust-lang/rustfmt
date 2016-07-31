@@ -1,4 +1,5 @@
 // rustfmt-use_try_shorthand: true
+// rustfmt-chain_indent: Tabbed
 
 fn main() {
     let x = some_expr()?;

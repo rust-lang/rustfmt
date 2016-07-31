@@ -181,11 +181,11 @@ fn rewrite_segment(expr_context: bool,
                                                          !data.types.is_empty() ||
                                                          !data.bindings.is_empty() => {
             let param_list = data.lifetimes
-                .iter()
-                .map(SegmentParam::LifeTime)
-                .chain(data.types.iter().map(|x| SegmentParam::Type(&*x)))
-                .chain(data.bindings.iter().map(|x| SegmentParam::Binding(&*x)))
-                .collect::<Vec<_>>();
+                                 .iter()
+                                 .map(SegmentParam::LifeTime)
+                                 .chain(data.types.iter().map(|x| SegmentParam::Type(&*x)))
+                                 .chain(data.bindings.iter().map(|x| SegmentParam::Binding(&*x)))
+                                 .collect::<Vec<_>>();
 
             let next_span_lo = param_list.last().unwrap().get_span().hi + BytePos(1);
             let list_lo = context.codemap.span_after(codemap::mk_sp(*span_lo, span_hi), "<");
@@ -271,7 +271,7 @@ fn format_function_type<'a, I>(inputs: I,
                              // FIXME Would be nice to avoid this allocation,
                              // but I couldn't get the types to work out.
                              inputs.map(|i| ArgumentKind::Regular(Box::new(i)))
-                                 .chain(variadic_arg),
+                                   .chain(variadic_arg),
                              ")",
                              |arg| {
                                  match *arg {
@@ -404,8 +404,8 @@ fn rewrite_bounded_lifetime<'b, I>(lt: &ast::Lifetime,
         Some(result)
     } else {
         let appendix: Vec<_> = try_opt!(bounds.into_iter()
-            .map(|b| b.rewrite(context, width, offset))
-            .collect());
+                                              .map(|b| b.rewrite(context, width, offset))
+                                              .collect());
         let result = format!("{}: {}", result, appendix.join(" + "));
         wrap_str(result, context.config.max_width, width, offset)
     }
@@ -438,8 +438,8 @@ impl Rewrite for ast::Lifetime {
 impl Rewrite for ast::TyParamBounds {
     fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
         let strs: Vec<_> = try_opt!(self.iter()
-            .map(|b| b.rewrite(context, width, offset))
-            .collect());
+                                        .map(|b| b.rewrite(context, width, offset))
+                                        .collect());
         wrap_str(strs.join(" + "), context.config.max_width, width, offset)
     }
 }
@@ -451,11 +451,12 @@ impl Rewrite for ast::TyParam {
         if !self.bounds.is_empty() {
             result.push_str(": ");
 
-            let bounds: String = try_opt!(self.bounds
-                .iter()
-                .map(|ty_bound| ty_bound.rewrite(context, width, offset))
-                .intersperse(Some(" + ".to_string()))
-                .collect());
+            let bounds: String =
+                try_opt!(self.bounds
+                             .iter()
+                             .map(|ty_bound| ty_bound.rewrite(context, width, offset))
+                             .intersperse(Some(" + ".to_string()))
+                             .collect());
 
             result.push_str(&bounds);
         }
@@ -479,16 +480,16 @@ impl Rewrite for ast::PolyTraitRef {
     fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
         if !self.bound_lifetimes.is_empty() {
             let lifetime_str: String = try_opt!(self.bound_lifetimes
-                .iter()
-                .map(|lt| lt.rewrite(context, width, offset))
-                .intersperse(Some(", ".to_string()))
-                .collect());
+                                                    .iter()
+                                                    .map(|lt| lt.rewrite(context, width, offset))
+                                                    .intersperse(Some(", ".to_string()))
+                                                    .collect());
 
             // 6 is "for<> ".len()
             let extra_offset = lifetime_str.len() + 6;
             let max_path_width = try_opt!(width.checked_sub(extra_offset));
             let path_str = try_opt!(self.trait_ref
-                .rewrite(context, max_path_width, offset + extra_offset));
+                                        .rewrite(context, max_path_width, offset + extra_offset));
 
             Some(format!("for<{}> {}", lifetime_str, path_str))
         } else {
@@ -542,7 +543,9 @@ impl Rewrite for ast::Ty {
                                 lt_str,
                                 mut_str,
                                 try_opt!(mt.ty
-                                    .rewrite(context, budget, offset + 2 + mut_len + lt_len)))
+                                           .rewrite(context,
+                                                    budget,
+                                                    offset + 2 + mut_len + lt_len)))
                     }
                     None => {
                         let budget = try_opt!(width.checked_sub(1 + mut_len));
@@ -607,10 +610,14 @@ fn rewrite_bare_fn(bare_fn: &ast::BareFnTy,
         // This doesn't work out so nicely for mutliline situation with lots of
         // rightward drift. If that is a problem, we could use the list stuff.
         result.push_str(&try_opt!(bare_fn.lifetimes
-            .iter()
-            .map(|l| l.rewrite(context, try_opt!(width.checked_sub(6)), offset + 4))
-            .intersperse(Some(", ".to_string()))
-            .collect::<Option<String>>()));
+                                         .iter()
+                                         .map(|l| {
+                                             l.rewrite(context,
+                                                       try_opt!(width.checked_sub(6)),
+                                                       offset + 4)
+                                         })
+                                         .intersperse(Some(", ".to_string()))
+                                         .collect::<Option<String>>()));
         result.push_str("> ");
     }
 

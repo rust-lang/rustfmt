@@ -1,5 +1,6 @@
 // rustfmt-single_line_if_else_max_width: 0
 // rustfmt-chains_overflow_last: false
+// rustfmt-chain_indent: Tabbed
 // Test chain formatting without overflowing the last item.
 
 fn main() {

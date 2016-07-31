@@ -99,9 +99,9 @@ impl<'a> FmtVisitor<'a> {
         if let Some(ref e) = b.expr {
             self.format_missing_with_indent(source!(self, e.span).lo);
             let rewrite = e.rewrite(&self.get_context(),
-                         self.config.max_width - self.block_indent.width(),
-                         self.block_indent)
-                .unwrap_or_else(|| self.snippet(e.span));
+                                    self.config.max_width - self.block_indent.width(),
+                                    self.block_indent)
+                           .unwrap_or_else(|| self.snippet(e.span));
 
             self.buffer.push_str(&rewrite);
             self.last_pos = source!(self, e.span).hi;
@@ -213,16 +213,16 @@ impl<'a> FmtVisitor<'a> {
                     // Module is not inline and should not be skipped. We want
                     // to process only the attributes in the current file.
                     let attrs = item.attrs
-                        .iter()
-                        .filter_map(|a| {
-                            let attr_file = self.codemap.lookup_char_pos(a.span.lo).file;
-                            if attr_file.name == outer_file.name {
-                                Some(a.clone())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>();
+                                    .iter()
+                                    .filter_map(|a| {
+                        let attr_file = self.codemap.lookup_char_pos(a.span.lo).file;
+                        if attr_file.name == outer_file.name {
+                            Some(a.clone())
+                        } else {
+                            None
+                        }
+                    })
+                                    .collect::<Vec<_>>();
                     // Assert because if we should skip it should be caught by
                     // the above case.
                     assert!(!self.visit_attrs(&attrs));
@@ -275,12 +275,12 @@ impl<'a> FmtVisitor<'a> {
                                            item.span,
                                            indent,
                                            None)
-                        .map(|s| {
-                            match *def {
-                                ast::VariantData::Tuple(..) => s + ";",
-                                _ => s,
-                            }
-                        })
+                            .map(|s| {
+                                match *def {
+                                    ast::VariantData::Tuple(..) => s + ";",
+                                    _ => s,
+                                }
+                            })
                 };
                 self.push_rewrite(item.span, rewrite);
             }
@@ -480,9 +480,9 @@ impl<'a> FmtVisitor<'a> {
         }
 
         let outers: Vec<_> = attrs.iter()
-            .filter(|a| a.node.style == ast::AttrStyle::Outer)
-            .cloned()
-            .collect();
+                                  .filter(|a| a.node.style == ast::AttrStyle::Outer)
+                                  .cloned()
+                                  .collect();
         if outers.is_empty() {
             return false;
         }
@@ -491,9 +491,9 @@ impl<'a> FmtVisitor<'a> {
         self.format_missing_with_indent(source!(self, first.span).lo);
 
         let rewrite = outers.rewrite(&self.get_context(),
-                     self.config.max_width - self.block_indent.width(),
-                     self.block_indent)
-            .unwrap();
+                                     self.config.max_width - self.block_indent.width(),
+                                     self.block_indent)
+                            .unwrap();
         self.buffer.push_str(&rewrite);
         let last = outers.last().unwrap();
         self.last_pos = source!(self, last.span).hi;
@@ -535,8 +535,8 @@ impl<'a> FmtVisitor<'a> {
             self.buffer.push_str(" {");
             // Hackery to account for the closing }.
             let mod_lo = self.codemap.span_after(source!(self, s), "{");
-            let body_snippet =
-                self.snippet(codemap::mk_sp(mod_lo, source!(self, m.inner).hi - BytePos(1)));
+            let body_snippet = self.snippet(codemap::mk_sp(mod_lo,
+                                                           source!(self, m.inner).hi - BytePos(1)));
             let body_snippet = body_snippet.trim();
             if body_snippet.is_empty() {
                 self.buffer.push_str("}");

@@ -388,7 +388,7 @@ create_config! {
     report_fixme: ReportTactic, ReportTactic::Never,
         "Report all, none or unnumbered occurrences of FIXME in source file comments";
     chain_base_indent: BlockIndentStyle, BlockIndentStyle::Tabbed, "Indent on chain base";
-    chain_indent: BlockIndentStyle, BlockIndentStyle::Tabbed, "Indentation of chain";
+    chain_indent: BlockIndentStyle, BlockIndentStyle::Visual, "Indentation of chain";
     chains_overflow_last: bool, true, "Allow last call in method chain to break the line";
     reorder_imports: bool, false, "Reorder import statements alphabetically";
     reorder_imported_names: bool, false,
@@ -406,8 +406,8 @@ create_config! {
     match_block_trailing_comma: bool, false,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
     match_wildcard_trailing_comma: bool, true, "Put a trailing comma after a wildcard arm";
-    closure_block_indent_threshold: isize, 5, "How many lines a closure must have before it is \
-                                               block indented. -1 means never use block indent.";
+    closure_block_indent_threshold: isize, 10, "How many lines a closure must have before it is \
+                                                block indented. -1 means never use block indent.";
     use_try_shorthand: bool, false, "Replace uses of the try! macro by the ? shorthand";
     write_mode: WriteMode, WriteMode::Replace,
         "What Write Mode to use when none is supplied: Replace, Overwrite, Display, Diff, Coverage";
