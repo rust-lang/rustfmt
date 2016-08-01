@@ -43,3 +43,9 @@ unsafe fn generic_call(cx: *mut JSContext, argc: libc::c_uint, vp: *mut JSVal,
 }
 
 pub fn start_export_thread<C: CryptoSchemee + 'static>(database: &Database, crypto_scheme: &C, block_size: usize, source_path: &Path) -> BonzoResult<mpsc::Consumer<'static, FileInstruction>> {}
+
+pub unsafe fn reborrow_mut(helloo: usize) -> Handle<NodeRef<marker::Mut, K, V, NodeType>, HandleType> where K: TooLongLine { println!(yes); }
+
+pub unsafe fn reborrow_mut(hello: usize) -> Handle<NodeRef<marker::Mut, K, V, NodeType>, HandleType> { println!(yes); }
+
+pub unsafe fn reborrow_mut(hello: usize) -> Handle<NodeRef<marker::Mut, K, V, NodeType>, HandleType> where K: NotLongEnough { println!(yes); }
