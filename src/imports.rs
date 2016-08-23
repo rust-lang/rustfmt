@@ -185,21 +185,16 @@ impl<'a> FmtVisitor<'a> {
             Some(offset) if prev_span_str[..offset].trim().is_empty() => {
                 self.last_pos + BytePos(offset as u32)
             }
-            Some(_) => self.last_pos,
             None if prev_span_str.trim().is_empty() => pos_before_first_use_item,
-            None => self.last_pos,
+            _ => self.last_pos,
         };
         // Look for indent (the line part preceding the use is all whitespace) and excise that
         // from the prefix
         let span_end = match prev_span_str.rfind('\n') {
-            Some(offset) => {
-                if prev_span_str[offset..].trim().is_empty() {
-                    self.last_pos + BytePos(offset as u32)
-                } else {
-                    pos_before_first_use_item
-                }
+            Some(offset) if prev_span_str[offset..].trim().is_empty() => {
+                self.last_pos + BytePos(offset as u32)
             }
-            None => pos_before_first_use_item,
+            _ => pos_before_first_use_item,
         };
 
         self.last_pos = prefix_span_start;
