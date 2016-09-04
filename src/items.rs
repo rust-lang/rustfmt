@@ -446,14 +446,19 @@ impl<'a> FmtVisitor<'a> {
 }
 
 pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -> Option<String> {
-    if let ast::ItemKind::Impl(_, _, ref generics, _, _, ref items) = item.node {
+    if let ast::ItemKind::Impl(_, _, ref generics, ref trait_ref, _, ref items) = item.node {
         let mut result = String::new();
 
-        // First try to format the ref and type without a split at the 'for'. If
-        // a line break occurs, format again with a split at the 'for'.
+        // First try to format the ref and type without a split at the 'for'.
         let mut ref_and_type = try_opt!(format_impl_ref_and_type(context, item, offset, false));
-        if ref_and_type.contains('\n') {
-            ref_and_type = try_opt!(format_impl_ref_and_type(context, item, offset, true));
+
+        // If there is a line break present in the first result format it again
+        // with a split at the 'for'. Skip this if there is no trait ref and
+        // therefore no 'for'.
+        if let Some(_) = *trait_ref {
+            if ref_and_type.contains('\n') {
+                ref_and_type = try_opt!(format_impl_ref_and_type(context, item, offset, true));
+            }
         }
         result.push_str(&ref_and_type);
 
