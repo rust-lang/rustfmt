@@ -450,7 +450,7 @@ pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -
         let mut result = String::new();
 
         // First try to format the ref and type without a split at the 'for'. If
-        // a line break occurs, break at the 'for' and format it again.
+        // a line break occurs, format again with a split at the 'for'.
         let mut ref_and_type = try_opt!(format_impl_ref_and_type(context, item, offset, false));
         if ref_and_type.contains('\n') {
             ref_and_type = try_opt!(format_impl_ref_and_type(context, item, offset, true));
@@ -586,11 +586,15 @@ fn format_impl_ref_and_type(context: &RewriteContext,
             let budget = try_opt!(context.config.max_width.checked_sub(result.len()));
             let indent = offset + result.len();
             result.push_str(&*try_opt!(trait_ref.rewrite(context, budget, indent)));
+
             if split_at_for {
                 result.push('\n');
+
+                // Add indentation of one additional tab.
                 let width = context.block_indent.width() + context.config.tab_spaces;
                 let for_indent = Indent::new(0, width);
                 result.push_str(&for_indent.to_string(context.config));
+
                 result.push_str("for ");
             } else {
                 result.push_str(" for ");
