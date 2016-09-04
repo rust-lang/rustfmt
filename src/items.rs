@@ -446,12 +446,7 @@ impl<'a> FmtVisitor<'a> {
 }
 
 pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -> Option<String> {
-    if let ast::ItemKind::Impl(_,
-                               _,
-                               ref generics,
-                               _,
-                               _,
-                               ref items) = item.node {
+    if let ast::ItemKind::Impl(_, _, ref generics, _, _, ref items) = item.node {
         let mut result = String::new();
 
         // First try to format the ref and type without a split at the 'for'. If
@@ -562,12 +557,8 @@ fn format_impl_ref_and_type(context: &RewriteContext,
                             offset: Indent,
                             split_at_for: bool)
                             -> Option<String> {
-    if let ast::ItemKind::Impl(unsafety,
-                               polarity,
-                               ref generics,
-                               ref trait_ref,
-                               ref self_ty,
-                               _) = item.node {
+    if let ast::ItemKind::Impl(unsafety, polarity, ref generics, ref trait_ref, ref self_ty, _) =
+           item.node {
         let mut result = String::new();
 
         result.push_str(&*format_visibility(&item.vis));
