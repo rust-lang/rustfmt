@@ -13,17 +13,17 @@ pub impl Foo for Bar {
 }
 
 pub unsafe impl<'a, 'b, X, Y: Foo<Bar>> !Foo<'a, X> for Bar<'b, Y> where X: Foo<'a, Z> {
-    fn foo() { "hi" }
+    fn foo() { "hi" }     
 }
 
 impl<'a, 'b, X, Y: Foo<Bar>> Foo<'a, X> for Bar<'b, Y> where X: Fooooooooooooooooooooooooooooo<'a, Z>
 {
-    fn foo() { "hi" }   
+    fn foo() { "hi" }     
 }
 
 impl<'a, 'b, X, Y: Foo<Bar>> Foo<'a, X> for Bar<'b, Y> where X: Foooooooooooooooooooooooooooo<'a, Z>
 {
-    fn foo() { "hi" }
+    fn foo() { "hi" }     
 }
 
 impl<T> Foo for Bar<T> where T: Baz 
