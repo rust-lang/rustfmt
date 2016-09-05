@@ -18,7 +18,7 @@ pub unsafe impl<'a, 'b, X, Y: Foo<Bar>> !Foo<'a, X> for Bar<'b, Y> where X: Foo<
 
 impl<'a, 'b, X, Y: Foo<Bar>> Foo<'a, X> for Bar<'b, Y> where X: Fooooooooooooooooooooooooooooo<'a, Z>
 {
-    fn foo() { "hi" }
+    fn foo() { "hi" }   
 }
 
 impl<'a, 'b, X, Y: Foo<Bar>> Foo<'a, X> for Bar<'b, Y> where X: Foooooooooooooooooooooooooooo<'a, Z>
@@ -26,7 +26,7 @@ impl<'a, 'b, X, Y: Foo<Bar>> Foo<'a, X> for Bar<'b, Y> where X: Fooooooooooooooo
     fn foo() { "hi" }
 }
 
-impl<T> Foo for Bar<T> where T: Baz
+impl<T> Foo for Bar<T> where T: Baz 
 {
 }
 
@@ -42,8 +42,8 @@ impl Boo {
     fn boo() {}
     // FOO
 
-
-
+    
+    
 }
 
 mod a {
@@ -77,7 +77,7 @@ impl Y5000 {
     fn bad(&self, ( x, y): CoorT) {}
 
     fn turbo_bad(self: X< 'a ,  'b >  , ( x, y): CoorT) {
-
+        
     }
 }
 
