@@ -99,8 +99,8 @@ impl<'a> FmtVisitor<'a> {
         if let Some(ref e) = b.expr {
             self.format_missing_with_indent(source!(self, e.span).lo);
             let rewrite = e.rewrite(&self.get_context(),
-                         self.config.max_width - self.block_indent.width(),
-                         self.block_indent)
+                                    self.config.max_width - self.block_indent.width(),
+                                    self.block_indent)
                 .unwrap_or_else(|| self.snippet(e.span));
 
             self.buffer.push_str(&rewrite);
