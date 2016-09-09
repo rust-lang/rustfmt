@@ -1291,9 +1291,12 @@ fn rewrite_pat_expr(context: &RewriteContext,
                                         offset + extra_offset + spacer.len());
 
         if let Some(expr_string) = expr_rewrite {
-            result.push_str(spacer);
-            result.push_str(&expr_string);
-            return Some(result);
+            // if we have a pattern, it's possible to break at `connector` instead
+            if pat.is_none() || !expr_string.contains('\n') {
+                result.push_str(spacer);
+                result.push_str(&expr_string);
+                return Some(result);
+            }
         }
     }
 
