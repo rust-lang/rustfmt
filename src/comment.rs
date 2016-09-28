@@ -20,6 +20,18 @@ use rewrite::RewriteContext;
 use string::{StringFormat, rewrite_string};
 use utils::wrap_str;
 
+fn is_custom_comment(comment: &str) -> bool {
+    if !comment.starts_with("//") || comment.len() < 4 {
+        false
+    } else {
+        if let Some(c) = comment.chars().nth(2) {
+            !c.is_alphanumeric() && !c.is_whitespace()
+        } else {
+            false
+        }
+    }
+}
+
 pub fn rewrite_comment(orig: &str,
                        block_style: bool,
                        width: usize,
@@ -51,6 +63,8 @@ pub fn rewrite_comment(orig: &str,
             ("/// ", "", "/// ")
         } else if orig.starts_with("//!") || orig.starts_with("/*!") {
             ("//! ", "", "//! ")
+        } else if is_custom_comment(orig) {
+            (&orig[0..4], "", &orig[0..4])
         } else {
             ("// ", "", "// ")
         };
@@ -136,7 +150,7 @@ pub fn rewrite_comment(orig: &str,
 
 fn left_trim_comment_line(line: &str) -> &str {
     if line.starts_with("//! ") || line.starts_with("/// ") || line.starts_with("/*! ") ||
-       line.starts_with("/** ") {
+       line.starts_with("/** ") || is_custom_comment(line) {
         &line[4..]
     } else if line.starts_with("/* ") || line.starts_with("// ") || line.starts_with("//!") ||
               line.starts_with("///") ||
