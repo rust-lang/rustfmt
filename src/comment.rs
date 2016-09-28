@@ -21,7 +21,7 @@ use string::{StringFormat, rewrite_string};
 use utils::wrap_str;
 
 fn is_custom_comment(comment: &str) -> bool {
-    if !comment.starts_with("//") || comment.len() < 4 {
+    if !comment.starts_with("//") {
         false
     } else {
         if let Some(c) = comment.chars().nth(2) {
@@ -150,8 +150,14 @@ pub fn rewrite_comment(orig: &str,
 
 fn left_trim_comment_line(line: &str) -> &str {
     if line.starts_with("//! ") || line.starts_with("/// ") || line.starts_with("/*! ") ||
-       line.starts_with("/** ") || is_custom_comment(line) {
+       line.starts_with("/** ") {
         &line[4..]
+    } else if is_custom_comment(line) {
+        if line.len() > 3 {
+            &line[4..]
+        } else {
+            &line[3..]
+        }
     } else if line.starts_with("/* ") || line.starts_with("// ") || line.starts_with("//!") ||
               line.starts_with("///") ||
               line.starts_with("** ") || line.starts_with("/*!") ||
