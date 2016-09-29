@@ -4,4 +4,5 @@
 //@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec adiam
 //@ lectus. Sed sit amet ipsum mauris. Maecenas congue ligula ac quam
 //@
+//@ foo
 fn test() {}

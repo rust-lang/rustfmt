@@ -64,7 +64,11 @@ pub fn rewrite_comment(orig: &str,
         } else if orig.starts_with("//!") || orig.starts_with("/*!") {
             ("//! ", "", "//! ")
         } else if is_custom_comment(orig) {
-            (&orig[0..4], "", &orig[0..4])
+            if orig.chars().nth(3) == Some(' ') {
+                (&orig[0..4], "", &orig[0..4])
+            } else {
+                (&orig[0..3], "", &orig[0..3])
+            }
         } else {
             ("// ", "", "// ")
         };
@@ -153,7 +157,7 @@ fn left_trim_comment_line(line: &str) -> &str {
        line.starts_with("/** ") {
         &line[4..]
     } else if is_custom_comment(line) {
-        if line.len() > 3 {
+        if line.len() > 3 && line.chars().nth(3) == Some(' ') {
             &line[4..]
         } else {
             &line[3..]
