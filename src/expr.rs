@@ -1536,11 +1536,11 @@ fn rewrite_call_inner<R>(context: &RewriteContext,
         None => return Err(Ordering::Less),
     };
 
-    if context.config.spaces_within_parens && list_str.len() > 0 {
-        Ok(format!("{}( {} )", callee_str, list_str))
+    Ok(if context.config.spaces_within_parens && list_str.len() > 0 {
+        format!("{}( {} )", callee_str, list_str)
     } else {
-        Ok(format!("{}({})", callee_str, list_str))
-    }
+        format!("{}({})", callee_str, list_str)
+    })
 }
 
 fn rewrite_paren(context: &RewriteContext,

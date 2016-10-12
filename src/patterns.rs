@@ -235,19 +235,19 @@ fn rewrite_tuple_pat(pats: &[ptr::P<ast::Pat>],
 
         match path_str {
             Some(path_str) => {
-                if context.config.spaces_within_parens {
-                    Some(format!("{}( {} )", path_str, list))
+                Some(if context.config.spaces_within_parens {
+                    format!("{}( {} )", path_str, list)
                 } else {
-                    Some(format!("{}({})", path_str, list))
-                }
+                    format!("{}({})", path_str, list)
+                })
             }
             None => {
                 let comma = if add_comma { "," } else { "" };
-                if context.config.spaces_within_parens {
-                    Some(format!("( {}{} )", list, comma))
+                Some(if context.config.spaces_within_parens {
+                    format!("( {}{} )", list, comma)
                 } else {
-                    Some(format!("({}{})", list, comma))
-                }
+                    format!("({}{})", list, comma)
+                })
             }
         }
     }

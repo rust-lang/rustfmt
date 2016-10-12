@@ -311,11 +311,11 @@ fn format_function_type<'a, I>(inputs: I,
         String::new()
     };
 
-    if context.config.spaces_within_parens {
-        Some(format!("( {} ){}{}", list_str, infix, output))
+    Some(if context.config.spaces_within_parens {
+        format!("( {} ){}{}", list_str, infix, output)
     } else {
-        Some(format!("({}){}{}", list_str, infix, output))
-    }
+        format!("({}){}{}", list_str, infix, output)
+    })
 }
 
 impl Rewrite for ast::WherePredicate {
