@@ -607,7 +607,11 @@ impl Rewrite for ast::Ty {
                     })
             }
             ast::TyKind::Vec(ref ty) => {
-                let budget = try_opt!(width.checked_sub(2));
+                let budget = if context.config.spaces_within_square_brackets {
+                    try_opt!(width.checked_sub(4))
+                } else {
+                    try_opt!(width.checked_sub(2))
+                };
                 ty.rewrite(context, budget, offset + 1)
                     .map(|ty_str| if context.config.spaces_within_square_brackets {
                         format!("[ {} ]", ty_str)

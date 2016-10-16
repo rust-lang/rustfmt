@@ -309,11 +309,14 @@ pub fn rewrite_array<'a, I>(expr_iter: I,
                             -> Option<String>
     where I: Iterator<Item = &'a ast::Expr>
 {
-    // 1 = [
-    let offset = offset + 1;
+    let bracket_size = if context.config.spaces_within_square_brackets {
+        2  // "[ "
+    } else {
+        1  // "["
+    };
+    let offset = offset + bracket_size;
     let inner_context = &RewriteContext { block_indent: offset, ..*context };
-    // 2 for brackets
-    let max_item_width = try_opt!(width.checked_sub(2));
+    let max_item_width = try_opt!(width.checked_sub(bracket_size * 2));
     let items = itemize_list(context.codemap,
                              expr_iter,
                              "]",
