@@ -206,10 +206,16 @@ fn format_expr(expr: &ast::Expr,
             rewrite_pair(&**expr, &**ty, "", ": ", "", context, width, offset)
         }
         ast::ExprKind::Index(ref expr, ref index) => {
-            rewrite_pair(&**expr, &**index, "", "[", "]", context, width, offset)
+            let use_spaces = context.config.spaces_within_square_brackets;
+            let lbr = if use_spaces { "[ " } else { "[" };
+            let rbr = if use_spaces { " ]" } else { "]" };
+            rewrite_pair(&**expr, &**index, "", lbr, rbr, context, width, offset)
         }
         ast::ExprKind::Repeat(ref expr, ref repeats) => {
-            rewrite_pair(&**expr, &**repeats, "[", "; ", "]", context, width, offset)
+            let use_spaces = context.config.spaces_within_square_brackets;
+            let lbr = if use_spaces { "[ " } else { "[" };
+            let rbr = if use_spaces { " ]" } else { "]" };
+            rewrite_pair(&**expr, &**repeats, lbr, "; ", rbr, context, width, offset)
         }
         ast::ExprKind::Range(ref lhs, ref rhs, limits) => {
             let delim = match limits {
@@ -339,7 +345,11 @@ pub fn rewrite_array<'a, I>(expr_iter: I,
     };
     let list_str = try_opt!(write_list(&items, &fmt));
 
-    Some(format!("[{}]", list_str))
+    Some(if context.config.spaces_within_square_brackets && list_str.len() > 0 {
+        format!("[ {} ]", list_str)
+    } else {
+        format!("[{}]", list_str)
+    })
 }
 
 // This functions is pretty messy because of the rules around closures and blocks:
