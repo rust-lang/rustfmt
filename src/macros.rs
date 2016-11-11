@@ -114,7 +114,11 @@ pub fn rewrite_macro(mac: &ast::Mac,
             parser.bump();
 
             if parser.token == Token::Eof {
-                return None;
+                if style == MacroStyle::Brackets {
+                    break;
+                } else {
+                    return None;
+                }
             }
         }
     }

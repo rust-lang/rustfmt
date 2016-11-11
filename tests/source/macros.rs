@@ -28,6 +28,11 @@ fn main() {
 
     vec! [a /* comment */];
 
+    // Trailing spaces after a comma
+    vec![
+    a,   
+    ];
+    
     foo(makro!(1,   3));
 
     hamkaas!{ () };
