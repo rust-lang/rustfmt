@@ -33,6 +33,10 @@ fn main() {
     a,   
     ];
     
+    unknown_bracket_macro__comma_should_not_be_stripped![
+    a,
+    ];
+    
     foo(makro!(1,   3));
 
     hamkaas!{ () };

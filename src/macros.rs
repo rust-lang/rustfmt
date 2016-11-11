@@ -114,7 +114,7 @@ pub fn rewrite_macro(mac: &ast::Mac,
             parser.bump();
 
             if parser.token == Token::Eof {
-                if style == MacroStyle::Brackets {
+                if macro_name == "vec!" {
                     break;
                 } else {
                     return None;
