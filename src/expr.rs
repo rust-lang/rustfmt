@@ -35,6 +35,9 @@ use syntax::{ast, ptr};
 use syntax::codemap::{CodeMap, Span, BytePos, mk_sp};
 use syntax::parse::classify;
 
+const FORMAT_LIKE_MACROS: &'static [&'static str] = 
+    &["format!","format_args!", "panic!", "print!", "println!"];
+
 impl Rewrite for ast::Expr {
     fn rewrite(&self, context: &RewriteContext, width: usize, offset: Indent) -> Option<String> {
         format_expr(self, ExprType::SubExpression, context, width, offset)
@@ -719,11 +722,7 @@ impl<'a> Rewrite for Loop<'a> {
             .rewrite(context, block_width, offset)
             .map(|result| {
                 format!("{}{}{}{}{}",
-                        label_string,
-                        self.keyword,
-                        pat_expr_string,
-                        block_sep,
-                        result)
+                        label_string, self.keyword, pat_expr_string, block_sep, result)
             })
     }
 }
@@ -745,8 +744,7 @@ fn extract_comment(span: Span,
         let comment =
             try_opt!(rewrite_comment(comment_str.trim(), false, width, offset, context.config));
         Some(format!("\n{indent}{}\n{indent}",
-                     comment,
-                     indent = offset.to_string(context.config)))
+                     comment, indent = offset.to_string(context.config)))
     } else {
         None
     }
@@ -816,10 +814,8 @@ fn rewrite_if_else(context: &RewriteContext,
         _ => " ",
     };
     let mut result = format!("if{}{}{}{}",
-                             between_if_cond_comment.as_ref().map_or(" ", |str| &**str),
-                             pat_expr_string,
-                             after_cond_comment.as_ref().map_or(after_sep, |str| &**str),
-                             if_block_string);
+                             between_if_cond_comment.as_ref().map_or(" ", |str| &**str), pat_expr_string,
+                             after_cond_comment.as_ref().map_or(after_sep, |str| &**str), if_block_string);
 
     if let Some(else_block) = else_block_opt {
         let mut last_in_chain = false;
@@ -920,9 +916,7 @@ fn single_line_if_else(context: &RewriteContext,
 
         if fits_line && !if_str.contains('\n') && !else_str.contains('\n') {
             return Some(format!("if {} {{ {} }} else {{ {} }}",
-                                pat_expr_str,
-                                if_str,
-                                else_str));
+                                pat_expr_str, if_str, else_str));
         }
     }
 
@@ -1517,10 +1511,14 @@ fn rewrite_call_inner<R>(context: &RewriteContext,
         }
     }
 
-    let tactic = definitive_tactic(&item_vec,
-                                   ListTactic::LimitedHorizontalVertical(context.config
-                                       .fn_call_width),
-                                   remaining_width);
+    
+    let list_tactic = if FORMAT_LIKE_MACROS.contains(&&callee_str[..]) {
+        ListTactic::FormatLikeMacroCall(context.config.fn_call_width)
+    } else {
+        ListTactic::LimitedHorizontalVertical(context.config.fn_call_width)
+    };
+
+    let tactic = definitive_tactic(&item_vec, list_tactic, remaining_width);
 
     // Replace the stub with the full overflowing last argument if the rewrite
     // succeeded and its first line fits with the other arguments.

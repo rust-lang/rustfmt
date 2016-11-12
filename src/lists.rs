@@ -28,6 +28,10 @@ pub enum ListTactic {
     Horizontal,
     // Try Horizontal layout, if that fails then vertical.
     HorizontalVertical,
+    // Try Horizontal layout, if that fails then put first element on the first line,
+    // and others as many items as possible per row over (possibly) many rows.
+    // Used for macro calls like `format!`, `println!`, etc
+    FormatLikeMacroCall(usize),
     // HorizontalVertical with a soft limit of n characters.
     LimitedHorizontalVertical(usize),
     // Pack as many items as possible per row over (possibly) many rows.
@@ -153,6 +157,7 @@ pub enum DefinitiveListTactic {
     Vertical,
     Horizontal,
     Mixed,
+    FormatLikeMacroVertical,
 }
 
 pub fn definitive_tactic<I, T>(items: I, tactic: ListTactic, width: usize) -> DefinitiveListTactic
@@ -169,6 +174,7 @@ pub fn definitive_tactic<I, T>(items: I, tactic: ListTactic, width: usize) -> De
         ListTactic::Horizontal => return DefinitiveListTactic::Horizontal,
         ListTactic::Vertical => return DefinitiveListTactic::Vertical,
         ListTactic::LimitedHorizontalVertical(limit) => ::std::cmp::min(width, limit),
+        ListTactic::FormatLikeMacroCall(limit) => ::std::cmp::min(width, limit),
         ListTactic::HorizontalVertical => width,
     };
 
@@ -176,10 +182,17 @@ pub fn definitive_tactic<I, T>(items: I, tactic: ListTactic, width: usize) -> De
     let sep_len = ", ".len(); // FIXME: make more generic?
     let total_sep_len = sep_len * sep_count.checked_sub(1).unwrap_or(0);
     let real_total = total_width + total_sep_len;
+    
+    let format_macro = match tactic {
+        ListTactic::FormatLikeMacroCall(_) => true,
+        _ => false,
+    };
 
     if real_total <= limit && !pre_line_comments &&
        !items.into_iter().any(|item| item.as_ref().is_multiline()) {
         DefinitiveListTactic::Horizontal
+    } else if format_macro {
+        DefinitiveListTactic::FormatLikeMacroVertical
     } else {
         DefinitiveListTactic::Vertical
     }
@@ -233,6 +246,29 @@ pub fn write_list<I, T>(items: I, formatting: &ListFormatting) -> Option<String>
             DefinitiveListTactic::Mixed => {
                 let total_width = total_item_width(item) + item_sep_len;
 
+                // 1 is space between separator and item.
+                if line_len > 0 && line_len + 1 + total_width > formatting.width {
+                    result.push('\n');
+                    result.push_str(indent_str);
+                    line_len = 0;
+                }
+
+                if line_len > 0 {
+                    result.push(' ');
+                    line_len += 1;
+                }
+
+                line_len += total_width;
+            }
+            DefinitiveListTactic::FormatLikeMacroVertical => {
+                let total_width = total_item_width(item) + item_sep_len;
+                
+                if i == 1 {
+                    result.push('\n');
+                    result.push_str(indent_str);
+                    line_len = 0;
+                }
+                
                 // 1 is space between separator and item.
                 if line_len > 0 && line_len + 1 + total_width > formatting.width {
                     result.push('\n');
