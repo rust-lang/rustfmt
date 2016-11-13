@@ -1531,13 +1531,16 @@ fn rewrite_call_inner<R>(context: &RewriteContext,
         }
         (false, _, _) => {}
     }
+    
+    // 1 is for semicolon
+    let list_width = width.checked_sub(callee_str.len() + 1).unwrap_or(width);
 
     let fmt = ListFormatting {
         tactic: tactic,
         separator: ",",
         trailing_separator: SeparatorTactic::Never,
         indent: offset,
-        width: width,
+        width: list_width,
         ends_with_newline: false,
         config: context.config,
     };
