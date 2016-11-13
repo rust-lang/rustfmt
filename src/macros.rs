@@ -114,6 +114,7 @@ pub fn rewrite_macro(mac: &ast::Mac,
             parser.bump();
 
             if parser.token == Token::Eof {
+                // vec! is a special case of bracket macro which should be formated as an array.
                 if macro_name == "vec!" {
                     break;
                 } else {
