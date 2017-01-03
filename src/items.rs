@@ -539,6 +539,7 @@ pub fn format_impl(context: &RewriteContext, item: &ast::Item, offset: Indent) -
 
         if result.chars().last().unwrap() == '{' {
             result.push('\n');
+            result.push_str(&offset.to_string(context.config));
         }
         result.push('}');
 
