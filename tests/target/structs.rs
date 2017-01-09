@@ -165,4 +165,8 @@ struct Foo {}
 struct Foo {
     // comment
 }
+struct Foo {
+    // trailing space ->
+}
+struct Foo { /* comment */ }
 struct Foo();
