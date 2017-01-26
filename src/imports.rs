@@ -12,7 +12,8 @@ use Indent;
 use utils;
 use syntax::codemap::{self, BytePos, Span};
 use codemap::SpanUtils;
-use lists::{write_list, itemize_list, ListItem, ListFormatting, SeparatorTactic, definitive_tactic};
+use config::StructLitStyle;
+use lists::{write_list, itemize_list, ListItem, ListFormatting, ListTactic, definitive_tactic};
 use types::{rewrite_path, PathContext};
 use rewrite::{Rewrite, RewriteContext};
 use visitor::FmtVisitor;
@@ -299,9 +300,6 @@ pub fn rewrite_use_list(width: usize,
         _ => (),
     }
 
-    // 2 = {}
-    let remaining_width = width.checked_sub(path_str.len() + 2).unwrap_or(0);
-
     let mut items = {
         // Dummy value, see explanation below.
         let mut items = vec![ListItem::from_str("")];
@@ -329,14 +327,29 @@ pub fn rewrite_use_list(width: usize,
 
     let colons_offset = if path_str.is_empty() { 0 } else { 2 };
 
-    let tactic = definitive_tactic(&items[first_index..],
-                                   ::lists::ListTactic::Mixed,
-                                   remaining_width);
+    let (indent, list_tactic, remaining_width) = match context.config.multiple_import_style {
+        StructLitStyle::Visual => {
+            let indent = offset + path_str.len() + 1 + colons_offset;
+            // 2 = {}
+            let remaining_width = width.checked_sub(path_str.len() + 2).unwrap_or(0);
+            (indent, ListTactic::Mixed, remaining_width)
+        }
+        StructLitStyle::Block => {
+            let indent = context.block_indent.block_indent(context.config);
+            // newline except the indent
+            let remaining_width = width.checked_sub(indent.width()).unwrap_or(0);
+            (indent, ListTactic::Vertical, remaining_width)
+        }
+    };
+
+
+    let tactic = definitive_tactic(&items[first_index..], list_tactic, remaining_width);
+
     let fmt = ListFormatting {
         tactic: tactic,
         separator: ",",
-        trailing_separator: SeparatorTactic::Never,
-        indent: offset + path_str.len() + 1 + colons_offset,
+        trailing_separator: context.config.multiple_import_trailing_comma,
+        indent: indent,
         // FIXME This is too conservative, and will not use all width
         // available
         // (loose 1 column (";"))
@@ -346,10 +359,18 @@ pub fn rewrite_use_list(width: usize,
     };
     let list_str = try_opt!(write_list(&items[first_index..], &fmt));
 
-    Some(if path_str.is_empty() {
-        format!("{{{}}}", list_str)
-    } else {
-        format!("{}::{{{}}}", path_str, list_str)
+    Some(match (context.config.multiple_import_style, path_str.is_empty()) {
+        (StructLitStyle::Visual, true) => format!("{{{}}}", list_str),
+        (StructLitStyle::Visual, false) => format!("{}::{{{}}}", path_str, list_str),
+        (StructLitStyle::Block, true) => {
+            format!("{{\n{}{}\n}}", indent.to_string(context.config), list_str)
+        }
+        (StructLitStyle::Block, false) => {
+            format!("{}::{{\n{}{}\n}}",
+                    path_str,
+                    indent.to_string(context.config),
+                    list_str)
+        }
     })
 }
 

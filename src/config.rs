@@ -384,6 +384,9 @@ create_config! {
     reorder_imports: bool, false, "Reorder import statements alphabetically";
     reorder_imported_names: bool, false,
         "Reorder lists of names in import statements alphabetically";
+    multiple_import_style: StructLitStyle, StructLitStyle::Visual, "Style of multiple imports";
+    multiple_import_trailing_comma: SeparatorTactic, SeparatorTactic::Never,
+        "Put a trailing comma on multiple import declarations";
     single_line_if_else_max_width: usize, 50, "Maximum line length for single line if-else \
                                                 expressions. A value of zero means always break \
                                                 if-else expressions.";
