@@ -339,6 +339,10 @@ fn format_ast<F>(krate: &ast::Crate,
                  -> Result<(FileMap, bool), io::Error>
     where F: FnMut(&str, &mut StringBuffer) -> Result<bool, io::Error>
 {
+    if config.disable_all_formatting {
+        return Ok((FileMap::new(), false));
+    }
+
     let mut result = FileMap::new();
     // diff mode: check if any files are differing
     let mut has_diff = false;
