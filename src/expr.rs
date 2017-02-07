@@ -895,7 +895,7 @@ impl<'a> Rewrite for ControlFlow<'a> {
         let block_sep = if self.cond.is_none() && between_kwd_cond_comment.is_some() {
             ""
         } else if context.config.control_brace_style ==
-                  ControlBraceStyle::AlwaysNextLine {
+                                  ControlBraceStyle::AlwaysNextLine {
             alt_block_sep.as_str()
         } else {
             " "
