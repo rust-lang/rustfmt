@@ -1319,18 +1319,33 @@ impl Rewrite for ast::Arm {
             ("", "")
         };
 
+
         let block_sep = match context.config.control_brace_style {
             ControlBraceStyle::AlwaysNextLine => alt_block_sep + body_prefix + "\n",
             _ => String::from(" ") + body_prefix + "\n",
         };
-        Some(format!("{}{} =>{}{}{}\n{}{}",
-                     attr_str.trim_left(),
-                     pats_str,
-                     block_sep,
-                     indent_str,
-                     next_line_body,
-                     shape.indent.to_string(context.config),
-                     body_suffix))
+
+        if context.config.wrap_match_arms {
+            Some(format!("{}{} =>{}{}{}\n{}{}",
+                         attr_str.trim_left(),
+                         pats_str,
+                         block_sep,
+                         indent_str,
+                         next_line_body,
+                         shape.indent.to_string(context.config),
+                         body_suffix))
+        } else {
+            // If the line isn't being wrapped, we don't need the empty new-line
+            assert!(shape.indent.to_string(context.config).trim().is_empty() &&
+                    body_suffix.is_empty());
+
+            Some(format!("{}{} =>{}{}{},",
+                         attr_str.trim_left(),
+                         pats_str,
+                         block_sep,
+                         indent_str,
+                         next_line_body))
+        }
     }
 }
 
