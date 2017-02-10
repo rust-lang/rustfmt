@@ -1316,7 +1316,7 @@ impl Rewrite for ast::Arm {
                 ("{", "}")
             }
         } else {
-            ("", "")
+            ("", ",")
         };
 
 
@@ -1335,16 +1335,13 @@ impl Rewrite for ast::Arm {
                          shape.indent.to_string(context.config),
                          body_suffix))
         } else {
-            // If the line isn't being wrapped, we don't need the empty new-line
-            assert!(shape.indent.to_string(context.config).trim().is_empty() &&
-                    body_suffix.is_empty());
-
-            Some(format!("{}{} =>{}{}{},",
+            Some(format!("{}{} =>{}{}{}{}",
                          attr_str.trim_left(),
                          pats_str,
                          block_sep,
                          indent_str,
-                         next_line_body))
+                         next_line_body,
+                         body_suffix))
         }
     }
 }
