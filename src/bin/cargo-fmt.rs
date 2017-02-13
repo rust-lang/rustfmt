@@ -39,6 +39,7 @@ fn execute() -> i32 {
     opts.optflag("h", "help", "show this message");
     opts.optflag("q", "quiet", "no output printed to stdout");
     opts.optflag("v", "verbose", "use verbose output");
+    opts.optopt("v", "rustfmt-binary", "path to rustfmt binary", "BINARY");
 
     let matches = match opts.parse(env::args().skip(1).take_while(|a| a != "--")) {
         Ok(m) => m,
@@ -63,7 +64,9 @@ fn execute() -> i32 {
         return success;
     }
 
-    match format_crate(verbosity) {
+    let rustfmt_binary = matches.opt_str("rustfmt-binary").unwrap_or("rustfmt".to_string());
+
+    match format_crate(verbosity, &rustfmt_binary) {
         Err(e) => {
             print_usage(&opts, &e.to_string());
             failure
@@ -92,7 +95,7 @@ pub enum Verbosity {
     Quiet,
 }
 
-fn format_crate(verbosity: Verbosity) -> Result<ExitStatus, std::io::Error> {
+fn format_crate(verbosity: Verbosity, rustfmt_binary: &str) -> Result<ExitStatus, std::io::Error> {
     let targets = try!(get_targets());
 
     // Currently only bin and lib files get formatted
@@ -104,7 +107,7 @@ fn format_crate(verbosity: Verbosity) -> Result<ExitStatus, std::io::Error> {
         .map(|t| t.path)
         .collect();
 
-    format_files(&files, &get_fmt_args(), verbosity)
+    format_files(&files, &get_fmt_args(), verbosity, rustfmt_binary)
 }
 
 fn get_fmt_args() -> Vec<String> {
@@ -182,7 +185,8 @@ fn target_from_json(jtarget: &Json) -> Target {
 
 fn format_files(files: &[PathBuf],
                 fmt_args: &[String],
-                verbosity: Verbosity)
+                verbosity: Verbosity,
+                rustfmt_binary: &str)
                 -> Result<ExitStatus, std::io::Error> {
     let stdout = if verbosity == Verbosity::Quiet {
         std::process::Stdio::null()
@@ -190,7 +194,7 @@ fn format_files(files: &[PathBuf],
         std::process::Stdio::inherit()
     };
     if verbosity == Verbosity::Verbose {
-        print!("rustfmt");
+        print!("{}", rustfmt_binary);
         for a in fmt_args.iter() {
             print!(" {}", a);
         }
@@ -199,15 +203,16 @@ fn format_files(files: &[PathBuf],
         }
         println!("");
     }
-    let mut command = try!(Command::new("rustfmt")
+    let mut command = try!(Command::new(rustfmt_binary)
         .stdout(stdout)
         .args(files)
         .args(fmt_args)
         .spawn()
         .map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => {
-                std::io::Error::new(std::io::ErrorKind::Other,
-                                    "Could not run rustfmt, please make sure it is in your PATH.")
+                let message = format!("Could not run `{}`, please make sure it is in your PATH.",
+                                      rustfmt_binary);
+                std::io::Error::new(std::io::ErrorKind::Other, message)
             }
             _ => e,
         }));
