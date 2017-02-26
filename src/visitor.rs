@@ -180,6 +180,10 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_item(&mut self, item: &ast::Item) {
+        if !self.config.file_lines.intersects(&self.codemap.lookup_line_range(item.span)) {
+            return;
+        }
+
         // This is where we bail out if there is a skip attribute. This is only
         // complex in the module case. It is complex because the module could be
         // in a separate file and there might be attributes in both files, but
@@ -342,6 +346,10 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_trait_item(&mut self, ti: &ast::TraitItem) {
+        if !self.config.file_lines.intersects(&self.codemap.lookup_line_range(ti.span)) {
+            return;
+        }
+
         if self.visit_attrs(&ti.attrs) {
             self.push_rewrite(ti.span, None);
             return;
@@ -386,6 +394,10 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_impl_item(&mut self, ii: &ast::ImplItem) {
+        if !self.config.file_lines.intersects(&self.codemap.lookup_line_range(ii.span)) {
+            return;
+        }
+
         if self.visit_attrs(&ii.attrs) {
             self.push_rewrite(ii.span, None);
             return;
