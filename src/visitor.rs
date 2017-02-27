@@ -30,6 +30,7 @@ fn is_use_item(item: &ast::Item) -> bool {
     }
 }
 
+// FIXME(#434): Move this check to somewhere more central, eg Rewrite.
 macro_rules! check_file_lines_intersect {
     ($this:expr, $node:expr) => {
         if !$this.config.file_lines.intersects(&$this.codemap.lookup_line_range($node.span)) {
@@ -57,6 +58,7 @@ impl<'a> FmtVisitor<'a> {
 
         // FIXME(#434): Move this check to somewhere more central, eg Rewrite.
         if !self.config.file_lines.contains(&self.codemap.lookup_line_range(stmt.span)) {
+            self.push_rewrite(stmt.span, None);
             return;
         }
 

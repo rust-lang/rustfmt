@@ -1,4 +1,4 @@
-// rustfmt-file_lines: [{"file":"tests/source/file-lines-5.rs","range":[9,10]},{"file":"tests/source/file-lines-5.rs","range":[20,25]}]
+// rustfmt-file_lines: [{"file":"tests/source/file-lines-5.rs","range":[9,10]},{"file":"tests/source/file-lines-5.rs","range":[20,25]},{"file":"tests/source/file-lines-5.rs","range":[29,33]}]
 // rustfmt-error_on_line_overflow: false
 
 impl A {
@@ -26,6 +26,11 @@ fn main() {
 }
 
 fn bar() {
+    {
+        {
+            // comment
+        }
+    }
     {
         {
             // comment
