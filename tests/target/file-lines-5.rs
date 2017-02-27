@@ -18,3 +18,11 @@ trait C {
 fn main() {
     let y = if cond { val1 } else { val2 }.method_call();
 }
+
+fn bar() {
+    {
+        {
+            // comment
+        }
+    }
+}

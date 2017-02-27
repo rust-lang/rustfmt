@@ -33,6 +33,7 @@ fn is_use_item(item: &ast::Item) -> bool {
 macro_rules! check_file_lines_intersect {
     ($this:expr, $node:expr) => {
         if !$this.config.file_lines.intersects(&$this.codemap.lookup_line_range($node.span)) {
+            $this.push_rewrite($node.span, None);
             return;
         }
     }

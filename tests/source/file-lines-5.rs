@@ -24,3 +24,11 @@ fn main() {
         }
             .method_call();
 }
+
+fn bar() {
+    {
+        {
+            // comment
+        }
+    }
+}
