@@ -114,32 +114,27 @@ impl FileLines {
 
     /// Returns true if `range` is fully contained in `self`.
     pub fn contains(&self, range: &LineRange) -> bool {
-        let map = match self.0 {
-            // `None` means "all lines in all files".
-            None => return true,
-            Some(ref map) => map,
-        };
-
-        canonicalize_path_string(range.file_name())
-            .ok()
-            .and_then(|canonical| map.get_vec(&canonical))
-            .map_or(false,
-                    |ranges| ranges.iter().any(|r| r.contains(Range::from(range))))
+        self.any_range(range.file_name(), |r| r.contains(Range::from(range)))
     }
 
     /// Returns true if any lines in `range` are in `self`.
     pub fn intersects(&self, range: &LineRange) -> bool {
+        self.any_range(range.file_name(), |r| r.intersects(Range::from(range)))
+    }
+
+    fn any_range<F>(&self, file_name: &str, f: F) -> bool
+        where F: FnMut(&Range) -> bool
+    {
         let map = match self.0 {
             // `None` means "all lines in all files".
             None => return true,
             Some(ref map) => map,
         };
 
-        canonicalize_path_string(range.file_name())
+        canonicalize_path_string(file_name)
             .ok()
             .and_then(|canonical| map.get_vec(&canonical))
-            .map_or(false,
-                    |ranges| ranges.iter().any(|r| r.intersects(Range::from(range))))
+            .map_or(false, |ranges| ranges.iter().any(f))
     }
 }
 

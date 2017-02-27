@@ -30,6 +30,14 @@ fn is_use_item(item: &ast::Item) -> bool {
     }
 }
 
+macro_rules! check_file_lines_intersect {
+    ($this:expr, $node:expr) => {
+        if !$this.config.file_lines.intersects(&$this.codemap.lookup_line_range($node.span)) {
+            return;
+        }
+    }
+}
+
 pub struct FmtVisitor<'a> {
     pub parse_session: &'a ParseSess,
     pub codemap: &'a CodeMap,
@@ -180,9 +188,7 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_item(&mut self, item: &ast::Item) {
-        if !self.config.file_lines.intersects(&self.codemap.lookup_line_range(item.span)) {
-            return;
-        }
+        check_file_lines_intersect!(self, item);
 
         // This is where we bail out if there is a skip attribute. This is only
         // complex in the module case. It is complex because the module could be
@@ -346,9 +352,7 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_trait_item(&mut self, ti: &ast::TraitItem) {
-        if !self.config.file_lines.intersects(&self.codemap.lookup_line_range(ti.span)) {
-            return;
-        }
+        check_file_lines_intersect!(self, ti);
 
         if self.visit_attrs(&ti.attrs) {
             self.push_rewrite(ti.span, None);
@@ -394,9 +398,7 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_impl_item(&mut self, ii: &ast::ImplItem) {
-        if !self.config.file_lines.intersects(&self.codemap.lookup_line_range(ii.span)) {
-            return;
-        }
+        check_file_lines_intersect!(self, ii);
 
         if self.visit_attrs(&ii.attrs) {
             self.push_rewrite(ii.span, None);
