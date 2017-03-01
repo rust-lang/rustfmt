@@ -469,6 +469,10 @@ fn format_lines(text: &mut StringBuffer, name: &str, config: &Config, report: &m
     let mut issue_seeker = BadIssueSeeker::new(config.report_todo, config.report_fixme);
 
     for (c, b) in text.chars() {
+        if c == '\r' {
+            continue;
+        }
+
         // Add warnings for bad todos/ fixmes
         if let Some(issue) = issue_seeker.inspect(c) {
             errors.push(FormattingError {
@@ -477,7 +481,7 @@ fn format_lines(text: &mut StringBuffer, name: &str, config: &Config, report: &m
                         });
         }
 
-        if c == '\n' || c == '\r' {
+        if c == '\n' {
             // Check for (and record) trailing whitespace.
             if let Some(lw) = last_wspace {
                 trims.push((cur_line, lw, b));
