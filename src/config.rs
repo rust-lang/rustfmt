@@ -167,6 +167,8 @@ configuration_option_enum! { WriteMode:
     Plain,
     // Outputs a checkstyle XML file.
     Checkstyle,
+    // Outputs to stdout in codeclimate-engine format
+    Codeclimate,
 }
 
 /// Trait for types that can be used in `Config`.
