@@ -31,6 +31,16 @@ fn is_use_item(item: &ast::Item) -> bool {
     }
 }
 
+// FIXME(#434): Move this check to somewhere more central, eg Rewrite.
+macro_rules! check_file_lines_intersect {
+    ($this:expr, $node:expr) => {
+        if !$this.config.file_lines.intersects(&$this.codemap.lookup_line_range($node.span)) {
+            $this.push_rewrite($node.span, None);
+            return;
+        }
+    }
+}
+
 pub struct FmtVisitor<'a> {
     pub parse_session: &'a ParseSess,
     pub codemap: &'a CodeMap,
@@ -49,6 +59,7 @@ impl<'a> FmtVisitor<'a> {
 
         // FIXME(#434): Move this check to somewhere more central, eg Rewrite.
         if !self.config.file_lines.contains(&self.codemap.lookup_line_range(stmt.span)) {
+            self.push_rewrite(stmt.span, None);
             return;
         }
 
@@ -181,6 +192,8 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_item(&mut self, item: &ast::Item) {
+        check_file_lines_intersect!(self, item);
+
         // This is where we bail out if there is a skip attribute. This is only
         // complex in the module case. It is complex because the module could be
         // in a separate file and there might be attributes in both files, but
@@ -343,6 +356,8 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_trait_item(&mut self, ti: &ast::TraitItem) {
+        check_file_lines_intersect!(self, ti);
+
         if self.visit_attrs(&ti.attrs) {
             self.push_rewrite(ti.span, None);
             return;
@@ -387,6 +402,8 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn visit_impl_item(&mut self, ii: &ast::ImplItem) {
+        check_file_lines_intersect!(self, ii);
+
         if self.visit_attrs(&ii.attrs) {
             self.push_rewrite(ii.span, None);
             return;
