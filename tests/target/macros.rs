@@ -66,6 +66,20 @@ fn main() {
         // comment
         not function like
     );
+
+    info!("Found {} code blocks (not all might have file names)",
+          code_blocks.len());
+
+    assert_eq!(1,
+               hashmap
+                   .values()
+                   .filter(|v| v.upgrade().is_some())
+                   .count());
+
+    let parent = match path.parent() {
+        Some(p) => p,
+        None => bail!("Can't create file for code block, path has no parent directory"),
+    };
 }
 
 impl X {
