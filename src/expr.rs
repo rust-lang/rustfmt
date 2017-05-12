@@ -245,10 +245,34 @@ fn format_expr(expr: &ast::Expr,
         ast::ExprKind::InlineAsm(..) => {
             wrap_str(context.snippet(expr.span), context.config.max_width, shape)
         }
-        // FIXME(#1537)
-        ast::ExprKind::Catch(..) => unimplemented!(),
+        ast::ExprKind::Catch(ref block) => {
+            if let rewrite @ Some(_) = try_one_line_block(context, shape, "do catch ", block) {
+                return rewrite;
+            }
+            // 9 = `do catch `
+            let budget = shape.width.checked_sub(9).unwrap_or(0);
+            Some(format!("{}{}",
+                         "do catch ",
+                         try_opt!(block.rewrite(&context, Shape::legacy(budget, shape.indent)))))
+        }
     };
     result.and_then(|res| recover_comment_removed(res, expr.span, context, shape))
+}
+
+fn try_one_line_block(context: &RewriteContext,
+                      shape: Shape,
+                      prefix: &str,
+                      block: &ast::Block)
+                      -> Option<String> {
+    if is_simple_block(block, context.codemap) {
+        let expr_shape = Shape::legacy(shape.width - prefix.len(), shape.indent);
+        let expr_str = try_opt!(block.stmts[0].rewrite(context, expr_shape));
+        let result = format!("{}{{ {} }}", prefix, expr_str);
+        if result.len() <= shape.width && !result.contains('\n') {
+            return Some(result);
+        }
+    }
+    None
 }
 
 pub fn rewrite_pair<LHS, RHS>(lhs: &LHS,
@@ -579,12 +603,12 @@ fn rewrite_closure(capture: ast::CaptureBy,
                              context: &RewriteContext,
                              shape: Shape)
                              -> Option<String> {
+        let block_threshold = context.config.closure_block_indent_threshold;
         // Start with visual indent, then fall back to block indent if the
         // closure is large.
-        if let Some(block_str) = block.rewrite(&context, shape) {
-            let block_threshold = context.config.closure_block_indent_threshold;
-            if block_threshold < 0 || block_str.matches('\n').count() <= block_threshold as usize {
-                if let Some(block_str) = block_str.rewrite(context, shape) {
+        if block_threshold >= 0 {
+            if let Some(block_str) = block.rewrite(&context, shape) {
+                if block_str.matches('\n').count() <= block_threshold as usize {
                     return Some(format!("{} {}", prefix, block_str));
                 }
             }
@@ -594,9 +618,7 @@ fn rewrite_closure(capture: ast::CaptureBy,
         // means we must re-format.
         let block_shape = shape.block().with_max_width(context.config);
         let block_str = try_opt!(block.rewrite(&context, block_shape));
-        Some(format!("{} {}",
-                     prefix,
-                     try_opt!(block_str.rewrite(context, block_shape))))
+        Some(format!("{} {}", prefix, block_str))
     }
 }
 
@@ -660,24 +682,13 @@ impl Rewrite for ast::Block {
                 } else {
                     "unsafe ".to_owned()
                 };
-
-                if is_simple_block(self, context.codemap) && prefix.len() < shape.width {
-                    let expr_str =
-                        self.stmts[0].rewrite(context,
-                                              Shape::legacy(shape.width - prefix.len(),
-                                                            shape.indent));
-                    let expr_str = try_opt!(expr_str);
-                    let result = format!("{}{{ {} }}", prefix, expr_str);
-                    if result.len() <= shape.width && !result.contains('\n') {
-                        return Some(result);
-                    }
+                if let result @ Some(_) = try_one_line_block(context, shape, &prefix, self) {
+                    return result;
                 }
-
                 prefix
             }
             ast::BlockCheckMode::Default => {
                 visitor.last_pos = self.span.lo;
-
                 String::new()
             }
         };
