@@ -9,7 +9,7 @@
 // except according to those terms.
 
 use syntax::{ast, ptr, visit};
-use syntax::codemap::{self, CodeMap, Span, BytePos};
+use syntax::codemap::{CodeMap, Span, BytePos};
 use syntax::parse::ParseSess;
 
 use strings::string_buffer::StringBuffer;
@@ -145,7 +145,7 @@ impl<'a> FmtVisitor<'a> {
                                 defaultness,
                                 abi,
                                 vis,
-                                codemap::mk_sp(s.lo, b.span.lo),
+                                utils::mk_sp(s.lo, b.span.lo),
                                 &b)
             }
             visit::FnKind::Method(ident, sig, vis, b) => {
@@ -159,7 +159,7 @@ impl<'a> FmtVisitor<'a> {
                                 defaultness,
                                 sig.abi,
                                 vis.unwrap_or(&ast::Visibility::Inherited),
-                                codemap::mk_sp(s.lo, b.span.lo),
+                                utils::mk_sp(s.lo, b.span.lo),
                                 &b)
             }
             visit::FnKind::Closure(_) => unreachable!(),
@@ -340,6 +340,12 @@ impl<'a> FmtVisitor<'a> {
             }
             ast::ItemKind::Union(..) => {
                 // FIXME(#1157): format union definitions.
+            }
+            ast::ItemKind::GlobalAsm(..) => {
+                // FIXME(#1538): format GlobalAsm
+            }
+            ast::ItemKind::MacroDef(..) => {
+                // FIXME(#1539): macros 2.0
             }
         }
     }
@@ -543,7 +549,7 @@ impl<'a> FmtVisitor<'a> {
             // Hackery to account for the closing }.
             let mod_lo = self.codemap.span_after(source!(self, s), "{");
             let body_snippet =
-                self.snippet(codemap::mk_sp(mod_lo, source!(self, m.inner).hi - BytePos(1)));
+                self.snippet(utils::mk_sp(mod_lo, source!(self, m.inner).hi - BytePos(1)));
             let body_snippet = body_snippet.trim();
             if body_snippet.is_empty() {
                 self.buffer.push_str("}");
@@ -592,7 +598,7 @@ impl<'a> Rewrite for [ast::Attribute] {
 
             // Write comments and blank lines between attributes.
             if i > 0 {
-                let comment = context.snippet(codemap::mk_sp(self[i - 1].span.hi, a.span.lo));
+                let comment = context.snippet(utils::mk_sp(self[i - 1].span.hi, a.span.lo));
                 // This particular horror show is to preserve line breaks in between doc
                 // comments. An alternative would be to force such line breaks to start
                 // with the usual doc comment token.
