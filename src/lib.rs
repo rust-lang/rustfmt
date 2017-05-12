@@ -8,9 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-// TODO we're going to allocate a whole bunch of temp Strings, is it worth
-// keeping some scratch mem for this and running our own StrPool?
-// TODO for lint violations of names, emit a refactor script
+#![feature(rustc_private)]
 
 #[macro_use]
 extern crate log;
@@ -20,8 +18,8 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-extern crate syntex_syntax as syntax;
-extern crate syntex_errors as errors;
+extern crate syntax;
+extern crate rustc_errors as errors;
 
 extern crate strings;
 
@@ -33,7 +31,7 @@ extern crate term;
 use errors::{Handler, DiagnosticBuilder};
 use errors::emitter::{ColorConfig, EmitterWriter};
 use syntax::ast;
-use syntax::codemap::{mk_sp, CodeMap, Span};
+use syntax::codemap::{CodeMap, Span, FilePathMapping};
 use syntax::parse::{self, ParseSess};
 
 use strings::string_buffer::StringBuffer;
@@ -107,7 +105,7 @@ impl Spanned for ast::Ty {
 impl Spanned for ast::Arg {
     fn span(&self) -> Span {
         if items::is_named_arg(self) {
-            mk_sp(self.pat.span.lo, self.ty.span.hi)
+            self.pat.span.to(self.ty.span)
         } else {
             self.ty.span
         }
@@ -578,7 +576,7 @@ pub fn format_input<T: Write>(input: Input,
     if config.disable_all_formatting() {
         return Ok((summary, FileMap::new(), FormatReport::new()));
     }
-    let codemap = Rc::new(CodeMap::new());
+    let codemap = Rc::new(CodeMap::new(FilePathMapping::empty()));
 
     let tty_handler =
         Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(codemap.clone()));

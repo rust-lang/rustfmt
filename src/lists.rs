@@ -11,12 +11,13 @@
 use std::cmp;
 use std::iter::Peekable;
 
-use syntax::codemap::{self, CodeMap, BytePos};
+use syntax::codemap::{CodeMap, BytePos};
 
 use {Indent, Shape};
 use comment::{FindUncommented, rewrite_comment, find_comment_end};
 use config::{Config, IndentStyle};
 use rewrite::RewriteContext;
+use utils::mk_sp;
 
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 /// Formatting tactic for lists. This will be cast down to a
