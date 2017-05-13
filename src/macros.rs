@@ -32,6 +32,8 @@ use rewrite::{Rewrite, RewriteContext};
 use expr::{rewrite_call, rewrite_array};
 use comment::{FindUncommented, contains_comment};
 
+use itertools::Itertools;
+
 const FORCED_BRACKET_MACROS: &'static [&'static str] = &["vec!"];
 
 // FIXME: use the enum from libsyntax?
@@ -169,10 +171,17 @@ pub fn rewrite_macro(mac: &ast::Mac,
             Some(format!("{}{}", macro_name, rewrite))
         }
         MacroStyle::Braces => {
-            // Skip macro invocations with braces, for now.
-            None
+            // Skip macro invocations with braces and only remove trailing whitespaces,
+            // for now.
+            let snippet = context.snippet(mac.span);
+            Some(snippet.lines().map(remove_trailing_whitespaces).join("\n"))
         }
     }
+}
+
+fn remove_trailing_whitespaces(line: &str) -> &str {
+    line.rfind(|c: char| c != ' ')
+        .map_or("", |i| &line[0..i + 1])
 }
 
 /// Tries to convert a macro use into a short hand try expression. Returns None
