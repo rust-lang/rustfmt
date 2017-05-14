@@ -80,3 +80,14 @@ gfx_pipeline!(pipe {
 fn issue_1279() {
     println!("dsfs"); // a comment
 }
+
+// #878
+macro_rules! log {
+
+    ($state:expr) => {
+
+        println!("log({}): {}", 3, $state);
+        println!("log({}): {}", 4, $state);
+
+    };
+}
