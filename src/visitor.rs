@@ -42,7 +42,7 @@ fn item_bound(item: &ast::Item) -> Span {
             Span {
                 lo: cmp::min(bound.lo, span.lo),
                 hi: cmp::max(bound.hi, span.hi),
-                expn_id: span.expn_id,
+                ctxt: span.ctxt,
             }
         })
 }

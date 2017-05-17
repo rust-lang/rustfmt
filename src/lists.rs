@@ -345,7 +345,7 @@ impl<'a, T, I, F1, F2, F3> Iterator for ListItems<'a, I, F1, F2, F3>
             let mut new_lines = false;
             // Pre-comment
             let pre_snippet = self.codemap
-                .span_to_snippet(codemap::mk_sp(self.prev_span_end, (self.get_lo)(&item)))
+                .span_to_snippet(mk_sp(self.prev_span_end, (self.get_lo)(&item)))
                 .unwrap();
             let trimmed_pre_snippet = pre_snippet.trim();
             let has_pre_comment = trimmed_pre_snippet.contains("//") ||
@@ -362,7 +362,7 @@ impl<'a, T, I, F1, F2, F3> Iterator for ListItems<'a, I, F1, F2, F3>
                 None => self.next_span_start,
             };
             let post_snippet = self.codemap
-                .span_to_snippet(codemap::mk_sp((self.get_hi)(&item), next_start))
+                .span_to_snippet(mk_sp((self.get_hi)(&item), next_start))
                 .unwrap();
 
             let comment_end = match self.inner.peek() {
