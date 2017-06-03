@@ -178,6 +178,11 @@ options covering different styles. File an issue, or even better, submit a PR.
     #[rustfmt_skip]  // requires nightly and #![feature(custom_attribute)] in crate root
     #[cfg_attr(rustfmt, rustfmt_skip)]  // works in stable
     ```
+
+  Note that if one of these attributes is used on a `mod` item that references
+  a file (e.g., `mod foo;`), the referenced file will be ignored entirely,
+  whereas, in other skipped sections of code, rustfmt will warn on lines that
+  exceed the line length limit.
 * When you run rustfmt, place a file named `rustfmt.toml` or `.rustfmt.toml` in
   target file directory or its parents to override the default settings of
   rustfmt.
