@@ -53,3 +53,19 @@ trait FooBar<T> : Tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt
 
 trait WhereList<T, J> where T: Foo, J: Bar {}
 
+// #1168
+pub trait Number: Copy + Eq +      Not<Output = Self> + Shl<u8, Output = Self> +
+    Shr<u8, Output = Self>       +
+    BitAnd<Self, Output=Self> +    BitOr<Self, Output=Self>  + BitAndAssign + BitOrAssign
+
+
+
+{
+    // test
+    fn zero() -> Self;
+}
+
+// #1642
+pub trait SomeTrait : Clone + Eq + PartialEq + Ord + PartialOrd + Default + Hash + Debug + Display + Write + Read + FromStr {
+    // comment
+}

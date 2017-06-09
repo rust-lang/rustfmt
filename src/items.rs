@@ -2182,11 +2182,21 @@ fn rewrite_trait_bounds(context: &RewriteContext,
                                  .map(|ty_bound| ty_bound.rewrite(&context, shape))
                                  .collect::<Option<Vec<_>>>())
         .join(joiner);
-
-    let mut result = String::new();
-    result.push_str(": ");
-    result.push_str(&bound_str);
-    Some(result)
+    // 2 = `: `
+    if bound_str.len() + 2 <= shape.width {
+        Some(format!(": {}", bound_str))
+    } else {
+        let bound_str = try_opt!(bounds
+                                     .iter()
+                                     .map(|ty_bound| ty_bound.rewrite(&context, shape))
+                                     .collect::<Option<Vec<_>>>())
+            .join(&format!("\n{}+ ",
+                           shape
+                               .indent
+                               .block_indent(context.config)
+                               .to_string(context.config)));
+        Some(format!(": {}", bound_str))
+    }
 }
 
 fn rewrite_where_clause_rfc_style(context: &RewriteContext,
