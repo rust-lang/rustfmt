@@ -19,6 +19,7 @@ use std::io::{self, Write, Read, BufWriter};
 use config::{NewlineStyle, Config, WriteMode};
 use rustfmt_diff::{make_diff, print_diff, Mismatch};
 use checkstyle::{output_header, output_footer, output_checkstyle_file};
+use codeclimate::output_codeclimate;
 
 // A map of the files of a crate, with their new content
 pub type FileMap = Vec<FileRecord>;
@@ -155,6 +156,10 @@ pub fn write_file<T>(text: &StringBuffer,
         WriteMode::Checkstyle => {
             let diff = create_diff(filename, text, config)?;
             output_checkstyle_file(out, filename, diff)?;
+        }
+        WriteMode::Codeclimate => {
+            let diff = try!(create_diff(filename, text, config));
+            try!(output_codeclimate(out, filename, diff));
         }
     }
 
