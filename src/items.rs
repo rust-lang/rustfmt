@@ -1468,9 +1468,9 @@ impl Rewrite for ast::StructField {
             Some(ref ty) if ty.contains('\n') => {
                 let new_ty = rewrite_type_in_next_line();
                 match new_ty {
-                    Some(ref new_ty) if !new_ty.contains('\n') &&
-                                            new_ty.len() + type_offset.width() <=
-                                                context.config.max_width() => {
+                    Some(ref new_ty)
+                        if !new_ty.contains('\n') &&
+                               new_ty.len() + type_offset.width() <= context.config.max_width() => {
                         Some(format!(
                             "{}\n{}{}",
                             result,
