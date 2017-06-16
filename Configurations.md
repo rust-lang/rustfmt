@@ -916,6 +916,70 @@ match lorem {
 
 See also: [`match_block_trailing_comma`](#match_block_trailing_comma), [`wrap_match_arms`](#wrap_match_arms).
 
+## `match_align_arms`
+
+Aligns the arms of a `match` statement to be flush with each other. `"Preserve"` will not re-format match arms that have already been aligned manually.
+
+- **Default value**: `"Preserve"`
+- **Possible values**: `"Always"`, `"Preserve"`, `"Never"`
+
+#### `"Never"`:
+
+```rust
+match lorem {
+    Lorem::Ipsum => (),
+    Lorem::Dolor => (),
+    Lorem::Sit => (),
+    Lorem::Amet => (),
+}
+
+match lorem {
+    Lorem::Ipsum => (),
+    Lorem::Dolor => (),
+    Lorem::Sit => (),
+    Lorem::Amet => (),
+}
+```
+
+#### `"Preserve"`:
+
+```rust
+match lorem {
+    Lorem::Ipsum => (),
+    Lorem::Dolor => (),
+    Lorem::Sit => (),
+    Lorem::Amet => (),
+}
+
+match lorem {
+    Lorem::Ipsum    => (),
+    Lorem::Dolor    => (),
+    Lorem::Sit      => (),
+    Lorem::Amet     => (),
+}
+```
+
+#### `"Always"`:
+
+```rust
+match lorem {
+    Lorem::Ipsum => (),
+    Lorem::Dolor => (),
+    Lorem::Sit   => (),
+    Lorem::Amet  => (),
+}
+
+match lorem {
+    Lorem::Ipsum    => (),
+    Lorem::Dolor    => (),
+    Lorem::Sit      => (),
+    Lorem::Amet     => (),
+}
+```
+
+See also: [`indent_match_arms`](#indent_match_arms), [`wrap_match_arms`](#wrap_match_arms).
+
+
 ## `item_brace_style`
 
 Brace style for structs and enums
