@@ -23,7 +23,7 @@ use utils::{extra_offset, last_line_width, wrap_str, binary_search, first_line_w
             semicolon_for_stmt, trimmed_last_line_width, left_most_sub_expr, stmt_expr,
             colon_spaces, contains_skip, mk_sp};
 use visitor::FmtVisitor;
-use config::{Config, IndentStyle, MultilineStyle, ControlBraceStyle, Style};
+use config::{Config, IndentStyle, MultilineStyle, ControlBraceStyle, Style, MatchAlignArms};
 use comment::{FindUncommented, rewrite_comment, contains_comment, recover_comment_removed};
 use types::{rewrite_path, PathContext, can_be_overflowed_type};
 use items::{span_lo_for_arg, span_hi_for_arg};
@@ -360,8 +360,9 @@ where
         // This is needed in case of line break not caused by a
         // shortage of space, but by end-of-line comments, for example.
         if !rhs_result.contains('\n') {
-            let lhs_shape =
-                try_opt!(try_opt!(shape.offset_left(prefix.len())).sub_width(infix.len()));
+            let lhs_shape = try_opt!(try_opt!(shape.offset_left(prefix.len())).sub_width(
+                infix.len(),
+            ));
             let lhs_result = lhs.rewrite(context, lhs_shape);
             if let Some(lhs_result) = lhs_result {
                 let mut result = format!("{}{}{}", prefix, lhs_result, infix);
@@ -450,11 +451,9 @@ where
     let nested_shape = match context.config.array_layout() {
         IndentStyle::Block => shape.block().block_indent(context.config.tab_spaces()),
         IndentStyle::Visual => {
-            try_opt!(
-                shape
-                    .visual_indent(bracket_size)
-                    .sub_width(bracket_size * 2)
-            )
+            try_opt!(shape.visual_indent(bracket_size).sub_width(
+                bracket_size * 2,
+            ))
         }
     };
 
@@ -477,9 +476,9 @@ where
         }
     }
 
-    let has_long_item = items
-        .iter()
-        .any(|li| li.item.as_ref().map(|s| s.len() > 10).unwrap_or(false));
+    let has_long_item = items.iter().any(|li| {
+        li.item.as_ref().map(|s| s.len() > 10).unwrap_or(false)
+    });
 
     let tactic = match context.config.array_layout() {
         IndentStyle::Block => {
@@ -755,14 +754,14 @@ fn and_one_line(x: Option<String>) -> Option<String> {
 
 fn nop_block_collapse(block_str: Option<String>, budget: usize) -> Option<String> {
     debug!("nop_block_collapse {:?} {}", block_str, budget);
-    block_str.map(|block_str| {
-        if block_str.starts_with('{') && budget >= 2 &&
-            (block_str[1..].find(|c: char| !c.is_whitespace()).unwrap() == block_str.len() - 2)
-        {
-            "{}".to_owned()
-        } else {
-            block_str.to_owned()
-        }
+    block_str.map(|block_str| if block_str.starts_with('{') && budget >= 2 &&
+        (block_str[1..]
+             .find(|c: char| !c.is_whitespace())
+             .unwrap() == block_str.len() - 2)
+    {
+        "{}".to_owned()
+    } else {
+        block_str.to_owned()
     })
 }
 
@@ -1479,13 +1478,61 @@ fn rewrite_match(
     };
     let mut result = format!("match {}{}{{", cond_str, block_sep);
 
-    let arm_shape = if context.config.indent_match_arms() {
-        shape.block_indent(context.config.tab_spaces())
-    } else {
-        shape.block_indent(0)
-    };
+    let mut arm_shapes = Vec::new();
 
-    let arm_indent_str = arm_shape.indent.to_string(context.config);
+    let mut furthest_arrow_pos = 0;
+    let mut furthest_pat_pos = 0;
+    let mut should_preserve_align = true;
+    if let Some(arm) = arms.first() {
+        furthest_arrow_pos = arm_arrow_pos(arm);
+        furthest_pat_pos = arm_pat_end_pos_relative(arm);
+    }
+
+    for arm in arms.iter() {
+        let arrow_pos = arm_arrow_pos(arm);
+        let pat_pos = arm_pat_end_pos_relative(arm);
+
+        if arrow_pos != furthest_arrow_pos {
+            should_preserve_align = false;
+        }
+
+        if arrow_pos > furthest_arrow_pos {
+            furthest_arrow_pos = arrow_pos;
+        }
+
+        if pat_pos > furthest_pat_pos {
+            furthest_pat_pos = pat_pos;
+        }
+    }
+
+    for arm in arms.iter() {
+        let alignment = match context.config.match_align_arms() {
+            MatchAlignArms::Always => {
+                if should_preserve_align {
+                    arm_arrow_spacing(arm)
+                } else {
+                    furthest_pat_pos - arm_pat_end_pos_relative(arm)
+                }
+            }
+            MatchAlignArms::Preserve => {
+                if should_preserve_align {
+                    arm_arrow_spacing(arm)
+                } else {
+                    0
+                }
+            }
+            MatchAlignArms::Never => 0,
+        };
+
+        let mut arm_shape = if context.config.indent_match_arms() {
+            shape.block_indent(context.config.tab_spaces())
+        } else {
+            shape.block_indent(0)
+        };
+
+        arm_shape.alignment = alignment;
+        arm_shapes.push(arm_shape);
+    }
 
     let open_brace_pos = context.codemap.span_after(
         mk_sp(cond.span.hi, arm_start_pos(&arms[0])),
@@ -1493,6 +1540,9 @@ fn rewrite_match(
     );
 
     for (i, arm) in arms.iter().enumerate() {
+        let arm_shape = arm_shapes[i];
+        let arm_indent_str = arm_shape.indent.to_string(context.config);
+
         // Make sure we get the stuff between arms.
         let missed_str = if i == 0 {
             context.snippet(mk_sp(open_brace_pos, arm_start_pos(arm)))
@@ -1519,14 +1569,17 @@ fn rewrite_match(
             result.push_str(arm_comma(context.config, &arm.body));
         }
     }
+    let last_arm_shape = arm_shapes[arms.len() - 1];
+    let last_arm_indent_str = last_arm_shape.indent.to_string(context.config);
+
     // BytePos(1) = closing match brace.
     let last_span = mk_sp(arm_end_pos(&arms[arms.len() - 1]), span.hi - BytePos(1));
     let last_comment = context.snippet(last_span);
     let comment = try_opt!(rewrite_match_arm_comment(
         context,
         &last_comment,
-        arm_shape,
-        &arm_indent_str,
+        last_arm_shape,
+        &last_arm_indent_str,
     ));
     result.push_str(&comment);
     result.push('\n');
@@ -1550,6 +1603,24 @@ fn arm_start_pos(arm: &ast::Arm) -> BytePos {
 
 fn arm_end_pos(arm: &ast::Arm) -> BytePos {
     arm.body.span.hi
+}
+
+fn arm_pat_end_pos_relative(arm: &ast::Arm) -> usize {
+    let &ast::Arm { ref pats, .. } = arm;
+    (pats[pats.len() - 1].span.hi - pats[0].span.lo).0 as usize
+}
+
+fn arm_arrow_pos(arm: &ast::Arm) -> usize {
+    let &ast::Arm { ref body, ref pats, .. } = arm;
+    let pat_start_pos = pats[0].span.lo;
+    // 3 = `=> `.len()
+    (body.span.lo - pat_start_pos).0 as usize - 3
+}
+
+fn arm_arrow_spacing(arm: &ast::Arm) -> usize {
+    let pat_end_rel = arm_pat_end_pos_relative(arm);
+    let arrow_pos = arm_arrow_pos(arm);
+    arrow_pos - pat_end_rel - 1
 }
 
 fn arm_comma(config: &Config, body: &ast::Expr) -> &'static str {
@@ -1653,6 +1724,11 @@ impl Rewrite for ast::Arm {
         let alt_block_sep = String::from("\n") +
             &shape.indent.block_only().to_string(context.config);
 
+        let mut alignment_str = String::with_capacity(shape.alignment);
+        for _ in 0..shape.alignment {
+            alignment_str.push(' ');
+        }
+
         let pat_width = extra_offset(&pats_str, shape);
         // Let's try and get the arm body on the same line as the condition.
         // 4 = ` => `.len()
@@ -1681,9 +1757,10 @@ impl Rewrite for ast::Arm {
                     };
 
                     return Some(format!(
-                        "{}{} =>{}{}{}",
+                        "{}{} {}=>{}{}{}",
                         attr_str.trim_left(),
                         pats_str,
+                        alignment_str,
                         block_sep,
                         body_str,
                         comma
@@ -1700,10 +1777,9 @@ impl Rewrite for ast::Arm {
             body.rewrite(context, body_shape),
             body_shape.width,
         ));
-        let indent_str = shape
-            .indent
-            .block_indent(context.config)
-            .to_string(context.config);
+        let indent_str = shape.indent.block_indent(context.config).to_string(
+            context.config,
+        );
         let (body_prefix, body_suffix) = if context.config.wrap_match_arms() {
             if context.config.match_block_trailing_comma() {
                 ("{", "},")
@@ -1723,9 +1799,10 @@ impl Rewrite for ast::Arm {
 
         if context.config.wrap_match_arms() {
             Some(format!(
-                "{}{} =>{}{}{}\n{}{}",
+                "{}{} {}=>{}{}{}\n{}{}",
                 attr_str.trim_left(),
                 pats_str,
+                alignment_str,
                 block_sep,
                 indent_str,
                 next_line_body,
@@ -1734,9 +1811,10 @@ impl Rewrite for ast::Arm {
             ))
         } else {
             Some(format!(
-                "{}{} =>{}{}{}{}",
+                "{}{} {}=>{}{}{}{}",
                 attr_str.trim_left(),
                 pats_str,
+                alignment_str,
                 block_sep,
                 indent_str,
                 next_line_body,
@@ -1765,13 +1843,13 @@ fn rewrite_guard(
     if let Some(ref guard) = *guard {
         // First try to fit the guard string on the same line as the pattern.
         // 4 = ` if `, 5 = ` => {`
-        if let Some(cond_shape) = shape
-            .shrink_left(pattern_width + 4)
-            .and_then(|s| s.sub_width(5))
+        if let Some(cond_shape) = shape.shrink_left(pattern_width + 4).and_then(
+            |s| s.sub_width(5),
+        )
         {
-            if let Some(cond_str) = guard
-                .rewrite(context, cond_shape)
-                .and_then(|s| s.rewrite(context, cond_shape))
+            if let Some(cond_str) = guard.rewrite(context, cond_shape).and_then(|s| {
+                s.rewrite(context, cond_shape)
+            })
             {
                 if !cond_str.contains('\n') {
                     return Some(format!(" if {}", cond_str));
@@ -1789,10 +1867,9 @@ fn rewrite_guard(
             if let Some(cond_str) = guard.rewrite(context, cond_shape) {
                 return Some(format!(
                     "\n{}if {}",
-                    shape
-                        .indent
-                        .block_indent(context.config)
-                        .to_string(context.config),
+                    shape.indent.block_indent(context.config).to_string(
+                        context.config,
+                    ),
                     cond_str
                 ));
             }
@@ -1824,8 +1901,9 @@ fn rewrite_pat_expr(
             } else {
                 format!("{} ", matcher)
             };
-            let pat_shape =
-                try_opt!(try_opt!(shape.offset_left(matcher.len())).sub_width(connector.len()));
+            let pat_shape = try_opt!(try_opt!(shape.offset_left(matcher.len())).sub_width(
+                connector.len(),
+            ));
             pat_string = try_opt!(pat.rewrite(context, pat_shape));
             format!("{}{}{}", matcher, pat_string, connector)
         }
@@ -1938,9 +2016,9 @@ where
             width: callee_max_width,
             ..shape
         };
-        let callee_str = callee
-            .rewrite(context, callee_shape)
-            .ok_or(Ordering::Greater)?;
+        let callee_str = callee.rewrite(context, callee_shape).ok_or(
+            Ordering::Greater,
+        )?;
 
         rewrite_call_inner(
             context,
@@ -2048,9 +2126,9 @@ where
         );
     }
 
-    let args_shape = shape
-        .sub_width(last_line_width(&callee_str))
-        .ok_or(Ordering::Less)?;
+    let args_shape = shape.sub_width(last_line_width(&callee_str)).ok_or(
+        Ordering::Less,
+    )?;
     Ok(format!(
         "{}{}",
         callee_str,
@@ -2066,8 +2144,9 @@ where
 
 fn need_block_indent(s: &str, shape: Shape) -> bool {
     s.lines().skip(1).any(|s| {
-        s.find(|c| !char::is_whitespace(c))
-            .map_or(false, |w| w + 1 < shape.indent.width())
+        s.find(|c| !char::is_whitespace(c)).map_or(false, |w| {
+            w + 1 < shape.indent.width()
+        })
     })
 }
 
@@ -2205,6 +2284,7 @@ fn last_arg_shape(
         width: try_opt!(max_width.checked_sub(overhead)),
         indent: arg_indent,
         offset: 0,
+        alignment: 0,
     })
 }
 
@@ -2435,10 +2515,9 @@ fn rewrite_struct_lit<'a>(
         return Some(format!("{} {{}}", path_str));
     }
 
-    let field_iter = fields
-        .into_iter()
-        .map(StructLitField::Regular)
-        .chain(base.into_iter().map(StructLitField::Base));
+    let field_iter = fields.into_iter().map(StructLitField::Regular).chain(
+        base.into_iter().map(StructLitField::Base),
+    );
 
     // Foo { a: Foo } - indent is +3, width is -5.
     let (h_shape, v_shape) = try_opt!(struct_lit_shape(shape, context, path_str.len() + 3, 2));

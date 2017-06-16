@@ -222,6 +222,8 @@ pub struct Shape {
     // Indentation + any already emitted text on the first line of the current
     // statement.
     pub offset: usize,
+    // Alignment to other structures
+    pub alignment: usize,
 }
 
 impl Shape {
@@ -245,6 +247,7 @@ impl Shape {
             width: width,
             indent: indent,
             offset: indent.alignment,
+            alignment: 0,
         }
     }
 
@@ -253,6 +256,7 @@ impl Shape {
             width: config.max_width().checked_sub(indent.width()).unwrap_or(0),
             indent: indent,
             offset: indent.alignment,
+            alignment: 0,
         }
     }
 
@@ -271,6 +275,7 @@ impl Shape {
             width: width,
             indent: indent,
             offset: offset,
+            alignment: 0,
         }
     }
 
@@ -280,6 +285,7 @@ impl Shape {
             width: self.width,
             indent: Indent::new(self.indent.block_indent, alignment),
             offset: alignment,
+            alignment: 0,
         }
     }
 
@@ -289,12 +295,14 @@ impl Shape {
                 width: self.width,
                 indent: Indent::new(self.indent.block_indent + extra_width, 0),
                 offset: 0,
+                alignment: 0,
             }
         } else {
             Shape {
                 width: self.width,
                 indent: self.indent + extra_width,
                 offset: self.indent.alignment + extra_width,
+                alignment: 0,
             }
         }
     }
@@ -329,6 +337,7 @@ impl Shape {
             width: try_opt!(self.width.checked_sub(width)),
             indent: self.indent + width,
             offset: self.offset + width,
+            alignment: 0,
         })
     }
 

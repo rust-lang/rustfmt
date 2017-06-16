@@ -149,8 +149,9 @@ impl<'a> FmtVisitor<'a> {
                 self.format_missing_no_indent(item.span.hi - BytePos(1));
                 self.block_indent = self.block_indent.block_unindent(self.config);
 
-                self.buffer
-                    .push_str(&self.block_indent.to_string(self.config));
+                self.buffer.push_str(
+                    &self.block_indent.to_string(self.config),
+                );
             } else {
                 for item in &item.body {
                     self.format_body_element(item);
@@ -423,8 +424,9 @@ impl<'a> FmtVisitor<'a> {
         self.block_indent = self.block_indent.block_unindent(self.config);
 
         if variant_list.is_some() || contains_comment(&enum_snippet[brace_pos..]) {
-            self.buffer
-                .push_str(&self.block_indent.to_string(self.config));
+            self.buffer.push_str(
+                &self.block_indent.to_string(self.config),
+            );
         }
         self.buffer.push_str("}");
         self.last_pos = span.hi;
@@ -497,6 +499,7 @@ impl<'a> FmtVisitor<'a> {
                 width: context.config.max_width(),
                 indent: self.block_indent,
                 offset: self.block_indent.alignment,
+                alignment: 0,
             };
             let missing_comment = rewrite_missing_comment_on_field(
                 &context,
@@ -682,15 +685,13 @@ fn format_impl_ref_and_type(
     item: &ast::Item,
     offset: Indent,
 ) -> Option<String> {
-    if let ast::ItemKind::Impl(
-        unsafety,
-        polarity,
-        _,
-        ref generics,
-        ref trait_ref,
-        ref self_ty,
-        _,
-    ) = item.node
+    if let ast::ItemKind::Impl(unsafety,
+                               polarity,
+                               _,
+                               ref generics,
+                               ref trait_ref,
+                               ref self_ty,
+                               _) = item.node
     {
         let mut result = String::new();
 
@@ -953,12 +954,9 @@ pub fn format_trait(context: &RewriteContext, item: &ast::Item, offset: Indent) 
             Density::Tall
         };
 
-        let where_budget = try_opt!(
-            context
-                .config
-                .max_width()
-                .checked_sub(last_line_width(&result))
-        );
+        let where_budget = try_opt!(context.config.max_width().checked_sub(
+            last_line_width(&result),
+        ));
         let where_clause_str = try_opt!(rewrite_where_clause(
             context,
             &generics.where_clause,
@@ -1101,12 +1099,9 @@ fn format_struct_struct(
 
     let item_indent = offset.block_indent(context.config);
     // 1 = ","
-    let item_budget = try_opt!(
-        context
-            .config
-            .max_width()
-            .checked_sub(item_indent.width() + 1)
-    );
+    let item_budget = try_opt!(context.config.max_width().checked_sub(
+        item_indent.width() + 1,
+    ));
 
     let items = itemize_list(
         context.codemap,
@@ -1148,9 +1143,9 @@ fn format_struct_struct(
         Some(format!(
             "{}\n{}{}\n{}}}",
             result,
-            offset
-                .block_indent(context.config)
-                .to_string(context.config),
+            offset.block_indent(context.config).to_string(
+                context.config,
+            ),
             items_str,
             offset.to_string(context.config)
         ))
@@ -1185,12 +1180,9 @@ fn format_tuple_struct(
             let generics_str = try_opt!(rewrite_generics(context, generics, shape, g_span));
             result.push_str(&generics_str);
 
-            let where_budget = try_opt!(
-                context
-                    .config
-                    .max_width()
-                    .checked_sub(last_line_width(&result))
-            );
+            let where_budget = try_opt!(context.config.max_width().checked_sub(
+                last_line_width(&result),
+            ));
             try_opt!(rewrite_where_clause(
                 context,
                 &generics.where_clause,
@@ -1236,12 +1228,9 @@ fn format_tuple_struct(
             }
         };
         // 3 = `();`
-        let item_budget = try_opt!(
-            context
-                .config
-                .max_width()
-                .checked_sub(item_indent.width() + 3)
-        );
+        let item_budget = try_opt!(context.config.max_width().checked_sub(
+            item_indent.width() + 3,
+        ));
 
         let items = itemize_list(
             context.codemap,
@@ -1331,12 +1320,9 @@ pub fn rewrite_type_alias(
     let generics_str = try_opt!(rewrite_generics(context, generics, shape, g_span));
     result.push_str(&generics_str);
 
-    let where_budget = try_opt!(
-        context
-            .config
-            .max_width()
-            .checked_sub(last_line_width(&result))
-    );
+    let where_budget = try_opt!(context.config.max_width().checked_sub(
+        last_line_width(&result),
+    ));
     let where_clause_str = try_opt!(rewrite_where_clause(
         context,
         &generics.where_clause,
@@ -1371,12 +1357,9 @@ pub fn rewrite_type_alias(
                 let type_indent = indent.block_indent(context.config);
                 result.push('\n');
                 result.push_str(&type_indent.to_string(context.config));
-                let budget = try_opt!(
-                    context
-                        .config
-                        .max_width()
-                        .checked_sub(type_indent.width() + ";".len())
-                );
+                let budget = try_opt!(context.config.max_width().checked_sub(
+                    type_indent.width() + ";".len(),
+                ));
                 ty.rewrite(context, Shape::legacy(budget, type_indent))
             })
     );
@@ -1572,6 +1555,7 @@ pub fn rewrite_static(
                     width: context.config.max_width(),
                     indent: offset,
                     offset: offset.alignment,
+                    alignment: 0,
                 },
             )
         })
@@ -1979,10 +1963,9 @@ fn rewrite_fn_base(
         }
         // If the last line of args contains comment, we cannot put the closing paren
         // on the same line.
-        if arg_str
-            .lines()
-            .last()
-            .map_or(false, |last_line| last_line.contains("//"))
+        if arg_str.lines().last().map_or(false, |last_line| {
+            last_line.contains("//")
+        })
         {
             args_last_line_contains_comment = true;
             result.push('\n');
@@ -2055,13 +2038,12 @@ fn rewrite_fn_base(
             let snippet_hi = span.hi;
             let snippet = context.snippet(mk_sp(snippet_lo, snippet_hi));
             // Try to preserve the layout of the original snippet.
-            let original_starts_with_newline =
-                snippet
-                    .find(|c| c != ' ')
-                    .map_or(false, |i| snippet[i..].starts_with('\n'));
-            let original_ends_with_newline = snippet
-                .rfind(|c| c != ' ')
-                .map_or(false, |i| snippet[i..].ends_with('\n'));
+            let original_starts_with_newline = snippet.find(|c| c != ' ').map_or(false, |i| {
+                snippet[i..].starts_with('\n')
+            });
+            let original_ends_with_newline = snippet.rfind(|c| c != ' ').map_or(false, |i| {
+                snippet[i..].ends_with('\n')
+            });
             let snippet = snippet.trim();
             if !snippet.is_empty() {
                 result.push(if original_starts_with_newline {
@@ -2088,12 +2070,9 @@ fn rewrite_fn_base(
     } || (put_args_in_block && ret_str.is_empty());
 
     if where_clause.predicates.len() == 1 && should_compress_where {
-        let budget = try_opt!(
-            context
-                .config
-                .max_width()
-                .checked_sub(last_line_width(&result))
-        );
+        let budget = try_opt!(context.config.max_width().checked_sub(
+            last_line_width(&result),
+        ));
         if let Some(where_clause_str) =
             rewrite_where_clause(
                 context,
@@ -2484,9 +2463,9 @@ pub fn wrap_generics_with_angle_brackets(
             "<\n{}{}\n{}>",
             list_offset.to_string(context.config),
             list_str,
-            list_offset
-                .block_unindent(context.config)
-                .to_string(context.config)
+            list_offset.block_unindent(context.config).to_string(
+                context.config,
+            )
         )
     } else if context.config.spaces_within_angle_brackets() {
         format!("< {} >", list_str)
@@ -2693,12 +2672,9 @@ fn format_generics(
     let mut result = try_opt!(rewrite_generics(context, generics, shape, span));
 
     if !generics.where_clause.predicates.is_empty() || result.contains('\n') {
-        let budget = try_opt!(
-            context
-                .config
-                .max_width()
-                .checked_sub(last_line_width(&result))
-        );
+        let budget = try_opt!(context.config.max_width().checked_sub(
+            last_line_width(&result),
+        ));
         let where_clause_str = try_opt!(rewrite_where_clause(
             context,
             &generics.where_clause,
