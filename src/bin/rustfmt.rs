@@ -315,7 +315,7 @@ fn print_usage(opts: &Options, reason: &str) {
 
 fn print_version() {
     println!(
-        "{}-nightly{}",
+        "{}{}",
         env!("CARGO_PKG_VERSION"),
         include_str!(concat!(env!("OUT_DIR"), "/commit-info.txt"))
     )
