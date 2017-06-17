@@ -23,7 +23,7 @@ use utils::{extra_offset, last_line_width, wrap_str, binary_search, first_line_w
             semicolon_for_stmt, trimmed_last_line_width, left_most_sub_expr, stmt_expr,
             colon_spaces, contains_skip, mk_sp};
 use visitor::FmtVisitor;
-use config::{Config, IndentStyle, MultilineStyle, ControlBraceStyle, Style};
+use config::{Config, IndentStyle, MultilineStyle, ControlBraceStyle, Style, MatchAlignArms};
 use comment::{FindUncommented, rewrite_comment, contains_comment, recover_comment_removed};
 use types::{rewrite_path, PathContext, can_be_overflowed_type};
 use items::{span_lo_for_arg, span_hi_for_arg};
@@ -938,16 +938,12 @@ fn to_control_flow<'a>(expr: &'a ast::Expr, expr_type: ExprType) -> Option<Contr
         ast::ExprKind::ForLoop(ref pat, ref cond, ref block, label) => {
             Some(ControlFlow::new_for(pat, cond, block, label, expr.span))
         }
-        ast::ExprKind::Loop(ref block, label) => Some(
-            ControlFlow::new_loop(block, label, expr.span),
-        ),
-        ast::ExprKind::While(ref cond, ref block, label) => Some(ControlFlow::new_while(
-            None,
-            cond,
-            block,
-            label,
-            expr.span,
-        )),
+        ast::ExprKind::Loop(ref block, label) => {
+            Some(ControlFlow::new_loop(block, label, expr.span))
+        }
+        ast::ExprKind::While(ref cond, ref block, label) => {
+            Some(ControlFlow::new_while(None, cond, block, label, expr.span))
+        }
         ast::ExprKind::WhileLet(ref pat, ref cond, ref block, label) => {
             Some(ControlFlow::new_while(
                 Some(pat),
@@ -1208,23 +1204,20 @@ impl<'a> ControlFlow<'a> {
         };
 
         Some((
-            format!(
-                "{}{}{}{}{}",
-                label_string,
-                self.keyword,
-                between_kwd_cond_comment.as_ref().map_or(
-                    if pat_expr_string.is_empty() ||
-                        pat_expr_string.starts_with('\n')
-                    {
-                        ""
-                    } else {
-                        " "
-                    },
-                    |s| &**s,
-                ),
-                pat_expr_string,
-                after_cond_comment.as_ref().map_or(block_sep, |s| &**s)
-            ),
+            format!("{}{}{}{}{}",
+                      label_string,
+                      self.keyword,
+                      between_kwd_cond_comment
+                          .as_ref()
+                          .map_or(if pat_expr_string.is_empty() ||
+                                     pat_expr_string.starts_with('\n') {
+                                      ""
+                                  } else {
+                                      " "
+                                  },
+                                  |s| &**s),
+                      pat_expr_string,
+                      after_cond_comment.as_ref().map_or(block_sep, |s| &**s)),
             used_width,
         ))
     }
@@ -1478,20 +1471,71 @@ fn rewrite_match(
     };
     let mut result = format!("match {}{}{{", cond_str, block_sep);
 
-    let arm_shape = if context.config.indent_match_arms() {
-        shape.block_indent(context.config.tab_spaces())
-    } else {
-        shape.block_indent(0)
-    };
+    let mut furthest_arrow_pos = 0;
+    let mut furthest_pat_pos = 0;
+    let mut should_preserve_align = true;
+    if let Some(arm) = arms.first() {
+        furthest_arrow_pos = arm_arrow_pos(arm);
+        furthest_pat_pos = arm_pat_end_pos_relative(arm);
+    }
 
-    let arm_indent_str = arm_shape.indent.to_string(context.config);
+    for arm in arms.iter() {
+        let arrow_pos = arm_arrow_pos(arm);
+        let pat_pos = arm_pat_end_pos_relative(arm);
+
+        if arrow_pos != furthest_arrow_pos {
+            should_preserve_align = false;
+        }
+
+        if arrow_pos > furthest_arrow_pos {
+            furthest_arrow_pos = arrow_pos;
+        }
+
+        if pat_pos > furthest_pat_pos {
+            furthest_pat_pos = pat_pos;
+        }
+    }
 
     let open_brace_pos = context.codemap.span_after(
         mk_sp(cond.span.hi, arm_start_pos(&arms[0])),
         "{",
     );
 
+    let mut arm_shape = if context.config.indent_match_arms() {
+        shape.block_indent(context.config.tab_spaces())
+    } else {
+        shape.block_indent(0)
+    };
+
     for (i, arm) in arms.iter().enumerate() {
+        let alignment = match context.config.match_align_arms() {
+            MatchAlignArms::Always => {
+                if should_preserve_align {
+                    arm_arrow_spacing(arm)
+                } else {
+                    furthest_pat_pos - arm_pat_end_pos_relative(arm)
+                }
+            }
+            MatchAlignArms::Preserve => {
+                if should_preserve_align {
+                    arm_arrow_spacing(arm)
+                } else {
+                    0
+                }
+            }
+            MatchAlignArms::Never => 0,
+        };
+
+        arm_shape = if context.config.indent_match_arms() {
+            shape.block_indent(context.config.tab_spaces())
+        } else {
+            shape.block_indent(0)
+        };
+
+        arm_shape.alignment = alignment;
+
+        let arm_indent_str = arm_shape.indent.to_string(context.config);
+
         // Make sure we get the stuff between arms.
         let missed_str = if i == 0 {
             context.snippet(mk_sp(open_brace_pos, arm_start_pos(arm)))
@@ -1518,6 +1562,8 @@ fn rewrite_match(
             result.push_str(arm_comma(context.config, &arm.body));
         }
     }
+    let last_arm_indent_str = arm_shape.indent.to_string(context.config);
+
     // BytePos(1) = closing match brace.
     let last_span = mk_sp(arm_end_pos(&arms[arms.len() - 1]), span.hi - BytePos(1));
     let last_comment = context.snippet(last_span);
@@ -1525,7 +1571,7 @@ fn rewrite_match(
         context,
         &last_comment,
         arm_shape,
-        &arm_indent_str,
+        &last_arm_indent_str,
     ));
     result.push_str(&comment);
     result.push('\n');
@@ -1549,6 +1595,24 @@ fn arm_start_pos(arm: &ast::Arm) -> BytePos {
 
 fn arm_end_pos(arm: &ast::Arm) -> BytePos {
     arm.body.span.hi
+}
+
+fn arm_pat_end_pos_relative(arm: &ast::Arm) -> usize {
+    let &ast::Arm { ref pats, .. } = arm;
+    (pats[pats.len() - 1].span.hi - pats[0].span.lo).0 as usize
+}
+
+fn arm_arrow_pos(arm: &ast::Arm) -> usize {
+    let &ast::Arm { ref body, ref pats, .. } = arm;
+    let pat_start_pos = pats[0].span.lo;
+    // 3 = `=> `.len()
+    (body.span.lo - pat_start_pos).0 as usize - 3
+}
+
+fn arm_arrow_spacing(arm: &ast::Arm) -> usize {
+    let pat_end_rel = arm_pat_end_pos_relative(arm);
+    let arrow_pos = arm_arrow_pos(arm);
+    arrow_pos - pat_end_rel - 1
 }
 
 fn arm_comma(config: &Config, body: &ast::Expr) -> &'static str {
@@ -1652,6 +1716,11 @@ impl Rewrite for ast::Arm {
         let alt_block_sep = String::from("\n") +
             &shape.indent.block_only().to_string(context.config);
 
+        let mut alignment_str = String::with_capacity(shape.alignment);
+        for _ in 0..shape.alignment {
+            alignment_str.push(' ');
+        }
+
         let pat_width = extra_offset(&pats_str, shape);
         // Let's try and get the arm body on the same line as the condition.
         // 4 = ` => `.len()
@@ -1680,9 +1749,10 @@ impl Rewrite for ast::Arm {
                     };
 
                     return Some(format!(
-                        "{}{} =>{}{}{}",
+                        "{}{} {}=>{}{}{}",
                         attr_str.trim_left(),
                         pats_str,
+                        alignment_str,
                         block_sep,
                         body_str,
                         comma
@@ -1722,9 +1792,10 @@ impl Rewrite for ast::Arm {
 
         if context.config.wrap_match_arms() {
             Some(format!(
-                "{}{} =>{}{}{}\n{}{}",
+                "{}{} {}=>{}{}{}\n{}{}",
                 attr_str.trim_left(),
                 pats_str,
+                alignment_str,
                 block_sep,
                 indent_str,
                 next_line_body,
@@ -1733,9 +1804,10 @@ impl Rewrite for ast::Arm {
             ))
         } else {
             Some(format!(
-                "{}{} =>{}{}{}{}",
+                "{}{} {}=>{}{}{}{}",
                 attr_str.trim_left(),
                 pats_str,
+                alignment_str,
                 block_sep,
                 indent_str,
                 next_line_body,
@@ -2204,6 +2276,7 @@ fn last_arg_shape(
         width: try_opt!(max_width.checked_sub(overhead)),
         indent: arg_indent,
         offset: 0,
+        alignment: 0,
     })
 }
 

@@ -965,6 +965,69 @@ struct Dolor<T>
 }
 ```
 
+## `match_align_arms`
+
+Aligns the arms of a `match` statement to be flush with each other. `"Preserve"` will not re-format match arms that have already been aligned manually.
+
+- **Default value**: `"Preserve"`
+- **Possible values**: `"Always"`, `"Preserve"`, `"Never"`
+
+#### `"Never"`:
+
+```rust
+match lorem {
+    Lorem::Ipsum => (),
+    Lorem::Dolor => (),
+    Lorem::Sit => (),
+    Lorem::Amet => (),
+}
+
+match lorem {
+    Lorem::Ipsum => (),
+    Lorem::Dolor => (),
+    Lorem::Sit => (),
+    Lorem::Amet => (),
+}
+```
+
+#### `"Preserve"`:
+
+```rust
+match lorem {
+    Lorem::Ipsum => (),
+    Lorem::Dolor => (),
+    Lorem::Sit => (),
+    Lorem::Amet => (),
+}
+
+match lorem {
+    Lorem::Ipsum    => (),
+    Lorem::Dolor    => (),
+    Lorem::Sit      => (),
+    Lorem::Amet     => (),
+}
+```
+
+#### `"Always"`:
+
+```rust
+match lorem {
+    Lorem::Ipsum => (),
+    Lorem::Dolor => (),
+    Lorem::Sit   => (),
+    Lorem::Amet  => (),
+}
+
+match lorem {
+    Lorem::Ipsum    => (),
+    Lorem::Dolor    => (),
+    Lorem::Sit      => (),
+    Lorem::Amet     => (),
+}
+```
+
+See also: [`indent_match_arms`](#indent_match_arms), [`wrap_match_arms`](#wrap_match_arms).
+
 ## `match_block_trailing_comma`
 
 Put a trailing comma after a block based match arm (non-block arms are not affected)

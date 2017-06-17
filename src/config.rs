@@ -93,6 +93,12 @@ configuration_option_enum! { TypeDensity:
     Wide,
 }
 
+configuration_option_enum! { MatchAlignArms:
+    Always,
+    Preserve,
+    Never,
+}
+
 
 impl Density {
     pub fn to_list_tactic(self) -> ListTactic {
@@ -598,7 +604,8 @@ create_config! {
         "What Write Mode to use when none is supplied: Replace, Overwrite, Display, Diff, Coverage";
     condense_wildcard_suffixes: bool, false, "Replace strings of _ wildcards by a single .. in \
                                               tuple patterns";
-    combine_control_expr: bool, true, "Combine control expressions with funciton calls."
+    combine_control_expr: bool, true, "Combine control expressions with funciton calls.";
+    match_align_arms: MatchAlignArms, MatchAlignArms::Never, "Align match arms"
 }
 
 #[cfg(test)]

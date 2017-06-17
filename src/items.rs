@@ -497,6 +497,7 @@ impl<'a> FmtVisitor<'a> {
                 width: context.config.max_width(),
                 indent: self.block_indent,
                 offset: self.block_indent.alignment,
+                alignment: 0,
             };
             let missing_comment = rewrite_missing_comment_on_field(
                 &context,
@@ -1572,6 +1573,7 @@ pub fn rewrite_static(
                     width: context.config.max_width(),
                     indent: offset,
                     offset: offset.alignment,
+                    alignment: 0,
                 },
             )
         })
