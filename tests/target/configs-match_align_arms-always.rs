@@ -17,10 +17,10 @@ fn main() {
     }
 
     match lorem {
-        Lorem::Ipsum    => (),
-        Lorem::Dolor    => (),
-        Lorem::Sit      => (),
-        Lorem::Amet     => (),
+        Lorem::Ipsum => (),
+        Lorem::Dolor => (),
+        Lorem::Sit   => (),
+        Lorem::Amet  => (),
     }
 
     match lorem {

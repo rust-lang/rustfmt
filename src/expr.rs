@@ -1510,15 +1510,11 @@ fn rewrite_match(
     for (i, arm) in arms.iter().enumerate() {
         let alignment = match context.config.match_align_arms() {
             MatchAlignArms::Always => {
-                if should_preserve_align {
-                    arm_arrow_spacing(arm)
-                } else {
-                    furthest_pat_pos - arm_pat_end_pos_relative(arm)
-                }
+                furthest_pat_pos - arm_pat_end_pos_relative(arm)
             }
             MatchAlignArms::Preserve => {
                 if should_preserve_align {
-                    arm_arrow_spacing(arm)
+                    furthest_pat_pos - arm_pat_end_pos_relative(arm)
                 } else {
                     0
                 }
@@ -1607,12 +1603,6 @@ fn arm_arrow_pos(arm: &ast::Arm) -> usize {
     let pat_start_pos = pats[0].span.lo;
     // 3 = `=> `.len()
     (body.span.lo - pat_start_pos).0 as usize - 3
-}
-
-fn arm_arrow_spacing(arm: &ast::Arm) -> usize {
-    let pat_end_rel = arm_pat_end_pos_relative(arm);
-    let arrow_pos = arm_arrow_pos(arm);
-    arrow_pos - pat_end_rel - 1
 }
 
 fn arm_comma(config: &Config, body: &ast::Expr) -> &'static str {
