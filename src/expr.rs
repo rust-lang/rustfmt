@@ -1595,19 +1595,6 @@ fn arm_pat_end_pos_relative(arm: &ast::Arm) -> usize {
     (pats[pats.len() - 1].span.hi - pats[0].span.lo).0 as usize
 }
 
-fn arm_arrow_pos(arm: &ast::Arm) -> usize {
-    let &ast::Arm { ref body, ref pats, .. } = arm;
-    let pat_start_pos = pats[0].span.lo;
-    // 3 = `=> `.len()
-    (body.span.lo - pat_start_pos).0 as usize - 3
-}
-
-fn arm_arrow_spacing(arm: &ast::Arm) -> usize {
-    let pat_end_rel = arm_pat_end_pos_relative(arm);
-    let arrow_pos = arm_arrow_pos(arm);
-    arrow_pos - pat_end_rel - 1
-}
-
 fn arm_comma(config: &Config, body: &ast::Expr) -> &'static str {
     if config.match_block_trailing_comma() {
         ","
