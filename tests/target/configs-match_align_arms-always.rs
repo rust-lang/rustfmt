@@ -17,22 +17,14 @@ fn main() {
     }
 
     match lorem {
-        Lorem::Ipsum => (),
-        Lorem::Dolor => (),
-        Lorem::Sit   => (),
-        Lorem::Amet  => (),
-    }
-
-    match lorem {
-        Lorem::Ipsum => (),
-        Lorem::Dolor => {
+        Lorem::Ipsum                                      => {
             lorem();
             ipsum();
         }
-        Lorem::Sit   => {
+        Lorem::DolorSitAmetConsecteturAdipiscingElitSedDo => (),
+        Lorem::Eiusmod                                    => {
             lorem();
             ipsum();
         }
-        Lorem::Amet  => (),
     }
 }

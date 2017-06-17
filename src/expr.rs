@@ -1471,28 +1471,25 @@ fn rewrite_match(
     };
     let mut result = format!("match {}{}{{", cond_str, block_sep);
 
-    let mut furthest_arrow_pos = 0;
-    let mut furthest_pat_pos = 0;
-    let mut should_preserve_align = true;
+    let mut min_pat_pos = 0;
+    let mut max_pat_pos = 0;
+    let mut realign_if_conservative = true;
     if let Some(arm) = arms.first() {
-        furthest_arrow_pos = arm_arrow_pos(arm);
-        furthest_pat_pos = arm_pat_end_pos_relative(arm);
+        min_pat_pos = arm_pat_end_pos_relative(arm);
+        max_pat_pos = min_pat_pos;
     }
 
     for arm in arms.iter() {
-        let arrow_pos = arm_arrow_pos(arm);
         let pat_pos = arm_pat_end_pos_relative(arm);
 
-        if arrow_pos != furthest_arrow_pos {
-            should_preserve_align = false;
+        if max_pat_pos - min_pat_pos > context.config.match_arm_align_threshold() {
+            realign_if_conservative = false;
         }
 
-        if arrow_pos > furthest_arrow_pos {
-            furthest_arrow_pos = arrow_pos;
-        }
-
-        if pat_pos > furthest_pat_pos {
-            furthest_pat_pos = pat_pos;
+        if pat_pos > max_pat_pos {
+            max_pat_pos = pat_pos;
+        } else if pat_pos < min_pat_pos {
+            min_pat_pos = pat_pos;
         }
     }
 
@@ -1510,11 +1507,11 @@ fn rewrite_match(
     for (i, arm) in arms.iter().enumerate() {
         let alignment = match context.config.match_align_arms() {
             MatchAlignArms::Always => {
-                furthest_pat_pos - arm_pat_end_pos_relative(arm)
+                max_pat_pos - arm_pat_end_pos_relative(arm)
             }
-            MatchAlignArms::Preserve => {
-                if should_preserve_align {
-                    furthest_pat_pos - arm_pat_end_pos_relative(arm)
+            MatchAlignArms::Conservative => {
+                if realign_if_conservative {
+                    max_pat_pos - arm_pat_end_pos_relative(arm)
                 } else {
                     0
                 }
@@ -1603,6 +1600,12 @@ fn arm_arrow_pos(arm: &ast::Arm) -> usize {
     let pat_start_pos = pats[0].span.lo;
     // 3 = `=> `.len()
     (body.span.lo - pat_start_pos).0 as usize - 3
+}
+
+fn arm_arrow_spacing(arm: &ast::Arm) -> usize {
+    let pat_end_rel = arm_pat_end_pos_relative(arm);
+    let arrow_pos = arm_arrow_pos(arm);
+    arrow_pos - pat_end_rel - 1
 }
 
 fn arm_comma(config: &Config, body: &ast::Expr) -> &'static str {

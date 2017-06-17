@@ -95,7 +95,7 @@ configuration_option_enum! { TypeDensity:
 
 configuration_option_enum! { MatchAlignArms:
     Always,
-    Preserve,
+    Conservative,
     Never,
 }
 
@@ -605,7 +605,9 @@ create_config! {
     condense_wildcard_suffixes: bool, false, "Replace strings of _ wildcards by a single .. in \
                                               tuple patterns";
     combine_control_expr: bool, true, "Combine control expressions with funciton calls.";
-    match_align_arms: MatchAlignArms, MatchAlignArms::Never, "Align match arms"
+    match_align_arms: MatchAlignArms, MatchAlignArms::Never, "Align match arms";
+    match_arm_align_threshold: usize, 10, "Maximum spacing between match arm patterns before \
+                                           falling back on non-alignment"
 }
 
 #[cfg(test)]
