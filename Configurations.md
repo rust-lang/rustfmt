@@ -968,90 +968,15 @@ struct Dolor<T>
 
 ## `match_arm_align_threshold`
 
-Maximum number of spaces between `match` statement patterns for the arms to be aligned by `match_align_arms`.
+Maximum number of spaces between `match` statement patterns for the arms to be aligned with each other.
 
-- **Default value**: `10`
+- **Default value**: `0`
 - **Possible values**: any positive integer
 
-**Note:** A value of `0` results in match arm alignment being applied regardless of the spacing between match arm patterns.
+**Note:** A value greater than or equal to `max_width` results in match arm alignment being applied regardless of the spacing between match arm patterns. A value of `0` will never align match arms.
 
 #### Difference in width shorter than `match_arm_align_threshold`:
 ```rust
-match lorem {
-    Lorem::Ipsum => (),
-    Lorem::Dolor => (),
-    Lorem::Sit   => (),
-    Lorem::Amet  => (),
-}
-```
-
-#### Difference in width longer than `match_arm_align_threshold`:
-
-See [`match_align_arms`](#match_align_arms).
-
-## `match_align_arms`
-
-Aligns the arms of a `match` statement to be flush with each other. `"Conservative"` will only format match arms with a maximum of `match_arm_align_threshold` spaces between patterns.
-
-- **Default value**: `"Conservative"`
-- **Possible values**: `"Always"`, `"Conservative"`, `"Never"`
-
-#### `"Never"`:
-
-```rust
-match lorem {
-    Lorem::Ipsum => (),
-    Lorem::Dolor => (),
-    Lorem::Sit => (),
-    Lorem::Amet => (),
-}
-
-match lorem {
-    Lorem::Ipsum => {
-        lorem();
-        ipsum();
-    }
-    Lorem::DolorSitAmetConsecteturAdipiscingElitSedDo => (),
-    Lorem::Eiusmod => {
-        lorem();
-        ipsum();
-    }
-}
-```
-
-#### `"Conservative"`:
-
-```rust
-match lorem {
-    Lorem::Ipsum => (),
-    Lorem::Dolor => (),
-    Lorem::Sit   => (),
-    Lorem::Amet  => (),
-}
-
-match lorem {
-    Lorem::Ipsum => {
-        lorem();
-        ipsum();
-    }
-    Lorem::DolorSitAmetConsecteturAdipiscingElitSedDo => (),
-    Lorem::Eiusmod => {
-        lorem();
-        ipsum();
-    }
-}
-```
-
-#### `"Always"`:
-
-```rust
-match lorem {
-    Lorem::Ipsum => (),
-    Lorem::Dolor => (),
-    Lorem::Sit   => (),
-    Lorem::Amet  => (),
-}
-
 match lorem {
     Lorem::Ipsum                                      => {
         lorem();
@@ -1065,7 +990,22 @@ match lorem {
 }
 ```
 
-See also: [`match_arm_align_threshold`](#match_arm_align_threshold), [`indent_match_arms`](#indent_match_arms), [`wrap_match_arms`](#wrap_match_arms).
+#### Difference in width longer than `match_arm_align_threshold`:
+```rust
+match lorem {
+    Lorem::Ipsum => {
+        lorem();
+        ipsum();
+    }
+    Lorem::DolorSitAmetConsecteturAdipiscingElitSedDo => (),
+    Lorem::Eiusmod => {
+        lorem();
+        ipsum();
+    }
+}
+```
+
+See also: [`indent_match_arms`](#indent_match_arms), [`wrap_match_arms`](#wrap_match_arms).
 
 ## `match_block_trailing_comma`
 

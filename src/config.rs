@@ -93,13 +93,6 @@ configuration_option_enum! { TypeDensity:
     Wide,
 }
 
-configuration_option_enum! { MatchAlignArms:
-    Always,
-    Conservative,
-    Never,
-}
-
-
 impl Density {
     pub fn to_list_tactic(self) -> ListTactic {
         match self {
@@ -605,9 +598,8 @@ create_config! {
     condense_wildcard_suffixes: bool, false, "Replace strings of _ wildcards by a single .. in \
                                               tuple patterns";
     combine_control_expr: bool, true, "Combine control expressions with funciton calls.";
-    match_align_arms: MatchAlignArms, MatchAlignArms::Never, "Align match arms";
-    match_arm_align_threshold: usize, 10, "Maximum spacing between match arm patterns before \
-                                           falling back on non-alignment"
+    match_arm_align_threshold: usize, 0, "Maximum difference in width between match arms for \
+                                           them to be aligned. 0 means never align."
 }
 
 #[cfg(test)]

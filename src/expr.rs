@@ -23,7 +23,7 @@ use utils::{extra_offset, last_line_width, wrap_str, binary_search, first_line_w
             semicolon_for_stmt, trimmed_last_line_width, left_most_sub_expr, stmt_expr,
             colon_spaces, contains_skip, mk_sp};
 use visitor::FmtVisitor;
-use config::{Config, IndentStyle, MultilineStyle, ControlBraceStyle, Style, MatchAlignArms};
+use config::{Config, IndentStyle, MultilineStyle, ControlBraceStyle, Style};
 use comment::{FindUncommented, rewrite_comment, contains_comment, recover_comment_removed};
 use types::{rewrite_path, PathContext, can_be_overflowed_type};
 use items::{span_lo_for_arg, span_hi_for_arg};
@@ -1473,7 +1473,12 @@ fn rewrite_match(
 
     let mut min_pat_pos = 0;
     let mut max_pat_pos = 0;
-    let mut realign_if_conservative = true;
+    let mut should_align_arms = true;
+
+    if context.config.match_arm_align_threshold() == 0 {
+        should_align_arms = false;
+    }
+
     if let Some(arm) = arms.first() {
         min_pat_pos = arm_pat_end_pos_relative(arm);
         max_pat_pos = min_pat_pos;
@@ -1483,7 +1488,7 @@ fn rewrite_match(
         let pat_pos = arm_pat_end_pos_relative(arm);
 
         if max_pat_pos - min_pat_pos > context.config.match_arm_align_threshold() {
-            realign_if_conservative = false;
+            should_align_arms = false;
         }
 
         if pat_pos > max_pat_pos {
@@ -1491,6 +1496,10 @@ fn rewrite_match(
         } else if pat_pos < min_pat_pos {
             min_pat_pos = pat_pos;
         }
+    }
+
+    if context.config.match_arm_align_threshold() >= context.config.max_width() {
+        should_align_arms = true;
     }
 
     let open_brace_pos = context.codemap.span_after(
@@ -1505,18 +1514,10 @@ fn rewrite_match(
     };
 
     for (i, arm) in arms.iter().enumerate() {
-        let alignment = match context.config.match_align_arms() {
-            MatchAlignArms::Always => {
-                max_pat_pos - arm_pat_end_pos_relative(arm)
-            }
-            MatchAlignArms::Conservative => {
-                if realign_if_conservative {
-                    max_pat_pos - arm_pat_end_pos_relative(arm)
-                } else {
-                    0
-                }
-            }
-            MatchAlignArms::Never => 0,
+        let alignment = if should_align_arms {
+            max_pat_pos - arm_pat_end_pos_relative(arm)
+        } else {
+            0
         };
 
         arm_shape = if context.config.indent_match_arms() {
