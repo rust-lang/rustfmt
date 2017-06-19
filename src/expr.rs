@@ -1480,12 +1480,12 @@ fn rewrite_match(
     }
 
     if let Some(arm) = arms.first() {
-        min_pat_pos = arm_pat_end_pos_relative(arm);
+        min_pat_pos = arm_pat_end_pos_relative(arm, shape.indent.block_indent, context);
         max_pat_pos = min_pat_pos;
     }
 
     for arm in arms.iter() {
-        let pat_pos = arm_pat_end_pos_relative(arm);
+        let pat_pos = arm_pat_end_pos_relative(arm, shape.indent.block_indent, context);
 
         if max_pat_pos - min_pat_pos > context.config.match_arm_align_threshold() {
             should_align_arms = false;
@@ -1515,7 +1515,7 @@ fn rewrite_match(
 
     for (i, arm) in arms.iter().enumerate() {
         let alignment = if should_align_arms {
-            max_pat_pos - arm_pat_end_pos_relative(arm)
+            max_pat_pos - arm_pat_end_pos_relative(arm, shape.indent.block_indent, context)
         } else {
             0
         };
@@ -1591,9 +1591,18 @@ fn arm_end_pos(arm: &ast::Arm) -> BytePos {
     arm.body.span.hi
 }
 
-fn arm_pat_end_pos_relative(arm: &ast::Arm) -> usize {
+fn arm_pat_end_pos_relative(arm: &ast::Arm, indent: usize, context: &RewriteContext) -> usize {
     let &ast::Arm { ref pats, .. } = arm;
-    (pats[pats.len() - 1].span.hi - pats[0].span.lo).0 as usize
+    let mut len = indent;
+    let wrap_width = context.config.max_width();
+    for pat in pats.iter() {
+        let pat_width = (pat.span.hi - pat.span.lo).0 as usize;
+        len += pat_width;
+        if len + indent > wrap_width {
+            len = pat_width;
+        }
+    }
+    len
 }
 
 fn arm_comma(config: &Config, body: &ast::Expr) -> &'static str {

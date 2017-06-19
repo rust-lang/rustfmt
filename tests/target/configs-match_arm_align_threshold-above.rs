@@ -3,14 +3,16 @@
 
 fn main() {
     match lorem {
-        Lorem::Ipsum => {
-            lorem();
-            ipsum();
-        }
+        Lorem::Ipsum => (),
         Lorem::DolorSitAmetConsecteturAdipiscingElitSedDo => (),
         Lorem::Eiusmod => {
             lorem();
             ipsum();
         }
+        Lorem::Donec | Lorem::Hendrerit | Lorem::Tempor | Lorem::Tellus | Lorem::Proin |
+        Lorem::Quam | Lorem::Nisl => (),
+        Lorem::DonecHendrerit |
+        Lorem::TemporTellusProinQuamNislTinciduntEtMattisEgetConvallisNecPurusCumSociis => (),
+        Lorem::Natoque if lorem() => (),
     }
 }
