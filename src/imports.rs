@@ -374,7 +374,7 @@ pub fn rewrite_use_list(
 
     let tactic = definitive_tactic(
         &items[first_index..],
-        ::lists::ListTactic::Mixed,
+        context.config.imported_names_layout(),
         remaining_width,
     );
 

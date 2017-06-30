@@ -1069,6 +1069,10 @@ fn dolor() -> usize {}
 fn adipiscing() -> usize {}
 ```
 
+## `imported_names_layout`
+
+XXX TBD.
+
 ## `reorder_imported_names`
 
 Reorder lists of names in import statements alphabetically
