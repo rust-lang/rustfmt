@@ -561,6 +561,8 @@ create_config! {
     reorder_imports_in_group: bool, false, "Reorder import statements in group";
     reorder_imported_names: bool, false,
         "Reorder lists of names in import statements alphabetically";
+    imported_names_layout: ListTactic, ListTactic::Mixed,
+        "Layout of lists of names in import statements";
     single_line_if_else_max_width: usize, 50, "Maximum line length for single line if-else \
                                                 expressions. A value of zero means always break \
                                                 if-else expressions.";
