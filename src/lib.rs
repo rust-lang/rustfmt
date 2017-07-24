@@ -93,12 +93,11 @@ impl Spanned for ast::Expr {
 
 impl Spanned for ast::Stmt {
     fn span(&self) -> Span {
-        match self.node {
-            // Cover attributes
-            ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => {
-                mk_sp(expr.span().lo, self.span.hi)
-            }
-            _ => self.span,
+        let attrs = stmt_attrs(self);
+        if attrs.is_empty() {
+            self.span
+        } else {
+            mk_sp(attrs[0].span.lo, self.span.hi)
         }
     }
 }
@@ -202,6 +201,15 @@ impl Spanned for ast::TyParamBound {
             ast::TyParamBound::TraitTyParamBound(ref ptr, _) => ptr.span,
             ast::TyParamBound::RegionTyParamBound(ref l) => l.span,
         }
+    }
+}
+
+fn stmt_attrs(stmt: &ast::Stmt) -> &[ast::Attribute] {
+    match stmt.node {
+        ast::StmtKind::Local(ref local) => &local.attrs,
+        ast::StmtKind::Item(ref item) => &item.attrs,
+        ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => &expr.attrs,
+        ast::StmtKind::Mac(ref mac) => &mac.2,
     }
 }
 
