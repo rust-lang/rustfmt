@@ -185,10 +185,11 @@ pub fn format_expr(
                     } else {
                         // Rewrite block without trying to put it in a single line.
                         if let rw @ Some(_) = rewrite_empty_block(context, block, shape) {
-                            return rw;
+                            rw
+                        } else {
+                            let prefix = try_opt!(block_prefix(context, block, shape));
+                            rewrite_block_with_visitor(context, &prefix, block, shape)
                         }
-                        let prefix = try_opt!(block_prefix(context, block, shape));
-                        rewrite_block_with_visitor(context, &prefix, block, shape)
                     }
                 }
                 ExprType::SubExpression => block.rewrite(context, shape),
@@ -337,15 +338,16 @@ pub fn format_expr(
             if let rewrite @ Some(_) =
                 rewrite_single_line_block(context, "do catch ", block, shape)
             {
-                return rewrite;
+                rewrite
+            } else {
+                // 9 = `do catch `
+                let budget = shape.width.checked_sub(9).unwrap_or(0);
+                let shape = Shape::legacy(budget, shape.indent).add_offset(9);
+                Some(format!(
+                    "do catch {}",
+                    try_opt!(block.rewrite(&context, shape))
+                ))
             }
-            // 9 = `do catch `
-            let budget = shape.width.checked_sub(9).unwrap_or(0);
-            Some(format!(
-                "{}{}",
-                "do catch ",
-                try_opt!(block.rewrite(&context, Shape::legacy(budget, shape.indent)))
-            ))
         }
     };
 
