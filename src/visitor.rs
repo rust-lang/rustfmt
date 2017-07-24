@@ -15,12 +15,11 @@ use syntax::{ast, ptr, visit};
 use syntax::codemap::{BytePos, CodeMap, Span};
 use syntax::parse::ParseSess;
 
-use {Indent, Shape};
+use {Indent, Shape, Spanned};
 use codemap::{LineRangeUtils, SpanUtils};
 use comment::{contains_comment, FindUncommented};
 use comment::rewrite_comment;
 use config::{BraceStyle, Config};
-use expr::{format_expr, ExprType};
 use items::{format_impl, format_trait, rewrite_associated_impl_type, rewrite_associated_type,
             rewrite_static, rewrite_type_alias};
 use lists::{itemize_list, write_list, DefinitiveListTactic, ListFormatting, SeparatorTactic};
@@ -88,39 +87,26 @@ impl<'a> FmtVisitor<'a> {
                         Shape::indented(self.block_indent, self.config),
                     )
                 };
-                self.push_rewrite(stmt.span, rewrite);
+                self.push_rewrite(stmt.span(), rewrite);
             }
-            ast::StmtKind::Expr(ref expr) => {
-                let rewrite = format_expr(
-                    expr,
-                    ExprType::Statement,
-                    &self.get_context(),
-                    Shape::indented(self.block_indent, self.config),
-                );
-                let span = if expr.attrs.is_empty() {
-                    stmt.span
-                } else {
-                    mk_sp(expr.attrs[0].span.lo, stmt.span.hi)
-                };
-                self.push_rewrite(span, rewrite)
-            }
-            ast::StmtKind::Semi(ref expr) => {
+            ast::StmtKind::Expr(..) | ast::StmtKind::Semi(..) => {
                 let rewrite = stmt.rewrite(
                     &self.get_context(),
                     Shape::indented(self.block_indent, self.config),
                 );
-                let span = if expr.attrs.is_empty() {
-                    stmt.span
-                } else {
-                    mk_sp(expr.attrs[0].span.lo, stmt.span.hi)
-                };
-                self.push_rewrite(span, rewrite)
+                self.push_rewrite(stmt.span(), rewrite)
             }
             ast::StmtKind::Mac(ref mac) => {
                 let (ref mac, _macro_style, ref attrs) = **mac;
                 if contains_skip(attrs) {
                     self.push_rewrite(mac.span, None);
                 } else {
+                    if !attrs.is_empty() {
+                        let shape = Shape::indented(self.block_indent, self.config);
+                        let attrs_rw = attrs.rewrite(&self.get_context(), shape);
+                        let span = mk_sp(attrs[0].span.lo, attrs.last().unwrap().span.hi);
+                        self.push_rewrite(span, attrs_rw);
+                    }
                     self.visit_mac(mac, None, MacroPosition::Statement);
                 }
                 self.format_missing(stmt.span.hi);

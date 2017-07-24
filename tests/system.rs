@@ -346,10 +346,6 @@ fn handle_result(
 
         if fmt_text != text {
             let diff = make_diff(&text, &fmt_text, DIFF_CONTEXT_SIZE);
-            assert!(
-                !diff.is_empty(),
-                "Empty diff? Maybe due to a missing a newline at the end of a file?"
-            );
             failures.insert(file_name, diff);
         }
     }

@@ -59,10 +59,16 @@ fn combine_attr_and_expr(
         String::new()
     } else {
         // Try to recover comments between the attributes and the expression if available.
-        let missing_snippet = context.snippet(mk_sp(
-            expr.attrs[expr.attrs.len() - 1].span.hi,
-            expr.span.lo,
-        ));
+        // Some dirty hack involved here to recover missing `do` from rust parser.
+        let hi = if let ast::ExprKind::Catch(..) = expr.node {
+            let missing_span = mk_sp(expr.attrs[expr.attrs.len() - 1].span.hi, expr.span.lo);
+            let snippet = context.snippet(missing_span);
+            let do_pos = snippet.find_uncommented("do").unwrap();
+            missing_span.lo + BytePos(do_pos as u32)
+        } else {
+            expr.span.lo
+        };
+        let missing_snippet = context.snippet(mk_sp(expr.attrs[expr.attrs.len() - 1].span.hi, hi));
         let comment_opening_pos = missing_snippet.chars().position(|c| c == '/');
         let prefer_same_line = if let Some(pos) = comment_opening_pos {
             !missing_snippet[..pos].contains('\n')
@@ -185,10 +191,11 @@ pub fn format_expr(
                     } else {
                         // Rewrite block without trying to put it in a single line.
                         if let rw @ Some(_) = rewrite_empty_block(context, block, shape) {
-                            return rw;
+                            rw
+                        } else {
+                            let prefix = try_opt!(block_prefix(context, block, shape));
+                            rewrite_block_with_visitor(context, &prefix, block, shape)
                         }
-                        let prefix = try_opt!(block_prefix(context, block, shape));
-                        rewrite_block_with_visitor(context, &prefix, block, shape)
                     }
                 }
                 ExprType::SubExpression => block.rewrite(context, shape),
@@ -337,21 +344,31 @@ pub fn format_expr(
             if let rewrite @ Some(_) =
                 rewrite_single_line_block(context, "do catch ", block, shape)
             {
-                return rewrite;
+                rewrite
+            } else {
+                // 9 = `do catch `
+                let budget = shape.width.checked_sub(9).unwrap_or(0);
+                let shape = Shape::legacy(budget, shape.indent).add_offset(9);
+                Some(format!(
+                    "do catch {}",
+                    try_opt!(block.rewrite(&context, shape))
+                ))
             }
-            // 9 = `do catch `
-            let budget = shape.width.checked_sub(9).unwrap_or(0);
-            Some(format!(
-                "{}{}",
-                "do catch ",
-                try_opt!(block.rewrite(&context, Shape::legacy(budget, shape.indent)))
-            ))
         }
     };
 
     expr_rw
         .and_then(|expr_str| {
-            recover_comment_removed(expr_str, expr.span, context, shape)
+            // Unfortunately, we are missing `do` in span of catch from parser. We must add `do`
+            // manually when recovering missing comments.
+            recover_comment_removed(expr_str, expr.span, context, shape).map(|recoverd_str| {
+                if let ast::ExprKind::Catch(..) = expr.node {
+                    if !recoverd_str.starts_with("do") {
+                        return String::from("do ") + &recoverd_str;
+                    }
+                }
+                recoverd_str
+            })
         })
         .and_then(|expr_str| {
             combine_attr_and_expr(context, shape, expr, &expr_str)
@@ -948,11 +965,7 @@ impl Rewrite for ast::Stmt {
 
                 format_expr(
                     ex,
-                    match self.node {
-                        ast::StmtKind::Expr(_) => ExprType::SubExpression,
-                        ast::StmtKind::Semi(_) => ExprType::Statement,
-                        _ => unreachable!(),
-                    },
+                    ExprType::Statement,
                     context,
                     try_opt!(shape.sub_width(suffix.len())),
                 ).map(|s| s + suffix)
