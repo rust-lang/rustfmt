@@ -950,11 +950,7 @@ impl Rewrite for ast::Stmt {
 
                 format_expr(
                     ex,
-                    match self.node {
-                        ast::StmtKind::Expr(_) => ExprType::SubExpression,
-                        ast::StmtKind::Semi(_) => ExprType::Statement,
-                        _ => unreachable!(),
-                    },
+                    ExprType::Statement,
                     context,
                     try_opt!(shape.sub_width(suffix.len())),
                 ).map(|s| s + suffix)
