@@ -88,7 +88,7 @@ impl<'a> FmtVisitor<'a> {
                         Shape::indented(self.block_indent, self.config),
                     )
                 };
-                self.push_rewrite(stmt.span, rewrite);
+                self.push_rewrite(stmt.span(), rewrite);
             }
             ast::StmtKind::Expr(ref expr) => {
                 let rewrite = format_expr(
@@ -121,6 +121,12 @@ impl<'a> FmtVisitor<'a> {
                 if contains_skip(attrs) {
                     self.push_rewrite(mac.span, None);
                 } else {
+                    if !attrs.is_empty() {
+                        let shape = Shape::indented(self.block_indent, self.config);
+                        let attrs_rw = attrs.rewrite(&self.get_context(), shape);
+                        let span = mk_sp(attrs[0].span.lo, attrs.last().unwrap().span.hi);
+                        self.push_rewrite(span, attrs_rw);
+                    }
                     self.visit_mac(mac, None, MacroPosition::Statement);
                 }
                 self.format_missing(stmt.span.hi);

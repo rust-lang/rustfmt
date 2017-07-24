@@ -50,7 +50,13 @@ impl Rewrite for ast::Local {
             shape.width,
             shape.indent
         );
-        let mut result = "let ".to_owned();
+        let mut result = if self.attrs.is_empty() {
+            "let ".to_owned()
+        } else {
+            let attrs_str = try_opt!(self.attrs.rewrite(context, shape));
+            let indent_str = shape.indent.to_string(context.config);
+            format!("{}\n{}let ", attrs_str, indent_str)
+        };
 
         // 4 = "let ".len()
         let pat_shape = try_opt!(shape.offset_left(4));
