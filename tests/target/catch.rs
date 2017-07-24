@@ -18,4 +18,7 @@ fn main() {
     do catch {
         // Regular do catch block
     };
+
+    #[an_attribute(rustfmt)]
+    do catch { foo()? };
 }

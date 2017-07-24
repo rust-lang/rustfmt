@@ -91,3 +91,26 @@ fn issue_1799() {
     // https://github.com/rust-lang/rust/issues/43336
     Some(Err(error));
 }
+
+// #1813
+fn attributes_on_statemetns() {
+    // Semi
+    #[an_attribute(rustfmt)]
+    foo(1);
+
+    // Local
+    #[an_attribute(rustfmt)]
+    let x = foo(a, b, c);
+
+    // Item
+    #[an_attribute(rustfmt)]
+    use foobar;
+
+    // Mac
+    #[an_attribute(rustfmt)]
+    vec![1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 1, 1, 2, 1];
+
+    // Expr
+    #[an_attribute(rustfmt)]
+    {}
+}
