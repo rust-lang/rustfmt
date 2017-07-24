@@ -59,10 +59,16 @@ fn combine_attr_and_expr(
         String::new()
     } else {
         // Try to recover comments between the attributes and the expression if available.
-        let missing_snippet = context.snippet(mk_sp(
-            expr.attrs[expr.attrs.len() - 1].span.hi,
-            expr.span.lo,
-        ));
+        // Some dirty hack involved here to recover missing `do` from rust parser.
+        let hi = if let ast::ExprKind::Catch(..) = expr.node {
+            let missing_span = mk_sp(expr.attrs[expr.attrs.len() - 1].span.hi, expr.span.lo);
+            let snippet = context.snippet(missing_span);
+            let do_pos = snippet.find_uncommented("do").unwrap();
+            missing_span.lo + BytePos(do_pos as u32)
+        } else {
+            expr.span.lo
+        };
+        let missing_snippet = context.snippet(mk_sp(expr.attrs[expr.attrs.len() - 1].span.hi, hi));
         let comment_opening_pos = missing_snippet.chars().position(|c| c == '/');
         let prefer_same_line = if let Some(pos) = comment_opening_pos {
             !missing_snippet[..pos].contains('\n')
@@ -353,7 +359,16 @@ pub fn format_expr(
 
     expr_rw
         .and_then(|expr_str| {
-            recover_comment_removed(expr_str, expr.span, context, shape)
+            // Unfortunately, we are missing `do` in span of catch from parser. We must add `do`
+            // manually when recovering missing comments.
+            recover_comment_removed(expr_str, expr.span, context, shape).map(|recoverd_str| {
+                if let ast::ExprKind::Catch(..) = expr.node {
+                    if !recoverd_str.starts_with("do") {
+                        return String::from("do ") + &recoverd_str;
+                    }
+                }
+                recoverd_str
+            })
         })
         .and_then(|expr_str| {
             combine_attr_and_expr(context, shape, expr, &expr_str)
