@@ -621,34 +621,22 @@ fn rewrite_closure(
             return Some(format!("{} {{}}", prefix));
         }
 
-        // Figure out if the block is necessary.
-        let needs_block = block.rules != ast::BlockCheckMode::Default || block.stmts.len() > 1 ||
-            context.inside_macro ||
-            block_contains_comment(block, context.codemap) ||
-            prefix.contains('\n');
-
-        let no_return_type = if let ast::FunctionRetTy::Default(_) = fn_decl.output {
+        let has_return_type = if let ast::FunctionRetTy::Ty(..) = fn_decl.output {
             true
         } else {
             false
         };
-        if no_return_type && !needs_block {
-            // lock.stmts.len() == 1
+        // Figure out if the block is necessary.
+        let needs_block = block.rules != ast::BlockCheckMode::Default || block.stmts.len() > 1 ||
+            context.inside_macro ||
+            block_contains_comment(block, context.codemap) ||
+            prefix.contains('\n') || has_return_type;
+
+        if !needs_block {
+            // block.stmts.len() == 1
             if let Some(ref expr) = stmt_expr(&block.stmts[0]) {
                 if let Some(rw) = rewrite_closure_expr(expr, &prefix, context, body_shape) {
                     return Some(rw);
-                }
-            }
-        }
-
-        if !needs_block {
-            // We need braces, but we might still prefer a one-liner.
-            let stmt = &block.stmts[0];
-            // 4 = braces and spaces.
-            if let Some(body_shape) = body_shape.sub_width(4) {
-                // Checks if rewrite succeeded and fits on a single line.
-                if let Some(rewrite) = and_one_line(stmt.rewrite(context, body_shape)) {
-                    return Some(format!("{} {{ {} }}", prefix, rewrite));
                 }
             }
         }
