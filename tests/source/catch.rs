@@ -24,4 +24,7 @@ fn main() {
     do catch {
         // Regular do catch block
     };
+
+    #[ an_attribute_on_single_line_catch ]
+    do catch { foo() ? };
 }
