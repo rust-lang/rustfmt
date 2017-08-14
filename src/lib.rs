@@ -73,6 +73,7 @@ mod patterns;
 mod summary;
 mod vertical;
 
+/// Spanned will cover attributes as well if available.
 pub trait Spanned {
     fn span(&self) -> Span;
 }
@@ -107,15 +108,30 @@ impl Spanned for ast::Item {
     }
 }
 
+impl Spanned for ast::Local {
+    fn span(&self) -> Span {
+        span_with_attrs!(self)
+    }
+}
+
 impl Spanned for ast::Stmt {
     fn span(&self) -> Span {
-        match self.node {
-            // Cover attributes
-            ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => {
-                mk_sp(expr.span().lo, self.span.hi)
+        // Cover attributes
+        let hi = self.span.hi;
+        let lo = match self.node {
+            ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => expr.span().lo,
+            ast::StmtKind::Local(ref local) => local.span().lo,
+            ast::StmtKind::Item(ref item) => item.span().lo,
+            ast::StmtKind::Mac(ref mac) => {
+                let (_, _, ref attrs) = **mac;
+                if attrs.is_empty() {
+                    self.span.lo
+                } else {
+                    attrs[0].span.lo
+                }
             }
-            _ => self.span,
-        }
+        };
+        mk_sp(lo, hi)
     }
 }
 

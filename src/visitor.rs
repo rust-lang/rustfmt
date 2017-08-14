@@ -18,10 +18,10 @@ use syntax::parse::ParseSess;
 
 use {Indent, Shape, Spanned};
 use codemap::{LineRangeUtils, SpanUtils};
-use comment::{contains_comment, CodeCharKind, CommentCodeSlices, FindUncommented};
+use comment::{combine_strs_with_missing_comments, contains_comment, CodeCharKind,
+              CommentCodeSlices, FindUncommented};
 use comment::rewrite_comment;
 use config::{BraceStyle, Config};
-use expr::{format_expr, ExprType};
 use items::{format_impl, format_trait, rewrite_associated_impl_type, rewrite_associated_type,
             rewrite_static, rewrite_type_alias};
 use lists::{itemize_list, write_list, DefinitiveListTactic, ListFormatting, SeparatorTactic};
@@ -76,40 +76,26 @@ impl<'a> FmtVisitor<'a> {
                         Shape::indented(self.block_indent, self.config),
                     )
                 };
-                self.push_rewrite(stmt.span, rewrite);
+                self.push_rewrite(stmt.span(), rewrite);
             }
-            ast::StmtKind::Expr(ref expr) => {
-                let rewrite = format_expr(
-                    expr,
-                    ExprType::Statement,
-                    &self.get_context(),
-                    Shape::indented(self.block_indent, self.config),
-                );
-                let span = if expr.attrs.is_empty() {
-                    stmt.span
-                } else {
-                    mk_sp(expr.span().lo, stmt.span.hi)
-                };
-                self.push_rewrite(span, rewrite)
-            }
-            ast::StmtKind::Semi(ref expr) => {
+            ast::StmtKind::Expr(..) | ast::StmtKind::Semi(..) => {
                 let rewrite = stmt.rewrite(
                     &self.get_context(),
                     Shape::indented(self.block_indent, self.config),
                 );
-                let span = if expr.attrs.is_empty() {
-                    stmt.span
-                } else {
-                    mk_sp(expr.span().lo, stmt.span.hi)
-                };
-                self.push_rewrite(span, rewrite)
+                self.push_rewrite(stmt.span(), rewrite)
             }
             ast::StmtKind::Mac(ref mac) => {
-                let (ref mac, _macro_style, ref attrs) = **mac;
+                let (ref mac, macro_style, ref attrs) = **mac;
                 if contains_skip(attrs) {
-                    self.push_rewrite(mac.span, None);
+                    self.push_rewrite(stmt.span(), None);
                 } else {
-                    self.visit_mac(mac, None, MacroPosition::Statement);
+                    let position = if macro_style == ast::MacStmtStyle::Semicolon {
+                        MacroPosition::StatementSemicolon
+                    } else {
+                        MacroPosition::Statement
+                    };
+                    self.visit_mac(mac, None, position, stmt.span(), Some(&**attrs));
                 }
                 self.format_missing(stmt.span.hi);
             }
@@ -432,11 +418,11 @@ impl<'a> FmtVisitor<'a> {
                 self.format_mod(module, &item.vis, item.span, item.ident, &attrs);
             }
             ast::ItemKind::Mac(ref mac) => {
-                self.visit_mac(mac, Some(item.ident), MacroPosition::Item);
+                self.visit_mac(mac, Some(item.ident), MacroPosition::Item, item.span, None);
             }
             ast::ItemKind::ForeignMod(ref foreign_mod) => {
                 self.format_missing_with_indent(source!(self, item.span).lo);
-                self.format_foreign_mod(foreign_mod, item.span);
+                self.format_foreign_mod(foreign_mod, item.span());
             }
             ast::ItemKind::Static(ref ty, mutability, ref expr) => {
                 let rewrite = rewrite_static(
@@ -574,7 +560,13 @@ impl<'a> FmtVisitor<'a> {
                 self.push_rewrite(ti.span, rewrite);
             }
             ast::TraitItemKind::Macro(ref mac) => {
-                self.visit_mac(mac, Some(ti.ident), MacroPosition::Item);
+                self.visit_mac(
+                    mac,
+                    Some(ti.ident),
+                    MacroPosition::TraitItem,
+                    mac.span,
+                    None,
+                );
             }
         }
     }
@@ -624,20 +616,52 @@ impl<'a> FmtVisitor<'a> {
                 self.push_rewrite(ii.span, rewrite);
             }
             ast::ImplItemKind::Macro(ref mac) => {
-                self.visit_mac(mac, Some(ii.ident), MacroPosition::Item);
+                self.visit_mac(mac, Some(ii.ident), MacroPosition::ImplItem, mac.span, None);
             }
         }
     }
 
-    fn visit_mac(&mut self, mac: &ast::Mac, ident: Option<ast::Ident>, pos: MacroPosition) {
-        skip_out_of_file_lines_range_visitor!(self, mac.span);
+    fn visit_mac(
+        &mut self,
+        mac: &ast::Mac,
+        ident: Option<ast::Ident>,
+        pos: MacroPosition,
+        span: Span, // span including attributes, if available.
+        attrs: Option<&[ast::Attribute]>,
+    ) {
+        skip_out_of_file_lines_range_visitor!(self, span);
 
         // 1 = ;
         let shape = Shape::indented(self.block_indent, self.config)
             .sub_width(1)
             .unwrap();
-        let rewrite = rewrite_macro(mac, ident, &self.get_context(), shape, pos);
-        self.push_rewrite(mac.span, rewrite);
+        let rewrite = if let Some(ref attrs) = attrs {
+            let attrs_str = match attrs.rewrite(&self.get_context(), shape) {
+                Some(s) => s,
+                None => {
+                    self.push_rewrite(span, None);
+                    return;
+                }
+            };
+            let missing_span = if attrs.is_empty() {
+                mk_sp(mac.span.lo, mac.span.lo)
+            } else {
+                mk_sp(attrs[attrs.len() - 1].span.hi, mac.span.lo)
+            };
+            rewrite_macro(mac, ident, &self.get_context(), shape, pos).and_then(|macro_str| {
+                combine_strs_with_missing_comments(
+                    &self.get_context(),
+                    &attrs_str,
+                    &macro_str,
+                    missing_span,
+                    shape,
+                    false,
+                )
+            })
+        } else {
+            rewrite_macro(mac, ident, &self.get_context(), shape, pos)
+        };
+        self.push_rewrite(span, rewrite);
     }
 
     fn push_rewrite(&mut self, span: Span, rewrite: Option<String>) {

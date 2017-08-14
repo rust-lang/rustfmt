@@ -222,20 +222,24 @@ pub fn semicolon_for_expr(context: &RewriteContext, expr: &ast::Expr) -> bool {
 }
 
 #[inline]
-pub fn semicolon_for_stmt(context: &RewriteContext, stmt: &ast::Stmt) -> bool {
+pub fn semicolon_for_stmt(context: &RewriteContext, stmt: &ast::Stmt) -> &'static str {
     match stmt.node {
         ast::StmtKind::Semi(ref expr) => match expr.node {
             ast::ExprKind::While(..) |
             ast::ExprKind::WhileLet(..) |
             ast::ExprKind::Loop(..) |
-            ast::ExprKind::ForLoop(..) => false,
+            ast::ExprKind::ForLoop(..) => "",
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
-                context.config.trailing_semicolon()
+                if context.config.trailing_semicolon() {
+                    ";"
+                } else {
+                    ""
+                }
             }
-            _ => true,
+            _ => ";",
         },
-        ast::StmtKind::Expr(..) => false,
-        _ => true,
+        ast::StmtKind::Expr(..) => "",
+        _ => ";",
     }
 }
 
@@ -359,6 +363,18 @@ macro_rules! msg {
 macro_rules! source {
     ($this:ident, $sp: expr) => {
         $sp.source_callsite()
+    }
+}
+
+// Return the span between the end of the attributes of the given item and the beginning of the
+// given item. Returns an empty span if there are no attributes.
+macro_rules! missing_span_between_attrs {
+    ($this:ident) => {
+        if $this.attrs.is_empty() {
+            mk_sp($this.span.lo, $this.span.lo)
+        } else {
+            mk_sp($this.attrs[$this.attrs.len() - 1].span.hi, $this.span.lo)
+        }
     }
 }
 

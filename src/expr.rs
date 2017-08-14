@@ -133,10 +133,11 @@ pub fn format_expr(
                     } else {
                         // Rewrite block without trying to put it in a single line.
                         if let rw @ Some(_) = rewrite_empty_block(context, block, shape) {
-                            return rw;
+                            rw
+                        } else {
+                            let prefix = try_opt!(block_prefix(context, block, shape));
+                            rewrite_block_with_visitor(context, &prefix, block, shape)
                         }
-                        let prefix = try_opt!(block_prefix(context, block, shape));
-                        rewrite_block_with_visitor(context, &prefix, block, shape)
                     }
                 }
                 ExprType::SubExpression => block.rewrite(context, shape),
@@ -282,17 +283,17 @@ pub fn format_expr(
             shape,
         ),
         ast::ExprKind::Catch(ref block) => {
-            if let rewrite @ Some(_) = rewrite_single_line_block(context, "do catch ", block, shape)
-            {
-                return rewrite;
+            if let rw @ Some(_) = rewrite_single_line_block(context, "do catch ", block, shape) {
+                rw
+            } else {
+                // 9 = `do catch `
+                let budget = shape.width.checked_sub(9).unwrap_or(0);
+                Some(format!(
+                    "{}{}",
+                    "do catch ",
+                    try_opt!(block.rewrite(&context, Shape::legacy(budget, shape.indent)))
+                ))
             }
-            // 9 = `do catch `
-            let budget = shape.width.checked_sub(9).unwrap_or(0);
-            Some(format!(
-                "{}{}",
-                "do catch ",
-                try_opt!(block.rewrite(&context, Shape::legacy(budget, shape.indent)))
-            ))
         }
     };
 
@@ -620,34 +621,22 @@ fn rewrite_closure(
             return Some(format!("{} {{}}", prefix));
         }
 
-        // Figure out if the block is necessary.
-        let needs_block = block.rules != ast::BlockCheckMode::Default || block.stmts.len() > 1 ||
-            context.inside_macro ||
-            block_contains_comment(block, context.codemap) ||
-            prefix.contains('\n');
-
-        let no_return_type = if let ast::FunctionRetTy::Default(_) = fn_decl.output {
+        let has_return_type = if let ast::FunctionRetTy::Ty(..) = fn_decl.output {
             true
         } else {
             false
         };
-        if no_return_type && !needs_block {
-            // lock.stmts.len() == 1
+        // Figure out if the block is necessary.
+        let needs_block = block.rules != ast::BlockCheckMode::Default || block.stmts.len() > 1 ||
+            context.inside_macro ||
+            block_contains_comment(block, context.codemap) ||
+            prefix.contains('\n') || has_return_type;
+
+        if !needs_block {
+            // block.stmts.len() == 1
             if let Some(ref expr) = stmt_expr(&block.stmts[0]) {
                 if let Some(rw) = rewrite_closure_expr(expr, &prefix, context, body_shape) {
                     return Some(rw);
-                }
-            }
-        }
-
-        if !needs_block {
-            // We need braces, but we might still prefer a one-liner.
-            let stmt = &block.stmts[0];
-            // 4 = braces and spaces.
-            if let Some(body_shape) = body_shape.sub_width(4) {
-                // Checks if rewrite succeeded and fits on a single line.
-                if let Some(rewrite) = and_one_line(stmt.rewrite(context, body_shape)) {
-                    return Some(format!("{} {{ {} }}", prefix, rewrite));
                 }
             }
         }
@@ -865,22 +854,9 @@ impl Rewrite for ast::Stmt {
         let result = match self.node {
             ast::StmtKind::Local(ref local) => local.rewrite(context, shape),
             ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
-                let suffix = if semicolon_for_stmt(context, self) {
-                    ";"
-                } else {
-                    ""
-                };
-
-                format_expr(
-                    ex,
-                    match self.node {
-                        ast::StmtKind::Expr(_) => ExprType::SubExpression,
-                        ast::StmtKind::Semi(_) => ExprType::Statement,
-                        _ => unreachable!(),
-                    },
-                    context,
-                    try_opt!(shape.sub_width(suffix.len())),
-                ).map(|s| s + suffix)
+                let suffix = semicolon_for_stmt(context, self);
+                let real_shape = try_opt!(shape.sub_width(suffix.len()));
+                format_expr(ex, ExprType::Statement, context, real_shape).map(|s| s + suffix)
             }
             ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
         };

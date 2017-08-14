@@ -47,11 +47,7 @@ impl AlignedItem for ast::StructField {
 
     fn rewrite_prefix(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         let attrs_str = try_opt!(self.attrs.rewrite(context, shape));
-        let missing_span = if self.attrs.is_empty() {
-            mk_sp(self.span.lo, self.span.lo)
-        } else {
-            mk_sp(self.attrs.last().unwrap().span.hi, self.span.lo)
-        };
+        let missing_span = missing_span_between_attrs!(self);
         rewrite_struct_field_prefix(context, self).and_then(|field_str| {
             combine_strs_with_missing_comments(
                 context,
@@ -86,11 +82,7 @@ impl AlignedItem for ast::Field {
     fn rewrite_prefix(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         let attrs_str = try_opt!(self.attrs.rewrite(context, shape));
         let name = &self.ident.node.to_string();
-        let missing_span = if self.attrs.is_empty() {
-            mk_sp(self.span.lo, self.span.lo)
-        } else {
-            mk_sp(self.attrs.last().unwrap().span.hi, self.span.lo)
-        };
+        let missing_span = missing_span_between_attrs!(self);
         combine_strs_with_missing_comments(
             context,
             &attrs_str,

@@ -107,3 +107,22 @@ impl InnerAttributes() {
 mod InnerAttributes {
     #![this_is_an_inner_attribute(foo)]
 }
+
+// #1813
+fn attributes_on_statements() {
+    // ast::StmtKind::Semi
+    #[an_attribute(rustfmt)]
+    foo(1);
+    // ast::StmtKind::Local
+    #[an_attribute(rustfmt)]
+    let x = foo(1);
+    // ast::StmtKind::Item
+    #[an_attribute(rustfmt)]
+    use foobar;
+    // ast::StmtKind::Mac
+    #[an_attribute(rustfmt)]
+    vec![1, 2];
+    // ast::StmtKind::Expr
+    #[an_attribute(rustfmt)]
+    {}
+}
