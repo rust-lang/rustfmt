@@ -73,6 +73,7 @@ mod patterns;
 mod summary;
 mod vertical;
 
+/// Spanned will cover attributes as well if available.
 pub trait Spanned {
     fn span(&self) -> Span;
 }
