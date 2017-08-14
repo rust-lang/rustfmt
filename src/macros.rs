@@ -47,7 +47,10 @@ enum MacroStyle {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MacroPosition {
     Item,
-    Statement,
+    ImplItem,           // Inside impl; no trailing semicolon with braces
+    TraitItem,          // Inside trait no trailing semicolon with braces
+    Statement,          // Statement without a trailing semicolon
+    StatementSemicolon, // Statement with a trailing semicolon
     Expression,
 }
 
@@ -68,14 +71,6 @@ pub fn rewrite_macro(
     shape: Shape,
     position: MacroPosition,
 ) -> Option<String> {
-    let context = &mut context.clone();
-    context.inside_macro = true;
-    if context.config.use_try_shorthand() {
-        if let Some(expr) = convert_try_mac(mac, context) {
-            return expr.rewrite(context, shape);
-        }
-    }
-
     let original_style = macro_style(mac, context);
 
     let macro_name = match extra_ident {
@@ -93,16 +88,38 @@ pub fn rewrite_macro(
         original_style
     };
 
+    let add_trailing_semicolon = |rw, failed| match position {
+        // Span from macro in Item position contains a trailing semicolon, so we need not
+        // add it when we failed.
+        MacroPosition::Item | MacroPosition::ImplItem | MacroPosition::TraitItem if failed => rw,
+        // Macro with braces inside `impl` or `trait` is not allowd to have a trailing semicolon.
+        MacroPosition::ImplItem | MacroPosition::TraitItem if style == MacroStyle::Braces => rw,
+        MacroPosition::Item |
+        MacroPosition::ImplItem |
+        MacroPosition::TraitItem |
+        MacroPosition::StatementSemicolon => format!("{};", rw),
+        _ => rw,
+    };
+
+    let context = &mut context.clone();
+    context.inside_macro = true;
+    if context.config.use_try_shorthand() {
+        if let Some(expr) = convert_try_mac(mac, context) {
+            return expr.rewrite(context, shape)
+                .map(|s| add_trailing_semicolon(s, false));
+        }
+    }
+
     let ts: TokenStream = mac.node.tts.clone().into();
     if ts.is_empty() && !contains_comment(&context.snippet(mac.span)) {
-        return match style {
-            MacroStyle::Parens if position == MacroPosition::Item => {
-                Some(format!("{}();", macro_name))
-            }
-            MacroStyle::Parens => Some(format!("{}()", macro_name)),
-            MacroStyle::Brackets => Some(format!("{}[]", macro_name)),
-            MacroStyle::Braces => Some(format!("{}{{}}", macro_name)),
-        };
+        return Some(add_trailing_semicolon(
+            match style {
+                MacroStyle::Parens => format!("{}()", macro_name),
+                MacroStyle::Brackets => format!("{}[]", macro_name),
+                MacroStyle::Braces => format!("{}{{}}", macro_name),
+            },
+            false,
+        ));
     }
 
     let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
@@ -116,14 +133,14 @@ pub fn rewrite_macro(
                 Ok(expr) => {
                     // Recovered errors.
                     if context.parse_session.span_diagnostic.has_errors() {
-                        return Some(context.snippet(mac.span));
+                        return Some(add_trailing_semicolon(context.snippet(mac.span), true));
                     }
 
                     expr
                 }
                 Err(mut e) => {
                     e.cancel();
-                    return Some(context.snippet(mac.span));
+                    return Some(add_trailing_semicolon(context.snippet(mac.span), true));
                 }
             };
 
@@ -140,7 +157,9 @@ pub fn rewrite_macro(
                             match parser.parse_expr() {
                                 Ok(expr) => {
                                     if context.parse_session.span_diagnostic.has_errors() {
-                                        return None;
+                                        return Some(
+                                            add_trailing_semicolon(context.snippet(mac.span), true),
+                                        );
                                     }
                                     expr_vec.push(expr);
                                     parser.bump();
@@ -153,9 +172,9 @@ pub fn rewrite_macro(
                             }
                         }
                     }
-                    return None;
+                    return Some(add_trailing_semicolon(context.snippet(mac.span), true));
                 }
-                _ => return None,
+                _ => return Some(add_trailing_semicolon(context.snippet(mac.span), true)),
             }
 
             parser.bump();
@@ -167,7 +186,7 @@ pub fn rewrite_macro(
         }
     }
 
-    match style {
+    let result = match style {
         MacroStyle::Parens => {
             // Format macro invocation as function call, forcing no trailing
             // comma because not all macros support them.
@@ -180,10 +199,7 @@ pub fn rewrite_macro(
                 context.config.fn_call_width(),
                 trailing_comma,
             );
-            rw.ok().map(|rw| match position {
-                MacroPosition::Item => format!("{};", rw),
-                _ => rw,
-            })
+            rw.ok()
         }
         MacroStyle::Brackets => {
             let mac_shape = try_opt!(shape.offset_left(macro_name.len()));
@@ -244,7 +260,9 @@ pub fn rewrite_macro(
             // Skip macro invocations with braces, for now.
             None
         }
-    }
+    };
+
+    result.map(|s| add_trailing_semicolon(s, false))
 }
 
 /// Tries to convert a macro use into a short hand try expression. Returns None
