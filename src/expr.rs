@@ -854,22 +854,9 @@ impl Rewrite for ast::Stmt {
         let result = match self.node {
             ast::StmtKind::Local(ref local) => local.rewrite(context, shape),
             ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
-                let suffix = if semicolon_for_stmt(context, self) {
-                    ";"
-                } else {
-                    ""
-                };
-
-                format_expr(
-                    ex,
-                    match self.node {
-                        ast::StmtKind::Expr(_) => ExprType::SubExpression,
-                        ast::StmtKind::Semi(_) => ExprType::Statement,
-                        _ => unreachable!(),
-                    },
-                    context,
-                    try_opt!(shape.sub_width(suffix.len())),
-                ).map(|s| s + suffix)
+                let suffix = semicolon_for_stmt(context, self);
+                let real_shape = try_opt!(shape.sub_width(suffix.len()));
+                format_expr(ex, ExprType::Statement, context, real_shape).map(|s| s + suffix)
             }
             ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
         };

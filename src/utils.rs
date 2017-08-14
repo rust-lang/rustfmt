@@ -222,20 +222,24 @@ pub fn semicolon_for_expr(context: &RewriteContext, expr: &ast::Expr) -> bool {
 }
 
 #[inline]
-pub fn semicolon_for_stmt(context: &RewriteContext, stmt: &ast::Stmt) -> bool {
+pub fn semicolon_for_stmt(context: &RewriteContext, stmt: &ast::Stmt) -> &'static str {
     match stmt.node {
         ast::StmtKind::Semi(ref expr) => match expr.node {
             ast::ExprKind::While(..) |
             ast::ExprKind::WhileLet(..) |
             ast::ExprKind::Loop(..) |
-            ast::ExprKind::ForLoop(..) => false,
+            ast::ExprKind::ForLoop(..) => "",
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
-                context.config.trailing_semicolon()
+                if context.config.trailing_semicolon() {
+                    ";"
+                } else {
+                    ""
+                }
             }
-            _ => true,
+            _ => ";",
         },
-        ast::StmtKind::Expr(..) => false,
-        _ => true,
+        ast::StmtKind::Expr(..) => "",
+        _ => ";",
     }
 }
 
