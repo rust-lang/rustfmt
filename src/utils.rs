@@ -362,6 +362,18 @@ macro_rules! source {
     }
 }
 
+// Return the span between the end of the attributes of the given item and the beginning of the
+// given item. Returns an empty span if there are no attributes.
+macro_rules! missing_span_between_attrs {
+    ($this:ident) => {
+        if $this.attrs.is_empty() {
+            mk_sp($this.span.lo, $this.span.lo)
+        } else {
+            mk_sp($this.attrs[$this.attrs.len() - 1].span.hi, $this.span.lo)
+        }
+    }
+}
+
 pub fn mk_sp(lo: BytePos, hi: BytePos) -> Span {
     Span {
         lo,

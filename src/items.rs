@@ -1413,11 +1413,7 @@ pub fn rewrite_struct_field(
     let prefix = try_opt!(rewrite_struct_field_prefix(context, field));
 
     let attrs_str = try_opt!(field.attrs.rewrite(context, shape));
-    let missing_span = if field.attrs.is_empty() {
-        mk_sp(field.span.lo, field.span.lo)
-    } else {
-        mk_sp(field.attrs.last().unwrap().span.hi, field.span.lo)
-    };
+    let missing_span = missing_span_between_attrs!(field);
     let mut spacing = String::from(if field.ident.is_some() {
         type_annotation_spacing.1
     } else {
