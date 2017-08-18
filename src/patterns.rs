@@ -18,7 +18,7 @@ use comment::FindUncommented;
 use expr::{can_be_overflowed_expr, rewrite_call_inner, rewrite_pair, rewrite_unary_prefix,
            wrap_struct_field};
 use lists::{itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
-            struct_lit_tactic, write_list, DefinitiveListTactic, SeparatorTactic};
+            struct_lit_tactic, write_list, DefinitiveListTactic, SeparatorTactic, StructLitKind};
 use rewrite::{Rewrite, RewriteContext};
 use types::{rewrite_path, PathContext};
 use utils::{format_mutability, mk_sp, wrap_str};
@@ -149,6 +149,7 @@ fn rewrite_struct_pat(
     let (h_shape, v_shape) = try_opt!(struct_lit_shape(
         shape,
         context,
+        StructLitKind::Pat,
         path_str.len() + 3,
         elipses_str.len() + 2,
     ));

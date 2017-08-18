@@ -1643,7 +1643,7 @@ See also: [`struct_lit_multiline_style`](#struct_lit_multiline_style), [`struct_
 
 ## `struct_lit_width`
 
-Maximum width in the body of a struct lit before falling back to vertical formatting
+Maximum width in the body of a struct lit *expression* before falling back to vertical formatting
 
 - **Default value**: `18`
 - **Possible values**: any positive integer
@@ -1658,7 +1658,26 @@ let lorem = Lorem { ipsum: dolor, sit: amet };
 #### Lines longer than `struct_lit_width`:
 See [`struct_lit_style`](#struct_lit_style).
 
-See also: [`struct_lit_multiline_style`](#struct_lit_multiline_style), [`struct_lit_style`](#struct_lit_style).
+See also: [`struct_lit_multiline_style`](#struct_lit_multiline_style), [`struct_lit_style`](#struct_lit_style), [`struct_lit_pattern_width`](#struct_lit_pattern_width).
+
+## `struct_lit_pattern_width`
+
+Maximum width in the body of a struct lit *pattern* before falling back to vertical formatting
+
+- **Default value**: `18`
+- **Possible values**: any positive integer
+
+**Note:** A value of `0` results in vertical formatting being applied regardless of a line's width.
+
+#### Lines shorter than `struct_lit_pattern_width`:
+```rust
+let Lorem { ipsum: dolor, sit: amet } = lorem;
+```
+
+#### Lines longer than `struct_lit_pattern_width`:
+See [`struct_lit_style`](#struct_lit_style).
+
+See also: [`struct_lit_multiline_style`](#struct_lit_multiline_style), [`struct_lit_style`](#struct_lit_style), [`struct_lit_width`](#struct_lit_pattern_width).
 
 ## `struct_variant_width`
 

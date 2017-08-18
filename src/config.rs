@@ -506,7 +506,11 @@ create_config! {
     fn_call_width: usize, 60,
         "Maximum width of the args of a function call before falling back to vertical formatting";
     struct_lit_width: usize, 18,
-        "Maximum width in the body of a struct lit before falling back to vertical formatting";
+        "Maximum width in the body of a struct lit expressions before falling back to vertical \
+         formatting";
+    struct_lit_pattern_width: usize, 18,
+        "Maximum width in the body of a struct lit patterns before falling back to vertical \
+         formatting";
     struct_variant_width: usize, 35,
         "Maximum width in the body of a struct variant before falling back to vertical formatting";
     force_explicit_abi: bool, true, "Always print the abi for extern items";
