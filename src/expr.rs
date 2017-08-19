@@ -2154,7 +2154,9 @@ where
     let fmt = ListFormatting {
         tactic: tactic,
         separator: ",",
-        trailing_separator: if force_trailing_comma {
+        trailing_separator: if !context.config.fn_call_trailing_comma() {
+            SeparatorTactic::Never
+        } else if force_trailing_comma {
             SeparatorTactic::Always
         } else if context.inside_macro || !context.use_block_indent() {
             SeparatorTactic::Never
