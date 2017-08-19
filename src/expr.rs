@@ -1774,8 +1774,13 @@ fn rewrite_match_body(
         .offset_left(extra_offset(&pats_str, shape) + 4)
         .and_then(|shape| shape.sub_width(comma.len()));
     let orig_body = if let Some(body_shape) = orig_body_shape {
+        let expr_type = if context.config.treat_match_arm_bodies_as_statements() {
+            ExprType::Statement
+        } else {
+            ExprType::SubExpression
+        };
         let rewrite = nop_block_collapse(
-            format_expr(body, ExprType::Statement, context, body_shape),
+            format_expr(body, expr_type, context, body_shape),
             body_shape.width,
         );
 

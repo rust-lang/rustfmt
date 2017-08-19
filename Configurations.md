@@ -1823,6 +1823,31 @@ fn foo() -> usize {
 }
 ```
 
+## `treat_match_arm_bodies_as_statements`
+
+Format match arm bodies like freestanding statements instead of sub-expressions
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+
+#### `true`:
+```rust
+match lorem {
+    Ipsum(dolor) => if dolor {
+        0
+    } else {
+        1
+    },
+}
+```
+
+#### `false`:
+```rust
+match lorem {
+    Ipsum(dolor) => if dolor { 0 } else { 1 },
+}
+```
+
 ## `type_punctuation_density`
 
 Determines if `+` or `=` are wrapped in spaces in the punctuation of types
