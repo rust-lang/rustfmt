@@ -1802,7 +1802,7 @@ fn rewrite_match_body(
     );
     match (orig_body, next_line_body) {
         (Some(ref orig_str), Some(ref next_line_str))
-            if forbid_same_line || prefer_next_line(orig_str, next_line_str) =>
+            if forbid_same_line || prefer_next_line(orig_str, next_line_str, 1) =>
         {
             combine_next_line_body(next_line_str)
         }
@@ -2916,8 +2916,15 @@ fn choose_rhs(
             let new_rhs = expr.rewrite(context, new_shape);
             let new_indent_str = &new_shape.indent.to_string(context.config);
 
+            let next_line_weight = if context.config.favor_indenting_rhs_in_locals() {
+                0
+            } else {
+                1
+            };
             match (orig_rhs, new_rhs) {
-                (Some(ref orig_rhs), Some(ref new_rhs)) if prefer_next_line(orig_rhs, new_rhs) => {
+                (Some(ref orig_rhs), Some(ref new_rhs))
+                    if prefer_next_line(orig_rhs, new_rhs, next_line_weight) =>
+                {
                     Some(format!("\n{}{}", new_indent_str, new_rhs))
                 }
                 (None, Some(ref new_rhs)) => Some(format!("\n{}{}", new_indent_str, new_rhs)),
@@ -2928,13 +2935,13 @@ fn choose_rhs(
     }
 }
 
-fn prefer_next_line(orig_rhs: &str, next_line_rhs: &str) -> bool {
+fn prefer_next_line(orig_rhs: &str, next_line_rhs: &str, next_line_weight: usize) -> bool {
     fn count_line_breaks(src: &str) -> usize {
         src.chars().filter(|&x| x == '\n').count()
     }
 
     !next_line_rhs.contains('\n') ||
-        count_line_breaks(orig_rhs) > count_line_breaks(next_line_rhs) + 1
+        count_line_breaks(orig_rhs) > count_line_breaks(next_line_rhs) + next_line_weight
 }
 
 fn rewrite_expr_addrof(

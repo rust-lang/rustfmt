@@ -609,6 +609,9 @@ create_config! {
                                              threshold.";
     remove_blank_lines_at_start_or_end_of_block: bool, true,
         "Remove blank lines at start or end of a block";
+    favor_indenting_rhs_in_locals: bool, false,
+        "Prefer indenting the entire RHS in locals when it involves less line breaks in the RHS \
+         itself.";
 }
 
 #[cfg(test)]
