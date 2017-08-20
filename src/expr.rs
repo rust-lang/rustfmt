@@ -25,7 +25,7 @@ use config::{Config, ControlBraceStyle, IndentStyle, MultilineStyle, Style};
 use items::{span_hi_for_arg, span_lo_for_arg};
 use lists::{definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting,
             struct_lit_shape, struct_lit_tactic, write_list, DefinitiveListTactic, ListFormatting,
-            ListItem, ListTactic, Separator, SeparatorTactic};
+            ListItem, ListTactic, Separator, SeparatorTactic, StructLitKind};
 use macros::{rewrite_macro, MacroPosition};
 use patterns::{can_be_overflowed_pat, TuplePatField};
 use rewrite::{Rewrite, RewriteContext};
@@ -2541,7 +2541,13 @@ fn rewrite_struct_lit<'a>(
     }
 
     // Foo { a: Foo } - indent is +3, width is -5.
-    let (h_shape, v_shape) = try_opt!(struct_lit_shape(shape, context, path_str.len() + 3, 2));
+    let (h_shape, v_shape) = try_opt!(struct_lit_shape(
+        shape,
+        context,
+        StructLitKind::Expr,
+        path_str.len() + 3,
+        2,
+    ));
 
     let one_line_width = h_shape.map_or(0, |shape| shape.width);
     let body_lo = context.codemap.span_after(span, "{");

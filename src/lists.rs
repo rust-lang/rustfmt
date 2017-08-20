@@ -680,10 +680,17 @@ fn comment_len(comment: Option<&str>) -> usize {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum StructLitKind {
+    Expr,
+    Pat,
+}
+
 // Compute horizontal and vertical shapes for a struct-lit-like thing.
 pub fn struct_lit_shape(
     shape: Shape,
     context: &RewriteContext,
+    kind: StructLitKind,
     prefix_width: usize,
     suffix_width: usize,
 ) -> Option<(Option<Shape>, Shape)> {
@@ -701,7 +708,11 @@ pub fn struct_lit_shape(
     };
     let shape_width = shape.width.checked_sub(prefix_width + suffix_width);
     if let Some(w) = shape_width {
-        let shape_width = cmp::min(w, context.config.struct_lit_width());
+        let cap = match kind {
+            StructLitKind::Expr => context.config.struct_lit_width(),
+            StructLitKind::Pat => context.config.struct_lit_pattern_width(),
+        };
+        let shape_width = cmp::min(w, cap);
         Some((Some(Shape::legacy(shape_width, shape.indent)), v_shape))
     } else {
         Some((None, v_shape))
