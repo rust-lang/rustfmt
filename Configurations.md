@@ -387,6 +387,36 @@ Error if unable to get all lines within max_width
 
 See also [`max_width`](#max_width).
 
+## `favor_indenting_rhs_in_locals`
+
+Prefer indenting the entire RHS in locals when it involves less line breaks in
+the RHS itself
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+
+#### `false`:
+
+```rust
+let a_really_long_variable_name = if lorem_ipsum_dolor.amet() == 0 && foo_bar_baz.quux != "aaaaaaa"
+{
+    Some(42)
+} else {
+    None
+};
+```
+
+#### `true`:
+
+```rust
+let a_really_long_variable_name =
+    if lorem_ipsum_dolor.amet() == 0 && foo_bar_baz.quux != "aaaaaaa" {
+        Some(42)
+    } else {
+        None
+    };
+```
+
 ## `fn_args_density`
 
 Argument density in functions
