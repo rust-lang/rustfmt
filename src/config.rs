@@ -611,6 +611,8 @@ create_config! {
                                              threshold.";
     remove_blank_lines_at_start_or_end_of_block: bool, true,
         "Remove blank lines at start or end of a block";
+    treat_match_arm_bodies_as_statements: bool, true,
+        "Format match arm bodies like freestanding statements instead of sub-expressions.";
 }
 
 #[cfg(test)]
