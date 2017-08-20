@@ -611,6 +611,8 @@ create_config! {
                                              threshold.";
     remove_blank_lines_at_start_or_end_of_block: bool, true,
         "Remove blank lines at start or end of a block";
+    fn_call_trailing_comma: bool, true,
+        "Use a trailing comma for multi-line function call argument lists.";
 }
 
 #[cfg(test)]

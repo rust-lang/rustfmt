@@ -696,6 +696,45 @@ lorem("lorem",
       "elit");
 ```
 
+See also: [`fn_call_trailing_comma`](#fn_call_trailing_comma).
+
+## `fn_call_trailing_comma`
+
+Use a trailing comma for multi-line function call argument lists
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+
+#### `true`
+
+```rust
+fn_with_many_args(
+    my_first_argument,
+    my_second_argument,
+    my_third_argument,
+    my_fourth_argument,
+    my_fifth_argument,
+    my_sixth_argument,
+    my_seventh_argument,
+    my_eighth_argument,
+);
+```
+
+#### `false`
+
+```rust
+fn_with_many_args(
+    my_first_argument,
+    my_second_argument,
+    my_third_argument,
+    my_fourth_argument,
+    my_fifth_argument,
+    my_sixth_argument,
+    my_seventh_argument,
+    my_eighth_argument
+);
+```
+
 ## `fn_call_width`
 
 Maximum width of the args of a function call before falling back to vertical formatting
@@ -1833,7 +1872,7 @@ let Lorem {
 } = elit;
 ```
 
-See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
+See also: [`match_block_trailing_comma`](#match_block_trailing_comma), [`fn_call_trailing_comma`](#fn_call_trailing_comma).
 
 ## `trailing_semicolon`
 
