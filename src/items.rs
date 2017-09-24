@@ -2501,14 +2501,20 @@ fn rewrite_where_clause_rfc_style(
         span_end,
         false,
     );
-    let comma_tactic = if where_clause_option.suppress_comma {
+    let comma_tactic = if where_clause_option.suppress_comma || context.config.where_single_line() {
         SeparatorTactic::Never
     } else {
         context.config.trailing_comma()
     };
 
+    let shape_tactic = if context.config.where_single_line() {
+        DefinitiveListTactic::Horizontal
+    } else {
+        DefinitiveListTactic::Vertical
+    };
+
     let fmt = ListFormatting {
-        tactic: DefinitiveListTactic::Vertical,
+        tactic: shape_tactic,
         separator: ",",
         trailing_separator: comma_tactic,
         separator_place: SeparatorPlace::Back,
@@ -2532,6 +2538,8 @@ fn rewrite_where_clause_rfc_style(
         && comment_after.is_empty() && !preds_str.contains('\n')
         && 6 + preds_str.len() <= shape.width
     {
+        String::from(" ")
+    } else if context.config.where_single_line() {
         String::from(" ")
     } else {
         format!("\n{}", clause_shape.indent.to_string(context.config))
