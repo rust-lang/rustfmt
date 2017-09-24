@@ -541,6 +541,7 @@ create_config! {
     // function decl?
     // 2. Currently options `Tall` and `Vertical` produce the same output.
     where_density: Density, Density::Vertical, "Density of a where clause";
+    where_single_line: bool, false, "To force single line where layout";
     where_layout: ListTactic, ListTactic::Vertical, "Element layout inside a where clause";
     where_pred_indent: IndentStyle, IndentStyle::Visual,
         "Indentation style of a where predicate";
