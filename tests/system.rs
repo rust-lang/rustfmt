@@ -369,7 +369,8 @@ fn handle_result(
         let read_error = format!("Failed reading target {:?}", &target);
         f.read_to_string(&mut text).expect(&read_error);
 
-        if fmt_text != text {
+        // Compare line by line, for Windows machines using CRLF newline.
+        if fmt_text.lines().ne(text.lines()) {
             let diff = make_diff(&text, &fmt_text, DIFF_CONTEXT_SIZE);
             assert!(
                 !diff.is_empty(),
