@@ -2282,11 +2282,19 @@ fn compute_budgets_for_args(
 }
 
 fn newline_for_brace(config: &Config, where_clause: &ast::WhereClause, has_body: bool) -> bool {
-    match (config.fn_brace_style(), config.where_density()) {
-        (BraceStyle::AlwaysNextLine, _) => true,
-        (_, Density::Compressed) if where_clause.predicates.len() == 1 => false,
-        (_, Density::CompressedIfEmpty) if where_clause.predicates.len() == 1 && !has_body => false,
-        (BraceStyle::SameLineWhere, _) if !where_clause.predicates.is_empty() => true,
+    match (
+        config.fn_brace_style(),
+        config.where_density(),
+        config.where_single_line(),
+    ) {
+        // where single line option
+        (_, _, true) => false,
+        (BraceStyle::AlwaysNextLine, _, _) => true,
+        (_, Density::Compressed, _) if where_clause.predicates.len() == 1 => false,
+        (_, Density::CompressedIfEmpty, _) if where_clause.predicates.len() == 1 && !has_body => {
+            false
+        }
+        (BraceStyle::SameLineWhere, _, _) if !where_clause.predicates.is_empty() => true,
         _ => false,
     }
 }
