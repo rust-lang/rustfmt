@@ -1155,10 +1155,17 @@ impl<'a> ControlFlow<'a> {
         // 1 = space after keyword.
         let offset = self.keyword.len() + label_string.len() + 1;
 
+        let brace_overhead =
+            if context.config.control_brace_style() != ControlBraceStyle::AlwaysNextLine {
+                // 2 = ` {`
+                2
+            } else {
+                0
+            };
         let pat_expr_string = match self.cond {
             Some(cond) => {
                 let cond_shape = match context.config.control_style() {
-                    Style::Legacy => try_opt!(constr_shape.shrink_left(offset)),
+                    Style::Legacy => try_opt!(constr_shape.shrink_left(offset + brace_overhead)),
                     Style::Rfc => try_opt!(constr_shape.offset_left(offset)),
                 };
                 try_opt!(rewrite_pat_expr(
@@ -1174,13 +1181,6 @@ impl<'a> ControlFlow<'a> {
             None => String::new(),
         };
 
-        let brace_overhead =
-            if context.config.control_brace_style() != ControlBraceStyle::AlwaysNextLine {
-                // 2 = ` {`
-                2
-            } else {
-                0
-            };
         let one_line_budget = context
             .config
             .max_width()
