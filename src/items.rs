@@ -2282,19 +2282,17 @@ fn compute_budgets_for_args(
 }
 
 fn newline_for_brace(config: &Config, where_clause: &ast::WhereClause, has_body: bool) -> bool {
-    match (
-        config.fn_brace_style(),
-        config.where_density(),
-        config.where_single_line(),
-    ) {
-        // where single line option
-        (_, _, true) => false,
-        (BraceStyle::AlwaysNextLine, _, _) => true,
-        (_, Density::Compressed, _) if where_clause.predicates.len() == 1 => false,
-        (_, Density::CompressedIfEmpty, _) if where_clause.predicates.len() == 1 && !has_body => {
-            false
-        }
-        (BraceStyle::SameLineWhere, _, _) if !where_clause.predicates.is_empty() => true,
+    let len = where_clause.predicates.len();
+    let is_empty = where_clause.predicates.is_empty();
+
+    if config.where_single_line() && len == 1 {
+        return false;
+    }
+    match (config.fn_brace_style(), config.where_density()) {
+        (BraceStyle::AlwaysNextLine, _) => true,
+        (_, Density::Compressed) if len == 1 => false,
+        (_, Density::CompressedIfEmpty) if len == 1 && !has_body => false,
+        (BraceStyle::SameLineWhere, _) if !is_empty => true,
         _ => false,
     }
 }
@@ -2509,13 +2507,16 @@ fn rewrite_where_clause_rfc_style(
         span_end,
         false,
     );
-    let comma_tactic = if where_clause_option.suppress_comma || context.config.where_single_line() {
-        SeparatorTactic::Never
-    } else {
-        context.config.trailing_comma()
-    };
+    let comma_tactic =
+        if where_clause_option.suppress_comma || context.config.where_single_line() && len == 1 {
+            SeparatorTactic::Never
+        } else {
+            context.config.trailing_comma()
+        };
 
-    let shape_tactic = if context.config.where_single_line() {
+    // shape should be vertical only and only if we have `where_single_line` option enabled
+    // and the number of items of the where clause is equal to 1
+    let shape_tactic = if context.config.where_single_line() && len == 1 {
         DefinitiveListTactic::Horizontal
     } else {
         DefinitiveListTactic::Vertical
@@ -2545,9 +2546,8 @@ fn rewrite_where_clause_rfc_style(
     let clause_sep = if where_clause_option.compress_where && comment_before.is_empty()
         && comment_after.is_empty() && !preds_str.contains('\n')
         && 6 + preds_str.len() <= shape.width
+        || context.config.where_single_line() && len == 1
     {
-        String::from(" ")
-    } else if context.config.where_single_line() {
         String::from(" ")
     } else {
         format!("\n{}", clause_shape.indent.to_string(context.config))
