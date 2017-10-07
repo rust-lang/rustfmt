@@ -2282,17 +2282,16 @@ fn compute_budgets_for_args(
 }
 
 fn newline_for_brace(config: &Config, where_clause: &ast::WhereClause, has_body: bool) -> bool {
-    let len = where_clause.predicates.len();
-    let is_empty = where_clause.predicates.is_empty();
+    let predicate_count = where_clause.predicates.len();
 
-    if config.where_single_line() && len == 1 {
+    if config.where_single_line() && predicate_count == 1 {
         return false;
     }
     match (config.fn_brace_style(), config.where_density()) {
         (BraceStyle::AlwaysNextLine, _) => true,
-        (_, Density::Compressed) if len == 1 => false,
-        (_, Density::CompressedIfEmpty) if len == 1 && !has_body => false,
-        (BraceStyle::SameLineWhere, _) if !is_empty => true,
+        (_, Density::Compressed) if predicate_count == 1 => false,
+        (_, Density::CompressedIfEmpty) if predicate_count == 1 && !has_body => false,
+        (BraceStyle::SameLineWhere, _) if predicate_count > 0 => true,
         _ => false,
     }
 }
@@ -2507,16 +2506,16 @@ fn rewrite_where_clause_rfc_style(
         span_end,
         false,
     );
-    let comma_tactic =
-        if where_clause_option.suppress_comma || context.config.where_single_line() && len == 1 {
-            SeparatorTactic::Never
-        } else {
-            context.config.trailing_comma()
-        };
+    let where_single_line = context.config.where_single_line() && len == 1;
+    let comma_tactic = if where_clause_option.suppress_comma || where_single_line {
+        SeparatorTactic::Never
+    } else {
+        context.config.trailing_comma()
+    };
 
     // shape should be vertical only and only if we have `where_single_line` option enabled
     // and the number of items of the where clause is equal to 1
-    let shape_tactic = if context.config.where_single_line() && len == 1 {
+    let shape_tactic = if where_single_line {
         DefinitiveListTactic::Horizontal
     } else {
         DefinitiveListTactic::Vertical
@@ -2545,8 +2544,7 @@ fn rewrite_where_clause_rfc_style(
     // 6 = `where `
     let clause_sep = if where_clause_option.compress_where && comment_before.is_empty()
         && comment_after.is_empty() && !preds_str.contains('\n')
-        && 6 + preds_str.len() <= shape.width
-        || context.config.where_single_line() && len == 1
+        && 6 + preds_str.len() <= shape.width || where_single_line
     {
         String::from(" ")
     } else {
