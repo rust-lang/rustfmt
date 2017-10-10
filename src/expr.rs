@@ -1807,6 +1807,11 @@ fn rewrite_match_body(
         }
         (None, Some(ref next_line_str)) => combine_next_line_body(next_line_str),
         (None, None) => None,
+        (Some(ref orig_str), Some(ref next_line_str))
+            if first_line_width(orig_str) > orig_budget =>
+        {
+            combine_next_line_body(next_line_str)
+        }
         (Some(ref orig_str), _) => combine_orig_body(orig_str),
     }
 }
