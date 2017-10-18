@@ -12,6 +12,6 @@ mod foo {
     }
     // aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     fn baz() {
-        let j = 15;     
+        let j = 15;
     }
 }
