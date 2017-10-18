@@ -21,7 +21,8 @@ use syntax::visit;
 use spanned::Spanned;
 use codemap::{LineRangeUtils, SpanUtils};
 use comment::{combine_strs_with_missing_comments, contains_comment, recover_comment_removed,
-              recover_missing_comment_in_span, rewrite_missing_comment, FindUncommented};
+              recover_missing_comment_in_span, remove_trailing_white_spaces,
+              rewrite_missing_comment, FindUncommented};
 use config::{BraceStyle, Config, Density, IndentStyle, ReturnIndent, Style};
 use expr::{format_expr, is_empty_block, is_simple_block_stmt, rewrite_assign_rhs,
            rewrite_call_inner, ExprType};
@@ -59,7 +60,7 @@ impl Rewrite for ast::Local {
         skip_out_of_file_lines_range!(context, self.span);
 
         if contains_skip(&self.attrs) {
-            return None;
+            return Some(remove_trailing_white_spaces(&context.snippet(self.span())));
         }
 
         let attrs_str = self.attrs.rewrite(context, shape)?;
@@ -507,7 +508,7 @@ impl<'a> FmtVisitor<'a> {
         if contains_skip(&field.node.attrs) {
             let lo = field.node.attrs[0].span.lo();
             let span = mk_sp(lo, field.span.hi());
-            return Some(self.snippet(span));
+            return Some(remove_trailing_white_spaces(&self.snippet(span)));
         }
 
         let context = self.get_context();
@@ -1375,7 +1376,7 @@ pub fn rewrite_struct_field(
     lhs_max_width: usize,
 ) -> Option<String> {
     if contains_skip(&field.attrs) {
-        return Some(context.snippet(mk_sp(field.attrs[0].span.lo(), field.span.hi())));
+        return Some(remove_trailing_white_spaces(&context.snippet(field.span())));
     }
 
     let type_annotation_spacing = type_annotation_spacing(context.config);
