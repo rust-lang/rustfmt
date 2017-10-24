@@ -580,7 +580,7 @@ impl<'a> FmtVisitor<'a> {
 
     pub fn push_rewrite(&mut self, span: Span, rewrite: Option<String>) {
         self.format_missing_with_indent(source!(self, span).lo());
-        let result = rewrite.unwrap_or_else(|| self.snippet(span));
+        let result = rewrite.unwrap_or_else(|| remove_trailing_white_spaces(&self.snippet(span)));
         self.buffer.push_str(&result);
         self.last_pos = source!(self, span).hi();
     }

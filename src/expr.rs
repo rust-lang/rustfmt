@@ -20,7 +20,8 @@ use spanned::Spanned;
 use chains::rewrite_chain;
 use codemap::{LineRangeUtils, SpanUtils};
 use comment::{combine_strs_with_missing_comments, contains_comment, recover_comment_removed,
-              rewrite_comment, rewrite_missing_comment, FindUncommented};
+              remove_trailing_white_spaces, rewrite_comment, rewrite_missing_comment,
+              FindUncommented};
 use config::{Config, ControlBraceStyle, IndentStyle, MultilineStyle, Style};
 use items::{span_hi_for_arg, span_lo_for_arg};
 use lists::{definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting,
@@ -60,7 +61,7 @@ pub fn format_expr(
     skip_out_of_file_lines_range!(context, expr.span);
 
     if contains_skip(&*expr.attrs) {
-        return Some(context.snippet(expr.span()));
+        return Some(remove_trailing_white_spaces(&context.snippet(expr.span())));
     }
 
     let expr_rw = match expr.node {
@@ -2592,7 +2593,7 @@ pub fn rewrite_field(
     prefix_max_width: usize,
 ) -> Option<String> {
     if contains_skip(&field.attrs) {
-        return Some(context.snippet(field.span()));
+        return Some(remove_trailing_white_spaces(&context.snippet(field.span())));
     }
     let name = &field.ident.node.to_string();
     if field.is_shorthand {

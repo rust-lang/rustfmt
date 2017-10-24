@@ -71,3 +71,30 @@ fn skip_on_statements() {
 )]
 fn
 main() {}
+
+// Remove trailing whitespaces from skipped items.
+enum Foo {
+    #[rustfmt_skip]
+    Foo(
+        u32,
+        u32,  
+    ),
+}
+struct Bar {
+    #[rustfmt_skip]
+    field: 
+    u32,
+}
+fn foo() {
+    #[rustfmt_skip]
+    fn name() {
+        
+    }
+    #[rustfmt_skip]
+    let x =   
+        3;
+    #[rustfmt_skip]
+    foo(  
+        x,
+    )  
+}
