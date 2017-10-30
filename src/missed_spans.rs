@@ -173,17 +173,17 @@ impl<'a> FmtVisitor<'a> {
                         self.buffer.push_str(" ");
                     }
 
-                    let comment_width = if self.config.absolute_comment_width() {
-                        self.config
-                            .comment_width()
-                            .checked_sub(self.block_indent.width())
-                            .unwrap_or(0)
-                    } else {
-                        ::std::cmp::min(
-                            self.config.comment_width(),
-                            self.config.max_width() - self.block_indent.width(),
-                        )
-                    };
+                    let comment_width = ::std::cmp::min(
+                        if self.config.absolute_comment_width() {
+                            self.config
+                                .comment_width()
+                                .checked_sub(self.block_indent.width())
+                                .unwrap_or(0)
+                        } else {
+                            self.config.comment_width()
+                        },
+                        self.config.max_width() - self.block_indent.width(),
+                    );
                     let comment_indent = Indent::from_width(self.config, self.buffer.cur_offset());
 
                     self.buffer.push_str(&rewrite_comment(
