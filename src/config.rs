@@ -618,6 +618,8 @@ create_config! {
     wrap_comments: bool, false, false, "Break comments to fit on the line";
     comment_width: usize, 80, false,
         "Maximum length of comments. No effect unless wrap_comments = true";
+    absolute_comment_width: bool, false, false,
+        "Treat column_width as a fixed column number to wrap at";
     normalize_comments: bool, false, false, "Convert /* */ comments to // comments where possible";
     wrap_match_arms: bool, true, false, "Wrap the body of arms in blocks when it does not fit on \
                                   the same line with the pattern of arms";
