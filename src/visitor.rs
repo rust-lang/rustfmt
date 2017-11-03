@@ -258,6 +258,7 @@ impl<'a> FmtVisitor<'a> {
                     &FnSig::from_fn_kind(&fk, generics, fd, defaultness),
                     mk_sp(s.lo(), b.span.lo()),
                     b,
+                    inner_attrs,
                 )
             }
             visit::FnKind::Method(ident, _, _, b) => {
@@ -268,6 +269,7 @@ impl<'a> FmtVisitor<'a> {
                     &FnSig::from_fn_kind(&fk, generics, fd, defaultness),
                     mk_sp(s.lo(), b.span.lo()),
                     b,
+                    inner_attrs,
                 )
             }
             visit::FnKind::Closure(_) => unreachable!(),
@@ -422,6 +424,7 @@ impl<'a> FmtVisitor<'a> {
                 // FIXME(#78): format impl definitions.
             }
             ast::ItemKind::Fn(ref decl, unsafety, constness, abi, ref generics, ref body) => {
+                let inner_attrs = inner_attributes(&item.attrs);
                 self.visit_fn(
                     visit::FnKind::ItemFn(item.ident, unsafety, constness, abi, &item.vis, body),
                     generics,
@@ -429,7 +432,7 @@ impl<'a> FmtVisitor<'a> {
                     item.span,
                     item.id,
                     ast::Defaultness::Final,
-                    Some(&item.attrs),
+                    Some(&inner_attrs),
                 )
             }
             ast::ItemKind::Ty(ref ty, ref generics) => {
@@ -500,6 +503,7 @@ impl<'a> FmtVisitor<'a> {
                 self.push_rewrite(ti.span, rewrite);
             }
             ast::TraitItemKind::Method(ref sig, Some(ref body)) => {
+                let inner_attrs = inner_attributes(&ti.attrs);
                 self.visit_fn(
                     visit::FnKind::Method(ti.ident, sig, None, body),
                     &ti.generics,
@@ -507,7 +511,7 @@ impl<'a> FmtVisitor<'a> {
                     ti.span,
                     ti.id,
                     ast::Defaultness::Final,
-                    Some(&ti.attrs),
+                    Some(&inner_attrs),
                 );
             }
             ast::TraitItemKind::Type(ref type_param_bounds, ref type_default) => {
@@ -536,6 +540,7 @@ impl<'a> FmtVisitor<'a> {
 
         match ii.node {
             ast::ImplItemKind::Method(ref sig, ref body) => {
+                let inner_attrs = inner_attributes(&ii.attrs);
                 self.visit_fn(
                     visit::FnKind::Method(ii.ident, sig, Some(&ii.vis), body),
                     &ii.generics,
@@ -543,7 +548,7 @@ impl<'a> FmtVisitor<'a> {
                     ii.span,
                     ii.id,
                     ii.defaultness,
-                    Some(&ii.attrs),
+                    Some(&inner_attrs),
                 );
             }
             ast::ImplItemKind::Const(ref ty, ref expr) => {
