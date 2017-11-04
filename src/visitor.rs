@@ -16,15 +16,16 @@ use syntax::attr::HasAttrs;
 use syntax::codemap::{self, BytePos, CodeMap, Pos, Span};
 use syntax::parse::ParseSess;
 
+use expr::rewrite_literal;
 use spanned::Spanned;
 use codemap::{LineRangeUtils, SpanUtils};
-use comment::{contains_comment, recover_missing_comment_in_span, CodeCharKind, CommentCodeSlices,
-              FindUncommented};
+use comment::{contains_comment, recover_missing_comment_in_span, remove_trailing_white_spaces,
+              CodeCharKind, CommentCodeSlices, FindUncommented};
 use comment::rewrite_comment;
 use config::{BraceStyle, Config};
 use items::{format_impl, format_struct, format_struct_struct, format_trait,
             rewrite_associated_impl_type, rewrite_associated_type, rewrite_static,
-            rewrite_type_alias};
+            rewrite_type_alias, FnSig};
 use lists::{itemize_list, write_list, DefinitiveListTactic, ListFormatting, SeparatorPlace,
             SeparatorTactic};
 use macros::{rewrite_macro, MacroPosition};
@@ -135,13 +136,15 @@ impl<'a> FmtVisitor<'a> {
                     self.last_pos,
                     attr_lo.unwrap_or(first_stmt.span.lo()),
                 ));
-                let len = CommentCodeSlices::new(&snippet).nth(0).and_then(
-                    |(kind, _, s)| if kind == CodeCharKind::Normal {
-                        s.rfind('\n')
-                    } else {
-                        None
-                    },
-                );
+                let len = CommentCodeSlices::new(&snippet)
+                    .nth(0)
+                    .and_then(|(kind, _, s)| {
+                        if kind == CodeCharKind::Normal {
+                            s.rfind('\n')
+                        } else {
+                            None
+                        }
+                    });
                 if let Some(len) = len {
                     self.last_pos = self.last_pos + BytePos::from_usize(len);
                 }
@@ -149,8 +152,17 @@ impl<'a> FmtVisitor<'a> {
         }
 
         // Format inner attributes if available.
-        if let Some(attrs) = inner_attrs {
-            self.visit_attrs(attrs, ast::AttrStyle::Inner);
+        let skip_rewrite = if let Some(attrs) = inner_attrs {
+            self.visit_attrs(attrs, ast::AttrStyle::Inner)
+        } else {
+            false
+        };
+
+        if skip_rewrite {
+            self.push_rewrite(b.span, None);
+            self.close_block(false);
+            self.last_pos = source!(self, b.span).hi();
+            return;
         }
 
         self.walk_block_stmts(b);
@@ -228,6 +240,7 @@ impl<'a> FmtVisitor<'a> {
     fn visit_fn(
         &mut self,
         fk: visit::FnKind,
+        generics: &ast::Generics,
         fd: &ast::FnDecl,
         s: Span,
         _: ast::NodeId,
@@ -237,34 +250,22 @@ impl<'a> FmtVisitor<'a> {
         let indent = self.block_indent;
         let block;
         let rewrite = match fk {
-            visit::FnKind::ItemFn(ident, generics, unsafety, constness, abi, vis, b) => {
+            visit::FnKind::ItemFn(ident, _, _, _, _, b) => {
                 block = b;
                 self.rewrite_fn(
                     indent,
                     ident,
-                    fd,
-                    generics,
-                    unsafety,
-                    constness.node,
-                    defaultness,
-                    abi,
-                    vis,
+                    &FnSig::from_fn_kind(&fk, generics, fd, defaultness),
                     mk_sp(s.lo(), b.span.lo()),
                     b,
                 )
             }
-            visit::FnKind::Method(ident, sig, vis, b) => {
+            visit::FnKind::Method(ident, _, _, b) => {
                 block = b;
                 self.rewrite_fn(
                     indent,
                     ident,
-                    fd,
-                    &sig.generics,
-                    sig.unsafety,
-                    sig.constness.node,
-                    defaultness,
-                    sig.abi,
-                    vis.unwrap_or(&ast::Visibility::Inherited),
+                    &FnSig::from_fn_kind(&fk, generics, fd, defaultness),
                     mk_sp(s.lo(), b.span.lo()),
                     b,
                 )
@@ -296,7 +297,7 @@ impl<'a> FmtVisitor<'a> {
         // complex in the module case. It is complex because the module could be
         // in a separate file and there might be attributes in both files, but
         // the AST lumps them all together.
-        let filterd_attrs;
+        let filtered_attrs;
         let mut attrs = &item.attrs;
         match item.node {
             ast::ItemKind::Mod(ref m) => {
@@ -315,7 +316,7 @@ impl<'a> FmtVisitor<'a> {
                 } else {
                     // Module is not inline and should not be skipped. We want
                     // to process only the attributes in the current file.
-                    filterd_attrs = item.attrs
+                    filtered_attrs = item.attrs
                         .iter()
                         .filter_map(|a| {
                             let attr_file = self.codemap.lookup_char_pos(a.span.lo()).file;
@@ -328,8 +329,8 @@ impl<'a> FmtVisitor<'a> {
                         .collect::<Vec<_>>();
                     // Assert because if we should skip it should be caught by
                     // the above case.
-                    assert!(!self.visit_attrs(&filterd_attrs, ast::AttrStyle::Outer));
-                    attrs = &filterd_attrs;
+                    assert!(!self.visit_attrs(&filtered_attrs, ast::AttrStyle::Outer));
+                    attrs = &filtered_attrs;
                 }
             }
             _ => if self.visit_attrs(&item.attrs, ast::AttrStyle::Outer) {
@@ -422,15 +423,8 @@ impl<'a> FmtVisitor<'a> {
             }
             ast::ItemKind::Fn(ref decl, unsafety, constness, abi, ref generics, ref body) => {
                 self.visit_fn(
-                    visit::FnKind::ItemFn(
-                        item.ident,
-                        generics,
-                        unsafety,
-                        constness,
-                        abi,
-                        &item.vis,
-                        body,
-                    ),
+                    visit::FnKind::ItemFn(item.ident, unsafety, constness, abi, &item.vis, body),
+                    generics,
                     decl,
                     item.span,
                     item.id,
@@ -470,7 +464,7 @@ impl<'a> FmtVisitor<'a> {
             }
             ast::ItemKind::MacroDef(..) => {
                 // FIXME(#1539): macros 2.0
-                let mac_snippet = Some(self.snippet(item.span));
+                let mac_snippet = Some(remove_trailing_white_spaces(&self.snippet(item.span)));
                 self.push_rewrite(item.span, mac_snippet);
             }
         }
@@ -501,12 +495,14 @@ impl<'a> FmtVisitor<'a> {
             }
             ast::TraitItemKind::Method(ref sig, None) => {
                 let indent = self.block_indent;
-                let rewrite = self.rewrite_required_fn(indent, ti.ident, sig, ti.span);
+                let rewrite =
+                    self.rewrite_required_fn(indent, ti.ident, sig, &ti.generics, ti.span);
                 self.push_rewrite(ti.span, rewrite);
             }
             ast::TraitItemKind::Method(ref sig, Some(ref body)) => {
                 self.visit_fn(
                     visit::FnKind::Method(ti.ident, sig, None, body),
+                    &ti.generics,
                     &sig.decl,
                     ti.span,
                     ti.id,
@@ -542,6 +538,7 @@ impl<'a> FmtVisitor<'a> {
             ast::ImplItemKind::Method(ref sig, ref body) => {
                 self.visit_fn(
                     visit::FnKind::Method(ii.ident, sig, Some(&ii.vis), body),
+                    &ii.generics,
                     &sig.decl,
                     ii.span,
                     ii.id,
@@ -612,7 +609,7 @@ impl<'a> FmtVisitor<'a> {
         match self.codemap.span_to_snippet(span) {
             Ok(s) => s,
             Err(_) => {
-                println!(
+                eprintln!(
                     "Couldn't make snippet for span {:?}->{:?}",
                     self.codemap.lookup_char_pos(span.lo()),
                     self.codemap.lookup_char_pos(span.hi())
@@ -810,7 +807,7 @@ impl Rewrite for ast::NestedMetaItem {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         match self.node {
             ast::NestedMetaItemKind::MetaItem(ref meta_item) => meta_item.rewrite(context, shape),
-            ast::NestedMetaItemKind::Literal(..) => Some(context.snippet(self.span)),
+            ast::NestedMetaItemKind::Literal(ref l) => rewrite_literal(context, l, shape),
         }
     }
 }
@@ -821,12 +818,11 @@ impl Rewrite for ast::MetaItem {
             ast::MetaItemKind::Word => String::from(&*self.name.as_str()),
             ast::MetaItemKind::List(ref list) => {
                 let name = self.name.as_str();
-                // 3 = `#[` and `(`, 2 = `]` and `)`
-                let item_shape = try_opt!(
-                    shape
-                        .shrink_left(name.len() + 3)
-                        .and_then(|s| s.sub_width(2))
-                );
+                // 1 = `(`, 2 = `]` and `)`
+                let item_shape = shape
+                    .visual_indent(0)
+                    .shrink_left(name.len() + 1)
+                    .and_then(|s| s.sub_width(2))?;
                 let items = itemize_list(
                     context.codemap,
                     list.iter(),
@@ -849,22 +845,14 @@ impl Rewrite for ast::MetaItem {
                     preserve_newline: false,
                     config: context.config,
                 };
-                format!("{}({})", name, try_opt!(write_list(&item_vec, &fmt)))
+                format!("{}({})", name, write_list(&item_vec, &fmt)?)
             }
             ast::MetaItemKind::NameValue(ref literal) => {
                 let name = self.name.as_str();
-                let value = context.snippet(literal.span);
-                if &*name == "doc" && contains_comment(&value) {
-                    let doc_shape = Shape {
-                        width: cmp::min(shape.width, context.config.comment_width())
-                            .checked_sub(shape.indent.width())
-                            .unwrap_or(0),
-                        ..shape
-                    };
-                    try_opt!(rewrite_comment(&value, false, doc_shape, context.config))
-                } else {
-                    format!("{} = {}", name, value)
-                }
+                // 3 = ` = `
+                let lit_shape = shape.shrink_left(name.len() + 3)?;
+                let value = rewrite_literal(context, literal, lit_shape)?;
+                format!("{} = {}", name, value)
             }
         })
     }
@@ -872,22 +860,29 @@ impl Rewrite for ast::MetaItem {
 
 impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
-        try_opt!(self.meta())
-            .rewrite(context, shape)
-            .map(|rw| if self.is_sugared_doc {
-                rw
-            } else {
-                let original = context.snippet(self.span);
-                let prefix = match self.style {
-                    ast::AttrStyle::Inner => "#!",
-                    ast::AttrStyle::Outer => "#",
-                };
-                if contains_comment(&original) {
-                    original
-                } else {
-                    format!("{}[{}]", prefix, rw)
-                }
-            })
+        let prefix = match self.style {
+            ast::AttrStyle::Inner => "#!",
+            ast::AttrStyle::Outer => "#",
+        };
+        let snippet = context.snippet(self.span);
+        if self.is_sugared_doc {
+            let doc_shape = Shape {
+                width: cmp::min(shape.width, context.config.comment_width())
+                    .checked_sub(shape.indent.width())
+                    .unwrap_or(0),
+                ..shape
+            };
+            rewrite_comment(&snippet, false, doc_shape, context.config)
+        } else {
+            if contains_comment(&snippet) {
+                return Some(snippet);
+            }
+            // 1 = `[`
+            let shape = shape.offset_left(prefix.len() + 1)?;
+            self.meta()?
+                .rewrite(context, shape)
+                .map(|rw| format!("{}[{}]", prefix, rw))
+        }
     }
 }
 
@@ -905,7 +900,7 @@ impl<'a> Rewrite for [ast::Attribute] {
         let mut insert_new_line = true;
         let mut is_prev_sugared_doc = false;
         while let Some((i, a)) = iter.next() {
-            let a_str = try_opt!(a.rewrite(context, shape));
+            let a_str = a.rewrite(context, shape)?;
 
             // Write comments and blank lines between attributes.
             if i > 0 {
@@ -937,12 +932,12 @@ impl<'a> Rewrite for [ast::Attribute] {
                     (false, false)
                 };
 
-                let comment = try_opt!(recover_missing_comment_in_span(
+                let comment = recover_missing_comment_in_span(
                     mk_sp(self[i - 1].span.hi(), a.span.lo()),
                     shape.with_max_width(context.config),
                     context,
                     0,
-                ));
+                )?;
 
                 if !comment.is_empty() {
                     if multi_line_before {
@@ -977,7 +972,7 @@ impl<'a> Rewrite for [ast::Attribute] {
                         Some(&(_, next_attr)) if is_derive(next_attr) => insert_new_line = false,
                         // If not, rewrite the merged derives.
                         _ => {
-                            result.push_str(&try_opt!(format_derive(context, &derive_args, shape)));
+                            result.push_str(&format_derive(context, &derive_args, shape)?);
                             derive_args.clear();
                         }
                     }
@@ -999,7 +994,7 @@ fn format_derive(context: &RewriteContext, derive_args: &[String], shape: Shape)
     let mut result = String::with_capacity(128);
     result.push_str("#[derive(");
     // 11 = `#[derive()]`
-    let initial_budget = try_opt!(shape.width.checked_sub(11));
+    let initial_budget = shape.width.checked_sub(11)?;
     let mut budget = initial_budget;
     let num = derive_args.len();
     for (i, a) in derive_args.iter().enumerate() {

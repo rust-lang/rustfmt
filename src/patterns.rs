@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use syntax::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd};
+use syntax::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax};
 use syntax::codemap::{self, BytePos, Span};
 use syntax::ptr;
 
@@ -38,14 +38,12 @@ impl Rewrite for Pat {
                 let sub_pat = match *sub_pat {
                     Some(ref p) => {
                         // 3 - ` @ `.
-                        let width = try_opt!(
-                            shape
-                                .width
-                                .checked_sub(prefix.len() + mut_infix.len() + id_str.len() + 3)
-                        );
+                        let width = shape
+                            .width
+                            .checked_sub(prefix.len() + mut_infix.len() + id_str.len() + 3)?;
                         format!(
                             " @ {}",
-                            try_opt!(p.rewrite(context, Shape::legacy(width, shape.indent)))
+                            p.rewrite(context, Shape::legacy(width, shape.indent))?
                         )
                     }
                     None => "".to_owned(),
@@ -58,28 +56,23 @@ impl Rewrite for Pat {
             } else {
                 None
             },
-            PatKind::Range(ref lhs, ref rhs, ref end_kind) => match *end_kind {
-                RangeEnd::Included => rewrite_pair(
+            PatKind::Range(ref lhs, ref rhs, ref end_kind) => {
+                let infix = match *end_kind {
+                    RangeEnd::Included(RangeSyntax::DotDotDot) => "...",
+                    RangeEnd::Included(RangeSyntax::DotDotEq) => "..=",
+                    RangeEnd::Excluded => "..",
+                };
+                rewrite_pair(
                     &**lhs,
                     &**rhs,
                     "",
-                    "...",
+                    infix,
                     "",
                     context,
                     shape,
                     SeparatorPlace::Front,
-                ),
-                RangeEnd::Excluded => rewrite_pair(
-                    &**lhs,
-                    &**rhs,
-                    "",
-                    "..",
-                    "",
-                    context,
-                    shape,
-                    SeparatorPlace::Front,
-                ),
-            },
+                )
+            }
             PatKind::Ref(ref pat, mutability) => {
                 let prefix = format!("&{}", format_mutability(mutability));
                 rewrite_unary_prefix(context, &prefix, &**pat, shape)
@@ -91,8 +84,7 @@ impl Rewrite for Pat {
                 rewrite_path(context, PathContext::Expr, q_self.as_ref(), path, shape)
             }
             PatKind::TupleStruct(ref path, ref pat_vec, dotdot_pos) => {
-                let path_str =
-                    try_opt!(rewrite_path(context, PathContext::Expr, None, path, shape));
+                let path_str = rewrite_path(context, PathContext::Expr, None, path, shape)?;
                 rewrite_tuple_pat(
                     pat_vec,
                     dotdot_pos,
@@ -106,9 +98,9 @@ impl Rewrite for Pat {
             PatKind::Slice(ref prefix, ref slice_pat, ref suffix) => {
                 // Rewrite all the sub-patterns.
                 let prefix = prefix.iter().map(|p| p.rewrite(context, shape));
-                let slice_pat = slice_pat.as_ref().map(|p| {
-                    Some(format!("{}..", try_opt!(p.rewrite(context, shape))))
-                });
+                let slice_pat = slice_pat
+                    .as_ref()
+                    .map(|p| Some(format!("{}..", p.rewrite(context, shape)?)));
                 let suffix = suffix.iter().map(|p| p.rewrite(context, shape));
 
                 // Munge them together.
@@ -116,7 +108,7 @@ impl Rewrite for Pat {
                     prefix.chain(slice_pat.into_iter()).chain(suffix).collect();
 
                 // Check that all the rewrites succeeded, and if not return None.
-                let pats = try_opt!(pats);
+                let pats = pats?;
 
                 // Unwrap all the sub-strings and join them with commas.
                 let result = if context.config.spaces_within_square_brackets() {
@@ -126,8 +118,8 @@ impl Rewrite for Pat {
                 };
                 Some(result)
             }
-            PatKind::Struct(ref path, ref fields, elipses) => {
-                rewrite_struct_pat(path, fields, elipses, self.span, context, shape)
+            PatKind::Struct(ref path, ref fields, ellipsis) => {
+                rewrite_struct_pat(path, fields, ellipsis, self.span, context, shape)
             }
             // FIXME(#819) format pattern macros.
             PatKind::Mac(..) => Some(context.snippet(self.span)),
@@ -138,34 +130,24 @@ impl Rewrite for Pat {
 fn rewrite_struct_pat(
     path: &ast::Path,
     fields: &[codemap::Spanned<ast::FieldPat>],
-    elipses: bool,
+    ellipsis: bool,
     span: Span,
     context: &RewriteContext,
     shape: Shape,
 ) -> Option<String> {
     // 2 =  ` {`
-    let path_shape = try_opt!(shape.sub_width(2));
-    let path_str = try_opt!(rewrite_path(
-        context,
-        PathContext::Expr,
-        None,
-        path,
-        path_shape,
-    ));
+    let path_shape = shape.sub_width(2)?;
+    let path_str = rewrite_path(context, PathContext::Expr, None, path, path_shape)?;
 
-    if fields.is_empty() && !elipses {
+    if fields.is_empty() && !ellipsis {
         return Some(format!("{} {{}}", path_str));
     }
 
-    let (elipses_str, terminator) = if elipses { (", ..", "..") } else { ("", "}") };
+    let (ellipsis_str, terminator) = if ellipsis { (", ..", "..") } else { ("", "}") };
 
     // 3 = ` { `, 2 = ` }`.
-    let (h_shape, v_shape) = try_opt!(struct_lit_shape(
-        shape,
-        context,
-        path_str.len() + 3,
-        elipses_str.len() + 2,
-    ));
+    let (h_shape, v_shape) =
+        struct_lit_shape(shape, context, path_str.len() + 3, ellipsis_str.len() + 2)?;
 
     let items = itemize_list(
         context.codemap,
@@ -184,10 +166,10 @@ fn rewrite_struct_pat(
     let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
     let fmt = struct_lit_formatting(nested_shape, tactic, context, false);
 
-    let mut fields_str = try_opt!(write_list(&item_vec, &fmt));
+    let mut fields_str = write_list(&item_vec, &fmt)?;
     let one_line_width = h_shape.map_or(0, |shape| shape.width);
 
-    if elipses {
+    if ellipsis {
         if fields_str.contains('\n') || fields_str.len() > one_line_width {
             // Add a missing trailing comma.
             if fmt.trailing_separator == SeparatorTactic::Never {
@@ -198,7 +180,7 @@ fn rewrite_struct_pat(
             fields_str.push_str("..");
         } else {
             if !fields_str.is_empty() {
-                // there are preceeding struct fields being matched on
+                // there are preceding struct fields being matched on
                 if fmt.tactic == DefinitiveListTactic::Vertical {
                     // if the tactic is Vertical, write_list already added a trailing ,
                     fields_str.push_str(" ");
@@ -220,14 +202,14 @@ impl Rewrite for FieldPat {
         if self.is_shorthand {
             pat
         } else {
-            let pat_str = try_opt!(pat);
+            let pat_str = pat?;
             let id_str = self.ident.to_string();
             let one_line_width = id_str.len() + 2 + pat_str.len();
             if one_line_width <= shape.width {
                 Some(format!("{}: {}", id_str, pat_str))
             } else {
                 let nested_shape = shape.block_indent(context.config.tab_spaces());
-                let pat_str = try_opt!(self.pat.rewrite(context, nested_shape));
+                let pat_str = self.pat.rewrite(context, nested_shape)?;
                 Some(format!(
                     "{}:\n{}{}",
                     id_str,
@@ -265,9 +247,10 @@ impl<'a> Spanned for TuplePatField<'a> {
 pub fn can_be_overflowed_pat(context: &RewriteContext, pat: &TuplePatField, len: usize) -> bool {
     match *pat {
         TuplePatField::Pat(pat) => match pat.node {
-            ast::PatKind::Path(..) | ast::PatKind::Tuple(..) | ast::PatKind::Struct(..) => {
-                context.use_block_indent() && len == 1
-            }
+            ast::PatKind::Path(..) |
+            ast::PatKind::Tuple(..) |
+            ast::PatKind::Struct(..) |
+            ast::PatKind::TupleStruct(..) => context.use_block_indent() && len == 1,
             ast::PatKind::Ref(ref p, _) | ast::PatKind::Box(ref p) => {
                 can_be_overflowed_pat(context, &TuplePatField::Pat(p), len)
             }
@@ -351,7 +334,7 @@ fn rewrite_tuple_pat(
         shape,
         shape.width,
         add_comma,
-    ).ok()
+    )
 }
 
 fn count_wildcard_suffix_len(

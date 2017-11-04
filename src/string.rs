@@ -29,14 +29,32 @@ pub struct StringFormat<'a> {
     pub config: &'a Config,
 }
 
+impl<'a> StringFormat<'a> {
+    pub fn new(shape: Shape, config: &'a Config) -> StringFormat<'a> {
+        StringFormat {
+            opener: "\"",
+            closer: "\"",
+            line_start: " ",
+            line_end: "\\",
+            shape: shape,
+            trim_end: false,
+            config: config,
+        }
+    }
+}
+
 // FIXME: simplify this!
-pub fn rewrite_string<'a>(orig: &str, fmt: &StringFormat<'a>) -> Option<String> {
+pub fn rewrite_string<'a>(
+    orig: &str,
+    fmt: &StringFormat<'a>,
+    max_width: Option<usize>,
+) -> Option<String> {
     // Strip line breaks.
     let re = Regex::new(r"([^\\](\\\\)*)\\[\n\r][[:space:]]*").unwrap();
     let stripped_str = re.replace_all(orig, "$1");
 
     let graphemes = UnicodeSegmentation::graphemes(&*stripped_str, false).collect::<Vec<&str>>();
-    let shape = fmt.shape.visual_indent(0);
+    let shape = fmt.shape;
     let indent = shape.indent.to_string(fmt.config);
     let punctuation = ":,;.";
 
@@ -53,7 +71,9 @@ pub fn rewrite_string<'a>(orig: &str, fmt: &StringFormat<'a>) -> Option<String> 
     let ender_length = fmt.line_end.len();
     // If we cannot put at least a single character per line, the rewrite won't
     // succeed.
-    let max_chars = try_opt!(shape.width.checked_sub(fmt.opener.len() + ender_length + 1)) + 1;
+    let mut max_chars = shape
+        .width
+        .checked_sub(fmt.opener.len() + ender_length + 1)? + 1;
 
     // Snip a line at a time from `orig` until it is used up. Push the snippet
     // onto result.
@@ -119,6 +139,10 @@ pub fn rewrite_string<'a>(orig: &str, fmt: &StringFormat<'a>) -> Option<String> 
 
         // The next line starts where the current line ends.
         cur_start = cur_end;
+
+        if let Some(new_max_chars) = max_width {
+            max_chars = new_max_chars.checked_sub(fmt.opener.len() + ender_length + 1)? + 1;
+        }
     }
 
     result.push_str(fmt.closer);
@@ -133,16 +157,7 @@ mod test {
     #[test]
     fn issue343() {
         let config = Default::default();
-        let fmt = StringFormat {
-            opener: "\"",
-            closer: "\"",
-            line_start: " ",
-            line_end: "\\",
-            shape: Shape::legacy(2, Indent::empty()),
-            trim_end: false,
-            config: &config,
-        };
-
-        rewrite_string("eq_", &fmt);
+        let fmt = StringFormat::new(Shape::legacy(2, Indent::empty()), &config);
+        rewrite_string("eq_", &fmt, None);
     }
 }

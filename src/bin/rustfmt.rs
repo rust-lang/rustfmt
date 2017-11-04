@@ -21,7 +21,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use getopts::{Matches, Options};
+use getopts::{HasArg, Matches, Occur, Options};
 
 use rustfmt::{run, Input, Summary};
 use rustfmt::file_lines::FileLines;
@@ -44,8 +44,8 @@ enum Operation {
     Version,
     /// Print detailed configuration help.
     ConfigHelp,
-    /// Output default config to a file
-    ConfigOutputDefault { path: String },
+    /// Output default config to a file, or stdout if None
+    ConfigOutputDefault { path: Option<String> },
     /// No file specified, read from stdin
     Stdin {
         input: String,
@@ -60,6 +60,7 @@ struct CliOptions {
     verbose: bool,
     write_mode: Option<WriteMode>,
     file_lines: FileLines, // Default is all lines in all files.
+    unstable_features: bool,
 }
 
 impl CliOptions {
@@ -67,6 +68,17 @@ impl CliOptions {
         let mut options = CliOptions::default();
         options.skip_children = matches.opt_present("skip-children");
         options.verbose = matches.opt_present("verbose");
+        let unstable_features = matches.opt_present("unstable-features");
+        let rust_nightly = option_env!("CFG_RELEASE_CHANNEL")
+            .map(|c| c == "nightly")
+            .unwrap_or(false);
+        if unstable_features && !rust_nightly {
+            return Err(FmtError::from(format!(
+                "Unstable features are only available on Nightly channel"
+            )));
+        } else {
+            options.unstable_features = unstable_features;
+        }
 
         if let Some(ref write_mode) = matches.opt_str("write-mode") {
             if let Ok(write_mode) = WriteMode::from_str(write_mode) {
@@ -89,6 +101,7 @@ impl CliOptions {
         config.set().skip_children(self.skip_children);
         config.set().verbose(self.verbose);
         config.set().file_lines(self.file_lines);
+        config.set().unstable_features(self.unstable_features);
         if let Some(write_mode) = self.write_mode {
             config.set().write_mode(write_mode);
         }
@@ -122,14 +135,22 @@ fn make_opts() -> Options {
 
     opts.optflag(
         "",
+        "unstable-features",
+        "Enables unstable features. Only available on nightly channel",
+    );
+
+    opts.optflag(
+        "",
         "config-help",
         "show details of rustfmt configuration options",
     );
-    opts.optopt(
+    opts.opt(
         "",
         "dump-default-config",
-        "Dumps the default configuration to a file and exits.",
+        "Dumps default configuration to PATH. PATH defaults to stdout, if omitted.",
         "PATH",
+        HasArg::Maybe,
+        Occur::Optional,
     );
     opts.optopt(
         "",
@@ -159,7 +180,7 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
 
     match determine_operation(&matches)? {
         Operation::Help => {
-            print_usage(opts, "");
+            print_usage_to_stdout(opts, "");
             Summary::print_exit_codes();
             Ok(Summary::default())
         }
@@ -172,9 +193,13 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
             Ok(Summary::default())
         }
         Operation::ConfigOutputDefault { path } => {
-            let mut file = File::create(path)?;
             let toml = Config::default().all_options().to_toml()?;
-            file.write_all(toml.as_bytes())?;
+            if let Some(path) = path {
+                let mut file = File::create(path)?;
+                file.write_all(toml.as_bytes())?;
+            } else {
+                io::stdout().write_all(toml.as_bytes())?;
+            }
             Ok(Summary::default())
         }
         Operation::Stdin { input, config_path } => {
@@ -190,12 +215,17 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
                 config.set().file_lines(file_lines.parse()?);
                 for f in config.file_lines().files() {
                     if f != "stdin" {
-                        println!("Warning: Extra file listed in file_lines option '{}'", f);
+                        eprintln!("Warning: Extra file listed in file_lines option '{}'", f);
                     }
                 }
             }
 
-            Ok(run(Input::Text(input), &config))
+            let mut error_summary = Summary::default();
+            if config.version_meets_requirement(&mut error_summary) {
+                error_summary.add(run(Input::Text(input), &config));
+            }
+
+            Ok(error_summary)
         }
         Operation::Format {
             files,
@@ -206,7 +236,7 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
 
             for f in options.file_lines.files() {
                 if !files.contains(&PathBuf::from(f)) {
-                    println!("Warning: Extra file listed in file_lines option '{}'", f);
+                    eprintln!("Warning: Extra file listed in file_lines option '{}'", f);
                 }
             }
 
@@ -225,10 +255,10 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
             let mut error_summary = Summary::default();
             for file in files {
                 if !file.exists() {
-                    println!("Error: file `{}` does not exist", file.to_str().unwrap());
+                    eprintln!("Error: file `{}` does not exist", file.to_str().unwrap());
                     error_summary.add_operational_error();
                 } else if file.is_dir() {
-                    println!("Error: `{}` is a directory", file.to_str().unwrap());
+                    eprintln!("Error: `{}` is a directory", file.to_str().unwrap());
                     error_summary.add_operational_error();
                 } else {
                     // Check the file directory if the config-path could not be read or not provided
@@ -245,6 +275,10 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
                             }
                         }
                         config = config_tmp;
+                    }
+
+                    if !config.version_meets_requirement(&mut error_summary) {
+                        break;
                     }
 
                     options.clone().apply_to(&mut config);
@@ -287,7 +321,7 @@ fn main() {
             }
         }
         Err(e) => {
-            print_usage(&opts, &e.to_string());
+            print_usage_to_stderr(&opts, &e.to_string());
             1
         }
     };
@@ -301,13 +335,23 @@ fn main() {
     std::process::exit(exit_code);
 }
 
-fn print_usage(opts: &Options, reason: &str) {
-    let reason = format!(
-        "{}\n\nusage: {} [options] <file>...",
-        reason,
-        env::args_os().next().unwrap().to_string_lossy()
-    );
-    println!("{}", opts.usage(&reason));
+macro_rules! print_usage {
+    ($print:ident, $opts:ident, $reason:expr) => ({
+        let msg = format!(
+            "{}\n\nusage: {} [options] <file>...",
+            $reason,
+            env::args_os().next().unwrap().to_string_lossy()
+        );
+        $print!("{}", $opts.usage(&msg));
+    })
+}
+
+fn print_usage_to_stdout(opts: &Options, reason: &str) {
+    print_usage!(println, opts, reason);
+}
+
+fn print_usage_to_stderr(opts: &Options, reason: &str) {
+    print_usage!(eprintln, opts, reason);
 }
 
 fn print_version() {
@@ -327,8 +371,20 @@ fn determine_operation(matches: &Matches) -> FmtResult<Operation> {
         return Ok(Operation::ConfigHelp);
     }
 
-    if let Some(path) = matches.opt_str("dump-default-config") {
-        return Ok(Operation::ConfigOutputDefault { path });
+    if matches.opt_present("dump-default-config") {
+        // NOTE for some reason when configured with HasArg::Maybe + Occur::Optional opt_default
+        // doesn't recognize `--foo bar` as a long flag with an argument but as a long flag with no
+        // argument *plus* a free argument. Thus we check for that case in this branch -- this is
+        // required for backward compatibility.
+        if let Some(path) = matches.free.get(0) {
+            return Ok(Operation::ConfigOutputDefault {
+                path: Some(path.clone()),
+            });
+        } else {
+            return Ok(Operation::ConfigOutputDefault {
+                path: matches.opt_str("dump-default-config"),
+            });
+        }
     }
 
     if matches.opt_present("version") {

@@ -31,6 +31,20 @@ fn issue1346() {
 }
 
 fn skip_on_statements() {
+    // Outside block
+    #[rustfmt_skip]
+    {
+        foo; bar;
+            // junk
+    }
+
+    {
+        // Inside block
+        #![rustfmt_skip]
+        foo; bar;
+            // junk
+    }
+
     // Semi
     #[cfg_attr(rustfmt, rustfmt_skip)]
     foo(
@@ -63,3 +77,11 @@ fn skip_on_statements() {
     #[cfg_attr(rustfmt, rustfmt_skip)]
     foo(  a,   b  ,  c)
 }
+
+// Check that the skip attribute applies to other attributes.
+#[rustfmt_skip]
+#[cfg
+(  a , b
+)]
+fn
+main() {}

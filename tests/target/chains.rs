@@ -23,10 +23,12 @@ fn main() {
         false => (),
     });
 
-    loong_func().quux(move || if true {
-        1
-    } else {
-        2
+    loong_func().quux(move || {
+        if true {
+            1
+        } else {
+            2
+        }
     });
 
     some_fuuuuuuuuunction().method_call_a(aaaaa, bbbbb, |c| {
@@ -182,4 +184,12 @@ fn issue1392() {
         }
         "#.trim(),
     );
+}
+
+// #2067
+impl Settings {
+    fn save(&self) -> Result<()> {
+        let mut file = File::create(&settings_path)
+            .chain_err(|| ErrorKind::WriteError(settings_path.clone()))?;
+    }
 }

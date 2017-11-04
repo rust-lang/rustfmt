@@ -506,7 +506,7 @@ trait Lorem {
         dolor: Dolor,
         sit: Sit,
         amet: Amet,
-        consectetur: onsectetur,
+        consectetur: Consectetur,
         adipiscing: Adipiscing,
         elit: Elit,
     );
@@ -516,7 +516,7 @@ trait Lorem {
         dolor: Dolor,
         sit: Sit,
         amet: Amet,
-        consectetur: onsectetur,
+        consectetur: Consectetur,
         adipiscing: Adipiscing,
         elit: Elit,
     ) {
@@ -569,7 +569,7 @@ trait Lorem {
         dolor: Dolor,
         sit: Sit,
         amet: Amet,
-        consectetur: onsectetur,
+        consectetur: Consectetur,
         adipiscing: Adipiscing,
         elit: Elit,
     ) {
@@ -598,7 +598,7 @@ trait Lorem {
              dolor: Dolor,
              sit: Sit,
              amet: Amet,
-             consectetur: onsectetur,
+             consectetur: Consectetur,
              adipiscing: Adipiscing,
              elit: Elit);
 
@@ -606,7 +606,7 @@ trait Lorem {
              dolor: Dolor,
              sit: Sit,
              amet: Amet,
-             consectetur: onsectetur,
+             consectetur: Consectetur,
              adipiscing: Adipiscing,
              elit: Elit) {
         // body
@@ -1228,6 +1228,48 @@ struct Dolor<T>
     sit: T,
 }
 ```
+
+## `match_arm_forces_newline`
+
+Consistently put match arms (block based or not) in a newline.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+
+#### `false` (default):
+
+```rust
+match x {
+    // a non-empty block
+    X0 => {
+        f();
+    }
+    // an empty block
+    X1 => {}
+    // a non-block
+    X2 => println!("ok"),
+}
+```
+
+#### `true`:
+
+```rust
+match x {
+    // a non-empty block
+    X0 => {
+        f();
+    }
+    // an empty block
+    X1 =>
+        {}
+    // a non-block
+    X2 => {
+        println!("ok")
+    }
+}
+```
+
+See also: [`wrap_match_arms`](#wrap_match_arms).
 
 ## `match_block_trailing_comma`
 

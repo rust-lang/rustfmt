@@ -193,7 +193,7 @@ fn issue355() {
         nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn => println!("a", b),
         // Rewrite splits macro
         oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo => vec!(1, 2),
-        // Macro support fails to recognise this macro as splitable
+        // Macro support fails to recognise this macro as splittable
         // We push the whole expr to a new line, TODO split this macro as well
         pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp => vec!(3; 4),
         // q, r and s: Rewrite splits match arm
@@ -414,4 +414,14 @@ fn match_with_trailing_spaces() {
         Some(..) => 0,
         None => 1,
     }
+}
+
+fn issue_2099() {
+    let a = match x {
+};
+    let b = match x {
+        
+    };
+
+    match x {}
 }

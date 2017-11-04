@@ -7,7 +7,7 @@ fn op(x: Typ, key : &[u8], upd : Box<Fn(Option<&memcache::Item>) -> (memcache::S
         "cool"}
 
 
-fn weird_comment(/* /*/ double level */ comment */ x: Hello /*/*/* tripple, even */*/*/,
+fn weird_comment(/* /*/ double level */ comment */ x: Hello /*/*/* triple, even */*/*/,
 // Does this work?
 y: World
 ) {
@@ -52,3 +52,15 @@ pub fn waltz(cwd: &Path) -> CliAssert {
         }
     }
 }
+
+// #2003
+mod foo {
+    fn __bindgen_test_layout_i_open0_c_open1_char_a_open2_char_close2_close1_close0_instantiation() {
+        foo();
+    }
+}
+
+// #2082
+pub(crate) fn init() {}
+
+crate fn init() {}
