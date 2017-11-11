@@ -39,14 +39,14 @@ impl Mismatch {
 // Produces a diff between the expected output and actual output of rustfmt.
 pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Mismatch> {
     let mut line_number = 1;
-    let mut context_queue: VecDeque<&str> = VecDeque::with_capacity(context_size);
+    let mut context_queue: VecDeque<String> = VecDeque::with_capacity(context_size);
     let mut lines_since_mismatch = context_size + 1;
     let mut results = Vec::new();
     let mut mismatch = Mismatch::new(0);
 
     for result in diff::lines(expected, actual) {
         match result {
-            diff::Result::Left(str) => {
+            diff::Result::Left(cmp) => {
                 if lines_since_mismatch >= context_size && lines_since_mismatch > 0 {
                     results.push(mismatch);
                     mismatch = Mismatch::new(line_number - context_queue.len() as u32);
@@ -56,10 +56,10 @@ pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Misma
                     mismatch.lines.push(DiffLine::Context(line.to_owned()));
                 }
 
-                mismatch.lines.push(DiffLine::Resulting(str.to_owned()));
+                mismatch.lines.push(DiffLine::Resulting(cmp.to_owned()));
                 lines_since_mismatch = 0;
             }
-            diff::Result::Right(str) => {
+            diff::Result::Right(cmp) => {
                 if lines_since_mismatch >= context_size && lines_since_mismatch > 0 {
                     results.push(mismatch);
                     mismatch = Mismatch::new(line_number - context_queue.len() as u32);
@@ -69,19 +69,19 @@ pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Misma
                     mismatch.lines.push(DiffLine::Context(line.to_owned()));
                 }
 
-                mismatch.lines.push(DiffLine::Expected(str.to_owned()));
+                mismatch.lines.push(DiffLine::Expected(cmp.to_owned()));
                 line_number += 1;
                 lines_since_mismatch = 0;
             }
-            diff::Result::Both(str, _) => {
+            diff::Result::Both(cmp, _) => {
                 if context_queue.len() >= context_size {
-                    let _ = context_queue.pop_front();
+                    context_queue.pop_front();
                 }
 
                 if lines_since_mismatch < context_size {
-                    mismatch.lines.push(DiffLine::Context(str.to_owned()));
+                    mismatch.lines.push(DiffLine::Context(cmp.to_owned()));
                 } else if context_size > 0 {
-                    context_queue.push_back(str);
+                    context_queue.push_back(cmp.to_owned());
                 }
 
                 line_number += 1;
@@ -92,6 +92,13 @@ pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Misma
 
     results.push(mismatch);
     results.remove(0);
+
+    if !expected.ends_with('\n') && actual.ends_with('\n') {
+        let mut mismatch = Mismatch::new(line_number as u32);
+        mismatch.lines.push(DiffLine::Context("".to_owned()));
+        mismatch.lines.push(DiffLine::Expected("\n".to_owned()));
+        results.push(mismatch);
+    }
 
     results
 }
@@ -229,6 +236,22 @@ mod test {
                 Mismatch {
                     line_number: 3,
                     lines: vec![Resulting("three".into()), Expected("trois".into())],
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn diff_no_trailing_newline() {
+        let src = "one\ntwo\nthree\nfour\nfive";
+        let dest = "one\ntwo\nthree\nfour\nfive\n";
+        let diff = make_diff(src, dest, 0);
+        assert_eq!(
+            diff,
+            vec![
+                Mismatch {
+                    line_number: 6,
+                    lines: vec![Context("".into()), Expected("\n".into())],
                 },
             ]
         );
