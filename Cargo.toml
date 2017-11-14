@@ -44,6 +44,7 @@ log = "0.3"
 env_logger = "0.4"
 getopts = "0.2"
 derive-new = "0.5"
+time = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.11"
