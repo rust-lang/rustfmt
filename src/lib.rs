@@ -24,7 +24,6 @@ extern crate serde_json;
 extern crate strings;
 extern crate syntax;
 extern crate term;
-extern crate time;
 extern crate unicode_segmentation;
 
 use std::collections::HashMap;
@@ -33,6 +32,7 @@ use std::io::{self, stdout, Write};
 use std::iter::repeat;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::time::Duration;
 
 use errors::{DiagnosticBuilder, Handler};
 use errors::emitter::{ColorConfig, EmitterWriter};
@@ -557,10 +557,14 @@ pub fn format_input<T: Write>(
     summary.mark_format_time();
 
     if config.verbose() {
+        fn duration_to_f32(d: Duration) -> f32 {
+            d.as_secs() as f32 + d.subsec_nanos() as f32 / 1_000_000_000f32
+        }
+
         println!(
-            "Spent {} in the parsing phase, and {} in the formatting phase",
-            summary.get_parse_time().unwrap(),
-            summary.get_format_time().unwrap(),
+            "Spent {0:.3} secs in the parsing phase, and {1:.3} secs in the formatting phase",
+            duration_to_f32(summary.get_parse_time().unwrap()),
+            duration_to_f32(summary.get_format_time().unwrap()),
         );
     }
 
