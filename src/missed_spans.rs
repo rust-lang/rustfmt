@@ -11,7 +11,7 @@
 use std::borrow::Cow;
 use std::iter::repeat;
 
-use syntax::codemap::{BytePos, Pos, Span};
+use syntax::codemap::{BytePos, FileName, Pos, Span};
 
 use codemap::LineRangeUtils;
 use comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};
@@ -130,7 +130,7 @@ impl<'a> FmtVisitor<'a> {
         offset: usize,
         big_diff: usize,
         subslice: &str,
-        file_name: &str,
+        file_name: &FileName,
     ) -> bool {
         let last_char = big_snippet[..(offset + big_diff)]
             .chars()
