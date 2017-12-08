@@ -12,17 +12,19 @@
 
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Read, Write};
+use std::path::Path;
 
 use strings::string_buffer::StringBuffer;
 
 use checkstyle::{output_checkstyle_file, output_footer, output_header};
 use config::{Config, NewlineStyle, WriteMode};
 use rustfmt_diff::{make_diff, print_diff, Mismatch};
+use syntax::codemap::FileName;
 
 // A map of the files of a crate, with their new content
 pub type FileMap = Vec<FileRecord>;
 
-pub type FileRecord = (String, StringBuffer);
+pub type FileRecord = (FileName, StringBuffer);
 
 // Append a newline to the end of each file.
 pub fn append_newline(s: &mut StringBuffer) {
@@ -86,7 +88,7 @@ where
 
 pub fn write_file<T>(
     text: &StringBuffer,
-    filename: &str,
+    filename: &FileName,
     out: &mut T,
     config: &Config,
 ) -> Result<bool, io::Error>
@@ -95,7 +97,7 @@ where
 {
     fn source_and_formatted_text(
         text: &StringBuffer,
-        filename: &str,
+        filename: &Path,
         config: &Config,
     ) -> Result<(String, String), io::Error> {
         let mut f = File::open(filename)?;
@@ -108,7 +110,7 @@ where
     }
 
     fn create_diff(
-        filename: &str,
+        filename: &Path,
         text: &StringBuffer,
         config: &Config,
     ) -> Result<Vec<Mismatch>, io::Error> {
@@ -116,15 +118,21 @@ where
         Ok(make_diff(&ori, &fmt, 3))
     }
 
+    let filename_to_path = || match *filename {
+        FileName::Real(ref path) => path,
+        _ => panic!("cannot format `{}` with WriteMode::Replace", filename),
+    };
+
     match config.write_mode() {
         WriteMode::Replace => {
-            if let Ok((ori, fmt)) = source_and_formatted_text(text, filename, config) {
+            let filename = filename_to_path();
+            if let Ok((ori, fmt)) = source_and_formatted_text(text, &filename, config) {
                 if fmt != ori {
                     // Do a little dance to make writing safer - write to a temp file
                     // rename the original to a .bk, then rename the temp file to the
                     // original.
-                    let tmp_name = filename.to_owned() + ".tmp";
-                    let bk_name = filename.to_owned() + ".bk";
+                    let tmp_name = filename.with_extension("tmp");
+                    let bk_name = filename.with_extension("bk");
                     {
                         // Write text to temp file
                         let tmp_file = File::create(&tmp_name)?;
@@ -138,7 +146,8 @@ where
         }
         WriteMode::Overwrite => {
             // Write text directly over original file if there is a diff.
-            let (source, formatted) = source_and_formatted_text(text, filename, config)?;
+            let filename = filename_to_path();
+            let (source, formatted) = source_and_formatted_text(text, &filename, config)?;
             if source != formatted {
                 let file = File::create(filename)?;
                 write_system_newlines(file, text, config)?;
@@ -152,19 +161,21 @@ where
             write_system_newlines(out, text, config)?;
         }
         WriteMode::Diff => {
-            if let Ok((ori, fmt)) = source_and_formatted_text(text, filename, config) {
+            let filename = filename_to_path();
+            if let Ok((ori, fmt)) = source_and_formatted_text(text, &filename, config) {
                 let mismatch = make_diff(&ori, &fmt, 3);
                 let has_diff = !mismatch.is_empty();
                 print_diff(
                     mismatch,
-                    |line_num| format!("Diff in {} at line {}:", filename, line_num),
+                    |line_num| format!("Diff in {} at line {}:", filename.display(), line_num),
                     config.color(),
                 );
                 return Ok(has_diff);
             }
         }
         WriteMode::Checkstyle => {
-            let diff = create_diff(filename, text, config)?;
+            let filename = filename_to_path();
+            let diff = create_diff(&filename, text, config)?;
             output_checkstyle_file(out, filename, diff)?;
         }
     }
