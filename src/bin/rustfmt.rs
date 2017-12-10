@@ -71,7 +71,7 @@ impl CliOptions {
         options.skip_children = matches.opt_present("skip-children");
         options.verbose = matches.opt_present("verbose");
         let unstable_features = matches.opt_present("unstable-features");
-        let rust_nightly = option_env!("CFG_RELEASE_CHANNEL")
+        let rust_nightly = env::var("CFG_RELEASE_CHANNEL")
             .map(|c| c == "nightly")
             .unwrap_or(false);
         if unstable_features && !rust_nightly {
