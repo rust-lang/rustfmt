@@ -31,6 +31,7 @@ use std::io::{self, stdout, Write};
 use std::iter::repeat;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::time::Duration;
 
 use errors::{DiagnosticBuilder, Handler};
 use errors::emitter::{ColorConfig, EmitterWriter};
@@ -562,6 +563,8 @@ pub fn format_input<T: Write>(
         }
     };
 
+    summary.mark_parse_time();
+
     if parse_session.span_diagnostic.has_errors() {
         summary.add_parsing_error();
     }
@@ -576,7 +579,7 @@ pub fn format_input<T: Write>(
 
     let mut report = FormatReport::new();
 
-    match format_ast(
+    let format_result = format_ast(
         &krate,
         &mut parse_session,
         &main_file,
@@ -593,7 +596,23 @@ pub fn format_input<T: Write>(
             }
             Ok(false)
         },
-    ) {
+    );
+
+    summary.mark_format_time();
+
+    if config.verbose() {
+        fn duration_to_f32(d: Duration) -> f32 {
+            d.as_secs() as f32 + d.subsec_nanos() as f32 / 1_000_000_000f32
+        }
+
+        println!(
+            "Spent {0:.3} secs in the parsing phase, and {1:.3} secs in the formatting phase",
+            duration_to_f32(summary.get_parse_time().unwrap()),
+            duration_to_f32(summary.get_format_time().unwrap()),
+        );
+    }
+
+    match format_result {
         Ok((file_map, has_diff)) => {
             if report.has_warnings() {
                 summary.add_formatting_error();

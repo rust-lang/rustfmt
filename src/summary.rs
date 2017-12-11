@@ -1,3 +1,6 @@
+use std::time::{Duration, Instant};
+use std::default::Default;
+
 #[must_use]
 #[derive(Debug, Default, Clone)]
 pub struct Summary {
@@ -12,9 +15,42 @@ pub struct Summary {
 
     // Formatted code differs from existing code (write-mode diff only).
     pub has_diff: bool,
+
+    // Keeps track of time spent in parsing and formatting steps.
+    timer: Timer,
 }
 
 impl Summary {
+    pub fn mark_parse_time(&mut self) {
+        self.timer = self.timer.done_parsing();
+    }
+
+    pub fn mark_format_time(&mut self) {
+        self.timer = self.timer.done_formatting();
+    }
+
+    /// Returns the time it took to parse the source files in nanoseconds.
+    pub fn get_parse_time(&self) -> Option<Duration> {
+        match self.timer {
+            Timer::DoneParsing(init, parse_time) | Timer::DoneFormatting(init, parse_time, _) => {
+                // This should never underflow since `Instant::now()` guarantees monotonicity.
+                Some(parse_time.duration_since(init))
+            }
+            Timer::Initialized(..) => None,
+        }
+    }
+
+    /// Returns the time it took to go from the parsed AST to the formatted output. Parsing time is
+    /// not included.
+    pub fn get_format_time(&self) -> Option<Duration> {
+        match self.timer {
+            Timer::DoneFormatting(_init, parse_time, format_time) => {
+                Some(format_time.duration_since(parse_time))
+            }
+            Timer::DoneParsing(..) | Timer::Initialized(..) => None,
+        }
+    }
+
     pub fn has_operational_errors(&self) -> bool {
         self.has_operational_errors
     }
@@ -63,5 +99,36 @@ impl Summary {
     3 = Code is valid, but it is impossible to format it properly
     4 = Formatted code differs from existing code (write-mode diff only)"#;
         println!("{}", exit_codes);
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Timer {
+    Initialized(Instant),
+    DoneParsing(Instant, Instant),
+    DoneFormatting(Instant, Instant, Instant),
+}
+
+impl Default for Timer {
+    fn default() -> Self {
+        Timer::Initialized(Instant::now())
+    }
+}
+
+impl Timer {
+    fn done_parsing(self) -> Self {
+        match self {
+            Timer::Initialized(init_time) => Timer::DoneParsing(init_time, Instant::now()),
+            _ => panic!("Timer can only transition to DoneParsing from Initialized state"),
+        }
+    }
+
+    fn done_formatting(self) -> Self {
+        match self {
+            Timer::DoneParsing(init_time, parse_time) => {
+                Timer::DoneFormatting(init_time, parse_time, Instant::now())
+            }
+            _ => panic!("Timer can only transition to DoneFormatting from DoneParsing state"),
+        }
     }
 }
