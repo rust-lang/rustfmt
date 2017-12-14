@@ -15,12 +15,27 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
+    // Add `$(rustc --print sysroot)` to the rpath.
+    let lib_path = get_sysroot_lib_path();
+    let rust_flags = format!("-Clink-args=-Xlinker -rpath={}", lib_path);
+    println!("cargo:rustc-env=RUSTFLAGS=\"{}\"", rust_flags);
+
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
     File::create(out_dir.join("commit-info.txt"))
         .unwrap()
         .write_all(commit_info().as_bytes())
         .unwrap();
+}
+
+fn get_sysroot_lib_path() -> String {
+    let stdout = Command::new("rustc")
+        .args(&["--print", "sysroot"])
+        .output()
+        .expect("rustc --print sysroot failed")
+        .stdout;
+    let sysroot_path = String::from_utf8(stdout).unwrap();
+    format!("{}/lib", sysroot_path.trim_right()) // Trim a trailing newline.
 }
 
 // Try to get hash and date of the last commit on a best effort basis. If anything goes wrong
