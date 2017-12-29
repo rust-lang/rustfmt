@@ -614,6 +614,48 @@ Error if unable to get all comment lines within `comment_width`.
 
 See also [`comment_width`](#comment_width).
 
+## `blank_lines_upper_bound`
+
+Maximum number of blank lines which can be put between items.
+
+- **Default value**: `1`
+- **Possible values**: Any number representable by a `usize`
+- **Stable**: No
+
+#### `1` (default):
+
+```rust
+fn foo() {}
+fn bar() {}
+
+// comment
+fn foobar() {}
+
+fn foo1() {}
+fn bar1() {}
+
+// comment
+fn foobar1() {}
+```
+
+#### `2`:
+
+```rust
+fn foo() {}
+fn bar() {}
+
+// comment
+fn foobar() {}
+
+
+fn foo1() {}
+fn bar1() {}
+
+
+// comment
+fn foobar1() {}
+```
+
 ## `fn_args_density`
 
 Argument density in functions
