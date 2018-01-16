@@ -341,8 +341,9 @@ fn main() {
     let sum = 123456789012345678901234567890 + 123456789012345678901234567890 +
         123456789012345678901234567890;
 
+    // FIXME(#2364) range notation operator ("..") should be at the end of the first line.
     let range = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        ..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; // 🐜 See #2364.
+        ..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb;
 }
 ```
 
