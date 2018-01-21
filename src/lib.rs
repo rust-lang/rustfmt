@@ -9,7 +9,6 @@
 // except according to those terms.
 
 #![feature(match_default_bindings)]
-#![feature(rustc_private)]
 #![feature(type_ascription)]
 
 #[macro_use]

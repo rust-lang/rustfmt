@@ -338,7 +338,7 @@ pub fn report_errors_in_formatted_text(
             is_string = false;
         } else {
             newline_count = 0;
-            line_len += 1;
+            line_len += if c == '\t' { config.tab_spaces() } else { 1 };
             if c.is_whitespace() {
                 if last_wspace.is_none() {
                     last_wspace = Some(b);
