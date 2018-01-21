@@ -15,10 +15,13 @@
 #[macro_use]
 extern crate derive_new;
 extern crate diff;
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
 #[macro_use]
 extern crate log;
 extern crate regex;
-extern crate rustc_errors as errors;
+extern crate rustc_errors;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -27,13 +30,14 @@ extern crate syntax;
 extern crate term;
 extern crate unicode_segmentation;
 
-use std::io::{self, stdout, Write};
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use errors::{DiagnosticBuilder, Handler};
-use errors::emitter::{ColorConfig, EmitterWriter};
+use failure::Error;
+use rustc_errors::Handler;
+use rustc_errors::emitter::{ColorConfig, EmitterWriter};
 use syntax::ast;
 use syntax::codemap::{CodeMap, FilePathMapping};
 pub use syntax::codemap::FileName;
@@ -46,7 +50,7 @@ use shape::Indent;
 use utils::use_colored_tty;
 use visitor::{FmtVisitor, SnippetProvider};
 pub use report::*;
-
+pub use errors::{RustfmtError, RustfmtResult};
 pub use self::summary::Summary;
 
 #[macro_use]
@@ -78,6 +82,7 @@ mod patterns;
 mod summary;
 mod vertical;
 mod report;
+pub mod errors;
 
 // Formatting which depends on the AST.
 fn format_ast<T: Write>(
@@ -86,7 +91,7 @@ fn format_ast<T: Write>(
     main_file: &FileName,
     config: &Config,
     mut out: &mut Option<&mut T>,
-) -> Result<(FileMap, bool, FormatReport), io::Error> {
+) -> RustfmtResult<(FileMap, bool, FormatReport)> {
     let mut result = FileMap::new();
     let mut report = FormatReport::new();
     // diff mode: check if any files are differing
@@ -95,7 +100,7 @@ fn format_ast<T: Write>(
     // We always skip children for the "Plain" write mode, since there is
     // nothing to distinguish the nested module contents.
     let skip_children = config.skip_children() || config.write_mode() == config::WriteMode::Plain;
-    for (file_name, module) in modules::list_files(krate, parse_session.codemap())? {
+    for (file_name, module) in modules::list_files(krate, parse_session.codemap()) {
         if skip_children && file_name != *main_file {
             continue;
         }
@@ -132,11 +137,7 @@ fn format_ast<T: Write>(
 
         has_diff |= match maybe_has_diff {
             Ok(diff) => diff,
-            Err(e) => {
-                // Create a new error with file name to help users see which files failed
-                let err_msg = format!("{}: {}", file_name, e);
-                return Err(io::Error::new(e.kind(), err_msg));
-            }
+            Err(e) => return Err(RustfmtError::FileIOError(file_name, e)),
         };
 
         result.push((file_name, visitor.buffer));
@@ -151,100 +152,72 @@ pub enum Input {
     Text(String),
 }
 
-fn parse_input(
-    input: Input,
-    parse_session: &ParseSess,
-) -> Result<ast::Crate, Option<DiagnosticBuilder>> {
-    let result = match input {
-        Input::File(file) => {
-            let mut parser = parse::new_parser_from_file(parse_session, &file);
-            parser.cfg_mods = false;
-            parser.parse_crate_mod()
-        }
-        Input::Text(text) => {
-            let mut parser = parse::new_parser_from_source_str(
-                parse_session,
-                FileName::Custom("stdin".to_owned()),
-                text,
-            );
-            parser.cfg_mods = false;
-            parser.parse_crate_mod()
-        }
+/// Returns a complete AST of the given input. Returns an error when parsing failed.
+fn parse_input(input: Input, parse_session: &ParseSess) -> RustfmtResult<ast::Crate> {
+    let mut parser = match input {
+        Input::File(file) => parse::new_parser_from_file(parse_session, &file),
+        Input::Text(text) => parse::new_parser_from_source_str(
+            parse_session,
+            FileName::Custom("stdin".to_owned()),
+            text,
+        ),
     };
-
-    match result {
-        Ok(c) => {
-            if parse_session.span_diagnostic.has_errors() {
-                // Bail out if the parser recovered from an error.
-                Err(None)
-            } else {
-                Ok(c)
-            }
+    parser.cfg_mods = false;
+    match parser.parse_crate_mod() {
+        _ if parse_session.span_diagnostic.has_errors() => Err(RustfmtError::ParseError),
+        Ok(krate) => Ok(krate),
+        Err(mut diagnostic) => {
+            diagnostic.emit();
+            Err(RustfmtError::ParseError)
         }
-        Err(e) => Err(Some(e)),
     }
 }
 
+fn create_silent_emitter(codemap: &Rc<CodeMap>) -> Box<EmitterWriter> {
+    Box::new(EmitterWriter::new(
+        Box::new(Vec::new()),
+        Some(codemap.clone()),
+        false,
+    ))
+}
+
+/// Format the given input based on the given config. The main purpose of this
+/// function is to set up various data structures for further processing.
+/// Parsing and formatting are delegated to `parse_input` and `format_ast`
+/// respectively.
 pub fn format_input<T: Write>(
     input: Input,
     config: &Config,
     mut out: Option<&mut T>,
-) -> Result<(Summary, FileMap, FormatReport), (io::Error, Summary)> {
+) -> Result<(Summary, FileMap, FormatReport), Error> {
     let mut summary = Summary::default();
+
     if config.disable_all_formatting() {
         // When the input is from stdin, echo back the input.
         if let Input::Text(ref buf) = input {
-            if let Err(e) = io::stdout().write_all(buf.as_bytes()) {
-                return Err((e, summary));
-            }
+            io::stdout().write_all(buf.as_bytes())?;
         }
         return Ok((summary, FileMap::new(), FormatReport::new()));
     }
-    let codemap = Rc::new(CodeMap::new(FilePathMapping::empty()));
 
+    let codemap = Rc::new(CodeMap::new(FilePathMapping::empty()));
     let tty_handler = if config.hide_parse_errors() {
-        let silent_emitter = Box::new(EmitterWriter::new(
-            Box::new(Vec::new()),
-            Some(codemap.clone()),
-            false,
-        ));
-        Handler::with_emitter(true, false, silent_emitter)
+        Handler::with_emitter(true, false, create_silent_emitter(&codemap))
     } else {
         Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(codemap.clone()))
     };
     let mut parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone());
-
     let main_file = match input {
         Input::File(ref file) => FileName::Real(file.clone()),
         Input::Text(..) => FileName::Custom("stdin".to_owned()),
     };
-
-    let krate = match parse_input(input, &parse_session) {
-        Ok(krate) => {
-            if parse_session.span_diagnostic.has_errors() {
-                summary.add_parsing_error();
-            }
-            krate
-        }
-        Err(diagnostic) => {
-            if let Some(mut diagnostic) = diagnostic {
-                diagnostic.emit();
-            }
-            summary.add_parsing_error();
-            return Ok((summary, FileMap::new(), FormatReport::new()));
-        }
-    };
+    let krate = parse_input(input, &parse_session)?;
 
     summary.mark_parse_time();
 
     // Suppress error output after parsing.
-    let silent_emitter = Box::new(EmitterWriter::new(
-        Box::new(Vec::new()),
-        Some(codemap.clone()),
-        false,
-    ));
+    let silent_emitter = create_silent_emitter(&codemap);
     parse_session.span_diagnostic = Handler::with_emitter(true, false, silent_emitter);
-
     let format_result = format_ast(&krate, &mut parse_session, &main_file, config, &mut out);
 
     summary.mark_format_time();
@@ -261,53 +234,41 @@ pub fn format_input<T: Write>(
         );
     }
 
-    match format_result {
-        Ok((file_map, has_diff, report)) => {
-            if report.has_warnings() {
-                summary.add_formatting_error();
-            }
+    let (file_map, has_diff, report) = format_result?;
 
-            if has_diff {
-                summary.add_diff();
-            }
-
-            Ok((summary, file_map, report))
-        }
-        Err(e) => Err((e, summary)),
+    if report.has_warnings() {
+        summary.add_formatting_error();
     }
+    if has_diff {
+        summary.add_diff();
+    }
+
+    Ok((summary, file_map, report))
 }
 
 /// An entry point to rustfmt.
-pub fn run(input: Input, config: &Config) -> Summary {
-    let out = &mut stdout();
+pub fn run(input: Input, config: &Config) -> Result<Summary, Error> {
+    let out = &mut io::stdout();
     output_header(out, config.write_mode()).ok();
-    match format_input(input, config, Some(out)) {
-        Ok((summary, _, report)) => {
-            output_footer(out, config.write_mode()).ok();
+    let (summary, _, report) = format_input(input, config, Some(out))?;
+    output_footer(out, config.write_mode()).ok();
 
-            if report.has_warnings() {
-                match term::stderr() {
-                    Some(ref t)
-                        if use_colored_tty(config.color()) && t.supports_color()
-                            && t.supports_attr(term::Attr::Bold) =>
-                    {
-                        match report.print_warnings_fancy(term::stderr().unwrap()) {
-                            Ok(..) => (),
-                            Err(..) => panic!("Unable to write to stderr: {}", report),
-                        }
-                    }
-                    _ => msg!("{}", report),
+    if report.has_warnings() {
+        match term::stderr() {
+            Some(ref t)
+                if use_colored_tty(config.color()) && t.supports_color()
+                    && t.supports_attr(term::Attr::Bold) =>
+            {
+                match report.print_warnings_fancy(term::stderr().unwrap()) {
+                    Ok(..) => (),
+                    Err(..) => panic!("Unable to write to stderr: {}", report),
                 }
             }
-
-            summary
-        }
-        Err((msg, mut summary)) => {
-            msg!("Error writing files: {}", msg);
-            summary.add_operational_error();
-            summary
+            _ => msg!("{}", report),
         }
     }
+
+    Ok(summary)
 }
 
 /// Format the given snippet. The snippet is expected to be *complete* code.
@@ -319,8 +280,6 @@ pub fn format_snippet(snippet: &str, config: &Config) -> Option<String> {
     config.set().write_mode(config::WriteMode::Plain);
     config.set().hide_parse_errors(true);
     match format_input(input, &config, Some(&mut out)) {
-        // `format_input()` returns an empty string on parsing error.
-        Ok(..) if out.is_empty() && !snippet.is_empty() => None,
         Ok(..) => String::from_utf8(out).ok(),
         Err(..) => None,
     }

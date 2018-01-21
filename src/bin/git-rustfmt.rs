@@ -80,9 +80,10 @@ fn fmt_files(files: &[&str]) -> i32 {
 
     let mut exit_code = 0;
     for file in files {
-        let summary = run(Input::File(PathBuf::from(file)), &config);
-        if !summary.has_no_errors() {
-            exit_code = 1;
+        match run(Input::File(PathBuf::from(file)), &config) {
+            Ok(summary) if !summary.has_no_errors() => exit_code = 1,
+            Err(..) => exit_code = 1,
+            _ => (),
         }
     }
     exit_code

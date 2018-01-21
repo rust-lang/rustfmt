@@ -12,23 +12,22 @@
 #![cfg(not(test))]
 
 extern crate env_logger;
+extern crate failure;
 extern crate getopts;
 extern crate rustfmt_nightly as rustfmt;
 
-use std::{env, error};
+use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use failure::Error;
 use getopts::{Matches, Options};
 
-use rustfmt::{run, FileName, Input, Summary};
+use rustfmt::{run, FileName, Input, RustfmtError, RustfmtResult, Summary};
 use rustfmt::config::{get_toml_path, Color, Config, WriteMode};
 use rustfmt::file_lines::FileLines;
-
-type FmtError = Box<error::Error + Send + Sync>;
-type FmtResult<T> = std::result::Result<T, FmtError>;
 
 /// Rustfmt operations.
 enum Operation {
@@ -68,7 +67,7 @@ struct CliOptions {
 }
 
 impl CliOptions {
-    fn from_matches(matches: &Matches) -> FmtResult<CliOptions> {
+    fn from_matches(matches: &Matches) -> RustfmtResult<CliOptions> {
         let mut options = CliOptions::default();
         options.skip_children = matches.opt_present("skip-children");
         options.verbose = matches.opt_present("verbose");
@@ -77,33 +76,42 @@ impl CliOptions {
             .map(|c| c == "nightly")
             .unwrap_or(false);
         if unstable_features && !rust_nightly {
-            return Err(FmtError::from(
-                "Unstable features are only available on Nightly channel",
-            ));
+            return Err(RustfmtError::UnstableFeature);
         } else {
             options.unstable_features = unstable_features;
         }
 
-        if let Some(ref write_mode) = matches.opt_str("write-mode") {
-            if let Ok(write_mode) = WriteMode::from_str(write_mode) {
+        if let Some(write_mode) = matches.opt_str("write-mode") {
+            if let Ok(write_mode) = WriteMode::from_str(&write_mode) {
                 options.write_mode = Some(write_mode);
             } else {
-                return Err(FmtError::from(format!(
-                    "Invalid write-mode: {}",
-                    write_mode
-                )));
+                return Err(RustfmtError::InvalidCommandLineOption(
+                    "write-mode".to_owned(),
+                    write_mode,
+                ));
             }
         }
 
-        if let Some(ref color) = matches.opt_str("color") {
-            match Color::from_str(color) {
-                Ok(color) => options.color = Some(color),
-                _ => return Err(FmtError::from(format!("Invalid color: {}", color))),
+        if let Some(color) = matches.opt_str("color") {
+            if let Ok(color) = Color::from_str(&color) {
+                options.color = Some(color);
+            } else {
+                return Err(RustfmtError::InvalidCommandLineOption(
+                    "color".to_owned(),
+                    color,
+                ));
             }
         }
 
-        if let Some(ref file_lines) = matches.opt_str("file-lines") {
-            options.file_lines = file_lines.parse()?;
+        if let Some(file_lines) = matches.opt_str("file-lines") {
+            if let Ok(file_lines) = file_lines.parse() {
+                options.file_lines = file_lines
+            } else {
+                return Err(RustfmtError::InvalidCommandLineOption(
+                    "file-lines".to_owned(),
+                    file_lines,
+                ));
+            }
         }
 
         if matches.opt_present("error-on-unformatted") {
@@ -132,12 +140,12 @@ impl CliOptions {
 fn match_cli_path_or_file(
     config_path: Option<PathBuf>,
     input_file: &Path,
-) -> FmtResult<(Config, Option<PathBuf>)> {
+) -> Result<(Config, Option<PathBuf>), Error> {
     if let Some(config_file) = config_path {
         let toml = Config::from_toml_path(config_file.as_ref())?;
         return Ok((toml, Some(config_file)));
     }
-    Config::from_resolved_toml_path(input_file).map_err(FmtError::from)
+    Ok(Config::from_resolved_toml_path(input_file)?)
 }
 
 fn make_opts() -> Options {
@@ -205,7 +213,7 @@ fn make_opts() -> Options {
     opts
 }
 
-fn execute(opts: &Options) -> FmtResult<Summary> {
+fn execute(opts: &Options) -> Result<Summary, Error> {
     let matches = opts.parse(env::args().skip(1))?;
 
     match determine_operation(&matches)? {
@@ -242,7 +250,9 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
 
             // parse file_lines
             if let Some(ref file_lines) = matches.opt_str("file-lines") {
-                config.set().file_lines(file_lines.parse()?);
+                config.set().file_lines(file_lines.parse().map_err(|e| {
+                    RustfmtError::InvalidCommandLineOption("file-lines".to_owned(), e)
+                })?);
                 for f in config.file_lines().files() {
                     match *f {
                         FileName::Custom(ref f) if f == "stdin" => {}
@@ -253,7 +263,7 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
 
             let mut error_summary = Summary::default();
             if config.version_meets_requirement(&mut error_summary) {
-                error_summary.add(run(Input::Text(input), &config));
+                error_summary.add(run(Input::Text(input), &config)?);
             }
 
             Ok(error_summary)
@@ -317,7 +327,7 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
                     }
 
                     options.clone().apply_to(&mut config);
-                    error_summary.add(run(Input::File(file), &config));
+                    error_summary.add(run(Input::File(file), &config)?);
                 }
             }
 
@@ -392,7 +402,20 @@ fn print_version() {
     )
 }
 
-fn determine_operation(matches: &Matches) -> FmtResult<Operation> {
+/// Read the config_path and convert to parent dir if a file is provided.
+/// If a config file cannot be found from the given path, return error.
+fn valid_config_file_path(matches: &Matches) -> RustfmtResult<Option<PathBuf>> {
+    match matches.opt_str("config-path").map(PathBuf::from) {
+        Some(ref path) if !path.exists() => Err(RustfmtError::ConfigFileNotFound(path.clone())),
+        Some(ref path) if path.is_dir() => match get_toml_path(path)? {
+            config_file_path @ Some(..) => Ok(config_file_path),
+            None => Err(RustfmtError::ConfigFileNotFound(path.clone())),
+        },
+        config_path => Ok(config_path),
+    }
+}
+
+fn determine_operation(matches: &Matches) -> Result<Operation, Error> {
     if matches.opt_present("h") {
         return Ok(Operation::Help);
     }
@@ -421,27 +444,7 @@ fn determine_operation(matches: &Matches) -> FmtResult<Operation> {
         return Ok(Operation::Version);
     }
 
-    let config_path_not_found = |path: &str| -> FmtResult<Operation> {
-        Err(FmtError::from(format!(
-            "Error: unable to find a config file for the given path: `{}`",
-            path
-        )))
-    };
-
-    // Read the config_path and convert to parent dir if a file is provided.
-    // If a config file cannot be found from the given path, return error.
-    let config_path: Option<PathBuf> = match matches.opt_str("config-path").map(PathBuf::from) {
-        Some(ref path) if !path.exists() => return config_path_not_found(path.to_str().unwrap()),
-        Some(ref path) if path.is_dir() => {
-            let config_file_path = get_toml_path(path)?;
-            if config_file_path.is_some() {
-                config_file_path
-            } else {
-                return config_path_not_found(path.to_str().unwrap());
-            }
-        }
-        path => path,
-    };
+    let config_path = valid_config_file_path(&matches)?;
 
     // If no path is given, we won't output a minimal config.
     let minimal_config_path = matches.opt_str("dump-minimal-config");
