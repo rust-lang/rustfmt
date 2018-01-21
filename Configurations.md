@@ -1468,7 +1468,7 @@ struct Foo {
 
 ## `spaces_around_ranges`
 
-Put spaces around the .. and ... range operators
+Put spaces around the .. and ..= range operators
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
