@@ -340,7 +340,7 @@ pub fn rewrite_macro_def(
     // variables for new names with the same length first.
 
     let old_body = context.snippet(branch.body).trim();
-    let (body_str, substs) = replace_names(old_body);
+    let (body_str, substs, repeats) = replace_names(old_body);
 
     // We'll hack the indent below, take this into account when formatting,
     let mut config = context.config.clone();
@@ -353,7 +353,10 @@ pub fn rewrite_macro_def(
         Some(new_body) => new_body,
         None => match ::format_code_block(&body_str, &config) {
             Some(new_body) => new_body,
-            None => return snippet,
+            None => {
+                debug!("format_snippet() and format_code_block failed");
+                return snippet;
+            }
         },
     };
 
@@ -384,6 +387,67 @@ pub fn rewrite_macro_def(
         new_body = new_body.replace(new, old);
     }
 
+    // Undo replaced `({..})` with `$(..)*` or `$(..)+`.
+    // FIXME: this could be *MUCH* more efficient.
+    let mut sorted: Vec<(&(usize, usize), &char)> = repeats.iter().collect();
+    sorted.sort_by(|x, y| (y.0).0.cmp(&(x.0).0));
+    for ((opening_brace_count, _), _) in sorted.clone() {
+        println!("opening_brace_count: {}", opening_brace_count);
+        let mut obc = *opening_brace_count as isize;
+
+        // Find out where to insert `$`.
+        for (i, c) in new_body.clone().chars().enumerate() {
+            if c == '{' {
+                obc -= 1;
+                if obc == 0 {
+                    new_body = {
+                        let (first, last) = new_body.split_at(i);
+                        println!("1. first last: `{}` `{}`", first, last);
+                        let last_idx = if last.chars().nth(1).map_or(false, |c| c == '\n') {
+                            1
+                        } else {
+                            2
+                        };
+                        format!("{}$({}", &first[..first.len() - 1], &last[last_idx..])
+                    };
+                }
+            }
+        }
+    }
+    for ((_, closing_brace_count), repeat_char) in sorted {
+        println!("closing_brace_count: {}", closing_brace_count);
+        let mut cbc = *closing_brace_count as isize;
+
+        // Find out where to insert `repeat_char`.
+        for (i, c) in new_body.clone().chars().enumerate() {
+            if c == '}' {
+                cbc -= 1;
+                if cbc == 0 {
+                    new_body = {
+                        let (first, last) = new_body.split_at(i);
+                        println!("2. first last: `{}` `{}`", first, last);
+                        let first_trim_len = if first
+                            .chars()
+                            .rev()
+                            .nth(1)
+                            .map_or(false, |c| c.is_whitespace())
+                        {
+                            0
+                        } else {
+                            1
+                        };
+                        format!(
+                            "{}){}{}",
+                            &first[..first.len() - first_trim_len],
+                            repeat_char,
+                            &last[2..]
+                        )
+                    };
+                }
+            }
+        }
+    }
+
     let result = format!(
         "{}macro {}({}) {{\n{}\n{}}}",
         format_visibility(vis),
@@ -396,22 +460,62 @@ pub fn rewrite_macro_def(
     Some(result)
 }
 
-// Replaces `$foo` with `zfoo`. We must check for name overlap to ensure we
-// aren't causing problems.
-// This should also work for escaped `$` variables, where we leave earlier `$`s.
-fn replace_names(input: &str) -> (String, HashMap<String, String>) {
+/// Replaces `$foo` with `zfoo` and `$(..)+` or `$(..)*` with `({..})`.
+/// We must check for name overlap to ensure we aren't causing problems.
+/// This should also work for escaped `$` variables, where we leave earlier `$`s.
+fn replace_names(
+    input: &str,
+) -> (
+    String,
+    HashMap<String, String>,
+    HashMap<(usize, usize), char>, // key: (# of '{', # of '}'), value: '+' or '*'
+) {
     // Each substitution will require five or six extra bytes.
     let mut result = String::with_capacity(input.len() + 64);
     let mut substs = HashMap::new();
     let mut dollar_count = 0;
+    let mut paren_count = 0;
+    let mut opening_brace_count = 0;
+    let mut closing_brace_count = 0;
+    let mut opening_brace_count_place_holder = 0;
+    let mut repeat_char = HashMap::new();
+    let mut paren_stack = Vec::new();
+    let mut memo_next_char = false;
     let mut cur_name = String::new();
 
     for c in input.chars() {
+        match c {
+            '(' => paren_count += 1,
+            '{' => opening_brace_count += 1,
+            '}' => closing_brace_count += 1,
+            _ => (),
+        }
+
+        if memo_next_char && (c == '+' || c == '*') {
+            memo_next_char = false;
+            repeat_char.insert((opening_brace_count_place_holder, closing_brace_count), c);
+            continue;
+        }
+
         if c == '$' {
             dollar_count += 1;
+        } else if c == ')' && paren_stack.last().map_or(false, |(x, _)| *x == paren_count) {
+            // Replace `)` with `})`.
+            result.push_str("})");
+            closing_brace_count += 1;
+            memo_next_char = true;
+
+            let (_, obc) = paren_stack.pop().unwrap();
+            opening_brace_count_place_holder = obc;
         } else if dollar_count == 0 {
             result.push(c);
+        } else if c == '(' && cur_name.is_empty() {
+            // Replace `$(` with `({`.
+            result.push_str("({");
+            opening_brace_count += 1;
+            dollar_count = 0;
 
+            paren_stack.push((paren_count, opening_brace_count));
         } else if !c.is_alphanumeric() && !cur_name.is_empty() {
             add_macro_var(&mut result, &mut substs, &cur_name, dollar_count);
 
@@ -422,16 +526,21 @@ fn replace_names(input: &str) -> (String, HashMap<String, String>) {
         } else if c.is_alphanumeric() {
             cur_name.push(c);
         }
+
+        if c == ')' {
+            paren_count -= 1;
+        }
     }
 
+    assert_eq!(paren_count, 0);
 
     if !cur_name.is_empty() {
         add_macro_var(&mut result, &mut substs, &cur_name, dollar_count);
     }
 
-    debug!("replace_names `{}` {:?}", result, substs);
+    debug!("replace_names `{}` {:?} {:?}", result, substs, repeat_char);
 
-    (result, substs)
+    (result, substs, repeat_char)
 }
 
 // This is a bit sketchy. The token rules probably need tweaking, but it works
