@@ -18,15 +18,21 @@ pub type RustfmtResult<T> = Result<T, RustfmtError>;
 
 #[derive(Debug, Fail)]
 pub enum RustfmtError {
-    #[fail(display = "{}", _0)] IOError(io::Error),
-    #[fail(display = "{}: {}", _0, _1)] FileIOError(FileName, io::Error),
-    #[fail(display = "unknown config option found: `{}`", _0)] UnknownConfig(String),
+    #[fail(display = "{}", _0)]
+    IOError(io::Error),
+    #[fail(display = "{}: {}", _0, _1)]
+    FileIOError(FileName, io::Error),
+    #[fail(display = "unknown config option found: `{}`", _0)]
+    UnknownConfig(String),
     #[fail(display = "failed to find a config file for the given path `{:?}`", _0)]
     ConfigFileNotFound(PathBuf),
-    #[fail(display = "failed to parse a config file: {}", _0)] ConfigFileParseError(String),
+    #[fail(display = "failed to parse a config file: {}", _0)]
+    ConfigFileParseError(String),
     // Since parse errors are already emitted by the parser, we do no to emit anything.
-    #[fail(display = "")] ParseError,
-    #[fail(display = "unstable features are only available on nightly channel")] UnstableFeature,
+    #[fail(display = "")]
+    ParseError,
+    #[fail(display = "unstable features are only available on nightly channel")]
+    UnstableFeature,
     #[fail(display = "invalid command line argument found for {}: {}", _0, _1)]
     InvalidCommandLineOption(String, String),
 }

@@ -36,7 +36,8 @@ use getopts::{Matches, Options};
 /// Error type for cargo-fmt.
 #[derive(Debug, Fail)]
 enum CargoFmtError {
-    #[fail(display = "failed to execute `cargo manifest`: {}", _0)] CargoManifestError(String),
+    #[fail(display = "failed to execute `cargo manifest`: {}", _0)]
+    CargoManifestError(String),
     #[fail(display = "package `{}` is not a member of this workspace", _0)]
     UnknownWorkspaceMember(String),
 }
