@@ -9,16 +9,18 @@
 // except according to those terms.
 
 #![feature(match_default_bindings)]
-#![feature(rustc_private)]
 #![feature(type_ascription)]
 
 #[macro_use]
 extern crate derive_new;
 extern crate diff;
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
 #[macro_use]
 extern crate log;
 extern crate regex;
-extern crate rustc_errors as errors;
+extern crate rustc_errors;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -27,30 +29,27 @@ extern crate syntax;
 extern crate term;
 extern crate unicode_segmentation;
 
-use std::collections::HashMap;
-use std::fmt;
-use std::io::{self, stdout, Write};
-use std::iter::repeat;
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use errors::{DiagnosticBuilder, Handler};
-use errors::emitter::{ColorConfig, EmitterWriter};
+use failure::Error;
+use rustc_errors::Handler;
+use rustc_errors::emitter::{ColorConfig, EmitterWriter};
 use syntax::ast;
 use syntax::codemap::{CodeMap, FilePathMapping};
 pub use syntax::codemap::FileName;
 use syntax::parse::{self, ParseSess};
 
 use checkstyle::{output_footer, output_header};
-use comment::{CharClasses, FullCodeCharKind};
 pub use config::Config;
 use filemap::FileMap;
-use issues::{BadIssueSeeker, Issue};
 use shape::Indent;
 use utils::use_colored_tty;
 use visitor::{FmtVisitor, SnippetProvider};
-
+pub use report::*;
+pub use errors::{RustfmtError, RustfmtResult};
 pub use self::summary::Summary;
 
 #[macro_use]
@@ -81,245 +80,31 @@ mod macros;
 mod patterns;
 mod summary;
 mod vertical;
-
-#[derive(Clone, Copy)]
-pub enum ErrorKind {
-    // Line has exceeded character limit (found, maximum)
-    LineOverflow(usize, usize),
-    // Line ends in whitespace
-    TrailingWhitespace,
-    // TO-DO or FIX-ME item without an issue number
-    BadIssue(Issue),
-}
-
-impl fmt::Display for ErrorKind {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            ErrorKind::LineOverflow(found, maximum) => write!(
-                fmt,
-                "line exceeded maximum width (maximum: {}, found: {})",
-                maximum, found
-            ),
-            ErrorKind::TrailingWhitespace => write!(fmt, "left behind trailing whitespace"),
-            ErrorKind::BadIssue(issue) => write!(fmt, "found {}", issue),
-        }
-    }
-}
-
-// Formatting errors that are identified *after* rustfmt has run.
-pub struct FormattingError {
-    line: usize,
-    kind: ErrorKind,
-    is_comment: bool,
-    is_string: bool,
-    line_buffer: String,
-}
-
-impl FormattingError {
-    fn msg_prefix(&self) -> &str {
-        match self.kind {
-            ErrorKind::LineOverflow(..) | ErrorKind::TrailingWhitespace => "error:",
-            ErrorKind::BadIssue(_) => "WARNING:",
-        }
-    }
-
-    fn msg_suffix(&self) -> &str {
-        if self.is_comment || self.is_string {
-            "set `error_on_unformatted = false` to suppress \
-             the warning against comments or string literals\n"
-        } else {
-            ""
-        }
-    }
-
-    // (space, target)
-    pub fn format_len(&self) -> (usize, usize) {
-        match self.kind {
-            ErrorKind::LineOverflow(found, max) => (max, found - max),
-            ErrorKind::TrailingWhitespace => {
-                let trailing_ws_len = self.line_buffer
-                    .chars()
-                    .rev()
-                    .take_while(|c| c.is_whitespace())
-                    .count();
-                (self.line_buffer.len() - trailing_ws_len, trailing_ws_len)
-            }
-            _ => unreachable!(),
-        }
-    }
-}
-
-pub struct FormatReport {
-    // Maps stringified file paths to their associated formatting errors.
-    file_error_map: HashMap<FileName, Vec<FormattingError>>,
-}
-
-impl FormatReport {
-    fn new() -> FormatReport {
-        FormatReport {
-            file_error_map: HashMap::new(),
-        }
-    }
-
-    pub fn warning_count(&self) -> usize {
-        self.file_error_map
-            .iter()
-            .map(|(_, errors)| errors.len())
-            .sum()
-    }
-
-    pub fn has_warnings(&self) -> bool {
-        self.warning_count() > 0
-    }
-
-    pub fn print_warnings_fancy(
-        &self,
-        mut t: Box<term::Terminal<Output = io::Stderr>>,
-    ) -> Result<(), term::Error> {
-        for (file, errors) in &self.file_error_map {
-            for error in errors {
-                let prefix_space_len = error.line.to_string().len();
-                let prefix_spaces: String = repeat(" ").take(1 + prefix_space_len).collect();
-
-                // First line: the overview of error
-                t.fg(term::color::RED)?;
-                t.attr(term::Attr::Bold)?;
-                write!(t, "{} ", error.msg_prefix())?;
-                t.reset()?;
-                t.attr(term::Attr::Bold)?;
-                write!(t, "{}\n", error.kind)?;
-
-                // Second line: file info
-                write!(t, "{}--> ", &prefix_spaces[1..])?;
-                t.reset()?;
-                write!(t, "{}:{}\n", file, error.line)?;
-
-                // Third to fifth lines: show the line which triggered error, if available.
-                if !error.line_buffer.is_empty() {
-                    let (space_len, target_len) = error.format_len();
-                    t.attr(term::Attr::Bold)?;
-                    write!(t, "{}|\n{} | ", prefix_spaces, error.line)?;
-                    t.reset()?;
-                    write!(t, "{}\n", error.line_buffer)?;
-                    t.attr(term::Attr::Bold)?;
-                    write!(t, "{}| ", prefix_spaces)?;
-                    t.fg(term::color::RED)?;
-                    write!(t, "{}\n", target_str(space_len, target_len))?;
-                    t.reset()?;
-                }
-
-                // The last line: show note if available.
-                let msg_suffix = error.msg_suffix();
-                if !msg_suffix.is_empty() {
-                    t.attr(term::Attr::Bold)?;
-                    write!(t, "{}= note: ", prefix_spaces)?;
-                    t.reset()?;
-                    write!(t, "{}\n", error.msg_suffix())?;
-                } else {
-                    write!(t, "\n")?;
-                }
-                t.reset()?;
-            }
-        }
-
-        if !self.file_error_map.is_empty() {
-            t.attr(term::Attr::Bold)?;
-            write!(t, "warning: ")?;
-            t.reset()?;
-            write!(
-                t,
-                "rustfmt may have failed to format. See previous {} errors.\n\n",
-                self.warning_count(),
-            )?;
-        }
-
-        Ok(())
-    }
-}
-
-fn target_str(space_len: usize, target_len: usize) -> String {
-    let empty_line: String = repeat(" ").take(space_len).collect();
-    let overflowed: String = repeat("^").take(target_len).collect();
-    empty_line + &overflowed
-}
-
-impl fmt::Display for FormatReport {
-    // Prints all the formatting errors.
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        for (file, errors) in &self.file_error_map {
-            for error in errors {
-                let prefix_space_len = error.line.to_string().len();
-                let prefix_spaces: String = repeat(" ").take(1 + prefix_space_len).collect();
-
-                let error_line_buffer = if error.line_buffer.is_empty() {
-                    String::from(" ")
-                } else {
-                    let (space_len, target_len) = error.format_len();
-                    format!(
-                        "{}|\n{} | {}\n{}| {}",
-                        prefix_spaces,
-                        error.line,
-                        error.line_buffer,
-                        prefix_spaces,
-                        target_str(space_len, target_len)
-                    )
-                };
-
-                let error_info = format!("{} {}", error.msg_prefix(), error.kind);
-                let file_info = format!("{}--> {}:{}", &prefix_spaces[1..], file, error.line);
-                let msg_suffix = error.msg_suffix();
-                let note = if msg_suffix.is_empty() {
-                    String::new()
-                } else {
-                    format!("{}note= ", prefix_spaces)
-                };
-
-                write!(
-                    fmt,
-                    "{}\n{}\n{}\n{}{}\n",
-                    error_info,
-                    file_info,
-                    error_line_buffer,
-                    note,
-                    error.msg_suffix()
-                )?;
-            }
-        }
-        if !self.file_error_map.is_empty() {
-            write!(
-                fmt,
-                "warning: rustfmt may have failed to format. See previous {} errors.\n",
-                self.warning_count(),
-            )?;
-        }
-        Ok(())
-    }
-}
+mod report;
+pub mod errors;
 
 // Formatting which depends on the AST.
-fn format_ast<F>(
+fn format_ast<T: Write>(
     krate: &ast::Crate,
     parse_session: &mut ParseSess,
     main_file: &FileName,
     config: &Config,
-    mut after_file: F,
-) -> Result<(FileMap, bool), io::Error>
-where
-    F: FnMut(&FileName, &mut String, &[(usize, usize)]) -> Result<bool, io::Error>,
-{
+    mut out: &mut Option<&mut T>,
+) -> RustfmtResult<(FileMap, bool, FormatReport)> {
     let mut result = FileMap::new();
+    let mut report = FormatReport::new();
     // diff mode: check if any files are differing
     let mut has_diff = false;
 
     // We always skip children for the "Plain" write mode, since there is
     // nothing to distinguish the nested module contents.
     let skip_children = config.skip_children() || config.write_mode() == config::WriteMode::Plain;
-    for (path, module) in modules::list_files(krate, parse_session.codemap())? {
-        if skip_children && path != *main_file {
+    for (file_name, module) in modules::list_files(krate, parse_session.codemap()) {
+        if skip_children && file_name != *main_file {
             continue;
         }
         if config.verbose() {
-            println!("Formatting {}", path);
+            println!("Formatting {}", file_name);
         }
         let filemap = parse_session
             .codemap()
@@ -329,7 +114,7 @@ where
         let snippet_provider = SnippetProvider::new(filemap.start_pos, big_snippet);
         let mut visitor = FmtVisitor::from_codemap(parse_session, config, &snippet_provider);
         // Format inner attributes if available.
-        if !krate.attrs.is_empty() && path == *main_file {
+        if !krate.attrs.is_empty() && file_name == *main_file {
             visitor.skip_empty_lines(filemap.end_pos);
             if visitor.visit_attrs(&krate.attrs, ast::AttrStyle::Inner) {
                 visitor.push_rewrite(module.inner, None);
@@ -347,190 +132,142 @@ where
             ::utils::count_newlines(&format!("{}", visitor.buffer))
         );
 
-        let filename = path.clone();
-        has_diff |= match after_file(&filename, &mut visitor.buffer, &visitor.skipped_range) {
-            Ok(result) => result,
-            Err(e) => {
-                // Create a new error with path_str to help users see which files failed
-                let err_msg = format!("{}: {}", path, e);
-                return Err(io::Error::new(e.kind(), err_msg));
-            }
+        let maybe_has_diff = visitor.report_errors_after_format(&file_name, &mut report, &mut out);
+
+        has_diff |= match maybe_has_diff {
+            Ok(diff) => diff,
+            Err(e) => return Err(RustfmtError::FileIOError(file_name, e)),
         };
 
-        result.push((filename, visitor.buffer));
+        result.push((file_name, visitor.buffer));
     }
 
-    Ok((result, has_diff))
+    Ok((result, has_diff, report))
 }
 
-/// Returns true if the line with the given line number was skipped by `#[rustfmt_skip]`.
-fn is_skipped_line(line_number: usize, skipped_range: &[(usize, usize)]) -> bool {
-    skipped_range
-        .iter()
-        .any(|&(lo, hi)| lo <= line_number && line_number <= hi)
+#[derive(Debug)]
+pub enum Input {
+    File(PathBuf),
+    Text(String),
 }
 
-fn should_report_error(
-    config: &Config,
-    char_kind: FullCodeCharKind,
-    is_string: bool,
-    error_kind: ErrorKind,
-) -> bool {
-    let allow_error_report = if char_kind.is_comment() || is_string {
-        config.error_on_unformatted()
-    } else {
-        true
+/// Returns a complete AST of the given input. Returns an error when parsing failed.
+fn parse_input(input: Input, parse_session: &ParseSess) -> RustfmtResult<ast::Crate> {
+    let mut parser = match input {
+        Input::File(file) => parse::new_parser_from_file(parse_session, &file),
+        Input::Text(text) => parse::new_parser_from_source_str(
+            parse_session,
+            FileName::Custom("stdin".to_owned()),
+            text,
+        ),
     };
-
-    match error_kind {
-        ErrorKind::LineOverflow(..) => config.error_on_line_overflow() && allow_error_report,
-        ErrorKind::TrailingWhitespace => allow_error_report,
-        _ => true,
+    parser.cfg_mods = false;
+    match parser.parse_crate_mod() {
+        _ if parse_session.span_diagnostic.has_errors() => Err(RustfmtError::ParseError),
+        Ok(krate) => Ok(krate),
+        Err(mut diagnostic) => {
+            diagnostic.emit();
+            Err(RustfmtError::ParseError)
+        }
     }
 }
 
-// Formatting done on a char by char or line by line basis.
-// FIXME(#209) warn on bad license
-// FIXME(#20) other stuff for parity with make tidy
-fn format_lines(
-    text: &mut String,
-    name: &FileName,
-    skipped_range: &[(usize, usize)],
-    config: &Config,
-    report: &mut FormatReport,
-) {
-    // Iterate over the chars in the file map.
-    let mut trims = vec![];
-    let mut last_wspace: Option<usize> = None;
-    let mut line_len = 0;
-    let mut cur_line = 1;
-    let mut newline_count = 0;
-    let mut errors = vec![];
-    let mut issue_seeker = BadIssueSeeker::new(config.report_todo(), config.report_fixme());
-    let mut line_buffer = String::with_capacity(config.max_width() * 2);
-    let mut is_string = false; // true if the current line contains a string literal.
-    let mut format_line = config.file_lines().contains_line(name, cur_line);
-
-    for (kind, (b, c)) in CharClasses::new(text.chars().enumerate()) {
-        if c == '\r' {
-            continue;
-        }
-
-        if format_line {
-            // Add warnings for bad todos/ fixmes
-            if let Some(issue) = issue_seeker.inspect(c) {
-                errors.push(FormattingError {
-                    line: cur_line,
-                    kind: ErrorKind::BadIssue(issue),
-                    is_comment: false,
-                    is_string: false,
-                    line_buffer: String::new(),
-                });
-            }
-        }
-
-        if c == '\n' {
-            if format_line {
-                // Check for (and record) trailing whitespace.
-                if let Some(..) = last_wspace {
-                    if should_report_error(config, kind, is_string, ErrorKind::TrailingWhitespace) {
-                        trims.push((cur_line, kind, line_buffer.clone()));
-                    }
-                    line_len -= 1;
-                }
-
-                // Check for any line width errors we couldn't correct.
-                let error_kind = ErrorKind::LineOverflow(line_len, config.max_width());
-                if line_len > config.max_width() && !is_skipped_line(cur_line, skipped_range)
-                    && should_report_error(config, kind, is_string, error_kind)
-                {
-                    errors.push(FormattingError {
-                        line: cur_line,
-                        kind: error_kind,
-                        is_comment: kind.is_comment(),
-                        is_string: is_string,
-                        line_buffer: line_buffer.clone(),
-                    });
-                }
-            }
-
-            line_len = 0;
-            cur_line += 1;
-            format_line = config.file_lines().contains_line(name, cur_line);
-            newline_count += 1;
-            last_wspace = None;
-            line_buffer.clear();
-            is_string = false;
-        } else {
-            newline_count = 0;
-            line_len += if c == '\t' { config.tab_spaces() } else { 1 };
-            if c.is_whitespace() {
-                if last_wspace.is_none() {
-                    last_wspace = Some(b);
-                }
-            } else {
-                last_wspace = None;
-            }
-            line_buffer.push(c);
-            if kind.is_string() {
-                is_string = true;
-            }
-        }
-    }
-
-    if newline_count > 1 {
-        debug!("track truncate: {} {}", text.len(), newline_count);
-        let line = text.len() - newline_count + 1;
-        text.truncate(line);
-    }
-
-    for &(l, kind, ref b) in &trims {
-        if !is_skipped_line(l, skipped_range) {
-            errors.push(FormattingError {
-                line: l,
-                kind: ErrorKind::TrailingWhitespace,
-                is_comment: kind.is_comment(),
-                is_string: kind.is_string(),
-                line_buffer: b.clone(),
-            });
-        }
-    }
-
-    report.file_error_map.insert(name.clone(), errors);
+fn create_silent_emitter(codemap: &Rc<CodeMap>) -> Box<EmitterWriter> {
+    Box::new(EmitterWriter::new(
+        Box::new(Vec::new()),
+        Some(codemap.clone()),
+        false,
+    ))
 }
 
-fn parse_input(
+/// Format the given input based on the given config. The main purpose of this
+/// function is to set up various data structures for further processing.
+/// Parsing and formatting are delegated to `parse_input` and `format_ast`
+/// respectively.
+pub fn format_input<T: Write>(
     input: Input,
-    parse_session: &ParseSess,
-) -> Result<ast::Crate, Option<DiagnosticBuilder>> {
-    let result = match input {
-        Input::File(file) => {
-            let mut parser = parse::new_parser_from_file(parse_session, &file);
-            parser.cfg_mods = false;
-            parser.parse_crate_mod()
-        }
-        Input::Text(text) => {
-            let mut parser = parse::new_parser_from_source_str(
-                parse_session,
-                FileName::Custom("stdin".to_owned()),
-                text,
-            );
-            parser.cfg_mods = false;
-            parser.parse_crate_mod()
-        }
-    };
+    config: &Config,
+    mut out: Option<&mut T>,
+) -> Result<(Summary, FileMap, FormatReport), Error> {
+    let mut summary = Summary::default();
 
-    match result {
-        Ok(c) => {
-            if parse_session.span_diagnostic.has_errors() {
-                // Bail out if the parser recovered from an error.
-                Err(None)
-            } else {
-                Ok(c)
-            }
+    if config.disable_all_formatting() {
+        // When the input is from stdin, echo back the input.
+        if let Input::Text(ref buf) = input {
+            io::stdout().write_all(buf.as_bytes())?;
         }
-        Err(e) => Err(Some(e)),
+        return Ok((summary, FileMap::new(), FormatReport::new()));
     }
+
+    let codemap = Rc::new(CodeMap::new(FilePathMapping::empty()));
+    let tty_handler = if config.hide_parse_errors() {
+        Handler::with_emitter(true, false, create_silent_emitter(&codemap))
+    } else {
+        Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(codemap.clone()))
+    };
+    let mut parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone());
+    let main_file = match input {
+        Input::File(ref file) => FileName::Real(file.clone()),
+        Input::Text(..) => FileName::Custom("stdin".to_owned()),
+    };
+    let krate = parse_input(input, &parse_session)?;
+
+    summary.mark_parse_time();
+
+    // Suppress error output after parsing.
+    let silent_emitter = create_silent_emitter(&codemap);
+    parse_session.span_diagnostic = Handler::with_emitter(true, false, silent_emitter);
+    let format_result = format_ast(&krate, &mut parse_session, &main_file, config, &mut out);
+
+    summary.mark_format_time();
+
+    if config.verbose() {
+        fn duration_to_f32(d: Duration) -> f32 {
+            d.as_secs() as f32 + d.subsec_nanos() as f32 / 1_000_000_000f32
+        }
+
+        println!(
+            "Spent {0:.3} secs in the parsing phase, and {1:.3} secs in the formatting phase",
+            duration_to_f32(summary.get_parse_time().unwrap()),
+            duration_to_f32(summary.get_format_time().unwrap()),
+        );
+    }
+
+    let (file_map, has_diff, report) = format_result?;
+
+    if report.has_warnings() {
+        summary.add_formatting_error();
+    }
+    if has_diff {
+        summary.add_diff();
+    }
+
+    Ok((summary, file_map, report))
+}
+
+/// An entry point to rustfmt.
+pub fn run(input: Input, config: &Config) -> Result<Summary, Error> {
+    let out = &mut io::stdout();
+    output_header(out, config.write_mode()).ok();
+    let (summary, _, report) = format_input(input, config, Some(out))?;
+    output_footer(out, config.write_mode()).ok();
+
+    if report.has_warnings() {
+        match term::stderr() {
+            Some(ref t)
+                if use_colored_tty(config.color()) && t.supports_color()
+                    && t.supports_attr(term::Attr::Bold) =>
+            {
+                match report.print_warnings_fancy(term::stderr().unwrap()) {
+                    Ok(..) => (),
+                    Err(..) => panic!("Unable to write to stderr: {}", report),
+                }
+            }
+            _ => msg!("{}", report),
+        }
+    }
+
+    Ok(summary)
 }
 
 /// Format the given snippet. The snippet is expected to be *complete* code.
@@ -542,8 +279,6 @@ pub fn format_snippet(snippet: &str, config: &Config) -> Option<String> {
     config.set().write_mode(config::WriteMode::Plain);
     config.set().hide_parse_errors(true);
     match format_input(input, &config, Some(&mut out)) {
-        // `format_input()` returns an empty string on parsing error.
-        Ok(..) if out.is_empty() && !snippet.is_empty() => None,
         Ok(..) => String::from_utf8(out).ok(),
         Err(..) => None,
     }
@@ -581,154 +316,6 @@ pub fn format_code_block(code_snippet: &str, config: &Config) -> Option<String> 
             .collect::<Vec<_>>()
             .join("\n")
     })
-}
-
-pub fn format_input<T: Write>(
-    input: Input,
-    config: &Config,
-    mut out: Option<&mut T>,
-) -> Result<(Summary, FileMap, FormatReport), (io::Error, Summary)> {
-    let mut summary = Summary::default();
-    if config.disable_all_formatting() {
-        // When the input is from stdin, echo back the input.
-        if let Input::Text(ref buf) = input {
-            if let Err(e) = io::stdout().write_all(buf.as_bytes()) {
-                return Err((e, summary));
-            }
-        }
-        return Ok((summary, FileMap::new(), FormatReport::new()));
-    }
-    let codemap = Rc::new(CodeMap::new(FilePathMapping::empty()));
-
-    let tty_handler = if config.hide_parse_errors() {
-        let silent_emitter = Box::new(EmitterWriter::new(
-            Box::new(Vec::new()),
-            Some(codemap.clone()),
-            false,
-        ));
-        Handler::with_emitter(true, false, silent_emitter)
-    } else {
-        Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(codemap.clone()))
-    };
-    let mut parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone());
-
-    let main_file = match input {
-        Input::File(ref file) => FileName::Real(file.clone()),
-        Input::Text(..) => FileName::Custom("stdin".to_owned()),
-    };
-
-    let krate = match parse_input(input, &parse_session) {
-        Ok(krate) => krate,
-        Err(diagnostic) => {
-            if let Some(mut diagnostic) = diagnostic {
-                diagnostic.emit();
-            }
-            summary.add_parsing_error();
-            return Ok((summary, FileMap::new(), FormatReport::new()));
-        }
-    };
-
-    summary.mark_parse_time();
-
-    if parse_session.span_diagnostic.has_errors() {
-        summary.add_parsing_error();
-    }
-
-    // Suppress error output after parsing.
-    let silent_emitter = Box::new(EmitterWriter::new(
-        Box::new(Vec::new()),
-        Some(codemap.clone()),
-        false,
-    ));
-    parse_session.span_diagnostic = Handler::with_emitter(true, false, silent_emitter);
-
-    let mut report = FormatReport::new();
-
-    let format_result = format_ast(
-        &krate,
-        &mut parse_session,
-        &main_file,
-        config,
-        |file_name, file, skipped_range| {
-            // For some reason, the codemap does not include terminating
-            // newlines so we must add one on for each file. This is sad.
-            filemap::append_newline(file);
-
-            format_lines(file, file_name, skipped_range, config, &mut report);
-
-            if let Some(ref mut out) = out {
-                return filemap::write_file(file, file_name, out, config);
-            }
-            Ok(false)
-        },
-    );
-
-    summary.mark_format_time();
-
-    if config.verbose() {
-        fn duration_to_f32(d: Duration) -> f32 {
-            d.as_secs() as f32 + d.subsec_nanos() as f32 / 1_000_000_000f32
-        }
-
-        println!(
-            "Spent {0:.3} secs in the parsing phase, and {1:.3} secs in the formatting phase",
-            duration_to_f32(summary.get_parse_time().unwrap()),
-            duration_to_f32(summary.get_format_time().unwrap()),
-        );
-    }
-
-    match format_result {
-        Ok((file_map, has_diff)) => {
-            if report.has_warnings() {
-                summary.add_formatting_error();
-            }
-
-            if has_diff {
-                summary.add_diff();
-            }
-
-            Ok((summary, file_map, report))
-        }
-        Err(e) => Err((e, summary)),
-    }
-}
-
-#[derive(Debug)]
-pub enum Input {
-    File(PathBuf),
-    Text(String),
-}
-
-pub fn run(input: Input, config: &Config) -> Summary {
-    let out = &mut stdout();
-    output_header(out, config.write_mode()).ok();
-    match format_input(input, config, Some(out)) {
-        Ok((summary, _, report)) => {
-            output_footer(out, config.write_mode()).ok();
-
-            if report.has_warnings() {
-                match term::stderr() {
-                    Some(ref t)
-                        if use_colored_tty(config.color()) && t.supports_color()
-                            && t.supports_attr(term::Attr::Bold) =>
-                    {
-                        match report.print_warnings_fancy(term::stderr().unwrap()) {
-                            Ok(..) => (),
-                            Err(..) => panic!("Unable to write to stderr: {}", report),
-                        }
-                    }
-                    _ => msg!("{}", report),
-                }
-            }
-
-            summary
-        }
-        Err((msg, mut summary)) => {
-            msg!("Error writing files: {}", msg);
-            summary.add_operational_error();
-            summary
-        }
-    }
 }
 
 #[cfg(test)]

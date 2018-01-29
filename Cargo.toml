@@ -46,6 +46,8 @@ derive-new = "0.5"
 cargo_metadata = "0.4"
 rustc-ap-syntax = "12.0.0"
 rustc-ap-rustc_errors = "12.0.0"
+failure = "0.1"
+failure_derive = "0.1"
 
 [dev-dependencies]
 lazy_static = "1.0.0"

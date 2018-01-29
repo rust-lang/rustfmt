@@ -10,14 +10,17 @@
 
 extern crate toml;
 
+use failure::Error;
+
 use std::{env, fs};
 use std::cell::Cell;
 use std::default::Default;
 use std::fs::File;
-use std::io::{Error, ErrorKind, Read};
+use std::io::{ErrorKind, Read};
 use std::path::{Path, PathBuf};
 
 use Summary;
+use errors::*;
 use file_lines::FileLines;
 use lists::{ListTactic, SeparatorPlace, SeparatorTactic};
 
@@ -284,15 +287,14 @@ macro_rules! create_config {
         }
 
         impl PartialConfig {
-            pub fn to_toml(&self) -> Result<String, String> {
+            pub fn to_toml(&self) -> Result<String, Error> {
                 // Non-user-facing options can't be specified in TOML
                 let mut cloned = self.clone();
                 cloned.file_lines = None;
                 cloned.verbose = None;
                 cloned.width_heuristics = None;
 
-                toml::to_string(&cloned)
-                    .map_err(|e| format!("Could not output config: {}", e.to_string()))
+                Ok(toml::to_string(&cloned)?)
             }
         }
 
@@ -381,14 +383,15 @@ macro_rules! create_config {
                 self
             }
 
-            pub fn from_toml(toml: &str) -> Result<Config, String> {
-                let parsed: toml::Value =
-                    toml.parse().map_err(|e| format!("Could not parse TOML: {}", e))?;
+            pub fn from_toml(toml: &str) -> RustfmtResult<Config> {
+                let parsed: toml::Value = toml.parse().map_err(|e| {
+                    RustfmtError::ConfigFileParseError(format!("{}", e))
+                })?;
                 let mut err: String = String::new();
                 {
-                    let table = parsed
-                        .as_table()
-                        .ok_or(String::from("Parsed config was not table"))?;
+                    let table = parsed.as_table().ok_or(RustfmtError::ConfigFileParseError(
+                        "config file must be in a TOML table".to_owned(),
+                    ))?;
                     for key in table.keys() {
                         match &**key {
                             $(
@@ -410,10 +413,7 @@ macro_rules! create_config {
                         Ok(Config::default().fill_from_parsed_config(parsed_config))
                     }
                     Err(e) => {
-                        err.push_str("Error: Decoding config file failed:\n");
-                        err.push_str(format!("{}\n", e).as_str());
-                        err.push_str("Please check your config file.");
-                        Err(err)
+                        Err(RustfmtError::ConfigFileParseError(format!("{}", e)))
                     }
                 }
             }
@@ -469,7 +469,7 @@ macro_rules! create_config {
                 let mut file = File::open(&file_path)?;
                 let mut toml = String::new();
                 file.read_to_string(&mut toml)?;
-                Config::from_toml(&toml).map_err(|err| Error::new(ErrorKind::InvalidData, err))
+                Ok(Config::from_toml(&toml)?)
             }
 
             /// Resolve the config for input in `dir`.
@@ -496,9 +496,8 @@ macro_rules! create_config {
                     current = fs::canonicalize(current)?;
 
                     loop {
-                        match get_toml_path(&current) {
-                            Ok(Some(path)) => return Ok(Some(path)),
-                            Err(e) => return Err(e),
+                        match get_toml_path(&current)? {
+                            path @ Some(..) => return Ok(path),
                             _ => ()
                         }
 
@@ -573,7 +572,7 @@ macro_rules! create_config {
 /// Check for the presence of known config file names (`rustfmt.toml, `.rustfmt.toml`) in `dir`
 ///
 /// Return the path if a config file exists, empty if no file exists, and Error for IO errors
-pub fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
+pub fn get_toml_path(dir: &Path) -> RustfmtResult<Option<PathBuf>> {
     const CONFIG_FILE_NAMES: [&str; 2] = [".rustfmt.toml", "rustfmt.toml"];
     for config_file_name in &CONFIG_FILE_NAMES {
         let config_file = dir.join(config_file_name);
@@ -585,7 +584,7 @@ pub fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
             // find the project file yet, and continue searching.
             Err(e) => {
                 if e.kind() != ErrorKind::NotFound {
-                    return Err(e);
+                    return Err(RustfmtError::IOError(e));
                 }
             }
             _ => {}

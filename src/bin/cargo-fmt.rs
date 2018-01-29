@@ -14,20 +14,35 @@
 #![deny(warnings)]
 
 extern crate cargo_metadata;
+#[macro_use]
+extern crate failure;
 extern crate getopts;
+extern crate rustfmt_nightly as rustfmt;
 extern crate serde_json as json;
 
 use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::io::{self, Write};
+use std::io::Write;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 use std::str;
 
+use failure::Error;
 use getopts::{Matches, Options};
+
+/// Error type for cargo-fmt.
+#[derive(Debug, Fail)]
+enum CargoFmtError {
+    #[fail(display = "failed to execute `cargo manifest`: {}", _0)]
+    CargoManifestError(String),
+    #[fail(display = "package `{}` is not a member of this workspace", _0)]
+    UnknownWorkspaceMember(String),
+}
+
+type CargoFmtResult<T> = Result<T, CargoFmtError>;
 
 fn main() {
     let exit_status = execute();
@@ -58,7 +73,7 @@ fn execute() -> i32 {
         if arg.starts_with('-') {
             is_package_arg = arg.starts_with("--package");
         } else if !is_package_arg {
-            print_usage_to_stderr(&opts, &format!("Invalid argument: `{}`.", arg));
+            print_usage_to_stderr(&opts, &format!("Invalid argument: `{}`", arg));
             return FAILURE;
         } else {
             is_package_arg = false;
@@ -122,7 +137,7 @@ pub enum Verbosity {
     Quiet,
 }
 
-fn handle_command_status(status: Result<ExitStatus, io::Error>, opts: &getopts::Options) -> i32 {
+fn handle_command_status(status: Result<ExitStatus, Error>, opts: &getopts::Options) -> i32 {
     match status {
         Err(e) => {
             print_usage_to_stderr(opts, &e.to_string());
@@ -138,14 +153,11 @@ fn handle_command_status(status: Result<ExitStatus, io::Error>, opts: &getopts::
     }
 }
 
-fn get_version(verbosity: Verbosity) -> Result<ExitStatus, io::Error> {
+fn get_version(verbosity: Verbosity) -> Result<ExitStatus, Error> {
     run_rustfmt(&[], &[String::from("--version")], verbosity)
 }
 
-fn format_crate(
-    verbosity: Verbosity,
-    strategy: &CargoFmtStrategy,
-) -> Result<ExitStatus, io::Error> {
+fn format_crate(verbosity: Verbosity, strategy: &CargoFmtStrategy) -> Result<ExitStatus, Error> {
     let rustfmt_args = get_fmt_args();
     let targets = if rustfmt_args.iter().any(|s| s == "--dump-default-config") {
         HashSet::new()
@@ -228,7 +240,7 @@ impl CargoFmtStrategy {
 }
 
 /// Based on the specified `CargoFmtStrategy`, returns a set of main source files.
-fn get_targets(strategy: &CargoFmtStrategy) -> Result<HashSet<Target>, io::Error> {
+fn get_targets(strategy: &CargoFmtStrategy) -> CargoFmtResult<HashSet<Target>> {
     let mut targets = HashSet::new();
 
     match *strategy {
@@ -238,16 +250,15 @@ fn get_targets(strategy: &CargoFmtStrategy) -> Result<HashSet<Target>, io::Error
     }
 
     if targets.is_empty() {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Failed to find targets".to_owned(),
+        Err(CargoFmtError::CargoManifestError(
+            "failed to find targets".to_owned(),
         ))
     } else {
         Ok(targets)
     }
 }
 
-fn get_targets_root_only(targets: &mut HashSet<Target>) -> Result<(), io::Error> {
+fn get_targets_root_only(targets: &mut HashSet<Target>) -> CargoFmtResult<()> {
     let metadata = get_cargo_metadata(None)?;
 
     for package in metadata.packages {
@@ -263,7 +274,7 @@ fn get_targets_recursive(
     manifest_path: Option<&Path>,
     mut targets: &mut HashSet<Target>,
     visited: &mut HashSet<String>,
-) -> Result<(), io::Error> {
+) -> CargoFmtResult<()> {
     let metadata = get_cargo_metadata(manifest_path)?;
 
     for package in metadata.packages {
@@ -294,7 +305,7 @@ fn get_targets_recursive(
 fn get_targets_with_hitlist(
     hitlist: &[String],
     targets: &mut HashSet<Target>,
-) -> Result<(), io::Error> {
+) -> CargoFmtResult<()> {
     let metadata = get_cargo_metadata(None)?;
 
     let mut workspace_hitlist: HashSet<&String> = HashSet::from_iter(hitlist);
@@ -311,10 +322,7 @@ fn get_targets_with_hitlist(
         Ok(())
     } else {
         let package = workspace_hitlist.iter().next().unwrap();
-        Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("package `{}` is not a member of the workspace", package),
-        ))
+        Err(CargoFmtError::UnknownWorkspaceMember((*package).clone()))
     }
 }
 
@@ -328,7 +336,7 @@ fn run_rustfmt(
     files: &[PathBuf],
     fmt_args: &[String],
     verbosity: Verbosity,
-) -> Result<ExitStatus, io::Error> {
+) -> Result<ExitStatus, Error> {
     let stdout = if verbosity == Verbosity::Quiet {
         std::process::Stdio::null()
     } else {
@@ -350,24 +358,14 @@ fn run_rustfmt(
         .stdout(stdout)
         .args(files)
         .args(fmt_args)
-        .spawn()
-        .map_err(|e| match e.kind() {
-            io::ErrorKind::NotFound => io::Error::new(
-                io::ErrorKind::Other,
-                "Could not run rustfmt, please make sure it is in your PATH.",
-            ),
-            _ => e,
-        })?;
+        .spawn()?;
 
-    command.wait()
+    Ok(command.wait()?)
 }
 
-fn get_cargo_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Metadata, io::Error> {
+fn get_cargo_metadata(manifest_path: Option<&Path>) -> CargoFmtResult<cargo_metadata::Metadata> {
     match cargo_metadata::metadata(manifest_path) {
         Ok(metadata) => Ok(metadata),
-        Err(..) => Err(io::Error::new(
-            io::ErrorKind::Other,
-            "`cargo manifest` failed.",
-        )),
+        Err(e) => Err(CargoFmtError::CargoManifestError(format!("{}", e))),
     }
 }
