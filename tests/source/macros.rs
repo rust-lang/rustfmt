@@ -332,3 +332,50 @@ macro foo() {
   bar();
   }
 }
+
+// macro-2.0 with repeat.
+macro lex_err($kind: ident $(, $body: expr)*) {
+    Err ( QlError :: LexError ( LexError :: $ kind ( $ ( $ body , ) * ) ) )
+}
+
+pub macro foo($x: ident) {
+    $ ( ( $ x )
+          + (3))
+        +
+        + $(($x)
+            + (3)
+        ) *
+}
+
+// From 'rust/src/librustc_mir/transform/mod.rs'.
+pub macro foo($tcx:ident, $mir:ident, $def_id:ident, $suite_index:expr; $($pass:expr,)*) {{
+    let suite_index: usize = $suite_index;
+    let run_passes = |mir: &mut _, promoted| {
+        let source = MirSource {
+            def_id: $def_id,
+            promoted
+        };
+        let mut index = 0;
+        let mut run_pass = |pass: &MirPass| {
+            let run_hooks = |mir: &_, index, is_after| {
+                dump_mir::on_mir_pass($tcx, &format_args!("{:03}-{:03}", suite_index, index),
+                                      &pass.name(), source, mir, is_after);
+            };
+            run_hooks(mir, index, false);
+            pass.run_pass($tcx, source, mir);
+            run_hooks(mir, index, true);
+
+            index += 1;
+        };
+        $(run_pass(&$pass);)*
+    };
+
+    run_passes(&mut $mir, None);
+
+    for (index, promoted_mir) in $mir.promoted.iter_enumerated_mut() {
+        run_passes(promoted_mir, Some(index));
+
+        // Let's make sure we don't miss any nested instances
+        assert!(promoted_mir.promoted.is_empty());
+    }
+}}
