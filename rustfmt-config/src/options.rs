@@ -189,6 +189,15 @@ configuration_option_enum! { Color:
     Auto,
 }
 
+configuration_option_enum! { LineWidth:
+    // Always format lines as short as possible (?)
+    Minimum,
+    // Use width heuristics to determine whether to reformat a line
+    Medium,
+    // Format lines to be as long as possible
+    Maximum,
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct WidthHeuristics {
     // Maximum width of the args of a function call before falling back
@@ -233,6 +242,17 @@ impl WidthHeuristics {
             array_width: (60.0 * max_width_ratio).round() as usize,
             chain_width: (60.0 * max_width_ratio).round() as usize,
             single_line_if_else_max_width: (50.0 * max_width_ratio).round() as usize,
+        }
+    }
+
+    pub fn maximum(max_width: usize) -> WidthHeuristics {
+        WidthHeuristics {
+            fn_call_width: max_width,
+            struct_lit_width: max_width,
+            struct_variant_width: max_width,
+            array_width: max_width,
+            chain_width: max_width,
+            single_line_if_else_max_width: max_width,
         }
     }
 }
