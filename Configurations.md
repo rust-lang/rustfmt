@@ -327,7 +327,7 @@ fn main() {
 }
 ```
 
-### `maximum`
+#### `maximum`
 
 ```rust
 enum Lorem {
