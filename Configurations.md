@@ -263,13 +263,41 @@ fn lorem<Ipsum, Dolor, Sit, Amet>() -> T
 
 ## `use_small_heuristics`
 
-Whether to use different formatting for items and expressions if they satisfy a heuristic notion of 'small'.
+Specifies how long to make lines of code, in an abstract way based on a heuristic.
 
-- **Default value**: `true`
-- **Possible values**: `true`, `false`
+- **Default value**: `medium`
+- **Possible values**: `minimum`, `medium`, `maximum`
 - **Stable**: No
 
-#### `true` (default):
+#### `minimum`:
+
+```rust
+enum Lorem {
+    Ipsum,
+    Dolor(bool),
+    Sit {
+        amet: Consectetur,
+        adipiscing: Elit,
+    },
+}
+
+fn main() {
+    lorem("lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing");
+
+    let lorem = Lorem {
+        ipsum: dolor,
+        sit: amet,
+    };
+
+    let lorem = if ipsum {
+        dolor
+    } else {
+        sit
+    };
+}
+```
+
+#### `medium` (default):
 
 ```rust
 enum Lorem {
@@ -299,31 +327,22 @@ fn main() {
 }
 ```
 
-#### `false`:
+### `maximum`
 
 ```rust
 enum Lorem {
     Ipsum,
     Dolor(bool),
-    Sit {
-        amet: Consectetur,
-        adipiscing: Elit,
-    },
+    Sit { amet: Consectetur, adipiscing: Elit },
 }
 
 fn main() {
     lorem("lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing");
 
-    let lorem = Lorem {
-        ipsum: dolor,
-        sit: amet,
-    };
+    let lorem = Lorem { ipsum: dolor, sit: amet };
+    let lorem = Lorem { ipsum: dolor };
 
-    let lorem = if ipsum {
-        dolor
-    } else {
-        sit
-    };
+    let lorem = if ipsum { dolor } else { sit };
 }
 ```
 
