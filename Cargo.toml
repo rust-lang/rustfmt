@@ -30,9 +30,9 @@ lazy_static = "1.0.0"
 
 [dependencies]
 cargo_metadata = "0.4"
-env_logger = "0.4"
+env_logger = "0.5"
 getopts = "0.2"
-log = "0.3"
+log = "0.4"
 regex = "0.2"
 rustfmt-config = { path = "rustfmt-config" }
 rustfmt-core = { path = "rustfmt-core" }
