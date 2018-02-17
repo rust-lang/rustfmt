@@ -76,9 +76,12 @@ macro_rules! create_config {
     ($($i:ident: $ty:ty, $def:expr, $stb:expr, $( $dstring:expr ),+ );+ $(;)*) => (
         #[derive(Clone)]
         pub struct Config {
-            // For each config item, we store a bool indicating whether it has
-            // been accessed and the value, and a bool whether the option was
-            // manually initialised, or taken from the default,
+            // For each config item, we store:
+            // - a bool indicating whether it has been accessed
+            // - a bool indicating whether the option was manually initialised, or taken from the
+            //   default,
+            // - the value of the option
+            // - whether this option is stable (if false, it will only work on nightly builds)
             $($i: (Cell<bool>, bool, $ty, bool)),+
         }
 
@@ -358,12 +361,12 @@ macro_rules! create_config {
             }
 
             fn set_heuristics(&mut self) {
-                if self.use_small_heuristics.2 {
-                    let max_width = self.max_width.2;
-                    self.set().width_heuristics(WidthHeuristics::scaled(max_width));
-                } else {
-                    self.set().width_heuristics(WidthHeuristics::null());
-                }
+                let width = match self.use_small_heuristics.2 {
+                    LineWidth::Minimum => WidthHeuristics::null(),
+                    LineWidth::Medium => WidthHeuristics::scaled(self.max_width.2),
+                    LineWidth::Maximum => WidthHeuristics::maximum(self.max_width.2),
+                };
+                self.set().width_heuristics(width);
             }
         }
 

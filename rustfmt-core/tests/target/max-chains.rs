@@ -1,6 +1,6 @@
 // rustfmt-normalize_comments: true
-// rustfmt-use_small_heuristics: minimum
-// Test chain formatting.
+// rustfmt-use_small_heuristics: maximum
+// Test chain formatting with `maximum` line lengths
 
 fn main() {
     let a = b.c.d.1.foo(|x| x + 1);
@@ -22,13 +22,7 @@ fn main() {
         false => (),
     });
 
-    loong_func().quux(move || {
-        if true {
-            1
-        } else {
-            2
-        }
-    });
+    loong_func().quux(move || if true { 1 } else { 2 });
 
     some_fuuuuuuuuunction().method_call_a(aaaaa, bbbbb, |c| {
         let x = c;
@@ -71,22 +65,11 @@ fn main() {
 }
 
 fn floaters() {
-    let z = Foo {
-        field1: val1,
-        field2: val2,
-    };
+    let z = Foo { field1: val1, field2: val2 };
 
-    let x = Foo {
-        field1: val1,
-        field2: val2,
-    }.method_call()
-        .method_call();
+    let x = Foo { field1: val1, field2: val2 }.method_call().method_call();
 
-    let y = if cond {
-        val1
-    } else {
-        val2
-    }.method_call();
+    let y = if cond { val1 } else { val2 }.method_call();
 
     {
         match x {
@@ -109,21 +92,18 @@ fn floaters() {
     }.bar()
         .baz();
 
-    Foo {
-        x: val,
-    }.baz(|| {
-        force();
-        multiline();
-    })
+    Foo { x: val }
+        .baz(|| {
+            force();
+            multiline();
+        })
         .quux();
 
-    Foo {
-        y: i_am_multi_line,
-        z: ok,
-    }.baz(|| {
-        force();
-        multiline();
-    })
+    Foo { y: i_am_multi_line, z: ok }
+        .baz(|| {
+            force();
+            multiline();
+        })
         .quux();
 
     a + match x {

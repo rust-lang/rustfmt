@@ -1,6 +1,6 @@
 // rustfmt-normalize_comments: true
-// rustfmt-use_small_heuristics: minimum
-// Test chain formatting.
+// rustfmt-use_small_heuristics: maximum
+// Test chain formatting with `maximum` line lengths
 
 fn main() {
     let a = b .c
