@@ -211,22 +211,20 @@ fn idempotence_tests() {
 #[test]
 fn self_tests() {
     let mut files = get_test_files(Path::new("tests"), false);
-    let bin_directories = vec![
-        "cargo-fmt",
-        "git-rustfmt",
-        "rustfmt-bin",
-        "rustfmt-format-diff",
+    let bin_files = vec![
+        "cargo-fmt.rs",
+        "git-rustfmt.rs",
+        "rustfmt.rs",
+        "rustfmt-format-diff.rs",
     ];
-    for dir in bin_directories {
-        let mut path = PathBuf::from("..");
-        path.push(dir);
-        path.push("src/main.rs");
+    for bin in bin_files {
+        let mut path = PathBuf::from("src/");
+        path.push(bin);
         files.push(path);
     }
     let lib_directories = vec!["rustfmt-core", "rustfmt-config"];
     for dir in lib_directories {
-        let mut path = PathBuf::from("..");
-        path.push(dir);
+        let mut path = PathBuf::from(dir);
         path.push("src/lib.rs");
         files.push(path);
     }
@@ -826,7 +824,7 @@ fn configuration_snippet_tests() {
     // entry for each Rust code block found.
     fn get_code_blocks() -> Vec<ConfigCodeBlock> {
         let mut file_iter = BufReader::new(
-            fs::File::open(Path::new("..").join(CONFIGURATIONS_FILE_NAME))
+            fs::File::open(Path::new(CONFIGURATIONS_FILE_NAME))
                 .expect(&format!("Couldn't read file {}", CONFIGURATIONS_FILE_NAME)),
         ).lines()
             .map(|l| l.unwrap())
