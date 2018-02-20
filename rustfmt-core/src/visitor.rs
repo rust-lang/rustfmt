@@ -49,7 +49,7 @@ fn is_mod_decl(item: &ast::Item) -> bool {
     }
 }
 
-fn is_use_item(item: &ast::Item) -> bool {
+pub fn is_use_item(item: &ast::Item) -> bool {
     match item.node {
         ast::ItemKind::Use(_) => true,
         _ => false,
