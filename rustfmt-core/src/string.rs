@@ -150,8 +150,9 @@ pub fn rewrite_string<'a>(
 
 #[cfg(test)]
 mod test {
-    use super::{rewrite_string, StringFormat};
-    use shape::{Indent, Shape};
+    use StringFormat;
+use rewrite_string;
+use shape::{Indent, Shape};
 
     #[test]
     fn issue343() {

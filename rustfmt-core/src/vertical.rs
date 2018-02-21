@@ -13,8 +13,7 @@
 use std::cmp;
 
 use config::lists::*;
-use syntax::ast;
-use syntax::codemap::{BytePos, Span};
+use syntax::{ast, codemap::{BytePos, Span}};
 
 use codemap::SpanUtils;
 use comment::{combine_strs_with_missing_comments, contains_comment};

@@ -67,12 +67,9 @@ use shape::Shape;
 use utils::{first_line_width, last_line_extendable, last_line_width, mk_sp,
             trimmed_last_line_width, wrap_str};
 
-use std::borrow::Cow;
-use std::cmp::min;
-use std::iter;
+use std::{iter, borrow::Cow, cmp::min};
 
-use syntax::{ast, ptr};
-use syntax::codemap::Span;
+use syntax::{ast, ptr, codemap::Span};
 
 pub fn rewrite_chain(expr: &ast::Expr, context: &RewriteContext, shape: Shape) -> Option<String> {
     debug!("rewrite_chain {:?}", shape);

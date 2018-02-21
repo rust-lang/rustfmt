@@ -11,8 +11,7 @@
 use std::cmp::Ordering;
 
 use config::lists::*;
-use syntax::ast;
-use syntax::codemap::{BytePos, Span};
+use syntax::{ast, codemap::{BytePos, Span}};
 
 use codemap::SpanUtils;
 use config::IndentStyle;

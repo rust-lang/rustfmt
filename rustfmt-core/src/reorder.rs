@@ -19,9 +19,9 @@
 use config::{Config, lists::*};
 use syntax::{ast, attr, codemap::Span};
 
-use format_code_block;
 use codemap::LineRangeUtils;
 use comment::{combine_strs_with_missing_comments, contains_comment};
+use format_code_block;
 use imports::{path_to_imported_ident, rewrite_import};
 use items::rewrite_mod;
 use lists::{itemize_list, write_list, ListFormatting};
@@ -31,8 +31,7 @@ use spanned::Spanned;
 use utils::mk_sp;
 use visitor::{filter_inline_attrs, is_use_item, rewrite_extern_crate, FmtVisitor};
 
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::{cmp::Ordering, collections::BTreeMap};
 
 fn compare_path_segments(a: &ast::PathSegment, b: &ast::PathSegment) -> Ordering {
     a.identifier.name.as_str().cmp(&b.identifier.name.as_str())

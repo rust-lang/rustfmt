@@ -10,9 +10,7 @@
 
 // TODO: add tests
 
-use std::fs::{self, File};
-use std::io::{self, BufWriter, Read, Write};
-use std::path::Path;
+use std::{fs::{self, File}, io::{self, BufWriter, Read, Write}, path::Path};
 
 use checkstyle::{output_checkstyle_file, output_footer, output_header};
 use config::{Config, NewlineStyle, WriteMode};

@@ -8,8 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io::{self, Write};
-use std::path::Path;
+use std::{io::{self, Write}, path::Path};
 
 use config::WriteMode;
 use rustfmt_diff::{DiffLine, Mismatch};

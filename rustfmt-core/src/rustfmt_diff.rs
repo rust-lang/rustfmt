@@ -10,10 +10,8 @@
 
 use config::Color;
 use diff;
-use std::collections::VecDeque;
-use std::io;
+use std::{collections::VecDeque, io::{self, Write}};
 use term;
-use std::io::Write;
 use utils::use_colored_tty;
 
 #[derive(Debug, PartialEq)]
@@ -211,8 +209,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::{make_diff, Mismatch};
-    use super::DiffLine::*;
+    use DiffLine::*;
+use Mismatch;
+use make_diff;
 
     #[test]
     fn diff_simple() {

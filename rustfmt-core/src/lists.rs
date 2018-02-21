@@ -10,8 +10,7 @@
 
 //! Format list-like expressions and items.
 
-use std::cmp;
-use std::iter::Peekable;
+use std::{cmp, iter::Peekable};
 
 use config::lists::*;
 use syntax::codemap::BytePos;
