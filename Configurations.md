@@ -579,23 +579,13 @@ Don't reformat anything
 
 ## `error_on_line_overflow`
 
-Error if unable to get all lines within `max_width`
+Error if unable to get all lines within `max_width`, except for comments and string literals.
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
 - **Stable**: No
 
 See also [`max_width`](#max_width).
-
-## `error_on_line_overflow_comments`
-
-Error if unable to get all comment lines within `comment_width`.
-
-- **Default value**: `true`
-- **Possible values**: `true`, `false`
-- **Stable**: No
-
-See also [`comment_width`](#comment_width).
 
 ## `fn_args_density`
 
@@ -1378,6 +1368,41 @@ extern crate sit;
 #### `false`:
 
 This value has no influence beyond the effect of the [`reorder_extern_crates`](#reorder_extern_crates) option. Set [`reorder_extern_crates`](#reorder_extern_crates) to `false` if you do not want `extern crate` groups to be collapsed and ordered.
+
+## `reorder_modules`
+
+Reorder `mod` declarations alphabetically in group.
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `true`
+
+```rust
+mod a;
+mod b;
+
+mod dolor;
+mod ipsum;
+mod lorem;
+mod sit;
+```
+
+#### `false`
+
+```rust
+mod b;
+mod a;
+
+mod lorem;
+mod ipsum;
+mod dolor;
+mod sit;
+```
+
+**Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantic
+of the original source code.
 
 ## `report_todo`
 
