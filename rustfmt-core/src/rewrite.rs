@@ -10,8 +10,7 @@
 
 // A generic trait to abstract the rewriting of an element (of the AST).
 
-use syntax::codemap::{CodeMap, Span};
-use syntax::parse::ParseSess;
+use syntax::{codemap::{CodeMap, Span}, parse::ParseSess};
 
 use config::{Config, IndentStyle};
 use shape::Shape;

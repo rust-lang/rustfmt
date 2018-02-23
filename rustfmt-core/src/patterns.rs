@@ -9,9 +9,8 @@
 // except according to those terms.
 
 use config::lists::*;
-use syntax::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax};
-use syntax::codemap::{self, BytePos, Span};
-use syntax::ptr;
+use syntax::{ptr, ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax},
+             codemap::{self, BytePos, Span}};
 
 use codemap::SpanUtils;
 use comment::FindUncommented;

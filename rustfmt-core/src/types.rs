@@ -8,13 +8,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::iter::ExactSizeIterator;
-use std::ops::Deref;
+use std::{iter::ExactSizeIterator, ops::Deref};
 
 use config::lists::*;
-use syntax::ast::{self, FunctionRetTy, Mutability};
-use syntax::codemap::{self, BytePos, Span};
-use syntax::symbol::keywords;
+use syntax::{ast::{self, FunctionRetTy, Mutability}, codemap::{self, BytePos, Span},
+             symbol::keywords};
 
 use codemap::SpanUtils;
 use config::{IndentStyle, TypeDensity};

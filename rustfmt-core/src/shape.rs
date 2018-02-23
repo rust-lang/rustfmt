@@ -8,8 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::borrow::Cow;
-use std::ops::{Add, Sub};
+use std::{borrow::Cow, ops::{Add, Sub}};
 
 use Config;
 

@@ -1117,9 +1117,14 @@ fn remove_comment_header(comment: &str) -> &str {
 
 #[cfg(test)]
 mod test {
-    use super::{contains_comment, rewrite_comment, CharClasses, CodeCharKind, CommentCodeSlices,
-                FindUncommented, FullCodeCharKind};
-    use shape::{Indent, Shape};
+    use CharClasses;
+use CodeCharKind;
+use CommentCodeSlices;
+use FindUncommented;
+use FullCodeCharKind;
+use contains_comment;
+use rewrite_comment;
+use shape::{Indent, Shape};
 
     #[test]
     fn char_classes() {

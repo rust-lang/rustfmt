@@ -69,6 +69,7 @@ create_config! {
     // Imports
     imports_indent: IndentStyle, IndentStyle::Visual, false, "Indent of imports";
     imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
+    merge_imports: bool, false, false, "Merge imports from the same module";
 
     // Ordering
     reorder_extern_crates: bool, true, false, "Reorder extern crate statements alphabetically";

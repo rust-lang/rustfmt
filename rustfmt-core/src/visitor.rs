@@ -11,15 +11,12 @@
 use std::cmp;
 
 use config::lists::*;
-use syntax::{ast, visit};
-use syntax::attr::HasAttrs;
-use syntax::codemap::{self, BytePos, CodeMap, Pos, Span};
-use syntax::parse::ParseSess;
+use syntax::{ast, visit, attr::HasAttrs, codemap::{self, BytePos, CodeMap, Pos, Span},
+             parse::ParseSess};
 
 use codemap::{LineRangeUtils, SpanUtils};
-use comment::{combine_strs_with_missing_comments, contains_comment, CodeCharKind,
-              CommentCodeSlices, FindUncommented};
-use comment::rewrite_doc_comment;
+use comment::{combine_strs_with_missing_comments, contains_comment, rewrite_doc_comment,
+              CodeCharKind, CommentCodeSlices, FindUncommented};
 use config::{BraceStyle, Config};
 use expr::rewrite_literal;
 use items::{format_impl, format_trait, format_trait_alias, rewrite_associated_impl_type,
@@ -49,7 +46,7 @@ fn is_mod_decl(item: &ast::Item) -> bool {
     }
 }
 
-fn is_use_item(item: &ast::Item) -> bool {
+pub fn is_use_item(item: &ast::Item) -> bool {
     match item.node {
         ast::ItemKind::Use(_) => true,
         _ => false,

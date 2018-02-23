@@ -10,14 +10,11 @@
 
 // Formatting top-level items - functions, structs, enums, traits, impls.
 
-use std::borrow::Cow;
-use std::cmp::min;
+use std::{borrow::Cow, cmp::min};
 
 use config::lists::*;
-use syntax::{abi, ast, ptr, symbol};
-use syntax::ast::{CrateSugar, ImplItem};
-use syntax::codemap::{BytePos, Span};
-use syntax::visit;
+use syntax::{abi, ptr, symbol, visit, ast::{self, CrateSugar, ImplItem},
+             codemap::{BytePos, Span}};
 
 use codemap::{LineRangeUtils, SpanUtils};
 use comment::{combine_strs_with_missing_comments, contains_comment, recover_comment_removed,

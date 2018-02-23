@@ -8,6 +8,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#![feature(box_patterns)]
+#![feature(box_syntax)]
 #![feature(custom_attribute)]
 #![feature(decl_macro)]
 #![feature(match_default_bindings)]
@@ -25,20 +27,11 @@ extern crate syntax;
 extern crate term;
 extern crate unicode_segmentation;
 
-use std::collections::HashMap;
-use std::fmt;
-use std::io::{self, stdout, BufRead, Write};
-use std::iter::repeat;
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::time::Duration;
+use std::{fmt, collections::HashMap, io::{self, stdout, BufRead, Write}, iter::repeat,
+          path::PathBuf, rc::Rc, time::Duration};
 
-use errors::{DiagnosticBuilder, Handler};
-use errors::emitter::{ColorConfig, EmitterWriter};
-use syntax::ast;
-use syntax::codemap::{CodeMap, FilePathMapping};
-pub use syntax::codemap::FileName;
-use syntax::parse::{self, ParseSess};
+use errors::{DiagnosticBuilder, Handler, emitter::{ColorConfig, EmitterWriter}};
+use syntax::{ast, codemap::{CodeMap, FileName, FilePathMapping}, parse::{self, ParseSess}};
 
 use checkstyle::{output_footer, output_header};
 use comment::{CharClasses, FullCodeCharKind};
@@ -47,8 +40,7 @@ use shape::Indent;
 use utils::use_colored_tty;
 use visitor::{FmtVisitor, SnippetProvider};
 
-pub use config::Config;
-pub use config::summary::Summary;
+use config::{Config, summary::Summary};
 
 #[macro_use]
 mod utils;
@@ -847,7 +839,9 @@ pub fn run(input: Input, config: &Config) -> Summary {
 
 #[cfg(test)]
 mod test {
-    use super::{format_code_block, format_snippet, Config};
+    use Config;
+use format_code_block;
+use format_snippet;
 
     #[test]
     fn test_no_panic_on_format_snippet_and_format_code_block() {

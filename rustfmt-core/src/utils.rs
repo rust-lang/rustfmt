@@ -10,10 +10,10 @@
 
 use std::borrow::Cow;
 
-use syntax::{abi, ptr};
-use syntax::ast::{self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem,
-                  NestedMetaItemKind, Path, Visibility};
-use syntax::codemap::{BytePos, Span, NO_EXPANSION};
+use syntax::{abi, ptr,
+             ast::{self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem,
+                   NestedMetaItemKind, Path, Visibility},
+             codemap::{BytePos, Span, NO_EXPANSION}};
 
 use config::Color;
 use rewrite::RewriteContext;

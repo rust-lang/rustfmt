@@ -20,7 +20,8 @@ use config::{Config, lists::*};
 use syntax::{ast, attr, codemap::Span};
 
 use codemap::LineRangeUtils;
-use comment::combine_strs_with_missing_comments;
+use comment::{combine_strs_with_missing_comments, contains_comment};
+use format_code_block;
 use imports::{path_to_imported_ident, rewrite_import};
 use items::rewrite_mod;
 use lists::{itemize_list, write_list, ListFormatting};
@@ -28,9 +29,9 @@ use rewrite::{Rewrite, RewriteContext};
 use shape::Shape;
 use spanned::Spanned;
 use utils::mk_sp;
-use visitor::{filter_inline_attrs, rewrite_extern_crate, FmtVisitor};
+use visitor::{filter_inline_attrs, is_use_item, rewrite_extern_crate, FmtVisitor};
 
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::BTreeMap};
 
 fn compare_path_segments(a: &ast::PathSegment, b: &ast::PathSegment) -> Ordering {
     a.identifier.name.as_str().cmp(&b.identifier.name.as_str())
@@ -146,6 +147,116 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
     }
 }
 
+/// Collect names in `use` declarations so that we can merge them which come
+/// from the same module.
+#[derive(Debug)]
+struct UseNameTree {
+    subtree: BTreeMap<String, Box<Option<UseNameTree>>>,
+}
+
+impl UseNameTree {
+    pub fn new() -> UseNameTree {
+        UseNameTree {
+            subtree: BTreeMap::new(),
+        }
+    }
+
+    /// Add names that appear in the given `UseTree`.
+    pub fn add_use_tree(&mut self, use_tree: &ast::UseTree) {
+        // 1 = skip root.
+        self.add_use_tree_inner(use_tree, 1)
+    }
+
+    fn add_use_tree_inner(&mut self, use_tree: &ast::UseTree, depth: usize) {
+        if use_tree.prefix.segments.len() == depth {
+            match use_tree.kind {
+                ast::UseTreeKind::Glob => {
+                    self.subtree.insert("*".to_owned(), box None);
+                }
+                ast::UseTreeKind::Simple(_) => {
+                    self.subtree.insert("self".to_owned(), box None);
+                }
+                ast::UseTreeKind::Nested(ref nested_use_trees) => {
+                    for (nested_use_tree, _) in nested_use_trees {
+                        self.add_use_tree_inner(nested_use_tree, 0);
+                    }
+                }
+            };
+            return;
+        }
+        let identifier = use_tree.prefix.segments[depth].identifier.name.to_string();
+        if let Some(box Some(ref mut map)) = self.subtree.get_mut(&identifier) {
+            map.add_use_tree_inner(use_tree, depth + 1);
+            return;
+        }
+        let mut map = UseNameTree::new();
+        map.add_use_tree_inner(use_tree, depth + 1);
+        self.subtree.insert(identifier, box Some(map));
+    }
+
+    fn to_string_simple_inner(
+        &self,
+        shape: Shape,
+        context: &RewriteContext,
+        mut result: &mut String,
+    ) {
+        for (seg, map) in &self.subtree {
+            result.push_str(seg);
+            if let box Some(ref map) = map {
+                result.push_str("::{");
+                let nested_shape = shape.block_indent(context.config.tab_spaces());
+                result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
+                map.to_string_simple_inner(nested_shape, context, &mut result);
+                result.push_str(&shape.indent.to_string_with_newline(context.config));
+                result.push('}');
+            }
+            result.push_str(", ");
+        }
+    }
+
+    /// Converts this `UseNameTree` to merged `use` declarations. The produced
+    /// string is syntactically correct, but is not properly formatted.
+    // FIXME: Currently we call `format_code_block` after creating a string with
+    // this method. Instead, it would be nice if this method can format the
+    // string by itself.
+    pub fn to_string_simple(&self, shape: Shape, context: &RewriteContext) -> String {
+        let mut result = String::with_capacity(256);
+        for (seg, map) in &self.subtree {
+            result.push_str("use ");
+            let nested_shape = shape.block_indent(context.config.tab_spaces());
+            result.push_str(seg);
+            result.push_str("::{");
+            result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
+            if let box Some(ref map) = map {
+                map.to_string_simple_inner(nested_shape, context, &mut result);
+            }
+            result.push_str(&shape.indent.to_string_with_newline(context.config));
+            result.push_str("};\n");
+        }
+        result
+    }
+}
+
+/// Format `use` declarations. If two or more `use` declarations are from the same module,
+/// those will be merged into a single declaration.
+///
+/// Before calling this function, make sure that there are no comments
+/// among/within any `use` declarations.
+fn rewrite_use_items_with_merge(
+    context: &RewriteContext,
+    use_items: Vec<&ast::UseTree>,
+    shape: Shape,
+) -> Option<String> {
+    let mut use_name_tree = UseNameTree::new();
+    for use_item in use_items {
+        use_name_tree.add_use_tree(use_item);
+    }
+    let snippet = use_name_tree.to_string_simple(shape, context);
+    let mut config = context.config.clone();
+    config.set().merge_imports(false);
+    format_code_block(&snippet, &config)
+}
+
 /// Rewrite a list of items with reordering. Every item in `items` must have
 /// the same `ast::ItemKind`.
 // TODO (some day) remove unused imports, expand globs, compress many single
@@ -156,6 +267,28 @@ fn rewrite_reorderable_items(
     shape: Shape,
     span: Span,
 ) -> Option<String> {
+    // Try to merge `use` declarations from the same module if there are no
+    // comments among declarations.
+    if context.config.merge_imports() && !contains_comment(context.snippet(span))
+        && is_use_item(reorderable_items[0])
+    {
+        fn get_use_tree<'a>(item: &&'a ast::Item) -> &'a ast::UseTree {
+            match item.node {
+                ast::ItemKind::Use(ref use_tree) => use_tree,
+                _ => unreachable!(),
+            }
+        }
+
+        return rewrite_use_items_with_merge(
+            context,
+            reorderable_items
+                .iter()
+                .map(get_use_tree)
+                .collect::<Vec<_>>(),
+            shape,
+        );
+    }
+
     let items = itemize_list(
         context.snippet_provider,
         reorderable_items.iter(),

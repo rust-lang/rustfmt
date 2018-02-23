@@ -8,8 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::borrow::Cow;
-use std::iter::repeat;
+use std::{borrow::Cow, iter::repeat};
 
 use syntax::codemap::{BytePos, FileName, Pos, Span};
 

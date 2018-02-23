@@ -8,13 +8,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::borrow::Cow;
-use std::cmp::min;
-use std::iter::repeat;
+use std::{borrow::Cow, cmp::min, iter::repeat};
 
 use config::lists::*;
-use syntax::{ast, ptr};
-use syntax::codemap::{BytePos, CodeMap, Span};
+use syntax::{ast, ptr, codemap::{BytePos, CodeMap, Span}};
 
 use chains::rewrite_chain;
 use closures;
@@ -23,7 +20,8 @@ use comment::{combine_strs_with_missing_comments, contains_comment, recover_comm
               rewrite_comment, rewrite_missing_comment, FindUncommented};
 use config::{Config, ControlBraceStyle, IndentStyle};
 use lists::{definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting,
-            struct_lit_shape, struct_lit_tactic, write_list, ListFormatting, ListItem, Separator};
+            struct_lit_shape, struct_lit_tactic, write_list, ListFormatting, ListItem,
+            Separator};
 use macros::{rewrite_macro, MacroArg, MacroPosition};
 use patterns::{can_be_overflowed_pat, TuplePatField};
 use rewrite::{Rewrite, RewriteContext};
