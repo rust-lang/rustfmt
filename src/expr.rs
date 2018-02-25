@@ -2365,11 +2365,12 @@ pub fn wrap_args_with_parens(
     }
 }
 
-/// Return true if a function call or a method call represented by the given span ends with a
+/// Return true if a function call ,a method call or a struct represented by the given span ends with a
 /// trailing comma. This function is used when rewriting macro, as adding or removing a trailing
 /// comma from macro can potentially break the code.
 fn span_ends_with_comma(context: &RewriteContext, span: Span) -> bool {
     let mut encountered_closing_paren = false;
+    let mut encountered_closing_braces = false;
     for c in context.snippet(span).chars().rev() {
         match c {
             ',' => return true,
@@ -2377,6 +2378,11 @@ fn span_ends_with_comma(context: &RewriteContext, span: Span) -> bool {
                 return false;
             } else {
                 encountered_closing_paren = true;
+            },
+            '}' => if encountered_closing_braces {
+                return false;
+            } else {
+                encountered_closing_braces = true;
             },
             _ if c.is_whitespace() => continue,
             _ => return false,
@@ -2566,7 +2572,19 @@ fn rewrite_struct_lit<'a>(
 
         let tactic = struct_lit_tactic(h_shape, context, &item_vec);
         let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
-        let fmt = struct_lit_formatting(nested_shape, tactic, context, base.is_some());
+
+        let ends_with_comma = span_ends_with_comma(context, span);
+        let force_no_trailing_comma = if context.inside_macro && !ends_with_comma {
+            true
+        } else {
+            false
+        };
+        let fmt = struct_lit_formatting(
+            nested_shape,
+            tactic,
+            context,
+            force_no_trailing_comma || base.is_some(),
+        );
 
         write_list(&item_vec, &fmt)?
     };
