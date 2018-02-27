@@ -234,7 +234,7 @@ impl ReorderableItemKind {
         match item.node {
             _ if contains_macro_use_attr(item) => ReorderableItemKind::Other,
             ast::ItemKind::ExternCrate(..) => ReorderableItemKind::ExternCrate,
-            ast::ItemKind::Mod(..) => ReorderableItemKind::Mod,
+            ast::ItemKind::Mod(ref m) if m.inner.hi() != item.span.hi() => ReorderableItemKind::Mod,
             ast::ItemKind::Use(..) => ReorderableItemKind::Use,
             _ => ReorderableItemKind::Other,
         }
