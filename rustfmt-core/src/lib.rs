@@ -382,12 +382,15 @@ fn is_skipped_line(line_number: usize, skipped_range: &[(usize, usize)]) -> bool
 }
 
 fn should_report_error(
+    path: &FileName,
     config: &Config,
     char_kind: FullCodeCharKind,
     is_string: bool,
     error_kind: ErrorKind,
 ) -> bool {
-    let allow_error_report = if char_kind.is_comment() || is_string {
+    let allow_error_report = if path.to_string() == STDIN {
+        false
+    } else if char_kind.is_comment() || is_string {
         config.error_on_unformatted()
     } else {
         true
@@ -445,7 +448,13 @@ fn format_lines(
             if format_line {
                 // Check for (and record) trailing whitespace.
                 if let Some(..) = last_wspace {
-                    if should_report_error(config, kind, is_string, ErrorKind::TrailingWhitespace) {
+                    if should_report_error(
+                        name,
+                        config,
+                        kind,
+                        is_string,
+                        ErrorKind::TrailingWhitespace,
+                    ) {
                         trims.push((cur_line, kind, line_buffer.clone()));
                     }
                     line_len -= 1;
@@ -454,7 +463,7 @@ fn format_lines(
                 // Check for any line width errors we couldn't correct.
                 let error_kind = ErrorKind::LineOverflow(line_len, config.max_width());
                 if line_len > config.max_width() && !is_skipped_line(cur_line, skipped_range)
-                    && should_report_error(config, kind, is_string, error_kind)
+                    && should_report_error(name, config, kind, is_string, error_kind)
                 {
                     errors.push(FormattingError {
                         line: cur_line,
