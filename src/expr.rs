@@ -7,7 +7,6 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-
 use std::borrow::Cow;
 use std::cmp::min;
 use std::iter::repeat;
@@ -20,8 +19,7 @@ use chains::rewrite_chain;
 use closures;
 use codemap::{LineRangeUtils, SpanUtils};
 use comment::{combine_strs_with_missing_comments, contains_comment, recover_comment_removed,
-              rewrite_comment, rewrite_missing_comment, CharClasses, FindUncommented,
-              FullCodeCharKind};
+              rewrite_comment, rewrite_missing_comment, CharClasses, FindUncommented};
 use config::{Config, ControlBraceStyle, IndentStyle};
 use lists::{definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting,
             struct_lit_shape, struct_lit_tactic, write_list, ListFormatting, ListItem, Separator};
@@ -2371,9 +2369,24 @@ pub fn wrap_args_with_parens(
 /// comma from macro can potentially break the code.
 fn span_ends_with_comma(context: &RewriteContext, span: Span) -> bool {
     let mut encountered_closing_paren = false;
-    for c in context.snippet(span).chars().rev() {
+    let mut encountered_closing_braces = false;
+
+    let snippet = context.snippet(span);
+    let mut snippet_string = snippet.to_string();
+    for (kind, c) in CharClasses::new(snippet.chars()) {
+        match kind.is_comment() {
+            true => snippet_string.retain(|i| c != i),
+            false => continue,
+        }
+    }
+    for c in snippet_string.as_str().chars().rev() {
         match c {
             ',' => return true,
+            '}' => if encountered_closing_braces {
+                return false;
+            } else {
+                encountered_closing_braces = true;
+            },
             ')' => if encountered_closing_paren {
                 return false;
             } else {
@@ -2482,26 +2495,6 @@ fn struct_lit_can_be_aligned(fields: &[ast::Field], base: &Option<&ast::Expr>) -
     fields.iter().all(|field| !field.is_shorthand)
 }
 
-#[allow(dead_code)]
-/// Check if a struct representation ends with comma by match on the chars of struct
-/// snippet reversely, once a FullCodeCharKind::Normal comma matched, returns true
-fn struct_lit_ends_with_comma(context: &RewriteContext, span: Span) -> bool {
-    // FIXME: implement DoubleEndedIterator trait for CharClasses
-    //
-    // for (char_kind, c) in CharClasses::new(context.snippet(span).chars()).rev() {
-    //     match c {
-    //         ',' => match char_kind {
-    //             FullCodeCharKind::Normal => return true,
-    //             _ => continue,
-    //         },
-    //         _ => continue,
-    //     }
-    // }
-    //
-    // false
-    unimplemented!()
-}
-
 fn rewrite_struct_lit<'a>(
     context: &RewriteContext,
     path: &ast::Path,
@@ -2588,7 +2581,7 @@ fn rewrite_struct_lit<'a>(
         let tactic = struct_lit_tactic(h_shape, context, &item_vec);
         let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
 
-        let ends_with_comma = struct_lit_ends_with_comma(context, span);
+        let ends_with_comma = span_ends_with_comma(context, span);
         let force_no_trailing_comma = if context.inside_macro && !ends_with_comma {
             true
         } else {
