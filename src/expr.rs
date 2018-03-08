@@ -2368,35 +2368,20 @@ pub fn wrap_args_with_parens(
 /// trailing comma. This function is used when rewriting macro, as adding or removing a trailing
 /// comma from macro can potentially break the code.
 fn span_ends_with_comma(context: &RewriteContext, span: Span) -> bool {
-    let mut encountered_closing_paren = false;
-    let mut encountered_closing_braces = false;
+    let mut result: bool = Default::default();
+    let mut prev_char: char = Default::default();
 
-    let snippet = context.snippet(span);
-    let mut snippet_string = snippet.to_string();
-    for (kind, c) in CharClasses::new(snippet.chars()) {
-        match kind.is_comment() {
-            true => snippet_string.retain(|i| c != i),
-            false => continue,
-        }
-    }
-    for c in snippet_string.as_str().chars().rev() {
+    for (kind, c) in CharClasses::new(context.snippet(span).chars()) {
         match c {
-            ',' => return true,
-            '}' => if encountered_closing_braces {
-                return false;
-            } else {
-                encountered_closing_braces = true;
-            },
-            ')' => if encountered_closing_paren {
-                return false;
-            } else {
-                encountered_closing_paren = true;
-            },
-            _ if c.is_whitespace() => continue,
-            _ => return false,
+            _ if kind.is_comment() || c.is_whitespace() => continue,
+            ')' | '}' => result = result && prev_char != c,
+            ',' => result = true,
+            _ => result = false,
         }
+        prev_char = c;
     }
-    false
+
+    result
 }
 
 fn rewrite_paren(context: &RewriteContext, subexpr: &ast::Expr, shape: Shape) -> Option<String> {
