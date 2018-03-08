@@ -4,7 +4,7 @@ test!(RunPassPretty {
     mode: "pretty",
     suite: "run-pass",
     default: false,
-    host: true // should force no trailing comma here
+    host: true // should, force, , no trailing comma here
 });
 
 test!(RunPassPretty {
@@ -13,7 +13,7 @@ test!(RunPassPretty {
     mode: "pretty",
     suite: "run-pass",
     default: false,
-    host: true, // should preserve the trailing comma
+    host: true, // should, , preserve, the trailing comma
 });
 
 test!(Test {
