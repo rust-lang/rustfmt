@@ -12,7 +12,6 @@
 #![feature(decl_macro)]
 #![feature(match_default_bindings)]
 #![feature(type_ascription)]
-#![feature(string_retain)]
 
 #[macro_use]
 extern crate derive_new;
