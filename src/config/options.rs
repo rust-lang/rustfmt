@@ -183,6 +183,9 @@ configuration_option_enum! { WriteMode:
     Checkstyle,
     // Output the changed lines (for internal value only)
     Modified,
+    // Displays how much of the input was processed, but if anything was modified, rustfmt quits
+    // with exit code 0. This option is intended to be run as part of a CI pipeline.
+    Check,
 }
 
 configuration_option_enum! { Color:

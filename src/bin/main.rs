@@ -198,7 +198,7 @@ fn make_opts() -> Options {
         "",
         "write-mode",
         "How to write output (not usable when piping from stdin)",
-        "[replace|overwrite|display|plain|diff|coverage|checkstyle]",
+        "[replace|overwrite|display|plain|diff|check|coverage|checkstyle]",
     );
 
     opts
@@ -287,6 +287,10 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
             }
 
             let mut error_summary = Summary::default();
+            if let Some(mode) = options.write_mode {
+                error_summary.add_write_mode(mode)
+            }
+
             for file in files {
                 if !file.exists() {
                     eprintln!("Error: file `{}` does not exist", file.to_str().unwrap());
@@ -341,6 +345,8 @@ fn main() {
     let exit_code = match execute(&opts) {
         Ok(summary) => {
             if summary.has_operational_errors() {
+                1
+            } else if summary.has_diff && summary.write_mode == Some(WriteMode::Check) {
                 1
             } else if summary.has_parsing_errors() {
                 2
