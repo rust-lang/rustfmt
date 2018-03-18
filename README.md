@@ -98,7 +98,7 @@ read data from stdin. Alternatively, you can use `cargo fmt` to format all
 binary and library targets of your crate.
 
 You'll probably want to specify the write mode. Currently, there are modes for
-`diff`, `replace`, `overwrite`, `display`, `coverage`, `checkstyle`, and `plain`.
+`check`, `diff`, `replace`, `overwrite`, `display`, `coverage`, `checkstyle`, and `plain`.
 
 * `overwrite` Is the default and overwrites the original files _without_ creating backups.
 * `replace` Overwrites the original files after creating backups of the files.
@@ -106,6 +106,8 @@ You'll probably want to specify the write mode. Currently, there are modes for
 * `plain` Also writes to stdout, but with no metadata.
 * `diff` Will print a diff between the original files and formatted files to stdout.
          Will also exit with an error code if there are any differences.
+* `check` Similar to `diff`, but is intended to be run in during CI and returns error code 1
+          on failure instead of 4 as `diff` does.  
 * `checkstyle` Will output the lines that need to be corrected as a checkstyle XML file,
   that can be used by tools like Jenkins.
 
