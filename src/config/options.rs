@@ -183,8 +183,8 @@ configuration_option_enum! { WriteMode:
     Checkstyle,
     // Output the changed lines (for internal value only)
     Modified,
-    // Displays how much of the input was processed, but if anything was modified, rustfmt quits
-    // with exit code 0. This option is intended to be run as part of a CI pipeline.
+    // Checks if a diff can be generated. If so, rustfmt outputs a diff and quits with exit code 1.
+    // This option is designed to be run in CI where a non-zero exit signifies non-standard code formatting.
     Check,
 }
 
