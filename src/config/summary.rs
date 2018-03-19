@@ -28,8 +28,8 @@ pub struct Summary {
     // Formatted code differs from existing code (write-mode diff only).
     pub has_diff: bool,
 
-    // What write mode rustfmt was invoked with, if any.
-    pub write_mode: Option<WriteMode>,
+    // What write mode rustfmt was invoked with. Defaults to WriteMode::Overwrite.
+    pub write_mode: WriteMode,
 
     // Keeps track of time spent in parsing and formatting steps.
     timer: Timer,
@@ -95,7 +95,7 @@ impl Summary {
     }
 
     pub fn add_write_mode(&mut self, mode: WriteMode) {
-        self.write_mode = Some(mode)
+        self.write_mode = mode;
     }
 
     pub fn has_no_errors(&self) -> bool {

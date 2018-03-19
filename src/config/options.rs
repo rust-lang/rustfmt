@@ -253,6 +253,12 @@ impl ::std::str::FromStr for WidthHeuristics {
     }
 }
 
+impl Default for WriteMode {
+    fn default() -> WriteMode {
+        WriteMode::Overwrite
+    }
+}
+
 /// A set of directories, files and modules that rustfmt should ignore.
 #[derive(Default, Deserialize, Serialize, Clone, Debug)]
 pub struct IgnoreList(HashSet<PathBuf>);

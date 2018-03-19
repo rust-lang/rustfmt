@@ -346,7 +346,7 @@ fn main() {
         Ok(summary) => {
             if summary.has_operational_errors() {
                 1
-            } else if summary.has_diff && summary.write_mode == Some(WriteMode::Check) {
+            } else if summary.has_diff && summary.write_mode == WriteMode::Check {
                 1
             } else if summary.has_parsing_errors() {
                 2
