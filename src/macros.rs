@@ -45,6 +45,9 @@ use utils::{format_visibility, mk_sp, wrap_str};
 
 const FORCED_BRACKET_MACROS: &[&str] = &["vec!"];
 
+// These are used in 'nom', which is a very macro-heavy crate
+const SKIP_MACROS: &[&str] = &["named!", "do_parse!"];
+
 // FIXME: use the enum from libsyntax?
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum MacroStyle {
@@ -189,6 +192,10 @@ pub fn rewrite_macro(
         if let success @ Some(..) = format_lazy_static(context, shape, &ts) {
             return success;
         }
+    }
+
+    if SKIP_MACROS.contains(&&macro_name[..]) {
+        return None;
     }
 
     let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
