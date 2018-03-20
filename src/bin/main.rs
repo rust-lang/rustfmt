@@ -349,12 +349,9 @@ fn main() {
             } else if summary.has_diff && summary.write_mode == WriteMode::Check {
                 1
             } else if summary.has_parsing_errors() {
-                2
+                1
             } else if summary.has_formatting_errors() {
-                3
-            } else if summary.has_diff {
-                // should only happen in diff mode
-                4
+                1
             } else {
                 assert!(summary.has_no_errors());
                 0

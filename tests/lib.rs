@@ -875,3 +875,16 @@ fn verify_check_works() {
     ]).succeeds()
         .unwrap();
 }
+
+#[test]
+fn verify_diff_works() {
+    assert_cli::Assert::command(&[
+        "cargo",
+        "run",
+        "--bin=rustfmt",
+        "--",
+        "--write-mode=diff",
+        "src/bin/main.rs",
+    ]).succeeds()
+        .unwrap();
+}
