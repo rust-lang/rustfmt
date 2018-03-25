@@ -344,13 +344,10 @@ fn main() {
 
     let exit_code = match execute(&opts) {
         Ok(summary) => {
-            if summary.has_operational_errors() {
-                1
-            } else if summary.has_diff && summary.write_mode == WriteMode::Check {
-                1
-            } else if summary.has_parsing_errors() {
-                1
-            } else if summary.has_formatting_errors() {
+            if summary.has_operational_errors()
+                || summary.has_diff && summary.write_mode == WriteMode::Check
+                || summary.has_parsing_errors() || summary.has_formatting_errors()
+            {
                 1
             } else {
                 assert!(summary.has_no_errors());
