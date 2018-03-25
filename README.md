@@ -106,8 +106,9 @@ You'll probably want to specify the write mode. Currently, there are modes for
 * `plain` Also writes to stdout, but with no metadata.
 * `diff` Will print a diff between the original files and formatted files to stdout.
          Will also exit with an error code if there are any differences.
-* `check` Checks if a diff can be generated. If so, rustfmt outputs a diff and quits with exit code 1.
-          This option is designed to be run in CI-like where a non-zero exit signifies non-standard code formatting. 
+* `check` Checks if the program's formatting matches what rustfmt would do. Silently exits
+          with code 0 if so, emits a diff and exits with code 1 if not. This option is
+          designed to be run in CI-like where a non-zero exit signifies incorrect formatting.
 * `checkstyle` Will output the lines that need to be corrected as a checkstyle XML file,
   that can be used by tools like Jenkins.
 
