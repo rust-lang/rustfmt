@@ -700,7 +700,8 @@ fn format_input_inner<T: Write>(
         };
         Handler::with_tty_emitter(color_cfg, true, false, Some(codemap.clone()))
     };
-    let mut parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone());
+    let env_sb = Lrc::new(EnvSandbox::default());
+    let mut parse_session = ParseSess::with_span_handler(tty_handler, codemap.clone(), env_sb);
 
     let main_file = match input {
         Input::File(ref file) => FileName::Real(file.clone()),
