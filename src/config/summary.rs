@@ -11,8 +11,6 @@
 use std::time::{Duration, Instant};
 use std::default::Default;
 
-use config::options::WriteMode;
-
 #[must_use]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Summary {
@@ -27,9 +25,6 @@ pub struct Summary {
 
     // Formatted code differs from existing code (write-mode diff only).
     pub has_diff: bool,
-
-    // What write mode rustfmt was invoked with. Defaults to WriteMode::Overwrite.
-    pub write_mode: WriteMode,
 
     // Keeps track of time spent in parsing and formatting steps.
     timer: Timer,
@@ -94,10 +89,6 @@ impl Summary {
         self.has_diff = true;
     }
 
-    pub fn add_write_mode(&mut self, mode: WriteMode) {
-        self.write_mode = mode;
-    }
-
     pub fn has_no_errors(&self) -> bool {
         !(self.has_operational_errors || self.has_parsing_errors || self.has_formatting_errors
             || self.has_diff)
@@ -113,10 +104,7 @@ impl Summary {
     pub fn print_exit_codes() {
         let exit_codes = r#"Exit Codes:
     0 = No errors
-    1 = Encountered operational errors e.g. an IO error
-    2 = Failed to reformat code because of parsing errors
-    3 = Code is valid, but it is impossible to format it properly
-    4 = Formatted code differs from existing code (write-mode diff only)"#;
+    1 = Encountered error in formatting code"#;
         println!("{}", exit_codes);
     }
 }

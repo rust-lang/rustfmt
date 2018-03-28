@@ -287,9 +287,6 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
             }
 
             let mut error_summary = Summary::default();
-            if let Some(mode) = options.write_mode {
-                error_summary.add_write_mode(mode)
-            }
 
             for file in files {
                 if !file.exists() {
@@ -341,11 +338,18 @@ fn main() {
     env_logger::init();
 
     let opts = make_opts();
+    let matches = opts.parse(env::args().skip(1)).unwrap();
+    let options = CliOptions::from_matches(&matches).unwrap();
+    // Only handles arguments passed in, not through a configuration file.
+    let write_mode = match options.write_mode {
+        Some(m) => m,
+        None => WriteMode::default(),
+    };
 
     let exit_code = match execute(&opts) {
         Ok(summary) => {
             if summary.has_operational_errors()
-                || summary.has_diff && summary.write_mode == WriteMode::Check
+                || summary.has_diff && write_mode == WriteMode::Check
                 || summary.has_parsing_errors() || summary.has_formatting_errors()
             {
                 1
