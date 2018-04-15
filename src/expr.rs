@@ -176,10 +176,7 @@ pub fn format_expr(
                 capture, movability, fn_decl, body, expr.span, context, shape,
             )
         }
-        ast::ExprKind::Try(..)
-        | ast::ExprKind::Field(..)
-        | ast::ExprKind::TupField(..)
-        | ast::ExprKind::MethodCall(..) => {
+        ast::ExprKind::Try(..) | ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(..) => {
             rewrite_chain(expr, context, shape)
         }
         ast::ExprKind::Mac(ref mac) => {
