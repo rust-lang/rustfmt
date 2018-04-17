@@ -14,16 +14,16 @@ extern crate env_logger;
 extern crate getopts;
 extern crate rustfmt_nightly as rustfmt;
 
-use std::{env, error};
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::{env, error};
 
 use getopts::{Matches, Options};
 
-use rustfmt::config::{get_toml_path, Color, Config, WriteMode};
 use rustfmt::config::file_lines::FileLines;
+use rustfmt::config::{get_toml_path, Color, Config, WriteMode};
 use rustfmt::{run, FileName, Input, Summary};
 
 type FmtError = Box<error::Error + Send + Sync>;
@@ -334,17 +334,20 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
     }
 }
 
-fn main() {
-    env_logger::init();
-
-    let opts = make_opts();
+fn determine_write_mode(opts: &Options) -> WriteMode {
     let matches = opts.parse(env::args().skip(1)).unwrap();
     let options = CliOptions::from_matches(&matches).unwrap();
-    // Only handles arguments passed in, not through a configuration file.
-    let write_mode = match options.write_mode {
+    match options.write_mode {
         Some(m) => m,
         None => WriteMode::default(),
-    };
+    }
+}
+
+fn main() {
+    env_logger::init();
+    let opts = make_opts();
+    // Only handles arguments passed in through the CLI.
+    let mut write_mode = determine_write_mode(&opts);
 
     let exit_code = match execute(&opts) {
         Ok(summary) => {

@@ -12,6 +12,7 @@
 #![feature(decl_macro)]
 #![feature(match_default_bindings)]
 #![feature(type_ascription)]
+#![feature(unicode_internals)]
 
 #[macro_use]
 extern crate derive_new;
@@ -38,11 +39,11 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use syntax::errors::{DiagnosticBuilder, Handler};
-use syntax::errors::emitter::{ColorConfig, EmitterWriter};
 use syntax::ast;
-use syntax::codemap::{CodeMap, FilePathMapping};
 pub use syntax::codemap::FileName;
+use syntax::codemap::{CodeMap, FilePathMapping};
+use syntax::errors::emitter::{ColorConfig, EmitterWriter};
+use syntax::errors::{DiagnosticBuilder, Handler};
 use syntax::parse::{self, ParseSess};
 
 use checkstyle::{output_footer, output_header};
@@ -52,8 +53,8 @@ use shape::Indent;
 use utils::use_colored_tty;
 use visitor::{FmtVisitor, SnippetProvider};
 
-pub use config::Config;
 pub use config::summary::Summary;
+pub use config::Config;
 
 #[macro_use]
 mod utils;
