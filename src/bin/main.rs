@@ -289,6 +289,8 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
             }
 
             let mut config = Config::default();
+            options.clone().apply_to(&mut config);
+
             // Load the config path file if provided
             if let Some(config_file) = config_path.as_ref() {
                 config = Config::from_toml_path(config_file.as_ref())?;
