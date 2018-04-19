@@ -15,6 +15,8 @@ peg_file! modname("mygrammarfile.rustpeg");
 fn main() {
     foo!();
 
+    foo!(,);
+
     bar!(a, b, c);
 
     bar!(a, b, c,);
@@ -141,7 +143,7 @@ fn issue_1555() {
 
 fn issue1178() {
     macro_rules! foo {
-        (#[$attr: meta] $name: ident) => {};
+        (#[$attr:meta] $name:ident) => {};
     }
 
     foo!(
@@ -246,7 +248,7 @@ fn __bindgen_test_layout_HandleWithDtor_open0_int_close0_instantiation() {
 
 // #878
 macro_rules! try_opt {
-    ($expr: expr) => {
+    ($expr:expr) => {
         match $expr {
             Some(val) => val,
 
@@ -891,7 +893,7 @@ fn macro_in_pattern_position() {
 
 macro foo() {}
 
-pub macro bar($x: ident + $y: expr;) {
+pub macro bar($x:ident + $y:expr;) {
     fn foo($x: Foo) {
         long_function(
             a_long_argument_to_a_long_function_is_what_this_is(AAAAAAAAAAAAAAAAAAAAAAAAAAAA),
@@ -908,6 +910,11 @@ macro foo() {
     }
 }
 
+// #2574
+macro_rules! test {
+    () => {{}};
+}
+
 macro lex_err($kind: ident $(, $body: expr)*) {
     Err(QlError::LexError(LexError::$kind($($body,)*)))
 }
@@ -915,3 +922,42 @@ macro lex_err($kind: ident $(, $body: expr)*) {
 // Preserve trailing comma on item-level macro with `()` or `[]`.
 methods![get, post, delete,];
 methods!(get, post, delete,);
+
+// #2588
+macro_rules! m {
+    () => {
+        r#"
+            test
+        "#
+    };
+}
+fn foo() {
+    f!{r#"
+            test
+       "#};
+}
+
+// #2591
+fn foo() {
+    match 0u32 {
+        0 => (),
+        _ => unreachable!(/* obviously */),
+    }
+}
+
+fn foo() {
+    let _ = column!(/* here */);
+}
+
+// #2616
+// Preserve trailing comma when using mixed layout for macro call.
+fn foo() {
+    foo!(
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    );
+    foo!(
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    );
+}

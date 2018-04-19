@@ -97,7 +97,7 @@ fn execute() -> i32 {
 }
 
 macro_rules! print_usage {
-    ($print: ident, $opts: ident, $reason: expr) => {{
+    ($print:ident, $opts:ident, $reason:expr) => {{
         let msg = format!("{}\nusage: cargo fmt [options]", $reason);
         $print!(
             "{}\nThis utility formats all bin and lib files of the current crate using rustfmt. \
@@ -211,7 +211,7 @@ impl Hash for Target {
 pub enum CargoFmtStrategy {
     /// Format every packages and dependencies.
     All,
-    /// Format pacakges that are specified by the command line argument.
+    /// Format packages that are specified by the command line argument.
     Some(Vec<String>),
     /// Format the root packages only.
     Root,

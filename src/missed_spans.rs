@@ -9,7 +9,6 @@
 // except according to those terms.
 
 use std::borrow::Cow;
-use std::iter::repeat;
 
 use syntax::codemap::{BytePos, FileName, Pos, Span};
 
@@ -94,6 +93,12 @@ impl<'a> FmtVisitor<'a> {
         self.last_pos = end;
         let span = mk_sp(start, end);
         let snippet = self.snippet(span);
+
+        // Do nothing for spaces in the beginning of the file
+        if start == BytePos(0) && end.0 as usize == snippet.len() && snippet.trim().is_empty() {
+            return;
+        }
+
         if snippet.trim().is_empty() && !out_of_file_lines_range!(self, span) {
             // Keep vertical spaces within range.
             self.push_vertical_spaces(count_newlines(snippet));
@@ -104,17 +109,36 @@ impl<'a> FmtVisitor<'a> {
     }
 
     fn push_vertical_spaces(&mut self, mut newline_count: usize) {
-        // The buffer already has a trailing newline.
-        let offset = if self.buffer.ends_with('\n') { 0 } else { 1 };
-        let newline_upper_bound = self.config.blank_lines_upper_bound() + offset;
-        let newline_lower_bound = self.config.blank_lines_lower_bound() + offset;
-        if newline_count > newline_upper_bound {
-            newline_count = newline_upper_bound;
-        } else if newline_count < newline_lower_bound {
-            newline_count = newline_lower_bound;
+        let offset = self.count_trailing_newlines();
+        let newline_upper_bound = self.config.blank_lines_upper_bound() + 1;
+        let newline_lower_bound = self.config.blank_lines_lower_bound() + 1;
+
+        if newline_count + offset > newline_upper_bound {
+            if offset >= newline_upper_bound {
+                newline_count = 0;
+            } else {
+                newline_count = newline_upper_bound - offset;
+            }
+        } else if newline_count + offset < newline_lower_bound {
+            if offset >= newline_lower_bound {
+                newline_count = 0;
+            } else {
+                newline_count = newline_lower_bound - offset;
+            }
         }
-        let blank_lines: String = repeat('\n').take(newline_count).collect();
+
+        let blank_lines = "\n".repeat(newline_count);
         self.push_str(&blank_lines);
+    }
+
+    fn count_trailing_newlines(&self) -> usize {
+        let mut buf = &*self.buffer;
+        let mut result = 0;
+        while buf.ends_with('\n') {
+            buf = &buf[..buf.len() - 1];
+            result += 1;
+        }
+        result
     }
 
     fn write_snippet<F>(&mut self, span: Span, process_last_snippet: F)
@@ -157,7 +181,7 @@ impl<'a> FmtVisitor<'a> {
         let mut status = SnippetStatus::new(char_pos.line);
 
         let snippet = &*match self.config.write_mode() {
-            WriteMode::Coverage => replace_chars(old_snippet),
+            WriteMode::Coverage => Cow::from(replace_chars(old_snippet)),
             _ => Cow::from(old_snippet),
         };
 
@@ -302,11 +326,9 @@ impl<'a> FmtVisitor<'a> {
     }
 }
 
-fn replace_chars(string: &str) -> Cow<str> {
-    Cow::from(
-        string
-            .chars()
-            .map(|ch| if ch.is_whitespace() { ch } else { 'X' })
-            .collect::<String>(),
-    )
+fn replace_chars(string: &str) -> String {
+    string
+        .chars()
+        .map(|ch| if ch.is_whitespace() { ch } else { 'X' })
+        .collect()
 }

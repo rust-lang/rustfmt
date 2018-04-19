@@ -77,8 +77,8 @@ use std::borrow::Cow;
 use std::cmp::min;
 use std::iter;
 
-use syntax::{ast, ptr};
 use syntax::codemap::Span;
+use syntax::{ast, ptr};
 
 pub fn rewrite_chain(expr: &ast::Expr, context: &RewriteContext, shape: Shape) -> Option<String> {
     debug!("rewrite_chain {:?}", shape);
@@ -104,7 +104,7 @@ pub fn rewrite_chain(expr: &ast::Expr, context: &RewriteContext, shape: Shape) -
     };
     let parent_rewrite = parent
         .rewrite(context, parent_shape)
-        .map(|parent_rw| parent_rw + &repeat_try(prefix_try_num))?;
+        .map(|parent_rw| parent_rw + &"?".repeat(prefix_try_num))?;
     let parent_rewrite_contains_newline = parent_rewrite.contains('\n');
     let is_small_parent = parent_rewrite.len() <= context.config.tab_spaces();
 
@@ -297,7 +297,7 @@ pub fn rewrite_chain(expr: &ast::Expr, context: &RewriteContext, shape: Shape) -
             join_rewrites(&rewrites, &connector)
         )
     };
-    let result = format!("{}{}", result, repeat_try(suffix_try_num));
+    let result = format!("{}{}", result, "?".repeat(suffix_try_num));
     if context.config.indent_style() == IndentStyle::Visual {
         wrap_str(result, context.config.max_width(), shape)
     } else {
@@ -316,12 +316,6 @@ fn chain_only_try(exprs: &[ast::Expr]) -> bool {
     })
 }
 
-// Try to rewrite and replace the last non-try child. Return `true` if
-// replacing succeeds.
-fn repeat_try(try_count: usize) -> String {
-    iter::repeat("?").take(try_count).collect::<String>()
-}
-
 fn rewrite_try(
     expr: &ast::Expr,
     try_count: usize,
@@ -329,7 +323,7 @@ fn rewrite_try(
     shape: Shape,
 ) -> Option<String> {
     let sub_expr = expr.rewrite(context, shape.sub_width(try_count)?)?;
-    Some(format!("{}{}", sub_expr, repeat_try(try_count)))
+    Some(format!("{}{}", sub_expr, "?".repeat(try_count)))
 }
 
 fn join_rewrites(rewrites: &[String], connector: &str) -> String {
@@ -340,7 +334,7 @@ fn join_rewrites(rewrites: &[String], connector: &str) -> String {
         if rewrite != "?" {
             result.push_str(connector);
         }
-        result.push_str(&rewrite[..]);
+        result.push_str(&rewrite);
     }
 
     result
@@ -399,9 +393,9 @@ fn pop_expr_chain(expr: &ast::Expr, context: &RewriteContext) -> Option<ast::Exp
         ast::ExprKind::MethodCall(_, ref expressions) => {
             Some(convert_try(&expressions[0], context))
         }
-        ast::ExprKind::TupField(ref subexpr, _)
-        | ast::ExprKind::Field(ref subexpr, _)
-        | ast::ExprKind::Try(ref subexpr) => Some(convert_try(subexpr, context)),
+        ast::ExprKind::Field(ref subexpr, _) | ast::ExprKind::Try(ref subexpr) => {
+            Some(convert_try(subexpr, context))
+        }
         _ => None,
     }
 }
@@ -444,18 +438,27 @@ fn rewrite_chain_subexpr(
                 },
                 _ => &[],
             };
-            rewrite_method_call(segment.identifier, types, expressions, span, context, shape)
+            rewrite_method_call(segment.ident, types, expressions, span, context, shape)
         }
-        ast::ExprKind::Field(_, ref field) => rewrite_element(format!(".{}", field.node)),
-        ast::ExprKind::TupField(ref expr, ref field) => {
-            let space = match expr.node {
-                ast::ExprKind::TupField(..) => " ",
-                _ => "",
+        ast::ExprKind::Field(ref nested, ref field) => {
+            let space = if is_tup_field_access(expr) && is_tup_field_access(nested) {
+                " "
+            } else {
+                ""
             };
-            rewrite_element(format!("{}.{}", space, field.node))
+            rewrite_element(format!("{}.{}", space, field.name))
         }
         ast::ExprKind::Try(_) => rewrite_element(String::from("?")),
         _ => unreachable!(),
+    }
+}
+
+fn is_tup_field_access(expr: &ast::Expr) -> bool {
+    match expr.node {
+        ast::ExprKind::Field(_, ref field) => {
+            field.name.to_string().chars().all(|c| c.is_digit(10))
+        }
+        _ => false,
     }
 }
 

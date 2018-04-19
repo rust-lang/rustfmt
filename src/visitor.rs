@@ -8,10 +8,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use syntax::{ast, visit};
 use syntax::attr::HasAttrs;
 use syntax::codemap::{self, BytePos, CodeMap, Pos, Span};
 use syntax::parse::ParseSess;
+use syntax::{ast, visit};
 
 use attr::*;
 use codemap::{LineRangeUtils, SpanUtils};
@@ -335,7 +335,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 let snippet = self.snippet(item.span);
                 let where_span_end = snippet
                     .find_uncommented("{")
-                    .map(|x| (BytePos(x as u32)) + source!(self, item.span).lo());
+                    .map(|x| BytePos(x as u32) + source!(self, item.span).lo());
                 let rw = format_impl(&self.get_context(), item, self.block_indent, where_span_end);
                 self.push_rewrite(item.span, rw);
             }
@@ -696,9 +696,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             parse_session: self.parse_session,
             codemap: self.codemap,
             config: self.config,
-            inside_macro: false,
+            inside_macro: RefCell::new(false),
             use_block: RefCell::new(false),
-            is_if_else_block: false,
+            is_if_else_block: RefCell::new(false),
             force_one_line_chain: RefCell::new(false),
             snippet_provider: self.snippet_provider,
         }

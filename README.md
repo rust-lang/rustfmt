@@ -41,6 +41,14 @@ to run on a cargo project in the current working directory:
 cargo fmt
 ```
 
+For the latest and greatest `rustfmt` (nightly required):
+```
+rustup component add rustfmt-preview --toolchain nightly
+```
+To run:
+```
+cargo +nightly fmt
+```
 
 ## Limitations
 
@@ -79,9 +87,9 @@ rustup component add rustfmt-preview
 
 ## Installing from source
 
-To install from source, first checkout to the tag or branch you want to install, then issue
+To install from source (nightly required), first checkout to the tag or branch you want to install, then issue
 ```
-cargo install --path  .
+cargo install --path .
 ```
 
 This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add `~/.cargo/bin` directory to

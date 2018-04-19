@@ -9,9 +9,9 @@
 // except according to those terms.
 
 use config::lists::*;
-use syntax::{ast, ptr};
 use syntax::codemap::Span;
 use syntax::parse::classify;
+use syntax::{ast, ptr};
 
 use codemap::SpanUtils;
 use expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond, ToExpr};
@@ -127,13 +127,11 @@ fn rewrite_closure_with_block(
     }
 
     let block = ast::Block {
-        stmts: vec![
-            ast::Stmt {
-                id: ast::NodeId::new(0),
-                node: ast::StmtKind::Expr(ptr::P(body.clone())),
-                span: body.span,
-            },
-        ],
+        stmts: vec![ast::Stmt {
+            id: ast::NodeId::new(0),
+            node: ast::StmtKind::Expr(ptr::P(body.clone())),
+            span: body.span,
+        }],
         id: ast::NodeId::new(0),
         rules: ast::BlockCheckMode::Default,
         span: body.span,
@@ -170,7 +168,7 @@ fn rewrite_closure_expr(
 
     // When rewriting closure's body without block, we require it to fit in a single line
     // unless it is a block-like expression or we are inside macro call.
-    let veto_multiline = (!allow_multi_line(expr) && !context.inside_macro)
+    let veto_multiline = (!allow_multi_line(expr) && !context.inside_macro())
         || context.config.force_multiline_blocks();
     expr.rewrite(context, shape)
         .and_then(|rw| {
@@ -300,13 +298,7 @@ pub fn rewrite_last_closure(
             _ => body,
         };
         let (prefix, extra_offset) = rewrite_closure_fn_decl(
-            capture,
-            movability,
-            fn_decl,
-            body,
-            expr.span,
-            context,
-            shape,
+            capture, movability, fn_decl, body, expr.span, context, shape,
         )?;
         // If the closure goes multi line before its body, do not overflow the closure.
         if prefix.contains('\n') {
@@ -370,7 +362,7 @@ where
 
 fn is_block_closure_forced(context: &RewriteContext, expr: &ast::Expr) -> bool {
     // If we are inside macro, we do not want to add or remove block from closure body.
-    if context.inside_macro {
+    if context.inside_macro() {
         false
     } else {
         is_block_closure_forced_inner(expr)

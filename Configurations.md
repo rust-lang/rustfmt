@@ -6,7 +6,7 @@ A possible content of `rustfmt.toml` or `.rustfmt.toml` might look like this:
 
 ```toml
 indent_style = "Block"
-reorder_imported_names = true
+reorder_imports = false
 ```
 
 Each configuration option is either stable or unstable.
@@ -579,9 +579,12 @@ Don't reformat anything
 
 ## `error_on_line_overflow`
 
-Error if unable to get all lines within `max_width`, except for comments and string literals.
+Error if Rustfmt is unable to get all lines within `max_width`, except for comments and string
+literals. If this happens, then it is a bug in Rustfmt. You might be able to work around the bug by
+refactoring your code to avoid long/complex expressions, usually by extracting a local variable or
+using a shorter name.
 
-- **Default value**: `true`
+- **Default value**: `false`
 - **Possible values**: `true`, `false`
 - **Stable**: No
 
@@ -889,7 +892,7 @@ See also [`control_brace_style`](#control_brace_style).
 
 ## `where_single_line`
 
-To force single line where layout
+Forces the `where` clause to be laid out on a single line.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
@@ -1081,6 +1084,28 @@ use foo::{aaa,
           fff};
 ```
 
+## `merge_imports`
+
+Merge multiple imports into a single nested import.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+use foo::{a, c, d};
+use foo::{b, g};
+use foo::{e, f};
+```
+
+#### `true`:
+
+```rust
+use foo::{a, b, c, d, e, f, g};
+```
+
 
 ## `match_block_trailing_comma`
 
@@ -1237,95 +1262,11 @@ fn dolor() -> usize {}
 fn adipiscing() -> usize {}
 ```
 
-## `reorder_imported_names`
-
-Reorder lists of names in import statements alphabetically
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: No
-
-#### `false` (default):
-
-```rust
-use super::{lorem, ipsum, dolor, sit};
-```
-
-#### `true`:
-
-```rust
-use super::{dolor, ipsum, lorem, sit};
-```
-
-See also [`reorder_imports`](#reorder_imports).
 
 ## `reorder_imports`
 
-Reorder import statements alphabetically
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: No
-
-#### `false` (default):
-
-```rust
-use lorem;
-use ipsum;
-use dolor;
-use sit;
-```
-
-#### `true`:
-
-```rust
-use dolor;
-use ipsum;
-use lorem;
-use sit;
-```
-
-See also [`reorder_imported_names`](#reorder_imported_names), [`reorder_imports_in_group`](#reorder_imports_in_group).
-
-## `reorder_imports_in_group`
-
-Reorder import statements in group
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: No
-
-**Note:** This option takes effect only when [`reorder_imports`](#reorder_imports) is set to `true`.
-
-#### `false` (default):
-
-```rust
-use std::mem;
-use std::io;
-
-use lorem;
-use ipsum;
-use dolor;
-use sit;
-```
-
-#### `true`:
-
-```rust
-use std::io;
-use std::mem;
-
-use dolor;
-use ipsum;
-use lorem;
-use sit;
-```
-
-See also [`reorder_imports`](#reorder_imports).
-
-## `reorder_extern_crates`
-
-Reorder `extern crate` statements alphabetically
+Reorder import and extern crate statements alphabetically in groups (a group is
+separated by a newline).
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
@@ -1334,49 +1275,21 @@ Reorder `extern crate` statements alphabetically
 #### `true` (default):
 
 ```rust
-extern crate dolor;
-extern crate ipsum;
-extern crate lorem;
-extern crate sit;
+use dolor;
+use ipsum;
+use lorem;
+use sit;
 ```
 
 #### `false`:
 
 ```rust
-extern crate lorem;
-extern crate ipsum;
-
-extern crate dolor;
-extern crate sit;
+use lorem;
+use ipsum;
+use dolor;
+use sit;
 ```
 
-See also [`reorder_extern_crates_in_group`](#reorder_extern_crates_in_group).
-
-## `reorder_extern_crates_in_group`
-
-Reorder `extern crate` statements in group
-
-- **Default value**: `true`
-- **Possible values**: `true`, `false`
-- **Stable**: No
-
-#### `true` (default):
-
-**Note:** This only takes effect when [`reorder_extern_crates`](#reorder_extern_crates) is set to `true`.
-
-```rust
-extern crate a;
-extern crate b;
-
-extern crate dolor;
-extern crate ipsum;
-extern crate lorem;
-extern crate sit;
-```
-
-#### `false`:
-
-This value has no influence beyond the effect of the [`reorder_extern_crates`](#reorder_extern_crates) option. Set [`reorder_extern_crates`](#reorder_extern_crates) to `false` if you do not want `extern crate` groups to be collapsed and ordered.
 
 ## `reorder_modules`
 
@@ -1386,7 +1299,7 @@ Reorder `mod` declarations alphabetically in group.
 - **Possible values**: `true`, `false`
 - **Stable**: No
 
-#### `true`
+#### `true` (default)
 
 ```rust
 mod a;
@@ -1412,6 +1325,42 @@ mod sit;
 
 **Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantic
 of the original source code.
+
+## `reorder_impl_items`
+
+Reorder impl items. `type` and `const` are put first, then macros and methods.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default)
+
+```rust
+struct Dummy;
+
+impl Iterator for Dummy {
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
+
+    type Item = i32;
+}
+```
+
+#### `true`
+
+```rust
+struct Dummy;
+
+impl Iterator for Dummy {
+    type Item = i32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
+}
+```
 
 ## `report_todo`
 
@@ -1688,7 +1637,8 @@ Number of spaces per tab
 fn lorem() {
     let ipsum = dolor();
     let sit = vec![
-        "amet consectetur adipiscing elit amet consectetur adipiscing elit amet consectetur.",
+        "amet consectetur adipiscing elit amet",
+        "consectetur adipiscing elit amet consectetur.",
     ];
 }
 ```
@@ -1699,7 +1649,8 @@ fn lorem() {
 fn lorem() {
   let ipsum = dolor();
   let sit = vec![
-    "amet consectetur adipiscing elit amet consectetur adipiscing elit amet consectetur.",
+    "amet consectetur adipiscing elit amet",
+    "consectetur adipiscing elit amet consectetur.",
   ];
 }
 ```
@@ -2110,7 +2061,7 @@ Whether to use colored output or not.
 
 ## `unstable_features`
 
-Enable unstable featuers on stable channel.
+Enable unstable features on stable channel.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`

@@ -56,7 +56,7 @@ impl AsRef<ListItem> for ListItem {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum ListItemCommentStyle {
     // Try to keep the comment on the same line with the item.
     SameLine,
@@ -66,6 +66,7 @@ pub enum ListItemCommentStyle {
     None,
 }
 
+#[derive(Debug, Clone)]
 pub struct ListItem {
     // None for comments mean that they are not present.
     pub pre_comment: Option<String>,
@@ -79,6 +80,16 @@ pub struct ListItem {
 }
 
 impl ListItem {
+    pub fn empty() -> ListItem {
+        ListItem {
+            pre_comment: None,
+            pre_comment_style: ListItemCommentStyle::None,
+            item: None,
+            post_comment: None,
+            new_lines: false,
+        }
+    }
+
     pub fn inner_as_ref(&self) -> &str {
         self.item.as_ref().map_or("", |s| s)
     }
@@ -100,13 +111,17 @@ impl ListItem {
                 .map_or(false, |s| s.contains('\n'))
     }
 
-    pub fn has_comment(&self) -> bool {
+    pub fn has_single_line_comment(&self) -> bool {
         self.pre_comment
             .as_ref()
             .map_or(false, |comment| comment.trim_left().starts_with("//"))
             || self.post_comment
                 .as_ref()
                 .map_or(false, |comment| comment.trim_left().starts_with("//"))
+    }
+
+    pub fn has_comment(&self) -> bool {
+        self.pre_comment.is_some() || self.post_comment.is_some()
     }
 
     pub fn from_str<S: Into<String>>(s: S) -> ListItem {
@@ -117,6 +132,18 @@ impl ListItem {
             post_comment: None,
             new_lines: false,
         }
+    }
+
+    // true if the item causes something to be written.
+    fn is_substantial(&self) -> bool {
+        fn empty(s: &Option<String>) -> bool {
+            match *s {
+                Some(ref s) if !s.is_empty() => false,
+                _ => true,
+            }
+        }
+
+        !(empty(&self.pre_comment) && empty(&self.item) && empty(&self.post_comment))
     }
 }
 
@@ -151,15 +178,14 @@ where
     let pre_line_comments = items
         .clone()
         .into_iter()
-        .any(|item| item.as_ref().has_comment());
+        .any(|item| item.as_ref().has_single_line_comment());
 
     let limit = match tactic {
         _ if pre_line_comments => return DefinitiveListTactic::Vertical,
-        ListTactic::Mixed => return DefinitiveListTactic::Mixed,
         ListTactic::Horizontal => return DefinitiveListTactic::Horizontal,
         ListTactic::Vertical => return DefinitiveListTactic::Vertical,
         ListTactic::LimitedHorizontalVertical(limit) => ::std::cmp::min(width, limit),
-        ListTactic::HorizontalVertical => width,
+        ListTactic::Mixed | ListTactic::HorizontalVertical => width,
     };
 
     let (sep_count, total_width) = calculate_width(items.clone());
@@ -171,7 +197,10 @@ where
     {
         DefinitiveListTactic::Horizontal
     } else {
-        DefinitiveListTactic::Vertical
+        match tactic {
+            ListTactic::Mixed => DefinitiveListTactic::Mixed,
+            _ => DefinitiveListTactic::Vertical,
+        }
     }
 }
 
@@ -220,6 +249,10 @@ where
             item_last_line_width -= indent_str.len();
         }
 
+        if !item.is_substantial() {
+            continue;
+        }
+
         match tactic {
             DefinitiveListTactic::Horizontal if !first => {
                 result.push(' ');
@@ -236,7 +269,9 @@ where
                     result.push(' ');
                 }
             }
-            DefinitiveListTactic::Vertical if !first => {
+            DefinitiveListTactic::Vertical
+                if !first && !inner_item.is_empty() && !result.is_empty() =>
+            {
                 result.push('\n');
                 result.push_str(indent_str);
             }
@@ -249,12 +284,12 @@ where
                     result.push_str(indent_str);
                     line_len = 0;
                     if formatting.ends_with_newline {
-                        if last {
-                            separate = true;
-                        } else {
-                            trailing_separator = true;
-                        }
+                        trailing_separator = true;
                     }
+                }
+
+                if last && formatting.ends_with_newline {
+                    separate = formatting.trailing_separator != SeparatorTactic::Never;
                 }
 
                 if line_len > 0 {
@@ -276,26 +311,28 @@ where
                 rewrite_comment(comment, block_mode, formatting.shape, formatting.config)?;
             result.push_str(&comment);
 
-            if tactic == DefinitiveListTactic::Vertical {
-                // We cannot keep pre-comments on the same line if the comment if normalized.
-                let keep_comment = if formatting.config.normalize_comments()
-                    || item.pre_comment_style == ListItemCommentStyle::DifferentLine
-                {
-                    false
+            if !inner_item.is_empty() {
+                if tactic == DefinitiveListTactic::Vertical {
+                    // We cannot keep pre-comments on the same line if the comment if normalized.
+                    let keep_comment = if formatting.config.normalize_comments()
+                        || item.pre_comment_style == ListItemCommentStyle::DifferentLine
+                    {
+                        false
+                    } else {
+                        // We will try to keep the comment on the same line with the item here.
+                        // 1 = ` `
+                        let total_width = total_item_width(item) + item_sep_len + 1;
+                        total_width <= formatting.shape.width
+                    };
+                    if keep_comment {
+                        result.push(' ');
+                    } else {
+                        result.push('\n');
+                        result.push_str(indent_str);
+                    }
                 } else {
-                    // We will try to keep the comment on the same line with the item here.
-                    // 1 = ` `
-                    let total_width = total_item_width(item) + item_sep_len + 1;
-                    total_width <= formatting.shape.width
-                };
-                if keep_comment {
                     result.push(' ');
-                } else {
-                    result.push('\n');
-                    result.push_str(indent_str);
                 }
-            } else {
-                result.push(' ');
             }
             item_max_width = None;
         }
@@ -304,7 +341,7 @@ where
             result.push_str(formatting.separator.trim());
             result.push(' ');
         }
-        result.push_str(&inner_item[..]);
+        result.push_str(inner_item);
 
         // Post-comments
         if tactic != DefinitiveListTactic::Vertical && item.post_comment.is_some() {
@@ -590,6 +627,8 @@ where
 
             let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
                 post_snippet[1..].trim_matches(white_space)
+            } else if post_snippet.starts_with(self.separator) {
+                post_snippet[self.separator.len()..].trim_matches(white_space)
             } else if post_snippet.ends_with(',') {
                 post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
             } else {

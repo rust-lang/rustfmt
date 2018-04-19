@@ -15,19 +15,22 @@ extern crate getopts;
 extern crate rustfmt_nightly as rustfmt;
 
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, stdout, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, error};
 
 use getopts::{Matches, Options};
 
+use rustfmt::checkstyle;
 use rustfmt::config::file_lines::FileLines;
 use rustfmt::config::{get_toml_path, Color, Config, WriteMode};
 use rustfmt::{run, FileName, Input, Summary};
 
 type FmtError = Box<error::Error + Send + Sync>;
 type FmtResult<T> = std::result::Result<T, FmtError>;
+
+const WRITE_MODE_LIST: &str = "[replace|overwrite|display|plain|diff|coverage|checkstyle|check]";
 
 /// Rustfmt operations.
 enum Operation {
@@ -57,19 +60,18 @@ enum Operation {
 /// Parsed command line options.
 #[derive(Clone, Debug, Default)]
 struct CliOptions {
-    skip_children: bool,
+    skip_children: Option<bool>,
     verbose: bool,
     write_mode: Option<WriteMode>,
     color: Option<Color>,
     file_lines: FileLines, // Default is all lines in all files.
     unstable_features: bool,
-    error_on_unformatted: bool,
+    error_on_unformatted: Option<bool>,
 }
 
 impl CliOptions {
     fn from_matches(matches: &Matches) -> FmtResult<CliOptions> {
         let mut options = CliOptions::default();
-        options.skip_children = matches.opt_present("skip-children");
         options.verbose = matches.opt_present("verbose");
         let unstable_features = matches.opt_present("unstable-features");
         let rust_nightly = option_env!("CFG_RELEASE_CHANNEL")
@@ -88,8 +90,8 @@ impl CliOptions {
                 options.write_mode = Some(write_mode);
             } else {
                 return Err(FmtError::from(format!(
-                    "Invalid write-mode: {}",
-                    write_mode
+                    "Invalid write-mode: {}, expected one of {}",
+                    write_mode, WRITE_MODE_LIST
                 )));
             }
         }
@@ -105,19 +107,26 @@ impl CliOptions {
             options.file_lines = file_lines.parse()?;
         }
 
+        if matches.opt_present("skip-children") {
+            options.skip_children = Some(true);
+        }
         if matches.opt_present("error-on-unformatted") {
-            options.error_on_unformatted = true;
+            options.error_on_unformatted = Some(true);
         }
 
         Ok(options)
     }
 
     fn apply_to(self, config: &mut Config) {
-        config.set().skip_children(self.skip_children);
         config.set().verbose(self.verbose);
         config.set().file_lines(self.file_lines);
         config.set().unstable_features(self.unstable_features);
-        config.set().error_on_unformatted(self.error_on_unformatted);
+        if let Some(skip_children) = self.skip_children {
+            config.set().skip_children(skip_children);
+        }
+        if let Some(error_on_unformatted) = self.error_on_unformatted {
+            config.set().error_on_unformatted(error_on_unformatted);
+        }
         if let Some(write_mode) = self.write_mode {
             config.set().write_mode(write_mode);
         }
@@ -161,11 +170,13 @@ fn make_opts() -> Options {
          found reverts to the input file path",
         "[Path for the configuration file]",
     );
-    opts.optopt(
+    opts.opt(
         "",
         "dump-default-config",
         "Dumps default configuration to PATH. PATH defaults to stdout, if omitted.",
         "PATH",
+        getopts::HasArg::Maybe,
+        getopts::Occur::Optional,
     );
     opts.optopt(
         "",
@@ -198,7 +209,7 @@ fn make_opts() -> Options {
         "",
         "write-mode",
         "How to write output (not usable when piping from stdin)",
-        "[replace|overwrite|display|plain|diff|check|coverage|checkstyle]",
+        WRITE_MODE_LIST,
     );
 
     opts
@@ -218,7 +229,7 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
             Ok(Summary::default())
         }
         Operation::ConfigHelp => {
-            Config::print_docs();
+            Config::print_docs(&mut stdout(), matches.opt_present("unstable-features"));
             Ok(Summary::default())
         }
         Operation::ConfigOutputDefault { path } => {
@@ -252,7 +263,10 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
 
             let mut error_summary = Summary::default();
             if config.version_meets_requirement(&mut error_summary) {
+                let mut out = &mut stdout();
+                checkstyle::output_header(&mut out, config.write_mode())?;
                 error_summary.add(run(Input::Text(input), &config));
+                checkstyle::output_footer(&mut out, config.write_mode())?;
             }
 
             Ok(error_summary)
@@ -286,6 +300,8 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
                 }
             }
 
+            let mut out = &mut stdout();
+            checkstyle::output_header(&mut out, config.write_mode())?;
             let mut error_summary = Summary::default();
 
             for file in files {
@@ -320,6 +336,7 @@ fn execute(opts: &Options) -> FmtResult<Summary> {
                     error_summary.add(run(Input::File(file), &config));
                 }
             }
+            checkstyle::output_footer(&mut out, config.write_mode())?;
 
             // If we were given a path via dump-minimal-config, output any options
             // that were used during formatting as TOML.
@@ -347,7 +364,7 @@ fn main() {
     env_logger::init();
     let opts = make_opts();
     // Only handles arguments passed in through the CLI.
-    let mut write_mode = determine_write_mode(&opts);
+    let write_mode = determine_write_mode(&opts);
 
     let exit_code = match execute(&opts) {
         Ok(summary) => {
@@ -392,9 +409,8 @@ fn print_usage_to_stdout(opts: &Options, reason: &str) {
 
 fn print_version() {
     let version_info = format!(
-        "{}{}{}",
+        "{}-{}",
         option_env!("CARGO_PKG_VERSION").unwrap_or("unknown"),
-        "-",
         include_str!(concat!(env!("OUT_DIR"), "/commit-info.txt"))
     );
 

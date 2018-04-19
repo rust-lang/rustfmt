@@ -27,6 +27,40 @@ use spanned::Spanned;
 use types::{rewrite_path, PathContext};
 use utils::{format_mutability, mk_sp};
 
+/// Returns true if the given pattern is short. A short pattern is defined by the following grammer:
+///
+/// [small, ntp]:
+///     - single token
+///     - `&[single-line, ntp]`
+///
+/// [small]:
+///     - `[small, ntp]`
+///     - unary tuple constructor `([small, ntp])`
+///     - `&[small]`
+pub fn is_short_pattern(pat: &ast::Pat, pat_str: &str) -> bool {
+    // We also require that the pattern is reasonably 'small' with its literal width.
+    pat_str.len() <= 20 && !pat_str.contains('\n') && is_short_pattern_inner(pat)
+}
+
+fn is_short_pattern_inner(pat: &ast::Pat) -> bool {
+    match pat.node {
+        ast::PatKind::Wild | ast::PatKind::Lit(_) => true,
+        ast::PatKind::Ident(_, _, ref pat) => pat.is_none(),
+        ast::PatKind::Struct(..)
+        | ast::PatKind::Mac(..)
+        | ast::PatKind::Slice(..)
+        | ast::PatKind::Path(..)
+        | ast::PatKind::Range(..) => false,
+        ast::PatKind::Tuple(ref subpats, _) => subpats.len() <= 1,
+        ast::PatKind::TupleStruct(ref path, ref subpats, _) => {
+            path.segments.len() <= 1 && subpats.len() <= 1
+        }
+        ast::PatKind::Box(ref p) | ast::PatKind::Ref(ref p, _) | ast::PatKind::Paren(ref p) => {
+            is_short_pattern_inner(&*p)
+        }
+    }
+}
+
 impl Rewrite for Pat {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         match self.node {
@@ -37,7 +71,7 @@ impl Rewrite for Pat {
                     BindingMode::ByValue(mutability) => ("", mutability),
                 };
                 let mut_infix = format_mutability(mutability);
-                let id_str = ident.node.to_string();
+                let id_str = ident.name.to_string();
                 let sub_pat = match *sub_pat {
                     Some(ref p) => {
                         // 3 - ` @ `.
@@ -326,20 +360,13 @@ fn rewrite_tuple_pat(
 
     // add comma if `(x,)`
     let add_comma = path_str.is_none() && pat_vec.len() == 1 && dotdot_pos.is_none();
-    let mut context = context.clone();
-    if let Some(&TuplePatField::Dotdot(..)) = pat_vec.last() {
-        context.inside_macro = true;
-    }
     let path_str = path_str.unwrap_or_default();
-    let mut pat_ref_vec = Vec::with_capacity(pat_vec.len());
-    for pat in pat_vec {
-        pat_ref_vec.push(pat);
-    }
+    let pat_ref_vec = pat_vec.iter().collect::<Vec<_>>();
 
     overflow::rewrite_with_parens(
         &context,
         &path_str,
-        &pat_ref_vec[..],
+        &pat_ref_vec,
         shape,
         span,
         context.config.max_width(),
@@ -378,7 +405,7 @@ fn count_wildcard_suffix_len(
     }) {
         suffix_len += 1;
 
-        if item.pre_comment.is_some() || item.post_comment.is_some() {
+        if item.has_comment() {
             break;
         }
     }

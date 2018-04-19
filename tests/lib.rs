@@ -24,11 +24,11 @@ use std::iter::{Enumerate, Peekable};
 use std::path::{Path, PathBuf};
 use std::str::Chars;
 
-use rustfmt::*;
-use rustfmt::config::{Color, Config, ReportTactic};
 use rustfmt::config::summary::Summary;
+use rustfmt::config::{Color, Config, ReportTactic};
 use rustfmt::filemap::write_system_newlines;
 use rustfmt::rustfmt_diff::*;
+use rustfmt::*;
 
 const DIFF_CONTEXT_SIZE: usize = 3;
 const CONFIGURATIONS_FILE_NAME: &str = "Configurations.md";
@@ -284,7 +284,8 @@ fn stdin_formatting_smoke_test() {
 fn format_lines_errors_are_reported() {
     let long_identifier = String::from_utf8(vec![b'a'; 239]).unwrap();
     let input = Input::Text(format!("fn {}() {{}}", long_identifier));
-    let config = Config::default();
+    let mut config = Config::default();
+    config.set().error_on_line_overflow(true);
     let (error_summary, _file_map, _report) =
         format_input::<io::Stdout>(input, &config, None).unwrap();
     assert!(error_summary.has_formatting_errors());
@@ -294,7 +295,9 @@ fn format_lines_errors_are_reported() {
 fn format_lines_errors_are_reported_with_tabs() {
     let long_identifier = String::from_utf8(vec![b'a'; 97]).unwrap();
     let input = Input::Text(format!("fn a() {{\n\t{}\n}}", long_identifier));
-    let config = Config::from_toml("hard_tabs = true", Path::new("")).unwrap();
+    let mut config = Config::default();
+    config.set().error_on_line_overflow(true);
+    config.set().hard_tabs(true);
     let (error_summary, _file_map, _report) =
         format_input::<io::Stdout>(input, &config, None).unwrap();
     assert!(error_summary.has_formatting_errors());
@@ -541,19 +544,17 @@ fn rustfmt_diff_make_diff_tests() {
     let diff = make_diff("a\nb\nc\nd", "a\ne\nc\nd", 3);
     assert_eq!(
         diff,
-        vec![
-            Mismatch {
-                line_number: 1,
-                line_number_orig: 1,
-                lines: vec![
-                    DiffLine::Context("a".into()),
-                    DiffLine::Resulting("b".into()),
-                    DiffLine::Expected("e".into()),
-                    DiffLine::Context("c".into()),
-                    DiffLine::Context("d".into()),
-                ],
-            },
-        ]
+        vec![Mismatch {
+            line_number: 1,
+            line_number_orig: 1,
+            lines: vec![
+                DiffLine::Context("a".into()),
+                DiffLine::Resulting("b".into()),
+                DiffLine::Expected("e".into()),
+                DiffLine::Context("c".into()),
+                DiffLine::Context("d".into()),
+            ],
+        }]
     );
 }
 

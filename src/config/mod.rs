@@ -8,12 +8,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::{env, fs};
 use std::cell::Cell;
 use std::default::Default;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 use regex::Regex;
 
@@ -23,9 +23,9 @@ mod config_type;
 mod options;
 
 pub mod file_lines;
+pub mod license;
 pub mod lists;
 pub mod summary;
-pub mod license;
 
 use config::config_type::ConfigType;
 use config::file_lines::FileLines;
@@ -43,42 +43,37 @@ create_config! {
     hard_tabs: bool, false, true, "Use tab characters for indentation, spaces for alignment";
     tab_spaces: usize, 4, true, "Number of spaces per tab";
     newline_style: NewlineStyle, NewlineStyle::Unix, true, "Unix or Windows line endings";
-    indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items.";
     use_small_heuristics: bool, true, false, "Whether to use different formatting for items and \
         expressions if they satisfy a heuristic notion of 'small'.";
+    indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items.";
 
-    // strings and comments
-    format_strings: bool, false, false, "Format string literals where necessary";
+    // Comments and strings
     wrap_comments: bool, false, true, "Break comments to fit on the line";
     comment_width: usize, 80, false,
         "Maximum length of comments. No effect unless wrap_comments = true";
     normalize_comments: bool, false, true, "Convert /* */ comments to // comments where possible";
     license_template_path: String, String::default(), false, "Beginning of file must match license template";
+    format_strings: bool, false, false, "Format string literals where necessary";
 
-    // Single line expressions and items.
+    // Single line expressions and items
     empty_item_single_line: bool, true, false,
         "Put empty-body functions and impls on a single line";
     struct_lit_single_line: bool, true, false,
         "Put small struct literals on a single line";
     fn_single_line: bool, false, false, "Put single-expression functions on a single line";
-    where_single_line: bool, false, false, "To force single line where layout";
+    where_single_line: bool, false, false, "Force where clauses to be on a single line";
 
     // Imports
     imports_indent: IndentStyle, IndentStyle::Visual, false, "Indent of imports";
     imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
+    merge_imports: bool, false, false, "Merge imports";
 
     // Ordering
-    reorder_extern_crates: bool, true, false, "Reorder extern crate statements alphabetically";
-    reorder_extern_crates_in_group: bool, true, false, "Reorder extern crate statements in group";
-    reorder_imports: bool, false, false, "Reorder import statements alphabetically";
-    reorder_imports_in_group: bool, false, false, "Reorder import statements in group";
-    reorder_imported_names: bool, true, false,
-        "Reorder lists of names in import statements alphabetically";
-    reorder_modules: bool, false, false, "Reorder module statemtents alphabetically in group";
+    reorder_imports: bool, true, false, "Reorder import and extern crate statements alphabetically";
+    reorder_modules: bool, true, false, "Reorder module statements alphabetically in group";
+    reorder_impl_items: bool, false, false, "Reorder impl items";
 
     // Spaces around punctuation
-    binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
-        "Where to put a binary operator when a binary expression goes multiline.";
     type_punctuation_density: TypeDensity, TypeDensity::Wide, false,
         "Determines if '+' or '=' are wrapped in spaces in the punctuation of types";
     space_before_colon: bool, false, false, "Leave a space before the colon";
@@ -86,13 +81,15 @@ create_config! {
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ... range operators";
     spaces_within_parens_and_brackets: bool, false, false,
         "Put spaces within non-empty parentheses or brackets";
+    binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
+        "Where to put a binary operator when a binary expression goes multiline.";
 
     // Misc.
+    remove_blank_lines_at_start_or_end_of_block: bool, true, false,
+        "Remove blank lines at start or end of a block";
     combine_control_expr: bool, true, false, "Combine control expressions with function calls.";
     struct_field_align_threshold: usize, 0, false, "Align struct fields if their diffs fits within \
                                              threshold.";
-    remove_blank_lines_at_start_or_end_of_block: bool, true, false,
-        "Remove blank lines at start or end of a block";
     match_arm_blocks: bool, true, false, "Wrap the body of arms in blocks when it does not fit on \
         the same line with the pattern of arms";
     force_multiline_blocks: bool, false, false,
@@ -101,10 +98,10 @@ create_config! {
     brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
     control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,
         "Brace style for control flow constructs";
-    trailing_comma: SeparatorTactic, SeparatorTactic::Vertical, false,
-        "How to handle trailing commas for lists";
     trailing_semicolon: bool, true, false,
         "Add trailing semicolon after break, continue and return";
+    trailing_comma: SeparatorTactic, SeparatorTactic::Vertical, false,
+        "How to handle trailing commas for lists";
     match_block_trailing_comma: bool, false, false,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
     blank_lines_upper_bound: usize, 1, false,
@@ -133,7 +130,7 @@ create_config! {
     disable_all_formatting: bool, false, false, "Don't reformat anything";
     skip_children: bool, false, false, "Don't reformat out of line modules";
     hide_parse_errors: bool, false, false, "Hide errors from the parser";
-    error_on_line_overflow: bool, true, false, "Error if unable to get all lines within max_width";
+    error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
     error_on_unformatted: bool, false, false,
         "Error if unable to get comments or string literals within max_width, \
          or they are left with trailing whitespaces";
@@ -144,7 +141,7 @@ create_config! {
     ignore: IgnoreList, IgnoreList::default(), false,
         "Skip formatting the specified files and directories.";
 
-    // Not user-facing.
+    // Not user-facing
     verbose: bool, false, false, "Use verbose output";
     file_lines: FileLines, FileLines::all(), false,
         "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
@@ -180,6 +177,31 @@ pub fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
 #[cfg(test)]
 mod test {
     use super::Config;
+    use std::str;
+
+    #[allow(dead_code)]
+    mod mock {
+        use super::super::*;
+
+        create_config! {
+            // Options that are used by the generated functions
+            max_width: usize, 100, true, "Maximum width of each line";
+            use_small_heuristics: bool, true, false, "Whether to use different formatting for items and \
+                expressions if they satisfy a heuristic notion of 'small'.";
+            license_template_path: String, String::default(), false, "Beginning of file must match license template";
+            required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false, "Require a specific version of rustfmt.";
+            ignore: IgnoreList, IgnoreList::default(), false, "Skip formatting the specified files and directories.";
+            verbose: bool, false, false, "Use verbose output";
+            file_lines: FileLines, FileLines::all(), false,
+                "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
+                    via the --file-lines option";
+            width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false, "'small' heuristic values";
+
+            // Options that are used by the tests
+            stable_option: bool, false, true, "A stable option";
+            unstable_option: bool, false, false, "An unstable option";
+        }
+    }
 
     #[test]
     fn test_config_set() {
@@ -215,6 +237,33 @@ mod test {
 
         assert_eq!(config.was_set().hard_tabs(), true);
         assert_eq!(config.was_set().verbose(), false);
+    }
+
+    #[test]
+    fn test_print_docs_exclude_unstable() {
+        use self::mock::Config;
+
+        let mut output = Vec::new();
+        Config::print_docs(&mut output, false);
+
+        let s = str::from_utf8(&output).unwrap();
+
+        assert_eq!(s.contains("stable_option"), true);
+        assert_eq!(s.contains("unstable_option"), false);
+        assert_eq!(s.contains("(unstable)"), false);
+    }
+
+    #[test]
+    fn test_print_docs_include_unstable() {
+        use self::mock::Config;
+
+        let mut output = Vec::new();
+        Config::print_docs(&mut output, true);
+
+        let s = str::from_utf8(&output).unwrap();
+        assert_eq!(s.contains("stable_option"), true);
+        assert_eq!(s.contains("unstable_option"), true);
+        assert_eq!(s.contains("(unstable)"), true);
     }
 
     // FIXME(#2183) these tests cannot be run in parallel because they use env vars

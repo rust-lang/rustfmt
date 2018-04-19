@@ -11,13 +11,13 @@
 // Formatting top-level items - functions, structs, enums, traits, impls.
 
 use std::borrow::Cow;
-use std::cmp::min;
+use std::cmp::{min, Ordering};
 
 use config::lists::*;
 use regex::Regex;
-use syntax::{abi, ast, ptr, symbol};
 use syntax::codemap::{self, BytePos, Span};
 use syntax::visit;
+use syntax::{abi, ast, ptr, symbol};
 
 use codemap::{LineRangeUtils, SpanUtils};
 use comment::{combine_strs_with_missing_comments, contains_comment, recover_comment_removed,
@@ -26,8 +26,9 @@ use config::{BraceStyle, Config, Density, IndentStyle};
 use expr::{format_expr, is_empty_block, is_simple_block_stmt, rewrite_assign_rhs,
            rewrite_assign_rhs_with, ExprType, RhsTactics};
 use lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator};
-use rewrite::{Rewrite, RewriteContext};
+use macros::{rewrite_macro, MacroPosition};
 use overflow;
+use rewrite::{Rewrite, RewriteContext};
 use shape::{Indent, Shape};
 use spanned::Spanned;
 use types::TraitTyParamBounds;
@@ -204,7 +205,7 @@ impl<'a> FnSig<'a> {
         fn_kind: &'a visit::FnKind,
         generics: &'a ast::Generics,
         decl: &'a ast::FnDecl,
-        defualtness: ast::Defaultness,
+        defaultness: ast::Defaultness,
     ) -> FnSig<'a> {
         match *fn_kind {
             visit::FnKind::ItemFn(_, unsafety, constness, abi, visibility, _) => FnSig {
@@ -212,13 +213,13 @@ impl<'a> FnSig<'a> {
                 generics,
                 abi,
                 constness: constness.node,
-                defaultness: defualtness,
+                defaultness,
                 unsafety,
                 visibility: visibility.clone(),
             },
             visit::FnKind::Method(_, method_sig, vis, _) => {
                 let mut fn_sig = FnSig::from_method_sig(method_sig, generics);
-                fn_sig.defaultness = defualtness;
+                fn_sig.defaultness = defaultness;
                 if let Some(vis) = vis {
                     fn_sig.visibility = vis.clone();
                 }
@@ -561,10 +562,10 @@ impl<'a> FmtVisitor<'a> {
             )?,
             ast::VariantData::Unit(..) => {
                 if let Some(ref expr) = field.node.disr_expr {
-                    let lhs = format!("{} =", field.node.name);
+                    let lhs = format!("{} =", field.node.ident.name);
                     rewrite_assign_rhs(&context, lhs, &**expr, shape)?
                 } else {
-                    field.node.name.to_string()
+                    field.node.ident.name.to_string()
                 }
             }
         };
@@ -660,12 +661,55 @@ pub fn format_impl(
 
         if !items.is_empty() || contains_comment(&snippet[open_pos..]) {
             let mut visitor = FmtVisitor::from_context(context);
-            visitor.block_indent = offset.block_only().block_indent(context.config);
+            let item_indent = offset.block_only().block_indent(context.config);
+            visitor.block_indent = item_indent;
             visitor.last_pos = item.span.lo() + BytePos(open_pos as u32);
 
             visitor.visit_attrs(&item.attrs, ast::AttrStyle::Inner);
-            for item in items {
-                visitor.visit_impl_item(item);
+            if context.config.reorder_impl_items() {
+                // Create visitor for each items, then reorder them.
+                let mut buffer = vec![];
+                for item in items {
+                    visitor.visit_impl_item(item);
+                    buffer.push((visitor.buffer.clone(), item.clone()));
+                    visitor.buffer.clear();
+                }
+                // type -> const -> macro -> method
+                use ast::ImplItemKind::*;
+                fn need_empty_line(a: &ast::ImplItemKind, b: &ast::ImplItemKind) -> bool {
+                    match (a, b) {
+                        (Type(..), Type(..)) | (Const(..), Const(..)) => false,
+                        _ => true,
+                    }
+                }
+
+                buffer.sort_by(|(_, a), (_, b)| match (&a.node, &b.node) {
+                    (Type(..), _) => Ordering::Less,
+                    (_, Type(..)) => Ordering::Greater,
+                    (Const(..), _) => Ordering::Less,
+                    (_, Const(..)) => Ordering::Greater,
+                    (Macro(..), _) => Ordering::Less,
+                    (_, Macro(..)) => Ordering::Greater,
+                    _ => Ordering::Less,
+                });
+                let mut prev_kind = None;
+                for (buf, item) in buffer {
+                    // Make sure that there are at least a single empty line between
+                    // different impl items.
+                    if prev_kind
+                        .as_ref()
+                        .map_or(false, |prev_kind| need_empty_line(prev_kind, &item.node))
+                    {
+                        visitor.push_str("\n");
+                    }
+                    visitor.push_str(&item_indent.to_string_with_newline(context.config));
+                    visitor.push_str(buf.trim());
+                    prev_kind = Some(item.node.clone());
+                }
+            } else {
+                for item in items {
+                    visitor.visit_impl_item(item);
+                }
             }
 
             visitor.format_missing(item.span.hi() - BytePos(1));
@@ -849,7 +893,7 @@ impl<'a> StructParts<'a> {
     fn from_variant(variant: &'a ast::Variant) -> Self {
         StructParts {
             prefix: "",
-            ident: variant.node.name,
+            ident: variant.node.ident,
             vis: &DEFAULT_VISIBILITY,
             def: &variant.node.data,
             generics: None,
@@ -977,7 +1021,7 @@ pub fn format_trait(context: &RewriteContext, item: &ast::Item, offset: Indent) 
             result.push_str(&where_clause_str);
         } else {
             let item_snippet = context.snippet(item.span);
-            if let Some(lo) = item_snippet.chars().position(|c| c == '/') {
+            if let Some(lo) = item_snippet.find('/') {
                 // 1 = `{`
                 let comment_hi = body_lo - BytePos(1);
                 let comment_lo = item.span.lo() + BytePos(lo as u32);
@@ -1287,7 +1331,7 @@ fn format_tuple_struct(
         result.push(')');
     } else {
         let shape = Shape::indented(offset, context.config).sub_width(1)?;
-        let fields = &fields.iter().collect::<Vec<_>>()[..];
+        let fields = &fields.iter().collect::<Vec<_>>();
         result = overflow::rewrite_with_parens(
             context,
             &result,
@@ -1750,7 +1794,7 @@ pub fn span_hi_for_arg(context: &RewriteContext, arg: &ast::Arg) -> BytePos {
 
 pub fn is_named_arg(arg: &ast::Arg) -> bool {
     if let ast::PatKind::Ident(_, ident, _) = arg.pat.node {
-        ident.node != symbol::keywords::Invalid.ident()
+        ident != symbol::keywords::Invalid.ident()
     } else {
         true
     }
@@ -2219,7 +2263,7 @@ fn rewrite_args(
 
 fn arg_has_pattern(arg: &ast::Arg) -> bool {
     if let ast::PatKind::Ident(_, ident, _) = arg.pat.node {
-        ident.node != symbol::keywords::Invalid.ident()
+        ident != symbol::keywords::Invalid.ident()
     } else {
         true
     }
@@ -2312,7 +2356,7 @@ fn rewrite_generics(
         return Some(ident.to_owned());
     }
 
-    let params = &generics.params.iter().map(|e| &*e).collect::<Vec<_>>()[..];
+    let params = &generics.params.iter().map(|e| &*e).collect::<Vec<_>>();
     overflow::rewrite_with_angle_brackets(context, ident, params, shape, span)
 }
 
@@ -2688,6 +2732,9 @@ impl Rewrite for ast::ForeignItem {
             ast::ForeignItemKind::Ty => {
                 let vis = format_visibility(&self.vis);
                 Some(format!("{}type {};", vis, self.ident))
+            }
+            ast::ForeignItemKind::Macro(ref mac) => {
+                rewrite_macro(mac, None, context, shape, MacroPosition::Item)
             }
         }?;
 

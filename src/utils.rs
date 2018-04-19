@@ -10,10 +10,10 @@
 
 use std::borrow::Cow;
 
-use syntax::{abi, ptr};
 use syntax::ast::{self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem,
                   NestedMetaItemKind, Path, Visibility, VisibilityKind};
 use syntax::codemap::{BytePos, Span, NO_EXPANSION};
+use syntax::{abi, ptr};
 
 use config::Color;
 use rewrite::RewriteContext;
@@ -42,7 +42,7 @@ pub fn format_visibility(vis: &Visibility) -> Cow<'static, str> {
         VisibilityKind::Crate(CrateSugar::JustCrate) => Cow::from("crate "),
         VisibilityKind::Restricted { ref path, .. } => {
             let Path { ref segments, .. } = **path;
-            let mut segments_iter = segments.iter().map(|seg| seg.identifier.name.to_string());
+            let mut segments_iter = segments.iter().map(|seg| seg.ident.name.to_string());
             if path.is_global() {
                 segments_iter
                     .next()
@@ -190,9 +190,9 @@ pub fn last_line_extendable(s: &str) -> bool {
 #[inline]
 fn is_skip(meta_item: &MetaItem) -> bool {
     match meta_item.node {
-        MetaItemKind::Word => meta_item.name == SKIP_ANNOTATION,
+        MetaItemKind::Word => meta_item.ident.name == SKIP_ANNOTATION,
         MetaItemKind::List(ref l) => {
-            meta_item.name == "cfg_attr" && l.len() == 2 && is_skip_nested(&l[1])
+            meta_item.ident.name == "cfg_attr" && l.len() == 2 && is_skip_nested(&l[1])
         }
         _ => false,
     }
@@ -251,7 +251,8 @@ pub fn stmt_expr(stmt: &ast::Stmt) -> Option<&ast::Expr> {
 
 #[inline]
 pub fn count_newlines(input: &str) -> usize {
-    input.chars().filter(|&c| c == '\n').count()
+    // Using `as_bytes` to omit UTF-8 decoding
+    input.as_bytes().iter().filter(|&&c| c == b'\n').count()
 }
 
 macro_rules! msg {
@@ -266,7 +267,7 @@ macro_rules! msg {
 // For format_missing and last_pos, need to use the source callsite (if applicable).
 // Required as generated code spans aren't guaranteed to follow on from the last span.
 macro_rules! source {
-    ($this: ident, $sp: expr) => {
+    ($this:ident, $sp:expr) => {
         $sp.source_callsite()
     };
 }
@@ -277,7 +278,7 @@ pub fn mk_sp(lo: BytePos, hi: BytePos) -> Span {
 
 // Return true if the given span does not intersect with file lines.
 macro_rules! out_of_file_lines_range {
-    ($self: ident, $span: expr) => {
+    ($self:ident, $span:expr) => {
         !$self.config.file_lines().is_all()
             && !$self
                 .config
@@ -287,7 +288,7 @@ macro_rules! out_of_file_lines_range {
 }
 
 macro_rules! skip_out_of_file_lines_range {
-    ($self: ident, $span: expr) => {
+    ($self:ident, $span:expr) => {
         if out_of_file_lines_range!($self, $span) {
             return None;
         }
@@ -295,7 +296,7 @@ macro_rules! skip_out_of_file_lines_range {
 }
 
 macro_rules! skip_out_of_file_lines_range_visitor {
-    ($self: ident, $span: expr) => {
+    ($self:ident, $span:expr) => {
         if out_of_file_lines_range!($self, $span) {
             $self.push_rewrite($span, None);
             return;
@@ -357,15 +358,13 @@ pub fn paren_overhead(context: &RewriteContext) -> usize {
 
 pub fn left_most_sub_expr(e: &ast::Expr) -> &ast::Expr {
     match e.node {
-        ast::ExprKind::InPlace(ref e, _)
-        | ast::ExprKind::Call(ref e, _)
+        ast::ExprKind::Call(ref e, _)
         | ast::ExprKind::Binary(_, ref e, _)
         | ast::ExprKind::Cast(ref e, _)
         | ast::ExprKind::Type(ref e, _)
         | ast::ExprKind::Assign(ref e, _)
         | ast::ExprKind::AssignOp(_, ref e, _)
         | ast::ExprKind::Field(ref e, _)
-        | ast::ExprKind::TupField(ref e, _)
         | ast::ExprKind::Index(ref e, _)
         | ast::ExprKind::Range(Some(ref e), _, _)
         | ast::ExprKind::Try(ref e) => left_most_sub_expr(e),

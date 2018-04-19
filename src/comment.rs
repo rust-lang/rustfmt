@@ -10,7 +10,7 @@
 
 // Formatting and tools for comments.
 
-use std::{self, iter, borrow::Cow};
+use std::{self, borrow::Cow, iter};
 
 use itertools::{multipeek, MultiPeek};
 use syntax::codemap::Span;
@@ -187,7 +187,7 @@ pub fn combine_strs_with_missing_comments(
     // expression and the second expression or the missing comment. We will preserve the original
     // layout whenever possible.
     let original_snippet = context.snippet(span);
-    let prefer_same_line = if let Some(pos) = original_snippet.chars().position(|c| c == '/') {
+    let prefer_same_line = if let Some(pos) = original_snippet.find('/') {
         !original_snippet[..pos].contains('\n')
     } else {
         !original_snippet.contains('\n')
@@ -523,7 +523,7 @@ pub fn recover_missing_comment_in_span(
         Some(String::new())
     } else {
         let missing_snippet = context.snippet(span);
-        let pos = missing_snippet.chars().position(|c| c == '/').unwrap_or(0);
+        let pos = missing_snippet.find('/').unwrap_or(0);
         // 1 = ` `
         let total_width = missing_comment.len() + used_width + 1;
         let force_new_line_before_comment =
@@ -901,6 +901,45 @@ where
     }
 }
 
+/// An iterator over the lines of a string, paired with the char kind at the
+/// end of the line.
+pub struct LineClasses<'a> {
+    base: iter::Peekable<CharClasses<std::str::Chars<'a>>>,
+    kind: FullCodeCharKind,
+}
+
+impl<'a> LineClasses<'a> {
+    pub fn new(s: &'a str) -> Self {
+        LineClasses {
+            base: CharClasses::new(s.chars()).peekable(),
+            kind: FullCodeCharKind::Normal,
+        }
+    }
+}
+
+impl<'a> Iterator for LineClasses<'a> {
+    type Item = (FullCodeCharKind, String);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.base.peek().is_none() {
+            return None;
+        }
+
+        let mut line = String::new();
+
+        while let Some((kind, c)) = self.base.next() {
+            self.kind = kind;
+            if c == '\n' {
+                break;
+            } else {
+                line.push(c);
+            }
+        }
+
+        Some((self.kind, line))
+    }
+}
+
 /// Iterator over functional and commented parts of a string. Any part of a string is either
 /// functional code, either *one* block comment, either *one* line comment. Whitespace between
 /// comments is functional code. Line comments contain their ending newlines.
@@ -1141,8 +1180,7 @@ fn remove_comment_header(comment: &str) -> &str {
 
 #[cfg(test)]
 mod test {
-    use super::{contains_comment, rewrite_comment, CharClasses, CodeCharKind, CommentCodeSlices,
-                FindUncommented, FullCodeCharKind};
+    use super::*;
     use shape::{Indent, Shape};
 
     #[test]
@@ -1297,5 +1335,11 @@ mod test {
         check("/**/abc/* */", "abc", Some(4));
         check("\"/* abc */\"", "abc", Some(4));
         check("\"/* abc", "abc", Some(4));
+    }
+
+    #[test]
+    fn test_remove_trailing_white_spaces() {
+        let s = format!("    r#\"\n        test\n    \"#");
+        assert_eq!(remove_trailing_white_spaces(&s), s);
     }
 }

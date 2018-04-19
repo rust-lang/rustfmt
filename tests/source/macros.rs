@@ -10,6 +10,8 @@ peg_file!   modname  ("mygrammarfile.rustpeg");
 fn main() {
     foo! ( );
 
+    foo!(,);
+
     bar!( a , b , c );
 
     bar!( a , b , c , );
@@ -333,6 +335,11 @@ macro foo() {
   }
 }
 
+// #2574
+macro_rules! test {
+    () => {{}}
+}
+
 macro lex_err($kind: ident $(, $body: expr)*) {
     Err(QlError::LexError(LexError::$kind($($body,)*)))
 }
@@ -340,3 +347,36 @@ macro lex_err($kind: ident $(, $body: expr)*) {
 // Preserve trailing comma on item-level macro with `()` or `[]`.
 methods![ get, post, delete, ];
 methods!( get, post, delete, );
+
+// #2588
+macro_rules! m {
+    () => {
+        r#"
+            test
+        "#
+    };
+}
+fn foo() {
+    f!{r#"
+            test
+       "#};
+}
+
+// #2591
+fn foo() {
+    match 0u32 {
+        0 => (),
+        _ => unreachable!(/* obviously */),
+    }
+}
+
+fn foo() {
+    let _ = column!(/* here */);
+}
+
+// #2616
+// Preserve trailing comma when using mixed layout for macro call.
+fn foo() {
+    foo!(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+    foo!(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,);
+}

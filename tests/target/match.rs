@@ -218,10 +218,7 @@ fn issue355() {
         xc => vec![1, 2],       // comment
         yc => vec![3; 4],       // comment
         yd => looooooooooooooooooooooooooooooooooooooooooooooooooooooooong_func(
-            aaaaaaaaaa,
-            bbbbbbbbbb,
-            cccccccccc,
-            dddddddddd,
+            aaaaaaaaaa, bbbbbbbbbb, cccccccccc, dddddddddd,
         ),
     }
 }
@@ -491,5 +488,28 @@ fn match_with_beginning_vert() {
     match x {
         | Foo::A | Foo::B => println!("AB"),
         | Foo::C => println!("C"),
+    }
+}
+
+// #2376
+// Preserve block around expressions with condition.
+fn issue_2376() {
+    let mut x = None;
+    match x {
+        Some(0) => {
+            for i in 1..11 {
+                x = Some(i);
+            }
+        }
+        Some(ref mut y) => {
+            while *y < 10 {
+                *y += 1;
+            }
+        }
+        None => {
+            while let None = x {
+                x = Some(10);
+            }
+        }
     }
 }

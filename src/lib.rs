@@ -10,6 +10,8 @@
 
 #![feature(custom_attribute)]
 #![feature(decl_macro)]
+// FIXME(cramertj) remove after match_default_bindings merges
+#![allow(stable_features)]
 #![feature(match_default_bindings)]
 #![feature(type_ascription)]
 #![feature(unicode_internals)]
@@ -33,7 +35,6 @@ extern crate unicode_segmentation;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, stdout, BufRead, Write};
-use std::iter::repeat;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -46,8 +47,7 @@ use syntax::errors::emitter::{ColorConfig, EmitterWriter};
 use syntax::errors::{DiagnosticBuilder, Handler};
 use syntax::parse::{self, ParseSess};
 
-use checkstyle::{output_footer, output_header};
-use comment::{CharClasses, FullCodeCharKind};
+use comment::{CharClasses, FullCodeCharKind, LineClasses};
 use issues::{BadIssueSeeker, Issue};
 use shape::Indent;
 use utils::use_colored_tty;
@@ -61,7 +61,7 @@ mod utils;
 
 mod attr;
 mod chains;
-mod checkstyle;
+pub mod checkstyle;
 mod closures;
 pub mod codemap;
 mod comment;
@@ -73,6 +73,7 @@ mod issues;
 mod items;
 mod lists;
 mod macros;
+mod matches;
 mod missed_spans;
 pub mod modules;
 mod overflow;
@@ -100,7 +101,7 @@ pub enum ErrorKind {
     LineOverflow(usize, usize),
     // Line ends in whitespace
     TrailingWhitespace,
-    // TO-DO or FIX-ME item without an issue number
+    // TODO or FIXME item without an issue number
     BadIssue(Issue),
     // License check has failed
     LicenseCheck,
@@ -111,8 +112,8 @@ impl fmt::Display for ErrorKind {
         match *self {
             ErrorKind::LineOverflow(found, maximum) => write!(
                 fmt,
-                "line exceeded maximum width (maximum: {}, found: {})",
-                maximum, found
+                "line formatted, but exceeded maximum width (maximum: {} (see `max_width` option), found: {})",
+                maximum, found,
             ),
             ErrorKind::TrailingWhitespace => write!(fmt, "left behind trailing whitespace"),
             ErrorKind::BadIssue(issue) => write!(fmt, "found {}", issue),
@@ -133,10 +134,9 @@ pub struct FormattingError {
 impl FormattingError {
     fn msg_prefix(&self) -> &str {
         match self.kind {
-            ErrorKind::LineOverflow(..)
-            | ErrorKind::TrailingWhitespace
-            | ErrorKind::LicenseCheck => "error:",
-            ErrorKind::BadIssue(_) => "WARNING:",
+            ErrorKind::LineOverflow(..) | ErrorKind::TrailingWhitespace => "internal error:",
+            ErrorKind::LicenseCheck => "error:",
+            ErrorKind::BadIssue(_) => "warning:",
         }
     }
 
@@ -154,12 +154,14 @@ impl FormattingError {
         match self.kind {
             ErrorKind::LineOverflow(found, max) => (max, found - max),
             ErrorKind::TrailingWhitespace => {
-                let trailing_ws_len = self.line_buffer
-                    .chars()
-                    .rev()
-                    .take_while(|c| c.is_whitespace())
-                    .count();
-                (self.line_buffer.len() - trailing_ws_len, trailing_ws_len)
+                let trailing_ws_start = self.line_buffer
+                    .rfind(|c: char| !c.is_whitespace())
+                    .map(|pos| pos + 1)
+                    .unwrap_or(0);
+                (
+                    trailing_ws_start,
+                    self.line_buffer.len() - trailing_ws_start,
+                )
             }
             _ => unreachable!(),
         }
@@ -196,7 +198,7 @@ impl FormatReport {
         for (file, errors) in &self.file_error_map {
             for error in errors {
                 let prefix_space_len = error.line.to_string().len();
-                let prefix_spaces: String = repeat(" ").take(1 + prefix_space_len).collect();
+                let prefix_spaces = " ".repeat(1 + prefix_space_len);
 
                 // First line: the overview of error
                 t.fg(term::color::RED)?;
@@ -255,8 +257,8 @@ impl FormatReport {
 }
 
 fn target_str(space_len: usize, target_len: usize) -> String {
-    let empty_line: String = repeat(" ").take(space_len).collect();
-    let overflowed: String = repeat("^").take(target_len).collect();
+    let empty_line = " ".repeat(space_len);
+    let overflowed = "^".repeat(target_len);
     empty_line + &overflowed
 }
 
@@ -266,7 +268,7 @@ impl fmt::Display for FormatReport {
         for (file, errors) in &self.file_error_map {
             for error in errors {
                 let prefix_space_len = error.line.to_string().len();
-                let prefix_spaces: String = repeat(" ").take(1 + prefix_space_len).collect();
+                let prefix_spaces = " ".repeat(1 + prefix_space_len);
 
                 let error_line_buffer = if error.line_buffer.is_empty() {
                     String::from(" ")
@@ -602,10 +604,19 @@ const FN_MAIN_PREFIX: &str = "fn main() {\n";
 
 fn enclose_in_main_block(s: &str, config: &Config) -> String {
     let indent = Indent::from_width(config, config.tab_spaces());
-    FN_MAIN_PREFIX.to_owned() + &indent.to_string(config)
-        + &s.lines()
-            .collect::<Vec<_>>()
-            .join(&indent.to_string_with_newline(config)) + "\n}"
+    let mut result = String::with_capacity(s.len() * 2);
+    result.push_str(FN_MAIN_PREFIX);
+    let mut need_indent = true;
+    for (kind, line) in LineClasses::new(s) {
+        if need_indent {
+            result.push_str(&indent.to_string(config));
+        }
+        result.push_str(&line);
+        result.push('\n');
+        need_indent = !(kind.is_string() && !line.ends_with('\\'));
+    }
+    result.push('}');
+    result
 }
 
 /// Format the given code block. Mainly targeted for code block in comment.
@@ -623,13 +634,16 @@ pub fn format_code_block(code_snippet: &str, config: &Config) -> Option<String> 
     let formatted = format_snippet(&snippet, config)?;
     // 2 = "}\n"
     let block_len = formatted.len().checked_sub(2).unwrap_or(0);
-    for line in formatted[FN_MAIN_PREFIX.len()..block_len].lines() {
+    let mut is_indented = true;
+    for (kind, ref line) in LineClasses::new(&formatted[FN_MAIN_PREFIX.len()..block_len]) {
         if !is_first {
             result.push('\n');
         } else {
             is_first = false;
         }
-        let trimmed_line = if line.len() > config.max_width() {
+        let trimmed_line = if !is_indented {
+            line
+        } else if line.len() > config.max_width() {
             // If there are lines that are larger than max width, we cannot tell
             // whether we have succeeded but have some comments or strings that
             // are too long, or we have failed to format code block. We will be
@@ -652,6 +666,7 @@ pub fn format_code_block(code_snippet: &str, config: &Config) -> Option<String> 
             line
         };
         result.push_str(trimmed_line);
+        is_indented = !(kind.is_string() && !line.ends_with('\\'));
     }
     Some(result)
 }
@@ -868,11 +883,8 @@ pub enum Input {
 
 pub fn run(input: Input, config: &Config) -> Summary {
     let out = &mut stdout();
-    output_header(out, config.write_mode()).ok();
     match format_input(input, config, Some(out)) {
         Ok((summary, _, report)) => {
-            output_footer(out, config.write_mode()).ok();
-
             if report.has_warnings() {
                 match term::stderr() {
                     Some(ref t)
