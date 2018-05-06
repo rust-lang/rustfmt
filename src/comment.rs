@@ -503,7 +503,7 @@ pub fn rewrite_missing_comment(
     let missing_snippet = context.snippet(span);
     let trimmed_snippet = missing_snippet.trim();
     if !trimmed_snippet.is_empty() {
-        rewrite_comment(trimmed_snippet, false, shape, context.config)
+        rewrite_comment(trimmed_snippet, context.config.normalize_comments(), shape, context.config)
     } else {
         Some(String::new())
     }
