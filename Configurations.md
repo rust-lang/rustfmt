@@ -1930,6 +1930,49 @@ fn main() {
 
 See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 
+## `match_reference_style`
+
+Normalize match reference style
+
+- **Default value**: `dereference`
+- **Possible values**: `reference`, `dereference`, `auto`
+- **Stable**: No
+
+**Note:** `auto` style need Rust v1.26.0 or later
+
+#### `reference`
+
+```rust
+fn hello(name: &Option<&str>) {
+    match name {
+        &Some(name) => println!("Hello {}!", name),
+        &None => println!("I don't know who you are."),
+    }
+}
+```
+
+#### `dereference`
+
+```rust
+fn hello(name: &Option<&str>) {
+    match *name {
+        Some(name) => println!("Hello {}!", name),
+        None => println!("I don't know who you are."),
+    }
+}
+```
+
+#### `auto`
+
+```rust
+fn hello(name: &Option<&str>) {
+    match name {
+        Some(name) => println!("Hello {}!", name),
+        None => println!("I don't know who you are."),
+    }
+}
+```
+
 ## `write_mode`
 
 What Write Mode to use when none is supplied: Replace, Overwrite, Display, Diff, Coverage
