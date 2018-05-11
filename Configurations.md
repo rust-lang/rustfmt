@@ -1934,11 +1934,15 @@ See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 
 Normalize match reference style
 
-- **Default value**: `dereference`
-- **Possible values**: `reference`, `dereference`, `auto`
+- **Default value**: `manual`
+- **Possible values**: `manual`, `reference`, `dereference`, `auto`
 - **Stable**: No
 
 **Note:** `auto` style need Rust v1.26.0 or later
+
+#### `manual`
+
+don't touch anything
 
 #### `reference`
 
