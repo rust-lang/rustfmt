@@ -1938,7 +1938,7 @@ Normalize match reference style
 - **Possible values**: `manual`, `reference`, `dereference`, `auto`
 - **Stable**: No
 
-**Note:** `auto` style need Rust v1.26.0 or later
+**Note:** `auto` style requires Rust v1.26.0 or later
 
 #### `manual`
 
