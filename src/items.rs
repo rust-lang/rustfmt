@@ -963,9 +963,9 @@ pub fn format_trait(context: &RewriteContext, item: &ast::Item, offset: Indent) 
         let mut result = String::with_capacity(128);
         let header = format!(
             "{}{}{}trait ",
-            format_auto(is_auto),
             format_visibility(&item.vis),
             format_unsafety(unsafety),
+            format_auto(is_auto),
         );
         result.push_str(&header);
 
@@ -1503,7 +1503,7 @@ pub fn rewrite_struct_field(
         attrs_extendable,
     )?;
     let overhead = last_line_width(&attr_prefix);
-    let lhs_offset = lhs_max_width.checked_sub(overhead).unwrap_or(0);
+    let lhs_offset = lhs_max_width.saturating_sub(overhead);
     for _ in 0..lhs_offset {
         spacing.push(' ');
     }
@@ -1915,12 +1915,6 @@ fn rewrite_fn_base(
     } else {
         result.push('(');
     }
-    if context.config.spaces_within_parens_and_brackets()
-        && !fd.inputs.is_empty()
-        && result.ends_with('(')
-    {
-        result.push(' ')
-    }
 
     // Skip `pub(crate)`.
     let lo_after_visibility = get_bytepos_after_visibility(&fn_sig.visibility, span);
@@ -1977,9 +1971,6 @@ fn rewrite_fn_base(
         // 1 = `)`
         if fd.inputs.is_empty() && used_width + 1 > context.config.max_width() {
             result.push('\n');
-        }
-        if context.config.spaces_within_parens_and_brackets() && !fd.inputs.is_empty() {
-            result.push(' ')
         }
         // If the last line of args contains comment, we cannot put the closing paren
         // on the same line.

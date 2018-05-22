@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use config::config_type::ConfigType;
-use config::file_lines::FileLines;
+pub use config::file_lines::{FileLines, FileName};
 pub use config::lists::*;
 pub use config::options::*;
 
@@ -46,10 +46,10 @@ create_config! {
     indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items.";
 
     // Comments and strings
-    wrap_comments: bool, false, true, "Break comments to fit on the line";
+    wrap_comments: bool, false, false, "Break comments to fit on the line";
     comment_width: usize, 80, false,
         "Maximum length of comments. No effect unless wrap_comments = true";
-    normalize_comments: bool, false, true, "Convert /* */ comments to // comments where possible";
+    normalize_comments: bool, false, false, "Convert /* */ comments to // comments where possible";
     license_template_path: String, String::default(), false,
         "Beginning of file must match license template";
     format_strings: bool, false, false, "Format string literals where necessary";
@@ -68,8 +68,8 @@ create_config! {
     merge_imports: bool, false, false, "Merge imports";
 
     // Ordering
-    reorder_imports: bool, true, false, "Reorder import and extern crate statements alphabetically";
-    reorder_modules: bool, true, false, "Reorder module statements alphabetically in group";
+    reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
+    reorder_modules: bool, true, true, "Reorder module statements alphabetically in group";
     reorder_impl_items: bool, false, false, "Reorder impl items";
 
     // Spaces around punctuation
@@ -77,15 +77,12 @@ create_config! {
         "Determines if '+' or '=' are wrapped in spaces in the punctuation of types";
     space_before_colon: bool, false, false, "Leave a space before the colon";
     space_after_colon: bool, true, false, "Leave a space after the colon";
-    spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ... range operators";
-    spaces_within_parens_and_brackets: bool, false, false,
-        "Put spaces within non-empty parentheses or brackets";
+    spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
     binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
         "Where to put a binary operator when a binary expression goes multiline.";
 
     // Misc.
-    remove_blank_lines_at_start_or_end_of_block: bool, true, false,
-        "Remove blank lines at start or end of a block";
+    remove_nested_parens: bool, true, true, "Remove nested parens.";
     combine_control_expr: bool, true, false, "Combine control expressions with function calls.";
     struct_field_align_threshold: usize, 0, false, "Align struct fields if their diffs fits within \
                                              threshold.";
@@ -109,26 +106,21 @@ create_config! {
         "Maximum number of blank lines which can be put between items.";
     blank_lines_lower_bound: usize, 0, false,
         "Minimum number of blank lines which must be put between items.";
-    remove_nested_parens: bool, false, false,
-        "Remove nested parens.";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
-    use_try_shorthand: bool, false, false, "Replace uses of the try! macro by the ? shorthand";
+    use_try_shorthand: bool, false, true, "Replace uses of the try! macro by the ? shorthand";
+    use_field_init_shorthand: bool, false, true, "Use field initialization shorthand if possible";
+    force_explicit_abi: bool, true, true, "Always print the abi for extern items";
     condense_wildcard_suffixes: bool, false, false, "Replace strings of _ wildcards by a single .. \
                                               in tuple patterns";
-    force_explicit_abi: bool, true, true, "Always print the abi for extern items";
-    use_field_init_shorthand: bool, false, false, "Use field initialization shorthand if possible";
 
     // Control options (changes the operation of rustfmt, rather than the formatting)
-    write_mode: WriteMode, WriteMode::Overwrite, false,
-        "What Write Mode to use when none is supplied: \
-         Replace, Overwrite, Display, Plain, Diff, Coverage, Check";
     color: Color, Color::Auto, false,
         "What Color option to use when none is supplied: Always, Never, Auto";
     required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
         "Require a specific version of rustfmt.";
-    unstable_features: bool, false, true,
+    unstable_features: bool, false, false,
             "Enables unstable features. Only available on nightly channel";
     disable_all_formatting: bool, false, false, "Don't reformat anything";
     skip_children: bool, false, false, "Don't reformat out of line modules";
@@ -151,14 +143,19 @@ create_config! {
          via the --file-lines option";
     width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
         "'small' heuristic values";
+    emit_mode: EmitMode, EmitMode::Files, false,
+        "What emit Mode to use when none is supplied";
+    make_backup: bool, false, false, "Backup changed files";
 }
 
-pub fn load_config(
+/// Load a config by checking the client-supplied options and if appropriate, the
+/// file system (including searching the file system for overrides).
+pub fn load_config<O: CliOptions>(
     file_path: Option<&Path>,
-    options: Option<&CliOptions>,
+    options: Option<O>,
 ) -> Result<(Config, Option<PathBuf>), Error> {
     let over_ride = match options {
-        Some(opts) => config_path(opts)?,
+        Some(ref opts) => config_path(opts)?,
         None => None,
     };
 
@@ -172,7 +169,7 @@ pub fn load_config(
 
     result.map(|(mut c, p)| {
         if let Some(options) = options {
-            options.clone().apply_to(&mut c);
+            options.apply_to(&mut c);
         }
         (c, p)
     })
@@ -215,9 +212,9 @@ fn config_path(options: &CliOptions) -> Result<Option<PathBuf>, Error> {
 
     // Read the config_path and convert to parent dir if a file is provided.
     // If a config file cannot be found from the given path, return error.
-    match options.config_path {
-        Some(ref path) if !path.exists() => config_path_not_found(path.to_str().unwrap()),
-        Some(ref path) if path.is_dir() => {
+    match options.config_path() {
+        Some(path) if !path.exists() => config_path_not_found(path.to_str().unwrap()),
+        Some(path) if path.is_dir() => {
             let config_file_path = get_toml_path(path)?;
             if config_file_path.is_some() {
                 Ok(config_file_path)
@@ -225,7 +222,7 @@ fn config_path(options: &CliOptions) -> Result<Option<PathBuf>, Error> {
                 config_path_not_found(path.to_str().unwrap())
             }
         }
-        ref path => Ok(path.to_owned()),
+        path => Ok(path.map(|p| p.to_owned())),
     }
 }
 

@@ -1260,7 +1260,7 @@ Convert /* */ comments to // comments where possible
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: Yes
+- **Stable**: No
 
 #### `false` (default):
 
@@ -1286,21 +1286,22 @@ fn adipiscing() -> usize {}
 
 Remove nested parens.
 
-- **Defalut value**: `false`,
+- **Default value**: `true`,
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: Yes
 
-#### `false` (default):
-```rust
-fn main() {
-    ((((foo()))));
-}
-```
 
-#### `true`:
+#### `true` (default):
 ```rust
 fn main() {
     (foo());
+}
+```
+
+#### `false`:
+```rust
+fn main() {
+    ((((foo()))));
 }
 ```
 
@@ -1312,7 +1313,7 @@ separated by a newline).
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: Yes
 
 #### `true` (default):
 
@@ -1339,7 +1340,7 @@ Reorder `mod` declarations alphabetically in group.
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: Yes
 
 #### `true` (default)
 
@@ -1589,52 +1590,6 @@ fn main() {
 }
 ```
 
-## `spaces_within_parens_and_brackets`
-
-Put spaces within non-empty generic arguments, parentheses, and square brackets
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: No
-
-#### `false` (default):
-
-```rust
-// generic arguments
-fn lorem<T: Eq>(t: T) {
-    // body
-}
-
-// non-empty parentheses
-fn lorem<T: Eq>(t: T) {
-    let lorem = (ipsum, dolor);
-}
-
-// non-empty square brackets
-fn lorem<T: Eq>(t: T) {
-    let lorem: [usize; 2] = [ipsum, dolor];
-}
-```
-
-#### `true`:
-
-```rust
-// generic arguments
-fn lorem< T: Eq >( t: T ) {
-    // body
-}
-
-// non-empty parentheses
-fn lorem< T: Eq >( t: T ) {
-    let lorem = ( ipsum, dolor );
-}
-
-// non-empty square brackets
-fn lorem< T: Eq >( t: T ) {
-    let lorem: [ usize; 2 ] = [ ipsum, dolor ];
-}
-```
-
 ## `struct_lit_single_line`
 
 Put small struct literals on a single line
@@ -1810,7 +1765,7 @@ Use field initialize shorthand if possible.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: Yes
 
 #### `false` (default):
 
@@ -1852,7 +1807,7 @@ Replace uses of the try! macro by the ? shorthand
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: Yes
 
 #### `false` (default):
 
@@ -1877,7 +1832,7 @@ Break comments to fit on the line
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: Yes
+- **Stable**: No
 
 #### `false` (default):
 
@@ -1998,7 +1953,7 @@ lines are found, they are trimmed down to match this integer.
 Original Code:
 
 ```rust
-#![rustfmt_skip]
+#![rustfmt::skip]
 
 fn foo() {
     println!("a");
@@ -2057,7 +2012,7 @@ them, additional blank lines are inserted.
 Original Code (rustfmt will not change it with the default value of `0`):
 
 ```rust
-#![rustfmt_skip]
+#![rustfmt::skip]
 
 fn foo() {
     println!("a");
@@ -2083,45 +2038,6 @@ fn bar() {
 }
 ```
 
-## `remove_blank_lines_at_start_or_end_of_block`
-
-Remove blank lines at the start or the end of a block.
-
-- **Default value**: `true`
-- **Possible values**: `true`, `false`
-- **Stable**: No
-
-#### `true`
-
-```rust
-fn foo() {
-    let msg = {
-        let mut str = String::new();
-        str.push_str("hello, ");
-        str.push_str("world!");
-        str
-    };
-    println!("{}", msg);
-}
-```
-
-#### `false`
-
-```rust
-fn foo() {
-
-    let msg = {
-
-        let mut str = String::new();
-        str.push_str("hello, ");
-        str.push_str("world!");
-        str
-
-    };
-    println!("{}", msg);
-
-}
-```
 
 ## `required_version`
 
@@ -2154,7 +2070,7 @@ Enable unstable features on stable channel.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: Yes
+- **Stable**: No
 
 ## `license_template_path`
 
@@ -2202,3 +2118,11 @@ ignore [
     "examples",
 ]
 ```
+
+## `emit_mode`
+
+Internal option
+
+## `make_backup`
+
+Internal option, use `--backup`

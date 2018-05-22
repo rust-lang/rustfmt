@@ -9,8 +9,10 @@
 // except according to those terms.
 
 #![cfg(not(test))]
+#![feature(extern_prelude)]
 
 extern crate env_logger;
+#[macro_use]
 extern crate failure;
 extern crate getopts;
 extern crate rustfmt_nightly as rustfmt;
@@ -19,14 +21,15 @@ use std::env;
 use std::fs::File;
 use std::io::{self, stdout, Read, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use failure::err_msg;
 
 use getopts::{Matches, Options};
 
 use rustfmt::{
-    emit_post_matter, emit_pre_matter, format_and_emit_report, load_config, CliOptions, Config,
-    FileName, FmtResult, Input, Summary, Verbosity, WriteMode, WRITE_MODE_LIST,
+    checkstyle_footer, checkstyle_header, format_input, load_config, CliOptions, Color, Config,
+    EmitMode, ErrorKind, FileLines, FileName, Input, Summary, Verbosity,
 };
 
 fn main() {
@@ -34,10 +37,10 @@ fn main() {
     let opts = make_opts();
 
     let exit_code = match execute(&opts) {
-        Ok((write_mode, summary)) => {
-            if summary.has_operational_errors()
-                || summary.has_parsing_errors()
-                || (summary.has_diff && write_mode == WriteMode::Check)
+        Ok((exit_mode, summary)) => {
+            if summary.has_operational_errors() || summary.has_parsing_errors()
+                || ((summary.has_diff || summary.has_check_errors())
+                    && exit_mode == ExitCodeMode::Check)
             {
                 1
             } else {
@@ -67,11 +70,9 @@ enum Operation {
         minimal_config_path: Option<String>,
     },
     /// Print the help message.
-    Help,
+    Help(HelpOp),
     // Print version information
     Version,
-    /// Print detailed configuration help.
-    ConfigHelp,
     /// Output default config to a file, or stdout if None
     ConfigOutputDefault {
         path: Option<String>,
@@ -82,21 +83,30 @@ enum Operation {
     },
 }
 
+/// Arguments to `--help`
+enum HelpOp {
+    None,
+    Config,
+    FileLines,
+}
+
 fn make_opts() -> Options {
     let mut opts = Options::new();
 
-    // Sorted in alphabetical order.
-    opts.optopt(
-        "",
-        "color",
-        "Use colored output (if supported)",
-        "[always|never|auto]",
-    );
     opts.optflag(
         "",
-        "config-help",
-        "Show details of rustfmt configuration options",
+        "check",
+        "Run in 'check' mode. Exits with 0 if input if formatted correctly. Exits \
+         with 1 and prints a diff if formatting is required.",
     );
+    let is_nightly = is_nightly();
+    let emit_opts = if is_nightly {
+        "[files|stdout|coverage|checkstyle]"
+    } else {
+        "[files|stdout]"
+    };
+    opts.optopt("", "emit", "What data to emit and how", emit_opts);
+    opts.optflag("", "backup", "Backup any modified files.");
     opts.optopt(
         "",
         "config-path",
@@ -104,68 +114,85 @@ fn make_opts() -> Options {
          found reverts to the input file path",
         "[Path for the configuration file]",
     );
-    opts.opt(
+    opts.optopt(
         "",
-        "dump-default-config",
-        "Dumps default configuration to PATH. PATH defaults to stdout, if omitted.",
-        "PATH",
-        getopts::HasArg::Maybe,
-        getopts::Occur::Optional,
+        "color",
+        "Use colored output (if supported)",
+        "[always|never|auto]",
     );
     opts.optopt(
         "",
-        "dump-minimal-config",
-        "Dumps configuration options that were checked during formatting to a file.",
-        "PATH",
+        "print-config",
+        "Dumps a default or minimal config to PATH. A minimal config is the \
+         subset of the current config file used for formatting the current program.",
+        "[minimal|default] PATH",
     );
-    opts.optflag(
-        "",
-        "error-on-unformatted",
-        "Error if unable to get comments or string literals within max_width, \
-         or they are left with trailing whitespaces",
-    );
-    opts.optopt(
-        "",
-        "file-lines",
-        "Format specified line ranges. See README for more detail on the JSON format.",
-        "JSON",
-    );
-    opts.optflag("h", "help", "Show this message");
-    opts.optflag("", "skip-children", "Don't reformat child modules");
-    opts.optflag(
-        "",
-        "unstable-features",
-        "Enables unstable features. Only available on nightly channel",
-    );
+
+    if is_nightly {
+        opts.optflag(
+            "",
+            "unstable-features",
+            "Enables unstable features. Only available on nightly channel.",
+        );
+        opts.optopt(
+            "",
+            "file-lines",
+            "Format specified line ranges. Run with `--help file-lines` for \
+             more detail (unstable).",
+            "JSON",
+        );
+        opts.optflag(
+            "",
+            "error-on-unformatted",
+            "Error if unable to get comments or string literals within max_width, \
+             or they are left with trailing whitespaces (unstable).",
+        );
+        opts.optflag(
+            "",
+            "skip-children",
+            "Don't reformat child modules (unstable).",
+        );
+    }
+
     opts.optflag("v", "verbose", "Print verbose output");
     opts.optflag("q", "quiet", "Print less output");
     opts.optflag("V", "version", "Show version information");
-    opts.optopt(
-        "",
-        "write-mode",
-        "How to write output (not usable when piping from stdin)",
-        WRITE_MODE_LIST,
+    opts.optflagopt(
+        "h",
+        "help",
+        "Show this message or help about a specific topic: `config` or `file-lines`",
+        "=TOPIC",
     );
 
     opts
 }
 
-fn execute(opts: &Options) -> FmtResult<(WriteMode, Summary)> {
+fn is_nightly() -> bool {
+    option_env!("CFG_RELEASE_CHANNEL")
+        .map(|c| c == "nightly")
+        .unwrap_or(false)
+}
+
+fn execute(opts: &Options) -> Result<(ExitCodeMode, Summary), failure::Error> {
     let matches = opts.parse(env::args().skip(1))?;
+    let options = GetOptsOptions::from_matches(&matches)?;
 
     match determine_operation(&matches)? {
-        Operation::Help => {
+        Operation::Help(HelpOp::None) => {
             print_usage_to_stdout(opts, "");
-            Summary::print_exit_codes();
-            Ok((WriteMode::None, Summary::default()))
+            Ok((ExitCodeMode::Normal, Summary::default()))
+        }
+        Operation::Help(HelpOp::Config) => {
+            Config::print_docs(&mut stdout(), options.unstable_features);
+            Ok((ExitCodeMode::Normal, Summary::default()))
+        }
+        Operation::Help(HelpOp::FileLines) => {
+            print_help_file_lines();
+            Ok((ExitCodeMode::Normal, Summary::default()))
         }
         Operation::Version => {
             print_version();
-            Ok((WriteMode::None, Summary::default()))
-        }
-        Operation::ConfigHelp => {
-            Config::print_docs(&mut stdout(), matches.opt_present("unstable-features"));
-            Ok((WriteMode::None, Summary::default()))
+            Ok((ExitCodeMode::Normal, Summary::default()))
         }
         Operation::ConfigOutputDefault { path } => {
             let toml = Config::default().all_options().to_toml().map_err(err_msg)?;
@@ -175,57 +202,49 @@ fn execute(opts: &Options) -> FmtResult<(WriteMode, Summary)> {
             } else {
                 io::stdout().write_all(toml.as_bytes())?;
             }
-            Ok((WriteMode::None, Summary::default()))
+            Ok((ExitCodeMode::Normal, Summary::default()))
         }
         Operation::Stdin { input } => {
             // try to read config from local directory
-            let options = CliOptions::from_matches(&matches)?;
-            let (mut config, _) = load_config(Some(Path::new(".")), Some(&options))?;
+            let (mut config, _) = load_config(Some(Path::new(".")), Some(options.clone()))?;
 
-            // write_mode is always Display for Stdin.
-            config.set().write_mode(WriteMode::Display);
+            // emit mode is always Stdout for Stdin.
+            config.set().emit_mode(EmitMode::Stdout);
             config.set().verbose(Verbosity::Quiet);
 
             // parse file_lines
-            if let Some(ref file_lines) = matches.opt_str("file-lines") {
-                config
-                    .set()
-                    .file_lines(file_lines.parse().map_err(err_msg)?);
-                for f in config.file_lines().files() {
-                    match *f {
-                        FileName::Custom(ref f) if f == "stdin" => {}
-                        _ => eprintln!("Warning: Extra file listed in file_lines option '{}'", f),
-                    }
+            config.set().file_lines(options.file_lines);
+            for f in config.file_lines().files() {
+                match *f {
+                    FileName::Stdin => {}
+                    _ => eprintln!("Warning: Extra file listed in file_lines option '{}'", f),
                 }
             }
 
             let mut error_summary = Summary::default();
-            emit_pre_matter(&config)?;
+            emit_pre_matter(&config);
             match format_and_emit_report(Input::Text(input), &config) {
                 Ok(summary) => error_summary.add(summary),
                 Err(_) => error_summary.add_operational_error(),
             }
-            emit_post_matter(&config)?;
+            emit_post_matter(&config);
 
-            Ok((WriteMode::Display, error_summary))
+            Ok((ExitCodeMode::Normal, error_summary))
         }
         Operation::Format {
             files,
             minimal_config_path,
-        } => {
-            let options = CliOptions::from_matches(&matches)?;
-            format(files, minimal_config_path, options)
-        }
+        } => format(files, minimal_config_path, options),
     }
 }
 
 fn format(
     files: Vec<PathBuf>,
     minimal_config_path: Option<String>,
-    options: CliOptions,
-) -> FmtResult<(WriteMode, Summary)> {
+    options: GetOptsOptions,
+) -> Result<(ExitCodeMode, Summary), failure::Error> {
     options.verify_file_lines(&files);
-    let (config, config_path) = load_config(None, Some(&options))?;
+    let (config, config_path) = load_config(None, Some(options.clone()))?;
 
     if config.verbose() == Verbosity::Verbose {
         if let Some(path) = config_path.as_ref() {
@@ -233,7 +252,7 @@ fn format(
         }
     }
 
-    emit_pre_matter(&config)?;
+    emit_pre_matter(&config);
     let mut error_summary = Summary::default();
 
     for file in files {
@@ -247,7 +266,7 @@ fn format(
             // Check the file directory if the config-path could not be read or not provided
             let local_config = if config_path.is_none() {
                 let (local_config, config_path) =
-                    load_config(Some(file.parent().unwrap()), Some(&options))?;
+                    load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
                 if local_config.verbose() == Verbosity::Verbose {
                     if let Some(path) = config_path {
                         println!(
@@ -271,7 +290,7 @@ fn format(
             }
         }
     }
-    emit_post_matter(&config)?;
+    emit_post_matter(&config);
 
     // If we were given a path via dump-minimal-config, output any options
     // that were used during formatting as TOML.
@@ -281,7 +300,55 @@ fn format(
         file.write_all(toml.as_bytes())?;
     }
 
-    Ok((config.write_mode(), error_summary))
+    let exit_mode = if options.check {
+        ExitCodeMode::Check
+    } else {
+        ExitCodeMode::Normal
+    };
+    Ok((exit_mode, error_summary))
+}
+
+fn format_and_emit_report(input: Input, config: &Config) -> Result<Summary, failure::Error> {
+    let out = &mut stdout();
+
+    match format_input(input, config, Some(out)) {
+        Ok((summary, report)) => {
+            if report.has_warnings() {
+                match term::stderr() {
+                    Some(ref t)
+                        if config.color().use_colored_tty()
+                            && t.supports_color()
+                            && t.supports_attr(term::Attr::Bold) =>
+                    {
+                        match report.fancy_print(term::stderr().unwrap()) {
+                            Ok(..) => (),
+                            Err(..) => panic!("Unable to write to stderr: {}", report),
+                        }
+                    }
+                    _ => eprintln!("{}", report),
+                }
+            }
+
+            Ok(summary)
+        }
+        Err((msg, mut summary)) => {
+            eprintln!("Error writing files: {}", msg);
+            summary.add_operational_error();
+            Ok(summary)
+        }
+    }
+}
+
+fn emit_pre_matter(config: &Config) {
+    if config.emit_mode() == EmitMode::Checkstyle {
+        println!("{}", checkstyle_header());
+    }
+}
+
+fn emit_post_matter(config: &Config) {
+    if config.emit_mode() == EmitMode::Checkstyle {
+        println!("{}", checkstyle_footer());
+    }
 }
 
 fn print_usage_to_stdout(opts: &Options, reason: &str) {
@@ -298,6 +365,29 @@ fn print_usage_to_stdout(opts: &Options, reason: &str) {
     println!("{}", opts.usage(&msg));
 }
 
+fn print_help_file_lines() {
+    println!(
+        "If you want to restrict reformatting to specific sets of lines, you can
+use the `--file-lines` option. Its argument is a JSON array of objects
+with `file` and `range` properties, where `file` is a file name, and
+`range` is an array representing a range of lines like `[7,13]`. Ranges
+are 1-based and inclusive of both end points. Specifying an empty array
+will result in no files being formatted. For example,
+
+```
+rustfmt --file-lines '[
+    {{\"file\":\"src/lib.rs\",\"range\":[7,13]}},
+    {{\"file\":\"src/lib.rs\",\"range\":[21,29]}},
+    {{\"file\":\"src/foo.rs\",\"range\":[10,11]}},
+    {{\"file\":\"src/foo.rs\",\"range\":[15,15]}}]'
+```
+
+would format lines `7-13` and `21-29` of `src/lib.rs`, and lines `10-11`,
+and `15` of `src/foo.rs`. No other files would be formatted, even if they
+are included as out of line modules from `src/lib.rs`."
+    );
+}
+
 fn print_version() {
     let version_info = format!(
         "{}-{}",
@@ -308,37 +398,37 @@ fn print_version() {
     println!("rustfmt {}", version_info);
 }
 
-fn determine_operation(matches: &Matches) -> FmtResult<Operation> {
+fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
     if matches.opt_present("h") {
-        return Ok(Operation::Help);
-    }
-
-    if matches.opt_present("config-help") {
-        return Ok(Operation::ConfigHelp);
-    }
-
-    if matches.opt_present("dump-default-config") {
-        // NOTE for some reason when configured with HasArg::Maybe + Occur::Optional opt_default
-        // doesn't recognize `--foo bar` as a long flag with an argument but as a long flag with no
-        // argument *plus* a free argument. Thus we check for that case in this branch -- this is
-        // required for backward compatibility.
-        if let Some(path) = matches.free.get(0) {
-            return Ok(Operation::ConfigOutputDefault {
-                path: Some(path.clone()),
-            });
+        let topic = matches.opt_str("h");
+        if topic == None {
+            return Ok(Operation::Help(HelpOp::None));
+        } else if topic == Some("config".to_owned()) {
+            return Ok(Operation::Help(HelpOp::Config));
+        } else if topic == Some("file-lines".to_owned()) {
+            return Ok(Operation::Help(HelpOp::FileLines));
         } else {
-            return Ok(Operation::ConfigOutputDefault {
-                path: matches.opt_str("dump-default-config"),
-            });
+            println!("Unknown help topic: `{}`\n", topic.unwrap());
+            return Ok(Operation::Help(HelpOp::None));
+        }
+    }
+
+    let mut minimal_config_path = None;
+    if let Some(ref kind) = matches.opt_str("print-config") {
+        let path = matches.free.get(0).cloned();
+        if kind == "default" {
+            return Ok(Operation::ConfigOutputDefault { path });
+        } else if kind == "minimal" {
+            minimal_config_path = path;
+            if minimal_config_path.is_none() {
+                println!("WARNING: PATH required for `--print-config minimal`");
+            }
         }
     }
 
     if matches.opt_present("version") {
         return Ok(Operation::Version);
     }
-
-    // If no path is given, we won't output a minimal config.
-    let minimal_config_path = matches.opt_str("dump-minimal-config");
 
     // if no file argument is supplied, read from stdin
     if matches.free.is_empty() {
@@ -363,4 +453,151 @@ fn determine_operation(matches: &Matches) -> FmtResult<Operation> {
         files,
         minimal_config_path,
     })
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum ExitCodeMode {
+    Normal,
+    Check,
+}
+
+const STABLE_EMIT_MODES: [EmitMode; 3] = [EmitMode::Files, EmitMode::Stdout, EmitMode::Diff];
+
+/// Parsed command line options.
+#[derive(Clone, Debug, Default)]
+struct GetOptsOptions {
+    skip_children: Option<bool>,
+    quiet: bool,
+    verbose: bool,
+    config_path: Option<PathBuf>,
+    emit_mode: EmitMode,
+    backup: bool,
+    check: bool,
+    color: Option<Color>,
+    file_lines: FileLines, // Default is all lines in all files.
+    unstable_features: bool,
+    error_on_unformatted: Option<bool>,
+}
+
+impl GetOptsOptions {
+    pub fn from_matches(matches: &Matches) -> Result<GetOptsOptions, failure::Error> {
+        let mut options = GetOptsOptions::default();
+        options.verbose = matches.opt_present("verbose");
+        options.quiet = matches.opt_present("quiet");
+        if options.verbose && options.quiet {
+            return Err(format_err!("Can't use both `--verbose` and `--quiet`"));
+        }
+
+        let rust_nightly = option_env!("CFG_RELEASE_CHANNEL")
+            .map(|c| c == "nightly")
+            .unwrap_or(false);
+        if rust_nightly {
+            options.unstable_features = matches.opt_present("unstable-features");
+        }
+
+        if options.unstable_features {
+            if matches.opt_present("skip-children") {
+                options.skip_children = Some(true);
+            }
+            if matches.opt_present("error-on-unformatted") {
+                options.error_on_unformatted = Some(true);
+            }
+            if let Some(ref file_lines) = matches.opt_str("file-lines") {
+                options.file_lines = file_lines.parse().map_err(err_msg)?;
+            }
+        }
+
+        options.config_path = matches.opt_str("config-path").map(PathBuf::from);
+
+        options.check = matches.opt_present("check");
+        if let Some(ref emit_str) = matches.opt_str("emit") {
+            if options.check {
+                return Err(format_err!("Invalid to use `--emit` and `--check`"));
+            }
+            if let Ok(emit_mode) = emit_mode_from_emit_str(emit_str) {
+                options.emit_mode = emit_mode;
+            } else {
+                return Err(format_err!("Invalid value for `--emit`"));
+            }
+        }
+
+        if matches.opt_present("backup") {
+            options.backup = true;
+        }
+
+        if !rust_nightly {
+            if !STABLE_EMIT_MODES.contains(&options.emit_mode) {
+                return Err(format_err!(
+                    "Invalid value for `--emit` - using an unstable \
+                     value without `--unstable-features`",
+                ));
+            }
+        }
+
+        if let Some(ref color) = matches.opt_str("color") {
+            match Color::from_str(color) {
+                Ok(color) => options.color = Some(color),
+                _ => return Err(format_err!("Invalid color: {}", color)),
+            }
+        }
+
+        Ok(options)
+    }
+
+    fn verify_file_lines(&self, files: &[PathBuf]) {
+        for f in self.file_lines.files() {
+            match *f {
+                FileName::Real(ref f) if files.contains(f) => {}
+                FileName::Real(_) => {
+                    eprintln!("Warning: Extra file listed in file_lines option '{}'", f)
+                }
+                FileName::Stdin => eprintln!("Warning: Not a file '{}'", f),
+            }
+        }
+    }
+}
+
+impl CliOptions for GetOptsOptions {
+    fn apply_to(self, config: &mut Config) {
+        if self.verbose {
+            config.set().verbose(Verbosity::Verbose);
+        } else if self.quiet {
+            config.set().verbose(Verbosity::Quiet);
+        } else {
+            config.set().verbose(Verbosity::Normal);
+        }
+        config.set().file_lines(self.file_lines);
+        config.set().unstable_features(self.unstable_features);
+        if let Some(skip_children) = self.skip_children {
+            config.set().skip_children(skip_children);
+        }
+        if let Some(error_on_unformatted) = self.error_on_unformatted {
+            config.set().error_on_unformatted(error_on_unformatted);
+        }
+        if self.check {
+            config.set().emit_mode(EmitMode::Diff);
+        } else {
+            config.set().emit_mode(self.emit_mode);
+        }
+        if self.backup {
+            config.set().make_backup(true);
+        }
+        if let Some(color) = self.color {
+            config.set().color(color);
+        }
+    }
+
+    fn config_path(&self) -> Option<&Path> {
+        self.config_path.as_ref().map(|p| &**p)
+    }
+}
+
+fn emit_mode_from_emit_str(emit_str: &str) -> Result<EmitMode, failure::Error> {
+    match emit_str {
+        "files" => Ok(EmitMode::Files),
+        "stdout" => Ok(EmitMode::Stdout),
+        "coverage" => Ok(EmitMode::Coverage),
+        "checkstyle" => Ok(EmitMode::Checkstyle),
+        _ => Err(format_err!("Invalid value for `--emit`")),
+    }
 }

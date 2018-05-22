@@ -464,7 +464,7 @@ fn rewrite_comment_inner(
                 // 1 = " "
                 let offset = 1 + last_line_width(&result) - line_start.len();
                 Shape {
-                    width: max_chars.checked_sub(offset).unwrap_or(0),
+                    width: max_chars.saturating_sub(offset),
                     indent: fmt_indent,
                     offset: fmt.shape.offset + offset,
                 }
@@ -1253,7 +1253,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[rustfmt::skip]
     fn format_comments() {
         let mut config: ::config::Config = Default::default();
         config.set().wrap_comments(true);

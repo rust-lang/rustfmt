@@ -18,21 +18,17 @@ use syntax::ast::{
 use syntax::codemap::{BytePos, Span, NO_EXPANSION};
 use syntax::ptr;
 
-use config::Color;
 use rewrite::RewriteContext;
 use shape::Shape;
 
-// When we get scoped annotations, we should have rustfmt::skip.
-const SKIP_ANNOTATION: &str = "rustfmt_skip";
+pub const DEPR_SKIP_ANNOTATION: &str = "rustfmt_skip";
+pub const SKIP_ANNOTATION: &str = "rustfmt::skip";
 
 // Computes the length of a string's last line, minus offset.
 pub fn extra_offset(text: &str, shape: Shape) -> usize {
     match text.rfind('\n') {
         // 1 for newline character
-        Some(idx) => text
-            .len()
-            .checked_sub(idx + 1 + shape.used_width())
-            .unwrap_or(0),
+        Some(idx) => text.len().saturating_sub(idx + 1 + shape.used_width()),
         None => text.len(),
     }
 }
@@ -212,7 +208,10 @@ pub fn last_line_extendable(s: &str) -> bool {
 #[inline]
 fn is_skip(meta_item: &MetaItem) -> bool {
     match meta_item.node {
-        MetaItemKind::Word => meta_item.name() == SKIP_ANNOTATION,
+        MetaItemKind::Word => {
+            let path_str = meta_item.ident.to_string();
+            path_str == SKIP_ANNOTATION || path_str == DEPR_SKIP_ANNOTATION
+        }
         MetaItemKind::List(ref l) => {
             meta_item.name() == "cfg_attr" && l.len() == 2 && is_skip_nested(&l[1])
         }
@@ -360,15 +359,6 @@ pub fn colon_spaces(before: bool, after: bool) -> &'static str {
     }
 }
 
-#[inline]
-pub fn paren_overhead(context: &RewriteContext) -> usize {
-    if context.config.spaces_within_parens_and_brackets() {
-        4
-    } else {
-        2
-    }
-}
-
 pub fn left_most_sub_expr(e: &ast::Expr) -> &ast::Expr {
     match e.node {
         ast::ExprKind::Call(ref e, _)
@@ -382,32 +372,6 @@ pub fn left_most_sub_expr(e: &ast::Expr) -> &ast::Expr {
         | ast::ExprKind::Range(Some(ref e), _, _)
         | ast::ExprKind::Try(ref e) => left_most_sub_expr(e),
         _ => e,
-    }
-}
-
-// isatty shamelessly adapted from cargo.
-#[cfg(unix)]
-pub fn isatty() -> bool {
-    extern crate libc;
-
-    unsafe { libc::isatty(libc::STDOUT_FILENO) != 0 }
-}
-#[cfg(windows)]
-pub fn isatty() -> bool {
-    extern crate winapi;
-
-    unsafe {
-        let handle = winapi::um::processenv::GetStdHandle(winapi::um::winbase::STD_OUTPUT_HANDLE);
-        let mut out = 0;
-        winapi::um::consoleapi::GetConsoleMode(handle, &mut out) != 0
-    }
-}
-
-pub fn use_colored_tty(color: Color) -> bool {
-    match color {
-        Color::Always => true,
-        Color::Never => false,
-        Color::Auto => isatty(),
     }
 }
 

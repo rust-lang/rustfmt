@@ -127,9 +127,11 @@ trait AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
     D,
     E,
 > = FooBar;
-#[rustfmt_skip]
+#[rustfmt::skip]
 trait FooBar = Foo
     + Bar;
 
 // #2637
 auto trait Example {}
+pub auto trait PubExample {}
+pub unsafe auto trait PubUnsafeExample {}

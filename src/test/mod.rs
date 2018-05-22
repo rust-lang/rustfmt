@@ -10,6 +10,8 @@
 
 extern crate assert_cli;
 
+use syntax;
+
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
@@ -143,7 +145,7 @@ fn modified_test() {
     let filename = "tests/writemode/source/modified.rs";
     let result = get_modified_lines(Input::File(filename.into()), &Config::default()).unwrap();
     assert_eq!(
-        result.modified_lines,
+        result,
         ModifiedLines {
             chunks: vec![
                 ModifiedChunk {
@@ -240,19 +242,13 @@ fn self_tests() {
 #[test]
 fn stdin_formatting_smoke_test() {
     let input = Input::Text("fn main () {}".to_owned());
-    let config = Config::default();
-    let (error_summary, file_map, _report) =
-        format_input::<io::Stdout>(input, &config, None).unwrap();
+    let mut config = Config::default();
+    config.set().emit_mode(EmitMode::Stdout);
+    let mut buf: Vec<u8> = vec![];
+    let (error_summary, _) = format_input(input, &config, Some(&mut buf)).unwrap();
     assert!(error_summary.has_no_errors());
-    for &(ref file_name, ref text) in &file_map {
-        if let FileName::Custom(ref file_name) = *file_name {
-            if file_name == "stdin" {
-                assert_eq!(text.to_string(), "fn main() {}\n");
-                return;
-            }
-        }
-    }
-    panic!("no stdin");
+    //eprintln!("{:?}", );
+    assert_eq!(buf, "fn main() {}\n".as_bytes());
 }
 
 // FIXME(#1990) restore this test
@@ -284,8 +280,7 @@ fn format_lines_errors_are_reported() {
     let input = Input::Text(format!("fn {}() {{}}", long_identifier));
     let mut config = Config::default();
     config.set().error_on_line_overflow(true);
-    let (error_summary, _file_map, _report) =
-        format_input::<io::Stdout>(input, &config, None).unwrap();
+    let (error_summary, _) = format_input::<io::Stdout>(input, &config, None).unwrap();
     assert!(error_summary.has_formatting_errors());
 }
 
@@ -296,8 +291,7 @@ fn format_lines_errors_are_reported_with_tabs() {
     let mut config = Config::default();
     config.set().error_on_line_overflow(true);
     config.set().hard_tabs(true);
-    let (error_summary, _file_map, _report) =
-        format_input::<io::Stdout>(input, &config, None).unwrap();
+    let (error_summary, _) = format_input::<io::Stdout>(input, &config, None).unwrap();
     assert!(error_summary.has_formatting_errors());
 }
 
@@ -382,15 +376,16 @@ fn read_config(filename: &Path) -> Config {
 fn format_file<P: Into<PathBuf>>(filepath: P, config: &Config) -> (Summary, FileMap, FormatReport) {
     let filepath = filepath.into();
     let input = Input::File(filepath);
-    format_input::<io::Stdout>(input, config, None).unwrap()
+    //format_input::<io::Stdout>(input, config, None).unwrap()
+    syntax::with_globals(|| format_input_inner::<io::Stdout>(input, config, None)).unwrap()
 }
 
-pub enum IdempotentCheckError {
+enum IdempotentCheckError {
     Mismatch(HashMap<PathBuf, Vec<Mismatch>>),
     Parse,
 }
 
-pub fn idempotent_check(
+fn idempotent_check(
     filename: &PathBuf,
     opt_config: &Option<PathBuf>,
 ) -> Result<FormatReport, IdempotentCheckError> {
@@ -704,14 +699,14 @@ impl ConfigCodeBlock {
         // We never expect to not have a code block.
         assert!(self.code_block.is_some() && self.code_block_start.is_some());
 
-        // See if code block begins with #![rustfmt_skip].
+        // See if code block begins with #![rustfmt::skip].
         let fmt_skip = self
             .code_block
             .as_ref()
             .unwrap()
             .split('\n')
             .nth(0)
-            .unwrap_or("") == "#![rustfmt_skip]";
+            .unwrap_or("") == "#![rustfmt::skip]";
 
         if self.config_name.is_none() && !fmt_skip {
             write_message(&format!(
@@ -757,8 +752,7 @@ impl ConfigCodeBlock {
         });
     }
 
-    fn formatted_has_diff(&self, file_map: &FileMap) -> bool {
-        let &(ref _file_name, ref text) = file_map.first().unwrap();
+    fn formatted_has_diff(&self, text: &str) -> bool {
         let compare = make_diff(self.code_block.as_ref().unwrap(), text, DIFF_CONTEXT_SIZE);
         if !compare.is_empty() {
             self.print_diff(compare);
@@ -778,19 +772,21 @@ impl ConfigCodeBlock {
         }
 
         let input = Input::Text(self.code_block.as_ref().unwrap().to_owned());
-        let config = self.get_block_config();
+        let mut config = self.get_block_config();
+        config.set().emit_mode(EmitMode::Stdout);
+        let mut buf: Vec<u8> = vec![];
 
-        let (error_summary, file_map, _report) =
-            format_input::<io::Stdout>(input, &config, None).unwrap();
+        let (error_summary, _) = format_input(input, &config, Some(&mut buf)).unwrap();
 
-        !self.has_parsing_errors(error_summary) && !self.formatted_has_diff(&file_map)
+        !self.has_parsing_errors(error_summary)
+            && !self.formatted_has_diff(&String::from_utf8(buf).unwrap())
     }
 
     // Extract a code block from the iterator. Behavior:
     // - Rust code blocks are identifed by lines beginning with "```rust".
     // - One explicit configuration setting is supported per code block.
     // - Rust code blocks with no configuration setting are illegal and cause an
-    //   assertion failure, unless the snippet begins with #![rustfmt_skip].
+    //   assertion failure, unless the snippet begins with #![rustfmt::skip].
     // - Configuration names in Configurations.md must be in the form of
     //   "## `NAME`".
     // - Configuration values in Configurations.md must be in the form of
@@ -912,18 +908,7 @@ fn verify_check_works() {
     let temp_file = make_temp_file("temp_check.rs");
     assert_cli::Assert::command(&[
         rustfmt().to_str().unwrap(),
-        "--write-mode=check",
-        temp_file.path.to_str().unwrap(),
-    ]).succeeds()
-        .unwrap();
-}
-
-#[test]
-fn verify_diff_works() {
-    let temp_file = make_temp_file("temp_diff.rs");
-    assert_cli::Assert::command(&[
-        rustfmt().to_str().unwrap(),
-        "--write-mode=diff",
+        "--check",
         temp_file.path.to_str().unwrap(),
     ]).succeeds()
         .unwrap();

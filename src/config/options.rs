@@ -8,20 +8,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use syntax::codemap::FileName;
-
 use config::config_type::ConfigType;
-use config::file_lines::FileLines;
 use config::lists::*;
-use config::Config;
-use {FmtResult, WRITE_MODE_LIST};
+use config::{Config, FileName};
 
-use failure::err_msg;
+use isatty::stdout_isatty;
 
-use getopts::Matches;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 /// Macro for deriving implementations of Serialize/Deserialize for enums
 #[macro_export]
@@ -192,29 +186,26 @@ configuration_option_enum! { ReportTactic:
     Never,
 }
 
-configuration_option_enum! { WriteMode:
-    // Backs the original file up and overwrites the original.
-    Replace,
-    // Overwrites original file without backup.
-    Overwrite,
+// What Rustfmt should emit. Mostly corresponds to the `--emit` command line
+// option.
+configuration_option_enum! { EmitMode:
+    // Emits to files.
+    Files,
     // Writes the output to stdout.
-    Display,
-    // Writes the diff to stdout.
-    Diff,
+    Stdout,
     // Displays how much of the input file was processed
     Coverage,
     // Unfancy stdout
     Checkstyle,
     // Output the changed lines (for internal value only)
-    Modified,
+    ModifiedLines,
     // Checks if a diff can be generated. If so, rustfmt outputs a diff and quits with exit code 1.
     // This option is designed to be run in CI where a non-zero exit signifies non-standard code
-    // formatting.
-    Check,
-    // Rustfmt shouldn't output anything formatting-like (e.g., emit a help message).
-    None,
+    // formatting. Used for `--check`.
+    Diff,
 }
 
+// Client-preference for coloured output.
 configuration_option_enum! { Color:
     // Always use color, whether it is a piped or terminal output
     Always,
@@ -224,6 +215,18 @@ configuration_option_enum! { Color:
     Auto,
 }
 
+impl Color {
+    /// Whether we should use a coloured terminal.
+    pub fn use_colored_tty(&self) -> bool {
+        match self {
+            Color::Always => true,
+            Color::Never => false,
+            Color::Auto => stdout_isatty(),
+        }
+    }
+}
+
+// How chatty should Rustfmt be?
 configuration_option_enum! { Verbosity:
     // Emit more.
     Verbose,
@@ -295,9 +298,9 @@ impl ::std::str::FromStr for WidthHeuristics {
     }
 }
 
-impl Default for WriteMode {
-    fn default() -> WriteMode {
-        WriteMode::Overwrite
+impl Default for EmitMode {
+    fn default() -> EmitMode {
+        EmitMode::Files
     }
 }
 
@@ -343,109 +346,9 @@ impl ::std::str::FromStr for IgnoreList {
     }
 }
 
-/// Parsed command line options.
-#[derive(Clone, Debug, Default)]
-pub struct CliOptions {
-    skip_children: Option<bool>,
-    quiet: bool,
-    verbose: bool,
-    pub(super) config_path: Option<PathBuf>,
-    write_mode: Option<WriteMode>,
-    color: Option<Color>,
-    file_lines: FileLines, // Default is all lines in all files.
-    unstable_features: bool,
-    error_on_unformatted: Option<bool>,
-}
-
-impl CliOptions {
-    pub fn from_matches(matches: &Matches) -> FmtResult<CliOptions> {
-        let mut options = CliOptions::default();
-        options.verbose = matches.opt_present("verbose");
-        options.quiet = matches.opt_present("quiet");
-        if options.verbose && options.quiet {
-            return Err(format_err!("Can't use both `--verbose` and `--quiet`"));
-        }
-
-        let unstable_features = matches.opt_present("unstable-features");
-        let rust_nightly = option_env!("CFG_RELEASE_CHANNEL")
-            .map(|c| c == "nightly")
-            .unwrap_or(false);
-        if unstable_features && !rust_nightly {
-            return Err(format_err!(
-                "Unstable features are only available on Nightly channel"
-            ));
-        } else {
-            options.unstable_features = unstable_features;
-        }
-
-        options.config_path = matches.opt_str("config-path").map(PathBuf::from);
-
-        if let Some(ref write_mode) = matches.opt_str("write-mode") {
-            if let Ok(write_mode) = WriteMode::from_str(write_mode) {
-                options.write_mode = Some(write_mode);
-            } else {
-                return Err(format_err!(
-                    "Invalid write-mode: {}, expected one of {}",
-                    write_mode,
-                    WRITE_MODE_LIST
-                ));
-            }
-        }
-
-        if let Some(ref color) = matches.opt_str("color") {
-            match Color::from_str(color) {
-                Ok(color) => options.color = Some(color),
-                _ => return Err(format_err!("Invalid color: {}", color)),
-            }
-        }
-
-        if let Some(ref file_lines) = matches.opt_str("file-lines") {
-            options.file_lines = file_lines.parse().map_err(err_msg)?;
-        }
-
-        if matches.opt_present("skip-children") {
-            options.skip_children = Some(true);
-        }
-        if matches.opt_present("error-on-unformatted") {
-            options.error_on_unformatted = Some(true);
-        }
-
-        Ok(options)
-    }
-
-    pub fn apply_to(self, config: &mut Config) {
-        if self.verbose {
-            config.set().verbose(Verbosity::Verbose);
-        } else if self.quiet {
-            config.set().verbose(Verbosity::Quiet);
-        } else {
-            config.set().verbose(Verbosity::Normal);
-        }
-        config.set().file_lines(self.file_lines);
-        config.set().unstable_features(self.unstable_features);
-        if let Some(skip_children) = self.skip_children {
-            config.set().skip_children(skip_children);
-        }
-        if let Some(error_on_unformatted) = self.error_on_unformatted {
-            config.set().error_on_unformatted(error_on_unformatted);
-        }
-        if let Some(write_mode) = self.write_mode {
-            config.set().write_mode(write_mode);
-        }
-        if let Some(color) = self.color {
-            config.set().color(color);
-        }
-    }
-
-    pub fn verify_file_lines(&self, files: &[PathBuf]) {
-        for f in self.file_lines.files() {
-            match *f {
-                FileName::Real(ref f) if files.contains(f) => {}
-                FileName::Real(_) => {
-                    eprintln!("Warning: Extra file listed in file_lines option '{}'", f)
-                }
-                _ => eprintln!("Warning: Not a file '{}'", f),
-            }
-        }
-    }
+/// Maps client-supplied options to Rustfmt's internals, mostly overriding
+/// values in a config with values from the command line.
+pub trait CliOptions {
+    fn apply_to(self, config: &mut Config);
+    fn config_path(&self) -> Option<&Path>;
 }

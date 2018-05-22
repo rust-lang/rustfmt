@@ -26,7 +26,11 @@ use macros::{rewrite_macro, rewrite_macro_def, MacroPosition};
 use rewrite::{Rewrite, RewriteContext};
 use shape::{Indent, Shape};
 use spanned::Spanned;
-use utils::{self, contains_skip, count_newlines, inner_attributes, mk_sp, ptr_vec_to_ref_vec};
+use utils::{
+    self, contains_skip, count_newlines, inner_attributes, mk_sp, ptr_vec_to_ref_vec,
+    DEPR_SKIP_ANNOTATION,
+};
+use {ErrorKind, FormatReport, FormattingError};
 
 use std::cell::RefCell;
 
@@ -66,6 +70,7 @@ pub struct FmtVisitor<'a> {
     pub snippet_provider: &'a SnippetProvider<'a>,
     pub line_number: usize,
     pub skipped_range: Vec<(usize, usize)>,
+    pub(crate) report: FormatReport,
 }
 
 impl<'b, 'a: 'b> FmtVisitor<'a> {
@@ -123,45 +128,43 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.block_indent = self.block_indent.block_indent(self.config);
         self.push_str("{");
 
-        if self.config.remove_blank_lines_at_start_or_end_of_block() {
-            if let Some(first_stmt) = b.stmts.first() {
-                let attr_lo = inner_attrs
-                    .and_then(|attrs| inner_attributes(attrs).first().map(|attr| attr.span.lo()))
-                    .or_else(|| {
-                        // Attributes for an item in a statement position
-                        // do not belong to the statement. (rust-lang/rust#34459)
-                        if let ast::StmtKind::Item(ref item) = first_stmt.node {
-                            item.attrs.first()
-                        } else {
-                            first_stmt.attrs().first()
-                        }.and_then(|attr| {
-                            // Some stmts can have embedded attributes.
-                            // e.g. `match { #![attr] ... }`
-                            let attr_lo = attr.span.lo();
-                            if attr_lo < first_stmt.span.lo() {
-                                Some(attr_lo)
-                            } else {
-                                None
-                            }
-                        })
-                    });
-
-                let snippet = self.snippet(mk_sp(
-                    self.last_pos,
-                    attr_lo.unwrap_or_else(|| first_stmt.span.lo()),
-                ));
-                let len = CommentCodeSlices::new(snippet)
-                    .nth(0)
-                    .and_then(|(kind, _, s)| {
-                        if kind == CodeCharKind::Normal {
-                            s.rfind('\n')
+        if let Some(first_stmt) = b.stmts.first() {
+            let attr_lo = inner_attrs
+                .and_then(|attrs| inner_attributes(attrs).first().map(|attr| attr.span.lo()))
+                .or_else(|| {
+                    // Attributes for an item in a statement position
+                    // do not belong to the statement. (rust-lang/rust#34459)
+                    if let ast::StmtKind::Item(ref item) = first_stmt.node {
+                        item.attrs.first()
+                    } else {
+                        first_stmt.attrs().first()
+                    }.and_then(|attr| {
+                        // Some stmts can have embedded attributes.
+                        // e.g. `match { #![attr] ... }`
+                        let attr_lo = attr.span.lo();
+                        if attr_lo < first_stmt.span.lo() {
+                            Some(attr_lo)
                         } else {
                             None
                         }
-                    });
-                if let Some(len) = len {
-                    self.last_pos = self.last_pos + BytePos::from_usize(len);
-                }
+                    })
+                });
+
+            let snippet = self.snippet(mk_sp(
+                self.last_pos,
+                attr_lo.unwrap_or_else(|| first_stmt.span.lo()),
+            ));
+            let len = CommentCodeSlices::new(snippet)
+                .nth(0)
+                .and_then(|(kind, _, s)| {
+                    if kind == CodeCharKind::Normal {
+                        s.rfind('\n')
+                    } else {
+                        None
+                    }
+                });
+            if let Some(len) = len {
+                self.last_pos = self.last_pos + BytePos::from_usize(len);
             }
         }
 
@@ -190,24 +193,22 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
 
         let mut remove_len = BytePos(0);
-        if self.config.remove_blank_lines_at_start_or_end_of_block() {
-            if let Some(stmt) = b.stmts.last() {
-                let snippet = self.snippet(mk_sp(
-                    stmt.span.hi(),
-                    source!(self, b.span).hi() - brace_compensation,
-                ));
-                let len = CommentCodeSlices::new(snippet)
-                    .last()
-                    .and_then(|(kind, _, s)| {
-                        if kind == CodeCharKind::Normal && s.trim().is_empty() {
-                            Some(s.len())
-                        } else {
-                            None
-                        }
-                    });
-                if let Some(len) = len {
-                    remove_len = BytePos::from_usize(len);
-                }
+        if let Some(stmt) = b.stmts.last() {
+            let snippet = self.snippet(mk_sp(
+                stmt.span.hi(),
+                source!(self, b.span).hi() - brace_compensation,
+            ));
+            let len = CommentCodeSlices::new(snippet)
+                .last()
+                .and_then(|(kind, _, s)| {
+                    if kind == CodeCharKind::Normal && s.trim().is_empty() {
+                        Some(s.len())
+                    } else {
+                        None
+                    }
+                });
+            if let Some(len) = len {
+                remove_len = BytePos::from_usize(len);
             }
         }
 
@@ -552,13 +553,19 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     }
 
     pub fn from_context(ctx: &'a RewriteContext) -> FmtVisitor<'a> {
-        FmtVisitor::from_codemap(ctx.parse_session, ctx.config, ctx.snippet_provider)
+        FmtVisitor::from_codemap(
+            ctx.parse_session,
+            ctx.config,
+            ctx.snippet_provider,
+            ctx.report.clone(),
+        )
     }
 
-    pub fn from_codemap(
+    pub(crate) fn from_codemap(
         parse_session: &'a ParseSess,
         config: &'a Config,
         snippet_provider: &'a SnippetProvider,
+        report: FormatReport,
     ) -> FmtVisitor<'a> {
         FmtVisitor {
             parse_session,
@@ -571,6 +578,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             snippet_provider,
             line_number: 0,
             skipped_range: vec![],
+            report,
         }
     }
 
@@ -584,6 +592,33 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
     // Returns true if we should skip the following item.
     pub fn visit_attrs(&mut self, attrs: &[ast::Attribute], style: ast::AttrStyle) -> bool {
+        for attr in attrs {
+            if attr.name() == DEPR_SKIP_ANNOTATION {
+                let file_name = self.codemap.span_to_filename(attr.span).into();
+                self.report.append(
+                    file_name,
+                    vec![FormattingError::from_span(
+                        &attr.span,
+                        &self.codemap,
+                        ErrorKind::DeprecatedAttr,
+                    )],
+                );
+            } else if attr.path.segments[0].ident.to_string() == "rustfmt" {
+                if attr.path.segments.len() == 1
+                    || attr.path.segments[1].ident.to_string() != "skip"
+                {
+                    let file_name = self.codemap.span_to_filename(attr.span).into();
+                    self.report.append(
+                        file_name,
+                        vec![FormattingError::from_span(
+                            &attr.span,
+                            &self.codemap,
+                            ErrorKind::BadAttr,
+                        )],
+                    );
+                }
+            }
+        }
         if contains_skip(attrs) {
             return true;
         }
@@ -711,6 +746,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             is_if_else_block: RefCell::new(false),
             force_one_line_chain: RefCell::new(false),
             snippet_provider: self.snippet_provider,
+            report: self.report.clone(),
         }
     }
 }

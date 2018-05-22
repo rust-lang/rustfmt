@@ -105,53 +105,14 @@ just need to run on the root file (usually mod.rs or lib.rs). Rustfmt can also
 read data from stdin. Alternatively, you can use `cargo fmt` to format all
 binary and library targets of your crate.
 
-You'll probably want to specify the write mode. Currently, there are modes for
-`check`, `diff`, `replace`, `overwrite`, `display`, `coverage`, `checkstyle`, and `plain`.
+You can run `rustfmt --help` for information about argument.
 
-* `overwrite` Is the default and overwrites the original files _without_ creating backups.
-* `replace` Overwrites the original files after creating backups of the files.
-* `display` Will print the formatted files to stdout.
-* `plain` Also writes to stdout, but with no metadata.
-* `diff` Will print a diff between the original files and formatted files to stdout.
-* `check` Checks if the program's formatting matches what rustfmt would do. Silently exits
-          with code 0 if so, emits a diff and exits with code 1 if not. This option is
-          designed to be run in CI-like where a non-zero exit signifies incorrect formatting.
-* `checkstyle` Will output the lines that need to be corrected as a checkstyle XML file,
-  that can be used by tools like Jenkins.
+When running with `--check`, Rustfmt will exit with `0` if Rustfmt would not
+make any formatting changes to the input, and `1` if Rustfmt would make changes.
+In other modes, Rustfmt will exit with `1` if there was some error during
+formatting (for example a parsing or internal error) and `0` if formatting
+completed without error (whether or not changes were made).
 
-The write mode can be set by passing the `--write-mode` flag on
-the command line. For example `rustfmt --write-mode=display src/filename.rs`
-
-`cargo fmt` uses `--write-mode=overwrite` by default.
-
-If you want to restrict reformatting to specific sets of lines, you can
-use the `--file-lines` option. Its argument is a JSON array of objects
-with `file` and `range` properties, where `file` is a file name, and
-`range` is an array representing a range of lines like `[7,13]`. Ranges
-are 1-based and inclusive of both end points. Specifying an empty array
-will result in no files being formatted. For example,
-
-```
-rustfmt --file-lines '[
-    {"file":"src/lib.rs","range":[7,13]},
-    {"file":"src/lib.rs","range":[21,29]},
-    {"file":"src/foo.rs","range":[10,11]},
-    {"file":"src/foo.rs","range":[15,15]}]'
-```
-
-would format lines `7-13` and `21-29` of `src/lib.rs`, and lines `10-11`,
-and `15` of `src/foo.rs`. No other files would be formatted, even if they
-are included as out of line modules from `src/lib.rs`.
-
-If `rustfmt` successfully reformatted the code it will exit with `0` exit
-status. Exit status `1` signals some unexpected error, like an unknown option or
-a failure to read a file. Exit status `2` is returned if there are syntax errors
-in the input files. `rustfmt` can't format syntactically invalid code. Finally,
-exit status `3` is returned if there are some issues which can't be resolved
-automatically. For example, if you have a very long comment line `rustfmt`
-doesn't split it. Instead it prints a warning and exits with `3`.
-
-You can run `rustfmt --help` for more information.
 
 
 ## Running Rustfmt from your editor
@@ -165,7 +126,7 @@ You can run `rustfmt --help` for more information.
 ## Checking style on a CI server
 
 To keep your code base consistently formatted, it can be helpful to fail the CI build
-when a pull request contains unformatted code. Using `--write-mode=check` instructs
+when a pull request contains unformatted code. Using `--check` instructs
 rustfmt to exit with an error code if the input is not formatted correctly.
 It will also print any found differences.
 
@@ -173,10 +134,12 @@ A minimal Travis setup could look like this (requires Rust 1.24.0 or greater):
 
 ```yaml
 language: rust
+rust:
+- nightly
 before_script:
 - rustup component add rustfmt-preview
 script:
-- cargo fmt --all -- --write-mode=check
+- cargo fmt --all -- --check
 - cargo build
 - cargo test
 ```
@@ -213,7 +176,7 @@ See [Configurations.md](Configurations.md) for details.
 * For things you do not want rustfmt to mangle, use one of
 
     ```rust
-    #[rustfmt_skip]  // requires nightly and #![feature(custom_attribute)] in crate root
+    #[rustfmt::skip]  // requires nightly Rust and #![feature(tool_attributes)] in crate root
     #[cfg_attr(rustfmt, rustfmt_skip)]  // works in stable
     ```
 * When you run rustfmt, place a file named `rustfmt.toml` or `.rustfmt.toml` in

@@ -39,8 +39,8 @@ use string::{rewrite_string, StringFormat};
 use types::{can_be_overflowed_type, rewrite_path, PathContext};
 use utils::{
     colon_spaces, contains_skip, count_newlines, first_line_width, inner_attributes,
-    last_line_extendable, last_line_width, mk_sp, outer_attributes, paren_overhead,
-    ptr_vec_to_ref_vec, semicolon_for_stmt, wrap_str,
+    last_line_extendable, last_line_width, mk_sp, outer_attributes, ptr_vec_to_ref_vec,
+    semicolon_for_stmt, wrap_str,
 };
 use vertical::rewrite_with_alignment;
 use visitor::FmtVisitor;
@@ -118,11 +118,11 @@ pub fn format_expr(
         | ast::ExprKind::While(..)
         | ast::ExprKind::WhileLet(..) => to_control_flow(expr, expr_type)
             .and_then(|control_flow| control_flow.rewrite(context, shape)),
-        ast::ExprKind::Block(ref block) => {
+        ast::ExprKind::Block(ref block, opt_label) => {
             match expr_type {
                 ExprType::Statement => {
                     if is_unsafe_block(block) {
-                        rewrite_block(block, Some(&expr.attrs), context, shape)
+                        rewrite_block(block, Some(&expr.attrs), opt_label, context, shape)
                     } else if let rw @ Some(_) =
                         rewrite_empty_block(context, block, Some(&expr.attrs), "", shape)
                     {
@@ -130,6 +130,7 @@ pub fn format_expr(
                         rw
                     } else {
                         let prefix = block_prefix(context, block, shape)?;
+
                         rewrite_block_with_visitor(
                             context,
                             &prefix,
@@ -140,7 +141,9 @@ pub fn format_expr(
                         )
                     }
                 }
-                ExprType::SubExpression => rewrite_block(block, Some(&expr.attrs), context, shape),
+                ExprType::SubExpression => {
+                    rewrite_block(block, Some(&expr.attrs), opt_label, context, shape)
+                }
             }
         }
         ast::ExprKind::Match(ref cond, ref arms) => {
@@ -223,21 +226,14 @@ pub fn format_expr(
         ast::ExprKind::Index(ref expr, ref index) => {
             rewrite_index(&**expr, &**index, context, shape)
         }
-        ast::ExprKind::Repeat(ref expr, ref repeats) => {
-            let (lbr, rbr) = if context.config.spaces_within_parens_and_brackets() {
-                ("[ ", " ]")
-            } else {
-                ("[", "]")
-            };
-            rewrite_pair(
-                &**expr,
-                &**repeats,
-                PairParts::new(lbr, "; ", rbr),
-                context,
-                shape,
-                SeparatorPlace::Back,
-            )
-        }
+        ast::ExprKind::Repeat(ref expr, ref repeats) => rewrite_pair(
+            &**expr,
+            &**repeats,
+            PairParts::new("[", "; ", "]"),
+            context,
+            shape,
+            SeparatorPlace::Back,
+        ),
         ast::ExprKind::Range(ref lhs, ref rhs, limits) => {
             let delim = match limits {
                 ast::RangeLimits::HalfOpen => "..",
@@ -326,13 +322,14 @@ pub fn format_expr(
                 rw
             } else {
                 // 9 = `do catch `
-                let budget = shape.width.checked_sub(9).unwrap_or(0);
+                let budget = shape.width.saturating_sub(9);
                 Some(format!(
                     "{}{}",
                     "do catch ",
                     rewrite_block(
                         block,
                         Some(&expr.attrs),
+                        None,
                         context,
                         Shape::legacy(budget, shape.indent)
                     )?
@@ -650,17 +647,20 @@ pub fn rewrite_block_with_visitor(
 
 impl Rewrite for ast::Block {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
-        rewrite_block(self, None, context, shape)
+        rewrite_block(self, None, None, context, shape)
     }
 }
 
 fn rewrite_block(
     block: &ast::Block,
     attrs: Option<&[ast::Attribute]>,
+    label: Option<ast::Label>,
     context: &RewriteContext,
     shape: Shape,
 ) -> Option<String> {
-    let prefix = block_prefix(context, block, shape)?;
+    let unsafe_string = block_prefix(context, block, shape)?;
+    let label_string = rewrite_label(label);
+    let prefix = format!("{}{}", unsafe_string, label_string);
 
     // shape.width is used only for the single line case: either the empty block `{}`,
     // or an unsafe expression `unsafe { e }`.
@@ -887,7 +887,7 @@ impl<'a> ControlFlow<'a> {
         let else_block = self.else_block?;
         let fixed_cost = self.keyword.len() + "  {  } else {  }".len();
 
-        if let ast::ExprKind::Block(ref else_node) = else_block.node {
+        if let ast::ExprKind::Block(ref else_node, _) = else_block.node {
             if !is_simple_block(self.block, None, context.codemap)
                 || !is_simple_block(else_node, None, context.codemap)
                 || pat_expr_str.contains('\n')
@@ -1002,8 +1002,7 @@ impl<'a> ControlFlow<'a> {
         let one_line_budget = context
             .config
             .max_width()
-            .checked_sub(constr_shape.used_width() + offset + brace_overhead)
-            .unwrap_or(0);
+            .saturating_sub(constr_shape.used_width() + offset + brace_overhead);
         let force_newline_brace = (pat_expr_string.contains('\n')
             || pat_expr_string.len() > one_line_budget)
             && !last_line_extendable(&pat_expr_string);
@@ -1109,7 +1108,7 @@ impl<'a> Rewrite for ControlFlow<'a> {
             return Some(cond_str);
         }
 
-        let block_width = shape.width.checked_sub(used_width).unwrap_or(0);
+        let block_width = shape.width.saturating_sub(used_width);
         // This is used only for the empty block case: `{}`. So, we use 1 if we know
         // we should avoid the single line case.
         let block_width = if self.else_block.is_some() || self.nested_if {
@@ -1582,27 +1581,15 @@ fn rewrite_paren(
         break;
     }
 
-    let total_paren_overhead = paren_overhead(context);
-    let paren_overhead = total_paren_overhead / 2;
-    let sub_shape = shape
-        .offset_left(paren_overhead)
-        .and_then(|s| s.sub_width(paren_overhead))?;
-
-    let paren_wrapper = |s: &str| {
-        if context.config.spaces_within_parens_and_brackets() && !s.is_empty() {
-            format!("( {}{}{} )", pre_comment, s, post_comment)
-        } else {
-            format!("({}{}{})", pre_comment, s, post_comment)
-        }
-    };
+    // 1 `(`
+    let sub_shape = shape.offset_left(1).and_then(|s| s.sub_width(1))?;
 
     let subexpr_str = subexpr.rewrite(context, sub_shape)?;
     debug!("rewrite_paren, subexpr_str: `{:?}`", subexpr_str);
 
-    if subexpr_str.contains('\n')
-        || first_line_width(&subexpr_str) + total_paren_overhead <= shape.width
-    {
-        Some(paren_wrapper(&subexpr_str))
+    // 2 = `()`
+    if subexpr_str.contains('\n') || first_line_width(&subexpr_str) + 2 <= shape.width {
+        Some(format!("({}{}{})", pre_comment, &subexpr_str, post_comment))
     } else {
         None
     }
@@ -1616,54 +1603,44 @@ fn rewrite_index(
 ) -> Option<String> {
     let expr_str = expr.rewrite(context, shape)?;
 
-    let (lbr, rbr) = if context.config.spaces_within_parens_and_brackets() {
-        ("[ ", " ]")
-    } else {
-        ("[", "]")
-    };
-
-    let offset = last_line_width(&expr_str) + lbr.len();
+    let offset = last_line_width(&expr_str) + 1;
     let rhs_overhead = shape.rhs_overhead(context.config);
     let index_shape = if expr_str.contains('\n') {
         Shape::legacy(context.config.max_width(), shape.indent)
             .offset_left(offset)
-            .and_then(|shape| shape.sub_width(rbr.len() + rhs_overhead))
+            .and_then(|shape| shape.sub_width(1 + rhs_overhead))
     } else {
-        shape.visual_indent(offset).sub_width(offset + rbr.len())
+        shape.visual_indent(offset).sub_width(offset + 1)
     };
     let orig_index_rw = index_shape.and_then(|s| index.rewrite(context, s));
 
     // Return if index fits in a single line.
     match orig_index_rw {
         Some(ref index_str) if !index_str.contains('\n') => {
-            return Some(format!("{}{}{}{}", expr_str, lbr, index_str, rbr));
+            return Some(format!("{}[{}]", expr_str, index_str));
         }
         _ => (),
     }
 
     // Try putting index on the next line and see if it fits in a single line.
     let indent = shape.indent.block_indent(context.config);
-    let index_shape = Shape::indented(indent, context.config).offset_left(lbr.len())?;
-    let index_shape = index_shape.sub_width(rbr.len() + rhs_overhead)?;
+    let index_shape = Shape::indented(indent, context.config).offset_left(1)?;
+    let index_shape = index_shape.sub_width(1 + rhs_overhead)?;
     let new_index_rw = index.rewrite(context, index_shape);
     match (orig_index_rw, new_index_rw) {
         (_, Some(ref new_index_str)) if !new_index_str.contains('\n') => Some(format!(
-            "{}{}{}{}{}",
+            "{}{}[{}]",
             expr_str,
             indent.to_string_with_newline(context.config),
-            lbr,
             new_index_str,
-            rbr
         )),
         (None, Some(ref new_index_str)) => Some(format!(
-            "{}{}{}{}{}",
+            "{}{}[{}]",
             expr_str,
             indent.to_string_with_newline(context.config),
-            lbr,
             new_index_str,
-            rbr
         )),
-        (Some(ref index_str), _) => Some(format!("{}{}{}{}", expr_str, lbr, index_str, rbr)),
+        (Some(ref index_str), _) => Some(format!("{}[{}]", expr_str, index_str)),
         _ => None,
     }
 }
@@ -1828,7 +1805,7 @@ pub fn rewrite_field(
         Some(attrs_str + &name)
     } else {
         let mut separator = String::from(struct_lit_field_separator(context.config));
-        for _ in 0..prefix_max_width.checked_sub(name.len()).unwrap_or(0) {
+        for _ in 0..prefix_max_width.saturating_sub(name.len()) {
             separator.push(' ');
         }
         let overhead = name.len() + separator.len();
@@ -1878,13 +1855,7 @@ where
             .next()
             .unwrap()
             .rewrite(context, nested_shape)
-            .map(|s| {
-                if context.config.spaces_within_parens_and_brackets() {
-                    format!("( {}, )", s)
-                } else {
-                    format!("({},)", s)
-                }
-            });
+            .map(|s| format!("({},)", s));
     }
 
     let list_lo = context.snippet_provider.span_after(span, "(");
@@ -1920,11 +1891,7 @@ where
     };
     let list_str = write_list(&item_vec, &fmt)?;
 
-    if context.config.spaces_within_parens_and_brackets() && !list_str.is_empty() {
-        Some(format!("( {} )", list_str))
-    } else {
-        Some(format!("({})", list_str))
-    }
+    Some(format!("({})", list_str))
 }
 
 pub fn rewrite_tuple<'a, T>(
@@ -2053,13 +2020,11 @@ pub fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
     rhs_tactics: RhsTactics,
 ) -> Option<String> {
     let lhs = lhs.into();
-    let last_line_width = last_line_width(&lhs)
-        .checked_sub(if lhs.contains('\n') {
-            shape.indent.width()
-        } else {
-            0
-        })
-        .unwrap_or(0);
+    let last_line_width = last_line_width(&lhs).saturating_sub(if lhs.contains('\n') {
+        shape.indent.width()
+    } else {
+        0
+    });
     // 1 = space between operator and rhs.
     let orig_shape = shape.offset_left(last_line_width + 1).unwrap_or(Shape {
         width: 0,

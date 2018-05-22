@@ -259,13 +259,8 @@ pub fn rewrite_macro_inner(
             // Handle special case: `vec![expr; expr]`
             if vec_with_semi {
                 let mac_shape = shape.offset_left(macro_name.len())?;
-                let (lbr, rbr) = if context.config.spaces_within_parens_and_brackets() {
-                    ("[ ", " ]")
-                } else {
-                    ("[", "]")
-                };
-                // 6 = `vec!` + `; `
-                let total_overhead = lbr.len() + rbr.len() + 6;
+                // 8 = `vec![]` + `; `
+                let total_overhead = 8;
                 let nested_shape = mac_shape.block_indent(context.config.tab_spaces());
                 let lhs = arg_vec[0].rewrite(context, nested_shape)?;
                 let rhs = arg_vec[1].rewrite(context, nested_shape)?;
@@ -273,18 +268,16 @@ pub fn rewrite_macro_inner(
                     && !rhs.contains('\n')
                     && lhs.len() + rhs.len() + total_overhead <= shape.width
                 {
-                    Some(format!("{}{}{}; {}{}", macro_name, lbr, lhs, rhs, rbr))
+                    Some(format!("{}[{}; {}]", macro_name, lhs, rhs))
                 } else {
                     Some(format!(
-                        "{}{}{}{};{}{}{}{}",
+                        "{}[{}{};{}{}{}]",
                         macro_name,
-                        lbr,
                         nested_shape.indent.to_string_with_newline(context.config),
                         lhs,
                         nested_shape.indent.to_string_with_newline(context.config),
                         rhs,
                         shape.indent.to_string_with_newline(context.config),
-                        rbr
                     ))
                 }
             } else {
@@ -1091,9 +1084,7 @@ fn indent_macro_snippet(
                         _ if !trimmed => line.to_owned(),
                         Some(original_indent_width) => {
                             let new_indent_width = indent.width()
-                                + original_indent_width
-                                    .checked_sub(min_prefix_space_width)
-                                    .unwrap_or(0);
+                                + original_indent_width.saturating_sub(min_prefix_space_width);
                             let new_indent = Indent::from_width(context.config, new_indent_width);
                             format!("{}{}", new_indent.to_string(context.config), line.trim())
                         }
