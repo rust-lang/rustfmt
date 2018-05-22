@@ -1932,14 +1932,6 @@ fn hello(name: &Option<&str>) {
 }
 ```
 
-## `write_mode`
-
-What Write Mode to use when none is supplied: Replace, Overwrite, Display, Diff, Coverage
-
-- **Default value**: `"Overwrite"`
-- **Possible values**: `"Checkstyle"`, `"Coverage"`, `"Diff"`, `"Display"`, `"Overwrite"`, `"Plain"`, `"Replace"`
-- **Stable**: No
-
 ## `blank_lines_upper_bound`
 
 Maximum number of blank lines which can be put between items. If more than this number of consecutive empty
