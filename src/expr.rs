@@ -545,7 +545,12 @@ impl Rewrite for ast::Stmt {
                 };
 
                 let shape = shape.sub_width(suffix.len())?;
-                format_expr(ex, ExprType::Statement, context, shape).map(|s| s + suffix)
+                let expr_type = if stmt_is_expr(&self) {
+                    ExprType::SubExpression
+                } else {
+                    ExprType::Statement
+                };
+                format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
             }
             ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
         };
@@ -634,11 +639,7 @@ fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow>
 }
 
 fn choose_matcher(pats: &[&ast::Pat]) -> &'static str {
-    if pats.is_empty() {
-        ""
-    } else {
-        "let"
-    }
+    if pats.is_empty() { "" } else { "let" }
 }
 
 impl<'a> ControlFlow<'a> {
