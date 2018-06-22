@@ -366,6 +366,7 @@ where
         shape: list_shape,
         ends_with_newline: tactic.ends_with_newline(context.config.indent_style()),
         preserve_newline: true,
+        nested: false,
         config: context.config,
     };
 
@@ -417,7 +418,7 @@ fn type_bound_colon(context: &RewriteContext) -> &'static str {
 
 impl Rewrite for ast::WherePredicate {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
-        // TODO: dead spans?
+        // FIXME: dead spans?
         let result = match *self {
             ast::WherePredicate::BoundPredicate(ast::WhereBoundPredicate {
                 ref bound_generic_params,
