@@ -1885,6 +1885,52 @@ fn main() {
 
 See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 
+## `match_reference_style`
+
+Normalize match reference style
+
+- **Default value**: `manual`
+- **Possible values**: `manual`, `reference`, `dereference`, `auto`
+- **Stable**: No
+
+**Note:** `auto` style requires Rust v1.26.0 or later
+
+#### `manual`
+
+don't touch anything
+
+#### `reference`
+
+```rust
+fn hello(name: &Option<&str>) {
+    match name {
+        &Some(name) => println!("Hello {}!", name),
+        &None => println!("I don't know who you are."),
+    }
+}
+```
+
+#### `dereference`
+
+```rust
+fn hello(name: &Option<&str>) {
+    match *name {
+        Some(name) => println!("Hello {}!", name),
+        None => println!("I don't know who you are."),
+    }
+}
+```
+
+#### `auto`
+
+```rust
+fn hello(name: &Option<&str>) {
+    match name {
+        Some(name) => println!("Hello {}!", name),
+        None => println!("I don't know who you are."),
+    }
+}
+```
 
 ## `blank_lines_upper_bound`
 

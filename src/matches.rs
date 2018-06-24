@@ -18,7 +18,7 @@ use syntax::{ast, ptr};
 
 use codemap::SpanUtils;
 use comment::combine_strs_with_missing_comments;
-use config::{Config, ControlBraceStyle, IndentStyle};
+use config::{Config, ControlBraceStyle, IndentStyle, MatchReferenceStyle};
 use expr::{
     format_expr, is_empty_block, is_simple_block, is_unsafe_block, prefer_next_line,
     rewrite_multiple_patterns, ExprType, RhsTactics, ToExpr,
@@ -91,7 +91,7 @@ pub fn rewrite_match(
         IndentStyle::Visual => cond_shape.shrink_left(6)?,
         IndentStyle::Block => cond_shape.offset_left(6)?,
     };
-    let cond_str = cond.rewrite(context, cond_shape)?;
+    let mut cond_str = cond.rewrite(context, cond_shape)?;
     let alt_block_sep = &shape.indent.to_string_with_newline(context.config);
     let block_sep = match context.config.control_brace_style() {
         ControlBraceStyle::AlwaysNextLine => alt_block_sep,
@@ -138,13 +138,28 @@ pub fn rewrite_match(
         }
     } else {
         let span_after_cond = mk_sp(cond.span.hi(), span.hi());
+        let mut arms_str =
+            rewrite_match_arms(context, arms, shape, span_after_cond, open_brace_pos)?;
+
+        rewrite_match_reference_style(
+            context,
+            cond,
+            arms,
+            shape,
+            cond_shape,
+            span_after_cond,
+            open_brace_pos,
+            &mut cond_str,
+            &mut arms_str,
+        )?;
+
         Some(format!(
             "match {}{}{{\n{}{}{}\n{}}}",
             cond_str,
             block_sep,
             inner_attrs_str,
             nested_indent_str,
-            rewrite_match_arms(context, arms, shape, span_after_cond, open_brace_pos)?,
+            arms_str,
             shape.indent.to_string(context.config),
         ))
     }
@@ -181,6 +196,109 @@ fn collect_beginning_verts(
         lo = arm.span().hi();
     }
     beginning_verts
+}
+
+fn rewrite_match_reference_style(
+    context: &RewriteContext,
+    cond: &ast::Expr,
+    arms: &[ast::Arm],
+    shape: Shape,
+    cond_shape: Shape,
+    span_after_cond: Span,
+    open_brace_pos: BytePos,
+    cond_str: &mut String,
+    arms_str: &mut String,
+) -> Option<()> {
+    let match_in_reference_style = arms.iter().all(|arm| {
+        arm.pats.iter().all(|pat| match pat.node {
+            ast::PatKind::Wild | ast::PatKind::Ref(..) => true,
+            _ => false,
+        })
+    });
+    let match_in_derefrence_style = match cond.node {
+        ast::ExprKind::Unary(ast::UnOp::Deref, _) => true,
+        _ => false,
+    };
+
+    let prepend_arms_ref = || {
+        arms.iter()
+            .map(|arm| {
+                let pats = arm
+                    .pats
+                    .iter()
+                    .map(|pat| {
+                        ptr::P(ast::Pat {
+                            id: pat.id,
+                            node: ast::PatKind::Ref(pat.clone(), ast::Mutability::Immutable),
+                            span: pat.span,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+
+                ast::Arm {
+                    pats,
+                    ..arm.clone()
+                }
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let strip_arms_ref = || {
+        arms.iter()
+            .map(|arm| {
+                let pats = arm
+                    .pats
+                    .iter()
+                    .map(|pat| match pat.node {
+                        ast::PatKind::Ref(ref pat, _) => pat,
+                        _ => pat,
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+
+                ast::Arm {
+                    pats,
+                    ..arm.clone()
+                }
+            })
+            .collect::<Vec<_>>()
+    };
+
+    match context.config.match_reference_style() {
+        MatchReferenceStyle::Reference if match_in_derefrence_style => {
+            if let ast::ExprKind::Unary(ast::UnOp::Deref, ref cond) = cond.node {
+                *cond_str = cond.rewrite(context, cond_shape)?;
+            }
+
+            let arms = prepend_arms_ref();
+
+            *arms_str = rewrite_match_arms(context, &arms, shape, span_after_cond, open_brace_pos)?
+        }
+        MatchReferenceStyle::Dereference if match_in_reference_style => {
+            let cond = ast::Expr {
+                node: ast::ExprKind::Unary(ast::UnOp::Deref, ptr::P(cond.clone())),
+                ..cond.clone()
+            };
+            *cond_str = cond.rewrite(context, cond_shape)?;
+
+            let arms = strip_arms_ref();
+
+            *arms_str = rewrite_match_arms(context, &arms, shape, span_after_cond, open_brace_pos)?
+        }
+        MatchReferenceStyle::Auto if match_in_derefrence_style => {
+            if let ast::ExprKind::Unary(ast::UnOp::Deref, ref cond) = cond.node {
+                *cond_str = cond.rewrite(context, cond_shape)?;
+            }
+        }
+        MatchReferenceStyle::Auto if match_in_reference_style => {
+            let arms = strip_arms_ref();
+
+            *arms_str = rewrite_match_arms(context, &arms, shape, span_after_cond, open_brace_pos)?
+        }
+        _ => {}
+    }
+
+    Some(())
 }
 
 fn rewrite_match_arms(

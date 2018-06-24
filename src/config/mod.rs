@@ -88,6 +88,8 @@ create_config! {
                                              threshold.";
     match_arm_blocks: bool, true, false, "Wrap the body of arms in blocks when it does not fit on \
         the same line with the pattern of arms";
+    match_reference_style: MatchReferenceStyle, MatchReferenceStyle::Manual, false,
+        "Normalize match reference style";
     force_multiline_blocks: bool, false, false,
         "Force multiline closure bodies and match arms to be wrapped in a block";
     fn_args_density: Density, Density::Tall, false, "Argument density in functions";

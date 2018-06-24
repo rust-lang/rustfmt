@@ -135,6 +135,25 @@ configuration_option_enum! { IndentStyle:
     Block,
 }
 
+configuration_option_enum! { MatchReferenceStyle:
+    Manual,
+    // match x {
+    //    &A => ...,
+    //    ...
+    // }
+    Reference,
+    // match *x {
+    //     A => ...,
+    //     ...
+    // }
+    Dereference,
+    // match x {
+    //     A => ...,
+    //     ...
+    // }
+    Auto
+}
+
 configuration_option_enum! { Density:
     // Fit as much on one line as possible.
     Compressed,
