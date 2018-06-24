@@ -107,7 +107,7 @@ binary and library targets of your crate.
 
 You can run `rustfmt --help` for information about argument.
 
-When running with `--check`, Rustfmt will exit with `0` if Rustfmt would not
+When running with `--write-mode=check`, Rustfmt will exit with `0` if Rustfmt would not
 make any formatting changes to the input, and `1` if Rustfmt would make changes.
 In other modes, Rustfmt will exit with `1` if there was some error during
 formatting (for example a parsing or internal error) and `0` if formatting
@@ -126,7 +126,7 @@ completed without error (whether or not changes were made).
 ## Checking style on a CI server
 
 To keep your code base consistently formatted, it can be helpful to fail the CI build
-when a pull request contains unformatted code. Using `--check` instructs
+when a pull request contains unformatted code. Using `--write-mode=check` instructs
 rustfmt to exit with an error code if the input is not formatted correctly.
 It will also print any found differences.
 
@@ -139,7 +139,7 @@ rust:
 before_script:
 - rustup component add rustfmt-preview
 script:
-- cargo fmt --all -- --check
+- cargo fmt --all -- --write-mode=check
 - cargo build
 - cargo test
 ```
