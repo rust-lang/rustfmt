@@ -545,11 +545,12 @@ impl Rewrite for ast::Stmt {
                 };
 
                 let shape = shape.sub_width(suffix.len())?;
-                let expr_type = if stmt_is_expr(&self) {
-                    ExprType::SubExpression
-                } else {
-                    ExprType::Statement
-                };
+                let expr_type =
+                    if stmt_is_expr(&self) && context.snippet(self.span).starts_with("if ") {
+                        ExprType::SubExpression
+                    } else {
+                        ExprType::Statement
+                    };
                 format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
             }
             ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
