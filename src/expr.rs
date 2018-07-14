@@ -1148,6 +1148,14 @@ fn stmt_is_if(stmt: &ast::Stmt) -> bool {
     }
 }
 
+fn block_last_stmt_is_if(block: &ast::Block) -> bool {
+    if let Some(ref stmt) = block.stmts.last() {
+        stmt_is_if(stmt)
+    } else {
+        false
+    }
+}
+
 pub fn is_unsafe_block(block: &ast::Block) -> bool {
     if let ast::BlockCheckMode::Unsafe(..) = block.rules {
         true
