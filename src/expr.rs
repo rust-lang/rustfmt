@@ -1192,6 +1192,16 @@ pub fn stmt_is_expr(stmt: &ast::Stmt) -> bool {
     }
 }
 
+pub(crate) fn stmt_is_if(stmt: &ast::Stmt) -> bool {
+    match stmt.node {
+        ast::StmtKind::Semi(ref e) | ast::StmtKind::Expr(ref e) => match e.node {
+            ast::ExprKind::If(..) => true,
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
 pub fn is_unsafe_block(block: &ast::Block) -> bool {
     if let ast::BlockCheckMode::Unsafe(..) = block.rules {
         true
