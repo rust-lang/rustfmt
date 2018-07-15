@@ -17,13 +17,14 @@ use attr::*;
 use codemap::{LineRangeUtils, SpanUtils};
 use comment::{CodeCharKind, CommentCodeSlices, FindUncommented};
 use config::{BraceStyle, Config};
+use expr::stmt_is_if;
 use items::{
     format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
     rewrite_associated_impl_type, rewrite_associated_type, rewrite_extern_crate,
     rewrite_type_alias, FnSig, StaticParts, StructParts,
 };
 use macros::{rewrite_macro, rewrite_macro_def, MacroPosition};
-use rewrite::{Rewrite, RewriteContext};
+use rewrite::{Rewrite, RewriteContext, RewriteStmt};
 use shape::{Indent, Shape};
 use spanned::Spanned;
 use utils::{
@@ -79,7 +80,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         Shape::indented(self.block_indent, self.config)
     }
 
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt, last_stmt_is_if: bool) {
         debug!(
             "visit_stmt: {:?} {:?}",
             self.codemap.lookup_char_pos(stmt.span.lo()),
@@ -94,7 +95,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 if contains_skip(get_attrs_from_stmt(stmt)) {
                     self.push_skipped_with_span(stmt.span());
                 } else {
-                    let rewrite = stmt.rewrite(&self.get_context(), self.shape());
+                    let rewrite = stmt.rewrite(&self.get_context(), self.shape(), last_stmt_is_if);
                     self.push_rewrite(stmt.span(), rewrite)
                 }
             }
@@ -662,7 +663,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             .collect();
 
         if items.is_empty() {
-            self.visit_stmt(&stmts[0]);
+            let last_stmt_is_if = stmts[0] == stmts[stmts.len() - 1] && stmt_is_if(&stmts[0]);
+            self.visit_stmt(&stmts[0], last_stmt_is_if);
             self.walk_stmts(&stmts[1..]);
         } else {
             self.visit_items_with_reordering(&items);

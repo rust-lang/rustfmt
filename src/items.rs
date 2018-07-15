@@ -33,7 +33,7 @@ use expr::{
 use lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator};
 use macros::{rewrite_macro, MacroPosition};
 use overflow;
-use rewrite::{Rewrite, RewriteContext};
+use rewrite::{Rewrite, RewriteContext, RewriteStmt};
 use shape::{Indent, Shape};
 use spanned::Spanned;
 use utils::*;
@@ -399,7 +399,7 @@ impl<'a> FmtVisitor<'a> {
                                 .map(|s| s + suffix)
                                 .or_else(|| Some(self.snippet(e.span).to_owned()))
                         }
-                        None => stmt.rewrite(&self.get_context(), self.shape()),
+                        None => stmt.rewrite(&self.get_context(), self.shape(), false),
                     }
                 } else {
                     None

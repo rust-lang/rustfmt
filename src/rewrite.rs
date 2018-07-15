@@ -25,6 +25,15 @@ pub trait Rewrite {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String>;
 }
 
+pub trait RewriteStmt {
+    fn rewrite(
+        &self,
+        context: &RewriteContext,
+        shape: Shape,
+        last_stmt_is_if: bool,
+    ) -> Option<String>;
+}
+
 #[derive(Clone)]
 pub struct RewriteContext<'a> {
     pub parse_session: &'a ParseSess,

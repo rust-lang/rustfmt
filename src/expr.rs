@@ -33,7 +33,7 @@ use matches::rewrite_match;
 use overflow;
 use pairs::{rewrite_all_pairs, rewrite_pair, PairParts};
 use patterns::{can_be_overflowed_pat, is_short_pattern, TuplePatField};
-use rewrite::{Rewrite, RewriteContext};
+use rewrite::{Rewrite, RewriteContext, RewriteStmt};
 use shape::{Indent, Shape};
 use spanned::Spanned;
 use string::{rewrite_string, StringFormat};
@@ -455,7 +455,7 @@ fn rewrite_single_line_block(
 ) -> Option<String> {
     if is_simple_block(block, attrs, context.codemap) {
         let expr_shape = shape.offset_left(last_line_width(prefix))?;
-        let expr_str = block.stmts[0].rewrite(context, expr_shape)?;
+        let expr_str = block.stmts[0].rewrite(context, expr_shape, false)?;
         let label_str = rewrite_label(label);
         let result = format!("{}{}{{ {} }}", prefix, label_str, expr_str);
         if result.len() <= shape.width && !result.contains('\n') {
@@ -531,8 +531,13 @@ fn rewrite_block(
     result
 }
 
-impl Rewrite for ast::Stmt {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+impl RewriteStmt for ast::Stmt {
+    fn rewrite(
+        &self,
+        context: &RewriteContext,
+        shape: Shape,
+        last_stmt_is_if: bool,
+    ) -> Option<String> {
         skip_out_of_file_lines_range!(context, self.span());
 
         let result = match self.node {
@@ -545,12 +550,11 @@ impl Rewrite for ast::Stmt {
                 };
 
                 let shape = shape.sub_width(suffix.len())?;
-                let expr_type =
-                    if stmt_is_expr(&self) && context.snippet(self.span).starts_with("if ") {
-                        ExprType::SubExpression
-                    } else {
-                        ExprType::Statement
-                    };
+                let expr_type = if last_stmt_is_if {
+                    ExprType::SubExpression
+                } else {
+                    ExprType::Statement
+                };
                 format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
             }
             ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
@@ -750,11 +754,12 @@ impl<'a> ControlFlow<'a> {
 
             let new_width = width.checked_sub(pat_expr_str.len() + fixed_cost)?;
             let expr = &self.block.stmts[0];
-            let if_str = expr.rewrite(context, Shape::legacy(new_width, Indent::empty()))?;
+            let if_str = expr.rewrite(context, Shape::legacy(new_width, Indent::empty()), false)?;
 
             let new_width = new_width.checked_sub(if_str.len())?;
             let else_expr = &else_node.stmts[0];
-            let else_str = else_expr.rewrite(context, Shape::legacy(new_width, Indent::empty()))?;
+            let else_str =
+                else_expr.rewrite(context, Shape::legacy(new_width, Indent::empty()), false)?;
 
             if if_str.contains('\n') || else_str.contains('\n') {
                 return None;
@@ -1136,23 +1141,13 @@ pub fn stmt_is_expr(stmt: &ast::Stmt) -> bool {
     }
 }
 
-fn stmt_is_if(stmt: &ast::Stmt) -> bool {
+pub(crate) fn stmt_is_if(stmt: &ast::Stmt) -> bool {
     match stmt.node {
-        ast::StmtKind::Semi(ref e) | ast::StmtKind::Expr(ref e) => {
-            match e.node {
-                ast::ExprKind::If(..) => true,
-                _ => false,
-            }
+        ast::StmtKind::Semi(ref e) | ast::StmtKind::Expr(ref e) => match e.node {
+            ast::ExprKind::If(..) => true,
+            _ => false,
         },
         _ => false,
-    }
-}
-
-fn block_last_stmt_is_if(block: &ast::Block) -> bool {
-    if let Some(ref stmt) = block.stmts.last() {
-        stmt_is_if(stmt)
-    } else {
-        false
     }
 }
 
