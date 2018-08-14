@@ -984,6 +984,11 @@ mod test {
     }
 
     #[test]
+    fn test_impl_only_use() {
+        assert_eq!(parse_use_tree("a::b as _").normalize(), parse_use_tree(""));
+    }
+
+    #[test]
     fn test_use_tree_ord() {
         assert!(parse_use_tree("a").normalize() < parse_use_tree("aa").normalize());
         assert!(parse_use_tree("a").normalize() < parse_use_tree("a::a").normalize());
