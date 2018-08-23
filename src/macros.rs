@@ -29,7 +29,7 @@ use syntax::parse::token::{BinOpToken, DelimToken, Token};
 use syntax::print::pprust;
 use syntax::symbol;
 use syntax::tokenstream::{Cursor, ThinTokenStream, TokenStream, TokenTree};
-use syntax::util::ThinVec;
+use syntax::ThinVec;
 use syntax::{ast, ptr};
 
 use codemap::SpanUtils;
@@ -1277,20 +1277,22 @@ impl MacroBranch {
         let body_indent = if has_block_body {
             shape.indent
         } else {
-            // We'll hack the indent below, take this into account when formatting,
-            let body_indent = shape.indent.block_indent(&config);
-            let new_width = config.max_width() - body_indent.width();
-            config.set().max_width(new_width);
-            body_indent
+            shape.indent.block_indent(&config)
         };
+        let new_width = config.max_width() - body_indent.width();
+        config.set().max_width(new_width);
 
         // First try to format as items, then as statements.
         let new_body = match ::format_snippet(&body_str, &config) {
             Some(new_body) => new_body,
-            None => match ::format_code_block(&body_str, &config) {
-                Some(new_body) => new_body,
-                None => return None,
-            },
+            None => {
+                let new_width = new_width + config.tab_spaces();
+                config.set().max_width(new_width);
+                match ::format_code_block(&body_str, &config) {
+                    Some(new_body) => new_body,
+                    None => return None,
+                }
+            }
         };
         let new_body = wrap_str(new_body, config.max_width(), shape)?;
 
