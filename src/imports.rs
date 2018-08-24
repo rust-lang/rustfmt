@@ -348,7 +348,10 @@ impl UseTree {
             UseTreeKind::Simple(ref rename, ..) => {
                 let name = rewrite_ident(context, path_to_imported_ident(&a.prefix)).to_owned();
                 let alias = rename.and_then(|ident| {
-                    if ident == path_to_imported_ident(&a.prefix) {
+                    if ident.name == "_" {
+                        // for impl-only-use
+                        Some("_".to_owned())
+                    } else if ident == path_to_imported_ident(&a.prefix) {
                         None
                     } else {
                         Some(rewrite_ident(context, ident).to_owned())
@@ -976,11 +979,6 @@ mod test {
             parse_use_tree("a::{b as bar, c::self}").normalize(),
             parse_use_tree("a::{b as bar, c}")
         );
-    }
-
-    #[test]
-    fn test_impl_only_use() {
-        assert_eq!(parse_use_tree("a::b as _").normalize(), parse_use_tree(""));
     }
 
     #[test]
