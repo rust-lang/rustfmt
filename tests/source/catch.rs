@@ -1,27 +1,27 @@
-#![feature(catch_expr)]
+#![feature(try_blocks)]
 
 fn main() {
-    let x = do catch {
+    let x = try {
         foo()?
     };
 
-    let x = do catch /* Invisible comment */ { foo()? };
+    let x = try /* Invisible comment */ { foo()? };
 
-    let x = do catch {
+    let x = try {
         unsafe { foo()? }
     };
 
-    let y = match (do catch {
+    let y = match (try {
         foo()?
     }) {
         _ => (),
     };
 
-    do catch {
+    try {
         foo()?;
     };
 
-    do catch {
-        // Regular do catch block
+    try {
+        // Regular try block
     };
 }

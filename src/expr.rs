@@ -320,7 +320,7 @@ pub fn format_expr(
         ast::ExprKind::TryBlock(ref block) => {
             if let rw @ Some(_) = rewrite_single_line_block(
                 context,
-                "do catch ",
+                "try ",
                 block,
                 Some(&expr.attrs),
                 None,
@@ -328,11 +328,11 @@ pub fn format_expr(
             ) {
                 rw
             } else {
-                // 9 = `do catch `
+                // 9 = `try `
                 let budget = shape.width.saturating_sub(9);
                 Some(format!(
                     "{}{}",
-                    "do catch ",
+                    "try ",
                     rewrite_block(
                         block,
                         Some(&expr.attrs),
