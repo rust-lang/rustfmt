@@ -317,7 +317,7 @@ pub fn format_expr(
         // We do not format these expressions yet, but they should still
         // satisfy our width restrictions.
         ast::ExprKind::InlineAsm(..) => Some(context.snippet(expr.span).to_owned()),
-        ast::ExprKind::Catch(ref block) => {
+        ast::ExprKind::TryBlock(ref block) => {
             if let rw @ Some(_) = rewrite_single_line_block(
                 context,
                 "do catch ",
