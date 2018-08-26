@@ -318,14 +318,9 @@ pub fn format_expr(
         // satisfy our width restrictions.
         ast::ExprKind::InlineAsm(..) => Some(context.snippet(expr.span).to_owned()),
         ast::ExprKind::TryBlock(ref block) => {
-            if let rw @ Some(_) = rewrite_single_line_block(
-                context,
-                "try ",
-                block,
-                Some(&expr.attrs),
-                None,
-                shape,
-            ) {
+            if let rw @ Some(_) =
+                rewrite_single_line_block(context, "try ", block, Some(&expr.attrs), None, shape)
+            {
                 rw
             } else {
                 // 9 = `try `
