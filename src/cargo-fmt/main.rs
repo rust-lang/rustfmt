@@ -49,21 +49,9 @@ fn execute() -> i32 {
         "specify package to format (only usable in workspaces)",
         "<package>",
     );
+    opts.optopt("", "manifest-path", "Path to Cargo.toml", "<PATH>");
     opts.optflag("", "version", "print rustfmt version and exit");
     opts.optflag("", "all", "format all packages (only usable in workspaces)");
-
-    // If there is any invalid argument passed to `cargo fmt`, return without formatting.
-    let mut is_package_arg = false;
-    for arg in env::args().skip(2).take_while(|a| a != "--") {
-        if arg.starts_with('-') {
-            is_package_arg = arg.starts_with("--package");
-        } else if !is_package_arg {
-            print_usage_to_stderr(&opts, &format!("Invalid argument: `{}`.", arg));
-            return FAILURE;
-        } else {
-            is_package_arg = false;
-        }
-    }
 
     let matches = match opts.parse(env::args().skip(1).take_while(|a| a != "--")) {
         Ok(m) => m,
@@ -72,6 +60,12 @@ fn execute() -> i32 {
             return FAILURE;
         }
     };
+
+    let invalid_arguments: Vec<&String> = matches.free.iter().take_while(|a| a.to_string() != "--").collect();
+    if !invalid_arguments.is_empty() {
+        print_usage_to_stderr(&opts, &format!("Invalid arguments: {}", matches.free.join(" ")));
+        return FAILURE;
+    }
 
     let verbosity = match (matches.opt_present("v"), matches.opt_present("q")) {
         (false, false) => Verbosity::Normal,
@@ -92,8 +86,12 @@ fn execute() -> i32 {
         return handle_command_status(get_version(verbosity), &opts);
     }
 
+    let manifest_path = matches
+        .opt_str("manifest-path")
+        .map(|path| PathBuf::from(path));
+    let manifest_path = manifest_path.as_ref().map(AsRef::as_ref);
     let strategy = CargoFmtStrategy::from_matches(&matches);
-    handle_command_status(format_crate(verbosity, &strategy), &opts)
+    handle_command_status(format_crate(verbosity, &strategy, manifest_path), &opts)
 }
 
 macro_rules! print_usage {
@@ -145,6 +143,7 @@ fn get_version(verbosity: Verbosity) -> Result<ExitStatus, io::Error> {
 fn format_crate(
     verbosity: Verbosity,
     strategy: &CargoFmtStrategy,
+    manifest_path: Option<&Path>,
 ) -> Result<ExitStatus, io::Error> {
     let rustfmt_args = get_fmt_args();
     let targets = if rustfmt_args
@@ -153,7 +152,7 @@ fn format_crate(
     {
         HashSet::new()
     } else {
-        get_targets(strategy)?
+        get_targets(manifest_path, strategy)?
     };
 
     // Currently only bin and lib files get formatted
@@ -231,13 +230,20 @@ impl CargoFmtStrategy {
 }
 
 /// Based on the specified `CargoFmtStrategy`, returns a set of main source files.
-fn get_targets(strategy: &CargoFmtStrategy) -> Result<HashSet<Target>, io::Error> {
+fn get_targets(
+    manifest_path: Option<&Path>,
+    strategy: &CargoFmtStrategy,
+) -> Result<HashSet<Target>, io::Error> {
     let mut targets = HashSet::new();
 
     match *strategy {
-        CargoFmtStrategy::Root => get_targets_root_only(&mut targets)?,
-        CargoFmtStrategy::All => get_targets_recursive(None, &mut targets, &mut HashSet::new())?,
-        CargoFmtStrategy::Some(ref hitlist) => get_targets_with_hitlist(hitlist, &mut targets)?,
+        CargoFmtStrategy::Root => get_targets_root_only(manifest_path, &mut targets)?,
+        CargoFmtStrategy::All => {
+            get_targets_recursive(manifest_path, &mut targets, &mut HashSet::new())?
+        }
+        CargoFmtStrategy::Some(ref hitlist) => {
+            get_targets_with_hitlist(manifest_path, hitlist, &mut targets)?
+        }
     }
 
     if targets.is_empty() {
@@ -250,8 +256,11 @@ fn get_targets(strategy: &CargoFmtStrategy) -> Result<HashSet<Target>, io::Error
     }
 }
 
-fn get_targets_root_only(targets: &mut HashSet<Target>) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(None)?;
+fn get_targets_root_only(
+    manifest_path: Option<&Path>,
+    targets: &mut HashSet<Target>,
+) -> Result<(), io::Error> {
+    let metadata = get_cargo_metadata(manifest_path)?;
     let current_dir = env::current_dir()?.canonicalize()?;
     let current_dir_manifest = current_dir.join("Cargo.toml");
     let workspace_root_path = PathBuf::from(&metadata.workspace_root).canonicalize()?;
@@ -301,10 +310,11 @@ fn get_targets_recursive(
 }
 
 fn get_targets_with_hitlist(
+    manifest_path: Option<&Path>,
     hitlist: &[String],
     targets: &mut HashSet<Target>,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(None)?;
+    let metadata = get_cargo_metadata(manifest_path)?;
 
     let mut workspace_hitlist: HashSet<&String> = HashSet::from_iter(hitlist);
 
