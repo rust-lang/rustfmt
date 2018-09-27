@@ -73,6 +73,7 @@ impl<'a> CommentStyle<'a> {
         }
     }
 
+    /// Returns true if the commenting style is for documentation.
     pub fn is_doc_comment(&self) -> bool {
         match *self {
             CommentStyle::TripleSlash | CommentStyle::Doc => true,
@@ -1619,7 +1620,7 @@ mod test {
         );
         check("sup // sup", "p", Some(2));
         check("sup", "x", None);
-        check(r#"π? /**/ π is nice!"#, r#"π is nice"#, Some(9));
+        check(r#"Ï? /**/ Ï is nice!"#, r#"Ï is nice"#, Some(9));
         check("/*sup yo? \n sup*/ sup", "p", Some(20));
         check("hel/*lohello*/lo", "hello", None);
         check("acb", "ab", None);
