@@ -510,13 +510,13 @@ fn rewrite_comment_inner(
     for (i, (line, has_leading_whitespace)) in lines.enumerate() {
         let is_last = i == count_newlines(orig);
 
-        if code_block_attr.is_some() {
+        if let Some(ref attr) = code_block_attr {
             if line.starts_with("```") {
-                result.push_str(&comment_line_separator);
-                let code_block = match code_block_attr.unwrap() {
+                let code_block = match attr {
                     CodeBlockAttribute::Ignore | CodeBlockAttribute::Text => {
                         trim_custom_comment_prefix(&code_block_buffer)
                     }
+                    _ if code_block_buffer.is_empty() => String::new(),
                     _ => {
                         let mut config = config.clone();
                         config.set().wrap_comments(false);
@@ -526,7 +526,10 @@ fn rewrite_comment_inner(
                         }
                     }
                 };
-                result.push_str(&join_code_block_with_comment_line_separator(&code_block));
+                if !code_block.is_empty() {
+                    result.push_str(&comment_line_separator);
+                    result.push_str(&join_code_block_with_comment_line_separator(&code_block));
+                }
                 code_block_buffer.clear();
                 result.push_str(&comment_line_separator);
                 result.push_str(line);
