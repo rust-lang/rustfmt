@@ -415,6 +415,15 @@ fn format_code_block(code_snippet: &str, config: &Config) -> Option<String> {
     // Trim "fn main() {" on the first line and "}" on the last line,
     // then unindent the whole code block.
     let block_len = formatted.rfind('}').unwrap_or(formatted.len());
+
+    // In case we are formatting an empty block, the code will be
+    // simplified (e.g removing unnecessary newline characters) so in
+    // this case we need to not try to extract the inexisting inner
+    // code block.
+    if !formatted.starts_with(FN_MAIN_PREFIX) {
+        return None;
+    }
+
     let mut is_indented = true;
     for (kind, ref line) in LineClasses::new(&formatted[FN_MAIN_PREFIX.len()..block_len]) {
         if !is_first {
