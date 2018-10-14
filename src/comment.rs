@@ -582,7 +582,7 @@ fn rewrite_comment_inner(
             match rewrite_string(
                 &item_block_buffer.replace("\n", " "),
                 &item_fmt,
-                max_chars - ib.indent,
+                max_chars.saturating_sub(ib.indent),
             ) {
                 Some(s) => result.push_str(&join_block(
                     &s,
@@ -726,7 +726,7 @@ fn rewrite_comment_inner(
         match rewrite_string(
             &item_block_buffer.replace("\n", " "),
             &item_fmt,
-            max_chars - ib.indent,
+            max_chars.saturating_sub(ib.indent),
         ) {
             Some(s) => result.push_str(&join_block(
                 &s,
