@@ -376,7 +376,8 @@ fn format_snippet(snippet: &str, config: &Config) -> Option<String> {
             Some(out)
         }
     })
-    .ok()??;
+    .ok()??; // The first try operator handles the error from catch_unwind,
+             // whereas the second one handles None from the closure.
     String::from_utf8(out).ok()
 }
 
