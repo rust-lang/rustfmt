@@ -59,16 +59,14 @@ enum Operation {
     },
     /// Print the help message.
     Help(HelpOp),
-    // Print version information
+    /// Interactive mode for initializing the configuration for rustfmt
+    Init,
+    /// Print version information
     Version,
     /// Output default config to a file, or stdout if None
-    ConfigOutputDefault {
-        path: Option<String>,
-    },
+    ConfigOutputDefault { path: Option<String> },
     /// No file specified, read from stdin
-    Stdin {
-        input: String,
-    },
+    Stdin { input: String },
 }
 
 /// Arguments to `--help`
@@ -86,6 +84,11 @@ fn make_opts() -> Options {
         "check",
         "Run in 'check' mode. Exits with 0 if input is formatted correctly. Exits \
          with 1 and prints a diff if formatting is required.",
+    );
+    opts.optflag(
+        "",
+        "init",
+        "Setup rustfmt configuration in an interactive mode",
     );
     let is_nightly = is_nightly();
     let emit_opts = if is_nightly {
@@ -182,6 +185,7 @@ fn execute(opts: &Options) -> Result<i32, failure::Error> {
             print_version();
             Ok(0)
         }
+        Operation::Init => Config::init_config(),
         Operation::ConfigOutputDefault { path } => {
             let toml = Config::default().all_options().to_toml().map_err(err_msg)?;
             if let Some(path) = path {
@@ -376,7 +380,7 @@ fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
             return Ok(Operation::Help(HelpOp::None));
         } else if topic == Some("config".to_owned()) {
             return Ok(Operation::Help(HelpOp::Config));
-        } else if topic == Some("file-lines".to_owned()) {
+        } else if topic == Some("init".to_owned()) {
             return Ok(Operation::Help(HelpOp::FileLines));
         } else {
             println!("Unknown help topic: `{}`\n", topic.unwrap());
@@ -395,6 +399,10 @@ fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
                 println!("WARNING: PATH required for `--print-config minimal`");
             }
         }
+    }
+
+    if matches.opt_present("init") {
+        return Ok(Operation::Init);
     }
 
     if matches.opt_present("version") {
