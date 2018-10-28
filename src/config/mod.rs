@@ -27,6 +27,7 @@ pub mod config_type;
 pub mod options;
 
 pub mod file_lines;
+pub mod interactive;
 pub mod license;
 pub mod lists;
 
@@ -183,7 +184,7 @@ pub fn load_config<O: CliOptions>(
 // Check for the presence of known config file names (`rustfmt.toml, `.rustfmt.toml`) in `dir`
 //
 // Return the path if a config file exists, empty if no file exists, and Error for IO errors
-fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
+pub fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
     const CONFIG_FILE_NAMES: [&str; 2] = [".rustfmt.toml", "rustfmt.toml"];
     for config_file_name in &CONFIG_FILE_NAMES {
         let config_file = dir.join(config_file_name);

@@ -85,11 +85,6 @@ fn make_opts() -> Options {
         "Run in 'check' mode. Exits with 0 if input is formatted correctly. Exits \
          with 1 and prints a diff if formatting is required.",
     );
-    opts.optflag(
-        "",
-        "init",
-        "Setup rustfmt configuration in an interactive mode",
-    );
     let is_nightly = is_nightly();
     let emit_opts = if is_nightly {
         "[files|stdout|coverage|checkstyle]"
@@ -121,6 +116,11 @@ fn make_opts() -> Options {
     );
 
     if is_nightly {
+        opts.optflag(
+            "",
+            "init",
+            "Setup rustfmt configuration in an interactive mode",
+        );
         opts.optflag(
             "",
             "unstable-features",
@@ -185,7 +185,7 @@ fn execute(opts: &Options) -> Result<i32, failure::Error> {
             print_version();
             Ok(0)
         }
-        Operation::Init => Config::init_config(),
+        Operation::Init => Config::interactive(),
         Operation::ConfigOutputDefault { path } => {
             let toml = Config::default().all_options().to_toml().map_err(err_msg)?;
             if let Some(path) = path {
@@ -380,7 +380,7 @@ fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
             return Ok(Operation::Help(HelpOp::None));
         } else if topic == Some("config".to_owned()) {
             return Ok(Operation::Help(HelpOp::Config));
-        } else if topic == Some("init".to_owned()) {
+        } else if topic == Some("file-lines".to_owned()) {
             return Ok(Operation::Help(HelpOp::FileLines));
         } else {
             println!("Unknown help topic: `{}`\n", topic.unwrap());

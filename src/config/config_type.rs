@@ -180,6 +180,9 @@ macro_rules! create_config {
             pub fn was_set(&self) -> ConfigWasSet {
                 ConfigWasSet(self)
             }
+            pub fn interactive<'a>() -> Result<i32, failure::Error> {
+                interactive::interactive_config()
+            }
 
             fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Config {
             $(
