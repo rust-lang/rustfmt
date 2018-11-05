@@ -73,7 +73,7 @@ create_config! {
 
     // Ordering
     reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
-    reorder_modules: bool, true, true, "Reorder module statements alphabetically in group";
+    reorder_modules: bool, false, true, "Reorder module statements alphabetically in group";
     reorder_impl_items: bool, false, false, "Reorder impl items";
 
     // Spaces around punctuation

@@ -1496,27 +1496,27 @@ Reorder `mod` declarations alphabetically in group.
 - **Possible values**: `true`, `false`
 - **Stable**: Yes
 
-#### `true` (default)
+#### `false`  (default)
 
 ```rust
-mod a;
 mod b;
+mod a;
 
-mod dolor;
-mod ipsum;
 mod lorem;
+mod ipsum;
+mod dolor;
 mod sit;
 ```
 
-#### `false`
+#### `true`
 
 ```rust
-mod b;
 mod a;
+mod b;
 
-mod lorem;
-mod ipsum;
 mod dolor;
+mod ipsum;
+mod lorem;
 mod sit;
 ```
 
