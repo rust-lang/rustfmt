@@ -156,7 +156,7 @@ fn return_macro_parse_failure_fallback(
     // rather than using "Visual" style, or another indentation style.
     let is_like_block_indent_style = context
         .snippet(span)
-        .split('\n')
+        .lines()
         .last()
         .map(|closing_line| {
             !closing_line.trim().chars().any(|ch| match ch {
