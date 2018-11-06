@@ -146,7 +146,7 @@ fn rewrite_macro_name(
 // Use this on failing to format the macro call.
 fn return_macro_parse_failure_fallback(
     context: &RewriteContext,
-    indent: &Indent,
+    indent: Indent,
     span: Span,
 ) -> Option<String> {
     // Mark this as a failure however we format it
@@ -261,7 +261,7 @@ pub fn rewrite_macro_inner(
             match parse_macro_arg(&mut parser) {
                 Some(arg) => arg_vec.push(arg),
                 None => {
-                    return return_macro_parse_failure_fallback(context, &shape.indent, mac.span);
+                    return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
                 }
             }
 
@@ -285,17 +285,17 @@ pub fn rewrite_macro_inner(
                                 None => {
                                     return return_macro_parse_failure_fallback(
                                         context,
-                                        &shape.indent,
+                                        shape.indent,
                                         mac.span,
                                     );
                                 }
                             }
                         }
                     }
-                    return return_macro_parse_failure_fallback(context, &shape.indent, mac.span);
+                    return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
                 }
                 _ if arg_vec.last().map_or(false, MacroArg::is_item) => continue,
-                _ => return return_macro_parse_failure_fallback(context, &shape.indent, mac.span),
+                _ => return return_macro_parse_failure_fallback(context, shape.indent, mac.span),
             }
 
             parser.bump();
@@ -401,7 +401,7 @@ pub fn rewrite_macro_inner(
         }
         DelimToken::Brace => {
             // Skip macro invocations with braces, for now.
-            trim_left_preserve_layout(context.snippet(mac.span), &shape.indent, &context.config)
+            trim_left_preserve_layout(context.snippet(mac.span), shape.indent, &context.config)
         }
         _ => unreachable!(),
     }
