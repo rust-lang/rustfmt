@@ -159,9 +159,9 @@ fn return_macro_parse_failure_fallback(
         .lines()
         .last()
         .map(|closing_line| {
-            !closing_line.trim().chars().any(|ch| match ch {
-                '}' | ')' | ']' => false,
-                _ => true,
+            closing_line.trim().chars().all(|ch| match ch {
+                '}' | ')' | ']' => true,
+                _ => false,
             })
         })
         .unwrap_or(false);
