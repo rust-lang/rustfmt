@@ -313,7 +313,7 @@ fn identify_comment(
             let mut closing_symbol_offset = 0;
             let mut hbl = false;
             let mut first = true;
-            for mut line in orig.lines() {
+            for line in orig.lines() {
                 closing_symbol_offset += compute_len(&orig[closing_symbol_offset..], line);
                 let mut trimmed_line = line.trim_left();
                 if !trimmed_line.starts_with('*')
