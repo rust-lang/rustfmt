@@ -289,6 +289,19 @@ where
 {
     debug!("format_function_type {:#?}", shape);
 
+    let ty_shape = match context.config.indent_style() {
+        // 4 = " -> "
+        IndentStyle::Block => shape.offset_left(4)?,
+        IndentStyle::Visual => shape.block_left(4)?,
+    };
+    let output = match *output {
+        FunctionRetTy::Ty(ref ty) => {
+            let type_str = ty.rewrite(context, ty_shape)?;
+            format!(" -> {}", type_str)
+        }
+        FunctionRetTy::Default(..) => String::new(),
+    };
+
     // Code for handling variadics is somewhat duplicated for items, but they
     // are different enough to need some serious refactoring to share code.
     enum ArgumentKind<T>
@@ -345,12 +358,16 @@ where
 
     let item_vec: Vec<_> = items.collect();
 
-    let tactic = definitive_tactic(
-        &*item_vec,
-        ListTactic::HorizontalVertical,
-        Separator::Comma,
-        budget,
-    );
+    let tactic = if output.contains('\n') {
+        DefinitiveListTactic::Vertical
+    } else {
+        definitive_tactic(
+            &*item_vec,
+            ListTactic::HorizontalVertical,
+            Separator::Comma,
+            shape.width.saturating_sub(2 + output.len()),
+        )
+    };
     let trailing_separator = if !context.use_block_indent() || variadic {
         SeparatorTactic::Never
     } else {
@@ -364,22 +381,7 @@ where
         .preserve_newline(true);
     let list_str = write_list(&item_vec, &fmt)?;
 
-    let ty_shape = match context.config.indent_style() {
-        // 4 = " -> "
-        IndentStyle::Block => shape.offset_left(4)?,
-        IndentStyle::Visual => shape.block_left(4)?,
-    };
-    let output = match *output {
-        FunctionRetTy::Ty(ref ty) => {
-            let type_str = ty.rewrite(context, ty_shape)?;
-            format!(" -> {}", type_str)
-        }
-        FunctionRetTy::Default(..) => String::new(),
-    };
-
-    let args = if (!list_str.contains('\n') || list_str.is_empty()) && !output.contains('\n')
-        || !context.use_block_indent()
-    {
+    let args = if tactic == DefinitiveListTactic::Horizontal || !context.use_block_indent() {
         format!("({})", list_str)
     } else {
         format!(
