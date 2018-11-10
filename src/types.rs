@@ -320,19 +320,18 @@ where
         None
     };
 
-    // 2 for ()
-    let budget = shape.width.checked_sub(2)?;
-    // 1 for (
-    let offset = match context.config.indent_style() {
-        IndentStyle::Block => {
-            shape
-                .block()
-                .block_indent(context.config.tab_spaces())
-                .indent
-        }
-        IndentStyle::Visual => shape.indent + 1,
+    let list_shape = if context.use_block_indent() {
+        Shape::indented(
+            shape.block().indent.block_indent(context.config),
+            context.config,
+        )
+    } else {
+        // 2 for ()
+        let budget = shape.width.checked_sub(2)?;
+        let offset = shape.indent + 1;
+        // 1 for (
+        Shape::legacy(budget, offset)
     };
-    let list_shape = Shape::legacy(budget, offset);
     let list_lo = context.snippet_provider.span_after(span, "(");
     let items = itemize_list(
         context.snippet_provider,
@@ -386,7 +385,7 @@ where
     } else {
         format!(
             "({}{}{})",
-            offset.to_string_with_newline(context.config),
+            list_shape.indent.to_string_with_newline(context.config),
             list_str,
             shape.block().indent.to_string_with_newline(context.config),
         )
@@ -397,7 +396,7 @@ where
         Some(format!(
             "{}\n{}{}",
             args,
-            offset.to_string(context.config),
+            list_shape.indent.to_string(context.config),
             output.trim_left()
         ))
     }
