@@ -328,8 +328,8 @@ where
     } else {
         // 2 for ()
         let budget = shape.width.checked_sub(2)?;
-        let offset = shape.indent + 1;
         // 1 for (
+        let offset = shape.indent + 1;
         Shape::legacy(budget, offset)
     };
     let list_lo = context.snippet_provider.span_after(span, "(");
@@ -357,6 +357,8 @@ where
 
     let item_vec: Vec<_> = items.collect();
 
+    // If the return type is multi-lined, then force to use multiple lines for
+    // arguments as well.
     let tactic = if output.contains('\n') {
         DefinitiveListTactic::Vertical
     } else {
