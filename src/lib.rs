@@ -21,6 +21,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate regex;
+extern crate rustc_data_structures;
 extern crate rustc_target;
 extern crate serde;
 #[macro_use]

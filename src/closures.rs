@@ -9,6 +9,7 @@
 // except according to those terms.
 
 use config::lists::*;
+use rustc_data_structures::indexed_vec::Idx;
 use syntax::parse::classify;
 use syntax::source_map::Span;
 use syntax::{ast, ptr};

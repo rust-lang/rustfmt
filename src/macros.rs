@@ -22,6 +22,7 @@
 use std::collections::HashMap;
 
 use config::lists::*;
+use rustc_data_structures::indexed_vec::Idx;
 use syntax::parse::new_parser_from_tts;
 use syntax::parse::parser::Parser;
 use syntax::parse::token::{BinOpToken, DelimToken, Token};
@@ -1102,7 +1103,6 @@ fn next_space(tok: &Token) -> SpaceState {
         | Token::DotDot
         | Token::DotDotDot
         | Token::DotDotEq
-        | Token::DotEq
         | Token::Question => SpaceState::Punctuation,
 
         Token::ModSep
