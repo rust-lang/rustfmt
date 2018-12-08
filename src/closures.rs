@@ -150,11 +150,11 @@ fn rewrite_closure_with_block(
 
     let block = ast::Block {
         stmts: vec![ast::Stmt {
-            id: ast::NodeId::new(0),
+            id: ast::NodeId::from_u32(0),
             node: ast::StmtKind::Expr(ptr::P(body.clone())),
             span: body.span,
         }],
-        id: ast::NodeId::new(0),
+        id: ast::NodeId::from_u32(0),
         rules: ast::BlockCheckMode::Default,
         span: body.span,
         recovered: false,
