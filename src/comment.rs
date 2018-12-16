@@ -367,22 +367,27 @@ fn identify_comment(
     if rest.is_empty() {
         Some(rewritten_first_group)
     } else {
-        identify_comment(rest.trim_start(), block_style, shape, config, is_doc_comment).map(
-            |rest_str| {
-                format!(
-                    "{}\n{}{}{}",
-                    rewritten_first_group,
-                    // insert back the blank line
-                    if has_bare_lines && style.is_line_comment() {
-                        "\n"
-                    } else {
-                        ""
-                    },
-                    shape.indent.to_string(config),
-                    rest_str
-                )
-            },
+        identify_comment(
+            rest.trim_start(),
+            block_style,
+            shape,
+            config,
+            is_doc_comment,
         )
+        .map(|rest_str| {
+            format!(
+                "{}\n{}{}{}",
+                rewritten_first_group,
+                // insert back the blank line
+                if has_bare_lines && style.is_line_comment() {
+                    "\n"
+                } else {
+                    ""
+                },
+                shape.indent.to_string(config),
+                rest_str
+            )
+        })
     }
 }
 
