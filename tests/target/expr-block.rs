@@ -1,4 +1,3 @@
-// rustfmt-indent_style: Block
 // Test expressions with block formatting.
 
 fn arrays() {
@@ -74,7 +73,7 @@ fn arrays() {
 
 fn function_calls() {
     let items = itemize_list(
-        context.codemap,
+        context.source_map,
         args.iter(),
         ")",
         |item| item.span.lo(),
@@ -93,7 +92,7 @@ fn function_calls() {
     );
 
     itemize_list(
-        context.codemap,
+        context.source_map,
         args.iter(),
         ")",
         |item| item.span.lo(),
@@ -277,6 +276,23 @@ fn issue_1862() {
         /* baz = */ None,
         /* This comment waaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long to be kept on the same line */
         None,
+        /* com */
+        this_last_arg_is_tooooooooooooooooooooooooooooooooo_long_to_be_kept_with_the_pre_comment,
+    )
+}
+
+fn issue_3025() {
+    foo(
+        // This describes the argument below.
+        /* bar = */ None,
+        // This describes the argument below.
+        something_something,
+        // This describes the argument below. */
+        None,
+        // This describes the argument below.
+        /* This comment waaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long to be kept on the same line */
+        None,
+        // This describes the argument below.
         /* com */
         this_last_arg_is_tooooooooooooooooooooooooooooooooo_long_to_be_kept_with_the_pre_comment,
     )

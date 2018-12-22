@@ -1,4 +1,3 @@
-// rustfmt-normalize_comments: true
 // rustfmt-use_small_heuristics: Off
 // Test chain formatting.
 
@@ -57,7 +56,8 @@ fn main() {
     body.fold(Body::new(), |mut body, chunk| {
         body.extend(chunk);
         Ok(body)
-    }).and_then(move |body| {
+    })
+    .and_then(move |body| {
         let req = Request::from_parts(parts, body);
         f(req).map_err(|_| io::Error::new(io::ErrorKind::Other, ""))
     });
@@ -79,14 +79,16 @@ fn floaters() {
     let x = Foo {
         field1: val1,
         field2: val2,
-    }.method_call()
-        .method_call();
+    }
+    .method_call()
+    .method_call();
 
     let y = if cond {
         val1
     } else {
         val2
-    }.method_call();
+    }
+    .method_call();
 
     {
         match x {
@@ -94,9 +96,10 @@ fn floaters() {
                 // params are 1-indexed
                 stack.push(
                     mparams[match cur.to_digit(10) {
-                                Some(d) => d as usize - 1,
-                                None => return Err("bad param number".to_owned()),
-                            }].clone(),
+                        Some(d) => d as usize - 1,
+                        None => return Err("bad param number".to_owned()),
+                    }]
+                    .clone(),
                 );
             }
         }
@@ -106,30 +109,34 @@ fn floaters() {
         some();
     } else {
         none();
-    }.bar()
-        .baz();
+    }
+    .bar()
+    .baz();
 
     Foo {
         x: val,
-    }.baz(|| {
+    }
+    .baz(|| {
         force();
         multiline();
     })
-        .quux();
+    .quux();
 
     Foo {
         y: i_am_multi_line,
         z: ok,
-    }.baz(|| {
+    }
+    .baz(|| {
         force();
         multiline();
     })
-        .quux();
+    .quux();
 
     a + match x {
         true => "yay!",
         false => "boo!",
-    }.bar()
+    }
+    .bar()
 }
 
 fn is_replaced_content() -> bool {
@@ -189,7 +196,8 @@ fn issue1392() {
         else {
             b();
         }
-        "#.trim(),
+        "#
+        .trim(),
     );
 }
 
@@ -253,6 +261,46 @@ fn issue2415() {
         Ok((|| {
             // stuff
             Some(value.to_string())
-        })().ok_or("")?)
-    })().unwrap_or_else(|_: Box<::std::error::Error>| String::from(""));
+        })()
+        .ok_or("")?)
+    })()
+    .unwrap_or_else(|_: Box<::std::error::Error>| String::from(""));
+}
+
+impl issue_2786 {
+    fn thing(&self) {
+        foo(|a| {
+            println!("a");
+            println!("b");
+        })
+        .bar(|c| {
+            println!("a");
+            println!("b");
+        })
+        .baz(|c| {
+            println!("a");
+            println!("b");
+        })
+    }
+}
+
+fn issue_2773() {
+    let bar = Some(0);
+    bar.or_else(|| {
+        // do stuff
+        None
+    })
+    .or_else(|| {
+        // do other stuff
+        None
+    })
+    .and_then(|val| {
+        // do this stuff
+        None
+    });
+}
+
+fn issue_3034() {
+    disallowed_headers.iter().any(|header| *header == name)
+        || disallowed_header_prefixes.iter().any(|prefix| name.starts_with(prefix))
 }

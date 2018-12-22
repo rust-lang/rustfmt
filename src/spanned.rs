@@ -8,15 +8,31 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use syntax::ast;
-use syntax::codemap::Span;
+use syntax::{
+    ast, ptr,
+    source_map::{self, Span},
+};
 
 use macros::MacroArg;
 use utils::{mk_sp, outer_attributes};
 
+use std::cmp::max;
+
 /// Spanned returns a span including attributes, if available.
 pub trait Spanned {
     fn span(&self) -> Span;
+}
+
+impl<T: Spanned> Spanned for ptr::P<T> {
+    fn span(&self) -> Span {
+        (**self).span()
+    }
+}
+
+impl<T> Spanned for source_map::Spanned<T> {
+    fn span(&self) -> Span {
+        self.span
+    }
 }
 
 macro_rules! span_with_attrs_lo_hi {
@@ -110,10 +126,25 @@ impl Spanned for ast::Arg {
 
 impl Spanned for ast::GenericParam {
     fn span(&self) -> Span {
-        match *self {
-            ast::GenericParam::Lifetime(ref lifetime_def) => lifetime_def.span(),
-            ast::GenericParam::Type(ref ty) => ty.span(),
-        }
+        let lo = if self.attrs.is_empty() {
+            self.ident.span.lo()
+        } else {
+            self.attrs[0].span.lo()
+        };
+        let hi = if self.bounds.is_empty() {
+            self.ident.span.hi()
+        } else {
+            self.bounds.last().unwrap().span().hi()
+        };
+        let ty_hi = if let ast::GenericParamKind::Type {
+            default: Some(ref ty),
+        } = self.kind
+        {
+            ty.span().hi()
+        } else {
+            hi
+        };
+        mk_sp(lo, max(hi, ty_hi))
     }
 }
 
@@ -142,42 +173,21 @@ impl Spanned for ast::FunctionRetTy {
     }
 }
 
-impl Spanned for ast::TyParam {
-    fn span(&self) -> Span {
-        // Note that ty.span is the span for ty.ident, not the whole item.
-        let lo = if self.attrs.is_empty() {
-            self.ident.span.lo()
-        } else {
-            self.attrs[0].span.lo()
-        };
-        if let Some(ref def) = self.default {
-            return mk_sp(lo, def.span.hi());
-        }
-        if self.bounds.is_empty() {
-            return mk_sp(lo, self.ident.span.hi());
-        }
-        let hi = self.bounds[self.bounds.len() - 1].span().hi();
-        mk_sp(lo, hi)
-    }
-}
-
-impl Spanned for ast::TyParamBound {
+impl Spanned for ast::GenericArg {
     fn span(&self) -> Span {
         match *self {
-            ast::TyParamBound::TraitTyParamBound(ref ptr, _) => ptr.span,
-            ast::TyParamBound::RegionTyParamBound(ref l) => l.ident.span,
+            ast::GenericArg::Lifetime(ref lt) => lt.ident.span,
+            ast::GenericArg::Type(ref ty) => ty.span(),
         }
     }
 }
 
-impl Spanned for ast::LifetimeDef {
+impl Spanned for ast::GenericBound {
     fn span(&self) -> Span {
-        let hi = if self.bounds.is_empty() {
-            self.lifetime.ident.span.hi()
-        } else {
-            self.bounds[self.bounds.len() - 1].ident.span.hi()
-        };
-        mk_sp(self.lifetime.ident.span.lo(), hi)
+        match *self {
+            ast::GenericBound::Trait(ref ptr, _) => ptr.span,
+            ast::GenericBound::Outlives(ref l) => l.ident.span,
+        }
     }
 }
 

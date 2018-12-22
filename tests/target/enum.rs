@@ -1,5 +1,4 @@
 // rustfmt-wrap_comments: true
-// rustfmt-error_on_line_overflow: false
 // Enums test
 
 #[atrr]
@@ -146,8 +145,8 @@ pub enum Bencoding<'i> {
     Int(i64),
     List(Vec<Bencoding<'i>>),
     /// A bencoded dict value. The first element the slice of bytes in the
-    /// source that the dict is composed of. The second is the dict,
-    /// decoded into an ordered map.
+    /// source that the dict is composed of. The second is the dict, decoded
+    /// into an ordered map.
     // TODO make Dict "structlike" AKA name the two values.
     Dict(&'i [u8], BTreeMap<&'i [u8], Bencoding<'i>>),
 }
@@ -255,7 +254,10 @@ pub enum QlError {
     #[fail(display = "Translation error: from {} to {}", 0, 1)]
     TranslationError(String, String),
     // (kind, input, expected)
-    #[fail(display = "Could not find {}: Found: {}, expected: {:?}", 0, 1, 2)]
+    #[fail(
+        display = "aaaaaaaaaaaaCould not find {}: Found: {}, expected: {:?}",
+        0, 1, 2
+    )]
     ResolveError(&'static str, String, Option<String>),
 }
 

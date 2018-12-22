@@ -29,7 +29,6 @@ pub mod options;
 pub mod file_lines;
 pub mod license;
 pub mod lists;
-pub mod summary;
 
 /// This macro defines configuration options used in rustfmt. Each option
 /// is defined as follows:
@@ -40,19 +39,24 @@ create_config! {
     max_width: usize, 100, true, "Maximum width of each line";
     hard_tabs: bool, false, true, "Use tab characters for indentation, spaces for alignment";
     tab_spaces: usize, 4, true, "Number of spaces per tab";
-    newline_style: NewlineStyle, NewlineStyle::Unix, true, "Unix or Windows line endings";
+    newline_style: NewlineStyle, NewlineStyle::Auto, true, "Unix or Windows line endings";
     use_small_heuristics: Heuristics, Heuristics::Default, true, "Whether to use different \
-        formatting for items and expressions if they satisfy a heuristic notion of 'small'.";
-    indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items.";
+        formatting for items and expressions if they satisfy a heuristic notion of 'small'";
+    indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items";
 
-    // Comments and strings
+    // Comments. macros, and strings
     wrap_comments: bool, false, false, "Break comments to fit on the line";
+    format_doc_comments: bool, false, false, "Format doc comments.";
     comment_width: usize, 80, false,
         "Maximum length of comments. No effect unless wrap_comments = true";
     normalize_comments: bool, false, false, "Convert /* */ comments to // comments where possible";
+    normalize_doc_attributes: bool, false, false, "Normalize doc attributes as doc comments";
     license_template_path: String, String::default(), false,
         "Beginning of file must match license template";
     format_strings: bool, false, false, "Format string literals where necessary";
+    format_macro_matchers: bool, false, false,
+        "Format the metavariable matching patterns in macros";
+    format_macro_bodies: bool, true, false, "Format the bodies of macros";
 
     // Single line expressions and items
     empty_item_single_line: bool, true, false,
@@ -79,13 +83,17 @@ create_config! {
     space_after_colon: bool, true, false, "Leave a space after the colon";
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
     binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
-        "Where to put a binary operator when a binary expression goes multiline.";
+        "Where to put a binary operator when a binary expression goes multiline";
 
     // Misc.
-    remove_nested_parens: bool, true, true, "Remove nested parens.";
-    combine_control_expr: bool, true, false, "Combine control expressions with function calls.";
-    struct_field_align_threshold: usize, 0, false, "Align struct fields if their diffs fits within \
-                                             threshold.";
+    remove_nested_parens: bool, true, true, "Remove nested parens";
+    combine_control_expr: bool, true, false, "Combine control expressions with function calls";
+    overflow_delimited_expr: bool, false, false,
+        "Allow trailing bracket/brace delimited expressions to overflow";
+    struct_field_align_threshold: usize, 0, false,
+        "Align struct fields if their diffs fits within threshold";
+    enum_discrim_align_threshold: usize, 0, false,
+        "Align enum variants discrims, if their diffs fit within threshold";
     match_arm_blocks: bool, true, false, "Wrap the body of arms in blocks when it does not fit on \
         the same line with the pattern of arms";
     force_multiline_blocks: bool, false, false,
@@ -101,9 +109,11 @@ create_config! {
     match_block_trailing_comma: bool, false, false,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
     blank_lines_upper_bound: usize, 1, false,
-        "Maximum number of blank lines which can be put between items.";
+        "Maximum number of blank lines which can be put between items";
     blank_lines_lower_bound: usize, 0, false,
-        "Minimum number of blank lines which must be put between items.";
+        "Minimum number of blank lines which must be put between items";
+    edition: Edition, Edition::Edition2015, true, "The edition of the parser (RFC 2052)";
+    version: Version, Version::One, false, "Version of formatting rules";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -111,13 +121,13 @@ create_config! {
     use_field_init_shorthand: bool, false, true, "Use field initialization shorthand if possible";
     force_explicit_abi: bool, true, true, "Always print the abi for extern items";
     condense_wildcard_suffixes: bool, false, false, "Replace strings of _ wildcards by a single .. \
-                                              in tuple patterns";
+                                                     in tuple patterns";
 
     // Control options (changes the operation of rustfmt, rather than the formatting)
     color: Color, Color::Auto, false,
         "What Color option to use when none is supplied: Always, Never, Auto";
     required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
-        "Require a specific version of rustfmt.";
+        "Require a specific version of rustfmt";
     unstable_features: bool, false, false,
             "Enables unstable features. Only available on nightly channel";
     disable_all_formatting: bool, false, false, "Don't reformat anything";
@@ -132,7 +142,7 @@ create_config! {
     report_fixme: ReportTactic, ReportTactic::Never, false,
         "Report all, none or unnumbered occurrences of FIXME in source file comments";
     ignore: IgnoreList, IgnoreList::default(), false,
-        "Skip formatting the specified files and directories.";
+        "Skip formatting the specified files and directories";
 
     // Not user-facing
     verbose: Verbosity, Verbosity::Normal, false, "How much to information to emit to the user";

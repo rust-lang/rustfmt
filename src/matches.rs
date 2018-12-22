@@ -13,23 +13,23 @@
 use std::iter::repeat;
 
 use config::lists::*;
-use syntax::codemap::{BytePos, Span};
+use syntax::source_map::{BytePos, Span};
 use syntax::{ast, ptr};
 
-use codemap::SpanUtils;
-use comment::combine_strs_with_missing_comments;
-use config::{Config, ControlBraceStyle, IndentStyle};
+use comment::{combine_strs_with_missing_comments, rewrite_comment};
+use config::{Config, ControlBraceStyle, IndentStyle, Version};
 use expr::{
-    format_expr, is_empty_block, is_simple_block, is_unsafe_block, prefer_next_line,
-    rewrite_multiple_patterns, ExprType, RhsTactics, ToExpr,
+    format_expr, is_empty_block, is_simple_block, is_unsafe_block, prefer_next_line, rewrite_cond,
+    rewrite_multiple_patterns, ExprType, RhsTactics,
 };
 use lists::{itemize_list, write_list, ListFormatting};
 use rewrite::{Rewrite, RewriteContext};
 use shape::Shape;
+use source_map::SpanUtils;
 use spanned::Spanned;
 use utils::{
     contains_skip, extra_offset, first_line_width, inner_attributes, last_line_extendable, mk_sp,
-    ptr_vec_to_ref_vec, trimmed_last_line_width,
+    ptr_vec_to_ref_vec, semicolon_for_expr, trimmed_last_line_width,
 };
 
 /// A simple wrapper type against `ast::Arm`. Used inside `write_list()`.
@@ -68,7 +68,7 @@ impl<'a> Spanned for ArmWrapper<'a> {
 
 impl<'a> Rewrite for ArmWrapper<'a> {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
-        rewrite_match_arm(context, self.arm, shape, self.is_last, self.beginning_vert)
+        rewrite_match_arm(context, self.arm, shape, self.is_last)
     }
 }
 
@@ -215,18 +215,10 @@ fn rewrite_match_arms(
         false,
     );
     let arms_vec: Vec<_> = items.collect();
-    let fmt = ListFormatting {
-        tactic: DefinitiveListTactic::Vertical,
-        // We will add/remove commas inside `arm.rewrite()`, and hence no separator here.
-        separator: "",
-        trailing_separator: SeparatorTactic::Never,
-        separator_place: SeparatorPlace::Back,
-        shape: arm_shape,
-        ends_with_newline: true,
-        preserve_newline: true,
-        nested: false,
-        config: context.config,
-    };
+    // We will add/remove commas inside `arm.rewrite()`, and hence no separator here.
+    let fmt = ListFormatting::new(arm_shape, context.config)
+        .separator("")
+        .preserve_newline(true);
 
     write_list(&arms_vec, &fmt)
 }
@@ -236,11 +228,10 @@ fn rewrite_match_arm(
     arm: &ast::Arm,
     shape: Shape,
     is_last: bool,
-    beginning_vert: Option<BytePos>,
 ) -> Option<String> {
     let (missing_span, attrs_str) = if !arm.attrs.is_empty() {
         if contains_skip(&arm.attrs) {
-            let (_, body) = flatten_arm_body(context, &arm.body);
+            let (_, body) = flatten_arm_body(context, &arm.body, None);
             // `arm.span()` does not include trailing comma, add it manually.
             return Some(format!(
                 "{}{}",
@@ -256,76 +247,89 @@ fn rewrite_match_arm(
     } else {
         (mk_sp(arm.span().lo(), arm.span().lo()), String::new())
     };
-    let pats_str = rewrite_match_pattern(
+
+    // Patterns
+    // 5 = ` => {`
+    let pat_shape = shape.sub_width(5)?;
+    let pats_str = rewrite_multiple_patterns(context, &ptr_vec_to_ref_vec(&arm.pats), pat_shape)?;
+
+    // Guard
+    let block_like_pat = trimmed_last_line_width(&pats_str) <= context.config.tab_spaces();
+    let new_line_guard = pats_str.contains('\n') && !block_like_pat;
+    let guard_str = rewrite_guard(
         context,
-        &ptr_vec_to_ref_vec(&arm.pats),
         &arm.guard,
-        beginning_vert.is_some(),
         shape,
-    ).and_then(|pats_str| {
-        combine_strs_with_missing_comments(
-            context,
-            &attrs_str,
-            &pats_str,
-            missing_span,
-            shape,
-            false,
-        )
-    })?;
+        trimmed_last_line_width(&pats_str),
+        new_line_guard,
+    )?;
+
+    let lhs_str = combine_strs_with_missing_comments(
+        context,
+        &attrs_str,
+        &format!("{}{}", pats_str, guard_str),
+        missing_span,
+        shape,
+        false,
+    )?;
+
+    let arrow_span = mk_sp(arm.pats.last().unwrap().span.hi(), arm.body.span.lo());
     rewrite_match_body(
         context,
         &arm.body,
-        &pats_str,
+        &lhs_str,
         shape,
-        arm.guard.is_some(),
+        guard_str.contains('\n'),
+        arrow_span,
         is_last,
     )
 }
 
-fn rewrite_match_pattern(
+fn block_can_be_flattened<'a>(
     context: &RewriteContext,
-    pats: &[&ast::Pat],
-    guard: &Option<ptr::P<ast::Expr>>,
-    has_beginning_vert: bool,
-    shape: Shape,
-) -> Option<String> {
-    // Patterns
-    // 5 = ` => {`
-    // 2 = `| `
-    let pat_shape = shape
-        .sub_width(5)?
-        .offset_left(if has_beginning_vert { 2 } else { 0 })?;
-    let pats_str = rewrite_multiple_patterns(context, pats, pat_shape)?;
-    let beginning_vert = if has_beginning_vert { "| " } else { "" };
-
-    // Guard
-    let guard_str = rewrite_guard(context, guard, shape, trimmed_last_line_width(&pats_str))?;
-
-    Some(format!("{}{}{}", beginning_vert, pats_str, guard_str))
+    expr: &'a ast::Expr,
+) -> Option<&'a ast::Block> {
+    match expr.node {
+        ast::ExprKind::Block(ref block, _)
+            if !is_unsafe_block(block)
+                && is_simple_block(block, Some(&expr.attrs), context.source_map) =>
+        {
+            Some(&*block)
+        }
+        _ => None,
+    }
 }
 
 // (extend, body)
 // @extend: true if the arm body can be put next to `=>`
 // @body: flattened body, if the body is block with a single expression
-fn flatten_arm_body<'a>(context: &'a RewriteContext, body: &'a ast::Expr) -> (bool, &'a ast::Expr) {
-    match body.node {
-        ast::ExprKind::Block(ref block, _)
-            if !is_unsafe_block(block)
-                && is_simple_block(block, Some(&body.attrs), context.codemap) =>
-        {
-            if let ast::StmtKind::Expr(ref expr) = block.stmts[0].node {
-                (
-                    !context.config.force_multiline_blocks() && can_flatten_block_around_this(expr),
-                    &*expr,
-                )
+fn flatten_arm_body<'a>(
+    context: &'a RewriteContext,
+    body: &'a ast::Expr,
+    opt_shape: Option<Shape>,
+) -> (bool, &'a ast::Expr) {
+    let can_extend =
+        |expr| !context.config.force_multiline_blocks() && can_flatten_block_around_this(expr);
+
+    if let Some(ref block) = block_can_be_flattened(context, body) {
+        if let ast::StmtKind::Expr(ref expr) = block.stmts[0].node {
+            if let ast::ExprKind::Block(..) = expr.node {
+                flatten_arm_body(context, expr, None)
             } else {
-                (false, &*body)
+                let cond_becomes_muti_line = opt_shape
+                    .and_then(|shape| rewrite_cond(context, expr, shape))
+                    .map_or(false, |cond| cond.contains('\n'));
+                if cond_becomes_muti_line {
+                    (false, &*body)
+                } else {
+                    (can_extend(expr), &*expr)
+                }
             }
+        } else {
+            (false, &*body)
         }
-        _ => (
-            !context.config.force_multiline_blocks() && body.can_be_overflowed(context, 1),
-            &*body,
-        ),
+    } else {
+        (can_extend(body), &*body)
     }
 }
 
@@ -335,13 +339,18 @@ fn rewrite_match_body(
     pats_str: &str,
     shape: Shape,
     has_guard: bool,
+    arrow_span: Span,
     is_last: bool,
 ) -> Option<String> {
-    let (extend, body) = flatten_arm_body(context, body);
+    let (extend, body) = flatten_arm_body(
+        context,
+        body,
+        shape.offset_left(extra_offset(pats_str, shape) + 4),
+    );
     let (is_block, is_empty_block) = if let ast::ExprKind::Block(ref block, _) = body.node {
         (
             true,
-            is_empty_block(block, Some(&body.attrs), context.codemap),
+            is_empty_block(block, Some(&body.attrs), context.source_map),
         )
     } else {
         (false, false)
@@ -359,31 +368,61 @@ fn rewrite_match_body(
         Some(format!("{} =>{}{}{}", pats_str, block_sep, body_str, comma))
     };
 
-    let forbid_same_line = has_guard && pats_str.contains('\n') && !is_empty_block;
     let next_line_indent = if !is_block || is_empty_block {
         shape.indent.block_indent(context.config)
     } else {
         shape.indent
     };
+
+    let forbid_same_line = has_guard && pats_str.contains('\n') && !is_empty_block;
+
+    // Look for comments between `=>` and the start of the body.
+    let arrow_comment = {
+        let arrow_snippet = context.snippet(arrow_span).trim();
+        // search for the arrow starting from the end of the snippet since there may be a match
+        // expression within the guard
+        let arrow_index = arrow_snippet.rfind("=>").unwrap();
+        // 2 = `=>`
+        let comment_str = arrow_snippet[arrow_index + 2..].trim();
+        if comment_str.is_empty() {
+            String::new()
+        } else {
+            rewrite_comment(comment_str, false, shape, &context.config)?
+        }
+    };
+
     let combine_next_line_body = |body_str: &str| {
+        let nested_indent_str = next_line_indent.to_string_with_newline(context.config);
+
         if is_block {
-            return Some(format!(
-                "{} =>{}{}",
-                pats_str,
-                next_line_indent.to_string_with_newline(context.config),
-                body_str
-            ));
+            let mut result = pats_str.to_owned();
+            result.push_str(" =>");
+            if !arrow_comment.is_empty() {
+                result.push_str(&nested_indent_str);
+                result.push_str(&arrow_comment);
+            }
+            result.push_str(&nested_indent_str);
+            result.push_str(&body_str);
+            return Some(result);
         }
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
-        let nested_indent_str = next_line_indent.to_string_with_newline(context.config);
         let (body_prefix, body_suffix) = if context.config.match_arm_blocks() {
             let comma = if context.config.match_block_trailing_comma() {
                 ","
             } else {
                 ""
             };
-            ("{", format!("{}}}{}", indent_str, comma))
+            let semicolon = if context.config.version() == Version::One {
+                ""
+            } else {
+                if semicolon_for_expr(context, body) {
+                    ";"
+                } else {
+                    ""
+                }
+            };
+            ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
         } else {
             ("", String::from(","))
         };
@@ -391,14 +430,22 @@ fn rewrite_match_body(
         let block_sep = match context.config.control_brace_style() {
             ControlBraceStyle::AlwaysNextLine => format!("{}{}", alt_block_sep, body_prefix),
             _ if body_prefix.is_empty() => "".to_owned(),
-            _ if forbid_same_line => format!("{}{}", alt_block_sep, body_prefix),
+            _ if forbid_same_line || !arrow_comment.is_empty() => {
+                format!("{}{}", alt_block_sep, body_prefix)
+            }
             _ => format!(" {}", body_prefix),
         } + &nested_indent_str;
 
-        Some(format!(
-            "{} =>{}{}{}",
-            pats_str, block_sep, body_str, body_suffix
-        ))
+        let mut result = pats_str.to_owned();
+        result.push_str(" =>");
+        if !arrow_comment.is_empty() {
+            result.push_str(&indent_str);
+            result.push_str(&arrow_comment);
+        }
+        result.push_str(&block_sep);
+        result.push_str(&body_str);
+        result.push_str(&body_suffix);
+        Some(result)
     };
 
     // Let's try and get the arm body on the same line as the condition.
@@ -406,7 +453,9 @@ fn rewrite_match_body(
     let orig_body_shape = shape
         .offset_left(extra_offset(pats_str, shape) + 4)
         .and_then(|shape| shape.sub_width(comma.len()));
-    let orig_body = if let Some(body_shape) = orig_body_shape {
+    let orig_body = if forbid_same_line || !arrow_comment.is_empty() {
+        None
+    } else if let Some(body_shape) = orig_body_shape {
         let rewrite = nop_block_collapse(
             format_expr(body, ExprType::Statement, context, body_shape),
             body_shape.width,
@@ -414,9 +463,7 @@ fn rewrite_match_body(
 
         match rewrite {
             Some(ref body_str)
-                if !forbid_same_line
-                    && (is_block
-                        || (!body_str.contains('\n') && body_str.len() <= body_shape.width)) =>
+                if is_block || (!body_str.contains('\n') && body_str.len() <= body_shape.width) =>
             {
                 return combine_orig_body(body_str);
             }
@@ -435,8 +482,7 @@ fn rewrite_match_body(
     );
     match (orig_body, next_line_body) {
         (Some(ref orig_str), Some(ref next_line_str))
-            if forbid_same_line
-                || prefer_next_line(orig_str, next_line_str, RhsTactics::Default) =>
+            if prefer_next_line(orig_str, next_line_str, RhsTactics::Default) =>
         {
             combine_next_line_body(next_line_str)
         }
@@ -452,14 +498,23 @@ fn rewrite_match_body(
     }
 }
 
+impl Rewrite for ast::Guard {
+    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+        match self {
+            ast::Guard::If(ref expr) => expr.rewrite(context, shape),
+        }
+    }
+}
+
 // The `if ...` guard on a match arm.
 fn rewrite_guard(
     context: &RewriteContext,
-    guard: &Option<ptr::P<ast::Expr>>,
+    guard: &Option<ast::Guard>,
     shape: Shape,
     // The amount of space used up on this line for the pattern in
     // the arm (excludes offset).
     pattern_width: usize,
+    multiline_pattern: bool,
 ) -> Option<String> {
     if let Some(ref guard) = *guard {
         // First try to fit the guard string on the same line as the pattern.
@@ -467,10 +522,12 @@ fn rewrite_guard(
         let cond_shape = shape
             .offset_left(pattern_width + 4)
             .and_then(|s| s.sub_width(5));
-        if let Some(cond_shape) = cond_shape {
-            if let Some(cond_str) = guard.rewrite(context, cond_shape) {
-                if !cond_str.contains('\n') || pattern_width <= context.config.tab_spaces() {
-                    return Some(format!(" if {}", cond_str));
+        if !multiline_pattern {
+            if let Some(cond_shape) = cond_shape {
+                if let Some(cond_str) = guard.rewrite(context, cond_shape) {
+                    if !cond_str.contains('\n') || pattern_width <= context.config.tab_spaces() {
+                        return Some(format!(" if {}", cond_str));
+                    }
                 }
             }
         }
@@ -503,9 +560,9 @@ fn nop_block_collapse(block_str: Option<String>, budget: usize) -> Option<String
             && budget >= 2
             && (block_str[1..].find(|c: char| !c.is_whitespace()).unwrap() == block_str.len() - 2)
         {
-            "{}".to_owned()
+            String::from("{}")
         } else {
-            block_str.to_owned()
+            block_str
         }
     })
 }

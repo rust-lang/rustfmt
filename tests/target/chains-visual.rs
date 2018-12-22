@@ -1,4 +1,3 @@
-// rustfmt-normalize_comments: true
 // rustfmt-indent_style: Visual
 // Test chain formatting.
 
@@ -16,16 +15,16 @@ fn main() {
     // Test case where first chain element isn't a path, but is shorter than
     // the size of a tab.
     x().y(|| match cond() {
-        true => (),
-        false => (),
-    });
+           true => (),
+           false => (),
+       });
 
     loong_func().quux(move || if true { 1 } else { 2 });
 
     some_fuuuuuuuuunction().method_call_a(aaaaa, bbbbb, |c| {
-        let x = c;
-        x
-    });
+                               let x = c;
+                               x
+                           });
 
     some_fuuuuuuuuunction().method_call_a(aaaaa, bbbbb, |c| {
                                let x = c;
@@ -38,8 +37,8 @@ fn main() {
 
     fffffffffffffffffffffffffffffffffff(a, {
         SCRIPT_TASK_ROOT.with(|root| {
-                                  *root.borrow_mut() = Some(&script_task);
-                              });
+                            *root.borrow_mut() = Some(&script_task);
+                        });
     });
 
     let suuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuum =
@@ -48,19 +47,19 @@ fn main() {
                .fold(0, |acc, x| acc + x);
 
     aaaaaaaaaaaaaaaa.map(|x| {
-                             x += 1;
-                             x
-                         })
+                        x += 1;
+                        x
+                    })
                     .filter(some_mod::some_filter)
 }
 
 fn floaters() {
     let z = Foo { field1: val1,
-                  field2: val2, };
+                  field2: val2 };
 
     let x = Foo { field1: val1,
-                  field2: val2, }.method_call()
-            .method_call();
+                  field2: val2 }.method_call()
+                                .method_call();
 
     let y = if cond { val1 } else { val2 }.method_call();
 
@@ -81,20 +80,20 @@ fn floaters() {
     } else {
         none();
     }.bar()
-    .baz();
+     .baz();
 
     Foo { x: val }.baz(|| {
-                           force();
-                           multiline();
-                       })
+                      force();
+                      multiline();
+                  })
                   .quux();
 
     Foo { y: i_am_multi_line,
-          z: ok, }.baz(|| {
-             force();
-             multiline();
-         })
-    .quux();
+          z: ok }.baz(|| {
+                     force();
+                     multiline();
+                 })
+                 .quux();
 
     a + match x {
             true => "yay!",
@@ -148,12 +147,12 @@ fn issue2264() {
     {
         something.function()
                  .map(|| {
-                          if let a_very_very_very_very_very_very_very_very_long_variable =
-                              compute_this_variable()
-                          {
-                              println!("Hello");
-                          }
-                      })
+                     if let a_very_very_very_very_very_very_very_very_long_variable =
+                         compute_this_variable()
+                     {
+                         println!("Hello");
+                     }
+                 })
                  .collect();
     }
 }

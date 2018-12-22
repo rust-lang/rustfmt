@@ -236,7 +236,7 @@ fn main() {
 ```rust
 fn main() {
     let lorem = Lorem { ipsum: dolor,
-                        sit: amet, };
+                        sit: amet };
 }
 ```
 
@@ -275,9 +275,9 @@ fn lorem<Ipsum, Dolor, Sit, Amet>() -> T
 
 Whether to use different formatting for items and expressions if they satisfy a heuristic notion of 'small'.
 
-- **Default value**: `Default`
-- **Possible values**: `Default`, `Off`
-- **Stable**: Yess
+- **Default value**: `"Default"`
+- **Possible values**: `"Default"`, `"Off"`, `"Max"`
+- **Stable**: Yes
 
 #### `Default` (default):
 
@@ -334,6 +334,24 @@ fn main() {
     } else {
         sit
     };
+}
+```
+
+#### `Max`:
+
+```rust
+enum Lorem {
+    Ipsum,
+    Dolor(bool),
+    Sit { amet: Consectetur, adipiscing: Elit },
+}
+
+fn main() {
+    lorem("lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing");
+
+    let lorem = Lorem { ipsum: dolor, sit: amet };
+
+    let lorem = if ipsum { dolor } else { sit };
 }
 ```
 
@@ -867,6 +885,53 @@ impl Lorem {
 See also [`brace_style`](#brace_style), [`control_brace_style`](#control_brace_style).
 
 
+## `enum_discrim_align_threshold`
+
+The maximum length of enum variant having discriminant, that gets vertically aligned with others.
+Variants without discriminants would be ignored for the purpose of alignment.
+
+Note that this is not how much whitespace is inserted, but instead the longest variant name that
+doesn't get ignored when aligning.
+
+- **Default value** : 0
+- **Possible values**: any positive integer
+- **Stable**: No
+
+#### `0` (default):
+
+```rust
+enum Bar {
+    A = 0,
+    Bb = 1,
+    RandomLongVariantGoesHere = 10,
+    Ccc = 71,
+}
+
+enum Bar {
+    VeryLongVariantNameHereA = 0,
+    VeryLongVariantNameHereBb = 1,
+    VeryLongVariantNameHereCcc = 2,
+}
+```
+
+#### `20`:
+
+```rust
+enum Foo {
+    A   = 0,
+    Bb  = 1,
+    RandomLongVariantGoesHere = 10,
+    Ccc = 2,
+}
+
+enum Bar {
+    VeryLongVariantNameHereA = 0,
+    VeryLongVariantNameHereBb = 1,
+    VeryLongVariantNameHereCcc = 2,
+}
+```
+
+
 ## `fn_single_line`
 
 Put single-expression functions on a single line
@@ -988,6 +1053,76 @@ fn main() {
 
 See also [`max_width`](#max_width).
 
+## `format_macro_matchers`
+
+Format the metavariable matching patterns in macros.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+macro_rules! foo {
+    ($a: ident : $b: ty) => {
+        $a(42): $b;
+    };
+    ($a: ident $b: ident $c: ident) => {
+        $a = $b + $c;
+    };
+}
+```
+
+#### `true`:
+
+```rust
+macro_rules! foo {
+    ($a:ident : $b:ty) => {
+        $a(42): $b;
+    };
+    ($a:ident $b:ident $c:ident) => {
+        $a = $b + $c;
+    };
+}
+```
+
+See also [`format_macro_bodies`](#format_macro_bodies).
+
+
+## `format_macro_bodies`
+
+Format the bodies of macros.
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `true` (default):
+
+```rust
+macro_rules! foo {
+    ($a: ident : $b: ty) => {
+        $a(42): $b;
+    };
+    ($a: ident $b: ident $c: ident) => {
+        $a = $b + $c;
+    };
+}
+```
+
+#### `false`:
+
+```rust
+macro_rules! foo {
+    ($a: ident : $b: ty) => { $a(42): $b; };
+    ($a: ident $b: ident $c: ident) => { $a=$b+$c; };
+}
+```
+
+See also [`format_macro_matchers`](#format_macro_matchers).
+
+
 ## `hard_tabs`
 
 Use tab characters for indentation, spaces for alignment
@@ -1019,24 +1154,24 @@ See also: [`tab_spaces`](#tab_spaces).
 
 Indent style of imports
 
-- **Default Value**: `"Visual"`
+- **Default Value**: `"Block"`
 - **Possible values**: `"Block"`, `"Visual"`
 - **Stable**: No
 
-#### `"Visual"` (default):
-
-```rust
-use foo::{xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy,
-          zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz};
-```
-
-#### `"Block"`:
+#### `"Block"` (default):
 
 ```rust
 use foo::{
     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy,
     zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz,
 };
+```
+
+#### `"Visual"`:
+
+```rust
+use foo::{xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy,
+          zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz};
 ```
 
 See also: [`imports_layout`](#imports_layout).
@@ -1215,7 +1350,7 @@ fn main() {
     });
 
     match lorem {
-        None => if ipsum {
+        None => |ipsum| {
             println!("Hello World");
         },
         Some(dolor) => foo(),
@@ -1236,7 +1371,7 @@ fn main() {
 
     match lorem {
         None => {
-            if ipsum {
+            |ipsum| {
                 println!("Hello World");
             }
         }
@@ -1250,9 +1385,28 @@ fn main() {
 
 Unix or Windows line endings
 
-- **Default value**: `"Unix"`
-- **Possible values**: `"Native"`, `"Unix"`, `"Windows"`
+- **Default value**: `"Auto"`
+- **Possible values**: `"Auto"`, `"Native"`, `"Unix"`, `"Windows"`
 - **Stable**: Yes
+
+#### `Auto` (default):
+
+The newline style is detected automatically on a per-file basis. Files
+with mixed line endings will be converted to the first detected line
+ending style.
+
+#### `Native`
+
+Line endings will be converted to `\r\n` on Windows and `\n` on all
+other platforms.
+
+#### `Unix`
+
+Line endings will be converted to `\n`.
+
+#### `Windows`
+
+Line endings will be converted to `\r\n`.
 
 ## `normalize_comments`
 
@@ -1366,7 +1520,7 @@ mod dolor;
 mod sit;
 ```
 
-**Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantic
+**Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantics
 of the original source code.
 
 ## `reorder_impl_items`
@@ -1825,6 +1979,56 @@ fn main() {
 }
 ```
 
+## `format_doc_comments`
+
+Format doc comments.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+/// Adds one to the number given.
+///
+/// # Examples
+///
+/// ```rust
+/// let five=5;
+///
+/// assert_eq!(
+///     6,
+///     add_one(5)
+/// );
+/// # fn add_one(x: i32) -> i32 {
+/// #     x + 1
+/// # }
+/// ```
+fn add_one(x: i32) -> i32 {
+    x + 1
+}
+```
+
+#### `true`
+
+```rust
+/// Adds one to the number given.
+///
+/// # Examples
+///
+/// ```rust
+/// let five = 5;
+///
+/// assert_eq!(6, add_one(5));
+/// # fn add_one(x: i32) -> i32 {
+/// #     x + 1
+/// # }
+/// ```
+fn add_one(x: i32) -> i32 {
+    x + 1
+}
+```
 
 ## `wrap_comments`
 
@@ -1885,6 +2089,88 @@ fn main() {
 
 See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 
+## `overflow_delimited_expr`
+
+When structs, slices, arrays, and block/array-like macros are used as the last
+argument in an expression list, allow them to overflow (like blocks/closures)
+instead of being indented on a new line.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+fn example() {
+    foo(ctx, |param| {
+        action();
+        foo(param)
+    });
+
+    foo(
+        ctx,
+        Bar {
+            x: value,
+            y: value2,
+        },
+    );
+
+    foo(
+        ctx,
+        &[
+            MAROON_TOMATOES,
+            PURPLE_POTATOES,
+            ORGANE_ORANGES,
+            GREEN_PEARS,
+            RED_APPLES,
+        ],
+    );
+
+    foo(
+        ctx,
+        vec![
+            MAROON_TOMATOES,
+            PURPLE_POTATOES,
+            ORGANE_ORANGES,
+            GREEN_PEARS,
+            RED_APPLES,
+        ],
+    );
+}
+```
+
+#### `true`:
+
+```rust
+fn example() {
+    foo(ctx, |param| {
+        action();
+        foo(param)
+    });
+
+    foo(ctx, Bar {
+        x: value,
+        y: value2,
+    });
+
+    foo(ctx, &[
+        MAROON_TOMATOES,
+        PURPLE_POTATOES,
+        ORGANE_ORANGES,
+        GREEN_PEARS,
+        RED_APPLES,
+    ]);
+
+    foo(ctx, vec![
+        MAROON_TOMATOES,
+        PURPLE_POTATOES,
+        ORGANE_ORANGES,
+        GREEN_PEARS,
+        RED_APPLES,
+    ]);
+}
+```
 
 ## `blank_lines_upper_bound`
 
@@ -2060,9 +2346,67 @@ ignore = [
 If you want to ignore every file under `examples/`, put the following to your config file:
 
 ```toml
-ignore [
+ignore = [
     "examples",
 ]
+```
+
+## `edition`
+
+Specifies which edition is used by the parser.
+
+- **Default value**: `2015`
+- **Possible values**: `2015`, `2018`
+- **Stable**: Yes
+
+### Example
+
+If you want to format code that requires edition 2018, add the following to your config file:
+
+```toml
+edition = "2018"
+```
+
+## `version`
+
+Which version of the formatting rules to use. `Version::One` is backwards-compatible
+with Rustfmt 1.0. Other versions are only backwards compatible within a major
+version number.
+
+- **Default value**: `One`
+- **Possible values**: `One`, `Two`
+- **Stable**: No
+
+### Example
+
+```toml
+version = "Two"
+```
+
+## `normalize_doc_attributes`
+
+Convert `#![doc]` and `#[doc]` attributes to `//!` and `///` doc comments.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+#![doc = "Example documentation"]
+
+#[doc = "Example item documentation"]
+pub enum Foo {}
+```
+
+#### `true`:
+
+```rust
+//! Example documentation
+
+/// Example item documentation
+pub enum Foo {}
 ```
 
 ## `emit_mode`

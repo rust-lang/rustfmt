@@ -10,27 +10,26 @@
 
 use config::lists::*;
 use syntax::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax};
-use syntax::codemap::{self, BytePos, Span};
 use syntax::ptr;
+use syntax::source_map::{self, BytePos, Span};
 
-use codemap::SpanUtils;
 use comment::FindUncommented;
-use expr::{
-    can_be_overflowed_expr, rewrite_pair, rewrite_unary_prefix, wrap_struct_field, PairParts,
-};
+use expr::{can_be_overflowed_expr, rewrite_unary_prefix, wrap_struct_field};
 use lists::{
     itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape, struct_lit_tactic,
     write_list,
 };
 use macros::{rewrite_macro, MacroPosition};
 use overflow;
+use pairs::{rewrite_pair, PairParts};
 use rewrite::{Rewrite, RewriteContext};
 use shape::Shape;
+use source_map::SpanUtils;
 use spanned::Spanned;
 use types::{rewrite_path, PathContext};
-use utils::{format_mutability, mk_sp};
+use utils::{format_mutability, mk_sp, rewrite_ident};
 
-/// Returns true if the given pattern is short. A short pattern is defined by the following grammer:
+/// Returns true if the given pattern is short. A short pattern is defined by the following grammar:
 ///
 /// [small, ntp]:
 ///     - single token
@@ -74,7 +73,7 @@ impl Rewrite for Pat {
                     BindingMode::ByValue(mutability) => ("", mutability),
                 };
                 let mut_infix = format_mutability(mutability);
-                let id_str = ident.name.to_string();
+                let id_str = rewrite_ident(context, ident);
                 let sub_pat = match *sub_pat {
                     Some(ref p) => {
                         // 3 - ` @ `.
@@ -99,7 +98,7 @@ impl Rewrite for Pat {
                 }
             }
             PatKind::Range(ref lhs, ref rhs, ref end_kind) => {
-                let infix = match *end_kind {
+                let infix = match end_kind.node {
                     RangeEnd::Included(RangeSyntax::DotDotDot) => "...",
                     RangeEnd::Included(RangeSyntax::DotDotEq) => "..=",
                     RangeEnd::Excluded => "..",
@@ -112,7 +111,7 @@ impl Rewrite for Pat {
                 rewrite_pair(
                     &**lhs,
                     &**rhs,
-                    PairParts::new("", &infix, ""),
+                    PairParts::infix(&infix),
                     context,
                     shape,
                     SeparatorPlace::Front,
@@ -145,7 +144,8 @@ impl Rewrite for Pat {
                 let prefix = prefix.iter().map(|p| p.rewrite(context, shape));
                 let slice_pat = slice_pat
                     .as_ref()
-                    .map(|p| Some(format!("{}..", p.rewrite(context, shape)?)));
+                    .and_then(|p| p.rewrite(context, shape))
+                    .map(|rw| Some(format!("{}..", if rw == "_" { "" } else { &rw })));
                 let suffix = suffix.iter().map(|p| p.rewrite(context, shape));
 
                 // Munge them together.
@@ -171,7 +171,7 @@ impl Rewrite for Pat {
 
 fn rewrite_struct_pat(
     path: &ast::Path,
-    fields: &[codemap::Spanned<ast::FieldPat>],
+    fields: &[source_map::Spanned<ast::FieldPat>],
     ellipsis: bool,
     span: Span,
     context: &RewriteContext,
@@ -215,7 +215,7 @@ fn rewrite_struct_pat(
     if ellipsis {
         if fields_str.contains('\n') || fields_str.len() > one_line_width {
             // Add a missing trailing comma.
-            if fmt.trailing_separator == SeparatorTactic::Never {
+            if context.config.trailing_comma() == SeparatorTactic::Never {
                 fields_str.push_str(",");
             }
             fields_str.push_str("\n");
@@ -224,7 +224,7 @@ fn rewrite_struct_pat(
         } else {
             if !fields_str.is_empty() {
                 // there are preceding struct fields being matched on
-                if fmt.tactic == DefinitiveListTactic::Vertical {
+                if tactic == DefinitiveListTactic::Vertical {
                     // if the tactic is Vertical, write_list already added a trailing ,
                     fields_str.push_str(" ");
                 } else {
@@ -246,7 +246,7 @@ impl Rewrite for FieldPat {
             pat
         } else {
             let pat_str = pat?;
-            let id_str = self.ident.to_string();
+            let id_str = rewrite_ident(context, self.ident);
             let one_line_width = id_str.len() + 2 + pat_str.len();
             if one_line_width <= shape.width {
                 Some(format!("{}: {}", id_str, pat_str))
@@ -264,6 +264,7 @@ impl Rewrite for FieldPat {
     }
 }
 
+#[derive(Debug)]
 pub enum TuplePatField<'a> {
     Pat(&'a ptr::P<ast::Pat>),
     Dotdot(Span),
@@ -312,7 +313,7 @@ fn rewrite_tuple_pat(
     context: &RewriteContext,
     shape: Shape,
 ) -> Option<String> {
-    let mut pat_vec: Vec<_> = pats.into_iter().map(|x| TuplePatField::Pat(x)).collect();
+    let mut pat_vec: Vec<_> = pats.iter().map(|x| TuplePatField::Pat(x)).collect();
 
     if let Some(pos) = dotdot_pos {
         let prev = if pos == 0 {
@@ -332,44 +333,44 @@ fn rewrite_tuple_pat(
             lo,
             // 2 == "..".len()
             lo + BytePos(2),
-            codemap::NO_EXPANSION,
+            source_map::NO_EXPANSION,
         ));
         pat_vec.insert(pos, dotdot);
     }
-
     if pat_vec.is_empty() {
         return Some(format!("{}()", path_str.unwrap_or_default()));
     }
-
     let wildcard_suffix_len = count_wildcard_suffix_len(context, &pat_vec, span, shape);
-    let (pat_vec, span) = if context.config.condense_wildcard_suffixes() && wildcard_suffix_len >= 2
-    {
-        let new_item_count = 1 + pat_vec.len() - wildcard_suffix_len;
-        let sp = pat_vec[new_item_count - 1].span();
-        let snippet = context.snippet(sp);
-        let lo = sp.lo() + BytePos(snippet.find_uncommented("_").unwrap() as u32);
-        pat_vec[new_item_count - 1] = TuplePatField::Dotdot(mk_sp(lo, lo + BytePos(1)));
-        (
-            &pat_vec[..new_item_count],
-            mk_sp(span.lo(), lo + BytePos(1)),
-        )
-    } else {
-        (&pat_vec[..], span)
-    };
+    let (pat_vec, span, condensed) =
+        if context.config.condense_wildcard_suffixes() && wildcard_suffix_len >= 2 {
+            let new_item_count = 1 + pat_vec.len() - wildcard_suffix_len;
+            let sp = pat_vec[new_item_count - 1].span();
+            let snippet = context.snippet(sp);
+            let lo = sp.lo() + BytePos(snippet.find_uncommented("_").unwrap() as u32);
+            pat_vec[new_item_count - 1] = TuplePatField::Dotdot(mk_sp(lo, lo + BytePos(1)));
+            (
+                &pat_vec[..new_item_count],
+                mk_sp(span.lo(), lo + BytePos(1)),
+                true,
+            )
+        } else {
+            (&pat_vec[..], span, false)
+        };
 
     // add comma if `(x,)`
-    let add_comma = path_str.is_none() && pat_vec.len() == 1 && dotdot_pos.is_none();
+    let add_comma = path_str.is_none() && pat_vec.len() == 1 && dotdot_pos.is_none() && !condensed;
     let path_str = path_str.unwrap_or_default();
-    let pat_ref_vec = pat_vec.iter().collect::<Vec<_>>();
 
     overflow::rewrite_with_parens(
         &context,
         &path_str,
-        &pat_ref_vec,
+        pat_vec.iter(),
         shape,
         span,
         context.config.max_width(),
-        if add_comma {
+        if dotdot_pos.is_some() {
+            Some(SeparatorTactic::Never)
+        } else if add_comma {
             Some(SeparatorTactic::Always)
         } else {
             None
@@ -396,7 +397,8 @@ fn count_wildcard_suffix_len(
         context.snippet_provider.span_after(span, "("),
         span.hi() - BytePos(1),
         false,
-    ).collect();
+    )
+    .collect();
 
     for item in items.iter().rev().take_while(|i| match i.item {
         Some(ref internal_string) if internal_string == "_" => true,

@@ -1,4 +1,4 @@
-// rustfmt-error_on_line_overflow: false
+// rustfmt-format_macro_matchers: true
 
 macro_rules! m {
     () => {};
@@ -271,5 +271,90 @@ macro_rules! save_regs {
               push r10
               push r11"
              :::: "intel", "volatile");
+    };
+}
+
+// #2721
+macro_rules! impl_as_byte_slice_arrays {
+    ($n:expr,) => {};
+    ($n:expr, $N:ident, $($NN:ident,)*) => {
+        impl_as_byte_slice_arrays!($n - 1, $($NN,)*);
+
+        impl<T> AsByteSliceMut for [T; $n] where [T]: AsByteSliceMut {
+            fn as_byte_slice_mut(&mut self) -> &mut [u8] {
+                self[..].as_byte_slice_mut()
+            }
+
+            fn to_le(&mut self) {
+                self[..].to_le()
+            }
+        }
+    };
+    (!div $n:expr,) => {};
+    (!div $n:expr, $N:ident, $($NN:ident,)*) => {
+        impl_as_byte_slice_arrays!(!div $n / 2, $($NN,)*);
+
+        impl<T> AsByteSliceMut for [T; $n] where [T]: AsByteSliceMut {
+            fn as_byte_slice_mut(&mut self) -> &mut [u8] {
+                self[..].as_byte_slice_mut()
+            }
+
+            fn to_le(&mut self) {
+                self[..].to_le()
+            }
+        }
+    };
+}
+
+// #2919
+fn foo() {
+    {
+        macro_rules! touch_value {
+            ($func:ident, $value:expr) => {{
+                let result = API::get_cached().$func(
+                    self,
+                    key.as_ptr(),
+                    $value,
+                    ffi::VSPropAppendMode::paTouch,
+                );
+                let result = API::get_cached().$func(self, key.as_ptr(), $value, ffi::VSPropAppend);
+                let result =
+                    API::get_cached().$func(self, key.as_ptr(), $value, ffi::VSPropAppendM);
+                let result =
+                    APIIIIIIIII::get_cached().$func(self, key.as_ptr(), $value, ffi::VSPropAppendM);
+                let result = API::get_cached().$func(
+                    self,
+                    key.as_ptr(),
+                    $value,
+                    ffi::VSPropAppendMMMMMMMMMM,
+                );
+                debug_assert!(result == 0);
+            }};
+        }
+    }
+}
+
+// #2642
+macro_rules! template {
+    ($name:expr) => {
+        format_args!(
+            r##"
+"http://example.com"
+
+# test
+"##,
+            $name
+        )
+    };
+}
+
+macro_rules! template {
+    () => {
+        format_args!(
+            r"
+//
+
+"
+        )
     };
 }

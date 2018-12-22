@@ -1,9 +1,9 @@
 # Contributing
 
 There are many ways to contribute to Rustfmt. This document lays out what they
-are and has information for how to get started. If you have any questions about
-contributing or need help with anything, please ping nrc on irc, #rust-dev-tools
-on irc.mozilla.org is probably the best channel. Feel free to also ask questions
+are and has information on how to get started. If you have any questions about
+contributing or need help with anything, please ask in the WG-Rustfmt channel
+on [Discord](https://discordapp.com/invite/rust-lang). Feel free to also ask questions
 on issues, or file new issues specifically to get help.
 
 All contributors are expected to follow our [Code of
@@ -13,14 +13,6 @@ Conduct](CODE_OF_CONDUCT.md).
 
 It would be really useful to have people use rustfmt on their projects and file
 issues where it does something you don't expect.
-
-A really useful thing to do that on a crate from the Rust repo. If it does
-something unexpected, file an issue; if not, make a PR to the Rust repo with the
-reformatted code. We hope to get the whole repo consistently rustfmt'ed and to
-replace `make tidy` with rustfmt as a medium-term goal. Issues with stack traces
-for bugs and/or minimal test cases are especially useful.
-
-See this [blog post](http://ncameron.org/blog/rustfmt-ing-rust/) for more details.
 
 
 ## Create test cases
@@ -64,10 +56,16 @@ would need a configuration file named `test-indent.toml` in that directory. As a
 example, the `issue-1111.rs` test file is configured by the file
 `./tests/config/issue-1111.toml`.
 
+## Debugging
+
+Some `rewrite_*` methods use the `debug!` macro for printing useful information.
+These messages can be printed by using the environment variable `RUST_LOG=rustfmt=DEBUG`.
+These traces can be helpful in understanding which part of the code was used
+and get a better grasp on the execution flow.
 
 ## Hack!
 
-Here are some [good starting issues](https://github.com/rust-lang-nursery/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Agood-first-issue).
+Here are some [good starting issues](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Agood-first-issue).
 
 If you've found areas which need polish and don't have issues, please submit a
 PR, don't feel there needs to be an issue.
@@ -83,8 +81,39 @@ Talking of tests, if you add a new feature or fix a bug, please also add a test.
 It's really easy, see above for details. Please run `cargo test` before
 submitting a PR to ensure your patch passes all tests, it's pretty quick.
 
+Rustfmt is post-1.0 and within major version releases we strive for backwards
+compatibility (at least when using the default options). That means any code
+which changes Rustfmt's output must be guarded by either an option or a version
+check. The latter is implemented as an option called `option`. See the section on
+[configuration](#Configuration) below.
+
 Please try to avoid leaving `TODO`s in the code. There are a few around, but I
 wish there weren't. You can leave `FIXME`s, preferably with an issue number.
+
+
+### Version-gate formatting changes
+
+A change that introduces a different code-formatting should be gated on the
+`version` configuration. This is to ensure the formatting of the current major
+release is preserved, while allowing fixes to be implemented for the next
+release.
+
+This is done by conditionally guarding the change like so:
+
+```rust
+if config.version() == Version::One { // if the current major release is 1.x
+    // current formatting
+} else {
+    // new formatting
+}
+```
+
+This allows the user to apply the next formatting explicitly via the
+configuration, while being stable by default.
+
+When the next major release is done, the code block of the previous formatting
+can be deleted, e.g., the first block in the example above when going from `1.x`
+to `2.x`.
 
 
 ### A quick tour of Rustfmt
@@ -125,14 +154,14 @@ can.
 
 Our primary tool here is to look between spans for text we've missed. For
 example, in a function call `foo(a, b)`, we have spans for `a` and `b`, in this
-case there is only a comma and a single space between the end of `a` and the
+case, there is only a comma and a single space between the end of `a` and the
 start of `b`, so there is nothing much to do. But if we look at
 `foo(a /* a comment */, b)`, then between `a` and `b` we find the comment.
 
 At a higher level, Rustfmt has machinery so that we account for text between
 'top level' items. Then we can reproduce that text pretty much verbatim. We only
 count spans we actually reformat, so if we can't format a span it is not missed
-completely, but is reproduced in the output without being formatted. This is
+completely but is reproduced in the output without being formatted. This is
 mostly handled in [src/missed_spans.rs](src/missed_spans.rs). See also `FmtVisitor::last_pos` in
 [src/visitor.rs](src/visitor.rs).
 
@@ -148,10 +177,12 @@ then walk their own children.
 The `Rewrite` trait is defined in [src/rewrite.rs](src/rewrite.rs). It is implemented for many
 things that can be rewritten, mostly AST nodes. It has a single function,
 `rewrite`, which is called to rewrite `self` into an `Option<String>`. The
-arguments are `width` which is the horizontal space we write into, and `offset`
+arguments are `width` which is the horizontal space we write into and `offset`
 which is how much we are currently indented from the lhs of the page. We also
 take a context which contains information used for parsing, the current block
 indent, and a configuration (see below).
+
+##### Rewrite and Indent
 
 To understand the indents, consider
 
@@ -193,9 +224,11 @@ space we have. Something like `available_space = budget - overhead`. Since
 widths are unsized integers, this would cause underflow. Therefore we use
 checked subtraction: `available_space = budget.checked_sub(overhead)?`.
 `checked_sub` returns an `Option`, and if we would underflow `?` returns
-`None`, otherwise we proceed with the computed space.
+`None`, otherwise, we proceed with the computed space.
 
-Much syntax in Rust is lists: lists of arguments, lists of fields, lists of
+##### Rewrite of list-like expressions
+
+Much of the syntax in Rust is lists: lists of arguments, lists of fields, lists of
 array elements, etc. We have some generic code to handle lists, including how to
 space them in horizontal and vertical space, indentation, comments between
 items, trailing separators, etc. However, since there are so many options, the
@@ -203,9 +236,11 @@ code is a bit complex. Look in [src/lists.rs](src/lists.rs). `write_list` is the
 and `ListFormatting` the key structure for configuration. You'll need to make a
 `ListItems` for input, this is usually done using `itemize_list`.
 
+##### Configuration
+
 Rustfmt strives to be highly configurable. Often the first part of a patch is
 creating a configuration option for the feature you are implementing. All
-handling of configuration options is done in [src/config.rs](src/config.rs). Look for the
+handling of configuration options is done in [src/config/mod.rs](src/config/mod.rs). Look for the
 `create_config!` macro at the end of the file for all the options. The rest of
 the file defines a bunch of enums used for options, and the machinery to produce
 the config struct and parse a config file, etc. Checking an option is done by

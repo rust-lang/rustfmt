@@ -72,9 +72,7 @@ impl ConfigType for IgnoreList {
 /// nightly compiler when installed from crates.io, default to nightly mode.
 macro_rules! is_nightly_channel {
     () => {
-        option_env!("CFG_RELEASE_CHANNEL")
-            .map(|c| c == "nightly")
-            .unwrap_or(true)
+        option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev")
     };
 }
 
@@ -114,7 +112,7 @@ macro_rules! create_config {
                 cloned.width_heuristics = None;
 
                 ::toml::to_string(&cloned)
-                    .map_err(|e| format!("Could not output config: {}", e.to_string()))
+                    .map_err(|e| format!("Could not output config: {}", e))
             }
         }
 
@@ -175,11 +173,11 @@ macro_rules! create_config {
             }
             )+
 
-            pub fn set<'a>(&'a mut self) -> ConfigSetter<'a> {
+            pub fn set(&mut self) -> ConfigSetter {
                 ConfigSetter(self)
             }
 
-            pub fn was_set<'a>(&'a self) -> ConfigWasSet<'a> {
+            pub fn was_set(&self) -> ConfigWasSet {
                 ConfigWasSet(self)
             }
 
@@ -245,7 +243,7 @@ macro_rules! create_config {
                         if !err.is_empty() {
                             eprint!("{}", err);
                         }
-                        Ok(Config::default().fill_from_parsed_config(parsed_config, dir: &Path))
+                        Ok(Config::default().fill_from_parsed_config(parsed_config, dir))
                     }
                     Err(e) => {
                         err.push_str("Error: Decoding config file failed:\n");
@@ -281,6 +279,7 @@ macro_rules! create_config {
                 match key {
                     $(
                         stringify!($i) => {
+                            self.$i.1 = true;
                             self.$i.2 = val.parse::<$ty>()
                                 .expect(&format!("Failed to parse override for {} (\"{}\") as a {}",
                                                  stringify!($i),
@@ -402,6 +401,9 @@ macro_rules! create_config {
                 if self.use_small_heuristics.2 == Heuristics::Default {
                     let max_width = self.max_width.2;
                     self.set().width_heuristics(WidthHeuristics::scaled(max_width));
+                } else if self.use_small_heuristics.2 == Heuristics::Max {
+                    let max_width = self.max_width.2;
+                    self.set().width_heuristics(WidthHeuristics::set(max_width));
                 } else {
                     self.set().width_heuristics(WidthHeuristics::null());
                 }
@@ -420,6 +422,16 @@ macro_rules! create_config {
 
             fn set_ignore(&mut self, dir: &Path) {
                 self.ignore.2.add_prefix(dir);
+            }
+
+            /// Returns true if the config key was explicitly set and is the default value.
+            pub fn is_default(&self, key: &str) -> bool {
+                $(
+                    if let stringify!($i) = key {
+                        return self.$i.1 && self.$i.2 == $def;
+                    }
+                 )+
+                false
             }
         }
 

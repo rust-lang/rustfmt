@@ -42,3 +42,101 @@ impl CombineTypes {
         self.query_callbacks()(&query_id)
     }
 }
+
+// #2859
+pub fn do_something<'a, T: Trait1 + Trait2 + 'a>(
+    &fooo: u32,
+) -> impl Future<
+    Item = (
+        impl Future<Item = (), Error = SomeError> + 'a,
+        impl Future<Item = (), Error = SomeError> + 'a,
+        impl Future<Item = (), Error = SomeError> + 'a,
+    ),
+    Error = SomeError,
+> + 'a {
+}
+
+pub fn do_something<'a, T: Trait1 + Trait2 + 'a>(
+    &fooo: u32,
+) -> impl Future<
+    Item = (
+        impl Future<Item = (), Error = SomeError> + 'a,
+        impl Future<Item = (), Error = SomeError> + 'a,
+        impl Future<Item = (), Error = SomeError> + 'a,
+    ),
+    Error = SomeError,
+> + Future<
+    Item = (
+        impl Future<Item = (), Error = SomeError> + 'a,
+        impl Future<Item = (), Error = SomeError> + 'a,
+        impl Future<Item = (), Error = SomeError> + 'a,
+    ),
+    Error = SomeError,
+> + Future<
+    Item = (
+        impl Future<Item = (), Error = SomeError> + 'a,
+        impl Future<Item = (), Error = SomeError> + 'a,
+        impl Future<Item = (), Error = SomeError> + 'a,
+    ),
+    Error = SomeError,
+> + 'a + 'b + 'c {
+}
+
+// #3060
+macro_rules! foo {
+    ($foo_api: ty) => {
+        type Target = ($foo_api) + 'static;
+    };
+}
+
+type Target = (FooAPI) + 'static;
+
+// #3137
+fn foo<T>(t: T)
+where
+    T: (FnOnce() -> ()) + Clone,
+    U: (FnOnce() -> ()) + 'static,
+{
+}
+
+// #3117
+fn issue3117() {
+    {
+        {
+            {
+                {
+                    {
+                        {
+                            {
+                                {
+                                    let opt: &mut Option<MyLongTypeHere> =
+                                        unsafe { &mut *self.future.get() };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// #3139
+fn issue3139() {
+    assert_eq!(
+        to_json_value(&None::<i32>).unwrap(),
+        json!({ "test": None::<i32> })
+    );
+}
+
+// #3180
+fn foo(
+    a: SomeLongComplexType,
+    b: SomeOtherLongComplexType,
+) -> Box<Future<Item = AnotherLongType, Error = ALongErrorType>> {
+}
+
+type MyFn = fn(
+    a: SomeLongComplexType,
+    b: SomeOtherLongComplexType,
+) -> Box<Future<Item = AnotherLongType, Error = ALongErrorType>>;

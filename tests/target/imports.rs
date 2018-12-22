@@ -1,5 +1,4 @@
 // rustfmt-normalize_comments: true
-// rustfmt-error_on_line_overflow: false
 
 // Imports.
 
@@ -121,3 +120,6 @@ use c;
 // #2670
 #[macro_use]
 use imports_with_attr;
+
+// #2888
+use std::f64::consts::{E, PI, SQRT_2};

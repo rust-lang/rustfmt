@@ -27,6 +27,7 @@ pub struct Indent {
 const INDENT_BUFFER_LEN: usize = 80;
 const INDENT_BUFFER: &str =
     "\n                                                                                ";
+
 impl Indent {
     pub fn new(block_indent: usize, alignment: usize) -> Indent {
         Indent {
@@ -90,7 +91,7 @@ impl Indent {
         };
         let num_chars = num_tabs + num_spaces;
         if num_tabs == 0 && num_chars + offset <= INDENT_BUFFER_LEN {
-            Cow::from(&INDENT_BUFFER[offset..num_chars + 1])
+            Cow::from(&INDENT_BUFFER[offset..=num_chars])
         } else {
             let mut indent = String::with_capacity(num_chars + if offset == 0 { 1 } else { 0 });
             if offset == 0 {
@@ -272,6 +273,12 @@ impl Shape {
             config.comment_width().saturating_sub(self.indent.width()),
         );
         Shape { width, ..*self }
+    }
+
+    pub fn to_string_with_newline(&self, config: &Config) -> Cow<'static, str> {
+        let mut offset_indent = self.indent;
+        offset_indent.alignment = self.offset;
+        offset_indent.to_string_inner(config, 0)
     }
 }
 

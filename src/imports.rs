@@ -12,16 +12,16 @@ use std::cmp::Ordering;
 
 use config::lists::*;
 use syntax::ast::{self, UseTreeKind};
-use syntax::codemap::{self, BytePos, Span, DUMMY_SP};
+use syntax::source_map::{self, BytePos, Span, DUMMY_SP};
 
-use codemap::SpanUtils;
 use comment::combine_strs_with_missing_comments;
-use config::IndentStyle;
+use config::{Edition, IndentStyle};
 use lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator};
 use rewrite::{Rewrite, RewriteContext};
 use shape::Shape;
+use source_map::SpanUtils;
 use spanned::Spanned;
-use utils::mk_sp;
+use utils::{is_same_visibility, mk_sp, rewrite_ident};
 use visitor::FmtVisitor;
 
 use std::borrow::Cow;
@@ -44,12 +44,13 @@ impl<'a> FmtVisitor<'a> {
             Some(item.vis.clone()),
             Some(item.span.lo()),
             Some(item.attrs.clone()),
-        ).rewrite_top_level(&self.get_context(), shape);
+        )
+        .rewrite_top_level(&self.get_context(), shape);
         match rw {
             Some(ref s) if s.is_empty() => {
                 // Format up to last newline
                 let prev_span = mk_sp(self.last_pos, source!(self, span).lo());
-                let trimmed_snippet = self.snippet(prev_span).trim_right();
+                let trimmed_snippet = self.snippet(prev_span).trim_end();
                 let span_end = self.last_pos + BytePos(trimmed_snippet.len() as u32);
                 self.format_missing(span_end);
                 // We have an excessive newline from the removed import.
@@ -96,6 +97,7 @@ pub enum UseSegment {
     Ident(String, Option<String>),
     Slf(Option<String>),
     Super(Option<String>),
+    Crate(Option<String>),
     Glob,
     List(Vec<UseTree>),
 }
@@ -137,21 +139,28 @@ impl UseSegment {
             UseSegment::Ident(ref s, _) => UseSegment::Ident(s.clone(), None),
             UseSegment::Slf(_) => UseSegment::Slf(None),
             UseSegment::Super(_) => UseSegment::Super(None),
+            UseSegment::Crate(_) => UseSegment::Crate(None),
             _ => self.clone(),
         }
     }
 
-    fn from_path_segment(path_seg: &ast::PathSegment) -> Option<UseSegment> {
-        let name = path_seg.ident.name.as_str();
-        if name == "{{root}}" {
+    fn from_path_segment(
+        context: &RewriteContext,
+        path_seg: &ast::PathSegment,
+        modsep: bool,
+    ) -> Option<UseSegment> {
+        let name = rewrite_ident(context, path_seg.ident);
+        if name.is_empty() || name == "{{root}}" {
             return None;
         }
-        Some(if name == "self" {
-            UseSegment::Slf(None)
-        } else if name == "super" {
-            UseSegment::Super(None)
-        } else {
-            UseSegment::Ident((*name).to_owned(), None)
+        Some(match name {
+            "self" => UseSegment::Slf(None),
+            "super" => UseSegment::Super(None),
+            "crate" => UseSegment::Crate(None),
+            _ => {
+                let mod_sep = if modsep { "::" } else { "" };
+                UseSegment::Ident(format!("{}{}", mod_sep, name), None)
+            }
         })
     }
 }
@@ -174,7 +183,7 @@ pub fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
 fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
     for tree in trees.iter_mut() {
         if tree.share_prefix(&use_tree) {
-            tree.merge(use_tree);
+            tree.merge(&use_tree);
             return;
         }
     }
@@ -201,6 +210,7 @@ impl fmt::Display for UseSegment {
             UseSegment::Ident(ref s, _) => write!(f, "{}", s),
             UseSegment::Slf(..) => write!(f, "self"),
             UseSegment::Super(..) => write!(f, "super"),
+            UseSegment::Crate(..) => write!(f, "crate"),
             UseSegment::List(ref list) => {
                 write!(f, "{{")?;
                 for (i, item) in list.iter().enumerate() {
@@ -231,15 +241,14 @@ impl fmt::Display for UseTree {
 impl UseTree {
     // Rewrite use tree with `use ` and a trailing `;`.
     pub fn rewrite_top_level(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
-        let vis = self
-            .visibility
-            .as_ref()
-            .map_or(Cow::from(""), |vis| ::utils::format_visibility(&vis));
+        let vis = self.visibility.as_ref().map_or(Cow::from(""), |vis| {
+            ::utils::format_visibility(context, &vis)
+        });
         let use_str = self
             .rewrite(context, shape.offset_left(vis.len())?)
             .map(|s| {
                 if s.is_empty() {
-                    s.to_owned()
+                    s
                 } else {
                     format!("{}use {};", vis, s)
                 }
@@ -287,7 +296,8 @@ impl UseTree {
                     } else {
                         Some(item.attrs.clone())
                     },
-                ).normalize(),
+                )
+                .normalize(),
             ),
             _ => None,
         }
@@ -313,11 +323,20 @@ impl UseTree {
             visibility,
             attrs,
         };
+
+        let leading_modsep = context.config.edition() == Edition::Edition2018
+            && a.prefix.to_string().len() > 2
+            && a.prefix.to_string().starts_with("::");
+
+        let mut modsep = leading_modsep;
+
         for p in &a.prefix.segments {
-            if let Some(use_segment) = UseSegment::from_path_segment(p) {
+            if let Some(use_segment) = UseSegment::from_path_segment(context, p, modsep) {
                 result.path.push(use_segment);
+                modsep = false;
             }
         }
+
         match a.kind {
             UseTreeKind::Glob => {
                 result.path.push(UseSegment::Glob);
@@ -336,7 +355,8 @@ impl UseTree {
                     context.snippet_provider.span_after(a.span, "{"),
                     a.span.hi(),
                     false,
-                ).collect();
+                )
+                .collect();
                 result.path.push(UseSegment::List(
                     list.iter()
                         .zip(items.into_iter())
@@ -346,22 +366,23 @@ impl UseTree {
                         .collect(),
                 ));
             }
-            UseTreeKind::Simple(ref rename) => {
-                let mut name = (*path_to_imported_ident(&a.prefix).name.as_str()).to_owned();
+            UseTreeKind::Simple(ref rename, ..) => {
+                let name = rewrite_ident(context, path_to_imported_ident(&a.prefix)).to_owned();
                 let alias = rename.and_then(|ident| {
-                    if ident == path_to_imported_ident(&a.prefix) {
+                    if ident.name == "_" {
+                        // for impl-only-use
+                        Some("_".to_owned())
+                    } else if ident == path_to_imported_ident(&a.prefix) {
                         None
                     } else {
-                        Some(ident.to_string())
+                        Some(rewrite_ident(context, ident).to_owned())
                     }
                 });
-
-                let segment = if &name == "self" {
-                    UseSegment::Slf(alias)
-                } else if &name == "super" {
-                    UseSegment::Super(alias)
-                } else {
-                    UseSegment::Ident(name, alias)
+                let segment = match name.as_ref() {
+                    "self" => UseSegment::Slf(alias),
+                    "super" => UseSegment::Super(alias),
+                    "crate" => UseSegment::Crate(alias),
+                    _ => UseSegment::Ident(name, alias),
                 };
 
                 // `name` is already in result.
@@ -469,7 +490,7 @@ impl UseTree {
     fn same_visibility(&self, other: &UseTree) -> bool {
         match (&self.visibility, &other.visibility) {
             (
-                Some(codemap::Spanned {
+                Some(source_map::Spanned {
                     node: ast::VisibilityKind::Inherited,
                     ..
                 }),
@@ -477,16 +498,13 @@ impl UseTree {
             )
             | (
                 None,
-                Some(codemap::Spanned {
+                Some(source_map::Spanned {
                     node: ast::VisibilityKind::Inherited,
                     ..
                 }),
             )
             | (None, None) => true,
-            (
-                Some(codemap::Spanned { node: lnode, .. }),
-                Some(codemap::Spanned { node: rnode, .. }),
-            ) => lnode == rnode,
+            (Some(ref a), Some(ref b)) => is_same_visibility(a, b),
             _ => false,
         }
     }
@@ -512,7 +530,7 @@ impl UseTree {
                 let prefix = &self.path[..self.path.len() - 1];
                 let mut result = vec![];
                 for nested_use_tree in list {
-                    for mut flattend in &mut nested_use_tree.clone().flatten() {
+                    for flattend in &mut nested_use_tree.clone().flatten() {
                         let mut new_path = prefix.to_vec();
                         new_path.append(&mut flattend.path);
                         result.push(UseTree {
@@ -531,9 +549,9 @@ impl UseTree {
         }
     }
 
-    fn merge(&mut self, other: UseTree) {
+    fn merge(&mut self, other: &UseTree) {
         let mut new_path = vec![];
-        for (mut a, b) in self
+        for (a, b) in self
             .path
             .clone()
             .iter_mut()
@@ -574,7 +592,7 @@ fn merge_rest(a: &[UseSegment], b: &[UseSegment], len: usize) -> Option<UseSegme
     if let UseSegment::List(mut list) = a_rest[0].clone() {
         merge_use_trees_inner(&mut list, UseTree::from_path(b_rest.to_vec(), DUMMY_SP));
         list.sort();
-        return Some(UseSegment::List(list.clone()));
+        return Some(UseSegment::List(list));
     }
     let mut list = vec![
         UseTree::from_path(a_rest.to_vec(), DUMMY_SP),
@@ -599,11 +617,14 @@ impl Ord for UseSegment {
         use self::UseSegment::*;
 
         fn is_upper_snake_case(s: &str) -> bool {
-            s.chars().all(|c| c.is_uppercase() || c == '_')
+            s.chars()
+                .all(|c| c.is_uppercase() || c == '_' || c.is_numeric())
         }
 
         match (self, other) {
-            (&Slf(ref a), &Slf(ref b)) | (&Super(ref a), &Super(ref b)) => a.cmp(b),
+            (&Slf(ref a), &Slf(ref b))
+            | (&Super(ref a), &Super(ref b))
+            | (&Crate(ref a), &Crate(ref b)) => a.cmp(b),
             (&Glob, &Glob) => Ordering::Equal,
             (&Ident(ref ia, ref aa), &Ident(ref ib, ref ab)) => {
                 // snake_case < CamelCase < UPPER_SNAKE_CASE
@@ -645,6 +666,8 @@ impl Ord for UseSegment {
             (_, &Slf(_)) => Ordering::Greater,
             (&Super(_), _) => Ordering::Less,
             (_, &Super(_)) => Ordering::Greater,
+            (&Crate(_), _) => Ordering::Less,
+            (_, &Crate(_)) => Ordering::Greater,
             (&Ident(..), _) => Ordering::Less,
             (_, &Ident(..)) => Ordering::Greater,
             (&Glob, _) => Ordering::Less,
@@ -715,21 +738,17 @@ fn rewrite_nested_use_tree(
 
     let ends_with_newline = context.config.imports_indent() == IndentStyle::Block
         && tactic != DefinitiveListTactic::Horizontal;
-    let fmt = ListFormatting {
-        tactic,
-        separator: ",",
-        trailing_separator: if ends_with_newline {
-            context.config.trailing_comma()
-        } else {
-            SeparatorTactic::Never
-        },
-        separator_place: SeparatorPlace::Back,
-        shape: nested_shape,
-        ends_with_newline,
-        preserve_newline: true,
-        nested: has_nested_list,
-        config: context.config,
+    let trailing_separator = if ends_with_newline {
+        context.config.trailing_comma()
+    } else {
+        SeparatorTactic::Never
     };
+    let fmt = ListFormatting::new(nested_shape, context.config)
+        .tactic(tactic)
+        .trailing_separator(trailing_separator)
+        .ends_with_newline(ends_with_newline)
+        .preserve_newline(true)
+        .nested(has_nested_list);
 
     let list_str = write_list(&list_items, &fmt)?;
 
@@ -751,13 +770,15 @@ fn rewrite_nested_use_tree(
 
 impl Rewrite for UseSegment {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
-        Some(match *self {
+        Some(match self {
             UseSegment::Ident(ref ident, Some(ref rename)) => format!("{} as {}", ident, rename),
             UseSegment::Ident(ref ident, None) => ident.clone(),
             UseSegment::Slf(Some(ref rename)) => format!("self as {}", rename),
             UseSegment::Slf(None) => "self".to_owned(),
             UseSegment::Super(Some(ref rename)) => format!("super as {}", rename),
             UseSegment::Super(None) => "super".to_owned(),
+            UseSegment::Crate(Some(ref rename)) => format!("crate as {}", rename),
+            UseSegment::Crate(None) => "crate".to_owned(),
             UseSegment::Glob => "*".to_owned(),
             UseSegment::List(ref use_tree_list) => rewrite_nested_use_tree(
                 context,
@@ -790,7 +811,7 @@ impl Rewrite for UseTree {
 #[cfg(test)]
 mod test {
     use super::*;
-    use syntax::codemap::DUMMY_SP;
+    use syntax::source_map::DUMMY_SP;
 
     // Parse the path part of an import. This parser is not robust and is only
     // suitable for use in a test harness.
@@ -820,18 +841,28 @@ mod test {
                 if !buf.is_empty() {
                     let mut alias = None;
                     swap(alias_buf, &mut alias);
-                    if buf == "self" {
-                        result.push(UseSegment::Slf(alias));
-                        *buf = String::new();
-                        *alias_buf = None;
-                    } else if buf == "super" {
-                        result.push(UseSegment::Super(alias));
-                        *buf = String::new();
-                        *alias_buf = None;
-                    } else {
-                        let mut name = String::new();
-                        swap(buf, &mut name);
-                        result.push(UseSegment::Ident(name, alias));
+
+                    match buf.as_ref() {
+                        "self" => {
+                            result.push(UseSegment::Slf(alias));
+                            *buf = String::new();
+                            *alias_buf = None;
+                        }
+                        "super" => {
+                            result.push(UseSegment::Super(alias));
+                            *buf = String::new();
+                            *alias_buf = None;
+                        }
+                        "crate" => {
+                            result.push(UseSegment::Crate(alias));
+                            *buf = String::new();
+                            *alias_buf = None;
+                        }
+                        _ => {
+                            let mut name = String::new();
+                            swap(buf, &mut name);
+                            result.push(UseSegment::Ident(name, alias));
+                        }
                     }
                 }
             }
@@ -915,19 +946,23 @@ mod test {
         parser.parse_in_list()
     }
 
-    macro parse_use_trees($($s:expr),* $(,)*) {
-        vec![
-            $(parse_use_tree($s),)*
-        ]
+    macro_rules! parse_use_trees {
+        ($($s:expr),* $(,)*) => {
+            vec![
+                $(parse_use_tree($s),)*
+            ]
+        }
     }
 
     #[test]
     fn test_use_tree_merge() {
-        macro test_merge([$($input:expr),* $(,)*], [$($output:expr),* $(,)*]) {
-            assert_eq!(
-                merge_use_trees(parse_use_trees!($($input,)*)),
-                parse_use_trees!($($output,)*),
-            );
+        macro_rules! test_merge {
+            ([$($input:expr),* $(,)*], [$($output:expr),* $(,)*]) => {
+                assert_eq!(
+                    merge_use_trees(parse_use_trees!($($input,)*)),
+                    parse_use_trees!($($output,)*),
+                );
+            }
         }
 
         test_merge!(["a::b::{c, d}", "a::b::{e, f}"], ["a::b::{c, d, e, f}"]);

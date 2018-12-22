@@ -9,17 +9,18 @@
 // except according to those terms.
 
 use config::lists::*;
-use syntax::codemap::Span;
 use syntax::parse::classify;
+use syntax::source_map::Span;
 use syntax::{ast, ptr};
 
-use codemap::SpanUtils;
-use expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond, ToExpr};
+use expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond};
 use items::{span_hi_for_arg, span_lo_for_arg};
 use lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
+use overflow::OverflowableItem;
 use rewrite::{Rewrite, RewriteContext};
 use shape::Shape;
-use utils::{last_line_width, left_most_sub_expr, stmt_expr};
+use source_map::SpanUtils;
+use utils::{last_line_width, left_most_sub_expr, stmt_expr, NodeIdExt};
 
 // This module is pretty messy because of the rules around closures and blocks:
 // FIXME - the below is probably no longer true in full.
@@ -33,6 +34,7 @@ use utils::{last_line_width, left_most_sub_expr, stmt_expr};
 
 pub fn rewrite_closure(
     capture: ast::CaptureBy,
+    asyncness: ast::IsAsync,
     movability: ast::Movability,
     fn_decl: &ast::FnDecl,
     body: &ast::Expr,
@@ -42,14 +44,15 @@ pub fn rewrite_closure(
 ) -> Option<String> {
     debug!("rewrite_closure {:?}", body);
 
-    let (prefix, extra_offset) =
-        rewrite_closure_fn_decl(capture, movability, fn_decl, body, span, context, shape)?;
+    let (prefix, extra_offset) = rewrite_closure_fn_decl(
+        capture, asyncness, movability, fn_decl, body, span, context, shape,
+    )?;
     // 1 = space between `|...|` and body.
     let body_shape = shape.offset_left(extra_offset)?;
 
     if let ast::ExprKind::Block(ref block, _) = body.node {
         // The body of the closure is an empty block.
-        if block.stmts.is_empty() && !block_contains_comment(block, context.codemap) {
+        if block.stmts.is_empty() && !block_contains_comment(block, context.source_map) {
             return body
                 .rewrite(context, shape)
                 .map(|s| format!("{} {}", prefix, s));
@@ -112,8 +115,24 @@ fn get_inner_expr<'a>(
 fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext) -> bool {
     is_unsafe_block(block)
         || block.stmts.len() > 1
-        || block_contains_comment(block, context.codemap)
+        || block_contains_comment(block, context.source_map)
         || prefix.contains('\n')
+}
+
+fn veto_block(e: &ast::Expr) -> bool {
+    match e.node {
+        ast::ExprKind::Call(..)
+        | ast::ExprKind::Binary(..)
+        | ast::ExprKind::Cast(..)
+        | ast::ExprKind::Type(..)
+        | ast::ExprKind::Assign(..)
+        | ast::ExprKind::AssignOp(..)
+        | ast::ExprKind::Field(..)
+        | ast::ExprKind::Index(..)
+        | ast::ExprKind::Range(..)
+        | ast::ExprKind::Try(..) => true,
+        _ => false,
+    }
 }
 
 // Rewrite closure with a single expression wrapping its body with block.
@@ -124,18 +143,18 @@ fn rewrite_closure_with_block(
     shape: Shape,
 ) -> Option<String> {
     let left_most = left_most_sub_expr(body);
-    let veto_block = left_most != body && !classify::expr_requires_semi_to_be_stmt(left_most);
+    let veto_block = veto_block(body) && !classify::expr_requires_semi_to_be_stmt(left_most);
     if veto_block {
         return None;
     }
 
     let block = ast::Block {
         stmts: vec![ast::Stmt {
-            id: ast::NodeId::new(0),
+            id: ast::NodeId::root(),
             node: ast::StmtKind::Expr(ptr::P(body.clone())),
             span: body.span,
         }],
-        id: ast::NodeId::new(0),
+        id: ast::NodeId::root(),
         rules: ast::BlockCheckMode::Default,
         span: body.span,
         recovered: false,
@@ -155,7 +174,7 @@ fn rewrite_closure_expr(
         match expr.node {
             ast::ExprKind::Match(..)
             | ast::ExprKind::Block(..)
-            | ast::ExprKind::Catch(..)
+            | ast::ExprKind::TryBlock(..)
             | ast::ExprKind::Loop(..)
             | ast::ExprKind::Struct(..) => true,
 
@@ -197,6 +216,7 @@ fn rewrite_closure_block(
 // Return type is (prefix, extra_offset)
 fn rewrite_closure_fn_decl(
     capture: ast::CaptureBy,
+    asyncness: ast::IsAsync,
     movability: ast::Movability,
     fn_decl: &ast::FnDecl,
     body: &ast::Expr,
@@ -204,12 +224,12 @@ fn rewrite_closure_fn_decl(
     context: &RewriteContext,
     shape: Shape,
 ) -> Option<(String, usize)> {
+    let is_async = if asyncness.is_async() { "async " } else { "" };
     let mover = if capture == ast::CaptureBy::Value {
         "move "
     } else {
         ""
     };
-
     let immovable = if movability == ast::Movability::Static {
         "static "
     } else {
@@ -218,7 +238,7 @@ fn rewrite_closure_fn_decl(
     // 4 = "|| {".len(), which is overconservative when the closure consists of
     // a single expression.
     let nested_shape = shape
-        .shrink_left(mover.len() + immovable.len())?
+        .shrink_left(is_async.len() + mover.len() + immovable.len())?
         .sub_width(4)?;
 
     // 1 = |
@@ -252,19 +272,11 @@ fn rewrite_closure_fn_decl(
         _ => arg_shape,
     };
 
-    let fmt = ListFormatting {
-        tactic,
-        separator: ",",
-        trailing_separator: SeparatorTactic::Never,
-        separator_place: SeparatorPlace::Back,
-        shape: arg_shape,
-        ends_with_newline: false,
-        preserve_newline: true,
-        nested: false,
-        config: context.config,
-    };
+    let fmt = ListFormatting::new(arg_shape, context.config)
+        .tactic(tactic)
+        .preserve_newline(true);
     let list_str = write_list(&item_vec, &fmt)?;
-    let mut prefix = format!("{}{}|{}|", immovable, mover, list_str);
+    let mut prefix = format!("{}{}{}|{}|", is_async, immovable, mover, list_str);
 
     if !ret_str.is_empty() {
         if prefix.contains('\n') {
@@ -288,18 +300,20 @@ pub fn rewrite_last_closure(
     expr: &ast::Expr,
     shape: Shape,
 ) -> Option<String> {
-    if let ast::ExprKind::Closure(capture, movability, ref fn_decl, ref body, _) = expr.node {
+    if let ast::ExprKind::Closure(capture, asyncness, movability, ref fn_decl, ref body, _) =
+        expr.node
+    {
         let body = match body.node {
             ast::ExprKind::Block(ref block, _)
                 if !is_unsafe_block(block)
-                    && is_simple_block(block, Some(&body.attrs), context.codemap) =>
+                    && is_simple_block(block, Some(&body.attrs), context.source_map) =>
             {
                 stmt_expr(&block.stmts[0]).unwrap_or(body)
             }
             _ => body,
         };
         let (prefix, extra_offset) = rewrite_closure_fn_decl(
-            capture, movability, fn_decl, body, expr.span, context, shape,
+            capture, asyncness, movability, fn_decl, body, expr.span, context, shape,
         )?;
         // If the closure goes multi line before its body, do not overflow the closure.
         if prefix.contains('\n') {
@@ -331,9 +345,9 @@ pub fn rewrite_last_closure(
 
         // When overflowing the closure which consists of a single control flow expression,
         // force to use block if its condition uses multi line.
-        let is_multi_lined_cond = rewrite_cond(context, body, body_shape)
-            .map(|cond| cond.contains('\n') || cond.len() > body_shape.width)
-            .unwrap_or(false);
+        let is_multi_lined_cond = rewrite_cond(context, body, body_shape).map_or(false, |cond| {
+            cond.contains('\n') || cond.len() > body_shape.width
+        });
         if is_multi_lined_cond {
             return rewrite_closure_with_block(body, &prefix, context, body_shape);
         }
@@ -345,20 +359,15 @@ pub fn rewrite_last_closure(
 }
 
 /// Returns true if the given vector of arguments has more than one `ast::ExprKind::Closure`.
-pub fn args_have_many_closure<T>(args: &[&T]) -> bool
-where
-    T: ToExpr,
-{
+pub fn args_have_many_closure(args: &[OverflowableItem]) -> bool {
     args.iter()
-        .filter(|arg| {
-            arg.to_expr()
-                .map(|e| match e.node {
-                    ast::ExprKind::Closure(..) => true,
-                    _ => false,
-                })
-                .unwrap_or(false)
+        .filter_map(|arg| arg.to_expr())
+        .filter(|expr| match expr.node {
+            ast::ExprKind::Closure(..) => true,
+            _ => false,
         })
-        .count() > 1
+        .count()
+        > 1
 }
 
 fn is_block_closure_forced(context: &RewriteContext, expr: &ast::Expr) -> bool {

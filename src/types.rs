@@ -13,23 +13,22 @@ use std::ops::Deref;
 
 use config::lists::*;
 use syntax::ast::{self, FunctionRetTy, Mutability};
-use syntax::codemap::{self, BytePos, Span};
+use syntax::source_map::{self, BytePos, Span};
 use syntax::symbol::keywords;
 
-use codemap::SpanUtils;
 use config::{IndentStyle, TypeDensity};
-use expr::{
-    rewrite_assign_rhs, rewrite_pair, rewrite_tuple, rewrite_unary_prefix, PairParts, ToExpr,
-};
+use expr::{rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix};
 use lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
 use macros::{rewrite_macro, MacroPosition};
 use overflow;
+use pairs::{rewrite_pair, PairParts};
 use rewrite::{Rewrite, RewriteContext};
 use shape::Shape;
+use source_map::SpanUtils;
 use spanned::Spanned;
 use utils::{
-    colon_spaces, extra_offset, first_line_width, format_abi, format_mutability, last_line_width,
-    mk_sp,
+    colon_spaces, extra_offset, first_line_width, format_abi, format_mutability,
+    last_line_extendable, last_line_width, mk_sp, rewrite_ident,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -115,7 +114,7 @@ where
 
     for segment in iter {
         // Indicates a global path, shouldn't be rendered.
-        if segment.ident.name == keywords::CrateRoot.name() {
+        if segment.ident.name == keywords::PathRoot.name() {
             continue;
         }
         if first {
@@ -142,10 +141,19 @@ where
 }
 
 #[derive(Debug)]
-enum SegmentParam<'a> {
+pub enum SegmentParam<'a> {
     LifeTime(&'a ast::Lifetime),
     Type(&'a ast::Ty),
     Binding(&'a ast::TypeBinding),
+}
+
+impl<'a> SegmentParam<'a> {
+    fn from_generic_arg(arg: &ast::GenericArg) -> SegmentParam {
+        match arg {
+            ast::GenericArg::Lifetime(ref lt) => SegmentParam::LifeTime(lt),
+            ast::GenericArg::Type(ref ty) => SegmentParam::Type(ty),
+        }
+    }
 }
 
 impl<'a> Spanned for SegmentParam<'a> {
@@ -158,19 +166,6 @@ impl<'a> Spanned for SegmentParam<'a> {
     }
 }
 
-impl<'a> ToExpr for SegmentParam<'a> {
-    fn to_expr(&self) -> Option<&ast::Expr> {
-        None
-    }
-
-    fn can_be_overflowed(&self, context: &RewriteContext, len: usize) -> bool {
-        match *self {
-            SegmentParam::Type(ty) => ty.can_be_overflowed(context, len),
-            _ => false,
-        }
-    }
-}
-
 impl<'a> Rewrite for SegmentParam<'a> {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         match *self {
@@ -178,8 +173,10 @@ impl<'a> Rewrite for SegmentParam<'a> {
             SegmentParam::Type(ty) => ty.rewrite(context, shape),
             SegmentParam::Binding(binding) => {
                 let mut result = match context.config.type_punctuation_density() {
-                    TypeDensity::Wide => format!("{} = ", binding.ident),
-                    TypeDensity::Compressed => format!("{}=", binding.ident),
+                    TypeDensity::Wide => format!("{} = ", rewrite_ident(context, binding.ident)),
+                    TypeDensity::Compressed => {
+                        format!("{}=", rewrite_ident(context, binding.ident))
+                    }
                 };
                 let budget = shape.width.checked_sub(result.len())?;
                 let rewrite = binding
@@ -211,7 +208,7 @@ fn rewrite_segment(
     shape: Shape,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
-    result.push_str(&segment.ident.name.as_str());
+    result.push_str(rewrite_ident(context, segment.ident));
 
     let ident_len = result.len();
     let shape = if context.use_block_indent() {
@@ -220,22 +217,21 @@ fn rewrite_segment(
         shape.shrink_left(ident_len)?
     };
 
-    if let Some(ref params) = segment.parameters {
-        match **params {
-            ast::PathParameters::AngleBracketed(ref data)
-                if !data.lifetimes.is_empty()
-                    || !data.types.is_empty()
-                    || !data.bindings.is_empty() =>
+    if let Some(ref args) = segment.args {
+        match **args {
+            ast::GenericArgs::AngleBracketed(ref data)
+                if !data.args.is_empty() || !data.bindings.is_empty() =>
             {
                 let param_list = data
-                    .lifetimes
+                    .args
                     .iter()
-                    .map(SegmentParam::LifeTime)
-                    .chain(data.types.iter().map(|x| SegmentParam::Type(&*x)))
+                    .map(SegmentParam::from_generic_arg)
                     .chain(data.bindings.iter().map(|x| SegmentParam::Binding(&*x)))
                     .collect::<Vec<_>>();
 
-                let separator = if path_context == PathContext::Expr {
+                let force_separator =
+                    context.inside_macro() && context.snippet(data.span).starts_with("::");
+                let separator = if path_context == PathContext::Expr || force_separator {
                     "::"
                 } else {
                     ""
@@ -245,7 +241,7 @@ fn rewrite_segment(
                 let generics_str = overflow::rewrite_with_angle_brackets(
                     context,
                     "",
-                    &param_list.iter().map(|e| &*e).collect::<Vec<_>>(),
+                    param_list.iter(),
                     shape,
                     mk_sp(*span_lo, span_hi),
                 )?;
@@ -257,10 +253,10 @@ fn rewrite_segment(
 
                 result.push_str(&generics_str)
             }
-            ast::PathParameters::Parenthesized(ref data) => {
+            ast::GenericArgs::Parenthesized(ref data) => {
                 let output = match data.output {
                     Some(ref ty) => FunctionRetTy::Ty(ty.clone()),
-                    None => FunctionRetTy::Default(codemap::DUMMY_SP),
+                    None => FunctionRetTy::Default(source_map::DUMMY_SP),
                 };
                 result.push_str(&format_function_type(
                     data.inputs.iter().map(|x| &**x),
@@ -291,6 +287,21 @@ where
     <I as Iterator>::Item: Deref,
     <I::Item as Deref>::Target: Rewrite + Spanned + 'a,
 {
+    debug!("format_function_type {:#?}", shape);
+
+    let ty_shape = match context.config.indent_style() {
+        // 4 = " -> "
+        IndentStyle::Block => shape.offset_left(4)?,
+        IndentStyle::Visual => shape.block_left(4)?,
+    };
+    let output = match *output {
+        FunctionRetTy::Ty(ref ty) => {
+            let type_str = ty.rewrite(context, ty_shape)?;
+            format!(" -> {}", type_str)
+        }
+        FunctionRetTy::Default(..) => String::new(),
+    };
+
     // Code for handling variadics is somewhat duplicated for items, but they
     // are different enough to need some serious refactoring to share code.
     enum ArgumentKind<T>
@@ -309,19 +320,18 @@ where
         None
     };
 
-    // 2 for ()
-    let budget = shape.width.checked_sub(2)?;
-    // 1 for (
-    let offset = match context.config.indent_style() {
-        IndentStyle::Block => {
-            shape
-                .block()
-                .block_indent(context.config.tab_spaces())
-                .indent
-        }
-        IndentStyle::Visual => shape.indent + 1,
+    let list_shape = if context.use_block_indent() {
+        Shape::indented(
+            shape.block().indent.block_indent(context.config),
+            context.config,
+        )
+    } else {
+        // 2 for ()
+        let budget = shape.width.checked_sub(2)?;
+        // 1 for (
+        let offset = shape.indent + 1;
+        Shape::legacy(budget, offset)
     };
-    let list_shape = Shape::legacy(budget, offset);
     let list_lo = context.snippet_provider.span_after(span, "(");
     let items = itemize_list(
         context.snippet_provider,
@@ -347,64 +357,49 @@ where
 
     let item_vec: Vec<_> = items.collect();
 
-    let tactic = definitive_tactic(
-        &*item_vec,
-        ListTactic::HorizontalVertical,
-        Separator::Comma,
-        budget,
-    );
-
-    let fmt = ListFormatting {
-        tactic,
-        separator: ",",
-        trailing_separator: if !context.use_block_indent() || variadic {
-            SeparatorTactic::Never
-        } else {
-            context.config.trailing_comma()
-        },
-        separator_place: SeparatorPlace::Back,
-        shape: list_shape,
-        ends_with_newline: tactic.ends_with_newline(context.config.indent_style()),
-        preserve_newline: true,
-        nested: false,
-        config: context.config,
+    // If the return type is multi-lined, then force to use multiple lines for
+    // arguments as well.
+    let tactic = if output.contains('\n') {
+        DefinitiveListTactic::Vertical
+    } else {
+        definitive_tactic(
+            &*item_vec,
+            ListTactic::HorizontalVertical,
+            Separator::Comma,
+            shape.width.saturating_sub(2 + output.len()),
+        )
+    };
+    let trailing_separator = if !context.use_block_indent() || variadic {
+        SeparatorTactic::Never
+    } else {
+        context.config.trailing_comma()
     };
 
+    let fmt = ListFormatting::new(list_shape, context.config)
+        .tactic(tactic)
+        .trailing_separator(trailing_separator)
+        .ends_with_newline(tactic.ends_with_newline(context.config.indent_style()))
+        .preserve_newline(true);
     let list_str = write_list(&item_vec, &fmt)?;
 
-    let ty_shape = match context.config.indent_style() {
-        // 4 = " -> "
-        IndentStyle::Block => shape.offset_left(4)?,
-        IndentStyle::Visual => shape.block_left(4)?,
-    };
-    let output = match *output {
-        FunctionRetTy::Ty(ref ty) => {
-            let type_str = ty.rewrite(context, ty_shape)?;
-            format!(" -> {}", type_str)
-        }
-        FunctionRetTy::Default(..) => String::new(),
-    };
-
-    let args = if (!list_str.contains('\n') || list_str.is_empty()) && !output.contains('\n')
-        || !context.use_block_indent()
-    {
+    let args = if tactic == DefinitiveListTactic::Horizontal || !context.use_block_indent() {
         format!("({})", list_str)
     } else {
         format!(
             "({}{}{})",
-            offset.to_string_with_newline(context.config),
+            list_shape.indent.to_string_with_newline(context.config),
             list_str,
             shape.block().indent.to_string_with_newline(context.config),
         )
     };
-    if last_line_width(&args) + first_line_width(&output) <= shape.width {
+    if output.is_empty() || last_line_width(&args) + first_line_width(&output) <= shape.width {
         Some(format!("{}{}", args, output))
     } else {
         Some(format!(
             "{}\n{}{}",
             args,
-            offset.to_string(context.config),
-            output.trim_left()
+            list_shape.indent.to_string(context.config),
+            output.trim_start()
         ))
     }
 }
@@ -427,7 +422,7 @@ impl Rewrite for ast::WherePredicate {
                 ..
             }) => {
                 let type_str = bounded_ty.rewrite(context, shape)?;
-                let colon = type_bound_colon(context).trim_right();
+                let colon = type_bound_colon(context).trim_end();
                 let lhs = if let Some(lifetime_str) =
                     rewrite_lifetime_param(context, shape, bound_generic_params)
                 {
@@ -457,15 +452,18 @@ impl Rewrite for ast::WherePredicate {
     }
 }
 
-impl Rewrite for ast::LifetimeDef {
+impl Rewrite for ast::GenericArg {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
-        rewrite_bounded_lifetime(&self.lifetime, &self.bounds, context, shape)
+        match *self {
+            ast::GenericArg::Lifetime(ref lt) => lt.rewrite(context, shape),
+            ast::GenericArg::Type(ref ty) => ty.rewrite(context, shape),
+        }
     }
 }
 
 fn rewrite_bounded_lifetime(
     lt: &ast::Lifetime,
-    bounds: &[ast::Lifetime],
+    bounds: &[ast::GenericBound],
     context: &RewriteContext,
     shape: Shape,
 ) -> Option<String> {
@@ -486,45 +484,42 @@ fn rewrite_bounded_lifetime(
     }
 }
 
-impl Rewrite for ast::TyParamBound {
+impl Rewrite for ast::Lifetime {
+    fn rewrite(&self, context: &RewriteContext, _: Shape) -> Option<String> {
+        Some(rewrite_ident(context, self.ident).to_owned())
+    }
+}
+
+impl Rewrite for ast::GenericBound {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         match *self {
-            ast::TyParamBound::TraitTyParamBound(ref tref, ast::TraitBoundModifier::None) => {
-                tref.rewrite(context, shape)
+            ast::GenericBound::Trait(ref poly_trait_ref, trait_bound_modifier) => {
+                let snippet = context.snippet(self.span());
+                let has_paren = snippet.starts_with('(') && snippet.ends_with(')');
+                let rewrite = match trait_bound_modifier {
+                    ast::TraitBoundModifier::None => poly_trait_ref.rewrite(context, shape),
+                    ast::TraitBoundModifier::Maybe => poly_trait_ref
+                        .rewrite(context, shape.offset_left(1)?)
+                        .map(|s| format!("?{}", s)),
+                };
+                rewrite.map(|s| if has_paren { format!("({})", s) } else { s })
             }
-            ast::TyParamBound::TraitTyParamBound(ref tref, ast::TraitBoundModifier::Maybe) => Some(
-                format!("?{}", tref.rewrite(context, shape.offset_left(1)?)?),
-            ),
-            ast::TyParamBound::RegionTyParamBound(ref l) => l.rewrite(context, shape),
+            ast::GenericBound::Outlives(ref lifetime) => lifetime.rewrite(context, shape),
         }
     }
 }
 
-impl Rewrite for ast::Lifetime {
-    fn rewrite(&self, _: &RewriteContext, _: Shape) -> Option<String> {
-        Some(self.ident.to_string())
-    }
-}
-
-/// A simple wrapper over type param bounds in trait.
-#[derive(new)]
-pub struct TraitTyParamBounds<'a> {
-    inner: &'a ast::TyParamBounds,
-}
-
-impl<'a> Rewrite for TraitTyParamBounds<'a> {
+impl Rewrite for ast::GenericBounds {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
-        join_bounds(context, shape, self.inner, false)
-    }
-}
+        if self.is_empty() {
+            return Some(String::new());
+        }
 
-impl Rewrite for ast::TyParamBounds {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         join_bounds(context, shape, self, true)
     }
 }
 
-impl Rewrite for ast::TyParam {
+impl Rewrite for ast::GenericParam {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         let mut result = String::with_capacity(128);
         // FIXME: If there are more than one attributes, this will force multiline.
@@ -532,19 +527,23 @@ impl Rewrite for ast::TyParam {
             Some(ref rw) if !rw.is_empty() => result.push_str(&format!("{} ", rw)),
             _ => (),
         }
-        result.push_str(&self.ident.to_string());
+        result.push_str(rewrite_ident(context, self.ident));
         if !self.bounds.is_empty() {
             result.push_str(type_bound_colon(context));
             result.push_str(&self.bounds.rewrite(context, shape)?)
         }
-        if let Some(ref def) = self.default {
+        if let ast::GenericParamKind::Type {
+            default: Some(ref def),
+        } = self.kind
+        {
             let eq_str = match context.config.type_punctuation_density() {
                 TypeDensity::Compressed => "=",
                 TypeDensity::Wide => " = ",
             };
             result.push_str(eq_str);
             let budget = shape.width.checked_sub(result.len())?;
-            let rewrite = def.rewrite(context, Shape::legacy(budget, shape.indent + result.len()))?;
+            let rewrite =
+                def.rewrite(context, Shape::legacy(budget, shape.indent + result.len()))?;
             result.push_str(&rewrite);
         }
 
@@ -646,12 +645,9 @@ impl Rewrite for ast::Ty {
                 ty.rewrite(context, Shape::legacy(budget, shape.indent + 1))
                     .map(|ty_str| format!("[{}]", ty_str))
             }
-            ast::TyKind::Tup(ref items) => rewrite_tuple(
-                context,
-                &::utils::ptr_vec_to_ref_vec(items),
-                self.span,
-                shape,
-            ),
+            ast::TyKind::Tup(ref items) => {
+                rewrite_tuple(context, items.iter(), self.span, shape, items.len() == 1)
+            }
             ast::TyKind::Path(ref q_self, ref path) => {
                 rewrite_path(context, PathContext::Type, q_self.as_ref(), path, shape)
             }
@@ -676,7 +672,7 @@ impl Rewrite for ast::Ty {
                 rewrite_macro(mac, None, context, shape, MacroPosition::Expression)
             }
             ast::TyKind::ImplicitSelf => Some(String::from("")),
-            ast::TyKind::ImplTrait(ref it) => it
+            ast::TyKind::ImplTrait(_, ref it) => it
                 .rewrite(context, shape)
                 .map(|it_str| format!("impl {}", it_str)),
             ast::TyKind::Err | ast::TyKind::Typeof(..) => unreachable!(),
@@ -690,6 +686,8 @@ fn rewrite_bare_fn(
     context: &RewriteContext,
     shape: Shape,
 ) -> Option<String> {
+    debug!("rewrite_bare_fn {:#?}", shape);
+
     let mut result = String::with_capacity(128);
 
     if let Some(ref lifetime_str) = rewrite_lifetime_param(context, shape, &bare_fn.generic_params)
@@ -712,7 +710,11 @@ fn rewrite_bare_fn(
 
     result.push_str("fn");
 
-    let func_ty_shape = shape.offset_left(result.len())?;
+    let func_ty_shape = if context.use_block_indent() {
+        shape.offset_left(result.len())?
+    } else {
+        shape.visual_indent(result.len()).sub_width(result.len())?
+    };
 
     let rewrite = format_function_type(
         bare_fn.decl.inputs.iter(),
@@ -728,15 +730,30 @@ fn rewrite_bare_fn(
     Some(result)
 }
 
-fn join_bounds<T>(
+fn is_generic_bounds_in_order(generic_bounds: &[ast::GenericBound]) -> bool {
+    let is_trait = |b: &ast::GenericBound| match b {
+        ast::GenericBound::Outlives(..) => false,
+        ast::GenericBound::Trait(..) => true,
+    };
+    let is_lifetime = |b: &ast::GenericBound| !is_trait(b);
+    let last_trait_index = generic_bounds.iter().rposition(is_trait);
+    let first_lifetime_index = generic_bounds.iter().position(is_lifetime);
+    match (last_trait_index, first_lifetime_index) {
+        (Some(last_trait_index), Some(first_lifetime_index)) => {
+            last_trait_index < first_lifetime_index
+        }
+        _ => true,
+    }
+}
+
+fn join_bounds(
     context: &RewriteContext,
     shape: Shape,
-    items: &[T],
+    items: &[ast::GenericBound],
     need_indent: bool,
-) -> Option<String>
-where
-    T: Rewrite,
-{
+) -> Option<String> {
+    debug_assert!(!items.is_empty());
+
     // Try to join types in a single line
     let joiner = match context.config.type_punctuation_density() {
         TypeDensity::Compressed => "+",
@@ -747,7 +764,7 @@ where
         .map(|item| item.rewrite(context, shape))
         .collect::<Option<Vec<_>>>()?;
     let result = type_strs.join(joiner);
-    if items.len() == 1 || (!result.contains('\n') && result.len() <= shape.width) {
+    if items.len() <= 1 || (!result.contains('\n') && result.len() <= shape.width) {
         return Some(result);
     }
 
@@ -764,8 +781,26 @@ where
         (type_strs, shape.indent)
     };
 
-    let joiner = format!("{}+ ", offset.to_string_with_newline(context.config));
-    Some(type_strs.join(&joiner))
+    let is_bound_extendable = |s: &str, b: &ast::GenericBound| match b {
+        ast::GenericBound::Outlives(..) => true,
+        ast::GenericBound::Trait(..) => last_line_extendable(s),
+    };
+    let mut result = String::with_capacity(128);
+    result.push_str(&type_strs[0]);
+    let mut can_be_put_on_the_same_line = is_bound_extendable(&result, &items[0]);
+    let generic_bounds_in_order = is_generic_bounds_in_order(items);
+    for (bound, bound_str) in items[1..].iter().zip(type_strs[1..].iter()) {
+        if generic_bounds_in_order && can_be_put_on_the_same_line {
+            result.push_str(joiner);
+        } else {
+            result.push_str(&offset.to_string_with_newline(context.config));
+            result.push_str("+ ");
+        }
+        result.push_str(bound_str);
+        can_be_put_on_the_same_line = is_bound_extendable(bound_str, bound);
+    }
+
+    Some(result)
 }
 
 pub fn can_be_overflowed_type(context: &RewriteContext, ty: &ast::Ty, len: usize) -> bool {
@@ -786,7 +821,10 @@ fn rewrite_lifetime_param(
 ) -> Option<String> {
     let result = generic_params
         .iter()
-        .filter(|p| p.is_lifetime_param())
+        .filter(|p| match p.kind {
+            ast::GenericParamKind::Lifetime => true,
+            _ => false,
+        })
         .map(|lt| lt.rewrite(context, shape))
         .collect::<Option<Vec<_>>>()?
         .join(", ");

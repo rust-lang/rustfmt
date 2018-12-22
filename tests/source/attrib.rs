@@ -18,9 +18,6 @@
 
 // Another comment
 
-#[invalid attribute]
-fn foo() {}
-
 /// Blah blah blah.
 /// Blah blah blah.
 /// Blah blah blah.
@@ -33,6 +30,7 @@ impl Bar {
     /// Blah blah blooo.
     /// Blah blah blooo.
     #[an_attribute]
+    #[doc = "an attribute that shouldn't be normalized to a doc comment"]
     fn foo(&mut self) -> isize {
     }
 
@@ -151,7 +149,13 @@ fn attributes_on_statements() {
     foo!();
 }
 
-// Large derive
+// Large derives
+#[derive(Add, Sub, Mul, Div, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, Serialize, Mul)]
+
+
+/// Foo bar baz
+
+
 #[derive(Add, Sub, Mul, Div, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, Serialize, Deserialize)]
 pub struct HP(pub u8);
 
@@ -168,3 +172,42 @@ pub fn foo() {}
 #[clippy::bar(a, b, c)]
 pub fn foo() {}
 
+mod issue_2620 {
+    #[derive(Debug, StructOpt)]
+#[structopt(about = "Display information about the character on FF Logs")]
+pub struct Params {
+  #[structopt(help = "The server the character is on")]
+  server: String,
+  #[structopt(help = "The character's first name")]
+  first_name: String,
+  #[structopt(help = "The character's last name")]
+  last_name: String,
+  #[structopt(
+    short = "j",
+    long = "job",
+    help = "The job to look at",
+    parse(try_from_str)
+  )]
+  job: Option<Job>
+}
+}
+
+// #2969
+#[cfg(not(all(feature="std",
+              any(target_os = "linux", target_os = "android",
+                  target_os = "netbsd",
+                  target_os = "dragonfly",
+                  target_os = "haiku",
+                  target_os = "emscripten",
+                  target_os = "solaris",
+                  target_os = "cloudabi",
+                  target_os = "macos", target_os = "ios",
+                  target_os = "freebsd",
+                  target_os = "openbsd", target_os = "bitrig",
+                  target_os = "redox",
+                  target_os = "fuchsia",
+                  windows,
+                  all(target_arch = "wasm32", feature = "stdweb"),
+                  all(target_arch = "wasm32", feature = "wasm-bindgen"),
+              ))))]
+type Os = NoSource;

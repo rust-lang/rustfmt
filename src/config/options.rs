@@ -12,15 +12,27 @@ use config::config_type::ConfigType;
 use config::lists::*;
 use config::{Config, FileName};
 
-use isatty::stdout_isatty;
+use atty;
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+/// Macro that will stringify the enum variants or a provided textual repr
+#[macro_export]
+macro_rules! configuration_option_enum_stringify {
+    ($variant:ident) => {
+        stringify!($variant)
+    };
+
+    ($_variant:ident: $value:expr) => {
+        stringify!($value)
+    };
+}
+
 /// Macro for deriving implementations of Serialize/Deserialize for enums
 #[macro_export]
 macro_rules! impl_enum_serialize_and_deserialize {
-    ( $e:ident, $( $x:ident ),* ) => {
+    ( $e:ident, $( $variant:ident $(: $value:expr)* ),* ) => {
         impl ::serde::ser::Serialize for $e {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where S: ::serde::ser::Serializer
@@ -31,7 +43,9 @@ macro_rules! impl_enum_serialize_and_deserialize {
                 #[allow(unreachable_patterns)]
                 match *self {
                     $(
-                        $e::$x => serializer.serialize_str(stringify!($x)),
+                        $e::$variant => serializer.serialize_str(
+                            configuration_option_enum_stringify!($variant $(: $value)*)
+                        ),
                     )*
                     _ => {
                         Err(S::Error::custom(format!("Cannot serialize {:?}", self)))
@@ -59,11 +73,13 @@ macro_rules! impl_enum_serialize_and_deserialize {
                 }
                 let s = d.deserialize_string(StringOnly::<D>(PhantomData))?;
                 $(
-                    if stringify!($x).eq_ignore_ascii_case(&s) {
-                      return Ok($e::$x);
+                    if configuration_option_enum_stringify!($variant $(: $value)*)
+                        .eq_ignore_ascii_case(&s) {
+                      return Ok($e::$variant);
                     }
                 )*
-                static ALLOWED: &'static[&str] = &[$(stringify!($x),)*];
+                static ALLOWED: &'static[&str] = &[
+                    $(configuration_option_enum_stringify!($variant $(: $value)*),)*];
                 Err(D::Error::unknown_variant(&s, ALLOWED))
             }
         }
@@ -73,8 +89,9 @@ macro_rules! impl_enum_serialize_and_deserialize {
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 $(
-                    if stringify!($x).eq_ignore_ascii_case(s) {
-                        return Ok($e::$x);
+                    if configuration_option_enum_stringify!($variant $(: $value)*)
+                        .eq_ignore_ascii_case(s) {
+                        return Ok($e::$variant);
                     }
                 )*
                 Err("Bad variant")
@@ -85,7 +102,9 @@ macro_rules! impl_enum_serialize_and_deserialize {
             fn doc_hint() -> String {
                 let mut variants = Vec::new();
                 $(
-                    variants.push(stringify!($x));
+                    variants.push(
+                        configuration_option_enum_stringify!($variant $(: $value)*)
+                    );
                 )*
                 format!("[{}]", variants.join("|"))
             }
@@ -93,21 +112,88 @@ macro_rules! impl_enum_serialize_and_deserialize {
     };
 }
 
-macro_rules! configuration_option_enum{
-    ($e:ident: $( $x:ident ),+ $(,)*) => {
-        #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+macro_rules! configuration_option_enum {
+    ($e:ident: $( $name:ident $(: $value:expr)* ),+ $(,)*) => (
+        #[derive(Copy, Clone, Eq, PartialEq)]
         pub enum $e {
-            $( $x ),+
+            $( $name ),+
         }
 
-        impl_enum_serialize_and_deserialize!($e, $( $x ),+);
-    }
+        impl ::std::fmt::Debug for $e {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                f.write_str(match self {
+                    $(
+                        $e::$name => configuration_option_enum_stringify!($name $(: $value)*),
+                    )+
+                })
+            }
+        }
+
+        impl_enum_serialize_and_deserialize!($e, $( $name $(: $value)* ),+);
+    );
 }
 
 configuration_option_enum! { NewlineStyle:
+    Auto, // Auto-detect based on the raw source input
     Windows, // \r\n
     Unix, // \n
     Native, // \r\n in Windows, \n on other platforms
+}
+
+impl NewlineStyle {
+    fn auto_detect(raw_input_text: &str) -> NewlineStyle {
+        if let Some(pos) = raw_input_text.find('\n') {
+            let pos = pos.saturating_sub(1);
+            if let Some('\r') = raw_input_text.chars().nth(pos) {
+                NewlineStyle::Windows
+            } else {
+                NewlineStyle::Unix
+            }
+        } else {
+            NewlineStyle::Native
+        }
+    }
+
+    fn native() -> NewlineStyle {
+        if cfg!(windows) {
+            NewlineStyle::Windows
+        } else {
+            NewlineStyle::Unix
+        }
+    }
+
+    /// Apply this newline style to the formatted text. When the style is set
+    /// to `Auto`, the `raw_input_text` is used to detect the existing line
+    /// endings.
+    ///
+    /// If the style is set to `Auto` and `raw_input_text` contains no
+    /// newlines, the `Native` style will be used.
+    pub(crate) fn apply(self, formatted_text: &mut String, raw_input_text: &str) {
+        use NewlineStyle::*;
+        let mut style = self;
+        if style == Auto {
+            style = Self::auto_detect(raw_input_text);
+        }
+        if style == Native {
+            style = Self::native();
+        }
+        match style {
+            Windows => {
+                let mut transformed = String::with_capacity(2 * formatted_text.capacity());
+                for c in formatted_text.chars() {
+                    match c {
+                        '\n' => transformed.push_str("\r\n"),
+                        '\r' => continue,
+                        c => transformed.push(c),
+                    }
+                }
+                *formatted_text = transformed;
+            }
+            Unix => return,
+            Native => unreachable!("NewlineStyle::Native"),
+            Auto => unreachable!("NewlineStyle::Auto"),
+        }
+    }
 }
 
 configuration_option_enum! { BraceStyle:
@@ -154,6 +240,8 @@ configuration_option_enum! { TypeDensity:
 configuration_option_enum! { Heuristics:
     // Turn off any heuristics
     Off,
+    // Turn on max heuristics
+    Max,
     // Use Rustfmt's defaults
     Default,
 }
@@ -203,13 +291,20 @@ configuration_option_enum! { Color:
     Auto,
 }
 
+configuration_option_enum! { Version:
+    // 1.x.y
+    One,
+    // 2.x.y
+    Two,
+}
+
 impl Color {
     /// Whether we should use a coloured terminal.
-    pub fn use_colored_tty(&self) -> bool {
+    pub fn use_colored_tty(self) -> bool {
         match self {
             Color::Always => true,
             Color::Never => false,
-            Color::Auto => stdout_isatty(),
+            Color::Auto => atty::is(atty::Stream::Stdout),
         }
     }
 }
@@ -223,11 +318,14 @@ configuration_option_enum! { Verbosity:
     Quiet,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct WidthHeuristics {
     // Maximum width of the args of a function call before falling back
     // to vertical formatting.
     pub fn_call_width: usize,
+    // Maximum width of the args of a function-like attributes before falling
+    // back to vertical formatting.
+    pub attr_fn_like_width: usize,
     // Maximum width in the body of a struct lit before falling back to
     // vertical formatting.
     pub struct_lit_width: usize,
@@ -249,11 +347,24 @@ impl WidthHeuristics {
     pub fn null() -> WidthHeuristics {
         WidthHeuristics {
             fn_call_width: usize::max_value(),
+            attr_fn_like_width: usize::max_value(),
             struct_lit_width: 0,
             struct_variant_width: 0,
             array_width: usize::max_value(),
             chain_width: usize::max_value(),
             single_line_if_else_max_width: 0,
+        }
+    }
+
+    pub fn set(max_width: usize) -> WidthHeuristics {
+        WidthHeuristics {
+            fn_call_width: max_width,
+            attr_fn_like_width: max_width,
+            struct_lit_width: max_width,
+            struct_variant_width: max_width,
+            array_width: max_width,
+            chain_width: max_width,
+            single_line_if_else_max_width: max_width,
         }
     }
 
@@ -269,6 +380,7 @@ impl WidthHeuristics {
         };
         WidthHeuristics {
             fn_call_width: (60.0 * max_width_ratio).round() as usize,
+            attr_fn_like_width: (70.0 * max_width_ratio).round() as usize,
             struct_lit_width: (18.0 * max_width_ratio).round() as usize,
             struct_variant_width: (35.0 * max_width_ratio).round() as usize,
             array_width: (60.0 * max_width_ratio).round() as usize,
@@ -293,7 +405,7 @@ impl Default for EmitMode {
 }
 
 /// A set of directories, files and modules that rustfmt should ignore.
-#[derive(Default, Deserialize, Serialize, Clone, Debug)]
+#[derive(Default, Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct IgnoreList(HashSet<PathBuf>);
 
 impl IgnoreList {
@@ -339,4 +451,81 @@ impl ::std::str::FromStr for IgnoreList {
 pub trait CliOptions {
     fn apply_to(self, config: &mut Config);
     fn config_path(&self) -> Option<&Path>;
+}
+
+/// The edition of the compiler (RFC 2052)
+configuration_option_enum! { Edition:
+    Edition2015: 2015,
+    Edition2018: 2018,
+}
+
+impl Default for Edition {
+    fn default() -> Edition {
+        Edition::Edition2015
+    }
+}
+
+impl Edition {
+    pub(crate) fn to_libsyntax_pos_edition(self) -> syntax_pos::edition::Edition {
+        match self {
+            Edition::Edition2015 => syntax_pos::edition::Edition::Edition2015,
+            Edition::Edition2018 => syntax_pos::edition::Edition::Edition2018,
+        }
+    }
+}
+
+#[test]
+fn test_newline_style_auto_detect() {
+    let lf = "One\nTwo\nThree";
+    let crlf = "One\r\nTwo\r\nThree";
+    let none = "One Two Three";
+
+    assert_eq!(NewlineStyle::Unix, NewlineStyle::auto_detect(lf));
+    assert_eq!(NewlineStyle::Windows, NewlineStyle::auto_detect(crlf));
+    assert_eq!(NewlineStyle::Native, NewlineStyle::auto_detect(none));
+}
+
+#[test]
+fn test_newline_style_auto_apply() {
+    let auto = NewlineStyle::Auto;
+
+    let formatted_text = "One\nTwo\nThree";
+    let raw_input_text = "One\nTwo\nThree";
+
+    let mut out = String::from(formatted_text);
+    auto.apply(&mut out, raw_input_text);
+    assert_eq!("One\nTwo\nThree", &out, "auto should detect 'lf'");
+
+    let formatted_text = "One\nTwo\nThree";
+    let raw_input_text = "One\r\nTwo\r\nThree";
+
+    let mut out = String::from(formatted_text);
+    auto.apply(&mut out, raw_input_text);
+    assert_eq!("One\r\nTwo\r\nThree", &out, "auto should detect 'crlf'");
+
+    #[cfg(not(windows))]
+    {
+        let formatted_text = "One\nTwo\nThree";
+        let raw_input_text = "One Two Three";
+
+        let mut out = String::from(formatted_text);
+        auto.apply(&mut out, raw_input_text);
+        assert_eq!(
+            "One\nTwo\nThree", &out,
+            "auto-native-unix should detect 'lf'"
+        );
+    }
+
+    #[cfg(windows)]
+    {
+        let formatted_text = "One\nTwo\nThree";
+        let raw_input_text = "One Two Three";
+
+        let mut out = String::from(formatted_text);
+        auto.apply(&mut out, raw_input_text);
+        assert_eq!(
+            "One\r\nTwo\r\nThree", &out,
+            "auto-native-windows should detect 'crlf'"
+        );
+    }
 }

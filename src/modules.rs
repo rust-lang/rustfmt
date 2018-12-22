@@ -13,8 +13,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use syntax::ast;
-use syntax::codemap;
 use syntax::parse::{parser, DirectoryOwnership};
+use syntax::source_map;
+use syntax_pos::symbol::Symbol;
 
 use config::FileName;
 use utils::contains_skip;
@@ -23,19 +24,34 @@ use utils::contains_skip;
 /// If a file is used twice in a crate, it appears only once.
 pub fn list_files<'a>(
     krate: &'a ast::Crate,
-    codemap: &codemap::CodeMap,
+    source_map: &source_map::SourceMap,
 ) -> Result<BTreeMap<FileName, &'a ast::Mod>, io::Error> {
     let mut result = BTreeMap::new(); // Enforce file order determinism
-    let root_filename = codemap.span_to_filename(krate.span);
+    let root_filename = source_map.span_to_filename(krate.span);
     {
         let parent = match root_filename {
-            codemap::FileName::Real(ref path) => path.parent().unwrap(),
+            source_map::FileName::Real(ref path) => path.parent().unwrap(),
             _ => Path::new(""),
         };
-        list_submodules(&krate.module, parent, None, codemap, &mut result)?;
+        list_submodules(&krate.module, parent, None, source_map, &mut result)?;
     }
     result.insert(root_filename.into(), &krate.module);
     Ok(result)
+}
+
+fn path_value(attr: &ast::Attribute) -> Option<Symbol> {
+    if attr.name() == "path" {
+        attr.value_str()
+    } else {
+        None
+    }
+}
+
+// N.B. Even when there are multiple `#[path = ...]` attributes, we just need to
+// examine the first one, since rustc ignores the second and the subsequent ones
+// as unused attributes.
+fn find_path_value(attrs: &[ast::Attribute]) -> Option<Symbol> {
+    attrs.iter().flat_map(path_value).next()
 }
 
 /// Recursively list all external modules included in a module.
@@ -43,25 +59,29 @@ fn list_submodules<'a>(
     module: &'a ast::Mod,
     search_dir: &Path,
     relative: Option<ast::Ident>,
-    codemap: &codemap::CodeMap,
+    source_map: &source_map::SourceMap,
     result: &mut BTreeMap<FileName, &'a ast::Mod>,
 ) -> Result<(), io::Error> {
     debug!("list_submodules: search_dir: {:?}", search_dir);
     for item in &module.items {
         if let ast::ItemKind::Mod(ref sub_mod) = item.node {
             if !contains_skip(&item.attrs) {
-                let is_internal =
-                    codemap.span_to_filename(item.span) == codemap.span_to_filename(sub_mod.inner);
+                let is_internal = source_map.span_to_filename(item.span)
+                    == source_map.span_to_filename(sub_mod.inner);
                 let (dir_path, relative) = if is_internal {
-                    (search_dir.join(&item.ident.to_string()), None)
+                    if let Some(path) = find_path_value(&item.attrs) {
+                        (search_dir.join(&path.as_str()), None)
+                    } else {
+                        (search_dir.join(&item.ident.to_string()), None)
+                    }
                 } else {
                     let (mod_path, relative) =
-                        module_file(item.ident, &item.attrs, search_dir, relative, codemap)?;
+                        module_file(item.ident, &item.attrs, search_dir, relative, source_map)?;
                     let dir_path = mod_path.parent().unwrap().to_owned();
                     result.insert(FileName::Real(mod_path), sub_mod);
                     (dir_path, relative)
                 };
-                list_submodules(sub_mod, &dir_path, relative, codemap, result)?;
+                list_submodules(sub_mod, &dir_path, relative, source_map, result)?;
             }
         }
     }
@@ -74,13 +94,13 @@ fn module_file(
     attrs: &[ast::Attribute],
     dir_path: &Path,
     relative: Option<ast::Ident>,
-    codemap: &codemap::CodeMap,
+    source_map: &source_map::SourceMap,
 ) -> Result<(PathBuf, Option<ast::Ident>), io::Error> {
     if let Some(path) = parser::Parser::submod_path_from_attr(attrs, dir_path) {
         return Ok((path, None));
     }
 
-    match parser::Parser::default_submod_path(id, relative, dir_path, codemap).result {
+    match parser::Parser::default_submod_path(id, relative, dir_path, source_map).result {
         Ok(parser::ModulePathSuccess {
             path,
             directory_ownership,

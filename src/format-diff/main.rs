@@ -83,7 +83,7 @@ fn main() {
     );
 
     if let Err(e) = run(&opts) {
-        println!("{}", opts.usage(&format!("{}", e)));
+        println!("{}", opts.usage(&e.to_string()));
         process::exit(1);
     }
 }
@@ -214,7 +214,7 @@ where
 
 #[test]
 fn scan_simple_git_diff() {
-    const DIFF: &'static str = include_str!("test/bindgen.diff");
+    const DIFF: &str = include_str!("test/bindgen.diff");
     let (files, ranges) = scan_diff(DIFF.as_bytes(), 1, r".*\.rs").expect("scan_diff failed?");
 
     assert!(

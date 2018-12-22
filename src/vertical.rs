@@ -14,17 +14,17 @@ use std::cmp;
 
 use config::lists::*;
 use syntax::ast;
-use syntax::codemap::{BytePos, Span};
+use syntax::source_map::{BytePos, Span};
 
-use codemap::SpanUtils;
 use comment::{combine_strs_with_missing_comments, contains_comment};
 use expr::rewrite_field;
 use items::{rewrite_struct_field, rewrite_struct_field_prefix};
-use lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
+use lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator};
 use rewrite::{Rewrite, RewriteContext};
 use shape::{Indent, Shape};
+use source_map::SpanUtils;
 use spanned::Spanned;
-use utils::{contains_skip, is_attributes_extendable, mk_sp};
+use utils::{contains_skip, is_attributes_extendable, mk_sp, rewrite_ident};
 
 pub trait AlignedItem {
     fn skip(&self) -> bool;
@@ -88,7 +88,7 @@ impl AlignedItem for ast::Field {
 
     fn rewrite_prefix(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
         let attrs_str = self.attrs.rewrite(context, shape)?;
-        let name = &self.ident.name.to_string();
+        let name = rewrite_ident(context, self.ident);
         let missing_span = if self.attrs.is_empty() {
             mk_sp(self.span.lo(), self.span.lo())
         } else {
@@ -126,7 +126,7 @@ pub fn rewrite_with_alignment<T: AlignedItem>(
     } else {
         ("", fields.len() - 1)
     };
-    let init = &fields[0..group_index + 1];
+    let init = &fields[0..=group_index];
     let rest = &fields[group_index + 1..];
     let init_last_pos = if rest.is_empty() {
         span.hi()
@@ -141,14 +141,14 @@ pub fn rewrite_with_alignment<T: AlignedItem>(
         );
 
         let snippet = context.snippet(missing_span);
-        if snippet.trim_left().starts_with("//") {
+        if snippet.trim_start().starts_with("//") {
             let offset = snippet.lines().next().map_or(0, |l| l.len());
             // 2 = "," + "\n"
             init_hi + BytePos(offset as u32 + 2)
-        } else if snippet.trim_left().starts_with("/*") {
+        } else if snippet.trim_start().starts_with("/*") {
             let comment_lines = snippet
                 .lines()
-                .position(|line| line.trim_right().ends_with("*/"))
+                .position(|line| line.trim_end().ends_with("*/"))
                 .unwrap_or(0);
 
             let offset = snippet
@@ -172,13 +172,13 @@ pub fn rewrite_with_alignment<T: AlignedItem>(
     } else {
         let rest_span = mk_sp(init_last_pos, span.hi());
         let rest_str = rewrite_with_alignment(rest, context, shape, rest_span, one_line_width)?;
-        Some(
-            result + spaces + "\n"
-                + &shape
-                    .indent
-                    .block_indent(context.config)
-                    .to_string(context.config) + &rest_str,
-        )
+        Some(format!(
+            "{}{}\n{}{}",
+            result,
+            spaces,
+            &shape.indent.to_string(context.config),
+            &rest_str
+        ))
     }
 }
 
@@ -214,9 +214,8 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     offset: Indent,
     one_line_width: usize,
 ) -> Option<String> {
-    let item_indent = offset.block_indent(context.config);
     // 1 = ","
-    let item_shape = Shape::indented(item_indent, context.config).sub_width(1)?;
+    let item_shape = Shape::indented(offset, context.config).sub_width(1)?;
     let (mut field_prefix_max_width, field_prefix_min_width) =
         struct_field_prefix_max_min_width(context, fields, item_shape);
     let max_diff = field_prefix_max_width.saturating_sub(field_prefix_min_width);
@@ -224,7 +223,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         field_prefix_max_width = 0;
     }
 
-    let items = itemize_list(
+    let mut items = itemize_list(
         context.snippet_provider,
         fields.iter(),
         "}",
@@ -235,7 +234,8 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         span.lo(),
         span.hi(),
         false,
-    ).collect::<Vec<_>>();
+    )
+    .collect::<Vec<_>>();
 
     let tactic = definitive_tactic(
         &items,
@@ -244,17 +244,24 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         one_line_width,
     );
 
-    let fmt = ListFormatting {
-        tactic,
-        separator: ",",
-        trailing_separator: context.config.trailing_comma(),
-        separator_place: SeparatorPlace::Back,
-        shape: item_shape,
-        ends_with_newline: true,
-        preserve_newline: true,
-        nested: false,
-        config: context.config,
-    };
+    if tactic == DefinitiveListTactic::Horizontal {
+        // since the items fits on a line, there is no need to align them
+        let do_rewrite =
+            |field: &T| -> Option<String> { field.rewrite_aligned_item(context, item_shape, 0) };
+        fields
+            .iter()
+            .zip(items.iter_mut())
+            .for_each(|(field, list_item): (&T, &mut ListItem)| {
+                if list_item.item.is_some() {
+                    list_item.item = do_rewrite(field);
+                }
+            });
+    }
+
+    let fmt = ListFormatting::new(item_shape, context.config)
+        .tactic(tactic)
+        .trailing_separator(context.config.trailing_comma())
+        .preserve_newline(true);
     write_list(&items, &fmt)
 }
 

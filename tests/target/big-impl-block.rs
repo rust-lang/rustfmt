@@ -1,5 +1,3 @@
-// rustfmt-indent_style: Block
-
 // #1357
 impl<'a, Select, From, Distinct, Where, Order, Limit, Offset, Groupby, DB> InternalBoxedDsl<'a, DB>
     for SelectStatement<Select, From, Distinct, Where, Order, Limit, Offset, GroupBy>
@@ -80,4 +78,5 @@ where
     S: event::Stream,
     F: for<'t> FnMut(transform::Api<'t, Stream<ContentStream<S>>>) -> transform::Api<'t, X>,
     X: event::Stream,
-{}
+{
+}

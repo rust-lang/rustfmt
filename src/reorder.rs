@@ -16,17 +16,17 @@
 
 // FIXME(#2455): Reorder trait items.
 
-use config::{lists::*, Config};
-use syntax::{ast, attr, codemap::Span};
+use config::Config;
+use syntax::{ast, attr, source_map::Span};
 
 use attr::filter_inline_attrs;
-use codemap::LineRangeUtils;
 use comment::combine_strs_with_missing_comments;
 use imports::{merge_use_trees, UseTree};
 use items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use lists::{itemize_list, write_list, ListFormatting, ListItem};
 use rewrite::{Rewrite, RewriteContext};
 use shape::Shape;
+use source_map::LineRangeUtils;
 use spanned::Spanned;
 use utils::mk_sp;
 use visitor::FmtVisitor;
@@ -37,15 +37,13 @@ use std::cmp::{Ord, Ordering};
 fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
     match (&a.node, &b.node) {
         (&ast::ItemKind::Mod(..), &ast::ItemKind::Mod(..)) => {
-            a.ident.name.as_str().cmp(&b.ident.name.as_str())
+            a.ident.as_str().cmp(&b.ident.as_str())
         }
         (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
-            let a_orig_name =
-                a_name.map_or_else(|| a.ident.name.as_str(), |symbol| symbol.as_str());
-            let b_orig_name =
-                b_name.map_or_else(|| b.ident.name.as_str(), |symbol| symbol.as_str());
+            let a_orig_name = a_name.map_or_else(|| a.ident.as_str(), |symbol| symbol.as_str());
+            let b_orig_name = b_name.map_or_else(|| b.ident.as_str(), |symbol| symbol.as_str());
             let result = a_orig_name.cmp(&b_orig_name);
             if result != Ordering::Equal {
                 return result;
@@ -57,7 +55,7 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
                 (Some(..), None) => Ordering::Greater,
                 (None, Some(..)) => Ordering::Less,
                 (None, None) => Ordering::Equal,
-                (Some(..), Some(..)) => a.ident.name.as_str().cmp(&b.ident.name.as_str()),
+                (Some(..), Some(..)) => a.ident.as_str().cmp(&b.ident.as_str()),
             }
         }
         _ => unreachable!(),
@@ -69,18 +67,9 @@ fn wrap_reorderable_items(
     list_items: &[ListItem],
     shape: Shape,
 ) -> Option<String> {
-    let fmt = ListFormatting {
-        tactic: DefinitiveListTactic::Vertical,
-        separator: "",
-        trailing_separator: SeparatorTactic::Never,
-        separator_place: SeparatorPlace::Back,
-        shape,
-        ends_with_newline: true,
-        preserve_newline: false,
-        nested: false,
-        config: context.config,
-    };
-
+    let fmt = ListFormatting::new(shape, context.config)
+        .separator("")
+        .align_comments(false);
     write_list(list_items, &fmt)
 }
 
@@ -100,7 +89,7 @@ fn rewrite_reorderable_item(
 
     let item_str = match item.node {
         ast::ItemKind::ExternCrate(..) => rewrite_extern_crate(context, item)?,
-        ast::ItemKind::Mod(..) => rewrite_mod(item),
+        ast::ItemKind::Mod(..) => rewrite_mod(context, item),
         _ => return None,
     };
 
@@ -205,12 +194,12 @@ impl ReorderableItemKind {
         }
     }
 
-    fn is_same_item_kind(&self, item: &ast::Item) -> bool {
-        ReorderableItemKind::from(item) == *self
+    fn is_same_item_kind(self, item: &ast::Item) -> bool {
+        ReorderableItemKind::from(item) == self
     }
 
-    fn is_reorderable(&self, config: &Config) -> bool {
-        match *self {
+    fn is_reorderable(self, config: &Config) -> bool {
+        match self {
             ReorderableItemKind::ExternCrate => config.reorder_imports(),
             ReorderableItemKind::Mod => config.reorder_modules(),
             ReorderableItemKind::Use => config.reorder_imports(),
@@ -218,8 +207,8 @@ impl ReorderableItemKind {
         }
     }
 
-    fn in_group(&self) -> bool {
-        match *self {
+    fn in_group(self) -> bool {
+        match self {
             ReorderableItemKind::ExternCrate
             | ReorderableItemKind::Mod
             | ReorderableItemKind::Use => true,
@@ -238,16 +227,17 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         item_kind: ReorderableItemKind,
         in_group: bool,
     ) -> usize {
-        let mut last = self.codemap.lookup_line_range(items[0].span());
+        let mut last = self.source_map.lookup_line_range(items[0].span());
         let item_length = items
             .iter()
             .take_while(|ppi| {
-                item_kind.is_same_item_kind(&***ppi) && (!in_group || {
-                    let current = self.codemap.lookup_line_range(ppi.span());
-                    let in_same_group = current.lo < last.hi + 2;
-                    last = current;
-                    in_same_group
-                })
+                item_kind.is_same_item_kind(&***ppi)
+                    && (!in_group || {
+                        let current = self.source_map.lookup_line_range(ppi.span());
+                        let in_same_group = current.lo < last.hi + 2;
+                        last = current;
+                        in_same_group
+                    })
             })
             .count();
         let items = &items[..item_length];

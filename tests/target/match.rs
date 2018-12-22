@@ -149,7 +149,7 @@ fn issue339() {
         n => {}
         o => {}
         p => {
-            // Dont collapse me
+            // Don't collapse me
         }
         q => {}
         r => {}
@@ -204,19 +204,19 @@ fn issue355() {
             vec![3; 4]
         }
         // Funky bracketing styles
-        t => println!{"a", b},
+        t => println! {"a", b},
         u => vec![1, 2],
         v => vec![3; 4],
         w => println!["a", b],
         x => vec![1, 2],
         y => vec![3; 4],
         // Brackets with comments
-        tc => println!{"a", b}, // comment
-        uc => vec![1, 2],       // comment
-        vc => vec![3; 4],       // comment
-        wc => println!["a", b], // comment
-        xc => vec![1, 2],       // comment
-        yc => vec![3; 4],       // comment
+        tc => println! {"a", b}, // comment
+        uc => vec![1, 2],        // comment
+        vc => vec![3; 4],        // comment
+        wc => println!["a", b],  // comment
+        xc => vec![1, 2],        // comment
+        yc => vec![3; 4],        // comment
         yd => looooooooooooooooooooooooooooooooooooooooooooooooooooooooong_func(
             aaaaaaaaaa, bbbbbbbbbb, cccccccccc, dddddddddd,
         ),
@@ -481,16 +481,6 @@ fn issue_2152() {
     }
 }
 
-// #2462
-// Preserve a `|` at the beginning of a match arm.
-fn match_with_beginning_vert() {
-    let x = Foo::A;
-    match x {
-        | Foo::A | Foo::B => println!("AB"),
-        | Foo::C => println!("C"),
-    }
-}
-
 // #2376
 // Preserve block around expressions with condition.
 fn issue_2376() {
@@ -510,6 +500,79 @@ fn issue_2376() {
             while let None = x {
                 x = Some(10);
             }
+        }
+    }
+}
+
+// #2621
+// Strip leading `|` in match arm patterns
+fn issue_2621() {
+    let x = Foo::A;
+    match x {
+        Foo::A => println!("No vert single condition"),
+        Foo::B | Foo::C => println!("Center vert two conditions"),
+        Foo::D => println!("Preceding vert single condition"),
+        Foo::E | Foo::F => println!("Preceding vert over two lines"),
+        Foo::G | Foo::H => println!("Trailing vert over two lines"),
+        // Comment on its own line
+        Foo::I => println!("With comment"), // Comment after line
+    }
+}
+
+fn issue_2377() {
+    match tok {
+        Tok::Not
+        | Tok::BNot
+        | Tok::Plus
+        | Tok::Minus
+        | Tok::PlusPlus
+        | Tok::MinusMinus
+        | Tok::Void
+        | Tok::Delete
+            if prec <= 16 =>
+        {
+            // code here...
+        }
+        Tok::TypeOf if prec <= 16 => {}
+    }
+}
+
+// #3040
+fn issue_3040() {
+    {
+        match foo {
+            DevtoolScriptControlMsg::WantsLiveNotifications(id, to_send) => {
+                match documents.find_window(id) {
+                    Some(window) => {
+                        devtools::handle_wants_live_notifications(window.upcast(), to_send)
+                    }
+                    None => return warn!("Message sent to closed pipeline {}.", id),
+                }
+            }
+        }
+    }
+}
+
+// #3030
+fn issue_3030() {
+    match input.trim().parse::<f64>() {
+        Ok(val)
+            if !(
+                // A valid number is the same as what rust considers to be valid,
+                // except for +1., NaN, and Infinity.
+                val.is_infinite() || val.is_nan() || input.ends_with(".") || input.starts_with("+")
+            ) => {}
+    }
+}
+
+fn issue_3005() {
+    match *token {
+        Token::Dimension {
+            value, ref unit, ..
+        } if num_context.is_ok(context.parsing_mode, value) => {
+            return NoCalcLength::parse_dimension(context, value, unit)
+                .map(LengthOrPercentage::Length)
+                .map_err(|()| location.new_unexpected_token_error(token.clone()));
         }
     }
 }

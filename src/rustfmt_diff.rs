@@ -161,7 +161,7 @@ where
     let mut writer = OutputWriter::new(color);
 
     for mismatch in diff {
-        let title = get_section_title(mismatch.line_number);
+        let title = get_section_title(mismatch.line_number_orig);
         writer.writeln(&title, None);
 
         for line in mismatch.lines {
@@ -193,19 +193,22 @@ where
     W: Write,
 {
     for mismatch in diff {
-        let (num_removed, num_added) = mismatch.lines.iter().fold((0, 0), |(rem, add), line| {
-            match *line {
-                DiffLine::Context(_) => panic!("No Context expected"),
-                DiffLine::Expected(_) => (rem, add + 1),
-                DiffLine::Resulting(_) => (rem + 1, add),
-            }
-        });
+        let (num_removed, num_added) =
+            mismatch
+                .lines
+                .iter()
+                .fold((0, 0), |(rem, add), line| match *line {
+                    DiffLine::Context(_) => panic!("No Context expected"),
+                    DiffLine::Expected(_) => (rem, add + 1),
+                    DiffLine::Resulting(_) => (rem + 1, add),
+                });
         // Write a header with enough information to separate the modified lines.
         writeln!(
             out,
             "{} {} {}",
             mismatch.line_number_orig, num_removed, num_added
-        ).unwrap();
+        )
+        .unwrap();
 
         for line in mismatch.lines {
             match line {

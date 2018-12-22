@@ -80,12 +80,12 @@ pub enum SeparatorPlace {
 impl_enum_serialize_and_deserialize!(SeparatorPlace, Front, Back);
 
 impl SeparatorPlace {
-    pub fn is_front(&self) -> bool {
-        *self == SeparatorPlace::Front
+    pub fn is_front(self) -> bool {
+        self == SeparatorPlace::Front
     }
 
-    pub fn is_back(&self) -> bool {
-        *self == SeparatorPlace::Back
+    pub fn is_back(self) -> bool {
+        self == SeparatorPlace::Back
     }
 
     pub fn from_tactic(
@@ -95,11 +95,13 @@ impl SeparatorPlace {
     ) -> SeparatorPlace {
         match tactic {
             DefinitiveListTactic::Vertical => default,
-            _ => if sep == "," {
-                SeparatorPlace::Back
-            } else {
-                default
-            },
+            _ => {
+                if sep == "," {
+                    SeparatorPlace::Back
+                } else {
+                    default
+                }
+            }
         }
     }
 }

@@ -1,9 +1,10 @@
 // rustfmt-normalize_comments: true
+// rustfmt-format_macro_matchers: true
 itemmacro!(this, is.now() .formatted(yay));
 
 itemmacro!(really, long.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbb() .is.formatted());
 
-itemmacro!{this, is.bracket().formatted()}
+itemmacro!{this, is.brace().formatted()}
 
 peg_file!   modname  ("mygrammarfile.rustpeg");
 
@@ -105,6 +106,7 @@ fn main() {
 
 impl X {
     empty_invoc!{}
+    empty_invoc! {}
 }
 
 fn issue_1279() {
@@ -181,6 +183,19 @@ fn issue1577() {
     let json = json!({
         "foo": "bar",
     });
+}
+
+// #3174
+fn issue_3174() {
+    let data =
+        if let Some(debug) = error.debug_info() {
+            json!({
+                "errorKind": format!("{:?}", error.err_kind()),
+                "debugMessage": debug.message,
+            })
+        } else {
+            json!({"errorKind": format!("{:?}", error.err_kind())})
+        };
 }
 
 gfx_pipeline!(pipe {
@@ -392,3 +407,62 @@ macro_rules! bar {
         $m!([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z]);
     };
 }
+
+// #2830
+// Preserve trailing comma-less/ness inside nested macro.
+named!(
+    do_parse_gsv<GsvData>,
+    map_res!(
+        do_parse!(
+            number_of_sentences: map_res!(digit, parse_num::<u16>)
+                >> char!(',')
+                >> sentence_index: map_res!(digit, parse_num::<u16>)
+                >> char!(',')
+                >> total_number_of_sats: map_res!(digit, parse_num::<u16>)
+                >> char!(',')
+                >> sat0: opt!(complete!(parse_gsv_sat_info))
+                >> sat1: opt!(complete!(parse_gsv_sat_info))
+                >> sat2: opt!(complete!(parse_gsv_sat_info))
+                >> sat3: opt!(complete!(parse_gsv_sat_info))
+                >> (
+                    number_of_sentences,
+                    sentence_index,
+                    total_number_of_sats,
+                    sat0,
+                    sat1,
+                    sat2,
+                    sat3
+                )
+        ),
+        construct_gsv_data
+    )
+);
+
+// #2857
+convert_args!(vec!(1, 2, 3));
+
+// #3031
+thread_local!(
+/// TLV Holds a set of JSTraceables that need to be rooted
+    static ROOTED_TRACEABLES: RefCell<RootedTraceableSet> =
+        RefCell::new(RootedTraceableSet::new()) ;
+) ;
+
+thread_local![
+    /// TLV Holds a set of JSTraceables that need to be rooted
+    static ROOTED_TRACEABLES: RefCell<RootedTraceableSet> =
+        RefCell::new(RootedTraceableSet::new()) ;
+
+    /// TLV Holds a set of JSTraceables that need to be rooted
+    static ROOTED_TRACEABLES: RefCell<RootedTraceableSet> =
+        RefCell::new(RootedTraceableSet::new(0)) ;
+
+    /// TLV Holds a set of JSTraceables that need to be rooted
+    static ROOTED_TRACEABLES: RefCell<RootedTraceableSet> =
+        RefCell::new(RootedTraceableSet::new(), xxx, yyy) ;
+
+    /// TLV Holds a set of JSTraceables that need to be rooted
+static ROOTED_TRACEABLES: RefCell<RootedTraceableSet> =
+        RefCell::new(RootedTraceableSet::new(1234)) ;
+
+] ;

@@ -150,7 +150,7 @@ fn issue339() {
         {
 
         }
-        p => { // Dont collapse me
+        p => { // Don't collapse me
         } q => { } r =>
         {
 
@@ -452,17 +452,6 @@ fn issue_2152() {
     }
 }
 
-// #2462
-// Preserve a `|` at the beginning of a match arm.
-fn match_with_beginning_vert() {
-    let x = Foo::A;
-    match x {
-        | Foo::A
-        | Foo::B => println!("AB"),
-        | Foo::C => println!("C"),
-    }
-}
-
 // #2376
 // Preserve block around expressions with condition.
 fn issue_2376() {
@@ -484,4 +473,79 @@ fn issue_2376() {
             }
         }
     }
+}
+
+// #2621
+// Strip leading `|` in match arm patterns
+fn issue_2621() {
+    let x = Foo::A;
+    match x {
+        Foo::A => println!("No vert single condition"),
+        Foo::B | Foo::C => println!("Center vert two conditions"),
+        | Foo::D => println!("Preceding vert single condition"),
+        | Foo::E
+        | Foo::F => println!("Preceding vert over two lines"),
+        Foo::G |
+        Foo::H => println!("Trailing vert over two lines"),
+        // Comment on its own line
+        | Foo::I => println!("With comment"), // Comment after line
+    }
+}
+
+fn issue_2377() {
+    match tok {
+        Tok::Not
+        | Tok::BNot
+        | Tok::Plus
+        | Tok::Minus
+        | Tok::PlusPlus
+        | Tok::MinusMinus
+        | Tok::Void
+        | Tok::Delete if prec <= 16 => {
+            // code here...
+        }
+        Tok::TypeOf if prec <= 16 => {}
+    }
+}
+
+// #3040
+fn issue_3040() {
+    {
+        match foo {
+            DevtoolScriptControlMsg::WantsLiveNotifications(id, to_send) => {
+                match documents.find_window(id) {
+                    Some(window) => devtools::handle_wants_live_notifications(window.upcast(), to_send),
+                    None => return warn!("Message sent to closed pipeline {}.", id),
+                }
+            }
+        }
+    }
+}
+
+// #3030
+fn issue_3030() {
+    match input.trim().parse::<f64>() {
+        Ok(val)
+            if !(
+    // A valid number is the same as what rust considers to be valid,
+    // except for +1., NaN, and Infinity.
+                val.is_infinite() || val
+                    .is_nan() || input.ends_with(".") || input.starts_with("+")
+            )
+            => {
+            }
+    }
+}
+
+fn issue_3005() {
+            match *token {
+                 Token::Dimension {
+                     value, ref unit, ..
+                 } if num_context.is_ok(context.parsing_mode, value) =>
+                 {
+                     return NoCalcLength::parse_dimension(context, value, unit)
+                         .map(LengthOrPercentage::Length)
+                         .map_err(|()| location.new_unexpected_token_error(token.clone()));
+                 },
+             }
 }

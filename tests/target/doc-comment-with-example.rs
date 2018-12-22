@@ -1,4 +1,4 @@
-// rustfmt-wrap_comments: true
+// rustfmt-format_doc_comments: true
 
 /// Foo
 ///
@@ -8,5 +8,4 @@
 /// # #![cfg_attr(not(dox), no_std)]
 /// fn foo() {}
 /// ```
-///
 fn foo() {}

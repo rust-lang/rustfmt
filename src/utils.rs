@@ -10,19 +10,28 @@
 
 use std::borrow::Cow;
 
+use bytecount;
+
 use rustc_target::spec::abi;
 use syntax::ast::{
-    self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NestedMetaItemKind, Path,
-    Visibility, VisibilityKind,
+    self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NestedMetaItemKind,
+    NodeId, Path, Visibility, VisibilityKind,
 };
-use syntax::codemap::{BytePos, Span, NO_EXPANSION};
 use syntax::ptr;
+use syntax::source_map::{BytePos, Span, NO_EXPANSION};
+use syntax_pos::Mark;
 
+use comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
+use config::Config;
 use rewrite::RewriteContext;
-use shape::Shape;
+use shape::{Indent, Shape};
 
 pub const DEPR_SKIP_ANNOTATION: &str = "rustfmt_skip";
 pub const SKIP_ANNOTATION: &str = "rustfmt::skip";
+
+pub fn rewrite_ident<'a>(context: &'a RewriteContext, ident: ast::Ident) -> &'a str {
+    context.snippet(ident.span)
+}
 
 // Computes the length of a string's last line, minus offset.
 pub fn extra_offset(text: &str, shape: Shape) -> usize {
@@ -33,8 +42,28 @@ pub fn extra_offset(text: &str, shape: Shape) -> usize {
     }
 }
 
+pub fn is_same_visibility(a: &Visibility, b: &Visibility) -> bool {
+    match (&a.node, &b.node) {
+        (
+            VisibilityKind::Restricted { path: p, .. },
+            VisibilityKind::Restricted { path: q, .. },
+        ) => p.to_string() == q.to_string(),
+        (VisibilityKind::Public, VisibilityKind::Public)
+        | (VisibilityKind::Inherited, VisibilityKind::Inherited)
+        | (
+            VisibilityKind::Crate(CrateSugar::PubCrate),
+            VisibilityKind::Crate(CrateSugar::PubCrate),
+        )
+        | (
+            VisibilityKind::Crate(CrateSugar::JustCrate),
+            VisibilityKind::Crate(CrateSugar::JustCrate),
+        ) => true,
+        _ => false,
+    }
+}
+
 // Uses Cow to avoid allocating in the common cases.
-pub fn format_visibility(vis: &Visibility) -> Cow<'static, str> {
+pub fn format_visibility(context: &RewriteContext, vis: &Visibility) -> Cow<'static, str> {
     match vis.node {
         VisibilityKind::Public => Cow::from("pub "),
         VisibilityKind::Inherited => Cow::from(""),
@@ -42,7 +71,7 @@ pub fn format_visibility(vis: &Visibility) -> Cow<'static, str> {
         VisibilityKind::Crate(CrateSugar::JustCrate) => Cow::from("crate "),
         VisibilityKind::Restricted { ref path, .. } => {
             let Path { ref segments, .. } = **path;
-            let mut segments_iter = segments.iter().map(|seg| seg.ident.name.to_string());
+            let mut segments_iter = segments.iter().map(|seg| rewrite_ident(context, seg.ident));
             if path.is_global() {
                 segments_iter
                     .next()
@@ -54,6 +83,14 @@ pub fn format_visibility(vis: &Visibility) -> Cow<'static, str> {
 
             Cow::from(format!("pub({}{}) ", in_str, path))
         }
+    }
+}
+
+#[inline]
+pub fn format_async(is_async: ast::IsAsync) -> &'static str {
+    match is_async {
+        ast::IsAsync::Async { .. } => "async ",
+        ast::IsAsync::NotAsync => "",
     }
 }
 
@@ -272,8 +309,8 @@ pub fn stmt_expr(stmt: &ast::Stmt) -> Option<&ast::Expr> {
 
 #[inline]
 pub fn count_newlines(input: &str) -> usize {
-    // Using `as_bytes` to omit UTF-8 decoding
-    input.as_bytes().iter().filter(|&&c| c == b'\n').count()
+    // Using bytes to omit UTF-8 decoding
+    bytecount::count(input.as_bytes(), b'\n')
 }
 
 // For format_missing and last_pos, need to use the source callsite (if applicable).
@@ -295,7 +332,7 @@ macro_rules! out_of_file_lines_range {
             && !$self
                 .config
                 .file_lines()
-                .intersects(&$self.codemap.lookup_line_range($span))
+                .intersects(&$self.source_map.lookup_line_range($span))
     };
 }
 
@@ -317,9 +354,9 @@ macro_rules! skip_out_of_file_lines_range_visitor {
 }
 
 // Wraps String in an Option. Returns Some when the string adheres to the
-// Rewrite constraints defined for the Rewrite trait and else otherwise.
+// Rewrite constraints defined for the Rewrite trait and None otherwise.
 pub fn wrap_str(s: String, max_width: usize, shape: Shape) -> Option<String> {
-    if is_valid_str(&s, max_width, shape) {
+    if is_valid_str(&filter_normal_code(&s), max_width, shape) {
         Some(s)
     } else {
         None
@@ -359,6 +396,7 @@ pub fn colon_spaces(before: bool, after: bool) -> &'static str {
     }
 }
 
+#[inline]
 pub fn left_most_sub_expr(e: &ast::Expr) -> &ast::Expr {
     match e.node {
         ast::ExprKind::Call(ref e, _)
@@ -375,6 +413,204 @@ pub fn left_most_sub_expr(e: &ast::Expr) -> &ast::Expr {
     }
 }
 
+#[inline]
 pub fn starts_with_newline(s: &str) -> bool {
     s.starts_with('\n') || s.starts_with("\r\n")
+}
+
+#[inline]
+pub fn first_line_ends_with(s: &str, c: char) -> bool {
+    s.lines().next().map_or(false, |l| l.ends_with(c))
+}
+
+// States whether an expression's last line exclusively consists of closing
+// parens, braces, and brackets in its idiomatic formatting.
+pub fn is_block_expr(context: &RewriteContext, expr: &ast::Expr, repr: &str) -> bool {
+    match expr.node {
+        ast::ExprKind::Mac(..)
+        | ast::ExprKind::Call(..)
+        | ast::ExprKind::MethodCall(..)
+        | ast::ExprKind::Array(..)
+        | ast::ExprKind::Struct(..)
+        | ast::ExprKind::While(..)
+        | ast::ExprKind::WhileLet(..)
+        | ast::ExprKind::If(..)
+        | ast::ExprKind::IfLet(..)
+        | ast::ExprKind::Block(..)
+        | ast::ExprKind::Loop(..)
+        | ast::ExprKind::ForLoop(..)
+        | ast::ExprKind::Match(..) => repr.contains('\n'),
+        ast::ExprKind::Paren(ref expr)
+        | ast::ExprKind::Binary(_, _, ref expr)
+        | ast::ExprKind::Index(_, ref expr)
+        | ast::ExprKind::Unary(_, ref expr)
+        | ast::ExprKind::Closure(_, _, _, _, ref expr, _)
+        | ast::ExprKind::Try(ref expr)
+        | ast::ExprKind::Yield(Some(ref expr)) => is_block_expr(context, expr, repr),
+        // This can only be a string lit
+        ast::ExprKind::Lit(_) => {
+            repr.contains('\n') && trimmed_last_line_width(repr) <= context.config.tab_spaces()
+        }
+        _ => false,
+    }
+}
+
+/// Remove trailing spaces from the specified snippet. We do not remove spaces
+/// inside strings or comments.
+pub fn remove_trailing_white_spaces(text: &str) -> String {
+    let mut buffer = String::with_capacity(text.len());
+    let mut space_buffer = String::with_capacity(128);
+    for (char_kind, c) in CharClasses::new(text.chars()) {
+        match c {
+            '\n' => {
+                if char_kind == FullCodeCharKind::InString {
+                    buffer.push_str(&space_buffer);
+                }
+                space_buffer.clear();
+                buffer.push('\n');
+            }
+            _ if c.is_whitespace() => {
+                space_buffer.push(c);
+            }
+            _ => {
+                if !space_buffer.is_empty() {
+                    buffer.push_str(&space_buffer);
+                    space_buffer.clear();
+                }
+                buffer.push(c);
+            }
+        }
+    }
+    buffer
+}
+
+/// Indent each line according to the specified `indent`.
+/// e.g.
+///
+/// ```rust,ignore
+/// foo!{
+/// x,
+/// y,
+/// foo(
+///     a,
+///     b,
+///     c,
+/// ),
+/// }
+/// ```
+///
+/// will become
+///
+/// ```rust,ignore
+/// foo!{
+///     x,
+///     y,
+///     foo(
+///         a,
+///         b,
+///         c,
+///     ),
+/// }
+/// ```
+pub fn trim_left_preserve_layout(orig: &str, indent: Indent, config: &Config) -> Option<String> {
+    let mut lines = LineClasses::new(orig);
+    let first_line = lines.next().map(|(_, s)| s.trim_end().to_owned())?;
+    let mut trimmed_lines = Vec::with_capacity(16);
+
+    let mut veto_trim = false;
+    let min_prefix_space_width = lines
+        .filter_map(|(kind, line)| {
+            let mut trimmed = true;
+            let prefix_space_width = if is_empty_line(&line) {
+                None
+            } else {
+                Some(get_prefix_space_width(config, &line))
+            };
+
+            let line = if veto_trim || (kind.is_string() && !line.ends_with('\\')) {
+                veto_trim = kind.is_string() && !line.ends_with('\\');
+                trimmed = false;
+                line
+            } else {
+                line.trim().to_owned()
+            };
+            trimmed_lines.push((trimmed, line, prefix_space_width));
+
+            // When computing the minimum, do not consider lines within a string.
+            // The reason is there is a veto against trimming and indenting such lines
+            match kind {
+                FullCodeCharKind::InString | FullCodeCharKind::EndString => None,
+                _ => prefix_space_width,
+            }
+        })
+        .min()?;
+
+    Some(
+        first_line
+            + "\n"
+            + &trimmed_lines
+                .iter()
+                .map(
+                    |&(trimmed, ref line, prefix_space_width)| match prefix_space_width {
+                        _ if !trimmed => line.to_owned(),
+                        Some(original_indent_width) => {
+                            let new_indent_width = indent.width()
+                                + original_indent_width.saturating_sub(min_prefix_space_width);
+                            let new_indent = Indent::from_width(config, new_indent_width);
+                            format!("{}{}", new_indent.to_string(config), line)
+                        }
+                        None => String::new(),
+                    },
+                )
+                .collect::<Vec<_>>()
+                .join("\n"),
+    )
+}
+
+pub fn is_empty_line(s: &str) -> bool {
+    s.is_empty() || s.chars().all(char::is_whitespace)
+}
+
+fn get_prefix_space_width(config: &Config, s: &str) -> usize {
+    let mut width = 0;
+    for c in s.chars() {
+        match c {
+            ' ' => width += 1,
+            '\t' => width += config.tab_spaces(),
+            _ => return width,
+        }
+    }
+    width
+}
+
+pub(crate) trait NodeIdExt {
+    fn root() -> Self;
+}
+
+impl NodeIdExt for NodeId {
+    fn root() -> NodeId {
+        NodeId::placeholder_from_mark(Mark::root())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_remove_trailing_white_spaces() {
+        let s = "    r#\"\n        test\n    \"#";
+        assert_eq!(remove_trailing_white_spaces(&s), s);
+    }
+
+    #[test]
+    fn test_trim_left_preserve_layout() {
+        let s = "aaa\n\tbbb\n    ccc";
+        let config = Config::default();
+        let indent = Indent::new(4, 0);
+        assert_eq!(
+            trim_left_preserve_layout(&s, indent, &config),
+            Some("aaa\n    bbb\n    ccc".to_string())
+        );
+    }
 }

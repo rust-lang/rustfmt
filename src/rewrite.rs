@@ -10,8 +10,9 @@
 
 // A generic trait to abstract the rewriting of an element (of the AST).
 
-use syntax::codemap::{CodeMap, Span};
 use syntax::parse::ParseSess;
+use syntax::ptr;
+use syntax::source_map::{SourceMap, Span};
 
 use config::{Config, IndentStyle};
 use shape::Shape;
@@ -25,15 +26,21 @@ pub trait Rewrite {
     fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String>;
 }
 
+impl<T: Rewrite> Rewrite for ptr::P<T> {
+    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+        (**self).rewrite(context, shape)
+    }
+}
+
 #[derive(Clone)]
 pub struct RewriteContext<'a> {
     pub parse_session: &'a ParseSess,
-    pub codemap: &'a CodeMap,
+    pub source_map: &'a SourceMap,
     pub config: &'a Config,
     pub inside_macro: RefCell<bool>,
     // Force block indent style even if we are using visual indent style.
     pub use_block: RefCell<bool>,
-    // When `format_if_else_cond_comment` is true, unindent the comment on top
+    // When `is_if_else_block` is true, unindent the comment on top
     // of the `else` or `else if`.
     pub is_if_else_block: RefCell<bool>,
     // When rewriting chain, veto going multi line except the last element

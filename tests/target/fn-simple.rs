@@ -9,8 +9,9 @@ fn simple(
         x: Typ,
         key: &[u8],
         upd: Box<
-            Fn(Option<&memcache::Item>)
-                -> (memcache::Status, Result<memcache::Item, Option<String>>),
+            Fn(
+                Option<&memcache::Item>,
+            ) -> (memcache::Status, Result<memcache::Item, Option<String>>),
         >,
     ) -> MapResult {
     }
@@ -107,4 +108,13 @@ pub(crate) fn init() {}
 crate fn init() {}
 
 // #2630
-fn make_map<T, F: Fn(&T) -> String>(records: &Vec<T>, key_fn: F) -> HashMap<String, usize> {}
+fn make_map<T, F: (Fn(&T) -> String)>(records: &Vec<T>, key_fn: F) -> HashMap<String, usize> {}
+
+// #2956
+fn bar(
+    beans: Asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf,
+    spam: bool,
+    eggs: bool,
+) -> bool {
+    unimplemented!();
+}

@@ -16,7 +16,7 @@ use config::{Config, EmitMode, FileName, Verbosity};
 use rustfmt_diff::{make_diff, output_modified, print_diff};
 
 #[cfg(test)]
-use FileRecord;
+use formatting::FileRecord;
 
 // Append a newline to the end of each file.
 pub fn append_newline(s: &mut String) {
@@ -25,7 +25,7 @@ pub fn append_newline(s: &mut String) {
 
 #[cfg(test)]
 pub(crate) fn write_all_files<T>(
-    file_map: &[FileRecord],
+    source_file: &[FileRecord],
     out: &mut T,
     config: &Config,
 ) -> Result<(), io::Error>
@@ -35,7 +35,7 @@ where
     if config.emit_mode() == EmitMode::Checkstyle {
         write!(out, "{}", ::checkstyle::header())?;
     }
-    for &(ref filename, ref text) in file_map {
+    for &(ref filename, ref text) in source_file {
         write_file(text, filename, out, config)?;
     }
     if config.emit_mode() == EmitMode::Checkstyle {

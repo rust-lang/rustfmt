@@ -1,7 +1,7 @@
 fn main() {
     // #1078
     let items = itemize_list(
-        context.codemap,
+        context.source_map,
         field_iter,
         "}",
         |item| match *item {
@@ -29,11 +29,12 @@ fn main() {
                     expr.rewrite(
                         inner_context,
                         &Constraints::new(try_opt!(v_budget.checked_sub(2)), indent + 2),
-                    ).map(|s| format!("..{}", s))
+                    )
+                    .map(|s| format!("..{}", s))
                 }
             }
         },
-        context.codemap.span_after(span, "{"),
+        context.source_map.span_after(span, "{"),
         span.hi(),
     );
 
