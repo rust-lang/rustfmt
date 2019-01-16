@@ -10,7 +10,7 @@
 
 //! Reorder items.
 //!
-//! `mod`, `extern crate` and `use` declarations are reorderd in alphabetical
+//! `mod`, `extern crate` and `use` declarations are reordered in alphabetical
 //! order. Trait items are reordered in pre-determined order (associated types
 //! and constants comes before methods).
 
