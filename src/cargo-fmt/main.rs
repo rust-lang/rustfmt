@@ -54,7 +54,7 @@ fn execute() -> i32 {
 
     // If there is any invalid argument passed to `cargo fmt`, return without formatting.
     let mut is_package_arg = false;
-    for arg in env::args().skip(2).take_while(|a| a != "--") {
+    for arg in env::args().skip(1).take_while(|a| a != "--") {
         if arg.starts_with('-') {
             is_package_arg = arg.starts_with("--package") | arg.starts_with("-p");
         } else if !is_package_arg {
