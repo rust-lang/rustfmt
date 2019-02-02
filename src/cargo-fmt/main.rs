@@ -242,7 +242,9 @@ fn get_targets_root_only(targets: &mut HashSet<Target>) -> Result<(), io::Error>
     let in_workspace_root = workspace_root_path == current_dir;
 
     for package in metadata.packages {
-        if in_workspace_root || PathBuf::from(&package.manifest_path) == current_dir_manifest {
+        if in_workspace_root
+            || PathBuf::from(&package.manifest_path).canonicalize()? == current_dir_manifest
+        {
             for target in package.targets {
                 targets.insert(Target::from_target(&target));
             }
