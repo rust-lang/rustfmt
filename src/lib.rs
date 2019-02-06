@@ -34,6 +34,9 @@ extern crate unicode_categories;
 extern crate unicode_segmentation;
 extern crate unicode_width;
 
+#[cfg(windows)]
+extern crate winapi;
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -55,6 +58,7 @@ pub use crate::config::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName, NewlineStyle,
     Range, Verbosity,
 };
+pub use crate::utils::absolute_path;
 
 #[macro_use]
 mod utils;

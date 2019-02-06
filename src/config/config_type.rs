@@ -334,7 +334,7 @@ macro_rules! create_config {
                         dir.to_path_buf()
                     };
 
-                    current = fs::canonicalize(current)?;
+                    current = crate::utils::absolute_path(current)?;
 
                     loop {
                         match get_toml_path(&current) {

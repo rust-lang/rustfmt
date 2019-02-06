@@ -18,8 +18,9 @@ use std::{cmp, fmt, iter, str};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{self, Serialize, Serializer};
 use serde_json as json;
-
 use syntax::source_map::{self, SourceFile};
+
+use crate::utils::absolute_path;
 
 /// A range of lines in a file, inclusive of both ends.
 pub struct LineRange {
@@ -233,7 +234,7 @@ impl FileLines {
             Some(ref map) => map,
         };
 
-        match canonicalize_path_string(file_name).and_then(|file| map.get(&file)) {
+        match absolute_path_string(file_name).and_then(|file| map.get(&file)) {
             Some(ranges) => ranges.iter().any(f),
             None => false,
         }
@@ -272,9 +273,9 @@ impl<'a> iter::Iterator for Files<'a> {
     }
 }
 
-fn canonicalize_path_string(file: &FileName) -> Option<FileName> {
+fn absolute_path_string(file: &FileName) -> Option<FileName> {
     match *file {
-        FileName::Real(ref path) => path.canonicalize().ok().map(FileName::Real),
+        FileName::Real(ref path) => absolute_path(path).ok().map(FileName::Real),
         _ => Some(file.clone()),
     }
 }
@@ -304,8 +305,8 @@ pub struct JsonSpan {
 impl JsonSpan {
     fn into_tuple(self) -> Result<(FileName, Range), String> {
         let (lo, hi) = self.range;
-        let canonical = canonicalize_path_string(&self.file)
-            .ok_or_else(|| format!("Can't canonicalize {}", &self.file))?;
+        let canonical = absolute_path_string(&self.file)
+            .ok_or_else(|| format!("Can't get absolute path {}", &self.file))?;
         Ok((canonical, Range::new(lo, hi)))
     }
 }

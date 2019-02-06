@@ -15,11 +15,11 @@
 
 extern crate cargo_metadata;
 extern crate getopts;
+extern crate rustfmt_nightly as rustfmt;
 extern crate serde_json as json;
 
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
 use std::iter::FromIterator;
@@ -28,6 +28,8 @@ use std::process::Command;
 use std::str;
 
 use getopts::{Matches, Options};
+
+use crate::rustfmt::absolute_path;
 
 fn main() {
     let exit_status = execute();
@@ -170,10 +172,10 @@ pub struct Target {
 impl Target {
     pub fn from_target(target: &cargo_metadata::Target) -> Self {
         let path = PathBuf::from(&target.src_path);
-        let canonicalized = fs::canonicalize(&path).unwrap_or(path);
+        let path = absolute_path(&path).unwrap_or(path);
 
         Target {
-            path: canonicalized,
+            path,
             kind: target.kind[0].clone(),
             edition: target.edition.clone(),
         }
@@ -236,9 +238,9 @@ fn get_targets(strategy: &CargoFmtStrategy) -> Result<HashSet<Target>, io::Error
 
 fn get_targets_root_only(targets: &mut HashSet<Target>) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(None)?;
-    let current_dir = env::current_dir()?.canonicalize()?;
+    let current_dir = absolute_path(env::current_dir()?)?;
     let current_dir_manifest = current_dir.join("Cargo.toml");
-    let workspace_root_path = PathBuf::from(&metadata.workspace_root).canonicalize()?;
+    let workspace_root_path = absolute_path(PathBuf::from(&metadata.workspace_root))?;
     let in_workspace_root = workspace_root_path == current_dir;
 
     for package in metadata.packages {
