@@ -674,11 +674,7 @@ fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow<
 }
 
 fn choose_matcher(pats: &[&ast::Pat]) -> &'static str {
-    if pats.is_empty() {
-        ""
-    } else {
-        "let"
-    }
+    if pats.is_empty() { "" } else { "let" }
 }
 
 impl<'a> ControlFlow<'a> {
