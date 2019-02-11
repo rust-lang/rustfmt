@@ -142,6 +142,7 @@ where
 
 #[derive(Debug)]
 pub enum SegmentParam<'a> {
+    Const(&'a ast::AnonConst),
     LifeTime(&'a ast::Lifetime),
     Type(&'a ast::Ty),
     Binding(&'a ast::TypeBinding),
@@ -150,15 +151,17 @@ pub enum SegmentParam<'a> {
 impl<'a> SegmentParam<'a> {
     fn from_generic_arg(arg: &ast::GenericArg) -> SegmentParam<'_> {
         match arg {
-            ast::GenericArg::Lifetime(ref lt) => SegmentParam::LifeTime(lt),
-            ast::GenericArg::Type(ref ty) => SegmentParam::Type(ty),
+            ast::GenericArg::Lifetime(lt) => SegmentParam::LifeTime(lt),
+            ast::GenericArg::Type(ty) => SegmentParam::Type(ty),
+            ast::GenericArg::Const(const_) => SegmentParam::Const(const_),
         }
     }
 }
 
 impl<'a> Spanned for SegmentParam<'a> {
     fn span(&self) -> Span {
-        match *self {
+        match self {
+            SegmentParam::Const(const_) => const_.value.span,
             SegmentParam::LifeTime(lt) => lt.ident.span,
             SegmentParam::Type(ty) => ty.span,
             SegmentParam::Binding(binding) => binding.span,
@@ -460,9 +463,10 @@ impl Rewrite for ast::WherePredicate {
 
 impl Rewrite for ast::GenericArg {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        match *self {
-            ast::GenericArg::Lifetime(ref lt) => lt.rewrite(context, shape),
-            ast::GenericArg::Type(ref ty) => ty.rewrite(context, shape),
+        match self {
+            ast::GenericArg::Lifetime(lt) => lt.rewrite(context, shape),
+            ast::GenericArg::Type(ty) => ty.rewrite(context, shape),
+            ast::GenericArg::Const(const_) => const_.rewrite(context, shape),
         }
     }
 }

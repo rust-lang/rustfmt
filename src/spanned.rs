@@ -175,9 +175,10 @@ impl Spanned for ast::FunctionRetTy {
 
 impl Spanned for ast::GenericArg {
     fn span(&self) -> Span {
-        match *self {
-            ast::GenericArg::Lifetime(ref lt) => lt.ident.span,
-            ast::GenericArg::Type(ref ty) => ty.span(),
+        match self {
+            ast::GenericArg::Lifetime(lt) => lt.ident.span,
+            ast::GenericArg::Type(ty) => ty.span(),
+            ast::GenericArg::Const(const_) => const_.value.span,
         }
     }
 }
