@@ -19,7 +19,7 @@ use crate::spanned::Spanned;
 use crate::types::{rewrite_path, PathContext};
 use crate::utils::{format_mutability, mk_sp, rewrite_ident};
 
-/// Returns true if the given pattern is short. A short pattern is defined by the following grammar:
+/// Returns `true` if the given pattern is short. A short pattern is defined by the following grammar:
 ///
 /// [small, ntp]:
 ///     - single token
@@ -142,7 +142,7 @@ impl Rewrite for Pat {
                 let pats: Option<Vec<String>> =
                     prefix.chain(slice_pat.into_iter()).chain(suffix).collect();
 
-                // Check that all the rewrites succeeded, and if not return None.
+                // Check that all the rewrites succeeded, and if not return `None`.
                 let pats = pats?;
 
                 // Unwrap all the sub-strings and join them with commas.

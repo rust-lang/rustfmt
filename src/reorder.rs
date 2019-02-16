@@ -253,7 +253,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         item_length
     }
 
-    /// Visit and format the given items. Items are reordered If they are
+    /// Visits and format the given items. Items are reordered If they are
     /// consecutive and reorderable.
     pub fn visit_items_with_reordering(&mut self, mut items: &[&ast::Item]) {
         while !items.is_empty() {

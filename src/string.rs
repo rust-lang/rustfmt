@@ -153,8 +153,8 @@ pub fn rewrite_string<'a>(
     wrap_str(result, fmt.config.max_width(), fmt.shape)
 }
 
-/// Returns the index to the end of the url if the given string includes an
-/// URL or alike. Otherwise, returns None;
+/// Returns the index to the end of the URL if the given string includes an
+/// URL or alike. Otherwise, returns `None`;
 fn detect_url(s: &[&str], index: usize) -> Option<usize> {
     let start = match s[..=index].iter().rposition(|g| is_whitespace(g)) {
         Some(pos) => pos + 1,

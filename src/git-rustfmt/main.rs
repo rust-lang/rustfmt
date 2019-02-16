@@ -1,8 +1,5 @@
-use env_logger;
-
 #[macro_use]
 extern crate log;
-use rustfmt_nightly as rustfmt;
 
 use std::env;
 use std::io::stdout;
@@ -10,7 +7,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
 
+use env_logger;
 use getopts::{Matches, Options};
+use rustfmt_nightly as rustfmt;
 
 use crate::rustfmt::{load_config, CliOptions, Input, Session};
 

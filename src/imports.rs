@@ -18,8 +18,8 @@ use crate::spanned::Spanned;
 use crate::utils::{is_same_visibility, mk_sp, rewrite_ident};
 use crate::visitor::FmtVisitor;
 
-/// Returns a name imported by a `use` declaration. e.g. returns `Ordering`
-/// for `std::cmp::Ordering` and `self` for `std::cmp::self`.
+/// Returns a name imported by a `use` declaration.
+/// E.g., returns `Ordering` for `std::cmp::Ordering` and `self` for `std::cmp::self`.
 pub fn path_to_imported_ident(path: &ast::Path) -> ast::Ident {
     path.segments.last().unwrap().ident
 }
@@ -77,7 +77,7 @@ impl<'a> FmtVisitor<'a> {
 // when ordering unless the imports are identical except for the alias (rare in
 // practice).
 
-// FIXME(#2531) - we should unify the comparison code here with the formatting
+// FIXME(#2531): we should unify the comparison code here with the formatting
 // code elsewhere since we are essentially string-ifying twice. Furthermore, by
 // parsing to our own format on comparison, we repeat a lot of work when
 // sorting.
@@ -257,7 +257,7 @@ impl UseTree {
 
     // FIXME: Use correct span?
     // The given span is essentially incorrect, since we are reconstructing
-    // use statements. This should not be a problem, though, since we have
+    // use-statements. This should not be a problem, though, since we have
     // already tried to extract comment and observed that there are no comment
     // around the given use item, and the span will not be used afterward.
     fn from_path(path: Vec<UseSegment>, span: Span) -> UseTree {

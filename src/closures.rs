@@ -350,7 +350,7 @@ pub fn rewrite_last_closure(
     None
 }
 
-/// Returns true if the given vector of arguments has more than one `ast::ExprKind::Closure`.
+/// Returns `true` if the given vector of arguments has more than one `ast::ExprKind::Closure`.
 pub fn args_have_many_closure(args: &[OverflowableItem<'_>]) -> bool {
     args.iter()
         .filter_map(|arg| arg.to_expr())

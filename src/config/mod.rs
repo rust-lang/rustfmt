@@ -55,7 +55,7 @@ create_config! {
     struct_lit_single_line: bool, true, false,
         "Put small struct literals on a single line";
     fn_single_line: bool, false, false, "Put single-expression functions on a single line";
-    where_single_line: bool, false, false, "Force where clauses to be on a single line";
+    where_single_line: bool, false, false, "Force where-clauses to be on a single line";
 
     // Imports
     imports_indent: IndentStyle, IndentStyle::Block, false, "Indent of imports";
@@ -147,7 +147,7 @@ create_config! {
     make_backup: bool, false, false, "Backup changed files";
 }
 
-/// Load a config by checking the client-supplied options and if appropriate, the
+/// Loads a config by checking the client-supplied options and if appropriate, the
 /// file system (including searching the file system for overrides).
 pub fn load_config<O: CliOptions>(
     file_path: Option<&Path>,
@@ -323,7 +323,7 @@ mod test {
         assert_eq!(s.contains("(unstable)"), true);
     }
 
-    // FIXME(#2183) these tests cannot be run in parallel because they use env vars
+    // FIXME(#2183): these tests cannot be run in parallel because they use env vars.
     // #[test]
     // fn test_as_not_nightly_channel() {
     //     let mut config = Config::default();

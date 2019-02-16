@@ -25,7 +25,7 @@ use crate::utils::{
 /// A simple wrapper type against `ast::Arm`. Used inside `write_list()`.
 struct ArmWrapper<'a> {
     pub arm: &'a ast::Arm,
-    /// True if the arm is the last one in match expression. Used to decide on whether we should add
+    /// `true` if the arm is the last one in match expression. Used to decide on whether we should add
     /// trailing comma to the match arm when `config.trailing_comma() == Never`.
     pub is_last: bool,
     /// Holds a byte position of `|` at the beginning of the arm pattern, if available.

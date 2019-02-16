@@ -310,7 +310,7 @@ pub fn mk_sp(lo: BytePos, hi: BytePos) -> Span {
     Span::new(lo, hi, NO_EXPANSION)
 }
 
-// Return true if the given span does not intersect with file lines.
+// Returns `true` if the given span does not intersect with file lines.
 macro_rules! out_of_file_lines_range {
     ($self:ident, $span:expr) => {
         !$self.config.file_lines().is_all()
@@ -444,7 +444,7 @@ pub fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr: &str)
     }
 }
 
-/// Remove trailing spaces from the specified snippet. We do not remove spaces
+/// Removes trailing spaces from the specified snippet. We do not remove spaces
 /// inside strings or comments.
 pub fn remove_trailing_white_spaces(text: &str) -> String {
     let mut buffer = String::with_capacity(text.len());

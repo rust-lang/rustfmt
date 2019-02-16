@@ -136,12 +136,12 @@ fn format_crate(verbosity: Verbosity, strategy: &CargoFmtStrategy) -> Result<i32
         get_targets(strategy)?
     };
 
-    // Currently only bin and lib files get formatted
+    // Currently only bin and lib files get formatted.
     run_rustfmt(&targets, &rustfmt_args, verbosity)
 }
 
 fn get_fmt_args() -> Vec<String> {
-    // All arguments after -- are passed to rustfmt
+    // All arguments after -- are passed to rustfmt.
     env::args().skip_while(|a| a != "--").skip(1).collect()
 }
 
@@ -150,7 +150,7 @@ fn get_fmt_args() -> Vec<String> {
 pub struct Target {
     /// A path to the main source file of the target.
     path: PathBuf,
-    /// A kind of target (e.g. lib, bin, example, ...).
+    /// A kind of target (e.g., lib, bin, example, ...).
     kind: String,
     /// Rust edition for this target.
     edition: String,

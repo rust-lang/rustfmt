@@ -35,7 +35,7 @@ fn main() {
 
     // Exit with given exit code.
     //
-    // NOTE: This immediately terminates the process without doing any cleanup,
+    // NOTE: this immediately terminates the process without doing any cleanup,
     // so make sure to finish all necessary cleanup before this is called.
     std::process::exit(exit_code);
 }

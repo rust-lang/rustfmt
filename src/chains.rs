@@ -1,5 +1,5 @@
-//! Formatting of chained expressions, i.e. expressions which are chained by
-//! dots: struct and enum field access, method calls, and try shorthand (?).
+//! Formatting of chained expressions, i.e., expressions that are chained by
+//! dots: struct and enum field access, method calls, and try shorthand (`?`).
 //!
 //! Instead of walking these subexpressions one-by-one, as is our usual strategy
 //! for expression formatting, we collect maximal sequences of these expressions
@@ -524,7 +524,7 @@ impl<'a> ChainFormatterShared<'a> {
     // ```
     //
     // In particular, overflowing is effective when the last child is a method with a multi-lined
-    // block-like argument (e.g. closure):
+    // block-like argument (e.g., closure):
     // ```ignore
     // parent.child1.child2.last_child(|a, b, c| {
     //     let x = foo(a, b, c);
@@ -843,7 +843,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
     }
 }
 
-/// Remove try operators (`?`s) that appear in the given string. If removing
+/// Removes try operators (`?`s) that appear in the given string. If removing
 /// them leaves an empty line, remove that line as well unless it is the first
 /// line (we need the first newline for detecting pre/post comment).
 fn trim_tries(s: &str) -> String {

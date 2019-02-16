@@ -189,7 +189,7 @@ impl NewlineStyle {
 configuration_option_enum! { BraceStyle:
     AlwaysNextLine,
     PreferSameLine,
-    // Prefer same line except where there is a where clause, in which case force
+    // Prefer same line except where there is a where-clause, in which case force
     // the brace to the next line.
     SameLineWhere,
 }

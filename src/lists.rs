@@ -19,7 +19,7 @@ pub struct ListFormatting<'a> {
     trailing_separator: SeparatorTactic,
     separator_place: SeparatorPlace,
     shape: Shape,
-    // Non-expressions, e.g. items, will have a new line at the end of the list.
+    // Non-expressions, e.g., items, will have a new line at the end of the list.
     // Important for comment styles.
     ends_with_newline: bool,
     // Remove newlines between list elements for expressions.
@@ -188,7 +188,7 @@ impl ListItem {
         }
     }
 
-    // true if the item causes something to be written.
+    // Returns `true` if the item causes something to be written.
     fn is_substantial(&self) -> bool {
         fn empty(s: &Option<String>) -> bool {
             match *s {

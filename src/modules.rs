@@ -37,7 +37,7 @@ fn path_value(attr: &ast::Attribute) -> Option<Symbol> {
     }
 }
 
-// N.B. Even when there are multiple `#[path = ...]` attributes, we just need to
+// N.B., even when there are multiple `#[path = ...]` attributes, we just need to
 // examine the first one, since rustc ignores the second and the subsequent ones
 // as unused attributes.
 fn find_path_value(attrs: &[ast::Attribute]) -> Option<Symbol> {
@@ -78,7 +78,7 @@ fn list_submodules<'a>(
     Ok(())
 }
 
-/// Find the file corresponding to an external mod
+/// Finds the file corresponding to an external mod
 fn module_file(
     id: ast::Ident,
     attrs: &[ast::Attribute],

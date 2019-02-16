@@ -34,9 +34,8 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub fn format_missing(&mut self, end: BytePos) {
-        // HACK(topecongiro)
-        // We use `format_missing()` to extract a missing comment between a macro
-        // (or alike) and a trailing semicolon. Here we just try to avoid calling
+        // HACK(topecongiro): we use `format_missing()` to extract a missing comment between
+        // a macro (or similar) and a trailing semicolon. Here we just try to avoid calling
         // `format_missing_inner` in the common case where there is no such comment.
         // This is a hack, ideally we should fix a possible bug in `format_missing_inner`
         // or refactor `visit_mac` and `rewrite_macro`, but this should suffice to fix the

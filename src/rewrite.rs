@@ -46,7 +46,7 @@ impl<'a> RewriteContext<'a> {
         self.snippet_provider.span_to_snippet(span).unwrap()
     }
 
-    /// Return true if we should use block indent style for rewriting function call.
+    /// Returns `true` if we should use block indent style for rewriting function call.
     pub fn use_block_indent(&self) -> bool {
         self.config.indent_style() == IndentStyle::Block || *self.use_block.borrow()
     }
