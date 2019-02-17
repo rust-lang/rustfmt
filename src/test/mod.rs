@@ -8,11 +8,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::Chars;
 
-use crate::{FormatReport, Input, Session};
 use crate::config::{Color, Config, EmitMode, FileName, ReportTactic};
 use crate::formatting::{ModifiedChunk, SourceFile};
 use crate::rustfmt_diff::{make_diff, print_diff, DiffLine, Mismatch, OutputWriter};
 use crate::source_file;
+use crate::{FormatReport, Input, Session};
 
 const DIFF_CONTEXT_SIZE: usize = 3;
 const CONFIGURATIONS_FILE_NAME: &str = "Configurations.md";
@@ -85,8 +85,8 @@ fn verify_config_test_names() {
     }
 }
 
-// This writes to the terminal using the same approach (via term::stdout or
-// println!) that is used by `rustfmt::rustfmt_diff::print_diff`. Writing
+// This writes to the terminal using the same approach (via `term::stdout` or
+// `println!`) that is used by `rustfmt::rustfmt_diff::print_diff`. Writing
 // using only one or the other will cause the output order to differ when
 // `print_diff` selects the approach not used.
 fn write_message(msg: &str) {
@@ -94,8 +94,8 @@ fn write_message(msg: &str) {
     writer.writeln(msg, None);
 }
 
-// Integration tests. The files in the tests/source are formatted and compared
-// to their equivalent in tests/target. The target file and config can be
+// Integration tests. The files in `tests/source` are formatted and compared
+// to their equivalent in `tests/target`. The target file and config can be
 // overridden by annotations in the source file. The input and output must match
 // exactly.
 #[test]
@@ -109,8 +109,8 @@ fn system_tests() {
     assert_eq!(fails, 0, "{} system tests failed", fails);
 }
 
-// Do the same for tests/coverage-source directory
-// the only difference is the coverage mode
+// Do the same for tests/coverage-source directory.
+// The only difference is the coverage mode.
 #[test]
 fn coverage_tests() {
     let files = get_test_files(Path::new("tests/coverage/source"), true);
@@ -280,7 +280,7 @@ fn stdin_formatting_smoke_test() {
 
 #[test]
 fn stdin_parser_panic_caught() {
-    // https://github.com/rust-lang/rustfmt/issues/3239
+    // See issue #3239.
     for text in ["{", "}"].iter().cloned().map(String::from) {
         let mut buf = vec![];
         let mut session = Session::new(Default::default(), Some(&mut buf));
@@ -937,7 +937,8 @@ fn make_temp_file(file_name: &'static str) -> TempFile {
 
     let mut file = File::create(&path).expect("couldn't create temp file");
     let content = "fn main() {}\n";
-    file.write_all(content.as_bytes()).expect("couldn't write temp file");
+    file.write_all(content.as_bytes())
+        .expect("couldn't write temp file");
     TempFile { path }
 }
 
