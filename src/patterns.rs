@@ -19,7 +19,8 @@ use crate::spanned::Spanned;
 use crate::types::{rewrite_path, PathContext};
 use crate::utils::{format_mutability, mk_sp, rewrite_ident};
 
-/// Returns `true` if the given pattern is short. A short pattern is defined by the following grammar:
+/// Returns `true` if the given pattern is "short".
+/// A short pattern is defined by the following grammar:
 ///
 /// [small, ntp]:
 ///     - single token
