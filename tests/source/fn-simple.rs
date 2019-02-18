@@ -1,6 +1,6 @@
 // rustfmt-normalize_comments: true
 
-fn simple(/*pre-comment on a function!?*/ i: i32/*yes, it's possible!  */
+fn simple(/*pre-comment on a function!?*/ i: i32/*yes, it's possible!  */   
                                         ,response: NoWay /* hose */) {
 fn op(x: Typ, key : &[u8], upd : Box<Fn(Option<&memcache::Item>) -> (memcache::Status, Result<memcache::Item, Option<String>>)>) -> MapResult {}
 
