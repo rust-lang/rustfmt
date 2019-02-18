@@ -72,7 +72,7 @@ fn bar() {
 
     for _  in  1 ..{ call_forever(); }
 
-    syntactically_correct(loop { sup( '?'); }, if cond { 0 } else { 1 });
+    syntactically_correct(loop { sup( '?'); }, !cond as _);
 
     let third = ..10;
     let infi_range = ..   ;

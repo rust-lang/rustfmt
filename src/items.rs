@@ -1250,7 +1250,7 @@ pub fn format_struct_struct(
         }
     };
     // 1 = `}`
-    let overhead = if fields.is_empty() { 1 } else { 0 };
+    let overhead = fields.is_empty() as usize;
     let total_width = result.len() + generics_str.len() + overhead;
     if !generics_str.is_empty()
         && !generics_str.contains('\n')

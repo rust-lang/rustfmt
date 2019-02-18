@@ -115,7 +115,7 @@ fn bar() {
         loop {
             sup('?');
         },
-        if cond { 0 } else { 1 },
+        !cond as _,
     );
 
     let third = ..10;

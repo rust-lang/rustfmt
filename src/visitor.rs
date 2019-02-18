@@ -144,7 +144,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         );
 
         // Check if this block has braces.
-        let brace_compensation = BytePos(if has_braces { 1 } else { 0 });
+        let brace_compensation = BytePos(has_braces as _);
 
         self.last_pos = self.last_pos + brace_compensation;
         self.block_indent = self.block_indent.block_indent(self.config);
