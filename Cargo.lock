@@ -234,6 +234,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "fnv"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -244,6 +249,18 @@ version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "unicode-width 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "globset"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "aho-corasick 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memchr 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -630,6 +647,7 @@ dependencies = [
  "env_logger 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "globset 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -892,8 +910,10 @@ dependencies = [
 "checksum error-chain 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "07e791d3be96241c77c43846b665ef1384606da2cd2a48730abe606a12906e02"
 "checksum failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "795bd83d3abeb9220f257e597aa0080a508b27533824adf336529648f6abf7e2"
 "checksum failure_derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "ea1063915fd7ef4309e222a5a07cf9c319fb9c7836b1f89b85458672dbb127e1"
+"checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
 "checksum fuchsia-cprng 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 "checksum getopts 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)" = "0a7292d30132fb5424b354f5dc02512a86e4c516fe544bb7a25e7f266951b797"
+"checksum globset 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4743617a7464bbda3c8aec8558ff2f9429047e025771037df561d383337ff865"
 "checksum humantime 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3ca7e5f2e110db35f93b837c81797f3714500b81d517bf20c431b16d3ca4f114"
 "checksum itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5b8467d9c1cebe26feb08c640139247fac215782d35371ade9a2136ed6085358"
 "checksum itoa 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "1306f3464951f30e30d12373d31c79fbd52d236e5e896fd92f96ec7babbbe60b"
