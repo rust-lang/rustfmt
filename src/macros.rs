@@ -295,55 +295,53 @@ fn rewrite_macro_inner(
     let mut vec_with_semi = false;
     let mut trailing_comma = false;
 
-    if DelimToken::Brace != style {
-        loop {
-            if let Some(arg) = parse_macro_arg(&mut parser) {
-                arg_vec.push(arg);
-            } else if let Some(arg) = check_keyword(&mut parser) {
-                arg_vec.push(arg);
-            } else {
-                return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
-            }
+    loop {
+        if let Some(arg) = parse_macro_arg(&mut parser) {
+            arg_vec.push(arg);
+        } else if let Some(arg) = check_keyword(&mut parser) {
+            arg_vec.push(arg);
+        } else {
+            return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
+        }
 
-            match parser.token {
-                Token::Eof => break,
-                Token::Comma => (),
-                Token::Semi => {
-                    // Try to parse `vec![expr; expr]`
-                    if FORCED_BRACKET_MACROS.contains(&&macro_name[..]) {
-                        parser.bump();
-                        if parser.token != Token::Eof {
-                            match parse_macro_arg(&mut parser) {
-                                Some(arg) => {
-                                    arg_vec.push(arg);
-                                    parser.bump();
-                                    if parser.token == Token::Eof && arg_vec.len() == 2 {
-                                        vec_with_semi = true;
-                                        break;
-                                    }
+        match parser.token {
+            Token::Eof => break,
+            Token::Comma => (),
+            Token::Semi => {
+                // Try to parse `vec![expr; expr]`
+                if FORCED_BRACKET_MACROS.contains(&&macro_name[..]) {
+                    parser.bump();
+                    if parser.token != Token::Eof {
+                        match parse_macro_arg(&mut parser) {
+                            Some(arg) => {
+                                arg_vec.push(arg);
+                                parser.bump();
+                                if parser.token == Token::Eof && arg_vec.len() == 2 {
+                                    vec_with_semi = true;
+                                    break;
                                 }
-                                None => {
-                                    return return_macro_parse_failure_fallback(
-                                        context,
-                                        shape.indent,
-                                        mac.span,
-                                    );
-                                }
+                            }
+                            None => {
+                                return return_macro_parse_failure_fallback(
+                                    context,
+                                    shape.indent,
+                                    mac.span,
+                                );
                             }
                         }
                     }
-                    return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
                 }
-                _ if arg_vec.last().map_or(false, MacroArg::is_item) => continue,
-                _ => return return_macro_parse_failure_fallback(context, shape.indent, mac.span),
+                return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
             }
+            _ if arg_vec.last().map_or(false, MacroArg::is_item) => continue,
+            _ => return return_macro_parse_failure_fallback(context, shape.indent, mac.span),
+        }
 
-            parser.bump();
+        parser.bump();
 
-            if parser.token == Token::Eof {
-                trailing_comma = true;
-                break;
-            }
+        if parser.token == Token::Eof {
+            trailing_comma = true;
+            break;
         }
     }
 
