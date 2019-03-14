@@ -679,6 +679,7 @@ impl Rewrite for ast::Ty {
             ast::TyKind::ImplTrait(_, ref it) => it
                 .rewrite(context, shape)
                 .map(|it_str| format!("impl {}", it_str)),
+            ast::TyKind::CVarArgs => Some("...".to_owned()),
             ast::TyKind::Err | ast::TyKind::Typeof(..) => unreachable!(),
         }
     }
@@ -723,7 +724,7 @@ fn rewrite_bare_fn(
     let rewrite = format_function_type(
         bare_fn.decl.inputs.iter(),
         &bare_fn.decl.output,
-        bare_fn.decl.variadic,
+        bare_fn.decl.c_variadic,
         span,
         context,
         func_ty_shape,

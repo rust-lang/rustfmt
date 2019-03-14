@@ -194,7 +194,7 @@ impl<'a> FnSig<'a> {
     ) -> FnSig<'a> {
         FnSig {
             unsafety: method_sig.header.unsafety,
-            is_async: method_sig.header.asyncness,
+            is_async: method_sig.header.asyncness.node,
             constness: method_sig.header.constness.node,
             defaultness: ast::Defaultness::Final,
             abi: method_sig.header.abi,
@@ -216,7 +216,7 @@ impl<'a> FnSig<'a> {
                 generics,
                 abi: fn_header.abi,
                 constness: fn_header.constness.node,
-                is_async: fn_header.asyncness,
+                is_async: fn_header.asyncness.node,
                 defaultness,
                 unsafety: fn_header.unsafety,
                 visibility: visibility.clone(),
@@ -2054,8 +2054,8 @@ fn rewrite_fn_base(
         indent,
         arg_indent,
         args_span,
-        fd.variadic,
         generics_str.contains('\n'),
+        fd.c_variadic,
     )?;
 
     let put_args_in_block = match context.config.indent_style() {
