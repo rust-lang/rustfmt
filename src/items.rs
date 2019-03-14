@@ -2256,7 +2256,6 @@ fn rewrite_args(
     span: Span,
     variadic: bool,
 ) -> Option<String> {
-
     if args.len() == 0 {
         let comment = context
             .snippet(mk_sp(
