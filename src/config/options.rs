@@ -443,7 +443,7 @@ pub trait CliOptions {
     fn config_path(&self) -> Option<&Path>;
 }
 
-/// The edition of the compiler (RFC 2052)
+// The edition of the compiler (RFC 2052)
 configuration_option_enum! { Edition:
     Edition2015: 2015,
     Edition2018: 2018,
