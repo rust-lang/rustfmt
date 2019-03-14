@@ -237,10 +237,11 @@ configuration_option_enum! { Heuristics:
 }
 
 impl Density {
-    pub fn to_list_tactic(self) -> ListTactic {
+    pub fn to_list_tactic(self, len: usize) -> ListTactic {
         match self {
             Density::Compressed => ListTactic::Mixed,
             Density::Tall => ListTactic::HorizontalVertical,
+            Density::Vertical if len == 1 => ListTactic::Horizontal,
             Density::Vertical => ListTactic::Vertical,
         }
     }
