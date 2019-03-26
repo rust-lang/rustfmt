@@ -165,6 +165,8 @@ pub struct FormatReport {
     non_formatted_ranges: Vec<(usize, usize)>,
 }
 
+unsafe impl Send for FormatReport {}
+
 impl FormatReport {
     fn new() -> FormatReport {
         FormatReport {

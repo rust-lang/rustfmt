@@ -7,6 +7,8 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::Chars;
+use std::sync::mpsc::channel;
+use std::thread;
 
 use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle, ReportTactic};
 use crate::formatting::{ReportedErrors, SourceFile};
@@ -116,7 +118,7 @@ fn write_message(msg: &str) {
 fn system_tests() {
     // Get all files in the tests/source directory.
     let files = get_test_files(Path::new("tests/source"), true);
-    let (_reports, count, fails) = check_files(files, &None);
+    let (_reports, count, fails) = check_files(files, None);
 
     // Display results.
     println!("Ran {} system tests.", count);
@@ -128,7 +130,7 @@ fn system_tests() {
 #[test]
 fn coverage_tests() {
     let files = get_test_files(Path::new("tests/coverage/source"), true);
-    let (_reports, count, fails) = check_files(files, &None);
+    let (_reports, count, fails) = check_files(files, None);
 
     println!("Ran {} tests in coverage mode.", count);
     assert_eq!(fails, 0, "{} tests failed", fails);
@@ -234,7 +236,7 @@ fn idempotence_tests() {
     }
     // Get all files in the tests/target directory.
     let files = get_test_files(Path::new("tests/target"), true);
-    let (_reports, count, fails) = check_files(files, &None);
+    let (_reports, count, fails) = check_files(files, None);
 
     // Display results.
     println!("Ran {} idempotent tests.", count);
@@ -259,7 +261,7 @@ fn self_tests() {
     }
     files.push(PathBuf::from("src/lib.rs"));
 
-    let (reports, count, fails) = check_files(files, &Some(PathBuf::from("rustfmt.toml")));
+    let (reports, count, fails) = check_files(files, Some(PathBuf::from("rustfmt.toml").clone()));
     let mut warnings = 0;
 
     // Display results.
@@ -385,32 +387,44 @@ fn format_lines_errors_are_reported_with_tabs() {
 
 // For each file, run rustfmt and collect the output.
 // Returns the number of files checked and the number of failures.
-fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<FormatReport>, u32, u32) {
-    let mut count = 0;
-    let mut fails = 0;
-    let mut reports = vec![];
+fn check_files(files: Vec<PathBuf>, opt_config: Option<PathBuf>) -> (Vec<FormatReport>, u32, u32) {
+    let (tx, rx) = channel();
+    // to avoid stack overflow
+    let builder = thread::Builder::new().stack_size(8388608);
 
-    for file_name in files {
-        debug!("Testing '{}'...", file_name.display());
+    let handler = builder
+        .spawn(move || {
+            let mut count = 0;
+            let mut fails = 0;
+            let mut reports = vec![];
 
-        match idempotent_check(&file_name, &opt_config) {
-            Ok(ref report) if report.has_warnings() => {
-                print!("{}", report);
-                fails += 1;
-            }
-            Ok(report) => reports.push(report),
-            Err(err) => {
-                if let IdempotentCheckError::Mismatch(msg) = err {
-                    print_mismatches_default_message(msg);
+            for file_name in files {
+                debug!("Testing '{}'...", file_name.display());
+
+                match idempotent_check(&file_name, &opt_config) {
+                    Ok(ref report) if report.has_warnings() => {
+                        print!("{}", report);
+                        fails += 1;
+                    }
+                    Ok(report) => reports.push(report),
+                    Err(err) => {
+                        if let IdempotentCheckError::Mismatch(msg) = err {
+                            print_mismatches_default_message(msg);
+                        }
+                        fails += 1;
+                    }
                 }
-                fails += 1;
+
+                count += 1;
             }
-        }
+            tx.send((reports, count, fails)).unwrap();
+        })
+        .unwrap();
 
-        count += 1;
-    }
+    let result = rx.recv().unwrap();
+    handler.join().unwrap();
 
-    (reports, count, fails)
+    result
 }
 
 fn print_mismatches_default_message(result: HashMap<PathBuf, Vec<Mismatch>>) {
