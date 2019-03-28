@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+    <head>
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.css" />
+      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
+      <style>
+        .markdown-body {
+          box-sizing: border-box;
+          min-width: 200px;
+          max-width: 980px;
+          margin: 0 auto;
+          padding: 45px;
+        }
+      
+        @media (max-width: 767px) {
+          .markdown-body {
+            padding: 15px;
+          }
+        }
+      </style>
+    </head>
+    <body>
+        <div id="app">
+          <article class="markdown-body">
+            <div>
+              <label for="search">search: </label>
+              <input id="search" v-model="searchCondition">
+            </div>
+            <div>
+                <label for="stable">stable: </label>
+                <input type="checkbox" id="stable" v-model="shouldStable">
+            </div>
+            
+            <div v-html="aboutHtml"></div>
+            <div v-html="configurationAboutHtml"></div>
+            <div v-html="outputHtml"></div>
+          </article>
+        </div>
+        <script>
+            const ConfigurationMdUrl = 'https://raw.githubusercontent.com/rust-lang/rustfmt/master/Configurations.md';
+            new Vue({
+              el: '#app',
+              data() {
+                const configurationDescriptions = [];
+                configurationDescriptions.links = {}
+                return {
+                  aboutHtml: '',
+                  configurationAboutHtml: '',
+                  searchCondition: '',
+                  configurationDescriptions,
+                  shouldStable: false
+                }
+              },
+              computed: {
+                outputHtml() {
+                  const ast = this.configurationDescriptions
+                                  .filter(({ head, stable }) => {
+                                    
+                                    if (head.includes(this.searchCondition) === false) {
+                                      return false;
+                                    }
+
+                                    return (this.shouldStable)
+                                      ? stable === true
+                                      : true;
+                                  })
+                                  .reduce((stack, { value }) => {
+                                    return stack.concat(value);
+                                  }, []);
+                  ast.links = {};
+                  return marked.parser(ast);
+                }
+              },
+              mounted: async function() {
+                const res = await axios.get(ConfigurationMdUrl);
+                const { 
+                  about,
+                  configurationAbout,
+                  configurationDescriptions
+                } = parseMarkdownAst(res.data);
+                this.aboutHtml = marked.parser(about);
+                this.configurationAboutHtml = marked.parser(configurationAbout);
+                this.configurationDescriptions = configurationDescriptions;
+              }
+            });
+
+            const extractDepthOnes = (ast) => {
+              return ast.reduce((stack, next) => {
+                if (next.depth === 1) {
+                  stack.push([]);
+                }
+                const lastIndex = stack.length - 1;
+                stack[lastIndex].push(next);
+                return stack;
+              }, []);
+            }
+
+            const extractDepthTwos = (ast) => {
+              return ast.map((elem) => {
+                return elem.reduce((stack, next) => {
+                  if (next.depth === 2) {
+                    stack.push([]);
+                  }
+                  const lastIndex = stack.length - 1;
+                  stack[lastIndex].push(next);
+                  return stack;
+                }, 
+                [[]]);
+              });
+            }
+
+            const createHeadAndValue = (ast) => {
+              return ast.map((elem) => {
+                return elem.map((val) => {
+
+                  return {
+                    head: val[0].text,
+                    value: val,
+                    stable: val.some((elem) => {
+                      return !!elem.text && elem.text.includes("**Stable**: Yes")
+                    })
+                  }
+                });
+              })
+            }
+
+            const parseMarkdownAst = (rawMarkdown) => {
+              const ast = marked.lexer(rawMarkdown);
+              const depthOnes = extractDepthOnes(ast);
+              const depthTwos = extractDepthTwos(depthOnes);
+              const [
+                abouts, configurations
+              ] = createHeadAndValue(depthTwos);
+              const about = abouts[0].value;
+              about.links = {};
+
+              const [
+                configurationAbout, ...configurationDescriptions
+              ] = configurations;
+              configurationAbout.value.links = {};
+              
+              return {
+                about,
+                configurationAbout: configurationAbout.value,
+                configurationDescriptions
+              };
+            }
+        </script>
+    </body>
+</html>
