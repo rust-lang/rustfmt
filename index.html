@@ -19,20 +19,28 @@
             padding: 15px;
           }
         }
+
+        .searchCondition {
+          display: flex;  
+        }
+        .searchCondition > div {
+          margin-right: 30px;
+        }
       </style>
     </head>
     <body>
         <div id="app">
           <article class="markdown-body">
-            <div>
-              <label for="search">search: </label>
-              <input id="search" v-model="searchCondition">
+            <div class="searchCondition">
+              <div>
+                <label for="search">search: </label>
+                <input id="search" v-model="searchCondition">
+              </div>
+              <div>
+                  <label for="stable">stable: </label>
+                  <input type="checkbox" id="stable" v-model="shouldStable">
+              </div>
             </div>
-            <div>
-                <label for="stable">stable: </label>
-                <input type="checkbox" id="stable" v-model="shouldStable">
-            </div>
-            
             <div v-html="aboutHtml"></div>
             <div v-html="configurationAboutHtml"></div>
             <div v-html="outputHtml"></div>
@@ -56,9 +64,9 @@
               computed: {
                 outputHtml() {
                   const ast = this.configurationDescriptions
-                                  .filter(({ head, stable }) => {
+                                  .filter(({ head, text, stable }) => {
                                     
-                                    if (head.includes(this.searchCondition) === false) {
+                                    if (text.includes(this.searchCondition) === false) {
                                       return false;
                                     }
 
@@ -114,13 +122,17 @@
             const createHeadAndValue = (ast) => {
               return ast.map((elem) => {
                 return elem.map((val) => {
-
                   return {
                     head: val[0].text,
                     value: val,
                     stable: val.some((elem) => {
                       return !!elem.text && elem.text.includes("**Stable**: Yes")
-                    })
+                    }),
+                    text: val.reduce((result, next) => {
+                      return next.text != null
+                        ? `${result} ${next.text}`
+                        : result;
+                    }, '')
                   }
                 });
               })
