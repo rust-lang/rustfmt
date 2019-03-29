@@ -1,11 +1,16 @@
 <!doctype html>
 <html>
     <head>
+      <meta name="viewport" content="width=device-width">
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.css" />
       <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.min.js"></script>
       <style>
+        body {
+          overflow: scroll;
+        }
+
         .markdown-body {
           box-sizing: border-box;
           min-width: 200px;
@@ -21,7 +26,7 @@
         }
 
         .searchCondition {
-          display: flex;  
+          display: flex;
         }
         .searchCondition > div {
           margin-right: 30px;
