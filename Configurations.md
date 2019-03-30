@@ -605,7 +605,7 @@ Don't reformat anything
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: #3388)
+- **Stable**: Yes
 
 ## `error_on_line_overflow`
 
