@@ -97,7 +97,11 @@ fn verify_config_used(path: &Path, config_name: &str) {
                     .lines()
                     .map(|l| l.unwrap())
                     .take_while(|l| l.starts_with("//"))
-                    .any(|l| l.starts_with(&format!("// rustfmt-{}", config_name))),
+                    .any(|l| {
+                        let option_name = format!("// rustfmt-{}", config_name);
+                        let skip_name = "// skip-option-check";
+                        l.starts_with(&option_name) || l.starts_with(&skip_name)
+                    }),
                 format!(
                     "config option file {} does not contain expected config name",
                     path.display()
