@@ -23,6 +23,10 @@ const SKIP_FILE_WHITE_LIST: &[&str] = &[
     // We want to make sure that the `skip_children` is correctly working,
     // so we do not want to test this file directly.
     "configs/skip_children/foo/mod.rs",
+    "configs/disable_all_formatting/true_mod/mod.rs",
+    "configs/disable_all_formatting/false_mod/mod.rs",
+    "configs/disable_all_formatting/no_entry_false.rs",
+    "configs/disable_all_formatting/no_entry_true.rs",
     "issue-3434/no_entry.rs",
 ];
 
