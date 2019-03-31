@@ -14,7 +14,7 @@ use syntax::source_map::{FilePathMapping, SourceMap, Span, DUMMY_SP};
 
 use crate::comment::{CharClasses, FullCodeCharKind};
 use crate::config::{Config, FileName, Verbosity};
-use crate::ignore::IgnorePathSet;
+use crate::ignore_path::IgnorePathSet;
 use crate::issues::BadIssueSeeker;
 use crate::utils::{count_newlines, get_skip_macro_names};
 use crate::visitor::{FmtVisitor, SnippetProvider};
@@ -104,7 +104,8 @@ fn format_project<T: FormatHandler>(
     .visit_crate(&krate)
     .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     for (path, (module, _)) in files {
-        if (config.skip_children() && path != main_file) || ignore_path_set.is_match(&path) {
+        let should_ignore = !input_is_stdin && ignore_path_set.is_match(&path);
+        if (config.skip_children() && path != main_file) || should_ignore {
             continue;
         }
         should_emit_verbose(input_is_stdin, config, || println!("Formatting {}", path));

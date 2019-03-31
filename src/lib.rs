@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use failure::Fail;
+use ignore;
 use syntax::{ast, parse::DirectoryOwnership};
 
 use crate::comment::LineClasses;
@@ -46,7 +47,7 @@ mod comment;
 pub(crate) mod config;
 mod expr;
 pub(crate) mod formatting;
-mod ignore;
+mod ignore_path;
 mod imports;
 mod issues;
 mod items;
@@ -113,7 +114,7 @@ pub enum ErrorKind {
     LostComment,
     /// Invalid glob pattern in `ignore` configuration option.
     #[fail(display = "Invalid glob pattern found in ignore list: {}", _0)]
-    InvalidGlobPattern(globset::Error),
+    InvalidGlobPattern(ignore::Error),
 }
 
 impl ErrorKind {

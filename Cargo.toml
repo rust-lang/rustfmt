@@ -57,12 +57,12 @@ bytecount = "0.5"
 unicode-width = "0.1.5"
 unicode_categories = "0.1.1"
 dirs = "1.0.4"
-globset = "0.4"
 
 # A noop dependency that changes in the Rust repository, it's a bit of a hack.
 # See the `src/tools/rustc-workspace-hack/README.md` file in `rust-lang/rust`
 # for more information.
 rustc-workspace-hack = "1.0.0"
+ignore = "0.4.6"
 
 [dev-dependencies]
 lazy_static = "1.0.0"
