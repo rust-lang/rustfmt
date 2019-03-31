@@ -208,12 +208,21 @@ pub fn rewrite_macro(
     shape: Shape,
     position: MacroPosition,
 ) -> Option<String> {
-    let guard = InsideMacroGuard::inside_macro_context(context);
-    let result = rewrite_macro_inner(mac, extra_ident, context, shape, position, guard.is_nested);
-    if result.is_none() {
-        context.macro_rewrite_failure.replace(true);
+    let should_skip = context
+        .skip_macro_names
+        .borrow()
+        .contains(&context.snippet(mac.node.path.span).to_owned());
+    if should_skip {
+        None
+    } else {
+        let guard = InsideMacroGuard::inside_macro_context(context);
+        let result =
+            rewrite_macro_inner(mac, extra_ident, context, shape, position, guard.is_nested);
+        if result.is_none() {
+            context.macro_rewrite_failure.replace(true);
+        }
+        result
     }
-    result
 }
 
 fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
@@ -431,11 +440,10 @@ pub fn rewrite_macro_inner(
             // For macro invocations with braces, always put a space between
             // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
             // anything in between the braces (for now).
-            let snippet = context.snippet(mac.span);
-            let macro_raw = snippet.split_at(snippet.find('!')? + 1).1.trim_start();
-            match trim_left_preserve_layout(macro_raw, shape.indent, &context.config) {
+            let snippet = context.snippet(mac.span).trim_start_matches(|c| c != '{');
+            match trim_left_preserve_layout(snippet, shape.indent, &context.config) {
                 Some(macro_body) => Some(format!("{} {}", macro_name, macro_body)),
-                None => Some(format!("{} {}", macro_name, macro_raw)),
+                None => Some(format!("{} {}", macro_name, snippet)),
             }
         }
         _ => unreachable!(),
@@ -532,17 +540,12 @@ fn register_metavariable(
     name: &str,
     dollar_count: usize,
 ) {
-    let mut new_name = String::new();
-    let mut old_name = String::new();
+    let mut new_name = "$".repeat(dollar_count - 1);
+    let mut old_name = "$".repeat(dollar_count);
 
-    old_name.push('$');
-    for _ in 0..(dollar_count - 1) {
-        new_name.push('$');
-        old_name.push('$');
-    }
     new_name.push('z');
-    new_name.push_str(&name);
-    old_name.push_str(&name);
+    new_name.push_str(name);
+    old_name.push_str(name);
 
     result.push_str(&new_name);
     map.insert(old_name, new_name);

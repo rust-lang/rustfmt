@@ -7,7 +7,7 @@ use syntax::symbol::keywords;
 
 use crate::config::lists::*;
 use crate::config::{IndentStyle, TypeDensity};
-use crate::expr::{rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix};
+use crate::expr::{format_expr, rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix, ExprType};
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::overflow;
@@ -132,6 +132,7 @@ where
 
 #[derive(Debug)]
 pub enum SegmentParam<'a> {
+    Const(&'a ast::AnonConst),
     LifeTime(&'a ast::Lifetime),
     Type(&'a ast::Ty),
     Binding(&'a ast::TypeBinding),
@@ -142,7 +143,7 @@ impl<'a> SegmentParam<'a> {
         match arg {
             ast::GenericArg::Lifetime(ref lt) => SegmentParam::LifeTime(lt),
             ast::GenericArg::Type(ref ty) => SegmentParam::Type(ty),
-            ast::GenericArg::Const(..) => unreachable!(), // FIXME(#3336)
+            ast::GenericArg::Const(const_) => SegmentParam::Const(const_),
         }
     }
 }
@@ -150,6 +151,7 @@ impl<'a> SegmentParam<'a> {
 impl<'a> Spanned for SegmentParam<'a> {
     fn span(&self) -> Span {
         match *self {
+            SegmentParam::Const(const_) => const_.value.span,
             SegmentParam::LifeTime(lt) => lt.ident.span,
             SegmentParam::Type(ty) => ty.span,
             SegmentParam::Binding(binding) => binding.span,
@@ -160,6 +162,7 @@ impl<'a> Spanned for SegmentParam<'a> {
 impl<'a> Rewrite for SegmentParam<'a> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match *self {
+            SegmentParam::Const(const_) => const_.rewrite(context, shape),
             SegmentParam::LifeTime(lt) => lt.rewrite(context, shape),
             SegmentParam::Type(ty) => ty.rewrite(context, shape),
             SegmentParam::Binding(binding) => {
@@ -299,24 +302,6 @@ where
         FunctionRetTy::Default(..) => String::new(),
     };
 
-    // Code for handling variadics is somewhat duplicated for items, but they
-    // are different enough to need some serious refactoring to share code.
-    enum ArgumentKind<T>
-    where
-        T: Deref,
-        <T as Deref>::Target: Rewrite + Spanned,
-    {
-        Regular(T),
-        Variadic(BytePos),
-    }
-
-    let variadic_arg = if variadic {
-        let variadic_start = context.snippet_provider.span_before(span, "...");
-        Some(ArgumentKind::Variadic(variadic_start))
-    } else {
-        None
-    };
-
     let list_shape = if context.use_block_indent() {
         Shape::indented(
             shape.block().indent.block_indent(context.config),
@@ -332,21 +317,12 @@ where
     let list_lo = context.snippet_provider.span_after(span, "(");
     let items = itemize_list(
         context.snippet_provider,
-        inputs.map(ArgumentKind::Regular).chain(variadic_arg),
+        inputs,
         ")",
         ",",
-        |arg| match *arg {
-            ArgumentKind::Regular(ref ty) => ty.span().lo(),
-            ArgumentKind::Variadic(start) => start,
-        },
-        |arg| match *arg {
-            ArgumentKind::Regular(ref ty) => ty.span().hi(),
-            ArgumentKind::Variadic(start) => start + BytePos(3),
-        },
-        |arg| match *arg {
-            ArgumentKind::Regular(ref ty) => ty.rewrite(context, list_shape),
-            ArgumentKind::Variadic(_) => Some("...".to_owned()),
-        },
+        |arg| arg.span().lo(),
+        |arg| arg.span().hi(),
+        |arg| arg.rewrite(context, list_shape),
         list_lo,
         span.hi(),
         false,
@@ -454,7 +430,7 @@ impl Rewrite for ast::GenericArg {
         match *self {
             ast::GenericArg::Lifetime(ref lt) => lt.rewrite(context, shape),
             ast::GenericArg::Type(ref ty) => ty.rewrite(context, shape),
-            ast::GenericArg::Const(..) => unreachable!(), // FIXME(#3336)
+            ast::GenericArg::Const(ref const_) => const_.rewrite(context, shape),
         }
     }
 }
@@ -479,6 +455,12 @@ fn rewrite_bounded_lifetime(
             join_bounds(context, shape.sub_width(overhead)?, bounds, true)?
         );
         Some(result)
+    }
+}
+
+impl Rewrite for ast::AnonConst {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        format_expr(&self.value, ExprType::SubExpression, context, shape)
     }
 }
 
@@ -525,7 +507,16 @@ impl Rewrite for ast::GenericParam {
             Some(ref rw) if !rw.is_empty() => result.push_str(&format!("{} ", rw)),
             _ => (),
         }
-        result.push_str(rewrite_ident(context, self.ident));
+
+        if let syntax::ast::GenericParamKind::Const { ref ty } = &self.kind {
+            result.push_str("const ");
+            result.push_str(rewrite_ident(context, self.ident));
+            result.push_str(": ");
+            result.push_str(&ty.rewrite(context, shape)?);
+        } else {
+            result.push_str(rewrite_ident(context, self.ident));
+        }
+
         if !self.bounds.is_empty() {
             result.push_str(type_bound_colon(context));
             result.push_str(&self.bounds.rewrite(context, shape)?)
@@ -676,9 +667,14 @@ impl Rewrite for ast::Ty {
                 rewrite_macro(mac, None, context, shape, MacroPosition::Expression)
             }
             ast::TyKind::ImplicitSelf => Some(String::from("")),
-            ast::TyKind::ImplTrait(_, ref it) => it
-                .rewrite(context, shape)
-                .map(|it_str| format!("impl {}", it_str)),
+            ast::TyKind::ImplTrait(_, ref it) => {
+                // Empty trait is not a parser error.
+                it.rewrite(context, shape).map(|it_str| {
+                    let space = if it_str.is_empty() { "" } else { " " };
+                    format!("impl{}{}", space, it_str)
+                })
+            }
+            ast::TyKind::CVarArgs => Some("...".to_owned()),
             ast::TyKind::Err | ast::TyKind::Typeof(..) => unreachable!(),
         }
     }
@@ -723,7 +719,7 @@ fn rewrite_bare_fn(
     let rewrite = format_function_type(
         bare_fn.decl.inputs.iter(),
         &bare_fn.decl.output,
-        bare_fn.decl.variadic,
+        bare_fn.decl.c_variadic,
         span,
         context,
         func_ty_shape,

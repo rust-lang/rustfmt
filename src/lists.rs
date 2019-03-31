@@ -577,13 +577,8 @@ pub fn extract_pre_comment(pre_snippet: &str) -> (Option<String>, ListItemCommen
     let has_block_comment = trimmed_pre_snippet.ends_with("*/");
     let has_single_line_comment = trimmed_pre_snippet.starts_with("//");
     if has_block_comment {
-        let comment_end = pre_snippet.chars().rev().position(|c| c == '/').unwrap();
-        if pre_snippet
-            .chars()
-            .rev()
-            .take(comment_end + 1)
-            .any(|c| c == '\n')
-        {
+        let comment_end = pre_snippet.rfind(|c| c == '/').unwrap();
+        if pre_snippet[comment_end..].contains('\n') {
             (
                 Some(trimmed_pre_snippet.to_owned()),
                 ListItemCommentStyle::DifferentLine,
@@ -622,8 +617,12 @@ pub fn extract_post_comment(
     } else {
         post_snippet
     };
-
-    if !post_snippet_trimmed.is_empty() {
+    // FIXME(#3441): post_snippet includes 'const' now
+    // it should not include here
+    let removed_newline_snippet = post_snippet_trimmed.trim();
+    if !post_snippet_trimmed.is_empty()
+        && (removed_newline_snippet.starts_with("//") || removed_newline_snippet.starts_with("/*"))
+    {
         Some(post_snippet_trimmed.to_owned())
     } else {
         None
@@ -647,7 +646,7 @@ pub fn get_comment_end(
     if let Some(i) = block_open_index {
         match post_snippet.find('/') {
             Some(j) if j < i => block_open_index = None,
-            _ if i > 0 && &post_snippet[i - 1..i] == "/" => block_open_index = None,
+            _ if post_snippet[..i].chars().last() == Some('/') => block_open_index = None,
             _ => (),
         }
     }
@@ -683,13 +682,18 @@ pub fn get_comment_end(
 
 // Account for extra whitespace between items. This is fiddly
 // because of the way we divide pre- and post- comments.
-fn has_extra_newline(post_snippet: &str, comment_end: usize) -> bool {
+pub fn has_extra_newline(post_snippet: &str, comment_end: usize) -> bool {
     if post_snippet.is_empty() || comment_end == 0 {
         return false;
     }
 
+    let len_last = post_snippet[..comment_end]
+        .chars()
+        .last()
+        .unwrap()
+        .len_utf8();
     // Everything from the separator to the next item.
-    let test_snippet = &post_snippet[comment_end - 1..];
+    let test_snippet = &post_snippet[comment_end - len_last..];
     let first_newline = test_snippet
         .find('\n')
         .unwrap_or_else(|| test_snippet.len());

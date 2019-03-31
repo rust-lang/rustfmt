@@ -1664,7 +1664,7 @@ See also: [`space_after_colon`](#space_after_colon).
 The maximum diff of width between struct fields to be aligned with each other.
 
 - **Default value** : 0
-- **Possible values**: any positive integer
+- **Possible values**: any non-negative integer
 - **Stable**: No (tracking issue: #3371)
 
 #### `0` (default):
@@ -2177,7 +2177,7 @@ Maximum number of blank lines which can be put between items. If more than this 
 lines are found, they are trimmed down to match this integer.
 
 - **Default value**: `1`
-- **Possible values**: *unsigned integer*
+- **Possible values**: any non-negative integer
 - **Stable**: No (tracking issue: #3381)
 
 ### Example
@@ -2327,7 +2327,7 @@ Copyright 2018 The Rust Project Developers.`, etc.:
 
 Skip formatting the specified files and directories.
 
-- **Default value**: format every files
+- **Default value**: format every file
 - **Possible values**: See an example below
 - **Stable**: No (tracking issue: #3395)
 
@@ -2358,9 +2358,9 @@ Specifies which edition is used by the parser.
 - **Possible values**: `2015`, `2018`
 - **Stable**: Yes
 
-### Example
-
-If you want to format code that requires edition 2018, add the following to your config file:
+Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
+through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition needs to be specified
+in your config file:
 
 ```toml
 edition = "2018"
@@ -2406,6 +2406,27 @@ pub enum Foo {}
 
 /// Example item documentation
 pub enum Foo {}
+```
+
+## `inline_attribute_width`
+
+Write an item and its attribute on the same line if their combined width is below a threshold
+
+- **Default value**: 0
+- **Possible values**: any positive integer
+- **Stable**: No (tracking issue: #3343)
+
+### Example
+
+#### `0` (default):
+```rust
+#[cfg(feature = "alloc")]
+use core::slice;
+```
+
+#### `50`:
+```rust
+#[cfg(feature = "alloc")] use core::slice;
 ```
 
 ## `emit_mode`

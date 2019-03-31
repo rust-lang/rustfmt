@@ -7,15 +7,56 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::Chars;
+use std::thread;
 
-use crate::config::{Color, Config, EmitMode, FileName, ReportTactic};
-use crate::formatting::{ModifiedChunk, SourceFile};
-use crate::rustfmt_diff::{make_diff, print_diff, DiffLine, Mismatch, OutputWriter};
+use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle, ReportTactic};
+use crate::formatting::{ReportedErrors, SourceFile};
+use crate::rustfmt_diff::{make_diff, print_diff, DiffLine, Mismatch, ModifiedChunk, OutputWriter};
 use crate::source_file;
 use crate::{FormatReport, Input, Session};
 
 const DIFF_CONTEXT_SIZE: usize = 3;
 const CONFIGURATIONS_FILE_NAME: &str = "Configurations.md";
+
+// A list of files on which we want to skip testing.
+const SKIP_FILE_WHITE_LIST: &[&str] = &[
+    // We want to make sure that the `skip_children` is correctly working,
+    // so we do not want to test this file directly.
+    "configs/skip_children/foo/mod.rs",
+    "issue-3434/no_entry.rs",
+];
+
+struct TestSetting {
+    /// The size of the stack of the thread that run tests.
+    stack_size: usize,
+}
+
+impl Default for TestSetting {
+    fn default() -> Self {
+        TestSetting {
+            stack_size: 8388608, // 8MB
+        }
+    }
+}
+
+fn run_test_with<F>(test_setting: &TestSetting, f: F)
+where
+    F: FnOnce(),
+    F: Send + 'static,
+{
+    thread::Builder::new()
+        .stack_size(test_setting.stack_size)
+        .spawn(f)
+        .expect("Failed to create a test thread")
+        .join()
+        .expect("Failed to join a test thread")
+}
+
+fn is_file_skip(path: &Path) -> bool {
+    SKIP_FILE_WHITE_LIST
+        .iter()
+        .any(|file_path| path.ends_with(file_path))
+}
 
 // Returns a `Vec` containing `PathBuf`s of files with an  `rs` extension in the
 // given path. The `recursive` argument controls if files from subdirectories
@@ -31,7 +72,7 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
             let path = entry.path();
             if path.is_dir() && recursive {
                 files.append(&mut get_test_files(&path, recursive));
-            } else if path.extension().map_or(false, |f| f == "rs") {
+            } else if path.extension().map_or(false, |f| f == "rs") && !is_file_skip(&path) {
                 files.push(path);
             }
         }
@@ -100,13 +141,15 @@ fn write_message(msg: &str) {
 // exactly.
 #[test]
 fn system_tests() {
-    // Get all files in the tests/source directory.
-    let files = get_test_files(Path::new("tests/source"), true);
-    let (_reports, count, fails) = check_files(files, &None);
+    run_test_with(&TestSetting::default(), || {
+        // Get all files in the tests/source directory.
+        let files = get_test_files(Path::new("tests/source"), true);
+        let (_reports, count, fails) = check_files(files, &None);
 
-    // Display results.
-    println!("Ran {} system tests.", count);
-    assert_eq!(fails, 0, "{} system tests failed", fails);
+        // Display results.
+        println!("Ran {} system tests.", count);
+        assert_eq!(fails, 0, "{} system tests failed", fails);
+    });
 }
 
 // Do the same for tests/coverage-source directory.
@@ -214,23 +257,29 @@ fn assert_output(source: &Path, expected_filename: &Path) {
 // rustfmt.
 #[test]
 fn idempotence_tests() {
-    match option_env!("CFG_RELEASE_CHANNEL") {
-        None | Some("nightly") => {}
-        _ => return, // these tests require nightly
-    }
-    // Get all files in the tests/target directory.
-    let files = get_test_files(Path::new("tests/target"), true);
-    let (_reports, count, fails) = check_files(files, &None);
+    run_test_with(&TestSetting::default(), || {
+        match option_env!("CFG_RELEASE_CHANNEL") {
+            None | Some("nightly") => {}
+            _ => return, // these tests require nightly
+        }
+        // Get all files in the tests/target directory.
+        let files = get_test_files(Path::new("tests/target"), true);
+        let (_reports, count, fails) = check_files(files, &None);
 
-    // Display results.
-    println!("Ran {} idempotent tests.", count);
-    assert_eq!(fails, 0, "{} idempotent tests failed", fails);
+        // Display results.
+        println!("Ran {} idempotent tests.", count);
+        assert_eq!(fails, 0, "{} idempotent tests failed", fails);
+    });
 }
 
 // Run rustfmt on itself. This operation must be idempotent. We also check that
 // no warnings are emitted.
 #[test]
 fn self_tests() {
+    match option_env!("CFG_RELEASE_CHANNEL") {
+        None | Some("nightly") => {}
+        _ => return, // Issue-3443: these tests require nightly
+    }
     let mut files = get_test_files(Path::new("tests"), false);
     let bin_directories = vec!["cargo-fmt", "git-rustfmt", "bin", "format-diff"];
     for dir in bin_directories {
@@ -288,6 +337,30 @@ fn stdin_parser_panic_caught() {
 
         assert!(session.has_parsing_errors());
     }
+}
+
+/// Ensures that `EmitMode::ModifiedLines` works with input from `stdin`. Useful
+/// when embedding Rustfmt (e.g. inside RLS).
+#[test]
+fn stdin_works_with_modified_lines() {
+    let input = "\nfn\n some( )\n{\n}\nfn main () {}\n";
+    let output = "1 6 2\nfn some() {}\nfn main() {}\n";
+
+    let input = Input::Text(input.to_owned());
+    let mut config = Config::default();
+    config.set().newline_style(NewlineStyle::Unix);
+    config.set().emit_mode(EmitMode::ModifiedLines);
+    let mut buf: Vec<u8> = vec![];
+    {
+        let mut session = Session::new(config, Some(&mut buf));
+        session.format(input).unwrap();
+        let errors = ReportedErrors {
+            has_diff: true,
+            ..Default::default()
+        };
+        assert_eq!(session.errors, errors);
+    }
+    assert_eq!(buf, output.as_bytes());
 }
 
 #[test]
@@ -536,11 +609,11 @@ fn handle_result(
     for (file_name, fmt_text) in result {
         // If file is in tests/source, compare to file with same name in tests/target.
         let target = get_target(&file_name, target);
-        let open_error = format!("couldn't open target {:?}", &target);
+        let open_error = format!("couldn't open target {:?}", target);
         let mut f = fs::File::open(&target).expect(&open_error);
 
         let mut text = String::new();
-        let read_error = format!("failed reading target {:?}", &target);
+        let read_error = format!("failed reading target {:?}", target);
         f.read_to_string(&mut text).expect(&read_error);
 
         // Ignore LF and CRLF difference for Windows.

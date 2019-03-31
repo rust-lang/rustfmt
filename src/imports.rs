@@ -205,11 +205,10 @@ impl fmt::Display for UseSegment {
             UseSegment::List(ref list) => {
                 write!(f, "{{")?;
                 for (i, item) in list.iter().enumerate() {
-                    let is_last = i == list.len() - 1;
-                    write!(f, "{}", item)?;
-                    if !is_last {
+                    if i != 0 {
                         write!(f, ", ")?;
                     }
+                    write!(f, "{}", item)?;
                 }
                 write!(f, "}}")
             }
@@ -219,13 +218,12 @@ impl fmt::Display for UseSegment {
 impl fmt::Display for UseTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, segment) in self.path.iter().enumerate() {
-            let is_last = i == self.path.len() - 1;
-            write!(f, "{}", segment)?;
-            if !is_last {
+            if i != 0 {
                 write!(f, "::")?;
             }
+            write!(f, "{}", segment)?;
         }
-        write!(f, "")
+        Ok(())
     }
 }
 
@@ -249,7 +247,23 @@ impl UseTree {
             let lo = attrs.last().as_ref()?.span().hi();
             let hi = self.span.lo();
             let span = mk_sp(lo, hi);
-            combine_strs_with_missing_comments(context, &attr_str, &use_str, span, shape, false)
+
+            let allow_extend = if attrs.len() == 1 {
+                let line_len = attr_str.len() + 1 + use_str.len();
+                !attrs.first().unwrap().is_sugared_doc
+                    && context.config.inline_attribute_width() >= line_len
+            } else {
+                false
+            };
+
+            combine_strs_with_missing_comments(
+                context,
+                &attr_str,
+                &use_str,
+                span,
+                shape,
+                allow_extend,
+            )
         } else {
             Some(use_str)
         }

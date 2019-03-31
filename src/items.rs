@@ -19,9 +19,7 @@ use crate::expr::{
     format_expr, is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with,
     ExprType, RhsTactics,
 };
-use crate::lists::{
-    definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
-};
+use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::overflow;
 use crate::rewrite::{Rewrite, RewriteContext};
@@ -193,7 +191,7 @@ impl<'a> FnSig<'a> {
     ) -> FnSig<'a> {
         FnSig {
             unsafety: method_sig.header.unsafety,
-            is_async: method_sig.header.asyncness,
+            is_async: method_sig.header.asyncness.node,
             constness: method_sig.header.constness.node,
             defaultness: ast::Defaultness::Final,
             abi: method_sig.header.abi,
@@ -215,7 +213,7 @@ impl<'a> FnSig<'a> {
                 generics,
                 abi: fn_header.abi,
                 constness: fn_header.constness.node,
-                is_async: fn_header.asyncness,
+                is_async: fn_header.asyncness.node,
                 defaultness,
                 unsafety: fn_header.unsafety,
                 visibility: visibility.clone(),
@@ -732,7 +730,7 @@ pub fn format_impl(
                 if generics.where_clause.predicates.len() == 1 {
                     result.push_str(",");
                 }
-                result.push_str(&format!("{}{{{}}}", &sep, &sep));
+                result.push_str(&format!("{}{{{}}}", sep, sep));
             } else {
                 result.push_str(" {}");
             }
@@ -914,7 +912,7 @@ fn rewrite_trait_ref(
     let shape = Shape::indented(offset + used_space, context.config);
     if let Some(trait_ref_str) = trait_ref.rewrite(context, shape) {
         if !trait_ref_str.contains('\n') {
-            return Some(format!(" {}{}", polarity_str, &trait_ref_str));
+            return Some(format!(" {}{}", polarity_str, trait_ref_str));
         }
     }
     // We could not make enough space for trait_ref, so put it on new line.
@@ -923,9 +921,9 @@ fn rewrite_trait_ref(
     let trait_ref_str = trait_ref.rewrite(context, shape)?;
     Some(format!(
         "{}{}{}",
-        &offset.to_string_with_newline(context.config),
+        offset.to_string_with_newline(context.config),
         polarity_str,
-        &trait_ref_str
+        trait_ref_str
     ))
 }
 
@@ -1832,7 +1830,9 @@ fn is_empty_infer(ty: &ast::Ty, pat_span: Span) -> bool {
 
 impl Rewrite for ast::Arg {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        if is_named_arg(self) {
+        if let Some(ref explicit_self) = self.to_self() {
+            rewrite_explicit_self(context, explicit_self)
+        } else if is_named_arg(self) {
             let mut result = self
                 .pat
                 .rewrite(context, Shape::legacy(shape.width, shape.indent))?;
@@ -1861,9 +1861,8 @@ impl Rewrite for ast::Arg {
 }
 
 fn rewrite_explicit_self(
-    explicit_self: &ast::ExplicitSelf,
-    args: &[ast::Arg],
     context: &RewriteContext<'_>,
+    explicit_self: &ast::ExplicitSelf,
 ) -> Option<String> {
     match explicit_self.node {
         ast::SelfKind::Region(lt, m) => {
@@ -1879,10 +1878,7 @@ fn rewrite_explicit_self(
                 None => Some(format!("&{}self", mut_str)),
             }
         }
-        ast::SelfKind::Explicit(ref ty, _) => {
-            assert!(!args.is_empty(), "&[ast::Arg] shouldn't be empty.");
-
-            let mutability = explicit_self_mutability(&args[0]);
+        ast::SelfKind::Explicit(ref ty, mutability) => {
             let type_str = ty.rewrite(
                 context,
                 Shape::legacy(context.config.max_width(), Indent::empty()),
@@ -1894,23 +1890,7 @@ fn rewrite_explicit_self(
                 type_str
             ))
         }
-        ast::SelfKind::Value(_) => {
-            assert!(!args.is_empty(), "&[ast::Arg] shouldn't be empty.");
-
-            let mutability = explicit_self_mutability(&args[0]);
-
-            Some(format!("{}self", format_mutability(mutability)))
-        }
-    }
-}
-
-// Hacky solution caused by absence of `Mutability` in `SelfValue` and
-// `SelfExplicit` variants of `ast::ExplicitSelf_`.
-fn explicit_self_mutability(arg: &ast::Arg) -> ast::Mutability {
-    if let ast::PatKind::Ident(ast::BindingMode::ByValue(mutability), _, _) = arg.pat.node {
-        mutability
-    } else {
-        unreachable!()
+        ast::SelfKind::Value(mutability) => Some(format!("{}self", format_mutability(mutability))),
     }
 }
 
@@ -2047,14 +2027,12 @@ fn rewrite_fn_base(
     let arg_str = rewrite_args(
         context,
         &fd.inputs,
-        fd.get_self().as_ref(),
         one_line_budget,
         multi_line_budget,
         indent,
         arg_indent,
         args_span,
-        fd.variadic,
-        generics_str.contains('\n'),
+        fd.c_variadic,
     )?;
 
     let put_args_in_block = match context.config.indent_style() {
@@ -2271,130 +2249,46 @@ impl WhereClauseOption {
 fn rewrite_args(
     context: &RewriteContext<'_>,
     args: &[ast::Arg],
-    explicit_self: Option<&ast::ExplicitSelf>,
     one_line_budget: usize,
     multi_line_budget: usize,
     indent: Indent,
     arg_indent: Indent,
     span: Span,
     variadic: bool,
-    generics_str_contains_newline: bool,
 ) -> Option<String> {
-    let mut arg_item_strs = args
-        .iter()
-        .map(|arg| {
+    if args.len() == 0 {
+        let comment = context
+            .snippet(mk_sp(
+                span.lo(),
+                // to remove ')'
+                span.hi() - BytePos(1),
+            ))
+            .trim();
+        return Some(comment.to_owned());
+    }
+    let arg_items: Vec<_> = itemize_list(
+        context.snippet_provider,
+        args.iter(),
+        ")",
+        ",",
+        |arg| span_lo_for_arg(arg),
+        |arg| arg.ty.span.hi(),
+        |arg| {
             arg.rewrite(context, Shape::legacy(multi_line_budget, arg_indent))
-                .unwrap_or_else(|| context.snippet(arg.span()).to_owned())
-        })
-        .collect::<Vec<_>>();
-
-    // Account for sugary self.
-    // FIXME: the comment for the self argument is dropped. This is blocked
-    // on rust issue #27522.
-    let min_args = explicit_self
-        .and_then(|explicit_self| rewrite_explicit_self(explicit_self, args, context))
-        .map_or(1, |self_str| {
-            arg_item_strs[0] = self_str;
-            2
-        });
-
-    // Comments between args.
-    let mut arg_items = Vec::new();
-    if min_args == 2 {
-        arg_items.push(ListItem::from_str(""));
-    }
-
-    // FIXME(#21): if there are no args, there might still be a comment, but
-    // without spans for the comment or parens, there is no chance of
-    // getting it right. You also don't get to put a comment on self, unless
-    // it is explicit.
-    if args.len() >= min_args || variadic {
-        let comment_span_start = if min_args == 2 {
-            let second_arg_start = if arg_has_pattern(&args[1]) {
-                args[1].pat.span.lo()
-            } else {
-                args[1].ty.span.lo()
-            };
-            let reduced_span = mk_sp(span.lo(), second_arg_start);
-
-            context.snippet_provider.span_after_last(reduced_span, ",")
-        } else {
-            span.lo()
-        };
-
-        enum ArgumentKind<'a> {
-            Regular(&'a ast::Arg),
-            Variadic(BytePos),
-        }
-
-        let variadic_arg = if variadic {
-            let variadic_span = mk_sp(args.last().unwrap().ty.span.hi(), span.hi());
-            let variadic_start =
-                context.snippet_provider.span_after(variadic_span, "...") - BytePos(3);
-            Some(ArgumentKind::Variadic(variadic_start))
-        } else {
-            None
-        };
-
-        let more_items = itemize_list(
-            context.snippet_provider,
-            args[min_args - 1..]
-                .iter()
-                .map(ArgumentKind::Regular)
-                .chain(variadic_arg),
-            ")",
-            ",",
-            |arg| match *arg {
-                ArgumentKind::Regular(arg) => span_lo_for_arg(arg),
-                ArgumentKind::Variadic(start) => start,
-            },
-            |arg| match *arg {
-                ArgumentKind::Regular(arg) => arg.ty.span.hi(),
-                ArgumentKind::Variadic(start) => start + BytePos(3),
-            },
-            |arg| match *arg {
-                ArgumentKind::Regular(..) => None,
-                ArgumentKind::Variadic(..) => Some("...".to_owned()),
-            },
-            comment_span_start,
-            span.hi(),
-            false,
-        );
-
-        arg_items.extend(more_items);
-    }
-
-    let fits_in_one_line = !generics_str_contains_newline
-        && (arg_items.is_empty()
-            || arg_items.len() == 1 && arg_item_strs[0].len() <= one_line_budget);
-
-    for (item, arg) in arg_items.iter_mut().zip(arg_item_strs) {
-        item.item = Some(arg);
-    }
-
-    let last_line_ends_with_comment = arg_items
-        .iter()
-        .last()
-        .and_then(|item| item.post_comment.as_ref())
-        .map_or(false, |s| s.trim().starts_with("//"));
-
-    let (indent, trailing_comma) = match context.config.indent_style() {
-        IndentStyle::Block if fits_in_one_line => {
-            (indent.block_indent(context.config), SeparatorTactic::Never)
-        }
-        IndentStyle::Block => (
-            indent.block_indent(context.config),
-            context.config.trailing_comma(),
-        ),
-        IndentStyle::Visual if last_line_ends_with_comment => {
-            (arg_indent, context.config.trailing_comma())
-        }
-        IndentStyle::Visual => (arg_indent, SeparatorTactic::Never),
-    };
+                .or_else(|| Some(context.snippet(arg.span()).to_owned()))
+        },
+        span.lo(),
+        span.hi(),
+        false,
+    )
+    .collect();
 
     let tactic = definitive_tactic(
         &arg_items,
-        context.config.fn_args_density().to_list_tactic(),
+        context
+            .config
+            .fn_args_density()
+            .to_list_tactic(arg_items.len()),
         Separator::Comma,
         one_line_budget,
     );
@@ -2402,13 +2296,17 @@ fn rewrite_args(
         DefinitiveListTactic::Horizontal => one_line_budget,
         _ => multi_line_budget,
     };
-
-    debug!("rewrite_args: budget: {}, tactic: {:?}", budget, tactic);
-
+    let indent = match context.config.indent_style() {
+        IndentStyle::Block => indent.block_indent(context.config),
+        IndentStyle::Visual => arg_indent,
+    };
     let trailing_separator = if variadic {
         SeparatorTactic::Never
     } else {
-        trailing_comma
+        match context.config.indent_style() {
+            IndentStyle::Block => context.config.trailing_comma(),
+            IndentStyle::Visual => SeparatorTactic::Never,
+        }
     };
     let fmt = ListFormatting::new(Shape::legacy(budget, indent), context.config)
         .tactic(tactic)
@@ -2416,14 +2314,6 @@ fn rewrite_args(
         .ends_with_newline(tactic.ends_with_newline(context.config.indent_style()))
         .preserve_newline(true);
     write_list(&arg_items, &fmt)
-}
-
-fn arg_has_pattern(arg: &ast::Arg) -> bool {
-    if let ast::PatKind::Ident(_, ident, _) = arg.pat.node {
-        ident != symbol::keywords::Invalid.ident()
-    } else {
-        true
-    }
 }
 
 fn compute_budgets_for_args(

@@ -26,7 +26,13 @@ pub trait LineRangeUtils {
 
 impl<'a> SpanUtils for SnippetProvider<'a> {
     fn span_after(&self, original: Span, needle: &str) -> BytePos {
-        self.opt_span_after(original, needle).expect("bad span")
+        self.opt_span_after(original, needle).unwrap_or_else(|| {
+            panic!(
+                "bad span: `{}`: `{}`",
+                needle,
+                self.span_to_snippet(original).unwrap()
+            )
+        })
     }
 
     fn span_after_last(&self, original: Span, needle: &str) -> BytePos {
@@ -43,7 +49,7 @@ impl<'a> SpanUtils for SnippetProvider<'a> {
     fn span_before(&self, original: Span, needle: &str) -> BytePos {
         self.opt_span_before(original, needle).unwrap_or_else(|| {
             panic!(
-                "bad span: {}: {}",
+                "bad span: `{}`: `{}`",
                 needle,
                 self.span_to_snippet(original).unwrap()
             )
@@ -65,6 +71,7 @@ impl<'a> SpanUtils for SnippetProvider<'a> {
 
 impl LineRangeUtils for SourceMap {
     fn lookup_line_range(&self, span: Span) -> LineRange {
+        let snippet = self.span_to_snippet(span).unwrap_or(String::new());
         let lo = self.lookup_line(span.lo()).unwrap();
         let hi = self.lookup_line(span.hi()).unwrap();
 
@@ -74,11 +81,14 @@ impl LineRangeUtils for SourceMap {
             lo, hi
         );
 
+        // in case the span starts with a newline, the line range is off by 1 without the
+        // adjustment below
+        let offset = 1 + if snippet.starts_with('\n') { 1 } else { 0 };
         // Line numbers start at 1
         LineRange {
             file: lo.sf.clone(),
-            lo: lo.line + 1,
-            hi: hi.line + 1,
+            lo: lo.line + offset,
+            hi: hi.line + offset,
         }
     }
 }

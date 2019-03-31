@@ -7,15 +7,16 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use syntax::ast;
-use syntax::errors::emitter::{ColorConfig, EmitterWriter};
+use syntax::errors::emitter::{ColorConfig, Emitter};
 use syntax::errors::{DiagnosticBuilder, Handler};
 use syntax::parse::{self, ParseSess};
-use syntax::source_map::{FilePathMapping, SourceMap, Span};
+use syntax::source_map::{FilePathMapping, SourceMap, Span, DUMMY_SP};
 
 use crate::comment::{CharClasses, FullCodeCharKind};
 use crate::config::{Config, FileName, Verbosity};
 use crate::ignore::IgnorePathSet;
 use crate::issues::BadIssueSeeker;
+use crate::utils::{count_newlines, get_skip_macro_names};
 use crate::visitor::{FmtVisitor, SnippetProvider};
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
 
@@ -48,11 +49,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             let format_result = format_project(input, config, self);
 
             format_result.map(|report| {
-                {
-                    let new_errors = &report.internal.borrow().1;
-
-                    self.errors.add(new_errors);
-                }
+                self.errors.add(&report.internal.borrow().1);
                 report
             })
         })
@@ -74,7 +71,14 @@ fn format_project<T: FormatHandler>(
     let source_map = Rc::new(SourceMap::new(FilePathMapping::empty()));
     let mut parse_session = make_parse_sess(source_map.clone(), config);
     let mut report = FormatReport::new();
-    let krate = match parse_crate(input, &parse_session, config, &mut report) {
+    let directory_ownership = input.to_directory_ownership();
+    let krate = match parse_crate(
+        input,
+        &parse_session,
+        config,
+        &mut report,
+        directory_ownership,
+    ) {
         Ok(krate) => krate,
         // Surface parse error via Session (errors are merged there from report)
         Err(ErrorKind::ParseError) => return Ok(report),
@@ -83,8 +87,8 @@ fn format_project<T: FormatHandler>(
     timer = timer.done_parsing();
 
     // Suppress error output if we have to do any further parsing.
-    let silent_emitter = silent_emitter(source_map);
-    parse_session.span_diagnostic = Handler::with_emitter(true, false, silent_emitter);
+    let silent_emitter = silent_emitter();
+    parse_session.span_diagnostic = Handler::with_emitter(true, None, silent_emitter);
 
     let mut context = FormatContext::new(&krate, report, parse_session, config, handler);
     let ignore_path_set = match IgnorePathSet::from_ignore_list(&config.ignore()) {
@@ -92,8 +96,14 @@ fn format_project<T: FormatHandler>(
         Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
     };
 
-    let files = modules::list_files(&krate, context.parse_session.source_map())?;
-    for (path, module) in files {
+    let files = modules::ModResolver::new(
+        context.parse_session.source_map(),
+        directory_ownership.unwrap_or(parse::DirectoryOwnership::UnownedViaMod(false)),
+        input_is_stdin,
+    )
+    .visit_crate(&krate)
+    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    for (path, (module, _)) in files {
         if (config.skip_children() && path != main_file) || ignore_path_set.is_match(&path) {
             continue;
         }
@@ -145,6 +155,10 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             &snippet_provider,
             self.report.clone(),
         );
+        visitor
+            .skip_macro_names
+            .borrow_mut()
+            .append(&mut get_skip_macro_names(&self.krate.attrs));
 
         // Format inner attributes if available.
         if !self.krate.attrs.is_empty() && is_root {
@@ -160,10 +174,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             visitor.format_separate_mod(module, &*source_file);
         };
 
-        debug_assert_eq!(
-            visitor.line_number,
-            crate::utils::count_newlines(&visitor.buffer)
-        );
+        debug_assert_eq!(visitor.line_number, count_newlines(&visitor.buffer));
 
         // For some reason, the source_map does not include terminating
         // newlines so we must add one on for each file. This is sad.
@@ -186,8 +197,12 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         self.report
             .add_non_formatted_ranges(visitor.skipped_range.clone());
 
-        self.handler
-            .handle_formatted_file(path, visitor.buffer.to_owned(), &mut self.report)
+        self.handler.handle_formatted_file(
+            self.parse_session.source_map(),
+            path,
+            visitor.buffer.to_owned(),
+            &mut self.report,
+        )
     }
 }
 
@@ -195,6 +210,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
 trait FormatHandler {
     fn handle_formatted_file(
         &mut self,
+        source_map: &SourceMap,
         path: FileName,
         result: String,
         report: &mut FormatReport,
@@ -205,13 +221,14 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
     // Called for each formatted file.
     fn handle_formatted_file(
         &mut self,
+        source_map: &SourceMap,
         path: FileName,
         result: String,
         report: &mut FormatReport,
     ) -> Result<(), ErrorKind> {
         if let Some(ref mut out) = self.out {
-            match source_file::write_file(&result, &path, out, &self.config) {
-                Ok(b) if b => report.add_diff(),
+            match source_file::write_file(Some(source_map), &path, &result, out, &self.config) {
+                Ok(has_diff) if has_diff => report.add_diff(),
                 Err(e) => {
                     // Create a new error with path_str to help users see which files failed
                     let err_msg = format!("{}: {}", path, e);
@@ -307,7 +324,7 @@ impl FormattingError {
 
 pub(crate) type FormatErrorMap = HashMap<FileName, Vec<FormattingError>>;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub(crate) struct ReportedErrors {
     // Encountered e.g., an IO error.
     pub(crate) has_operational_errors: bool,
@@ -338,25 +355,6 @@ impl ReportedErrors {
         self.has_check_errors |= other.has_check_errors;
         self.has_diff |= other.has_diff;
     }
-}
-
-/// A single span of changed lines, with 0 or more removed lines
-/// and a vector of 0 or more inserted lines.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct ModifiedChunk {
-    /// The first to be removed from the original text
-    pub line_number_orig: u32,
-    /// The number of lines which have been replaced
-    pub lines_removed: u32,
-    /// The new lines
-    pub lines: Vec<String>,
-}
-
-/// Set of changed sections of a file.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct ModifiedLines {
-    /// The set of changed chunks.
-    pub chunks: Vec<ModifiedChunk>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -614,16 +612,28 @@ fn parse_crate(
     parse_session: &ParseSess,
     config: &Config,
     report: &mut FormatReport,
+    directory_ownership: Option<parse::DirectoryOwnership>,
 ) -> Result<ast::Crate, ErrorKind> {
     let input_is_stdin = input.is_text();
 
     let parser = match input {
-        Input::File(file) => Ok(parse::new_parser_from_file(parse_session, &file)),
+        Input::File(ref file) => {
+            // Use `new_sub_parser_from_file` when we the input is a submodule.
+            Ok(if let Some(dir_own) = directory_ownership {
+                parse::new_sub_parser_from_file(parse_session, file, dir_own, None, DUMMY_SP)
+            } else {
+                parse::new_parser_from_file(parse_session, file)
+            })
+        }
         Input::Text(text) => parse::maybe_new_parser_from_source_str(
             parse_session,
             syntax::source_map::FileName::Custom("stdin".to_owned()),
             text,
         )
+        .map(|mut parser| {
+            parser.recurse_into_file_modules = false;
+            parser
+        })
         .map_err(|diags| {
             diags
                 .into_iter()
@@ -666,19 +676,21 @@ fn parse_crate(
     Err(ErrorKind::ParseError)
 }
 
-fn silent_emitter(source_map: Rc<SourceMap>) -> Box<EmitterWriter> {
-    Box::new(EmitterWriter::new(
-        Box::new(Vec::new()),
-        Some(source_map),
-        false,
-        false,
-    ))
+/// Emitter which discards every error.
+struct SilentEmitter;
+
+impl Emitter for SilentEmitter {
+    fn emit(&mut self, _db: &DiagnosticBuilder<'_>) {}
+}
+
+fn silent_emitter() -> Box<SilentEmitter> {
+    Box::new(SilentEmitter {})
 }
 
 fn make_parse_sess(source_map: Rc<SourceMap>, config: &Config) -> ParseSess {
     let tty_handler = if config.hide_parse_errors() {
-        let silent_emitter = silent_emitter(source_map.clone());
-        Handler::with_emitter(true, false, silent_emitter)
+        let silent_emitter = silent_emitter();
+        Handler::with_emitter(true, None, silent_emitter)
     } else {
         let supports_color = term::stderr().map_or(false, |term| term.supports_color());
         let color_cfg = if supports_color {
@@ -686,7 +698,7 @@ fn make_parse_sess(source_map: Rc<SourceMap>, config: &Config) -> ParseSess {
         } else {
             ColorConfig::Never
         };
-        Handler::with_tty_emitter(color_cfg, true, false, Some(source_map.clone()))
+        Handler::with_tty_emitter(color_cfg, true, None, Some(source_map.clone()))
     };
 
     ParseSess::with_span_handler(tty_handler, source_map)
