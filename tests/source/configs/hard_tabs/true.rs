@@ -2,5 +2,5 @@
 // Hard tabs
 
 fn lorem() -> usize {
-42 // spaces before 42
+42 // tabs before 42
 }
