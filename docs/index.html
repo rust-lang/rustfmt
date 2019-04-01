@@ -71,7 +71,10 @@
                   const ast = this.configurationDescriptions
                                   .filter(({ head, text, stable }) => {
                                     
-                                    if (text.includes(this.searchCondition) === false) {
+                                    if (
+                                      text.includes(this.searchCondition) === false &&
+                                      head.includes(this.searchCondition) === false
+                                    ) {
                                       return false;
                                     }
 
