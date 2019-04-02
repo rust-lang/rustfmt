@@ -1825,6 +1825,60 @@ fn is_empty_infer(ty: &ast::Ty, pat_span: Span) -> bool {
     }
 }
 
+/// Recover any missing comments between the argument and the type.
+///
+/// # Returns
+///
+/// A 2-len tuple with the comment before the colon in first position, and the comment after the
+/// colon in second position.
+fn get_missing_arg_comments(
+    context: &RewriteContext<'_>,
+    pat_span: Span,
+    ty_span: Span,
+    shape: Shape,
+) -> (String, String) {
+    let missing_comment_span = mk_sp(pat_span.hi(), ty_span.lo());
+
+    let span_before_colon = {
+        let missing_comment_span_hi = context
+            .snippet_provider
+            .span_before(missing_comment_span, ":");
+        mk_sp(pat_span.hi(), missing_comment_span_hi)
+    };
+    let span_after_colon = {
+        let missing_comment_span_lo = context
+            .snippet_provider
+            .span_after(missing_comment_span, ":");
+        mk_sp(missing_comment_span_lo, ty_span.lo())
+    };
+
+    let comment_before_colon = rewrite_missing_comment(span_before_colon, shape, context);
+    let comment_after_colon = rewrite_missing_comment(span_after_colon, shape, context);
+    let leading_space = |com: String| {
+        if com.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", com)
+        }
+    };
+    let trailing_space = |com: String| {
+        if com.is_empty() {
+            String::new()
+        } else {
+            format!("{} ", com)
+        }
+    };
+    match (comment_before_colon, comment_after_colon) {
+        (Some(comment_before_colon), Some(comment_after_colon)) => (
+            leading_space(comment_before_colon),
+            trailing_space(comment_after_colon),
+        ),
+        (Some(comment_before_colon), None) => (leading_space(comment_before_colon), String::new()),
+        (None, Some(comment_after_colon)) => (String::new(), trailing_space(comment_after_colon)),
+        _ => (String::new(), String::new()),
+    }
+}
+
 impl Rewrite for ast::Arg {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         if let Some(ref explicit_self) = self.to_self() {
@@ -1835,21 +1889,11 @@ impl Rewrite for ast::Arg {
                 .rewrite(context, Shape::legacy(shape.width, shape.indent))?;
 
             if !is_empty_infer(&*self.ty, self.pat.span) {
-                // recover any missing comment between the argument and the type
-                let missing_comment_span = mk_sp(self.pat.span.hi(), self.ty.span.lo());
-                let missing_comment_span_hi = context
-                    .snippet_provider
-                    .span_before(missing_comment_span, ":");
-                let missing_comment_span = mk_sp(self.pat.span.hi(), missing_comment_span_hi);
-                let missing_comment = rewrite_missing_comment(missing_comment_span, shape, context);
-                if let Some(missing_comment) = missing_comment {
-                    if !missing_comment.is_empty() {
-                        result.push_str(" ");
-                        result.push_str(&missing_comment);
-                    }
-                }
-
+                let (before_comment, after_comment) =
+                    get_missing_arg_comments(context, self.pat.span, self.ty.span, shape);
+                result.push_str(&before_comment);
                 result.push_str(colon_spaces(context.config));
+                result.push_str(&after_comment);
                 let overhead = last_line_width(&result);
                 let max_width = shape.width.checked_sub(overhead)?;
                 let ty_str = self
