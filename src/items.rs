@@ -36,7 +36,7 @@ const DEFAULT_VISIBILITY: ast::Visibility = source_map::Spanned {
 };
 
 fn type_annotation_separator(config: &Config) -> &str {
-    colon_spaces(config.space_before_colon(), config.space_after_colon())
+    colon_spaces(config)
 }
 
 // Statements of the form
@@ -1695,10 +1695,7 @@ fn rewrite_static(
     static_parts: &StaticParts<'_>,
     offset: Indent,
 ) -> Option<String> {
-    let colon = colon_spaces(
-        context.config.space_before_colon(),
-        context.config.space_after_colon(),
-    );
+    let colon = colon_spaces(context.config);
     let mut prefix = format!(
         "{}{}{} {}{}{}",
         format_visibility(context, static_parts.vis),
@@ -1838,13 +1835,21 @@ impl Rewrite for ast::Arg {
                 .rewrite(context, Shape::legacy(shape.width, shape.indent))?;
 
             if !is_empty_infer(&*self.ty, self.pat.span) {
-                if context.config.space_before_colon() {
-                    result.push_str(" ");
+                // recover any missing comment between the argument and the type
+                let missing_comment_span = mk_sp(self.pat.span.hi(), self.ty.span.lo());
+                let missing_comment_span_hi = context
+                    .snippet_provider
+                    .span_before(missing_comment_span, ":");
+                let missing_comment_span = mk_sp(self.pat.span.hi(), missing_comment_span_hi);
+                let missing_comment = rewrite_missing_comment(missing_comment_span, shape, context);
+                if let Some(missing_comment) = missing_comment {
+                    if !missing_comment.is_empty() {
+                        result.push_str(" ");
+                        result.push_str(&missing_comment);
+                    }
                 }
-                result.push_str(":");
-                if context.config.space_after_colon() {
-                    result.push_str(" ");
-                }
+
+                result.push_str(colon_spaces(context.config));
                 let overhead = last_line_width(&result);
                 let max_width = shape.width.checked_sub(overhead)?;
                 let ty_str = self
