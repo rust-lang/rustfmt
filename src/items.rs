@@ -1852,31 +1852,13 @@ fn get_missing_arg_comments(
         mk_sp(missing_comment_span_lo, ty_span.lo())
     };
 
-    let comment_before_colon = rewrite_missing_comment(span_before_colon, shape, context);
-    let comment_after_colon = rewrite_missing_comment(span_after_colon, shape, context);
-    let leading_space = |com: String| {
-        if com.is_empty() {
-            String::new()
-        } else {
-            format!(" {}", com)
-        }
-    };
-    let trailing_space = |com: String| {
-        if com.is_empty() {
-            String::new()
-        } else {
-            format!("{} ", com)
-        }
-    };
-    match (comment_before_colon, comment_after_colon) {
-        (Some(comment_before_colon), Some(comment_after_colon)) => (
-            leading_space(comment_before_colon),
-            trailing_space(comment_after_colon),
-        ),
-        (Some(comment_before_colon), None) => (leading_space(comment_before_colon), String::new()),
-        (None, Some(comment_after_colon)) => (String::new(), trailing_space(comment_after_colon)),
-        _ => (String::new(), String::new()),
-    }
+    let comment_before_colon = rewrite_missing_comment(span_before_colon, shape, context)
+        .filter(|comment| !comment.is_empty())
+        .map_or(String::new(), |comment| format!(" {}", comment));
+    let comment_after_colon = rewrite_missing_comment(span_after_colon, shape, context)
+        .filter(|comment| !comment.is_empty())
+        .map_or(String::new(), |comment| format!("{} ", comment));
+    (comment_before_colon, comment_after_colon)
 }
 
 impl Rewrite for ast::Arg {
