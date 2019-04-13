@@ -79,9 +79,7 @@ fn formatting_failure_snippet(warning_count: usize) -> Snippet {
 fn formatting_error_to_snippet(file: &FileName, error: &FormattingError) -> Snippet {
     let slices = vec![snippet_code_slice(file, error)];
     let title = Some(snippet_title(error));
-    let footer = snippet_footer(error)
-        .map(|footer| vec![footer])
-        .unwrap_or_default();
+    let footer = snippet_footer(error).into_iter().collect();
 
     Snippet {
         title,
@@ -115,9 +113,7 @@ fn snippet_footer(error: &FormattingError) -> Option<Annotation> {
 }
 
 fn snippet_code_slice(file: &FileName, error: &FormattingError) -> Slice {
-    let annotations = slice_annotation(error)
-        .map(|annotation| vec![annotation])
-        .unwrap_or_default();
+    let annotations = slice_annotation(error).into_iter().collect();
     let origin = Some(format!("{}:{}", file, error.line));
     let source = error.line_buffer.clone();
 
