@@ -53,18 +53,7 @@ impl<'a> Display for ReportFormatter<'a> {
         }
 
         if !errors_by_file.is_empty() {
-            let snippet = Snippet {
-                title: Some(Annotation {
-                    id: None,
-                    label: Some(format!(
-                        "rustfmt may have failed to format. See previous {} errors.",
-                        self.report.warning_count()
-                    )),
-                    annotation_type: AnnotationType::Warning,
-                }),
-                footer: Vec::new(),
-                slices: Vec::new(),
-            };
+            let snippet = formatting_failure_snippet(self.report.warning_count());
             writeln!(f, "{}", formatter.format(&DisplayList::from(snippet)))?;
         }
 
@@ -72,43 +61,97 @@ impl<'a> Display for ReportFormatter<'a> {
     }
 }
 
-fn formatting_error_to_snippet(file: &FileName, error: &FormattingError) -> Snippet {
-    let (space_len, target_len) = error.format_len();
-    let annotation_type = error_kind_to_snippet_annotation_type(&error.kind);
-    let slice_annotations = if target_len > 0 {
-        vec![SourceAnnotation {
-            range: (space_len, space_len + target_len),
-            label: String::new(),
-            annotation_type: AnnotationType::Error,
-        }]
-    } else {
-        Vec::new()
-    };
-
-    let title_annotation_id = if error.is_internal() {
-        Some("internal".to_string())
-    } else {
-        None
-    };
-
+fn formatting_failure_snippet(warning_count: usize) -> Snippet {
     Snippet {
         title: Some(Annotation {
-            id: title_annotation_id,
-            label: Some(format!("{}", error.kind)),
-            annotation_type,
-        }),
-        footer: vec![Annotation {
             id: None,
-            label: Some(error.msg_suffix().to_string()),
+            label: Some(format!(
+                "rustfmt may have failed to format. See previous {} errors.",
+                warning_count
+            )),
+            annotation_type: AnnotationType::Warning,
+        }),
+        footer: Vec::new(),
+        slices: Vec::new(),
+    }
+}
+
+fn formatting_error_to_snippet(file: &FileName, error: &FormattingError) -> Snippet {
+    let slices = vec![snippet_code_slice(file, error)];
+    let title = Some(snippet_title(error));
+    let footer = snippet_footer(error)
+        .map(|footer| vec![footer])
+        .unwrap_or_default();
+
+    Snippet {
+        title,
+        footer,
+        slices,
+    }
+}
+
+fn snippet_title(error: &FormattingError) -> Annotation {
+    let annotation_type = error_kind_to_snippet_annotation_type(&error.kind);
+
+    Annotation {
+        id: title_annotation_id(error),
+        label: Some(error.kind.to_string()),
+        annotation_type,
+    }
+}
+
+fn snippet_footer(error: &FormattingError) -> Option<Annotation> {
+    let message_suffix = error.msg_suffix();
+
+    if !message_suffix.is_empty() {
+        Some(Annotation {
+            id: None,
+            label: Some(message_suffix.to_string()),
             annotation_type: AnnotationType::Note,
-        }],
-        slices: vec![Slice {
-            source: error.line_buffer.clone(),
-            line_start: error.line,
-            origin: Some(format!("{}:{}", file, error.line)),
-            fold: false,
-            annotations: slice_annotations,
-        }],
+        })
+    } else {
+        None
+    }
+}
+
+fn snippet_code_slice(file: &FileName, error: &FormattingError) -> Slice {
+    let annotations = slice_annotation(error)
+        .map(|annotation| vec![annotation])
+        .unwrap_or_default();
+    let origin = Some(format!("{}:{}", file, error.line));
+    let source = error.line_buffer.clone();
+
+    Slice {
+        source,
+        line_start: error.line,
+        origin,
+        fold: false,
+        annotations,
+    }
+}
+
+fn slice_annotation(error: &FormattingError) -> Option<SourceAnnotation> {
+    let (range_start, range_length) = error.format_len();
+    let range_end = range_start + range_length;
+
+    if range_length > 0 {
+        Some(SourceAnnotation {
+            annotation_type: AnnotationType::Error,
+            range: (range_start, range_end),
+            label: String::new(),
+        })
+    } else {
+        None
+    }
+}
+
+fn title_annotation_id(error: &FormattingError) -> Option<String> {
+    const INTERNAL_ERROR_ID: &str = "internal";
+
+    if error.is_internal() {
+        Some(INTERNAL_ERROR_ID.to_string())
+    } else {
+        None
     }
 }
 
