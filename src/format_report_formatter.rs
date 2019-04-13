@@ -6,12 +6,14 @@ use annotate_snippets::formatter::DisplayListFormatter;
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use std::fmt::{self, Display};
 
+/// A builder for [`FormatReportFormatter`].
 pub struct FormatReportFormatterBuilder<'a> {
     report: &'a FormatReport,
     enable_colors: bool,
 }
 
 impl<'a> FormatReportFormatterBuilder<'a> {
+    /// Creates a new [`FormatReportFormatterBuilder`].
     pub fn new(report: &'a FormatReport) -> Self {
         Self {
             report,
@@ -19,6 +21,7 @@ impl<'a> FormatReportFormatterBuilder<'a> {
         }
     }
 
+    /// Enables colors and formatting in the output.
     pub fn enable_colors(self, enable_colors: bool) -> Self {
         Self {
             enable_colors,
@@ -26,6 +29,7 @@ impl<'a> FormatReportFormatterBuilder<'a> {
         }
     }
 
+    /// Creates a new [`FormatReportFormatter`] from the settings in this builder.
     pub fn build(self) -> FormatReportFormatter<'a> {
         FormatReportFormatter {
             report: self.report,
@@ -34,6 +38,9 @@ impl<'a> FormatReportFormatterBuilder<'a> {
     }
 }
 
+/// Formats the warnings/errors in a [`FormatReport`].
+///
+/// Can be created using a [`FormatReportFormatterBuilder`].
 pub struct FormatReportFormatter<'a> {
     report: &'a FormatReport,
     enable_colors: bool,

@@ -159,7 +159,7 @@ impl FormattedSnippet {
 
 /// Reports on any issues that occurred during a run of Rustfmt.
 ///
-/// Can be reported to the user via its `Display` implementation or `print_fancy`.
+/// Can be reported to the user using the `Display` impl on [`FormatReportFormatter`].
 #[derive(Clone)]
 pub struct FormatReport {
     // Maps stringified file paths to their associated formatting errors.
