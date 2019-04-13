@@ -310,21 +310,10 @@ fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) 
     match session.format(input) {
         Ok(report) => {
             if report.has_warnings() {
-                let enable_colors = match term::stderr() {
-                    Some(ref mut t)
-                        if session.config.color().use_colored_tty()
-                            && t.supports_color()
-                            && t.supports_attr(term::Attr::Bold) =>
-                    {
-                        true
-                    }
-                    _ => false,
-                };
-
                 eprintln!(
                     "{}",
                     FormatReportFormatterBuilder::new(&report)
-                        .enable_colors(enable_colors)
+                        .enable_colors(should_print_with_colors(session))
                         .build()
                 );
             }
@@ -333,6 +322,19 @@ fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) 
             eprintln!("Error writing files: {}", msg);
             session.add_operational_error();
         }
+    }
+}
+
+fn should_print_with_colors<T: Write>(session: &mut Session<'_, T>) -> bool {
+    match term::stderr() {
+        Some(ref mut t)
+            if session.config.color().use_colored_tty()
+                && t.supports_color()
+                && t.supports_attr(term::Attr::Bold) =>
+        {
+            true
+        }
+        _ => false,
     }
 }
 
