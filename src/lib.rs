@@ -32,7 +32,7 @@ pub use crate::config::{
     Range, Verbosity,
 };
 
-pub use crate::format_report_formatter::{ReportFormatter, ReportFormatterBuilder};
+pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
 
 pub use crate::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 

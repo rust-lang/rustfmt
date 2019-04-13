@@ -16,7 +16,7 @@ use getopts::{Matches, Options};
 
 use crate::rustfmt::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, ErrorKind, FileLines, FileName,
-    Input, ReportFormatterBuilder, Session, Verbosity,
+    FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
 
 fn main() {
@@ -323,7 +323,7 @@ fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) 
 
                 eprintln!(
                     "{}",
-                    ReportFormatterBuilder::new(&report)
+                    FormatReportFormatterBuilder::new(&report)
                         .enable_colors(enable_colors)
                         .build()
                 );

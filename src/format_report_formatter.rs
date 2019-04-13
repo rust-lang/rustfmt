@@ -6,12 +6,12 @@ use annotate_snippets::formatter::DisplayListFormatter;
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use std::fmt::{self, Display};
 
-pub struct ReportFormatterBuilder<'a> {
+pub struct FormatReportFormatterBuilder<'a> {
     report: &'a FormatReport,
     enable_colors: bool,
 }
 
-impl<'a> ReportFormatterBuilder<'a> {
+impl<'a> FormatReportFormatterBuilder<'a> {
     pub fn new(report: &'a FormatReport) -> Self {
         Self {
             report,
@@ -26,20 +26,20 @@ impl<'a> ReportFormatterBuilder<'a> {
         }
     }
 
-    pub fn build(self) -> ReportFormatter<'a> {
-        ReportFormatter {
+    pub fn build(self) -> FormatReportFormatter<'a> {
+        FormatReportFormatter {
             report: self.report,
             enable_colors: self.enable_colors,
         }
     }
 }
 
-pub struct ReportFormatter<'a> {
+pub struct FormatReportFormatter<'a> {
     report: &'a FormatReport,
     enable_colors: bool,
 }
 
-impl<'a> Display for ReportFormatter<'a> {
+impl<'a> Display for FormatReportFormatter<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let formatter = DisplayListFormatter::new(self.enable_colors);
         let errors_by_file = &self.report.internal.borrow().0;
