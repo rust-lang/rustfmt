@@ -17,7 +17,9 @@ use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
-use crate::utils::{contains_skip, is_attributes_extendable, mk_sp, rewrite_ident};
+use crate::utils::{
+    contains_skip, is_attributes_extendable, mk_sp, rewrite_ident, trimmed_last_line_width,
+};
 
 pub(crate) trait AlignedItem {
     fn skip(&self) -> bool;
@@ -183,13 +185,9 @@ fn struct_field_prefix_max_min_width<T: AlignedItem>(
     fields
         .iter()
         .map(|field| {
-            field.rewrite_prefix(context, shape).and_then(|field_str| {
-                if field_str.contains('\n') {
-                    None
-                } else {
-                    Some(field_str.len())
-                }
-            })
+            field
+                .rewrite_prefix(context, shape)
+                .map(|field_str| trimmed_last_line_width(&field_str))
         })
         .fold_options((0, ::std::usize::MAX), |(max_len, min_len), len| {
             (cmp::max(max_len, len), cmp::min(min_len, len))

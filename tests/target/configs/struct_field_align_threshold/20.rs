@@ -41,9 +41,9 @@ pub struct Foo {
     f: SomeType, // Comment beside a field
     // Comment on a field
     #[AnAttribute]
-    g: SomeOtherType,
+    g:     SomeOtherType,
     /// A doc comment on a field
-    h: AThirdType,
+    h:     AThirdType,
     pub i: TypeForPublicField,
 }
 
@@ -66,7 +66,7 @@ struct X {
 pub struct Writebatch<K: Key> {
     #[allow(dead_code)] // only used for holding the internal pointer
     writebatch: RawWritebatch,
-    marker: PhantomData<K>,
+    marker:     PhantomData<K>,
 }
 
 struct Bar;
