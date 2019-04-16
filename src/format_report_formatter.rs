@@ -73,7 +73,7 @@ fn formatting_failure_snippet(warning_count: usize) -> Snippet {
         title: Some(Annotation {
             id: None,
             label: Some(format!(
-                "rustfmt may have failed to format. See previous {} errors.",
+                "rustfmt has failed to format. See previous {} errors.",
                 warning_count
             )),
             annotation_type: AnnotationType::Warning,
