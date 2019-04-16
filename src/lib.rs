@@ -12,6 +12,7 @@ extern crate serde_derive;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt;
 use std::io::{self, Write};
 use std::mem;
 use std::panic;
@@ -238,6 +239,32 @@ impl FormatReport {
     /// Whether any warnings or errors are present in the report.
     pub fn has_warnings(&self) -> bool {
         self.internal.borrow().1.has_formatting_errors
+    }
+
+    /// Print the report to a terminal using colours and potentially other
+    /// fancy output.
+    #[deprecated(note = "Use FormatReportFormatter with colors enabled instead")]
+    pub fn fancy_print(
+        &self,
+        mut t: Box<dyn term::Terminal<Output = io::Stderr>>,
+    ) -> Result<(), term::Error> {
+        writeln!(
+            t,
+            "{}",
+            FormatReportFormatterBuilder::new(&self)
+                .enable_colors(true)
+                .build()
+        )?;
+        Ok(())
+    }
+}
+
+#[deprecated(note = "Use FormatReportFormatter instead")]
+impl fmt::Display for FormatReport {
+    // Prints all the formatting errors.
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", FormatReportFormatterBuilder::new(&self).build())?;
+        Ok(())
     }
 }
 
