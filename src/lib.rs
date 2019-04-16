@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use failure::Fail;
+use ignore;
 use syntax::{ast, parse::DirectoryOwnership};
 
 use crate::comment::LineClasses;
@@ -49,6 +50,7 @@ pub(crate) mod config;
 mod expr;
 mod format_report_formatter;
 pub(crate) mod formatting;
+mod ignore_path;
 mod imports;
 mod issues;
 mod items;
@@ -113,6 +115,9 @@ pub enum ErrorKind {
     /// If we had formatted the given node, then we would have lost a comment.
     #[fail(display = "not formatted because a comment would be lost")]
     LostComment,
+    /// Invalid glob pattern in `ignore` configuration option.
+    #[fail(display = "Invalid glob pattern found in ignore list: {}", _0)]
+    InvalidGlobPattern(ignore::Error),
 }
 
 impl ErrorKind {
