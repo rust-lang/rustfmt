@@ -54,8 +54,7 @@ impl<'a> Display for FormatReportFormatter<'a> {
         for (file, errors) in errors_by_file {
             for error in errors {
                 let snippet = formatting_error_to_snippet(file, error);
-                writeln!(f, "{}", formatter.format(&DisplayList::from(snippet)))?;
-                writeln!(f, "")?;
+                writeln!(f, "{}\n", formatter.format(&DisplayList::from(snippet)))?;
             }
         }
 
