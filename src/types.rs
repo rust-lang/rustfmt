@@ -328,9 +328,9 @@ where
         let comment = if comment.starts_with("//") {
             format!(
                 "{}{}{}",
-                &shape.indent.to_string_with_newline(context.config),
+                &list_shape.indent.to_string_with_newline(context.config),
                 comment,
-                &shape.indent.to_string_with_newline(context.config)
+                &shape.block().indent.to_string_with_newline(context.config)
             )
         } else {
             comment.to_string()
