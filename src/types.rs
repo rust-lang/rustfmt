@@ -319,7 +319,7 @@ where
 
     let list_lo = context.snippet_provider.span_after(span, "(");
     let (list_str, tactic) = if inputs.len() == 0 {
-        let tactic = get_tactics(&Vec::<ListItem>::new(), &output, &shape);
+        let tactic = get_tactics(&[], &output, shape);
         let list_hi = context.snippet_provider.span_before_last(span, ")");
         let comment = context
             .snippet_provider
@@ -351,7 +351,7 @@ where
         );
 
         let item_vec: Vec<_> = items.collect();
-        let tactic = get_tactics(&item_vec, &output, &shape);
+        let tactic = get_tactics(&item_vec, &output, shape);
         let trailing_separator = if !context.use_block_indent() || variadic {
             SeparatorTactic::Never
         } else {
@@ -394,12 +394,12 @@ fn type_bound_colon(context: &RewriteContext<'_>) -> &'static str {
 
 // If the return type is multi-lined, then force to use multiple lines for
 // arguments as well.
-fn get_tactics(item_vec: &Vec<ListItem>, output: &str, shape: &Shape) -> DefinitiveListTactic {
+fn get_tactics(item_vec: &[ListItem], output: &str, shape: Shape) -> DefinitiveListTactic {
     if output.contains('\n') {
         DefinitiveListTactic::Vertical
     } else {
         definitive_tactic(
-            &*item_vec,
+            item_vec,
             ListTactic::HorizontalVertical,
             Separator::Comma,
             // 2 is for the case of ',\n'
