@@ -1,6 +1,7 @@
 // High level formatting functions.
 
 use std::collections::HashMap;
+use std::env;
 use std::io::{self, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::rc::Rc;
@@ -80,6 +81,10 @@ fn format_project<T: FormatHandler>(
     let mut parse_session = make_parse_sess(source_map.clone(), config);
     let mut report = FormatReport::new();
     let directory_ownership = input.to_directory_ownership();
+    let stdin_buf = match &input {
+        Input::Text(ref buf) => Some(buf.clone()),
+        _ => None,
+    };
     let krate = match parse_crate(
         input,
         &parse_session,
@@ -107,8 +112,17 @@ fn format_project<T: FormatHandler>(
     .visit_crate(&krate)
     .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     for (path, (module, _)) in files {
-        let should_ignore = !input_is_stdin && ignore_path_set.is_match(&path);
+        let should_ignore = if input_is_stdin {
+            ignore_path_set.is_match(&FileName::Real(env::current_dir()?))
+        } else {
+            ignore_path_set.is_match(&path)
+        };
         if (config.skip_children() && path != main_file) || should_ignore {
+            if input_is_stdin {
+                if let Err(e) = io::stdout().write_all(stdin_buf.as_ref().unwrap().as_bytes()) {
+                    return Err(From::from(e));
+                }
+            }
             continue;
         }
         should_emit_verbose(input_is_stdin, config, || println!("Formatting {}", path));
