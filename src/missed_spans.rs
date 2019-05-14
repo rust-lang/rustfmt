@@ -1,18 +1,9 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 use std::borrow::Cow;
 
 use syntax::source_map::{BytePos, Pos, Span};
 
-use crate::comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};
+use crate::comment::{is_last_comment_block, rewrite_comment, CodeCharKind, CommentCodeSlices};
+use crate::config::file_lines::FileLines;
 use crate::config::{EmitMode, FileName};
 use crate::shape::{Indent, Shape};
 use crate::source_map::LineRangeUtils;
@@ -43,10 +34,9 @@ impl<'a> FmtVisitor<'a> {
         self.buffer.is_empty()
     }
 
-    pub fn format_missing(&mut self, end: BytePos) {
-        // HACK(topecongiro)
-        // We use `format_missing()` to extract a missing comment between a macro
-        // (or alike) and a trailing semicolon. Here we just try to avoid calling
+    pub(crate) fn format_missing(&mut self, end: BytePos) {
+        // HACK(topecongiro): we use `format_missing()` to extract a missing comment between
+        // a macro (or similar) and a trailing semicolon. Here we just try to avoid calling
         // `format_missing_inner` in the common case where there is no such comment.
         // This is a hack, ideally we should fix a possible bug in `format_missing_inner`
         // or refactor `visit_mac` and `rewrite_macro`, but this should suffice to fix the
@@ -60,7 +50,7 @@ impl<'a> FmtVisitor<'a> {
         self.format_missing_inner(end, |this, last_snippet, _| this.push_str(last_snippet))
     }
 
-    pub fn format_missing_with_indent(&mut self, end: BytePos) {
+    pub(crate) fn format_missing_with_indent(&mut self, end: BytePos) {
         let config = self.config;
         self.format_missing_inner(end, |this, last_snippet, snippet| {
             this.push_str(last_snippet.trim_end());
@@ -73,13 +63,13 @@ impl<'a> FmtVisitor<'a> {
         })
     }
 
-    pub fn format_missing_no_indent(&mut self, end: BytePos) {
+    pub(crate) fn format_missing_no_indent(&mut self, end: BytePos) {
         self.format_missing_inner(end, |this, last_snippet, _| {
             this.push_str(last_snippet.trim_end());
         })
     }
 
-    fn format_missing_inner<F: Fn(&mut FmtVisitor, &str, &str)>(
+    fn format_missing_inner<F: Fn(&mut FmtVisitor<'_>, &str, &str)>(
         &mut self,
         end: BytePos,
         process_last_snippet: F,
@@ -144,7 +134,7 @@ impl<'a> FmtVisitor<'a> {
 
     fn write_snippet<F>(&mut self, span: Span, process_last_snippet: F)
     where
-        F: Fn(&mut FmtVisitor, &str, &str),
+        F: Fn(&mut FmtVisitor<'_>, &str, &str),
     {
         // Get a snippet from the file start to the span's hi without allocating.
         // We need it to determine what precedes the current comment. If the comment
@@ -167,12 +157,12 @@ impl<'a> FmtVisitor<'a> {
     fn write_snippet_inner<F>(
         &mut self,
         big_snippet: &str,
-        big_diff: usize,
+        mut big_diff: usize,
         old_snippet: &str,
         span: Span,
         process_last_snippet: F,
     ) where
-        F: Fn(&mut FmtVisitor, &str, &str),
+        F: Fn(&mut FmtVisitor<'_>, &str, &str),
     {
         // Trim whitespace from the right hand side of each line.
         // Annoyingly, the library functions for splitting by lines etc. are not
@@ -186,16 +176,36 @@ impl<'a> FmtVisitor<'a> {
             _ => Cow::from(old_snippet),
         };
 
+        // if the snippet starts with a new line, then information about the lines needs to be
+        // adjusted since it is off by 1.
+        let snippet = if snippet.starts_with('\n') {
+            // this takes into account the blank_lines_* options
+            self.push_vertical_spaces(1);
+            // include the newline character into the big_diff
+            big_diff += 1;
+            status.cur_line += 1;
+            &snippet[1..]
+        } else {
+            snippet
+        };
+
+        let slice_within_file_lines_range = |file_lines: FileLines, cur_line, s| -> (usize, bool) {
+            let newline_count = count_newlines(s);
+            let within_file_lines_range = file_lines.contains_range(
+                file_name,
+                cur_line,
+                // if a newline character is at the end of the slice, then the number of newlines
+                // needs to be decreased by 1 so that the range checked against the file_lines is
+                // the visual range one would expect.
+                cur_line + newline_count - if s.ends_with('\n') { 1 } else { 0 },
+            );
+            (newline_count, within_file_lines_range)
+        };
         for (kind, offset, subslice) in CommentCodeSlices::new(snippet) {
             debug!("{:?}: {:?}", kind, subslice);
 
-            let newline_count = count_newlines(subslice);
-            let within_file_lines_range = self.config.file_lines().contains_range(
-                file_name,
-                status.cur_line,
-                status.cur_line + newline_count,
-            );
-
+            let (newline_count, within_file_lines_range) =
+                slice_within_file_lines_range(self.config.file_lines(), status.cur_line, subslice);
             if CodeCharKind::Comment == kind && within_file_lines_range {
                 // 1: comment.
                 self.process_comment(
@@ -216,7 +226,15 @@ impl<'a> FmtVisitor<'a> {
             }
         }
 
-        process_last_snippet(self, &snippet[status.line_start..], snippet);
+        let last_snippet = &snippet[status.line_start..];
+        let (_, within_file_lines_range) =
+            slice_within_file_lines_range(self.config.file_lines(), status.cur_line, last_snippet);
+        if within_file_lines_range {
+            process_last_snippet(self, last_snippet, snippet);
+        } else {
+            // just append what's left
+            self.push_str(last_snippet);
+        }
     }
 
     fn process_comment(
@@ -263,9 +281,14 @@ impl<'a> FmtVisitor<'a> {
         // - if there isn't one already
         // - otherwise, only if the last line is a line comment
         if status.line_start <= snippet.len() {
-            match snippet[status.line_start..].chars().next() {
+            match snippet[status.line_start..]
+                .chars()
+                // skip trailing whitespaces
+                .skip_while(|c| *c == ' ' || *c == '\t')
+                .next()
+            {
                 Some('\n') | Some('\r') => {
-                    if !subslice.trim_end().ends_with("*/") {
+                    if !is_last_comment_block(subslice) {
                         self.push_str("\n");
                     }
                 }

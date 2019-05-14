@@ -1,14 +1,5 @@
-// Copyright 2017 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 use std::collections::VecDeque;
+use std::fmt;
 use std::io;
 use std::io::Write;
 
@@ -43,16 +34,126 @@ impl Mismatch {
     }
 }
 
+/// A single span of changed lines, with 0 or more removed lines
+/// and a vector of 0 or more inserted lines.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ModifiedChunk {
+    /// The first to be removed from the original text
+    pub line_number_orig: u32,
+    /// The number of lines which have been replaced
+    pub lines_removed: u32,
+    /// The new lines
+    pub lines: Vec<String>,
+}
+
+/// Set of changed sections of a file.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ModifiedLines {
+    /// The set of changed chunks.
+    pub chunks: Vec<ModifiedChunk>,
+}
+
+impl From<Vec<Mismatch>> for ModifiedLines {
+    fn from(mismatches: Vec<Mismatch>) -> ModifiedLines {
+        let chunks = mismatches.into_iter().map(|mismatch| {
+            let lines = mismatch.lines.iter();
+            let num_removed = lines
+                .filter(|line| match line {
+                    DiffLine::Resulting(_) => true,
+                    _ => false,
+                })
+                .count();
+
+            let new_lines = mismatch.lines.into_iter().filter_map(|line| match line {
+                DiffLine::Context(_) | DiffLine::Resulting(_) => None,
+                DiffLine::Expected(str) => Some(str),
+            });
+
+            ModifiedChunk {
+                line_number_orig: mismatch.line_number_orig,
+                lines_removed: num_removed as u32,
+                lines: new_lines.collect(),
+            }
+        });
+
+        ModifiedLines {
+            chunks: chunks.collect(),
+        }
+    }
+}
+
+// Converts a `Mismatch` into a serialized form, which just includes
+// enough information to modify the original file.
+// Each section starts with a line with three integers, space separated:
+//     lineno num_removed num_added
+// followed by (`num_added`) lines of added text. The line numbers are
+// relative to the original file.
+impl fmt::Display for ModifiedLines {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for chunk in &self.chunks {
+            writeln!(
+                f,
+                "{} {} {}",
+                chunk.line_number_orig,
+                chunk.lines_removed,
+                chunk.lines.iter().count()
+            )?;
+
+            for line in &chunk.lines {
+                writeln!(f, "{}", line)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+// Allows to convert `Display`ed `ModifiedLines` back to the structural data.
+impl std::str::FromStr for ModifiedLines {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<ModifiedLines, ()> {
+        let mut chunks = vec![];
+
+        let mut lines = s.lines();
+        while let Some(header) = lines.next() {
+            let mut header = header.split_whitespace();
+            let (orig, rem, new_lines) = match (header.next(), header.next(), header.next()) {
+                (Some(orig), Some(removed), Some(added)) => (orig, removed, added),
+                _ => return Err(()),
+            };
+            let (orig, rem, new_lines): (u32, u32, usize) =
+                match (orig.parse(), rem.parse(), new_lines.parse()) {
+                    (Ok(a), Ok(b), Ok(c)) => (a, b, c),
+                    _ => return Err(()),
+                };
+            let lines = lines.by_ref().take(new_lines);
+            let lines: Vec<_> = lines.map(ToOwned::to_owned).collect();
+            if lines.len() != new_lines {
+                return Err(());
+            }
+
+            chunks.push(ModifiedChunk {
+                line_number_orig: orig,
+                lines_removed: rem,
+                lines,
+            });
+        }
+
+        Ok(ModifiedLines { chunks })
+    }
+}
+
 // This struct handles writing output to stdout and abstracts away the logic
 // of printing in color, if it's possible in the executing environment.
-pub struct OutputWriter {
-    terminal: Option<Box<term::Terminal<Output = io::Stdout>>>,
+pub(crate) struct OutputWriter {
+    terminal: Option<Box<dyn term::Terminal<Output = io::Stdout>>>,
 }
 
 impl OutputWriter {
     // Create a new OutputWriter instance based on the caller's preference
     // for colorized output and the capabilities of the terminal.
-    pub fn new(color: Color) -> Self {
+    pub(crate) fn new(color: Color) -> Self {
         if let Some(t) = term::stdout() {
             if color.use_colored_tty() && t.supports_color() {
                 return OutputWriter { terminal: Some(t) };
@@ -64,7 +165,7 @@ impl OutputWriter {
     // Write output in the optionally specified color. The output is written
     // in the specified color if this OutputWriter instance contains a
     // Terminal in its `terminal` field.
-    pub fn writeln(&mut self, msg: &str, color: Option<term::color::Color>) {
+    pub(crate) fn writeln(&mut self, msg: &str, color: Option<term::color::Color>) {
         match &mut self.terminal {
             Some(ref mut t) => {
                 if let Some(color) = color {
@@ -81,7 +182,7 @@ impl OutputWriter {
 }
 
 // Produces a diff between the expected output and actual output of rustfmt.
-pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Mismatch> {
+pub(crate) fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Mismatch> {
     let mut line_number = 1;
     let mut line_number_orig = 1;
     let mut context_queue: VecDeque<&str> = VecDeque::with_capacity(context_size);
@@ -149,7 +250,7 @@ pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Misma
     results
 }
 
-pub fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config)
+pub(crate) fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config)
 where
     F: Fn(u32) -> String,
 {
@@ -184,49 +285,11 @@ where
     }
 }
 
-/// Convert a Mismatch into a serialised form which just includes
-/// enough information to modify the original file.
-/// Each section starts with a line with three integers, space separated:
-///     lineno num_removed num_added
-/// followed by (num_added) lines of added text.  The line numbers are
-/// relative to the original file.
-pub fn output_modified<W>(mut out: W, diff: Vec<Mismatch>)
-where
-    W: Write,
-{
-    for mismatch in diff {
-        let (num_removed, num_added) =
-            mismatch
-                .lines
-                .iter()
-                .fold((0, 0), |(rem, add), line| match *line {
-                    DiffLine::Context(_) => panic!("No Context expected"),
-                    DiffLine::Expected(_) => (rem, add + 1),
-                    DiffLine::Resulting(_) => (rem + 1, add),
-                });
-        // Write a header with enough information to separate the modified lines.
-        writeln!(
-            out,
-            "{} {} {}",
-            mismatch.line_number_orig, num_removed, num_added
-        )
-        .unwrap();
-
-        for line in mismatch.lines {
-            match line {
-                DiffLine::Context(_) | DiffLine::Resulting(_) => (),
-                DiffLine::Expected(ref str) => {
-                    writeln!(out, "{}", str).unwrap();
-                }
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::DiffLine::*;
     use super::{make_diff, Mismatch};
+    use super::{ModifiedChunk, ModifiedLines};
 
     #[test]
     fn diff_simple() {
@@ -307,5 +370,36 @@ mod test {
                 lines: vec![Context("five".to_owned()), Expected("".to_owned())],
             }]
         );
+    }
+
+    #[test]
+    fn modified_lines_from_str() {
+        use std::str::FromStr;
+
+        let src = "1 6 2\nfn some() {}\nfn main() {}\n25 3 1\n  struct Test {}";
+        let lines = ModifiedLines::from_str(src).unwrap();
+        assert_eq!(
+            lines,
+            ModifiedLines {
+                chunks: vec![
+                    ModifiedChunk {
+                        line_number_orig: 1,
+                        lines_removed: 6,
+                        lines: vec!["fn some() {}".to_owned(), "fn main() {}".to_owned(),]
+                    },
+                    ModifiedChunk {
+                        line_number_orig: 25,
+                        lines_removed: 3,
+                        lines: vec!["  struct Test {}".to_owned()]
+                    }
+                ]
+            }
+        );
+
+        let src = "1 5 3";
+        assert_eq!(ModifiedLines::from_str(src), Err(()));
+
+        let src = "1 5 3\na\nb";
+        assert_eq!(ModifiedLines::from_str(src), Err(()));
     }
 }

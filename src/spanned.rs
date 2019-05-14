@@ -1,13 +1,3 @@
-// Copyright 2017 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 use std::cmp::max;
 
 use syntax::{
@@ -19,7 +9,7 @@ use crate::macros::MacroArg;
 use crate::utils::{mk_sp, outer_attributes};
 
 /// Spanned returns a span including attributes, if available.
-pub trait Spanned {
+pub(crate) trait Spanned {
     fn span(&self) -> Span;
 }
 
@@ -178,6 +168,7 @@ impl Spanned for ast::GenericArg {
         match *self {
             ast::GenericArg::Lifetime(ref lt) => lt.ident.span,
             ast::GenericArg::Type(ref ty) => ty.span(),
+            ast::GenericArg::Const(ref _const) => _const.value.span(),
         }
     }
 }
@@ -198,6 +189,7 @@ impl Spanned for MacroArg {
             MacroArg::Ty(ref ty) => ty.span(),
             MacroArg::Pat(ref pat) => pat.span(),
             MacroArg::Item(ref item) => item.span(),
+            MacroArg::Keyword(_, span) => span,
         }
     }
 }

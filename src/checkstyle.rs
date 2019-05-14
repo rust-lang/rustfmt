@@ -1,13 +1,3 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 use std::io::{self, Write};
 use std::path::Path;
 
@@ -17,7 +7,7 @@ use crate::rustfmt_diff::{DiffLine, Mismatch};
 ///
 /// Note that emitting checkstyle output is not stable and may removed in a
 /// future version of Rustfmt.
-pub fn header() -> String {
+pub(crate) fn header() -> String {
     let mut xml_heading = String::new();
     xml_heading.push_str("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
     xml_heading.push_str("\n");
@@ -29,11 +19,11 @@ pub fn header() -> String {
 ///
 /// Note that emitting checkstyle output is not stable and may removed in a
 /// future version of Rustfmt.
-pub fn footer() -> String {
+pub(crate) fn footer() -> String {
     "</checkstyle>\n".to_owned()
 }
 
-pub fn output_checkstyle_file<T>(
+pub(crate) fn output_checkstyle_file<T>(
     mut writer: T,
     filename: &Path,
     diff: Vec<Mismatch>,

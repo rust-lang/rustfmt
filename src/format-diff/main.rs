@@ -1,29 +1,18 @@
-// Copyright 2017 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 // Inspired by Clang's clang-format-diff:
 //
 // https://github.com/llvm-mirror/clang/blob/master/tools/clang-format/clang-format-diff.py
 
 #![deny(warnings)]
 
-extern crate env_logger;
+use env_logger;
 #[macro_use]
 extern crate failure;
-extern crate getopts;
+use getopts;
 #[macro_use]
 extern crate log;
-extern crate regex;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json as json;
+use regex;
+use serde::{Deserialize, Serialize};
+use serde_json as json;
 
 use std::collections::HashSet;
 use std::io::{self, BufRead};

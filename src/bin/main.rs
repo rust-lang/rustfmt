@@ -1,18 +1,8 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
-extern crate env_logger;
+use env_logger;
 #[macro_use]
 extern crate failure;
-extern crate getopts;
-extern crate rustfmt_nightly as rustfmt;
+
+use rustfmt_nightly as rustfmt;
 
 use std::env;
 use std::fs::File;
@@ -26,7 +16,7 @@ use getopts::{Matches, Options};
 
 use crate::rustfmt::{
     absolute_path, load_config, CliOptions, Color, Config, Edition, EmitMode, ErrorKind, FileLines,
-    FileName, Input, Session, Verbosity,
+    FormatReportFormatterBuilder, FileName, Input, Session, Verbosity,
 };
 
 fn main() {
@@ -45,7 +35,7 @@ fn main() {
 
     // Exit with given exit code.
     //
-    // NOTE: This immediately terminates the process without doing any cleanup,
+    // NOTE: this immediately terminates the process without doing any cleanup,
     // so make sure to finish all necessary cleanup before this is called.
     std::process::exit(exit_code);
 }
@@ -63,6 +53,10 @@ enum Operation {
     Version,
     /// Output default config to a file, or stdout if None
     ConfigOutputDefault {
+        path: Option<String>,
+    },
+    /// Output current config (as if formatting to a file) to stdout
+    ConfigOutputCurrent {
         path: Option<String>,
     },
     /// No file specified, read from stdin
@@ -113,8 +107,9 @@ fn make_opts() -> Options {
         "",
         "print-config",
         "Dumps a default or minimal config to PATH. A minimal config is the \
-         subset of the current config file used for formatting the current program.",
-        "[minimal|default] PATH",
+         subset of the current config file used for formatting the current program. \
+         `current` writes to stdout current config as if formatting the file at PATH.",
+        "[default|minimal|current] PATH",
     );
 
     if is_nightly {
@@ -190,6 +185,21 @@ fn execute(opts: &Options) -> Result<i32, failure::Error> {
             } else {
                 io::stdout().write_all(toml.as_bytes())?;
             }
+            Ok(0)
+        }
+        Operation::ConfigOutputCurrent { path } => {
+            let path = match path {
+                Some(path) => path,
+                None => return Err(format_err!("PATH required for `--print-config current`")),
+            };
+
+            let file = PathBuf::from(path);
+            let file = file.canonicalize().unwrap_or(file);
+
+            let (config, _) = load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
+            let toml = config.all_options().to_toml().map_err(err_msg)?;
+            io::stdout().write_all(toml.as_bytes())?;
+
             Ok(0)
         }
         Operation::Stdin { input } => format_string(input, options),
@@ -296,29 +306,35 @@ fn format(
     Ok(exit_code)
 }
 
-fn format_and_emit_report<T: Write>(session: &mut Session<T>, input: Input) {
+fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) {
     match session.format(input) {
         Ok(report) => {
             if report.has_warnings() {
-                match term::stderr() {
-                    Some(ref t)
-                        if session.config.color().use_colored_tty()
-                            && t.supports_color()
-                            && t.supports_attr(term::Attr::Bold) =>
-                    {
-                        match report.fancy_print(term::stderr().unwrap()) {
-                            Ok(..) => (),
-                            Err(..) => panic!("Unable to write to stderr: {}", report),
-                        }
-                    }
-                    _ => eprintln!("{}", report),
-                }
+                eprintln!(
+                    "{}",
+                    FormatReportFormatterBuilder::new(&report)
+                        .enable_colors(should_print_with_colors(session))
+                        .build()
+                );
             }
         }
         Err(msg) => {
             eprintln!("Error writing files: {}", msg);
             session.add_operational_error();
         }
+    }
+}
+
+fn should_print_with_colors<T: Write>(session: &mut Session<'_, T>) -> bool {
+    match term::stderr() {
+        Some(ref t)
+            if session.config.color().use_colored_tty()
+                && t.supports_color()
+                && t.supports_attr(term::Attr::Bold) =>
+        {
+            true
+        }
+        _ => false,
     }
 }
 
@@ -389,6 +405,8 @@ fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
         let path = matches.free.get(0).cloned();
         if kind == "default" {
             return Ok(Operation::ConfigOutputDefault { path });
+        } else if kind == "current" {
+            return Ok(Operation::ConfigOutputCurrent { path });
         } else if kind == "minimal" {
             minimal_config_path = path;
             if minimal_config_path.is_none() {

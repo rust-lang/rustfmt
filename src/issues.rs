@@ -1,13 +1,3 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 // Objects for seeking through a char stream for occurrences of TODO and FIXME.
 // Depending on the loaded configuration, may also check that these have an
 // associated issue number.
@@ -48,7 +38,7 @@ pub struct Issue {
 }
 
 impl fmt::Display for Issue {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let msg = match self.issue_type {
             IssueType::Todo => "TODO",
             IssueType::Fixme => "FIXME",
@@ -75,14 +65,14 @@ enum IssueClassification {
     None,
 }
 
-pub struct BadIssueSeeker {
+pub(crate) struct BadIssueSeeker {
     state: Seeking,
     report_todo: ReportTactic,
     report_fixme: ReportTactic,
 }
 
 impl BadIssueSeeker {
-    pub fn new(report_todo: ReportTactic, report_fixme: ReportTactic) -> BadIssueSeeker {
+    pub(crate) fn new(report_todo: ReportTactic, report_fixme: ReportTactic) -> BadIssueSeeker {
         BadIssueSeeker {
             state: Seeking::Issue {
                 todo_idx: 0,
@@ -93,13 +83,13 @@ impl BadIssueSeeker {
         }
     }
 
-    pub fn is_disabled(&self) -> bool {
+    pub(crate) fn is_disabled(&self) -> bool {
         !is_enabled(self.report_todo) && !is_enabled(self.report_fixme)
     }
 
     // Check whether or not the current char is conclusive evidence for an
     // unnumbered TO-DO or FIX-ME.
-    pub fn inspect(&mut self, c: char) -> Option<Issue> {
+    pub(crate) fn inspect(&mut self, c: char) -> Option<Issue> {
         match self.state {
             Seeking::Issue {
                 todo_idx,

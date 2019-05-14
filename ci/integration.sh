@@ -15,7 +15,7 @@ set -ex
 # it again.
 #
 #which cargo-fmt || cargo install --force
-cargo install --force
+cargo install --path . --force 
 
 echo "Integration tests for: ${INTEGRATION}"
 cargo fmt -- --version
@@ -42,8 +42,8 @@ function check_fmt_with_lib_tests {
 
 function check_fmt_base {
     local test_args="$1"
-    cargo test $test_args
-    if [[ $? != 0 ]]; then
+    local build=$(cargo test $test_args 2>&1)
+    if [[ "$build" =~ "build failed" ]] || [[ "$build" =~ "test result: FAILED." ]]; then
           return 0
     fi
     touch rustfmt.toml
@@ -76,10 +76,16 @@ function check_fmt_base {
     fi
 }
 
+function show_head {
+    local head=$(git rev-parse HEAD)
+    echo "Head commit of ${INTEGRATION}: $head"
+}
+
 case ${INTEGRATION} in
     cargo)
         git clone --depth=1 https://github.com/rust-lang/${INTEGRATION}.git
         cd ${INTEGRATION}
+        show_head
         export CFG_DISABLE_CROSS_TESTS=1
         check_fmt_with_all_tests
         cd -
@@ -87,12 +93,14 @@ case ${INTEGRATION} in
     crater)
         git clone --depth=1 https://github.com/rust-lang-nursery/${INTEGRATION}.git
         cd ${INTEGRATION}
+        show_head
         check_fmt_with_lib_tests
         cd -
         ;;
     *)
         git clone --depth=1 https://github.com/rust-lang-nursery/${INTEGRATION}.git
         cd ${INTEGRATION}
+        show_head
         check_fmt_with_all_tests
         cd -
         ;;

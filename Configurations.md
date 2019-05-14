@@ -24,7 +24,7 @@ Indent on expressions or items.
 
 - **Default value**: `"Block"`
 - **Possible values**: `"Block"`, `"Visual"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3346)
 
 ### Array
 
@@ -361,7 +361,7 @@ Where to put a binary operator when a binary expression goes multiline.
 
 - **Default value**: `"Front"`
 - **Possible values**: `"Front"`, `"Back"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3368)
 
 #### `"Front"` (default):
 
@@ -401,7 +401,7 @@ Combine control expressions with function calls.
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3369)
 
 #### `true` (default):
 
@@ -509,7 +509,7 @@ Maximum length of comments. No effect unless`wrap_comments = true`.
 
 - **Default value**: `80`
 - **Possible values**: any positive integer
-- **Stable**: No
+- **Stable**: No (tracking issue: #3349)
 
 **Note:** A value of `0` results in [`wrap_comments`](#wrap_comments) being applied regardless of a line's width.
 
@@ -532,7 +532,7 @@ Replace strings of _ wildcards by a single .. in tuple patterns
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3384)
 
 #### `false` (default):
 
@@ -557,7 +557,7 @@ Brace style for control flow constructs
 
 - **Default value**: `"AlwaysSameLine"`
 - **Possible values**: `"AlwaysNextLine"`, `"AlwaysSameLine"`, `"ClosingNextLine"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3377)
 
 #### `"AlwaysSameLine"` (default):
 
@@ -605,7 +605,7 @@ Don't reformat anything
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3388)
 
 ## `error_on_line_overflow`
 
@@ -616,7 +616,7 @@ using a shorter name.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3391)
 
 See also [`max_width`](#max_width).
 
@@ -627,7 +627,7 @@ trailing whitespaces.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3392)
 
 ## `fn_args_density`
 
@@ -635,7 +635,7 @@ Argument density in functions
 
 - **Default value**: `"Tall"`
 - **Possible values**: `"Compressed"`, `"Tall"`, `"Vertical"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3375)
 
 #### `"Tall"` (default):
 
@@ -746,7 +746,7 @@ Brace style for items
 
 - **Default value**: `"SameLineWhere"`
 - **Possible values**: `"AlwaysNextLine"`, `"PreferSameLine"`, `"SameLineWhere"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3376)
 
 ### Functions
 
@@ -862,7 +862,7 @@ Put empty-body functions and impls on a single line
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3356)
 
 #### `true` (default):
 
@@ -895,7 +895,7 @@ doesn't get ignored when aligning.
 
 - **Default value** : 0
 - **Possible values**: any positive integer
-- **Stable**: No
+- **Stable**: No (tracking issue: #3372)
 
 #### `0` (default):
 
@@ -938,7 +938,7 @@ Put single-expression functions on a single line
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3358)
 
 #### `false` (default):
 
@@ -973,7 +973,7 @@ Forces the `where` clause to be laid out on a single line.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3359)
 
 #### `false` (default):
 
@@ -1031,7 +1031,7 @@ Format string literals where necessary
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3353)
 
 #### `false` (default):
 
@@ -1058,7 +1058,7 @@ Format the metavariable matching patterns in macros.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3354)
 
 #### `false` (default):
 
@@ -1095,7 +1095,7 @@ Format the bodies of macros.
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3355)
 
 #### `true` (default):
 
@@ -1155,7 +1155,7 @@ Indent style of imports
 
 - **Default Value**: `"Block"`
 - **Possible values**: `"Block"`, `"Visual"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3360)
 
 #### `"Block"` (default):
 
@@ -1181,7 +1181,7 @@ Item layout inside a imports block
 
 - **Default value**: "Mixed"
 - **Possible values**: "Horizontal", "HorizontalVertical", "Mixed", "Vertical"
-- **Stable**: No
+- **Stable**: No (tracking issue: #3361)
 
 #### `"Mixed"` (default):
 
@@ -1244,7 +1244,7 @@ Merge multiple imports into a single nested import.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3362)
 
 #### `false` (default):
 
@@ -1267,7 +1267,7 @@ Put a trailing comma after a block based match arm (non-block arms are not affec
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3380)
 
 #### `false` (default):
 
@@ -1337,7 +1337,7 @@ Force multiline closure and match arm bodies to be wrapped in a block
 
 - **Default value**: `false`
 - **Possible values**: `false`, `true`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3374)
 
 #### `false` (default):
 
@@ -1413,7 +1413,7 @@ Convert /* */ comments to // comments where possible
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3350)
 
 #### `false` (default):
 
@@ -1528,7 +1528,7 @@ Reorder impl items. `type` and `const` are put first, then macros and methods.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3363)
 
 #### `false` (default)
 
@@ -1564,7 +1564,7 @@ Report `TODO` items in comments.
 
 - **Default value**: `"Never"`
 - **Possible values**: `"Always"`, `"Unnumbered"`, `"Never"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3393)
 
 Warns about any comments containing `TODO` in them when set to `"Always"`. If
 it contains a `#X` (with `X` being a number) in parentheses following the
@@ -1578,7 +1578,7 @@ Report `FIXME` items in comments.
 
 - **Default value**: `"Never"`
 - **Possible values**: `"Always"`, `"Unnumbered"`, `"Never"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3394)
 
 Warns about any comments containing `FIXME` in them when set to `"Always"`. If
 it contains a `#X` (with `X` being a number) in parentheses following the
@@ -1593,7 +1593,7 @@ Don't reformat out of line modules
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3389)
 
 ## `space_after_colon`
 
@@ -1601,7 +1601,7 @@ Leave a space after the colon.
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3366)
 
 #### `true` (default):
 
@@ -1633,7 +1633,7 @@ Leave a space before the colon.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3365)
 
 #### `false` (default):
 
@@ -1664,8 +1664,8 @@ See also: [`space_after_colon`](#space_after_colon).
 The maximum diff of width between struct fields to be aligned with each other.
 
 - **Default value** : 0
-- **Possible values**: any positive integer
-- **Stable**: No
+- **Possible values**: any non-negative integer
+- **Stable**: No (tracking issue: #3371)
 
 #### `0` (default):
 
@@ -1693,7 +1693,7 @@ Put spaces around the .., ..=, and ... range operators
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3367)
 
 #### `false` (default):
 
@@ -1749,7 +1749,7 @@ Put small struct literals on a single line
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3357)
 
 #### `true` (default):
 
@@ -1814,7 +1814,7 @@ How to handle trailing commas for lists
 
 - **Default value**: `"Vertical"`
 - **Possible values**: `"Always"`, `"Never"`, `"Vertical"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3379)
 
 #### `"Vertical"` (default):
 
@@ -1872,7 +1872,7 @@ Add trailing semicolon after break, continue and return
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3378)
 
 #### `true` (default):
 ```rust
@@ -1894,7 +1894,7 @@ Determines if `+` or `=` are wrapped in spaces in the punctuation of types
 
 - **Default value**: `"Wide"`
 - **Possible values**: `"Compressed"`, `"Wide"`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3364)
 
 #### `"Wide"` (default):
 
@@ -1984,7 +1984,7 @@ Format doc comments.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3348)
 
 #### `false` (default):
 
@@ -2035,7 +2035,7 @@ Break comments to fit on the line
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3347)
 
 #### `false` (default):
 
@@ -2059,7 +2059,7 @@ Wrap the body of arms in blocks when it does not fit on the same line with the p
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3373)
 
 #### `true` (default):
 
@@ -2096,7 +2096,7 @@ instead of being indented on a new line.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3370)
 
 #### `false` (default):
 
@@ -2177,8 +2177,8 @@ Maximum number of blank lines which can be put between items. If more than this 
 lines are found, they are trimmed down to match this integer.
 
 - **Default value**: `1`
-- **Possible values**: *unsigned integer*
-- **Stable**: No
+- **Possible values**: any non-negative integer
+- **Stable**: No (tracking issue: #3381)
 
 ### Example
 Original Code:
@@ -2237,7 +2237,7 @@ them, additional blank lines are inserted.
 
 - **Default value**: `0`
 - **Possible values**: *unsigned integer*
-- **Stable**: No
+- **Stable**: No (tracking issue: #3382)
 
 ### Example
 Original Code (rustfmt will not change it with the default value of `0`):
@@ -2277,7 +2277,7 @@ specific version of rustfmt is used in your CI, use this option.
 
 - **Default value**: `CARGO_PKG_VERSION`
 - **Possible values**: any published version (e.g. `"0.3.8"`)
-- **Stable**: No
+- **Stable**: No (tracking issue: #3386)
 
 ## `hide_parse_errors`
 
@@ -2285,7 +2285,7 @@ Do not show parse errors if the parser failed to parse files.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3390)
 
 ## `color`
 
@@ -2293,7 +2293,7 @@ Whether to use colored output or not.
 
 - **Default value**: `"Auto"`
 - **Possible values**: "Auto", "Always", "Never"
-- **Stable**: No
+- **Stable**: No (tracking issue: #3385)
 
 ## `unstable_features`
 
@@ -2301,15 +2301,15 @@ Enable unstable features on the unstable channel.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3387)
 
 ## `license_template_path`
 
 Check whether beginnings of files match a license template.
 
-- **Default value**: `""``
+- **Default value**: `""`
 - **Possible values**: path to a license template file
-- **Stable**: No
+- **Stable**: No (tracking issue: #3352)
 
 A license template is a plain text file which is matched literally against the
 beginning of each source file, except for `{}`-delimited blocks, which are
@@ -2327,9 +2327,9 @@ Copyright 2018 The Rust Project Developers.`, etc.:
 
 Skip formatting the specified files and directories.
 
-- **Default value**: format every files
+- **Default value**: format every file
 - **Possible values**: See an example below
-- **Stable**: No
+- **Stable**: No (tracking issue: #3395)
 
 ### Example
 
@@ -2358,9 +2358,9 @@ Specifies which edition is used by the parser.
 - **Possible values**: `2015`, `2018`
 - **Stable**: Yes
 
-### Example
-
-If you want to format code that requires edition 2018, add the following to your config file:
+Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
+through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition needs to be specified
+in your config file:
 
 ```toml
 edition = "2018"
@@ -2374,7 +2374,7 @@ version number.
 
 - **Default value**: `One`
 - **Possible values**: `One`, `Two`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3383)
 
 ### Example
 
@@ -2388,7 +2388,7 @@ Convert `#![doc]` and `#[doc]` attributes to `//!` and `///` doc comments.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: #3351)
 
 #### `false` (default):
 
@@ -2406,6 +2406,27 @@ pub enum Foo {}
 
 /// Example item documentation
 pub enum Foo {}
+```
+
+## `inline_attribute_width`
+
+Write an item and its attribute on the same line if their combined width is below a threshold
+
+- **Default value**: 0
+- **Possible values**: any positive integer
+- **Stable**: No (tracking issue: #3343)
+
+### Example
+
+#### `0` (default):
+```rust
+#[cfg(feature = "alloc")]
+use core::slice;
+```
+
+#### `50`:
+```rust
+#[cfg(feature = "alloc")] use core::slice;
 ```
 
 ## `emit_mode`

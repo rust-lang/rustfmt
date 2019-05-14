@@ -1,17 +1,8 @@
-// Copyright 2018 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 //! Rewrite a list some items with overflow.
 
 use std::cmp::min;
 
+use itertools::Itertools;
 use syntax::parse::token::DelimToken;
 use syntax::source_map::Span;
 use syntax::{ast, ptr};
@@ -77,7 +68,7 @@ const SPECIAL_ATTR_WHITELIST: &[(&str, usize)] = &[
 ];
 
 #[derive(Debug)]
-pub enum OverflowableItem<'a> {
+pub(crate) enum OverflowableItem<'a> {
     Expr(&'a ast::Expr),
     GenericParam(&'a ast::GenericParam),
     MacroArg(&'a MacroArg),
@@ -89,7 +80,7 @@ pub enum OverflowableItem<'a> {
 }
 
 impl<'a> Rewrite for OverflowableItem<'a> {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.map(|item| item.rewrite(context, shape))
     }
 }
@@ -101,9 +92,20 @@ impl<'a> Spanned for OverflowableItem<'a> {
 }
 
 impl<'a> OverflowableItem<'a> {
-    pub fn map<F, T>(&self, f: F) -> T
+    fn has_attrs(&self) -> bool {
+        match self {
+            OverflowableItem::Expr(ast::Expr { attrs, .. })
+            | OverflowableItem::GenericParam(ast::GenericParam { attrs, .. }) => !attrs.is_empty(),
+            OverflowableItem::StructField(ast::StructField { attrs, .. }) => !attrs.is_empty(),
+            OverflowableItem::MacroArg(MacroArg::Expr(expr)) => !expr.attrs.is_empty(),
+            OverflowableItem::MacroArg(MacroArg::Item(item)) => !item.attrs.is_empty(),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn map<F, T>(&self, f: F) -> T
     where
-        F: Fn(&IntoOverflowableItem<'a>) -> T,
+        F: Fn(&dyn IntoOverflowableItem<'a>) -> T,
     {
         match self {
             OverflowableItem::Expr(expr) => f(*expr),
@@ -117,7 +119,7 @@ impl<'a> OverflowableItem<'a> {
         }
     }
 
-    pub fn is_simple(&self) -> bool {
+    pub(crate) fn is_simple(&self) -> bool {
         match self {
             OverflowableItem::Expr(expr) => is_simple_expr(expr),
             OverflowableItem::MacroArg(MacroArg::Expr(expr)) => is_simple_expr(expr),
@@ -132,7 +134,7 @@ impl<'a> OverflowableItem<'a> {
         }
     }
 
-    pub fn is_expr(&self) -> bool {
+    pub(crate) fn is_expr(&self) -> bool {
         match self {
             OverflowableItem::Expr(..) => true,
             OverflowableItem::MacroArg(MacroArg::Expr(..)) => true,
@@ -140,7 +142,7 @@ impl<'a> OverflowableItem<'a> {
         }
     }
 
-    pub fn is_nested_call(&self) -> bool {
+    pub(crate) fn is_nested_call(&self) -> bool {
         match self {
             OverflowableItem::Expr(expr) => is_nested_call(expr),
             OverflowableItem::MacroArg(MacroArg::Expr(expr)) => is_nested_call(expr),
@@ -148,7 +150,7 @@ impl<'a> OverflowableItem<'a> {
         }
     }
 
-    pub fn to_expr(&self) -> Option<&'a ast::Expr> {
+    pub(crate) fn to_expr(&self) -> Option<&'a ast::Expr> {
         match self {
             OverflowableItem::Expr(expr) => Some(expr),
             OverflowableItem::MacroArg(macro_arg) => match macro_arg {
@@ -159,7 +161,7 @@ impl<'a> OverflowableItem<'a> {
         }
     }
 
-    pub fn can_be_overflowed(&self, context: &RewriteContext, len: usize) -> bool {
+    pub(crate) fn can_be_overflowed(&self, context: &RewriteContext<'_>, len: usize) -> bool {
         match self {
             OverflowableItem::Expr(expr) => can_be_overflowed_expr(context, expr, len),
             OverflowableItem::MacroArg(macro_arg) => match macro_arg {
@@ -167,6 +169,7 @@ impl<'a> OverflowableItem<'a> {
                 MacroArg::Ty(ref ty) => can_be_overflowed_type(context, ty, len),
                 MacroArg::Pat(..) => false,
                 MacroArg::Item(..) => len == 1,
+                MacroArg::Keyword(..) => false,
             },
             OverflowableItem::NestedMetaItem(nested_meta_item) if len == 1 => {
                 match nested_meta_item.node {
@@ -193,7 +196,7 @@ impl<'a> OverflowableItem<'a> {
     }
 }
 
-pub trait IntoOverflowableItem<'a>: Rewrite + Spanned {
+pub(crate) trait IntoOverflowableItem<'a>: Rewrite + Spanned {
     fn into_overflowable_item(&'a self) -> OverflowableItem<'a>;
 }
 
@@ -237,7 +240,7 @@ macro_rules! impl_into_overflowable_item_for_rustfmt_types {
 impl_into_overflowable_item_for_ast_node!(Expr, GenericParam, NestedMetaItem, StructField, Ty);
 impl_into_overflowable_item_for_rustfmt_types!([MacroArg], [SegmentParam, TuplePatField]);
 
-pub fn into_overflowable_list<'a, T>(
+pub(crate) fn into_overflowable_list<'a, T>(
     iter: impl Iterator<Item = &'a T>,
 ) -> impl Iterator<Item = OverflowableItem<'a>>
 where
@@ -246,8 +249,8 @@ where
     iter.map(|x| IntoOverflowableItem::into_overflowable_item(x))
 }
 
-pub fn rewrite_with_parens<'a, T: 'a + IntoOverflowableItem<'a>>(
-    context: &'a RewriteContext,
+pub(crate) fn rewrite_with_parens<'a, T: 'a + IntoOverflowableItem<'a>>(
+    context: &'a RewriteContext<'_>,
     ident: &'a str,
     items: impl Iterator<Item = &'a T>,
     shape: Shape,
@@ -270,8 +273,8 @@ pub fn rewrite_with_parens<'a, T: 'a + IntoOverflowableItem<'a>>(
     .rewrite(shape)
 }
 
-pub fn rewrite_with_angle_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
-    context: &'a RewriteContext,
+pub(crate) fn rewrite_with_angle_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
+    context: &'a RewriteContext<'_>,
     ident: &'a str,
     items: impl Iterator<Item = &'a T>,
     shape: Shape,
@@ -292,8 +295,8 @@ pub fn rewrite_with_angle_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
     .rewrite(shape)
 }
 
-pub fn rewrite_with_square_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
-    context: &'a RewriteContext,
+pub(crate) fn rewrite_with_square_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
+    context: &'a RewriteContext<'_>,
     name: &'a str,
     items: impl Iterator<Item = &'a T>,
     shape: Shape,
@@ -337,8 +340,8 @@ struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    pub fn new<T: 'a + IntoOverflowableItem<'a>>(
-        context: &'a RewriteContext,
+    fn new<T: 'a + IntoOverflowableItem<'a>>(
+        context: &'a RewriteContext<'_>,
         items: impl Iterator<Item = &'a T>,
         ident: &'a str,
         shape: Shape,
@@ -375,7 +378,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn last_item(&self) -> Option<&OverflowableItem> {
+    fn last_item(&self) -> Option<&OverflowableItem<'_>> {
         self.items.last()
     }
 
@@ -456,6 +459,7 @@ impl<'a> Context<'a> {
         // 1 = "("
         let combine_arg_with_callee = self.items.len() == 1
             && self.items[0].is_expr()
+            && !self.items[0].has_attrs()
             && self.ident.len() < self.context.config.tab_spaces();
         let overflow_last = combine_arg_with_callee || can_be_overflowed(self.context, &self.items);
 
@@ -512,7 +516,7 @@ impl<'a> Context<'a> {
                 // When we are rewriting a nested function call, we restrict the
                 // budget for the inner function to avoid them being deeply nested.
                 // However, when the inner function has a prefix or a suffix
-                // (e.g. `foo() as u32`), this budget reduction may produce poorly
+                // (e.g., `foo() as u32`), this budget reduction may produce poorly
                 // formatted code, where a prefix or a suffix being left on its own
                 // line. Here we explicitlly check those cases.
                 if count_newlines(overflowed) == 1 {
@@ -704,7 +708,7 @@ fn need_block_indent(s: &str, shape: Shape) -> bool {
     })
 }
 
-fn can_be_overflowed(context: &RewriteContext, items: &[OverflowableItem]) -> bool {
+fn can_be_overflowed(context: &RewriteContext<'_>, items: &[OverflowableItem<'_>]) -> bool {
     items
         .last()
         .map_or(false, |x| x.can_be_overflowed(context, items.len()))
@@ -712,7 +716,7 @@ fn can_be_overflowed(context: &RewriteContext, items: &[OverflowableItem]) -> bo
 
 /// Returns a shape for the last argument which is going to be overflowed.
 fn last_item_shape(
-    lists: &[OverflowableItem],
+    lists: &[OverflowableItem<'_>],
     items: &[ListItem],
     shape: Shape,
     args_max_width: usize,
@@ -720,10 +724,14 @@ fn last_item_shape(
     if items.len() == 1 && !lists.get(0)?.is_nested_call() {
         return Some(shape);
     }
-    let offset = items.iter().rev().skip(1).fold(0, |acc, i| {
-        // 2 = ", "
-        acc + 2 + i.inner_as_ref().len()
-    });
+    let offset = items
+        .iter()
+        .dropping_back(1)
+        .map(|i| {
+            // 2 = ", "
+            2 + i.inner_as_ref().len()
+        })
+        .sum();
     Shape {
         width: min(args_max_width, shape.width),
         ..shape
@@ -732,7 +740,7 @@ fn last_item_shape(
 }
 
 fn shape_from_indent_style(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     shape: Shape,
     overhead: usize,
     offset: usize,
@@ -758,7 +766,10 @@ fn no_long_items(list: &[ListItem]) -> bool {
 }
 
 /// In case special-case style is required, returns an offset from which we start horizontal layout.
-pub fn maybe_get_args_offset(callee_str: &str, args: &[OverflowableItem]) -> Option<(bool, usize)> {
+pub(crate) fn maybe_get_args_offset(
+    callee_str: &str,
+    args: &[OverflowableItem<'_>],
+) -> Option<(bool, usize)> {
     if let Some(&(_, num_args_before)) = args
         .get(0)?
         .whitelist()

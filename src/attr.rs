@@ -1,13 +1,3 @@
-// Copyright 2018 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 //! Format attributes and meta items.
 
 use syntax::ast;
@@ -25,7 +15,7 @@ use crate::types::{rewrite_path, PathContext};
 use crate::utils::{count_newlines, mk_sp};
 
 /// Returns attributes on the given statement.
-pub fn get_attrs_from_stmt(stmt: &ast::Stmt) -> &[ast::Attribute] {
+pub(crate) fn get_attrs_from_stmt(stmt: &ast::Stmt) -> &[ast::Attribute] {
     match stmt.node {
         ast::StmtKind::Local(ref local) => &local.attrs,
         ast::StmtKind::Item(ref item) => &item.attrs,
@@ -34,8 +24,23 @@ pub fn get_attrs_from_stmt(stmt: &ast::Stmt) -> &[ast::Attribute] {
     }
 }
 
+pub(crate) fn get_span_without_attrs(stmt: &ast::Stmt) -> Span {
+    match stmt.node {
+        ast::StmtKind::Local(ref local) => local.span,
+        ast::StmtKind::Item(ref item) => item.span,
+        ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => expr.span,
+        ast::StmtKind::Mac(ref mac) => {
+            let (ref mac, _, _) = **mac;
+            mac.span
+        }
+    }
+}
+
 /// Returns attributes that are within `outer_span`.
-pub fn filter_inline_attrs(attrs: &[ast::Attribute], outer_span: Span) -> Vec<ast::Attribute> {
+pub(crate) fn filter_inline_attrs(
+    attrs: &[ast::Attribute],
+    outer_span: Span,
+) -> Vec<ast::Attribute> {
     attrs
         .iter()
         .filter(|a| outer_span.lo() <= a.span.lo() && a.span.hi() <= outer_span.hi())
@@ -63,7 +68,7 @@ fn argument_shape(
     right: usize,
     combine: bool,
     shape: Shape,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
 ) -> Option<Shape> {
     match context.config.indent_style() {
         IndentStyle::Block => {
@@ -88,7 +93,7 @@ fn format_derive(
     derive_args: &[Span],
     prefix: &str,
     shape: Shape,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
     result.push_str(prefix);
@@ -121,7 +126,7 @@ fn format_derive(
 /// Returns the first group of attributes that fills the given predicate.
 /// We consider two doc comments are in different group if they are separated by normal comments.
 fn take_while_with_pred<'a, P>(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     attrs: &'a [ast::Attribute],
     pred: P,
 ) -> &'a [ast::Attribute]
@@ -152,7 +157,7 @@ where
 
 /// Rewrite the any doc comments which come before any other attributes.
 fn rewrite_initial_doc_comments(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     attrs: &[ast::Attribute],
     shape: Shape,
 ) -> Option<(usize, Option<String>)> {
@@ -181,7 +186,7 @@ fn rewrite_initial_doc_comments(
 }
 
 impl Rewrite for ast::NestedMetaItem {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match self.node {
             ast::NestedMetaItemKind::MetaItem(ref meta_item) => meta_item.rewrite(context, shape),
             ast::NestedMetaItemKind::Literal(ref l) => rewrite_literal(context, l, shape),
@@ -209,7 +214,7 @@ fn has_newlines_before_after_comment(comment: &str) -> (&str, &str) {
 }
 
 impl Rewrite for ast::MetaItem {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         Some(match self.node {
             ast::MetaItemKind::Word => {
                 rewrite_path(context, PathContext::Type, None, &self.ident, shape)?
@@ -256,7 +261,7 @@ fn format_arg_list<I, T, F1, F2, F3>(
     get_hi: F2,
     get_item_string: F3,
     span: Span,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     shape: Shape,
     one_line_shape: Shape,
     one_line_limit: Option<usize>,
@@ -306,7 +311,7 @@ where
 }
 
 impl Rewrite for ast::Attribute {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let snippet = context.snippet(self.span);
         if self.is_sugared_doc {
             rewrite_doc_comment(snippet, shape.comment(context.config), context.config)
@@ -353,7 +358,7 @@ impl Rewrite for ast::Attribute {
 }
 
 impl<'a> Rewrite for [ast::Attribute] {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         if self.is_empty() {
             return Some(String::new());
         }

@@ -1,18 +1,8 @@
-// Copyright 2018 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 use crate::config::file_lines::FileLines;
 use crate::config::options::{IgnoreList, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
-pub trait ConfigType: Sized {
+pub(crate) trait ConfigType: Sized {
     /// Returns hint text for use in `Config::print_docs()`. For enum types, this is a
     /// pipe-separated list of variants; for other types it returns "<type>".
     fn doc_hint() -> String;
@@ -60,14 +50,14 @@ impl ConfigType for IgnoreList {
     }
 }
 
-/// Check if we're in a nightly build.
+/// Checks if we're in a nightly build.
 ///
 /// The environment variable `CFG_RELEASE_CHANNEL` is set during the rustc bootstrap
 /// to "stable", "beta", or "nightly" depending on what toolchain is being built.
 /// If we are being built as part of the stable or beta toolchains, we want
 /// to disable unstable configuration options.
 ///
-/// If we're being built by cargo (e.g. `cargo +nightly install rustfmt-nightly`),
+/// If we're being built by cargo (e.g., `cargo +nightly install rustfmt-nightly`),
 /// `CFG_RELEASE_CHANNEL` is not set. As we only support being built against the
 /// nightly compiler when installed from crates.io, default to nightly mode.
 macro_rules! is_nightly_channel {
@@ -82,7 +72,10 @@ macro_rules! create_config {
         use std::collections::HashSet;
         use std::io::Write;
 
+        use serde::{Deserialize, Serialize};
+
         #[derive(Clone)]
+        #[allow(unreachable_pub)]
         pub struct Config {
             // if a license_template_path has been specified, successfully read, parsed and compiled
             // into a regex, it will be stored here
@@ -99,21 +92,9 @@ macro_rules! create_config {
         // We first parse into `PartialConfig`, then create a default `Config`
         // and overwrite the properties with corresponding values from `PartialConfig`.
         #[derive(Deserialize, Serialize, Clone)]
+        #[allow(unreachable_pub)]
         pub struct PartialConfig {
             $(pub $i: Option<$ty>),+
-        }
-
-        impl PartialConfig {
-            pub fn to_toml(&self) -> Result<String, String> {
-                // Non-user-facing options can't be specified in TOML
-                let mut cloned = self.clone();
-                cloned.file_lines = None;
-                cloned.verbose = None;
-                cloned.width_heuristics = None;
-
-                ::toml::to_string(&cloned)
-                    .map_err(|e| format!("Could not output config: {}", e))
-            }
         }
 
         // Macro hygiene won't allow us to make `set_$i()` methods on Config
@@ -121,10 +102,12 @@ macro_rules! create_config {
         // `config.set().option(false)`. It's pretty ugly. Consider replacing
         // with `config.set_option(false)` if we ever get a stable/usable
         // `concat_idents!()`.
+        #[allow(unreachable_pub)]
         pub struct ConfigSetter<'a>(&'a mut Config);
 
         impl<'a> ConfigSetter<'a> {
             $(
+            #[allow(unreachable_pub)]
             pub fn $i(&mut self, value: $ty) {
                 (self.0).$i.2 = value;
                 match stringify!($i) {
@@ -138,10 +121,12 @@ macro_rules! create_config {
 
         // Query each option, returns true if the user set the option, false if
         // a default was used.
+        #[allow(unreachable_pub)]
         pub struct ConfigWasSet<'a>(&'a Config);
 
         impl<'a> ConfigWasSet<'a> {
             $(
+            #[allow(unreachable_pub)]
             pub fn $i(&self) -> bool {
                 (self.0).$i.1
             }
@@ -149,35 +134,21 @@ macro_rules! create_config {
         }
 
         impl Config {
-            pub(crate) fn version_meets_requirement(&self) -> bool {
-                if self.was_set().required_version() {
-                    let version = env!("CARGO_PKG_VERSION");
-                    let required_version = self.required_version();
-                    if version != required_version {
-                        println!(
-                            "Error: rustfmt version ({}) doesn't match the required version ({})",
-                            version,
-                            required_version,
-                        );
-                        return false;
-                    }
-                }
-
-                true
-            }
-
             $(
+            #[allow(unreachable_pub)]
             pub fn $i(&self) -> $ty {
                 self.$i.0.set(true);
                 self.$i.2.clone()
             }
             )+
 
-            pub fn set(&mut self) -> ConfigSetter {
+            #[allow(unreachable_pub)]
+            pub fn set(&mut self) -> ConfigSetter<'_> {
                 ConfigSetter(self)
             }
 
-            pub fn was_set(&self) -> ConfigWasSet {
+            #[allow(unreachable_pub)]
+            pub fn was_set(&self) -> ConfigWasSet<'_> {
                 ConfigWasSet(self)
             }
 
@@ -223,37 +194,7 @@ macro_rules! create_config {
                 }
             }
 
-            pub(crate) fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
-                let parsed: ::toml::Value =
-                    toml.parse().map_err(|e| format!("Could not parse TOML: {}", e))?;
-                let mut err: String = String::new();
-                {
-                    let table = parsed
-                        .as_table()
-                        .ok_or(String::from("Parsed config was not table"))?;
-                    for key in table.keys() {
-                        if !Config::is_valid_name(key) {
-                            let msg = &format!("Warning: Unknown configuration option `{}`\n", key);
-                            err.push_str(msg)
-                        }
-                    }
-                }
-                match parsed.try_into() {
-                    Ok(parsed_config) => {
-                        if !err.is_empty() {
-                            eprint!("{}", err);
-                        }
-                        Ok(Config::default().fill_from_parsed_config(parsed_config, dir))
-                    }
-                    Err(e) => {
-                        err.push_str("Error: Decoding config file failed:\n");
-                        err.push_str(format!("{}\n", e).as_str());
-                        err.push_str("Please check your config file.");
-                        Err(err)
-                    }
-                }
-            }
-
+            #[allow(unreachable_pub)]
             pub fn used_options(&self) -> PartialConfig {
                 PartialConfig {
                     $(
@@ -266,6 +207,7 @@ macro_rules! create_config {
                 }
             }
 
+            #[allow(unreachable_pub)]
             pub fn all_options(&self) -> PartialConfig {
                 PartialConfig {
                     $(
@@ -274,6 +216,7 @@ macro_rules! create_config {
                 }
             }
 
+            #[allow(unreachable_pub)]
             pub fn override_value(&mut self, key: &str, val: &str)
             {
                 match key {
@@ -297,96 +240,19 @@ macro_rules! create_config {
                 }
             }
 
-            /// Construct a `Config` from the toml file specified at `file_path`.
-            ///
-            /// This method only looks at the provided path, for a method that
-            /// searches parents for a `rustfmt.toml` see `from_resolved_toml_path`.
-            ///
-            /// Return a `Config` if the config could be read and parsed from
-            /// the file, Error otherwise.
-            pub(super) fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
-                let mut file = File::open(&file_path)?;
-                let mut toml = String::new();
-                file.read_to_string(&mut toml)?;
-                Config::from_toml(&toml, file_path.parent().unwrap())
-                    .map_err(|err| Error::new(ErrorKind::InvalidData, err))
-            }
-
-            /// Resolve the config for input in `dir`.
-            ///
-            /// Searches for `rustfmt.toml` beginning with `dir`, and
-            /// recursively checking parents of `dir` if no config file is found.
-            /// If no config file exists in `dir` or in any parent, a
-            /// default `Config` will be returned (and the returned path will be empty).
-            ///
-            /// Returns the `Config` to use, and the path of the project file if there was
-            /// one.
-            pub(super) fn from_resolved_toml_path(
-                dir: &Path,
-            ) -> Result<(Config, Option<PathBuf>), Error> {
-                /// Try to find a project file in the given directory and its parents.
-                /// Returns the path of a the nearest project file if one exists,
-                /// or `None` if no project file was found.
-                fn resolve_project_file(dir: &Path) -> Result<Option<PathBuf>, Error> {
-                    let mut current = if dir.is_relative() {
-                        env::current_dir()?.join(dir)
-                    } else {
-                        dir.to_path_buf()
-                    };
-
-                    current = crate::utils::absolute_path(current)?;
-
-                    loop {
-                        match get_toml_path(&current) {
-                            Ok(Some(path)) => return Ok(Some(path)),
-                            Err(e) => return Err(e),
-                            _ => ()
-                        }
-
-                        // If the current directory has no parent, we're done searching.
-                        if !current.pop() {
-                            break;
-                        }
-                    }
-
-                    // If nothing was found, check in the home directory.
-                    if let Some(home_dir) = dirs::home_dir() {
-                        if let Some(path) = get_toml_path(&home_dir)? {
-                            return Ok(Some(path));
-                        }
-                    }
-
-                    // If none was found ther either, check in the user's configuration directory.
-                    if let Some(mut config_dir) = dirs::config_dir() {
-                        config_dir.push("rustfmt");
-                        if let Some(path) = get_toml_path(&config_dir)? {
-                            return Ok(Some(path));
-                        }
-                    }
-
-                    return Ok(None);
-                }
-
-                match resolve_project_file(dir)? {
-                    None => Ok((Config::default(), None)),
-                    Some(path) => Config::from_toml_path(&path).map(|config| (config, Some(path))),
-                }
-            }
-
+            #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
                 const HIDE_OPTIONS: [&str; 4] =
                     ["verbose", "verbose_diff", "file_lines", "width_heuristics"];
                 HIDE_OPTIONS.contains(&name)
             }
 
-            pub fn print_docs(out: &mut Write, include_unstable: bool) {
+            #[allow(unreachable_pub)]
+            pub fn print_docs(out: &mut dyn Write, include_unstable: bool) {
                 use std::cmp;
                 let max = 0;
                 $( let max = cmp::max(max, stringify!($i).len()+1); )+
-                let mut space_str = String::with_capacity(max);
-                for _ in 0..max {
-                    space_str.push(' ');
-                }
+                let space_str = " ".repeat(max);
                 writeln!(out, "Configuration Options:").unwrap();
                 $(
                     if $stb || include_unstable {
@@ -441,7 +307,8 @@ macro_rules! create_config {
                 self.ignore.2.add_prefix(dir);
             }
 
-            /// Returns true if the config key was explicitly set and is the default value.
+            #[allow(unreachable_pub)]
+            /// Returns `true` if the config key was explicitly set and is the default value.
             pub fn is_default(&self, key: &str) -> bool {
                 $(
                     if let stringify!($i) = key {

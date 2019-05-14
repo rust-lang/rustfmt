@@ -1,24 +1,14 @@
-// Copyright 2015-2016 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
-// Inspired by Paul Woolcock's cargo-fmt (https://github.com/pwoolcoc/cargo-fmt/)
+// Inspired by Paul Woolcock's cargo-fmt (https://github.com/pwoolcoc/cargo-fmt/).
 
 #![cfg(not(test))]
 #![deny(warnings)]
 
-extern crate cargo_metadata;
-extern crate getopts;
-extern crate rustfmt_nightly as rustfmt;
-extern crate serde_json as json;
+use cargo_metadata;
+use getopts;
+use rustfmt_nightly as rustfmt;
 
-use std::collections::{HashMap, HashSet};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
@@ -91,7 +81,7 @@ fn execute() -> i32 {
     }
 
     if matches.opt_present("version") {
-        return handle_command_status(get_version(verbosity), &opts);
+        return handle_command_status(get_version(), &opts);
     }
 
     let strategy = CargoFmtStrategy::from_matches(&matches);
@@ -134,8 +124,24 @@ fn handle_command_status(status: Result<i32, io::Error>, opts: &getopts::Options
     }
 }
 
-fn get_version(verbosity: Verbosity) -> Result<i32, io::Error> {
-    run_rustfmt(&HashSet::new(), &[String::from("--version")], verbosity)
+fn get_version() -> Result<i32, io::Error> {
+    let mut command = Command::new("rustfmt")
+        .stdout(std::process::Stdio::inherit())
+        .args(&[String::from("--version")])
+        .spawn()
+        .map_err(|e| match e.kind() {
+            io::ErrorKind::NotFound => io::Error::new(
+                io::ErrorKind::Other,
+                "Could not run rustfmt, please make sure it is in your PATH.",
+            ),
+            _ => e,
+        })?;
+    let result = command.wait()?;
+    if result.success() {
+        Ok(SUCCESS)
+    } else {
+        Ok(result.code().unwrap_or(SUCCESS))
+    }
 }
 
 fn format_crate(verbosity: Verbosity, strategy: &CargoFmtStrategy) -> Result<i32, io::Error> {
@@ -144,17 +150,17 @@ fn format_crate(verbosity: Verbosity, strategy: &CargoFmtStrategy) -> Result<i32
         .iter()
         .any(|s| ["--print-config", "-h", "--help", "-V", "--version"].contains(&s.as_str()))
     {
-        HashSet::new()
+        BTreeSet::new()
     } else {
         get_targets(strategy)?
     };
 
-    // Currently only bin and lib files get formatted
+    // Currently only bin and lib files get formatted.
     run_rustfmt(&targets, &rustfmt_args, verbosity)
 }
 
 fn get_fmt_args() -> Vec<String> {
-    // All arguments after -- are passed to rustfmt
+    // All arguments after -- are passed to rustfmt.
     env::args().skip_while(|a| a != "--").skip(1).collect()
 }
 
@@ -163,7 +169,7 @@ fn get_fmt_args() -> Vec<String> {
 pub struct Target {
     /// A path to the main source file of the target.
     path: PathBuf,
-    /// A kind of target (e.g. lib, bin, example, ...).
+    /// A kind of target (e.g., lib, bin, example, ...).
     kind: String,
     /// Rust edition for this target.
     edition: String,
@@ -185,6 +191,18 @@ impl Target {
 impl PartialEq for Target {
     fn eq(&self, other: &Target) -> bool {
         self.path == other.path
+    }
+}
+
+impl PartialOrd for Target {
+    fn partial_cmp(&self, other: &Target) -> Option<Ordering> {
+        Some(self.path.cmp(&other.path))
+    }
+}
+
+impl Ord for Target {
+    fn cmp(&self, other: &Target) -> Ordering {
+        self.path.cmp(&other.path)
     }
 }
 
@@ -217,12 +235,12 @@ impl CargoFmtStrategy {
 }
 
 /// Based on the specified `CargoFmtStrategy`, returns a set of main source files.
-fn get_targets(strategy: &CargoFmtStrategy) -> Result<HashSet<Target>, io::Error> {
-    let mut targets = HashSet::new();
+fn get_targets(strategy: &CargoFmtStrategy) -> Result<BTreeSet<Target>, io::Error> {
+    let mut targets = BTreeSet::new();
 
     match *strategy {
         CargoFmtStrategy::Root => get_targets_root_only(&mut targets)?,
-        CargoFmtStrategy::All => get_targets_recursive(None, &mut targets, &mut HashSet::new())?,
+        CargoFmtStrategy::All => get_targets_recursive(None, &mut targets, &mut BTreeSet::new())?,
         CargoFmtStrategy::Some(ref hitlist) => get_targets_with_hitlist(hitlist, &mut targets)?,
     }
 
@@ -236,7 +254,7 @@ fn get_targets(strategy: &CargoFmtStrategy) -> Result<HashSet<Target>, io::Error
     }
 }
 
-fn get_targets_root_only(targets: &mut HashSet<Target>) -> Result<(), io::Error> {
+fn get_targets_root_only(targets: &mut BTreeSet<Target>) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(None)?;
     let current_dir = absolute_path(env::current_dir()?)?;
     let current_dir_manifest = current_dir.join("Cargo.toml");
@@ -256,8 +274,8 @@ fn get_targets_root_only(targets: &mut HashSet<Target>) -> Result<(), io::Error>
 
 fn get_targets_recursive(
     manifest_path: Option<&Path>,
-    mut targets: &mut HashSet<Target>,
-    visited: &mut HashSet<String>,
+    mut targets: &mut BTreeSet<Target>,
+    visited: &mut BTreeSet<String>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path)?;
 
@@ -288,11 +306,11 @@ fn get_targets_recursive(
 
 fn get_targets_with_hitlist(
     hitlist: &[String],
-    targets: &mut HashSet<Target>,
+    targets: &mut BTreeSet<Target>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(None)?;
 
-    let mut workspace_hitlist: HashSet<&String> = HashSet::from_iter(hitlist);
+    let mut workspace_hitlist: BTreeSet<&String> = BTreeSet::from_iter(hitlist);
 
     for package in metadata.packages {
         if workspace_hitlist.remove(&package.name) {
@@ -313,34 +331,30 @@ fn get_targets_with_hitlist(
     }
 }
 
-fn add_targets(target_paths: &[cargo_metadata::Target], targets: &mut HashSet<Target>) {
+fn add_targets(target_paths: &[cargo_metadata::Target], targets: &mut BTreeSet<Target>) {
     for target in target_paths {
         targets.insert(Target::from_target(target));
     }
 }
 
 fn run_rustfmt(
-    targets: &HashSet<Target>,
+    targets: &BTreeSet<Target>,
     fmt_args: &[String],
     verbosity: Verbosity,
 ) -> Result<i32, io::Error> {
-    let default_edition = String::from("2015");
-    let mut by_edition = targets
+    let by_edition = targets
         .iter()
         .inspect(|t| {
             if verbosity == Verbosity::Verbose {
                 println!("[{} ({})] {:?}", t.kind, t.edition, t.path)
             }
         })
-        .map(|t| (&t.edition, &t.path))
-        .fold(HashMap::new(), |mut h, t| {
-            h.entry(t.0).or_insert_with(Vec::new).push(t.1);
+        .fold(BTreeMap::new(), |mut h, t| {
+            h.entry(&t.edition).or_insert_with(Vec::new).push(&t.path);
             h
         });
-    if by_edition.is_empty() {
-        by_edition.insert(&default_edition, Vec::new());
-    }
 
+    let mut status = vec![];
     for (edition, files) in by_edition {
         let stdout = if verbosity == Verbosity::Quiet {
             std::process::Stdio::null()
@@ -370,13 +384,14 @@ fn run_rustfmt(
                 _ => e,
             })?;
 
-        let status = command.wait()?;
-        if !status.success() {
-            return Ok(status.code().unwrap_or(FAILURE));
-        }
+        status.push(command.wait()?);
     }
 
-    Ok(SUCCESS)
+    Ok(status
+        .iter()
+        .filter_map(|s| if s.success() { None } else { s.code() })
+        .next()
+        .unwrap_or(SUCCESS))
 }
 
 fn get_cargo_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Metadata, io::Error> {

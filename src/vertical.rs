@@ -1,17 +1,8 @@
-// Copyright 2017 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 // Format with vertical alignment.
 
 use std::cmp;
 
+use itertools::Itertools;
 use syntax::ast;
 use syntax::source_map::{BytePos, Span};
 
@@ -28,13 +19,13 @@ use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{contains_skip, is_attributes_extendable, mk_sp, rewrite_ident};
 
-pub trait AlignedItem {
+pub(crate) trait AlignedItem {
     fn skip(&self) -> bool;
     fn get_span(&self) -> Span;
-    fn rewrite_prefix(&self, context: &RewriteContext, shape: Shape) -> Option<String>;
+    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String>;
     fn rewrite_aligned_item(
         &self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         prefix_max_width: usize,
     ) -> Option<String>;
@@ -49,7 +40,7 @@ impl AlignedItem for ast::StructField {
         self.span()
     }
 
-    fn rewrite_prefix(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let attrs_str = self.attrs.rewrite(context, shape)?;
         let missing_span = if self.attrs.is_empty() {
             mk_sp(self.span.lo(), self.span.lo())
@@ -71,7 +62,7 @@ impl AlignedItem for ast::StructField {
 
     fn rewrite_aligned_item(
         &self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         prefix_max_width: usize,
     ) -> Option<String> {
@@ -88,7 +79,7 @@ impl AlignedItem for ast::Field {
         self.span()
     }
 
-    fn rewrite_prefix(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let attrs_str = self.attrs.rewrite(context, shape)?;
         let name = rewrite_ident(context, self.ident);
         let missing_span = if self.attrs.is_empty() {
@@ -108,7 +99,7 @@ impl AlignedItem for ast::Field {
 
     fn rewrite_aligned_item(
         &self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         prefix_max_width: usize,
     ) -> Option<String> {
@@ -116,9 +107,9 @@ impl AlignedItem for ast::Field {
     }
 }
 
-pub fn rewrite_with_alignment<T: AlignedItem>(
+pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
     fields: &[T],
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     shape: Shape,
     span: Span,
     one_line_width: usize,
@@ -144,7 +135,7 @@ pub fn rewrite_with_alignment<T: AlignedItem>(
 
         let snippet = context.snippet(missing_span);
         if snippet.trim_start().starts_with("//") {
-            let offset = snippet.lines().next().map_or(0, |l| l.len());
+            let offset = snippet.lines().next().map_or(0, str::len);
             // 2 = "," + "\n"
             init_hi + BytePos(offset as u32 + 2)
         } else if snippet.trim_start().starts_with("/*") {
@@ -185,7 +176,7 @@ pub fn rewrite_with_alignment<T: AlignedItem>(
 }
 
 fn struct_field_prefix_max_min_width<T: AlignedItem>(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     fields: &[T],
     shape: Shape,
 ) -> (usize, usize) {
@@ -200,17 +191,14 @@ fn struct_field_prefix_max_min_width<T: AlignedItem>(
                 }
             })
         })
-        .fold(Some((0, ::std::usize::MAX)), |acc, len| match (acc, len) {
-            (Some((max_len, min_len)), Some(len)) => {
-                Some((cmp::max(max_len, len), cmp::min(min_len, len)))
-            }
-            _ => None,
+        .fold_options((0, ::std::usize::MAX), |(max_len, min_len), len| {
+            (cmp::max(max_len, len), cmp::min(min_len, len))
         })
         .unwrap_or((0, 0))
 }
 
 fn rewrite_aligned_items_inner<T: AlignedItem>(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     fields: &[T],
     span: Span,
     offset: Indent,
@@ -268,7 +256,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
 }
 
 fn group_aligned_items<T: AlignedItem>(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     fields: &[T],
 ) -> (&'static str, usize) {
     let mut index = 0;
@@ -284,7 +272,11 @@ fn group_aligned_items<T: AlignedItem>(
             .skip(1)
             .collect::<Vec<_>>()
             .join("\n");
-        let spacings = if snippet.lines().rev().skip(1).any(|l| l.trim().is_empty()) {
+        let spacings = if snippet
+            .lines()
+            .dropping_back(1)
+            .any(|l| l.trim().is_empty())
+        {
             "\n"
         } else {
             ""

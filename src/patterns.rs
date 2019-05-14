@@ -1,13 +1,3 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 use syntax::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax};
 use syntax::ptr;
 use syntax::source_map::{self, BytePos, Span};
@@ -29,7 +19,8 @@ use crate::spanned::Spanned;
 use crate::types::{rewrite_path, PathContext};
 use crate::utils::{format_mutability, mk_sp, rewrite_ident};
 
-/// Returns true if the given pattern is short. A short pattern is defined by the following grammar:
+/// Returns `true` if the given pattern is "short".
+/// A short pattern is defined by the following grammar:
 ///
 /// [small, ntp]:
 ///     - single token
@@ -39,7 +30,7 @@ use crate::utils::{format_mutability, mk_sp, rewrite_ident};
 ///     - `[small, ntp]`
 ///     - unary tuple constructor `([small, ntp])`
 ///     - `&[small]`
-pub fn is_short_pattern(pat: &ast::Pat, pat_str: &str) -> bool {
+pub(crate) fn is_short_pattern(pat: &ast::Pat, pat_str: &str) -> bool {
     // We also require that the pattern is reasonably 'small' with its literal width.
     pat_str.len() <= 20 && !pat_str.contains('\n') && is_short_pattern_inner(pat)
 }
@@ -64,7 +55,7 @@ fn is_short_pattern_inner(pat: &ast::Pat) -> bool {
 }
 
 impl Rewrite for Pat {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match self.node {
             PatKind::Box(ref pat) => rewrite_unary_prefix(context, "box ", &**pat, shape),
             PatKind::Ident(binding_mode, ident, ref sub_pat) => {
@@ -152,7 +143,7 @@ impl Rewrite for Pat {
                 let pats: Option<Vec<String>> =
                     prefix.chain(slice_pat.into_iter()).chain(suffix).collect();
 
-                // Check that all the rewrites succeeded, and if not return None.
+                // Check that all the rewrites succeeded, and if not return `None`.
                 let pats = pats?;
 
                 // Unwrap all the sub-strings and join them with commas.
@@ -174,7 +165,7 @@ fn rewrite_struct_pat(
     fields: &[source_map::Spanned<ast::FieldPat>],
     ellipsis: bool,
     span: Span,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
     // 2 =  ` {`
@@ -240,7 +231,7 @@ fn rewrite_struct_pat(
 }
 
 impl Rewrite for FieldPat {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let pat = self.pat.rewrite(context, shape);
         if self.is_shorthand {
             pat
@@ -265,13 +256,13 @@ impl Rewrite for FieldPat {
 }
 
 #[derive(Debug)]
-pub enum TuplePatField<'a> {
+pub(crate) enum TuplePatField<'a> {
     Pat(&'a ptr::P<ast::Pat>),
     Dotdot(Span),
 }
 
 impl<'a> Rewrite for TuplePatField<'a> {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match *self {
             TuplePatField::Pat(p) => p.rewrite(context, shape),
             TuplePatField::Dotdot(_) => Some("..".to_string()),
@@ -288,7 +279,11 @@ impl<'a> Spanned for TuplePatField<'a> {
     }
 }
 
-pub fn can_be_overflowed_pat(context: &RewriteContext, pat: &TuplePatField, len: usize) -> bool {
+pub(crate) fn can_be_overflowed_pat(
+    context: &RewriteContext<'_>,
+    pat: &TuplePatField<'_>,
+    len: usize,
+) -> bool {
     match *pat {
         TuplePatField::Pat(pat) => match pat.node {
             ast::PatKind::Path(..)
@@ -310,7 +305,7 @@ fn rewrite_tuple_pat(
     dotdot_pos: Option<usize>,
     path_str: Option<String>,
     span: Span,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
     let mut pat_vec: Vec<_> = pats.iter().map(|x| TuplePatField::Pat(x)).collect();
@@ -379,8 +374,8 @@ fn rewrite_tuple_pat(
 }
 
 fn count_wildcard_suffix_len(
-    context: &RewriteContext,
-    patterns: &[TuplePatField],
+    context: &RewriteContext<'_>,
+    patterns: &[TuplePatField<'_>],
     span: Span,
     shape: Shape,
 ) -> usize {

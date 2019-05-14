@@ -7,14 +7,14 @@ use regex;
 use regex::Regex;
 
 #[derive(Debug)]
-pub enum LicenseError {
+pub(crate) enum LicenseError {
     IO(io::Error),
     Regex(regex::Error),
     Parse(String),
 }
 
 impl fmt::Display for LicenseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             LicenseError::IO(ref err) => err.fmt(f),
             LicenseError::Regex(ref err) => err.fmt(f),
@@ -47,7 +47,7 @@ enum ParsingState {
 
 use self::ParsingState::*;
 
-pub struct TemplateParser {
+pub(crate) struct TemplateParser {
     parsed: String,
     buffer: String,
     state: ParsingState,
@@ -67,7 +67,7 @@ impl TemplateParser {
         }
     }
 
-    /// Convert a license template into a string which can be turned into a regex.
+    /// Converts a license template into a string which can be turned into a regex.
     ///
     /// The license template could use regex syntax directly, but that would require a lot of manual
     /// escaping, which is inconvenient. It is therefore literal by default, with optional regex
@@ -110,7 +110,7 @@ impl TemplateParser {
     /// "
     /// );
     /// ```
-    pub fn parse(template: &str) -> Result<String, LicenseError> {
+    pub(crate) fn parse(template: &str) -> Result<String, LicenseError> {
         let mut parser = Self::new();
         for chr in template.chars() {
             if chr == '\n' {
@@ -212,7 +212,7 @@ impl TemplateParser {
     }
 }
 
-pub fn load_and_compile_template(path: &str) -> Result<Regex, LicenseError> {
+pub(crate) fn load_and_compile_template(path: &str) -> Result<Regex, LicenseError> {
     let mut lt_file = File::open(&path)?;
     let mut lt_str = String::new();
     lt_file.read_to_string(&mut lt_str)?;

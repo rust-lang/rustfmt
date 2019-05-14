@@ -1,13 +1,3 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 // Format list-like macro invocations. These are invocations whose token trees
 // can be interpreted as expressions and separated by commas.
 // Note that these token trees do not actually have to be interpreted as
@@ -26,8 +16,8 @@ use syntax::parse::parser::Parser;
 use syntax::parse::token::{BinOpToken, DelimToken, Token};
 use syntax::print::pprust;
 use syntax::source_map::{BytePos, Span};
-use syntax::symbol;
-use syntax::tokenstream::{Cursor, ThinTokenStream, TokenStream, TokenTree};
+use syntax::symbol::keywords;
+use syntax::tokenstream::{Cursor, TokenStream, TokenTree};
 use syntax::ThinVec;
 use syntax::{ast, parse, ptr};
 
@@ -43,15 +33,15 @@ use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
-    format_visibility, is_empty_line, mk_sp, remove_trailing_white_spaces, rewrite_ident,
-    trim_left_preserve_layout, wrap_str, NodeIdExt,
+    format_visibility, indent_next_line, is_empty_line, mk_sp, remove_trailing_white_spaces,
+    rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
 };
 use crate::visitor::FmtVisitor;
 
 const FORCED_BRACKET_MACROS: &[&str] = &["vec!"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MacroPosition {
+pub(crate) enum MacroPosition {
     Item,
     Statement,
     Expression,
@@ -59,11 +49,12 @@ pub enum MacroPosition {
 }
 
 #[derive(Debug)]
-pub enum MacroArg {
+pub(crate) enum MacroArg {
     Expr(ptr::P<ast::Expr>),
     Ty(ptr::P<ast::Ty>),
     Pat(ptr::P<ast::Pat>),
     Item(ptr::P<ast::Item>),
+    Keyword(ast::Ident, Span),
 }
 
 impl MacroArg {
@@ -76,7 +67,7 @@ impl MacroArg {
 }
 
 impl Rewrite for ast::Item {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let mut visitor = crate::visitor::FmtVisitor::from_context(context);
         visitor.block_indent = shape.indent;
         visitor.last_pos = self.span().lo();
@@ -86,12 +77,13 @@ impl Rewrite for ast::Item {
 }
 
 impl Rewrite for MacroArg {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match *self {
             MacroArg::Expr(ref expr) => expr.rewrite(context, shape),
             MacroArg::Ty(ref ty) => ty.rewrite(context, shape),
             MacroArg::Pat(ref pat) => pat.rewrite(context, shape),
             MacroArg::Item(ref item) => item.rewrite(context, shape),
+            MacroArg::Keyword(ident, _) => Some(ident.to_string()),
         }
     }
 }
@@ -145,7 +137,7 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
 
 /// Rewrite macro name without using pretty-printer if possible.
 fn rewrite_macro_name(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     path: &ast::Path,
     extra_ident: Option<ast::Ident>,
 ) -> String {
@@ -156,14 +148,14 @@ fn rewrite_macro_name(
         format!("{}!", path)
     };
     match extra_ident {
-        Some(ident) if ident != symbol::keywords::Invalid.ident() => format!("{} {}", name, ident),
+        Some(ident) if ident != keywords::Invalid.ident() => format!("{} {}", name, ident),
         _ => name,
     }
 }
 
 // Use this on failing to format the macro call.
 fn return_macro_parse_failure_fallback(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     indent: Indent,
     span: Span,
 ) -> Option<String> {
@@ -197,7 +189,7 @@ struct InsideMacroGuard<'a> {
 }
 
 impl<'a> InsideMacroGuard<'a> {
-    fn inside_macro_context(context: &'a RewriteContext) -> InsideMacroGuard<'a> {
+    fn inside_macro_context(context: &'a RewriteContext<'_>) -> InsideMacroGuard<'a> {
         let is_nested = context.inside_macro.replace(true);
         InsideMacroGuard { context, is_nested }
     }
@@ -209,25 +201,51 @@ impl<'a> Drop for InsideMacroGuard<'a> {
     }
 }
 
-pub fn rewrite_macro(
+pub(crate) fn rewrite_macro(
     mac: &ast::Mac,
     extra_ident: Option<ast::Ident>,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     shape: Shape,
     position: MacroPosition,
 ) -> Option<String> {
-    let guard = InsideMacroGuard::inside_macro_context(context);
-    let result = rewrite_macro_inner(mac, extra_ident, context, shape, position, guard.is_nested);
-    if result.is_none() {
-        context.macro_rewrite_failure.replace(true);
+    let should_skip = context
+        .skip_macro_names
+        .borrow()
+        .contains(&context.snippet(mac.node.path.span).to_owned());
+    if should_skip {
+        None
+    } else {
+        let guard = InsideMacroGuard::inside_macro_context(context);
+        let result =
+            rewrite_macro_inner(mac, extra_ident, context, shape, position, guard.is_nested);
+        if result.is_none() {
+            context.macro_rewrite_failure.replace(true);
+        }
+        result
     }
-    result
 }
 
-pub fn rewrite_macro_inner(
+fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
+    for &keyword in RUST_KEYWORDS.iter() {
+        if parser.token.is_keyword(keyword)
+            && parser.look_ahead(1, |t| {
+                *t == Token::Eof
+                    || *t == Token::Comma
+                    || *t == Token::CloseDelim(DelimToken::NoDelim)
+            })
+        {
+            let macro_arg = MacroArg::Keyword(keyword.ident(), parser.span);
+            parser.bump();
+            return Some(macro_arg);
+        }
+    }
+    None
+}
+
+fn rewrite_macro_inner(
     mac: &ast::Mac,
     extra_ident: Option<ast::Ident>,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     shape: Shape,
     position: MacroPosition,
     is_nested_macro: bool,
@@ -256,6 +274,9 @@ pub fn rewrite_macro_inner(
             DelimToken::Paren if position == MacroPosition::Item => {
                 Some(format!("{}();", macro_name))
             }
+            DelimToken::Bracket if position == MacroPosition::Item => {
+                Some(format!("{}[];", macro_name))
+            }
             DelimToken::Paren => Some(format!("{}()", macro_name)),
             DelimToken::Bracket => Some(format!("{}[]", macro_name)),
             DelimToken::Brace => Some(format!("{} {{}}", macro_name)),
@@ -276,11 +297,12 @@ pub fn rewrite_macro_inner(
 
     if DelimToken::Brace != style {
         loop {
-            match parse_macro_arg(&mut parser) {
-                Some(arg) => arg_vec.push(arg),
-                None => {
-                    return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
-                }
+            if let Some(arg) = parse_macro_arg(&mut parser) {
+                arg_vec.push(arg);
+            } else if let Some(arg) = check_keyword(&mut parser) {
+                arg_vec.push(arg);
+            } else {
+                return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
             }
 
             match parser.token {
@@ -421,19 +443,18 @@ pub fn rewrite_macro_inner(
             // For macro invocations with braces, always put a space between
             // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
             // anything in between the braces (for now).
-            let snippet = context.snippet(mac.span);
-            let macro_raw = snippet.split_at(snippet.find('!')? + 1).1.trim_start();
-            match trim_left_preserve_layout(macro_raw, shape.indent, &context.config) {
+            let snippet = context.snippet(mac.span).trim_start_matches(|c| c != '{');
+            match trim_left_preserve_layout(snippet, shape.indent, &context.config) {
                 Some(macro_body) => Some(format!("{} {}", macro_name, macro_body)),
-                None => Some(format!("{} {}", macro_name, macro_raw)),
+                None => Some(format!("{} {}", macro_name, snippet)),
             }
         }
         _ => unreachable!(),
     }
 }
 
-pub fn rewrite_macro_def(
-    context: &RewriteContext,
+pub(crate) fn rewrite_macro_def(
+    context: &RewriteContext<'_>,
     shape: Shape,
     indent: Indent,
     def: &ast::MacroDef,
@@ -522,17 +543,12 @@ fn register_metavariable(
     name: &str,
     dollar_count: usize,
 ) {
-    let mut new_name = String::new();
-    let mut old_name = String::new();
+    let mut new_name = "$".repeat(dollar_count - 1);
+    let mut old_name = "$".repeat(dollar_count);
 
-    old_name.push('$');
-    for _ in 0..(dollar_count - 1) {
-        new_name.push('$');
-        old_name.push('$');
-    }
     new_name.push('z');
-    new_name.push_str(&name);
-    old_name.push_str(&name);
+    new_name.push_str(name);
+    old_name.push_str(name);
 
     result.push_str(&new_name);
     map.insert(old_name, new_name);
@@ -581,9 +597,9 @@ fn replace_names(input: &str) -> Option<(String, HashMap<String, String>)> {
 
 #[derive(Debug, Clone)]
 enum MacroArgKind {
-    /// e.g. `$x: expr`.
+    /// e.g., `$x: expr`.
     MetaVariable(ast::Ident, String),
-    /// e.g. `$($foo: expr),*`
+    /// e.g., `$($foo: expr),*`
     Repeat(
         /// `()`, `[]` or `{}`.
         DelimToken,
@@ -594,17 +610,17 @@ enum MacroArgKind {
         /// The repeat token. This could be one of `*`, `+` or `?`.
         Token,
     ),
-    /// e.g. `[derive(Debug)]`
+    /// e.g., `[derive(Debug)]`
     Delimited(DelimToken, Vec<ParsedMacroArg>),
-    /// A possible separator. e.g. `,` or `;`.
+    /// A possible separator. e.g., `,` or `;`.
     Separator(String, String),
     /// Other random stuff that does not fit to other kinds.
-    /// e.g. `== foo` in `($x: expr == foo)`.
+    /// e.g., `== foo` in `($x: expr == foo)`.
     Other(String, String),
 }
 
 fn delim_token_to_str(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     delim_token: DelimToken,
     shape: Shape,
     use_multiple_lines: bool,
@@ -670,7 +686,7 @@ impl MacroArgKind {
 
     fn rewrite(
         &self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         use_multiple_lines: bool,
     ) -> Option<String> {
@@ -720,9 +736,9 @@ struct ParsedMacroArg {
 }
 
 impl ParsedMacroArg {
-    pub fn rewrite(
+    fn rewrite(
         &self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         use_multiple_lines: bool,
     ) -> Option<String> {
@@ -732,13 +748,13 @@ impl ParsedMacroArg {
 
 /// Parses macro arguments on macro def.
 struct MacroArgParser {
-    /// Holds either a name of the next metavariable, a separator or a junk.
+    /// Either a name of the next metavariable, a separator, or junk.
     buf: String,
     /// The start position on the current buffer.
     lo: BytePos,
     /// The first token of the current buffer.
     start_tok: Token,
-    /// Set to true if we are parsing a metavariable or a repeat.
+    /// `true` if we are parsing a metavariable or a repeat.
     is_meta_var: bool,
     /// The position of the last token.
     hi: BytePos,
@@ -751,12 +767,12 @@ struct MacroArgParser {
 fn last_tok(tt: &TokenTree) -> Token {
     match *tt {
         TokenTree::Token(_, ref t) => t.clone(),
-        TokenTree::Delimited(_, ref d) => d.close_token(),
+        TokenTree::Delimited(_, delim, _) => Token::CloseDelim(delim),
     }
 }
 
 impl MacroArgParser {
-    pub fn new() -> MacroArgParser {
+    fn new() -> MacroArgParser {
         MacroArgParser {
             lo: BytePos(0),
             hi: BytePos(0),
@@ -831,7 +847,7 @@ impl MacroArgParser {
         span: Span,
     ) -> Option<()> {
         let mut buffer = String::new();
-        let mut first = false;
+        let mut first = true;
         let mut lo = span.lo();
         let mut hi = span.hi();
 
@@ -916,11 +932,10 @@ impl MacroArgParser {
     }
 
     /// Returns a collection of parsed macro def's arguments.
-    pub fn parse(mut self, tokens: ThinTokenStream) -> Option<Vec<ParsedMacroArg>> {
-        let stream: TokenStream = tokens.into();
-        let mut iter = stream.trees();
+    fn parse(mut self, tokens: TokenStream) -> Option<Vec<ParsedMacroArg>> {
+        let mut iter = tokens.trees();
 
-        while let Some(ref tok) = iter.next() {
+        while let Some(tok) = iter.next() {
             match tok {
                 TokenTree::Token(sp, Token::Dollar) => {
                     // We always want to add a separator before meta variables.
@@ -937,7 +952,7 @@ impl MacroArgParser {
                     self.add_meta_variable(&mut iter)?;
                 }
                 TokenTree::Token(sp, ref t) => self.update_buffer(sp.lo(), t),
-                TokenTree::Delimited(delimited_span, delimited) => {
+                TokenTree::Delimited(delimited_span, delimited, ref tts) => {
                     if !self.buf.is_empty() {
                         if next_space(&self.last_tok) == SpaceState::Always {
                             self.add_separator();
@@ -949,19 +964,19 @@ impl MacroArgParser {
                     // Parse the stuff inside delimiters.
                     let mut parser = MacroArgParser::new();
                     parser.lo = delimited_span.open.lo();
-                    let delimited_arg = parser.parse(delimited.tts.clone())?;
+                    let delimited_arg = parser.parse(tts.clone())?;
 
                     let span = delimited_span.entire();
                     if self.is_meta_var {
-                        self.add_repeat(delimited_arg, delimited.delim, &mut iter, span)?;
+                        self.add_repeat(delimited_arg, delimited, &mut iter, span)?;
                         self.is_meta_var = false;
                     } else {
-                        self.add_delimited(delimited_arg, delimited.delim, span);
+                        self.add_delimited(delimited_arg, delimited, span);
                     }
                 }
             }
 
-            self.set_last_tok(tok);
+            self.set_last_tok(&tok);
         }
 
         // We are left with some stuff in the buffer. Since there is nothing
@@ -975,7 +990,7 @@ impl MacroArgParser {
 }
 
 fn wrap_macro_args(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     args: &[ParsedMacroArg],
     shape: Shape,
 ) -> Option<String> {
@@ -984,7 +999,7 @@ fn wrap_macro_args(
 }
 
 fn wrap_macro_args_inner(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     args: &[ParsedMacroArg],
     shape: Shape,
     use_multiple_lines: bool,
@@ -1028,19 +1043,18 @@ fn wrap_macro_args_inner(
 // We always try and format on one line.
 // FIXME: Use multi-line when every thing does not fit on one line.
 fn format_macro_args(
-    context: &RewriteContext,
-    toks: ThinTokenStream,
+    context: &RewriteContext<'_>,
+    token_stream: TokenStream,
     shape: Shape,
 ) -> Option<String> {
     if !context.config.format_macro_matchers() {
-        let token_stream: TokenStream = toks.into();
         let span = span_for_token_stream(&token_stream);
         return Some(match span {
             Some(span) => context.snippet(span).to_owned(),
             None => String::new(),
         });
     }
-    let parsed_args = MacroArgParser::new().parse(toks)?;
+    let parsed_args = MacroArgParser::new().parse(token_stream)?;
     wrap_macro_args(context, &parsed_args, shape)
 }
 
@@ -1119,12 +1133,12 @@ fn next_space(tok: &Token) -> SpaceState {
     }
 }
 
-/// Tries to convert a macro use into a short hand try expression. Returns None
-/// when the macro is not an instance of try! (or parsing the inner expression
+/// Tries to convert a macro use into a short hand try expression. Returns `None`
+/// when the macro is not an instance of `try!` (or parsing the inner expression
 /// failed).
-pub fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext) -> Option<ast::Expr> {
+pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> Option<ast::Expr> {
     if &mac.node.path.to_string() == "try" {
-        let ts: TokenStream = mac.node.tts.clone().into();
+        let ts: TokenStream = mac.node.tts.clone();
         let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
 
         Some(ast::Expr {
@@ -1138,7 +1152,7 @@ pub fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext) -> Option<ast::
     }
 }
 
-fn macro_style(mac: &ast::Mac, context: &RewriteContext) -> DelimToken {
+fn macro_style(mac: &ast::Mac, context: &RewriteContext<'_>) -> DelimToken {
     let snippet = context.snippet(mac.span);
     let paren_pos = snippet.find_uncommented("(").unwrap_or(usize::max_value());
     let bracket_pos = snippet.find_uncommented("[").unwrap_or(usize::max_value());
@@ -1176,16 +1190,16 @@ impl MacroParser {
         let tok = self.toks.next()?;
         let (lo, args_paren_kind) = match tok {
             TokenTree::Token(..) => return None,
-            TokenTree::Delimited(delimited_span, ref d) => (delimited_span.open.lo(), d.delim),
+            TokenTree::Delimited(delimited_span, d, _) => (delimited_span.open.lo(), d),
         };
-        let args = tok.joint().into();
+        let args = tok.joint();
         match self.toks.next()? {
             TokenTree::Token(_, Token::FatArrow) => {}
             _ => return None,
         }
         let (mut hi, body, whole_body) = match self.toks.next()? {
             TokenTree::Token(..) => return None,
-            TokenTree::Delimited(delimited_span, _) => {
+            TokenTree::Delimited(delimited_span, ..) => {
                 let data = delimited_span.entire().data();
                 (
                     data.hi,
@@ -1218,7 +1232,7 @@ struct Macro {
 struct MacroBranch {
     span: Span,
     args_paren_kind: DelimToken,
-    args: ThinTokenStream,
+    args: TokenStream,
     body: Span,
     whole_body: Span,
 }
@@ -1226,7 +1240,7 @@ struct MacroBranch {
 impl MacroBranch {
     fn rewrite(
         &self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         multi_branch_style: bool,
     ) -> Option<String> {
@@ -1303,7 +1317,7 @@ impl MacroBranch {
                     {
                         s += &indent_str;
                     }
-                    (s + l + "\n", !kind.is_string() || l.ends_with('\\'))
+                    (s + l + "\n", indent_next_line(kind, &l, &config))
                 },
             )
             .0;
@@ -1344,7 +1358,11 @@ impl MacroBranch {
 ///     [pub] static ref NAME_N: TYPE_N = EXPR_N;
 /// }
 /// ```
-fn format_lazy_static(context: &RewriteContext, shape: Shape, ts: &TokenStream) -> Option<String> {
+fn format_lazy_static(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    ts: &TokenStream,
+) -> Option<String> {
     let mut result = String::with_capacity(1024);
     let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
     let nested_shape = shape
@@ -1377,8 +1395,8 @@ fn format_lazy_static(context: &RewriteContext, shape: Shape, ts: &TokenStream) 
     while parser.token != Token::Eof {
         // Parse a `lazy_static!` item.
         let vis = crate::utils::format_visibility(context, &parse_or!(parse_visibility, false));
-        parser.eat_keyword(symbol::keywords::Static);
-        parser.eat_keyword(symbol::keywords::Ref);
+        parser.eat_keyword(keywords::Static);
+        parser.eat_keyword(keywords::Ref);
         let id = parse_or!(parse_ident);
         parser.eat(&Token::Colon);
         let ty = parse_or!(parse_ty);
@@ -1413,7 +1431,7 @@ fn format_lazy_static(context: &RewriteContext, shape: Shape, ts: &TokenStream) 
 }
 
 fn rewrite_macro_with_items(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     items: &[MacroArg],
     macro_name: &str,
     shape: Shape,
@@ -1453,3 +1471,66 @@ fn rewrite_macro_with_items(
     result.push_str(trailing_semicolon);
     Some(result)
 }
+
+const RUST_KEYWORDS: [keywords::Keyword; 60] = [
+    keywords::PathRoot,
+    keywords::DollarCrate,
+    keywords::Underscore,
+    keywords::As,
+    keywords::Box,
+    keywords::Break,
+    keywords::Const,
+    keywords::Continue,
+    keywords::Crate,
+    keywords::Else,
+    keywords::Enum,
+    keywords::Extern,
+    keywords::False,
+    keywords::Fn,
+    keywords::For,
+    keywords::If,
+    keywords::Impl,
+    keywords::In,
+    keywords::Let,
+    keywords::Loop,
+    keywords::Match,
+    keywords::Mod,
+    keywords::Move,
+    keywords::Mut,
+    keywords::Pub,
+    keywords::Ref,
+    keywords::Return,
+    keywords::SelfLower,
+    keywords::SelfUpper,
+    keywords::Static,
+    keywords::Struct,
+    keywords::Super,
+    keywords::Trait,
+    keywords::True,
+    keywords::Type,
+    keywords::Unsafe,
+    keywords::Use,
+    keywords::Where,
+    keywords::While,
+    keywords::Abstract,
+    keywords::Become,
+    keywords::Do,
+    keywords::Final,
+    keywords::Macro,
+    keywords::Override,
+    keywords::Priv,
+    keywords::Typeof,
+    keywords::Unsized,
+    keywords::Virtual,
+    keywords::Yield,
+    keywords::Dyn,
+    keywords::Async,
+    keywords::Try,
+    keywords::UnderscoreLifetime,
+    keywords::StaticLifetime,
+    keywords::Auto,
+    keywords::Catch,
+    keywords::Default,
+    keywords::Existential,
+    keywords::Union,
+];

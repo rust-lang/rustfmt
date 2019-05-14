@@ -1,13 +1,3 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
@@ -28,14 +18,14 @@ use crate::spanned::Spanned;
 use crate::utils::{is_same_visibility, mk_sp, rewrite_ident};
 use crate::visitor::FmtVisitor;
 
-/// Returns a name imported by a `use` declaration. e.g. returns `Ordering`
-/// for `std::cmp::Ordering` and `self` for `std::cmp::self`.
-pub fn path_to_imported_ident(path: &ast::Path) -> ast::Ident {
+/// Returns a name imported by a `use` declaration.
+/// E.g., returns `Ordering` for `std::cmp::Ordering` and `self` for `std::cmp::self`.
+pub(crate) fn path_to_imported_ident(path: &ast::Path) -> ast::Ident {
     path.segments.last().unwrap().ident
 }
 
 impl<'a> FmtVisitor<'a> {
-    pub fn format_import(&mut self, item: &ast::Item, tree: &ast::UseTree) {
+    pub(crate) fn format_import(&mut self, item: &ast::Item, tree: &ast::UseTree) {
         let span = item.span();
         let shape = self.shape();
         let rw = UseTree::from_ast(
@@ -87,14 +77,14 @@ impl<'a> FmtVisitor<'a> {
 // when ordering unless the imports are identical except for the alias (rare in
 // practice).
 
-// FIXME(#2531) - we should unify the comparison code here with the formatting
+// FIXME(#2531): we should unify the comparison code here with the formatting
 // code elsewhere since we are essentially string-ifying twice. Furthermore, by
 // parsing to our own format on comparison, we repeat a lot of work when
 // sorting.
 
 // FIXME we do a lot of allocation to make our own representation.
 #[derive(Clone, Eq, PartialEq)]
-pub enum UseSegment {
+pub(crate) enum UseSegment {
     Ident(String, Option<String>),
     Slf(Option<String>),
     Super(Option<String>),
@@ -104,11 +94,11 @@ pub enum UseSegment {
 }
 
 #[derive(Clone)]
-pub struct UseTree {
-    pub path: Vec<UseSegment>,
-    pub span: Span,
+pub(crate) struct UseTree {
+    pub(crate) path: Vec<UseSegment>,
+    pub(crate) span: Span,
     // Comment information within nested use tree.
-    pub list_item: Option<ListItem>,
+    pub(crate) list_item: Option<ListItem>,
     // Additional fields for top level use items.
     // Should we have another struct for top-level use items rather than reusing this?
     visibility: Option<ast::Visibility>,
@@ -146,7 +136,7 @@ impl UseSegment {
     }
 
     fn from_path_segment(
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         path_seg: &ast::PathSegment,
         modsep: bool,
     ) -> Option<UseSegment> {
@@ -166,7 +156,7 @@ impl UseSegment {
     }
 }
 
-pub fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
+pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
         if use_tree.has_comment() || use_tree.attrs.is_some() {
@@ -193,19 +183,19 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
 }
 
 impl fmt::Debug for UseTree {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }
 }
 
 impl fmt::Debug for UseSegment {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }
 }
 
 impl fmt::Display for UseSegment {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             UseSegment::Glob => write!(f, "*"),
             UseSegment::Ident(ref s, _) => write!(f, "{}", s),
@@ -215,11 +205,10 @@ impl fmt::Display for UseSegment {
             UseSegment::List(ref list) => {
                 write!(f, "{{")?;
                 for (i, item) in list.iter().enumerate() {
-                    let is_last = i == list.len() - 1;
-                    write!(f, "{}", item)?;
-                    if !is_last {
+                    if i != 0 {
                         write!(f, ", ")?;
                     }
+                    write!(f, "{}", item)?;
                 }
                 write!(f, "}}")
             }
@@ -227,21 +216,24 @@ impl fmt::Display for UseSegment {
     }
 }
 impl fmt::Display for UseTree {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, segment) in self.path.iter().enumerate() {
-            let is_last = i == self.path.len() - 1;
-            write!(f, "{}", segment)?;
-            if !is_last {
+            if i != 0 {
                 write!(f, "::")?;
             }
+            write!(f, "{}", segment)?;
         }
-        write!(f, "")
+        Ok(())
     }
 }
 
 impl UseTree {
     // Rewrite use tree with `use ` and a trailing `;`.
-    pub fn rewrite_top_level(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    pub(crate) fn rewrite_top_level(
+        &self,
+        context: &RewriteContext<'_>,
+        shape: Shape,
+    ) -> Option<String> {
         let vis = self.visibility.as_ref().map_or(Cow::from(""), |vis| {
             crate::utils::format_visibility(context, &vis)
         });
@@ -254,20 +246,37 @@ impl UseTree {
                     format!("{}use {};", vis, s)
                 }
             })?;
-        if let Some(ref attrs) = self.attrs {
-            let attr_str = attrs.rewrite(context, shape)?;
-            let lo = attrs.last().as_ref()?.span().hi();
-            let hi = self.span.lo();
-            let span = mk_sp(lo, hi);
-            combine_strs_with_missing_comments(context, &attr_str, &use_str, span, shape, false)
-        } else {
-            Some(use_str)
+        match self.attrs {
+            Some(ref attrs) if !attrs.is_empty() => {
+                let attr_str = attrs.rewrite(context, shape)?;
+                let lo = attrs.last().as_ref()?.span().hi();
+                let hi = self.span.lo();
+                let span = mk_sp(lo, hi);
+
+                let allow_extend = if attrs.len() == 1 {
+                    let line_len = attr_str.len() + 1 + use_str.len();
+                    !attrs.first().unwrap().is_sugared_doc
+                        && context.config.inline_attribute_width() >= line_len
+                } else {
+                    false
+                };
+
+                combine_strs_with_missing_comments(
+                    context,
+                    &attr_str,
+                    &use_str,
+                    span,
+                    shape,
+                    allow_extend,
+                )
+            }
+            _ => Some(use_str),
         }
     }
 
     // FIXME: Use correct span?
     // The given span is essentially incorrect, since we are reconstructing
-    // use statements. This should not be a problem, though, since we have
+    // use-statements. This should not be a problem, though, since we have
     // already tried to extract comment and observed that there are no comment
     // around the given use item, and the span will not be used afterward.
     fn from_path(path: Vec<UseSegment>, span: Span) -> UseTree {
@@ -280,8 +289,8 @@ impl UseTree {
         }
     }
 
-    pub fn from_ast_with_normalization(
-        context: &RewriteContext,
+    pub(crate) fn from_ast_with_normalization(
+        context: &RewriteContext<'_>,
         item: &ast::Item,
     ) -> Option<UseTree> {
         match item.node {
@@ -305,7 +314,7 @@ impl UseTree {
     }
 
     fn from_ast(
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         a: &ast::UseTree,
         list_item: Option<ListItem>,
         visibility: Option<ast::Visibility>,
@@ -411,7 +420,7 @@ impl UseTree {
     }
 
     // Do the adjustments that rustfmt does elsewhere to use paths.
-    pub fn normalize(mut self) -> UseTree {
+    pub(crate) fn normalize(mut self) -> UseTree {
         let mut last = self.path.pop().expect("Empty use tree?");
         // Hack around borrow checker.
         let mut normalize_sole_list = false;
@@ -488,10 +497,7 @@ impl UseTree {
 
         // Recursively normalize elements of a list use (including sorting the list).
         if let UseSegment::List(list) = last {
-            let mut list = list
-                .into_iter()
-                .map(|ut| ut.normalize())
-                .collect::<Vec<_>>();
+            let mut list = list.into_iter().map(UseTree::normalize).collect::<Vec<_>>();
             list.sort();
             last = UseSegment::List(list);
         }
@@ -710,7 +716,7 @@ impl Ord for UseTree {
 }
 
 fn rewrite_nested_use_tree(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     use_tree_list: &[UseTree],
     shape: Shape,
 ) -> Option<String> {
@@ -786,7 +792,7 @@ fn rewrite_nested_use_tree(
 }
 
 impl Rewrite for UseSegment {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         Some(match self {
             UseSegment::Ident(ref ident, Some(ref rename)) => format!("{} as {}", ident, rename),
             UseSegment::Ident(ref ident, None) => ident.clone(),
@@ -809,7 +815,7 @@ impl Rewrite for UseSegment {
 
 impl Rewrite for UseTree {
     // This does NOT format attributes and visibility or add a trailing `;`.
-    fn rewrite(&self, context: &RewriteContext, mut shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, mut shape: Shape) -> Option<String> {
         let mut result = String::with_capacity(256);
         let mut iter = self.path.iter().peekable();
         while let Some(ref segment) = iter.next() {

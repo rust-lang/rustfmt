@@ -1,13 +1,3 @@
-// Copyright 2018 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 //! Format match expression.
 
 use std::iter::repeat;
@@ -34,20 +24,16 @@ use crate::utils::{
 
 /// A simple wrapper type against `ast::Arm`. Used inside `write_list()`.
 struct ArmWrapper<'a> {
-    pub arm: &'a ast::Arm,
-    /// True if the arm is the last one in match expression. Used to decide on whether we should add
-    /// trailing comma to the match arm when `config.trailing_comma() == Never`.
-    pub is_last: bool,
+    arm: &'a ast::Arm,
+    /// `true` if the arm is the last one in match expression. Used to decide on whether we should
+    /// add trailing comma to the match arm when `config.trailing_comma() == Never`.
+    is_last: bool,
     /// Holds a byte position of `|` at the beginning of the arm pattern, if available.
-    pub beginning_vert: Option<BytePos>,
+    beginning_vert: Option<BytePos>,
 }
 
 impl<'a> ArmWrapper<'a> {
-    pub fn new(
-        arm: &'a ast::Arm,
-        is_last: bool,
-        beginning_vert: Option<BytePos>,
-    ) -> ArmWrapper<'a> {
+    fn new(arm: &'a ast::Arm, is_last: bool, beginning_vert: Option<BytePos>) -> ArmWrapper<'a> {
         ArmWrapper {
             arm,
             is_last,
@@ -67,13 +53,13 @@ impl<'a> Spanned for ArmWrapper<'a> {
 }
 
 impl<'a> Rewrite for ArmWrapper<'a> {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         rewrite_match_arm(context, self.arm, shape, self.is_last)
     }
 }
 
-pub fn rewrite_match(
-    context: &RewriteContext,
+pub(crate) fn rewrite_match(
+    context: &RewriteContext<'_>,
     cond: &ast::Expr,
     arms: &[ast::Arm],
     shape: Shape,
@@ -168,7 +154,7 @@ fn arm_comma(config: &Config, body: &ast::Expr, is_last: bool) -> &'static str {
 
 /// Collect a byte position of the beginning `|` for each arm, if available.
 fn collect_beginning_verts(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     arms: &[ast::Arm],
     span: Span,
 ) -> Vec<Option<BytePos>> {
@@ -184,7 +170,7 @@ fn collect_beginning_verts(
 }
 
 fn rewrite_match_arms(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     arms: &[ast::Arm],
     shape: Shape,
     span: Span,
@@ -224,7 +210,7 @@ fn rewrite_match_arms(
 }
 
 fn rewrite_match_arm(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     arm: &ast::Arm,
     shape: Shape,
     is_last: bool,
@@ -273,7 +259,7 @@ fn rewrite_match_arm(
         false,
     )?;
 
-    let arrow_span = mk_sp(arm.pats.last().unwrap().span.hi(), arm.body.span.lo());
+    let arrow_span = mk_sp(arm.pats.last().unwrap().span.hi(), arm.body.span().lo());
     rewrite_match_body(
         context,
         &arm.body,
@@ -286,7 +272,7 @@ fn rewrite_match_arm(
 }
 
 fn block_can_be_flattened<'a>(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     expr: &'a ast::Expr,
 ) -> Option<&'a ast::Block> {
     match expr.node {
@@ -304,7 +290,7 @@ fn block_can_be_flattened<'a>(
 // @extend: true if the arm body can be put next to `=>`
 // @body: flattened body, if the body is block with a single expression
 fn flatten_arm_body<'a>(
-    context: &'a RewriteContext,
+    context: &'a RewriteContext<'_>,
     body: &'a ast::Expr,
     opt_shape: Option<Shape>,
 ) -> (bool, &'a ast::Expr) {
@@ -334,7 +320,7 @@ fn flatten_arm_body<'a>(
 }
 
 fn rewrite_match_body(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     body: &ptr::P<ast::Expr>,
     pats_str: &str,
     shape: Shape,
@@ -374,7 +360,8 @@ fn rewrite_match_body(
         shape.indent
     };
 
-    let forbid_same_line = has_guard && pats_str.contains('\n') && !is_empty_block;
+    let forbid_same_line =
+        (has_guard && pats_str.contains('\n') && !is_empty_block) || !body.attrs.is_empty();
 
     // Look for comments between `=>` and the start of the body.
     let arrow_comment = {
@@ -499,7 +486,7 @@ fn rewrite_match_body(
 }
 
 impl Rewrite for ast::Guard {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match self {
             ast::Guard::If(ref expr) => expr.rewrite(context, shape),
         }
@@ -508,7 +495,7 @@ impl Rewrite for ast::Guard {
 
 // The `if ...` guard on a match arm.
 fn rewrite_guard(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     guard: &Option<ast::Guard>,
     shape: Shape,
     // The amount of space used up on this line for the pattern in

@@ -197,7 +197,6 @@ pub fn foo() {}
 
 // path attrs
 #[clippy::bar]
-#[clippy::bar=foo]
 #[clippy::bar(a, b, c)]
 pub fn foo() {}
 
@@ -246,3 +245,28 @@ mod issue_2620 {
     )
 )))]
 type Os = NoSource;
+
+// #3313
+fn stmt_expr_attributes() {
+    let foo;
+    #[must_use]
+    foo = false;
+}
+
+// #3509
+fn issue3509() {
+    match MyEnum {
+        MyEnum::Option1 if cfg!(target_os = "windows") =>
+        #[cfg(target_os = "windows")]
+        {
+            1
+        }
+    }
+    match MyEnum {
+        MyEnum::Option1 if cfg!(target_os = "windows") =>
+        {
+            #[cfg(target_os = "windows")]
+            1
+        }
+    }
+}

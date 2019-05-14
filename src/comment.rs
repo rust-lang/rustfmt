@@ -1,13 +1,3 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 // Formatting and tools for comments.
 
 use std::{self, borrow::Cow, iter};
@@ -35,7 +25,7 @@ fn is_custom_comment(comment: &str) -> bool {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub enum CommentStyle<'a> {
+pub(crate) enum CommentStyle<'a> {
     DoubleSlash,
     TripleSlash,
     Doc,
@@ -54,8 +44,8 @@ fn custom_opener(s: &str) -> &str {
 }
 
 impl<'a> CommentStyle<'a> {
-    /// Returns true if the commenting style covers a line only.
-    pub fn is_line_comment(&self) -> bool {
+    /// Returns `true` if the commenting style covers a line only.
+    pub(crate) fn is_line_comment(&self) -> bool {
         match *self {
             CommentStyle::DoubleSlash
             | CommentStyle::TripleSlash
@@ -65,8 +55,8 @@ impl<'a> CommentStyle<'a> {
         }
     }
 
-    /// Returns true if the commenting style can span over multiple lines.
-    pub fn is_block_comment(&self) -> bool {
+    /// Returns `true` if the commenting style can span over multiple lines.
+    pub(crate) fn is_block_comment(&self) -> bool {
         match *self {
             CommentStyle::SingleBullet | CommentStyle::DoubleBullet | CommentStyle::Exclamation => {
                 true
@@ -75,15 +65,15 @@ impl<'a> CommentStyle<'a> {
         }
     }
 
-    /// Returns true if the commenting style is for documentation.
-    pub fn is_doc_comment(&self) -> bool {
+    /// Returns `true` if the commenting style is for documentation.
+    pub(crate) fn is_doc_comment(&self) -> bool {
         match *self {
             CommentStyle::TripleSlash | CommentStyle::Doc => true,
             _ => false,
         }
     }
 
-    pub fn opener(&self) -> &'a str {
+    pub(crate) fn opener(&self) -> &'a str {
         match *self {
             CommentStyle::DoubleSlash => "// ",
             CommentStyle::TripleSlash => "/// ",
@@ -95,7 +85,7 @@ impl<'a> CommentStyle<'a> {
         }
     }
 
-    pub fn closer(&self) -> &'a str {
+    pub(crate) fn closer(&self) -> &'a str {
         match *self {
             CommentStyle::DoubleSlash
             | CommentStyle::TripleSlash
@@ -106,7 +96,7 @@ impl<'a> CommentStyle<'a> {
         }
     }
 
-    pub fn line_start(&self) -> &'a str {
+    pub(crate) fn line_start(&self) -> &'a str {
         match *self {
             CommentStyle::DoubleSlash => "// ",
             CommentStyle::TripleSlash => "/// ",
@@ -117,12 +107,12 @@ impl<'a> CommentStyle<'a> {
         }
     }
 
-    pub fn to_str_tuplet(&self) -> (&'a str, &'a str, &'a str) {
+    pub(crate) fn to_str_tuplet(&self) -> (&'a str, &'a str, &'a str) {
         (self.opener(), self.closer(), self.line_start())
     }
 }
 
-fn comment_style(orig: &str, normalize_comments: bool) -> CommentStyle {
+fn comment_style(orig: &str, normalize_comments: bool) -> CommentStyle<'_> {
     if !normalize_comments {
         if orig.starts_with("/**") && !orig.starts_with("/**/") {
             CommentStyle::DoubleBullet
@@ -152,13 +142,18 @@ fn comment_style(orig: &str, normalize_comments: bool) -> CommentStyle {
     }
 }
 
+/// Returns true if the last line of the passed string finishes with a block-comment.
+pub(crate) fn is_last_comment_block(s: &str) -> bool {
+    s.trim_end().ends_with("*/")
+}
+
 /// Combine `prev_str` and `next_str` into a single `String`. `span` may contain
 /// comments between two strings. If there are such comments, then that will be
 /// recovered. If `allow_extend` is true and there is no comment between the two
 /// strings, then they will be put on a single line as long as doing so does not
 /// exceed max width.
-pub fn combine_strs_with_missing_comments(
-    context: &RewriteContext,
+pub(crate) fn combine_strs_with_missing_comments(
+    context: &RewriteContext<'_>,
     prev_str: &str,
     next_str: &str,
     span: Span,
@@ -244,11 +239,11 @@ pub fn combine_strs_with_missing_comments(
     Some(result)
 }
 
-pub fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> Option<String> {
+pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> Option<String> {
     identify_comment(orig, false, shape, config, true)
 }
 
-pub fn rewrite_comment(
+pub(crate) fn rewrite_comment(
     orig: &str,
     block_style: bool,
     shape: Shape,
@@ -286,7 +281,7 @@ fn identify_comment(
     // - a boolean indicating if there is a blank line
     // - a number indicating the size of the first group of comments
     fn consume_same_line_comments(
-        style: CommentStyle,
+        style: CommentStyle<'_>,
         orig: &str,
         line_start: &str,
     ) -> (bool, usize) {
@@ -439,7 +434,7 @@ struct ItemizedBlock {
 }
 
 impl ItemizedBlock {
-    /// Returns true if the line is formatted as an item
+    /// Returns `true` if the line is formatted as an item
     fn is_itemized_line(line: &str) -> bool {
         let trimmed = line.trim_start();
         trimmed.starts_with("* ") || trimmed.starts_with("- ")
@@ -458,8 +453,8 @@ impl ItemizedBlock {
         }
     }
 
-    /// Returns a `StringFormat` used for formatting the content of an item
-    fn create_string_format<'a>(&'a self, fmt: &'a StringFormat) -> StringFormat<'a> {
+    /// Returns a `StringFormat` used for formatting the content of an item.
+    fn create_string_format<'a>(&'a self, fmt: &'a StringFormat<'_>) -> StringFormat<'a> {
         StringFormat {
             opener: "",
             closer: "",
@@ -471,8 +466,8 @@ impl ItemizedBlock {
         }
     }
 
-    /// Returns true if the line is part of the current itemized block.
-    /// If it is, then it is added to the internal lines vec.
+    /// Returns `true` if the line is part of the current itemized block.
+    /// If it is, then it is added to the internal lines list.
     fn add_line(&mut self, line: &str) -> bool {
         if !ItemizedBlock::is_itemized_line(line)
             && self.indent <= line.chars().take_while(|c| c.is_whitespace()).count()
@@ -491,7 +486,7 @@ impl ItemizedBlock {
             .collect::<String>()
     }
 
-    /// Returns the block as a string under its original form
+    /// Returns the block as a string under its original form.
     fn original_block_as_string(&self) -> String {
         self.lines.join("\n")
     }
@@ -601,7 +596,7 @@ impl<'a> CommentRewrite<'a> {
             ) {
                 Some(s) => self.result.push_str(&Self::join_block(
                     &s,
-                    &format!("{}{}", &self.comment_line_separator, ib.line_start),
+                    &format!("{}{}", self.comment_line_separator, ib.line_start),
                 )),
                 None => self.result.push_str(&Self::join_block(
                     &ib.original_block_as_string(),
@@ -644,7 +639,7 @@ impl<'a> CommentRewrite<'a> {
             ) {
                 Some(s) => self.result.push_str(&Self::join_block(
                     &s,
-                    &format!("{}{}", &self.comment_line_separator, ib.line_start),
+                    &format!("{}{}", self.comment_line_separator, ib.line_start),
                 )),
                 None => self.result.push_str(&Self::join_block(
                     &ib.original_block_as_string(),
@@ -777,7 +772,7 @@ impl<'a> CommentRewrite<'a> {
 fn rewrite_comment_inner(
     orig: &str,
     block_style: bool,
-    style: CommentStyle,
+    style: CommentStyle<'_>,
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
@@ -820,7 +815,7 @@ fn rewrite_comment_inner(
 
 const RUSTFMT_CUSTOM_COMMENT_PREFIX: &str = "//#### ";
 
-fn hide_sharp_behind_comment(s: &str) -> Cow<str> {
+fn hide_sharp_behind_comment(s: &str) -> Cow<'_, str> {
     if s.trim_start().starts_with("# ") {
         Cow::from(format!("{}{}", RUSTFMT_CUSTOM_COMMENT_PREFIX, s))
     } else {
@@ -842,7 +837,7 @@ fn trim_custom_comment_prefix(s: &str) -> String {
         .join("\n")
 }
 
-/// Returns true if the given string MAY include URLs or alike.
+/// Returns `true` if the given string MAY include URLs or alike.
 fn has_url(s: &str) -> bool {
     // This function may return false positive, but should get its job done in most cases.
     s.contains("https://") || s.contains("http://") || s.contains("ftp://") || s.contains("file://")
@@ -850,10 +845,10 @@ fn has_url(s: &str) -> bool {
 
 /// Given the span, rewrite the missing comment inside it if available.
 /// Note that the given span must only include comments (or leading/trailing whitespaces).
-pub fn rewrite_missing_comment(
+pub(crate) fn rewrite_missing_comment(
     span: Span,
     shape: Shape,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
 ) -> Option<String> {
     let missing_snippet = context.snippet(span);
     let trimmed_snippet = missing_snippet.trim();
@@ -867,10 +862,10 @@ pub fn rewrite_missing_comment(
 /// Recover the missing comments in the specified span, if available.
 /// The layout of the comments will be preserved as long as it does not break the code
 /// and its total width does not exceed the max width.
-pub fn recover_missing_comment_in_span(
+pub(crate) fn recover_missing_comment_in_span(
     span: Span,
     shape: Shape,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     used_width: usize,
 ) -> Option<String> {
     let missing_comment = rewrite_missing_comment(span, shape, context)?;
@@ -934,7 +929,7 @@ fn light_rewrite_comment(
 /// Trims comment characters and possibly a single space from the left of a string.
 /// Does not trim all whitespace. If a single space is trimmed from the left of the string,
 /// this function returns true.
-fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle) -> (&'a str, bool) {
+fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
     if line.starts_with("//! ")
         || line.starts_with("/// ")
         || line.starts_with("/*! ")
@@ -969,7 +964,7 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle) -> (&'a str, 
     }
 }
 
-pub trait FindUncommented {
+pub(crate) trait FindUncommented {
     fn find_uncommented(&self, pat: &str) -> Option<usize>;
 }
 
@@ -1000,9 +995,9 @@ impl FindUncommented for str {
 
 // Returns the first byte position after the first comment. The given string
 // is expected to be prefixed by a comment, including delimiters.
-// Good: "/* /* inner */ outer */ code();"
-// Bad:  "code(); // hello\n world!"
-pub fn find_comment_end(s: &str) -> Option<usize> {
+// Good: `/* /* inner */ outer */ code();`
+// Bad:  `code(); // hello\n world!`
+pub(crate) fn find_comment_end(s: &str) -> Option<usize> {
     let mut iter = CharClasses::new(s.char_indices());
     for (kind, (i, _c)) in &mut iter {
         if kind == FullCodeCharKind::Normal || kind == FullCodeCharKind::InString {
@@ -1010,7 +1005,7 @@ pub fn find_comment_end(s: &str) -> Option<usize> {
         }
     }
 
-    // Handle case where the comment ends at the end of s.
+    // Handle case where the comment ends at the end of `s`.
     if iter.status == CharClassesStatus::Normal {
         Some(s.len())
     } else {
@@ -1018,12 +1013,12 @@ pub fn find_comment_end(s: &str) -> Option<usize> {
     }
 }
 
-/// Returns true if text contains any comment.
-pub fn contains_comment(text: &str) -> bool {
+/// Returns `true` if text contains any comment.
+pub(crate) fn contains_comment(text: &str) -> bool {
     CharClasses::new(text.chars()).any(|(kind, _)| kind.is_comment())
 }
 
-pub struct CharClasses<T>
+pub(crate) struct CharClasses<T>
 where
     T: Iterator,
     T::Item: RichChar,
@@ -1032,7 +1027,7 @@ where
     status: CharClassesStatus,
 }
 
-pub trait RichChar {
+pub(crate) trait RichChar {
     fn get_char(&self) -> char;
 }
 
@@ -1078,7 +1073,7 @@ enum CharClassesStatus {
 
 /// Distinguish between functional part of code and comments
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum CodeCharKind {
+pub(crate) enum CodeCharKind {
     Normal,
     Comment,
 }
@@ -1087,7 +1082,7 @@ pub enum CodeCharKind {
 /// describing opening and closing of comments for ease when chunking
 /// code from tagged characters
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum FullCodeCharKind {
+pub(crate) enum FullCodeCharKind {
     Normal,
     /// The first character of a comment, there is only one for a comment (always '/')
     StartComment,
@@ -1111,7 +1106,7 @@ pub enum FullCodeCharKind {
 }
 
 impl FullCodeCharKind {
-    pub fn is_comment(self) -> bool {
+    pub(crate) fn is_comment(self) -> bool {
         match self {
             FullCodeCharKind::StartComment
             | FullCodeCharKind::InComment
@@ -1124,7 +1119,7 @@ impl FullCodeCharKind {
     }
 
     /// Returns true if the character is inside a comment
-    pub fn inside_comment(self) -> bool {
+    pub(crate) fn inside_comment(self) -> bool {
         match self {
             FullCodeCharKind::InComment
             | FullCodeCharKind::StartStringCommented
@@ -1134,12 +1129,12 @@ impl FullCodeCharKind {
         }
     }
 
-    pub fn is_string(self) -> bool {
+    pub(crate) fn is_string(self) -> bool {
         self == FullCodeCharKind::InString || self == FullCodeCharKind::StartString
     }
 
     /// Returns true if the character is within a commented string
-    pub fn is_commented_string(self) -> bool {
+    pub(crate) fn is_commented_string(self) -> bool {
         self == FullCodeCharKind::InStringCommented
             || self == FullCodeCharKind::StartStringCommented
     }
@@ -1158,7 +1153,7 @@ where
     T: Iterator,
     T::Item: RichChar,
 {
-    pub fn new(base: T) -> CharClasses<T> {
+    pub(crate) fn new(base: T) -> CharClasses<T> {
         CharClasses {
             base: multipeek(base),
             status: CharClassesStatus::Normal,
@@ -1248,7 +1243,7 @@ where
             },
             CharClassesStatus::LitCharEscape => CharClassesStatus::LitChar,
             CharClassesStatus::Normal => match chr {
-                'r' => match self.base.peek().map(|c| c.get_char()) {
+                'r' => match self.base.peek().map(RichChar::get_char) {
                     Some('#') | Some('"') => {
                         char_kind = FullCodeCharKind::InString;
                         CharClassesStatus::RawStringPrefix(0)
@@ -1341,13 +1336,13 @@ where
 
 /// An iterator over the lines of a string, paired with the char kind at the
 /// end of the line.
-pub struct LineClasses<'a> {
+pub(crate) struct LineClasses<'a> {
     base: iter::Peekable<CharClasses<std::str::Chars<'a>>>,
     kind: FullCodeCharKind,
 }
 
 impl<'a> LineClasses<'a> {
-    pub fn new(s: &'a str) -> Self {
+    pub(crate) fn new(s: &'a str) -> Self {
         LineClasses {
             base: CharClasses::new(s.chars()).peekable(),
             kind: FullCodeCharKind::Normal,
@@ -1463,14 +1458,14 @@ impl<'a> Iterator for UngroupedCommentCodeSlices<'a> {
 /// Iterator over an alternating sequence of functional and commented parts of
 /// a string. The first item is always a, possibly zero length, subslice of
 /// functional text. Line style comments contain their ending newlines.
-pub struct CommentCodeSlices<'a> {
+pub(crate) struct CommentCodeSlices<'a> {
     slice: &'a str,
     last_slice_kind: CodeCharKind,
     last_slice_end: usize,
 }
 
 impl<'a> CommentCodeSlices<'a> {
-    pub fn new(slice: &'a str) -> CommentCodeSlices<'a> {
+    pub(crate) fn new(slice: &'a str) -> CommentCodeSlices<'a> {
         CommentCodeSlices {
             slice,
             last_slice_kind: CodeCharKind::Comment,
@@ -1540,11 +1535,11 @@ impl<'a> Iterator for CommentCodeSlices<'a> {
 }
 
 /// Checks is `new` didn't miss any comment from `span`, if it removed any, return previous text
-/// (if it fits in the width/offset, else return None), else return `new`
-pub fn recover_comment_removed(
+/// (if it fits in the width/offset, else return `None`), else return `new`
+pub(crate) fn recover_comment_removed(
     new: String,
     span: Span,
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
 ) -> Option<String> {
     let snippet = context.snippet(span);
     if snippet != new && changed_comment_content(snippet, &new) {
@@ -1565,7 +1560,7 @@ pub fn recover_comment_removed(
     }
 }
 
-pub fn filter_normal_code(code: &str) -> String {
+pub(crate) fn filter_normal_code(code: &str) -> String {
     let mut buffer = String::with_capacity(code.len());
     LineClasses::new(code).for_each(|(kind, line)| match kind {
         FullCodeCharKind::Normal
@@ -1583,14 +1578,14 @@ pub fn filter_normal_code(code: &str) -> String {
     buffer
 }
 
-/// Return true if the two strings of code have the same payload of comments.
+/// Returns `true` if the two strings of code have the same payload of comments.
 /// The payload of comments is everything in the string except:
-///     - actual code (not comments)
-///     - comment start/end marks
-///     - whitespace
-///     - '*' at the beginning of lines in block comments
+/// - actual code (not comments),
+/// - comment start/end marks,
+/// - whitespace,
+/// - '*' at the beginning of lines in block comments.
 fn changed_comment_content(orig: &str, new: &str) -> bool {
-    // Cannot write this as a fn since we cannot return types containing closures
+    // Cannot write this as a fn since we cannot return types containing closures.
     let code_comment_content = |code| {
         let slices = UngroupedCommentCodeSlices::new(code);
         slices
@@ -1625,7 +1620,8 @@ impl<'a> CommentReducer<'a> {
         let comment = remove_comment_header(comment);
         CommentReducer {
             is_block,
-            at_start_line: false, // There are no supplementary '*' on the first line
+            // There are no supplementary '*' on the first line.
+            at_start_line: false,
             iter: comment.chars(),
         }
     }
@@ -1641,7 +1637,7 @@ impl<'a> Iterator for CommentReducer<'a> {
                 while c.is_whitespace() {
                     c = self.iter.next()?;
                 }
-                // Ignore leading '*'
+                // Ignore leading '*'.
                 if c == '*' {
                     c = self.iter.next()?;
                 }
@@ -1777,7 +1773,7 @@ mod test {
                                       &wrap_normalize_config).unwrap();
         assert_eq!("/* trimmed */", comment);
 
-        // check that different comment style are properly recognised
+        // Check that different comment style are properly recognised.
         let comment = rewrite_comment(r#"/// test1
                                          /// test2
                                          /*
@@ -1788,7 +1784,7 @@ mod test {
                                       &wrap_normalize_config).unwrap();
         assert_eq!("/// test1\n/// test2\n// test3", comment);
 
-        // check that the blank line marks the end of a commented paragraph
+        // Check that the blank line marks the end of a commented paragraph.
         let comment = rewrite_comment(r#"// test1
 
                                          // test2"#,
@@ -1797,7 +1793,7 @@ mod test {
                                       &wrap_normalize_config).unwrap();
         assert_eq!("// test1\n\n// test2", comment);
 
-        // check that the blank line marks the end of a custom-commented paragraph
+        // Check that the blank line marks the end of a custom-commented paragraph.
         let comment = rewrite_comment(r#"//@ test1
 
                                          //@ test2"#,
@@ -1806,7 +1802,7 @@ mod test {
                                       &wrap_normalize_config).unwrap();
         assert_eq!("//@ test1\n\n//@ test2", comment);
 
-        // check that bare lines are just indented but left unchanged otherwise
+        // Check that bare lines are just indented but otherwise left unchanged.
         let comment = rewrite_comment(r#"// test1
                                          /*
                                            a bare line!
@@ -1819,8 +1815,8 @@ mod test {
         assert_eq!("// test1\n/*\n a bare line!\n\n      another bare line!\n*/", comment);
     }
 
-    // This is probably intended to be a non-test fn, but it is not used. I'm
-    // keeping it around unless it helps us test stuff.
+    // This is probably intended to be a non-test fn, but it is not used.
+    // We should keep this around unless it helps us test stuff to remove it.
     fn uncommented(text: &str) -> String {
         CharClasses::new(text.chars())
             .filter_map(|(s, c)| match s {

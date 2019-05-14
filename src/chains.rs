@@ -1,15 +1,5 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
-//! Formatting of chained expressions, i.e. expressions which are chained by
-//! dots: struct and enum field access, method calls, and try shorthand (?).
+//! Formatting of chained expressions, i.e., expressions that are chained by
+//! dots: struct and enum field access, method calls, and try shorthand (`?`).
 //!
 //! Instead of walking these subexpressions one-by-one, as is our usual strategy
 //! for expression formatting, we collect maximal sequences of these expressions
@@ -84,7 +74,11 @@ use crate::utils::{
     trimmed_last_line_width, wrap_str,
 };
 
-pub fn rewrite_chain(expr: &ast::Expr, context: &RewriteContext, shape: Shape) -> Option<String> {
+pub(crate) fn rewrite_chain(
+    expr: &ast::Expr,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> Option<String> {
     let chain = Chain::from_ast(expr, context);
     debug!("rewrite_chain {:?} {:?}", chain, shape);
 
@@ -128,7 +122,7 @@ enum ChainItemKind {
 }
 
 impl ChainItemKind {
-    fn is_block_like(&self, context: &RewriteContext, reps: &str) -> bool {
+    fn is_block_like(&self, context: &RewriteContext<'_>, reps: &str) -> bool {
         match self {
             ChainItemKind::Parent(ref expr) => utils::is_block_expr(context, expr, reps),
             ChainItemKind::MethodCall(..)
@@ -147,7 +141,7 @@ impl ChainItemKind {
         }
     }
 
-    fn from_ast(context: &RewriteContext, expr: &ast::Expr) -> (ChainItemKind, Span) {
+    fn from_ast(context: &RewriteContext<'_>, expr: &ast::Expr) -> (ChainItemKind, Span) {
         let (kind, span) = match expr.node {
             ast::ExprKind::MethodCall(ref segment, ref expressions) => {
                 let types = if let Some(ref generic_args) = segment.args {
@@ -182,7 +176,7 @@ impl ChainItemKind {
 }
 
 impl Rewrite for ChainItem {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let shape = shape.sub_width(self.tries)?;
         let rewrite = match self.kind {
             ChainItemKind::Parent(ref expr) => expr.rewrite(context, shape)?,
@@ -204,7 +198,7 @@ impl Rewrite for ChainItem {
 }
 
 impl ChainItem {
-    fn new(context: &RewriteContext, expr: &ast::Expr, tries: usize) -> ChainItem {
+    fn new(context: &RewriteContext<'_>, expr: &ast::Expr, tries: usize) -> ChainItem {
         let (kind, span) = ChainItemKind::from_ast(context, expr);
         ChainItem { kind, tries, span }
     }
@@ -229,7 +223,7 @@ impl ChainItem {
         types: &[ast::GenericArg],
         args: &[ptr::P<ast::Expr>],
         span: Span,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<String> {
         let type_str = if types.is_empty() {
@@ -254,7 +248,7 @@ struct Chain {
 }
 
 impl Chain {
-    fn from_ast(expr: &ast::Expr, context: &RewriteContext) -> Chain {
+    fn from_ast(expr: &ast::Expr, context: &RewriteContext<'_>) -> Chain {
         let subexpr_list = Self::make_subexpr_list(expr, context);
 
         // Un-parse the expression tree into ChainItems
@@ -376,7 +370,7 @@ impl Chain {
 
     // Returns a Vec of the prefixes of the chain.
     // E.g., for input `a.b.c` we return [`a.b.c`, `a.b`, 'a']
-    fn make_subexpr_list(expr: &ast::Expr, context: &RewriteContext) -> Vec<ast::Expr> {
+    fn make_subexpr_list(expr: &ast::Expr, context: &RewriteContext<'_>) -> Vec<ast::Expr> {
         let mut subexpr_list = vec![expr.clone()];
 
         while let Some(subexpr) = Self::pop_expr_chain(subexpr_list.last().unwrap(), context) {
@@ -388,7 +382,7 @@ impl Chain {
 
     // Returns the expression's subexpression, if it exists. When the subexpr
     // is a try! macro, we'll convert it to shorthand when the option is set.
-    fn pop_expr_chain(expr: &ast::Expr, context: &RewriteContext) -> Option<ast::Expr> {
+    fn pop_expr_chain(expr: &ast::Expr, context: &RewriteContext<'_>) -> Option<ast::Expr> {
         match expr.node {
             ast::ExprKind::MethodCall(_, ref expressions) => {
                 Some(Self::convert_try(&expressions[0], context))
@@ -400,7 +394,7 @@ impl Chain {
         }
     }
 
-    fn convert_try(expr: &ast::Expr, context: &RewriteContext) -> ast::Expr {
+    fn convert_try(expr: &ast::Expr, context: &RewriteContext<'_>) -> ast::Expr {
         match expr.node {
             ast::ExprKind::Mac(ref mac) if context.config.use_try_shorthand() => {
                 if let Some(subexpr) = convert_try_mac(mac, context) {
@@ -415,12 +409,16 @@ impl Chain {
 }
 
 impl Rewrite for Chain {
-    fn rewrite(&self, context: &RewriteContext, shape: Shape) -> Option<String> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         debug!("rewrite chain {:?} {:?}", self, shape);
 
         let mut formatter = match context.config.indent_style() {
-            IndentStyle::Block => Box::new(ChainFormatterBlock::new(self)) as Box<ChainFormatter>,
-            IndentStyle::Visual => Box::new(ChainFormatterVisual::new(self)) as Box<ChainFormatter>,
+            IndentStyle::Block => {
+                Box::new(ChainFormatterBlock::new(self)) as Box<dyn ChainFormatter>
+            }
+            IndentStyle::Visual => {
+                Box::new(ChainFormatterVisual::new(self)) as Box<dyn ChainFormatter>
+            }
         };
 
         formatter.format_root(&self.parent, context, shape)?;
@@ -455,18 +453,18 @@ trait ChainFormatter {
     fn format_root(
         &mut self,
         parent: &ChainItem,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<()>;
-    fn child_shape(&self, context: &RewriteContext, shape: Shape) -> Option<Shape>;
-    fn format_children(&mut self, context: &RewriteContext, child_shape: Shape) -> Option<()>;
+    fn child_shape(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<Shape>;
+    fn format_children(&mut self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<()>;
     fn format_last_child(
         &mut self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         child_shape: Shape,
     ) -> Option<()>;
-    fn join_rewrites(&self, context: &RewriteContext, child_shape: Shape) -> Option<String>;
+    fn join_rewrites(&self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<String>;
     // Returns `Some` if the chain is only a root, None otherwise.
     fn pure_root(&mut self) -> Option<String>;
 }
@@ -526,7 +524,7 @@ impl<'a> ChainFormatterShared<'a> {
     // ```
     //
     // In particular, overflowing is effective when the last child is a method with a multi-lined
-    // block-like argument (e.g. closure):
+    // block-like argument (e.g., closure):
     // ```ignore
     // parent.child1.child2.last_child(|a, b, c| {
     //     let x = foo(a, b, c);
@@ -540,7 +538,7 @@ impl<'a> ChainFormatterShared<'a> {
     fn format_last_child(
         &mut self,
         may_extend: bool,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         child_shape: Shape,
     ) -> Option<()> {
@@ -552,7 +550,7 @@ impl<'a> ChainFormatterShared<'a> {
         let almost_total = if extendable {
             prev_last_line_width
         } else {
-            self.rewrites.iter().fold(0, |a, b| a + b.len())
+            self.rewrites.iter().map(String::len).sum()
         } + last.tries;
         let one_line_budget = if self.child_count == 1 {
             shape.width
@@ -633,7 +631,7 @@ impl<'a> ChainFormatterShared<'a> {
         Some(())
     }
 
-    fn join_rewrites(&self, context: &RewriteContext, child_shape: Shape) -> Option<String> {
+    fn join_rewrites(&self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<String> {
         let connector = if self.fits_single_line {
             // Yay, we can put everything on one line.
             Cow::from("")
@@ -682,7 +680,7 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
     fn format_root(
         &mut self,
         parent: &ChainItem,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<()> {
         let mut root_rewrite: String = parent.rewrite(context, shape)?;
@@ -713,7 +711,7 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
         Some(())
     }
 
-    fn child_shape(&self, context: &RewriteContext, shape: Shape) -> Option<Shape> {
+    fn child_shape(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<Shape> {
         Some(
             if self.root_ends_with_block {
                 shape.block_indent(0)
@@ -724,7 +722,7 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
         )
     }
 
-    fn format_children(&mut self, context: &RewriteContext, child_shape: Shape) -> Option<()> {
+    fn format_children(&mut self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<()> {
         for item in &self.shared.children[..self.shared.children.len() - 1] {
             let rewrite = item.rewrite(context, child_shape)?;
             self.shared.rewrites.push(rewrite);
@@ -734,7 +732,7 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
 
     fn format_last_child(
         &mut self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         child_shape: Shape,
     ) -> Option<()> {
@@ -742,7 +740,7 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
             .format_last_child(true, context, shape, child_shape)
     }
 
-    fn join_rewrites(&self, context: &RewriteContext, child_shape: Shape) -> Option<String> {
+    fn join_rewrites(&self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<String> {
         self.shared.join_rewrites(context, child_shape)
     }
 
@@ -771,7 +769,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
     fn format_root(
         &mut self,
         parent: &ChainItem,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<()> {
         let parent_shape = shape.visual_indent(0);
@@ -811,14 +809,14 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
         Some(())
     }
 
-    fn child_shape(&self, context: &RewriteContext, shape: Shape) -> Option<Shape> {
+    fn child_shape(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<Shape> {
         shape
             .with_max_width(context.config)
             .offset_left(self.offset)
             .map(|s| s.visual_indent(0))
     }
 
-    fn format_children(&mut self, context: &RewriteContext, child_shape: Shape) -> Option<()> {
+    fn format_children(&mut self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<()> {
         for item in &self.shared.children[..self.shared.children.len() - 1] {
             let rewrite = item.rewrite(context, child_shape)?;
             self.shared.rewrites.push(rewrite);
@@ -828,7 +826,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
 
     fn format_last_child(
         &mut self,
-        context: &RewriteContext,
+        context: &RewriteContext<'_>,
         shape: Shape,
         child_shape: Shape,
     ) -> Option<()> {
@@ -836,7 +834,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
             .format_last_child(false, context, shape, child_shape)
     }
 
-    fn join_rewrites(&self, context: &RewriteContext, child_shape: Shape) -> Option<String> {
+    fn join_rewrites(&self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<String> {
         self.shared.join_rewrites(context, child_shape)
     }
 
@@ -845,7 +843,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
     }
 }
 
-/// Remove try operators (`?`s) that appear in the given string. If removing
+/// Removes try operators (`?`s) that appear in the given string. If removing
 /// them leaves an empty line, remove that line as well unless it is the first
 /// line (we need the first newline for detecting pre/post comment).
 fn trim_tries(s: &str) -> String {

@@ -1,18 +1,5 @@
-// Copyright 2018 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
-extern crate env_logger;
-extern crate getopts;
 #[macro_use]
 extern crate log;
-extern crate rustfmt_nightly as rustfmt;
 
 use std::env;
 use std::io::stdout;
@@ -20,9 +7,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
 
+use env_logger;
 use getopts::{Matches, Options};
+use rustfmt_nightly as rustfmt;
 
-use crate::rustfmt::{load_config, CliOptions, Input, Session};
+use crate::rustfmt::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
     let prefixes: Vec<_> = files
@@ -78,7 +67,7 @@ fn fmt_files(files: &[&str]) -> i32 {
     for file in files {
         let report = session.format(Input::File(PathBuf::from(file))).unwrap();
         if report.has_warnings() {
-            eprintln!("{}", report);
+            eprintln!("{}", FormatReportFormatterBuilder::new(&report).build());
         }
         if !session.has_no_errors() {
             exit_code = 1;
@@ -109,7 +98,7 @@ fn uncommitted_files() -> Vec<String> {
     stdout
         .lines()
         .filter(|s| s.ends_with(".rs"))
-        .map(|s| s.to_owned())
+        .map(std::borrow::ToOwned::to_owned)
         .collect()
 }
 

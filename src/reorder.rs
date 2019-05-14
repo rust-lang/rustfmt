@@ -1,13 +1,3 @@
-// Copyright 2018 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 //! Reorder items.
 //!
 //! `mod`, `extern crate` and `use` declarations are reordered in alphabetical
@@ -42,8 +32,10 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
         (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
-            let a_orig_name = a_name.map_or_else(|| a.ident.as_str(), |symbol| symbol.as_str());
-            let b_orig_name = b_name.map_or_else(|| b.ident.as_str(), |symbol| symbol.as_str());
+            let a_orig_name =
+                a_name.map_or_else(|| a.ident.as_str(), syntax_pos::symbol::Symbol::as_str);
+            let b_orig_name =
+                b_name.map_or_else(|| b.ident.as_str(), syntax_pos::symbol::Symbol::as_str);
             let result = a_orig_name.cmp(&b_orig_name);
             if result != Ordering::Equal {
                 return result;
@@ -63,7 +55,7 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
 }
 
 fn wrap_reorderable_items(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     list_items: &[ListItem],
     shape: Shape,
 ) -> Option<String> {
@@ -74,7 +66,7 @@ fn wrap_reorderable_items(
 }
 
 fn rewrite_reorderable_item(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     item: &ast::Item,
     shape: Shape,
 ) -> Option<String> {
@@ -93,13 +85,28 @@ fn rewrite_reorderable_item(
         _ => return None,
     };
 
-    combine_strs_with_missing_comments(context, &attrs_str, &item_str, missed_span, shape, false)
+    let allow_extend = if attrs.len() == 1 {
+        let line_len = attrs_str.len() + 1 + item_str.len();
+        !attrs.first().unwrap().is_sugared_doc
+            && context.config.inline_attribute_width() >= line_len
+    } else {
+        false
+    };
+
+    combine_strs_with_missing_comments(
+        context,
+        &attrs_str,
+        &item_str,
+        missed_span,
+        shape,
+        allow_extend,
+    )
 }
 
 /// Rewrite a list of items with reordering. Every item in `items` must have
 /// the same `ast::ItemKind`.
 fn rewrite_reorderable_items(
-    context: &RewriteContext,
+    context: &RewriteContext<'_>,
     reorderable_items: &[&ast::Item],
     shape: Shape,
     span: Span,
@@ -263,9 +270,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         item_length
     }
 
-    /// Visit and format the given items. Items are reordered If they are
+    /// Visits and format the given items. Items are reordered If they are
     /// consecutive and reorderable.
-    pub fn visit_items_with_reordering(&mut self, mut items: &[&ast::Item]) {
+    pub(crate) fn visit_items_with_reordering(&mut self, mut items: &[&ast::Item]) {
         while !items.is_empty() {
             // If the next item is a `use`, `extern crate` or `mod`, then extract it and any
             // subsequent items that have the same item kind to be reordered within

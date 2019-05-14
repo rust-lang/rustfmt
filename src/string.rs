@@ -1,13 +1,3 @@
-// Copyright 2015 The Rust Project Developers. See the COPYRIGHT
-// file at the top-level directory of this distribution and at
-// http://rust-lang.org/COPYRIGHT.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 // Format string literals.
 
 use regex::Regex;
@@ -21,24 +11,24 @@ use crate::utils::{unicode_str_width, wrap_str};
 const MIN_STRING: usize = 10;
 
 /// Describes the layout of a piece of text.
-pub struct StringFormat<'a> {
+pub(crate) struct StringFormat<'a> {
     /// The opening sequence of characters for the piece of text
-    pub opener: &'a str,
+    pub(crate) opener: &'a str,
     /// The closing sequence of characters for the piece of text
-    pub closer: &'a str,
+    pub(crate) closer: &'a str,
     /// The opening sequence of characters for a line
-    pub line_start: &'a str,
+    pub(crate) line_start: &'a str,
     /// The closing sequence of characters for a line
-    pub line_end: &'a str,
+    pub(crate) line_end: &'a str,
     /// The allocated box to fit the text into
-    pub shape: Shape,
+    pub(crate) shape: Shape,
     /// Trim trailing whitespaces
-    pub trim_end: bool,
-    pub config: &'a Config,
+    pub(crate) trim_end: bool,
+    pub(crate) config: &'a Config,
 }
 
 impl<'a> StringFormat<'a> {
-    pub fn new(shape: Shape, config: &'a Config) -> StringFormat<'a> {
+    pub(crate) fn new(shape: Shape, config: &'a Config) -> StringFormat<'a> {
         StringFormat {
             opener: "\"",
             closer: "\"",
@@ -71,7 +61,7 @@ impl<'a> StringFormat<'a> {
     }
 }
 
-pub fn rewrite_string<'a>(
+pub(crate) fn rewrite_string<'a>(
     orig: &str,
     fmt: &StringFormat<'a>,
     newline_max_chars: usize,
@@ -163,8 +153,8 @@ pub fn rewrite_string<'a>(
     wrap_str(result, fmt.config.max_width(), fmt.shape)
 }
 
-/// Returns the index to the end of the url if the given string includes an
-/// URL or alike. Otherwise, returns None;
+/// Returns the index to the end of the URL if the given string includes an
+/// URL or alike. Otherwise, returns `None`;
 fn detect_url(s: &[&str], index: usize) -> Option<usize> {
     let start = match s[..=index].iter().rposition(|g| is_whitespace(g)) {
         Some(pos) => pos + 1,
@@ -348,11 +338,13 @@ fn is_new_line(grapheme: &str) -> bool {
 }
 
 fn is_whitespace(grapheme: &str) -> bool {
-    grapheme.chars().all(|c| c.is_whitespace())
+    grapheme.chars().all(char::is_whitespace)
 }
 
 fn is_punctuation(grapheme: &str) -> bool {
-    grapheme.chars().all(|c| c.is_punctuation_other())
+    grapheme
+        .chars()
+        .all(UnicodeCategories::is_punctuation_other)
 }
 
 fn graphemes_width(graphemes: &[&str]) -> usize {
