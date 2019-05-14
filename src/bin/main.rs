@@ -16,7 +16,7 @@ use getopts::{Matches, Options};
 
 use crate::rustfmt::{
     absolute_path, load_config, CliOptions, Color, Config, Edition, EmitMode, ErrorKind, FileLines,
-    FormatReportFormatterBuilder, FileName, Input, Session, Verbosity,
+    FileName, FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
 
 fn main() {
