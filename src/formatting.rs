@@ -30,7 +30,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             return Err(ErrorKind::VersionMismatch);
         }
 
-        syntax::with_globals(|| {
+        syntax::with_globals(&[], || {
             syntax_pos::hygiene::set_default_edition(
                 self.config.edition().to_libsyntax_pos_edition(),
             );
