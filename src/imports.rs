@@ -989,9 +989,9 @@ mod test {
         }
 
         test_merge!(["a::b::{c, d}", "a::b::{e, f}"], ["a::b::{c, d, e, f}"]);
-        test_merge!(["a::b::c", "a::b"], ["a::b::{self, c}"]);
+        test_merge!(["a::b::c", "a::b"], ["a::{b, b::c}"]);
         test_merge!(["a::b", "a::b"], ["a::b"]);
-        test_merge!(["a", "a::b", "a::b::c"], ["a::{self, b::{self, c}}"]);
+        test_merge!(["a", "a::b", "a::b::c"], ["a", "a::b", "a::b::c"]);
         test_merge!(
             ["a::{b::{self, c}, d::e}", "a::d::f"],
             ["a::{b::{self, c}, d::{e, f}}"]
