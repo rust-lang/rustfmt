@@ -14,3 +14,6 @@ use foo::{a, b, c};
 pub use foo::{bar, foobar};
 
 use a::b::c::{d, xxx, yyy, zzz, *};
+
+use a::b;
+use a::b::c;

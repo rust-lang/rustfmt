@@ -22,3 +22,6 @@ use a::{b::{c::*}};
 use a::{b::{c::{}}};
 use a::{b::{c::d}};
 use a::{b::{c::{xxx, yyy, zzz}}};
+
+use a::b;
+use a::b::c;
