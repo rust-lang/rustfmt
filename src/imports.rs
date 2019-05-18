@@ -578,7 +578,8 @@ impl UseTree {
             .path
             .clone()
             .iter_mut()
-            .zip(other.path.clone().into_iter())
+            .take(self.path.len() - 1)
+            .zip(other.path.clone().into_iter().take(other.path.len() - 1))
         {
             if *a == b {
                 new_path.push(b);
