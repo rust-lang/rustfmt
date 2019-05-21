@@ -1,23 +1,27 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use syntax::ast;
-use syntax::parse::{parser, DirectoryOwnership};
+use syntax::parse::{parser, DirectoryOwnership, ParseSess};
 use syntax::source_map;
 use syntax::symbol::sym;
+use syntax::visit::Visitor;
 use syntax_pos::symbol::Symbol;
 
 use crate::config::FileName;
 use crate::items::is_mod_decl;
 use crate::utils::contains_skip;
 
-type FileModMap<'a> = BTreeMap<FileName, (&'a ast::Mod, String)>;
+mod visitor;
+
+type FileModMap<'ast> = BTreeMap<FileName, (Cow<'ast, ast::Mod>, String)>;
 
 /// Maps each module to the corresponding file.
-pub(crate) struct ModResolver<'a, 'b> {
-    source_map: &'b source_map::SourceMap,
+pub(crate) struct ModResolver<'ast, 'sess> {
+    parse_sess: &'sess ParseSess,
     directory: Directory,
-    file_map: FileModMap<'a>,
+    file_map: FileModMap<'ast>,
     recursive: bool,
 }
 
@@ -27,10 +31,19 @@ struct Directory {
     ownership: DirectoryOwnership,
 }
 
-impl<'a, 'b> ModResolver<'a, 'b> {
+impl<'a> Directory {
+    fn to_syntax_directory(&'a self) -> syntax::parse::Directory<'a> {
+        syntax::parse::Directory {
+            path: Cow::Borrowed(&self.path),
+            ownership: self.ownership.clone(),
+        }
+    }
+}
+
+impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     /// Creates a new `ModResolver`.
     pub(crate) fn new(
-        source_map: &'b source_map::SourceMap,
+        parse_sess: &'sess ParseSess,
         directory_ownership: DirectoryOwnership,
         recursive: bool,
     ) -> Self {
@@ -40,14 +53,17 @@ impl<'a, 'b> ModResolver<'a, 'b> {
                 ownership: directory_ownership,
             },
             file_map: BTreeMap::new(),
-            source_map,
+            parse_sess,
             recursive,
         }
     }
 
     /// Creates a map that maps a file name to the module in AST.
-    pub(crate) fn visit_crate(mut self, krate: &'a ast::Crate) -> Result<FileModMap<'a>, String> {
-        let root_filename = self.source_map.span_to_filename(krate.span);
+    pub(crate) fn visit_crate(
+        mut self,
+        krate: &'ast ast::Crate,
+    ) -> Result<FileModMap<'ast>, String> {
+        let root_filename = self.parse_sess.source_map().span_to_filename(krate.span);
         self.directory.path = match root_filename {
             source_map::FileName::Real(ref path) => path
                 .parent()
@@ -58,52 +74,97 @@ impl<'a, 'b> ModResolver<'a, 'b> {
 
         // Skip visiting sub modules when the input is from stdin.
         if self.recursive {
-            self.visit_mod(&krate.module)?;
+            self.visit_mod_(&krate.module)?;
         }
 
-        self.file_map
-            .insert(root_filename.into(), (&krate.module, String::new()));
+        self.file_map.insert(
+            root_filename.into(),
+            (Cow::Borrowed(&krate.module), String::new()),
+        );
         Ok(self.file_map)
     }
 
-    fn visit_mod(&mut self, module: &'a ast::Mod) -> Result<(), String> {
-        for item in &module.items {
-            if let ast::ItemKind::Mod(ref sub_mod) = item.node {
-                if contains_skip(&item.attrs) {
-                    continue;
+    fn visit_mac(&mut self, item: &'ast ast::Item) -> Result<(), String> {
+        let mut visitor =
+            visitor::CfgIfVisitor::new(self.parse_sess, self.directory.to_syntax_directory());
+        visitor.visit_item(item);
+        for module_item in visitor.mods() {
+            if let ast::ItemKind::Mod(ref sub_mod) = module_item.item.node {
+                let cow_sub_mod = Cow::Owned(sub_mod.clone());
+                if let Some(old_directory) = self.visit_sub_mod(&module_item.item, &cow_sub_mod)? {
+                    self.visit_mod(cow_sub_mod)?;
+                    self.directory = old_directory;
                 }
-
-                let old_direcotry = self.directory.clone();
-                if is_mod_decl(item) {
-                    // mod foo;
-                    // Look for an extern file.
-                    let (mod_path, directory_ownership) =
-                        self.find_external_module(item.ident, &item.attrs)?;
-                    self.file_map.insert(
-                        FileName::Real(mod_path.clone()),
-                        (sub_mod, item.ident.as_str().get().to_owned()),
-                    );
-                    self.directory = Directory {
-                        path: mod_path.parent().unwrap().to_path_buf(),
-                        ownership: directory_ownership,
-                    }
-                } else {
-                    // An internal module (`mod foo { /* ... */ }`);
-                    if let Some(path) = find_path_value(&item.attrs) {
-                        // All `#[path]` files are treated as though they are a `mod.rs` file.
-                        self.directory = Directory {
-                            path: Path::new(&path.as_str()).to_path_buf(),
-                            ownership: DirectoryOwnership::Owned { relative: None },
-                        };
-                    } else {
-                        self.push_inline_mod_directory(item.ident, &item.attrs);
-                    }
-                }
-                self.visit_mod(sub_mod)?;
-                self.directory = old_direcotry;
             }
         }
         Ok(())
+    }
+
+    fn visit_mod(&mut self, module: Cow<'ast, ast::Mod>) -> Result<(), String> {
+        for item in &module.items {
+            if let ast::ItemKind::Mod(ref sub_mod) = item.node {
+                let cow_sub_mod = Cow::Owned(sub_mod.clone());
+                if let Some(old_directory) = self.visit_sub_mod(item, &cow_sub_mod)? {
+                    self.visit_mod(cow_sub_mod)?;
+                    self.directory = old_directory;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_mod_(&mut self, module: &'ast ast::Mod) -> Result<(), String> {
+        for item in &module.items {
+            if let ast::ItemKind::Mac(..) = item.node {
+                self.visit_mac(item)?;
+            }
+
+            if let ast::ItemKind::Mod(ref sub_mod) = item.node {
+                if let Some(old_directory) = self.visit_sub_mod(item, &Cow::Borrowed(sub_mod))? {
+                    self.visit_mod_(sub_mod)?;
+                    self.directory = old_directory;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_sub_mod(
+        &mut self,
+        item: &'c ast::Item,
+        sub_mod: &Cow<'ast, ast::Mod>,
+    ) -> Result<Option<Directory>, String> {
+        if contains_skip(&item.attrs) {
+            return Ok(None);
+        }
+
+        let old_directory = self.directory.clone();
+        if is_mod_decl(item) {
+            // mod foo;
+            // Look for an extern file.
+            let (mod_path, directory_ownership) =
+                self.find_external_module(item.ident, &item.attrs)?;
+            self.file_map.insert(
+                FileName::Real(mod_path.clone()),
+                (sub_mod.clone(), item.ident.name.as_str().get().to_owned()),
+            );
+            self.directory = Directory {
+                path: mod_path.parent().unwrap().to_path_buf(),
+                ownership: directory_ownership,
+            }
+        } else {
+            // An internal module (`mod foo { /* ... */ }`);
+            if let Some(path) = find_path_value(&item.attrs) {
+                // All `#[path]` files are treated as though they are a `mod.rs` file.
+                self.directory = Directory {
+                    path: Path::new(&path.as_str()).to_path_buf(),
+                    ownership: DirectoryOwnership::Owned { relative: None },
+                };
+            } else {
+                self.push_inline_mod_directory(item.ident, &item.attrs);
+            }
+        }
+        Ok(Some(old_directory))
     }
 
     fn find_external_module(
@@ -123,7 +184,7 @@ impl<'a, 'b> ModResolver<'a, 'b> {
             mod_name,
             relative,
             &self.directory.path,
-            self.source_map,
+            self.parse_sess.source_map(),
         )
         .result
         {
