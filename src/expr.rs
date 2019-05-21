@@ -1894,7 +1894,8 @@ pub(crate) enum RhsTactics {
     Default,
     /// Put the rhs on the next line if it uses multiple line, without extra indentation.
     ForceNextLineWithoutIndent,
-    /// Allow overflowing max width if neither did not work.
+    /// Allow overflowing max width if neither `Default` nor `ForceNextLineWithoutIndent`
+    /// did not work.
     AllowOverflow,
 }
 
