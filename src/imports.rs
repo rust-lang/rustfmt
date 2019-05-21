@@ -478,7 +478,7 @@ impl UseTree {
 
         // Normalise foo::{bar} -> foo::bar
         if let UseSegment::List(ref list) = last {
-            if list.len() == 1 && format!("{}", list.first().unwrap()) != String::from("self") {
+            if list.len() == 1 && list[0].to_string() != "self" {
                 normalize_sole_list = true;
             }
         }
