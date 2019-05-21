@@ -1974,10 +1974,7 @@ fn choose_rhs<R: Rewrite>(
                 }
                 (None, Some(ref new_rhs)) => Some(format!("{}{}", new_indent_str, new_rhs)),
                 (None, None) if rhs_tactics == RhsTactics::AllowOverflow => {
-                    let shape = Shape {
-                        width: 8096, // 8096 is close to infinite for rustfmt.
-                        ..shape
-                    };
+                    let shape = shape.infinite_width();
                     expr.rewrite(context, shape).map(|s| format!(" {}", s))
                 }
                 (None, None) => None,
