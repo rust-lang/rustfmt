@@ -635,7 +635,7 @@ Argument density in functions
 
 - **Default value**: `"Tall"`
 - **Possible values**: `"Compressed"`, `"Tall"`, `"Vertical"`
-- **Stable**: No (tracking issue: #3375)
+- **Stable**: Yes
 
 #### `"Tall"` (default):
 
