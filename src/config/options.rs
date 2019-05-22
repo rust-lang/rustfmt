@@ -61,7 +61,7 @@ pub enum IndentStyle {
 pub enum Density {
     /// Fit as much on one line as possible.
     Compressed,
-    /// Use more lines.
+    /// Items are placed horizontally if sufficient space, vertically otherwise.
     Tall,
     /// Place every item on a separate line.
     Vertical,
