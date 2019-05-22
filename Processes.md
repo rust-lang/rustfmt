@@ -40,6 +40,10 @@ E.g., https://github.com/rust-lang/rustfmt/commit/5274b49caa1a7db6ac10c76bf1a3d5
 
 ## 3. Create a release tag
 
+```sh
+git tag -s v1.2.3 -m "Release 1.2.3"
+```
+
 ## 4. Publish to crates.io
 
 `cargo publish`
