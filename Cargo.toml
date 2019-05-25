@@ -62,6 +62,9 @@ structopt = "0.2.15"
 
 config_proc_macro = { path = "config_proc_macro" }
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["errhandlingapi", "fileapi"] }
+
 # A noop dependency that changes in the Rust repository, it's a bit of a hack.
 # See the `src/tools/rustc-workspace-hack/README.md` file in `rust-lang/rust`
 # for more information.

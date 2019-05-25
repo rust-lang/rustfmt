@@ -1,7 +1,8 @@
 use std::borrow::Cow;
+use std::io;
+use std::path;
 
 use bytecount;
-
 use rustc_target::spec::abi;
 use syntax::ast::{
     self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NestedMetaItemKind,
@@ -613,6 +614,47 @@ impl NodeIdExt for NodeId {
 
 pub(crate) fn unicode_str_width(s: &str) -> usize {
     s.width()
+}
+
+#[cfg(windows)]
+pub fn absolute_path<P: AsRef<path::Path>>(p: P) -> io::Result<path::PathBuf> {
+    use std::ffi::OsString;
+    use std::iter::once;
+    use std::os::windows::ffi::{OsStrExt, OsStringExt};
+    use std::ptr::null_mut;
+    use winapi::um::errhandlingapi::GetLastError;
+    use winapi::um::fileapi::GetFullPathNameW;
+
+    // FIXME: This `MAX_PATH` may be valid only from Windows 10, version 1607.
+    // https://docs.microsoft.com/ja-jp/windows/desktop/FileIO/naming-a-file#paths
+    const MAX_PATH: usize = 32767;
+    let wide: Vec<u16> = p
+        .as_ref()
+        .as_os_str()
+        .encode_wide()
+        .chain(once(0))
+        .collect();
+    let mut buffer: Vec<u16> = vec![0; MAX_PATH];
+    unsafe {
+        let result = GetFullPathNameW(
+            wide.as_ptr(),
+            MAX_PATH as u32,
+            buffer.as_mut_ptr(),
+            null_mut(),
+        );
+        if result == 0 {
+            Err(std::io::Error::from_raw_os_error(GetLastError() as i32))
+        } else {
+            Ok(path::PathBuf::from(OsString::from_wide(
+                &buffer[..result as usize],
+            )))
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn absolute_path<P: AsRef<path::Path>>(p: P) -> io::Result<path::PathBuf> {
+    std::fs::canonicalize(p)
 }
 
 pub(crate) fn get_skip_macro_names(attrs: &[ast::Attribute]) -> Vec<String> {

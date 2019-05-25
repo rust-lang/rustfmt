@@ -15,8 +15,8 @@ use failure::err_msg;
 use getopts::{Matches, Options};
 
 use crate::rustfmt::{
-    load_config, CliOptions, Color, Config, Edition, EmitMode, ErrorKind, FileLines, FileName,
-    FormatReportFormatterBuilder, Input, Session, Verbosity,
+    absolute_path, load_config, CliOptions, Color, Config, Edition, EmitMode, ErrorKind, FileLines,
+    FileName, FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
 
 fn main() {
@@ -432,9 +432,9 @@ fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
         .iter()
         .map(|s| {
             let p = PathBuf::from(s);
-            // we will do comparison later, so here tries to canonicalize first
-            // to get the expected behavior.
-            p.canonicalize().unwrap_or(p)
+            // we will do comparison later, so here tries to get the absolute
+            // path first to get the expected behavior.
+            absolute_path(&p).unwrap_or(p)
         })
         .collect();
 

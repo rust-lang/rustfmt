@@ -9,6 +9,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
+#[cfg(windows)]
+extern crate winapi;
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -32,6 +35,7 @@ pub use crate::config::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName, NewlineStyle,
     Range, Verbosity,
 };
+pub use crate::utils::absolute_path;
 
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
 
