@@ -3,6 +3,7 @@
 use syntax::ast;
 use syntax::source_map::{BytePos, Span, DUMMY_SP};
 
+use self::doc_comment::DocCommentFormatter;
 use crate::comment::{contains_comment, rewrite_doc_comment, CommentStyle};
 use crate::config::lists::*;
 use crate::config::IndentStyle;
@@ -13,6 +14,8 @@ use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::types::{rewrite_path, PathContext};
 use crate::utils::{count_newlines, mk_sp};
+
+mod doc_comment;
 
 /// Returns attributes on the given statement.
 pub(crate) fn get_attrs_from_stmt(stmt: &ast::Stmt) -> &[ast::Attribute] {
@@ -53,12 +56,11 @@ fn is_derive(attr: &ast::Attribute) -> bool {
 }
 
 /// Returns the arguments of `#[derive(...)]`.
-fn get_derive_spans(attr: &ast::Attribute) -> Option<Vec<Span>> {
+fn get_derive_spans<'a>(attr: &'a ast::Attribute) -> Option<impl Iterator<Item = Span> + 'a> {
     attr.meta_item_list().map(|meta_item_list| {
         meta_item_list
-            .iter()
+            .into_iter()
             .map(|nested_meta_item| nested_meta_item.span)
-            .collect()
     })
 }
 
@@ -331,11 +333,9 @@ impl Rewrite for ast::Attribute {
                             ast::AttrStyle::Outer => CommentStyle::TripleSlash,
                         };
 
-                        // Remove possible whitespace from the `CommentStyle::opener()` so that
-                        // the literal itself has control over the comment's leading spaces.
-                        let opener = comment_style.opener().trim_end();
-
-                        let doc_comment = format!("{}{}", opener, literal);
+                        let doc_comment_formatter =
+                            DocCommentFormatter::new(literal.as_str().get(), comment_style);
+                        let doc_comment = format!("{}", doc_comment_formatter);
                         return rewrite_doc_comment(
                             &doc_comment,
                             shape.comment(context.config),
@@ -411,10 +411,11 @@ impl<'a> Rewrite for [ast::Attribute] {
             // Handle derives if we will merge them.
             if context.config.merge_derives() && is_derive(&attrs[0]) {
                 let derives = take_while_with_pred(context, attrs, is_derive);
-                let mut derive_spans = vec![];
-                for derive in derives {
-                    derive_spans.append(&mut get_derive_spans(derive)?);
-                }
+                let derive_spans: Vec<_> = derives
+                    .iter()
+                    .filter_map(get_derive_spans)
+                    .flatten()
+                    .collect();
                 let derive_str =
                     format_derive(&derive_spans, attr_prefix(&attrs[0]), shape, context)?;
                 result.push_str(&derive_str);
