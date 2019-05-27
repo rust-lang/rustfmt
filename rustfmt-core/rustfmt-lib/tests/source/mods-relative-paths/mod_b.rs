@@ -1,0 +1,7 @@
+fn
+
+
+
+foo() {
+               println!("toto")
+}
