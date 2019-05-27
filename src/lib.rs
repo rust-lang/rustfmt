@@ -9,9 +9,6 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
-#[cfg(windows)]
-extern crate winapi;
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
