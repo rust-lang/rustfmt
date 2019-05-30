@@ -92,7 +92,7 @@ create_config! {
         the same line with the pattern of arms";
     force_multiline_blocks: bool, false, false,
         "Force multiline closure bodies and match arms to be wrapped in a block";
-    fn_args_layout: ItemsLayout, ItemsLayout::Tall, true,
+    fn_args_layout: Density, Density::Tall, true,
         "Control the layout of arguments in a function";
     brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
     control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,

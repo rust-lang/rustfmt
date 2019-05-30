@@ -58,7 +58,8 @@ pub enum IndentStyle {
 
 #[config_type]
 /// How to place a list-like items.
-pub enum ItemsLayout {
+/// FIXME: Issue-3581: this should be renamed to ItemsLayout when publishing 2.0
+pub enum Density {
     /// Fit as much on one line as possible.
     Compressed,
     /// Items are placed horizontally if sufficient space, vertically otherwise.
@@ -87,13 +88,13 @@ pub enum Heuristics {
     Default,
 }
 
-impl ItemsLayout {
+impl Density {
     pub fn to_list_tactic(self, len: usize) -> ListTactic {
         match self {
-            ItemsLayout::Compressed => ListTactic::Mixed,
-            ItemsLayout::Tall => ListTactic::HorizontalVertical,
-            ItemsLayout::Vertical if len == 1 => ListTactic::Horizontal,
-            ItemsLayout::Vertical => ListTactic::Vertical,
+            Density::Compressed => ListTactic::Mixed,
+            Density::Tall => ListTactic::HorizontalVertical,
+            Density::Vertical if len == 1 => ListTactic::Horizontal,
+            Density::Vertical => ListTactic::Vertical,
         }
     }
 }
