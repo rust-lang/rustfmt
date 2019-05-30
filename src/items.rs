@@ -1167,7 +1167,7 @@ impl<'a> Rewrite for TraitAliasBounds<'a> {
             &self.generics.where_clause,
             context.config.brace_style(),
             shape,
-            Density::Compressed,
+            false,
             ";",
             None,
             self.generics.where_clause.span.lo(),
