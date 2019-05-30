@@ -631,7 +631,7 @@ trailing whitespaces.
 
 ## `fn_args_layout`
 
-Argument density in functions
+Control the layout of arguments in a function
 
 - **Default value**: `"Tall"`
 - **Possible values**: `"Compressed"`, `"Tall"`, `"Vertical"`
