@@ -2386,7 +2386,7 @@ fn rewrite_args(
         &arg_items,
         context
             .config
-            .fn_args_density()
+            .fn_args_layout()
             .to_list_tactic(arg_items.len()),
         Separator::Comma,
         one_line_budget,

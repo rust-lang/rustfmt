@@ -629,7 +629,7 @@ trailing whitespaces.
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: #3392)
 
-## `fn_args_density`
+## `fn_args_layout`
 
 Argument density in functions
 
