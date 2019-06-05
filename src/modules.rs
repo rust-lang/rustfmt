@@ -74,7 +74,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
 
         // Skip visiting sub modules when the input is from stdin.
         if self.recursive {
-            self.visit_mod_(&krate.module)?;
+            self.visit_mod_from_ast(&krate.module)?;
         }
 
         self.file_map.insert(
@@ -85,14 +85,15 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     }
 
     fn visit_mac(&mut self, item: &'ast ast::Item) -> Result<(), String> {
+    /// Visit macro calls and look for module declarations. Currently only supports `cfg_if` macro.
         let mut visitor =
             visitor::CfgIfVisitor::new(self.parse_sess, self.directory.to_syntax_directory());
         visitor.visit_item(item);
         for module_item in visitor.mods() {
             if let ast::ItemKind::Mod(ref sub_mod) = module_item.item.node {
                 let cow_sub_mod = Cow::Owned(sub_mod.clone());
-                if let Some(old_directory) = self.visit_sub_mod(&module_item.item, &cow_sub_mod)? {
-                    self.visit_mod(cow_sub_mod)?;
+                if let Some(old_directory) = self.peek_sub_mod(&module_item.item, &cow_sub_mod)? {
+                    self.visit_mod_from_macro(cow_sub_mod)?;
                     self.directory = old_directory;
                 }
             }
@@ -100,12 +101,13 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         Ok(())
     }
 
-    fn visit_mod(&mut self, module: Cow<'ast, ast::Mod>) -> Result<(), String> {
+    /// Visit modules defined inside macro calls.
+    fn visit_mod_from_macro(&mut self, module: Cow<'ast, ast::Mod>) -> Result<(), String> {
         for item in &module.items {
             if let ast::ItemKind::Mod(ref sub_mod) = item.node {
                 let cow_sub_mod = Cow::Owned(sub_mod.clone());
-                if let Some(old_directory) = self.visit_sub_mod(item, &cow_sub_mod)? {
-                    self.visit_mod(cow_sub_mod)?;
+                if let Some(old_directory) = self.peek_sub_mod(item, &cow_sub_mod)? {
+                    self.visit_mod_from_macro(cow_sub_mod)?;
                     self.directory = old_directory;
                 }
             }
@@ -113,15 +115,16 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         Ok(())
     }
 
-    fn visit_mod_(&mut self, module: &'ast ast::Mod) -> Result<(), String> {
+    /// Visit modules from AST.
+    fn visit_mod_from_ast(&mut self, module: &'ast ast::Mod) -> Result<(), String> {
         for item in &module.items {
             if let ast::ItemKind::Mac(..) = item.node {
                 self.visit_mac(item)?;
             }
 
             if let ast::ItemKind::Mod(ref sub_mod) = item.node {
-                if let Some(old_directory) = self.visit_sub_mod(item, &Cow::Borrowed(sub_mod))? {
-                    self.visit_mod_(sub_mod)?;
+                if let Some(old_directory) = self.peek_sub_mod(item, &Cow::Borrowed(sub_mod))? {
+                    self.visit_mod_from_ast(sub_mod)?;
                     self.directory = old_directory;
                 }
             }
@@ -129,7 +132,14 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         Ok(())
     }
 
-    fn visit_sub_mod(
+    /// Inspect the given sub-module which we are about to visit and update the state of
+    /// `ModResolver` based on the kind of the sub-module.
+    /// Returns an error if we cannot find a file that corresponds to the sub-module.
+    /// Returns one of the followings on success:
+    /// - If we should not visit the sub-module (e.g., it has #[rustfmt::skip]), `Ok(None)`.
+    /// - If we should visit the sub-module, `Some(Directory)`, which should be restored after
+    ///   visiting the sub-module.
+    fn peek_sub_mod(
         &mut self,
         item: &'c ast::Item,
         sub_mod: &Cow<'ast, ast::Mod>,
@@ -167,6 +177,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         Ok(Some(old_directory))
     }
 
+    /// Find a file path in the filesystem which corresponds to the given module.
     fn find_external_module(
         &self,
         mod_name: ast::Ident,
