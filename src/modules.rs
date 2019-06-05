@@ -84,11 +84,11 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         Ok(self.file_map)
     }
 
-    fn visit_mac(&mut self, item: &'ast ast::Item) -> Result<(), String> {
     /// Visit macro calls and look for module declarations. Currently only supports `cfg_if` macro.
+    fn visit_mac(&mut self, item: Cow<'ast, ast::Item>) -> Result<(), String> {
         let mut visitor =
             visitor::CfgIfVisitor::new(self.parse_sess, self.directory.to_syntax_directory());
-        visitor.visit_item(item);
+        visitor.visit_item(&item);
         for module_item in visitor.mods() {
             if let ast::ItemKind::Mod(ref sub_mod) = module_item.item.node {
                 let cow_sub_mod = Cow::Owned(sub_mod.clone());
@@ -104,6 +104,10 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     /// Visit modules defined inside macro calls.
     fn visit_mod_from_macro(&mut self, module: Cow<'ast, ast::Mod>) -> Result<(), String> {
         for item in &module.items {
+            if let ast::ItemKind::Mac(..) = item.node {
+                self.visit_mac(Cow::Owned(item.clone().into_inner()))?;
+            }
+
             if let ast::ItemKind::Mod(ref sub_mod) = item.node {
                 let cow_sub_mod = Cow::Owned(sub_mod.clone());
                 if let Some(old_directory) = self.peek_sub_mod(item, &cow_sub_mod)? {
@@ -119,7 +123,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     fn visit_mod_from_ast(&mut self, module: &'ast ast::Mod) -> Result<(), String> {
         for item in &module.items {
             if let ast::ItemKind::Mac(..) = item.node {
-                self.visit_mac(item)?;
+                self.visit_mac(Cow::Borrowed(item))?;
             }
 
             if let ast::ItemKind::Mod(ref sub_mod) = item.node {
