@@ -25,6 +25,9 @@ const SKIP_FILE_WHITE_LIST: &[&str] = &[
     // so we do not want to test this file directly.
     "configs/skip_children/foo/mod.rs",
     "issue-3434/no_entry.rs",
+    // These files and directory are a part of modules defined inside `cfg_if!`.
+    "cfg_if/mod.rs",
+    "cfg_if/detect",
 ];
 
 struct TestSetting {
@@ -56,7 +59,7 @@ where
 fn is_file_skip(path: &Path) -> bool {
     SKIP_FILE_WHITE_LIST
         .iter()
-        .any(|file_path| path.ends_with(file_path))
+        .any(|file_path| path.to_str().map_or(false, |s| s.contains(file_path)))
 }
 
 // Returns a `Vec` containing `PathBuf`s of files with an  `rs` extension in the
