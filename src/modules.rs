@@ -40,6 +40,15 @@ impl<'a> Directory {
     }
 }
 
+enum SubModKind {
+    /// `mod foo;`
+    External(PathBuf, DirectoryOwnership),
+    /// `#[path = "..."] mod foo {}`
+    InternalWithPath(PathBuf),
+    /// `mod foo {}`
+    Internal,
+}
+
 impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     /// Creates a new `ModResolver`.
     pub(crate) fn new(
@@ -91,11 +100,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         visitor.visit_item(&item);
         for module_item in visitor.mods() {
             if let ast::ItemKind::Mod(ref sub_mod) = module_item.item.node {
-                let cow_sub_mod = Cow::Owned(sub_mod.clone());
-                if let Some(old_directory) = self.peek_sub_mod(&module_item.item, &cow_sub_mod)? {
-                    self.visit_mod_from_macro(cow_sub_mod)?;
-                    self.directory = old_directory;
-                }
+                self.visit_mod_inner(&item, Cow::Owned(sub_mod.clone()))?;
             }
         }
         Ok(())
@@ -109,13 +114,21 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             }
 
             if let ast::ItemKind::Mod(ref sub_mod) = item.node {
-                let cow_sub_mod = Cow::Owned(sub_mod.clone());
-                if let Some(old_directory) = self.peek_sub_mod(item, &cow_sub_mod)? {
-                    self.visit_mod_from_macro(cow_sub_mod)?;
-                    self.directory = old_directory;
-                }
+                self.visit_mod_inner(item, Cow::Owned(sub_mod.clone()))?;
             }
         }
+        Ok(())
+    }
+
+    fn visit_mod_inner(
+        &mut self,
+        item: &'c ast::Item,
+        sub_mod: Cow<'ast, ast::Mod>,
+    ) -> Result<(), String> {
+        let old_directory = self.directory.clone();
+        self.visit_sub_mod(item, &sub_mod)?;
+        self.visit_mod_from_macro(sub_mod)?;
+        self.directory = old_directory;
         Ok(())
     }
 
@@ -127,58 +140,62 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             }
 
             if let ast::ItemKind::Mod(ref sub_mod) = item.node {
-                if let Some(old_directory) = self.peek_sub_mod(item, &Cow::Borrowed(sub_mod))? {
-                    self.visit_mod_from_ast(sub_mod)?;
-                    self.directory = old_directory;
-                }
+                self.visit_mod_inner(item, Cow::Borrowed(sub_mod))?;
             }
         }
         Ok(())
     }
 
-    /// Inspect the given sub-module which we are about to visit and update the state of
-    /// `ModResolver` based on the kind of the sub-module.
-    /// Returns an error if we cannot find a file that corresponds to the sub-module.
-    /// Returns one of the followings on success:
-    /// - If we should not visit the sub-module (e.g., it has #[rustfmt::skip]), `Ok(None)`.
-    /// - If we should visit the sub-module, `Some(Directory)`, which should be restored after
-    ///   visiting the sub-module.
-    fn peek_sub_mod(
+    fn visit_sub_mod(
         &mut self,
         item: &'c ast::Item,
         sub_mod: &Cow<'ast, ast::Mod>,
-    ) -> Result<Option<Directory>, String> {
+    ) -> Result<(), String> {
+        match self.peek_sub_mod(item)? {
+            Some(SubModKind::External(mod_path, directory_ownership)) => {
+                self.file_map.insert(
+                    FileName::Real(mod_path.clone()),
+                    (sub_mod.clone(), item.ident.name.as_str().get().to_owned()),
+                );
+                self.directory = Directory {
+                    path: mod_path.parent().unwrap().to_path_buf(),
+                    ownership: directory_ownership,
+                };
+            }
+            Some(SubModKind::InternalWithPath(mod_path)) => {
+                // All `#[path]` files are treated as though they are a `mod.rs` file.
+                self.directory = Directory {
+                    path: mod_path,
+                    ownership: DirectoryOwnership::Owned { relative: None },
+                };
+            }
+            Some(SubModKind::Internal) => self.push_inline_mod_directory(item.ident, &item.attrs),
+            None => (), // rustfmt::skip
+        }
+        Ok(())
+    }
+
+    /// Inspect the given sub-module which we are about to visit and returns its kind.
+    fn peek_sub_mod(&self, item: &'c ast::Item) -> Result<Option<SubModKind>, String> {
         if contains_skip(&item.attrs) {
             return Ok(None);
         }
 
-        let old_directory = self.directory.clone();
         if is_mod_decl(item) {
             // mod foo;
             // Look for an extern file.
             let (mod_path, directory_ownership) =
                 self.find_external_module(item.ident, &item.attrs)?;
-            self.file_map.insert(
-                FileName::Real(mod_path.clone()),
-                (sub_mod.clone(), item.ident.name.as_str().get().to_owned()),
-            );
-            self.directory = Directory {
-                path: mod_path.parent().unwrap().to_path_buf(),
-                ownership: directory_ownership,
-            }
+            Ok(Some(SubModKind::External(mod_path, directory_ownership)))
         } else {
             // An internal module (`mod foo { /* ... */ }`);
             if let Some(path) = find_path_value(&item.attrs) {
-                // All `#[path]` files are treated as though they are a `mod.rs` file.
-                self.directory = Directory {
-                    path: Path::new(&path.as_str()).to_path_buf(),
-                    ownership: DirectoryOwnership::Owned { relative: None },
-                };
+                let path = Path::new(&path.as_str()).to_path_buf();
+                Ok(Some(SubModKind::InternalWithPath(path)))
             } else {
-                self.push_inline_mod_directory(item.ident, &item.attrs);
+                Ok(Some(SubModKind::Internal))
             }
         }
-        Ok(Some(old_directory))
     }
 
     /// Find a file path in the filesystem which corresponds to the given module.
