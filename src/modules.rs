@@ -100,7 +100,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         visitor.visit_item(&item);
         for module_item in visitor.mods() {
             if let ast::ItemKind::Mod(ref sub_mod) = module_item.item.node {
-                self.visit_mod_inner(&item, Cow::Owned(sub_mod.clone()))?;
+                self.visit_mod_from_mac_inner(&item, Cow::Owned(sub_mod.clone()))?;
             }
         }
         Ok(())
@@ -114,13 +114,13 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             }
 
             if let ast::ItemKind::Mod(ref sub_mod) = item.node {
-                self.visit_mod_inner(item, Cow::Owned(sub_mod.clone()))?;
+                self.visit_mod_from_mac_inner(item, Cow::Owned(sub_mod.clone()))?;
             }
         }
         Ok(())
     }
 
-    fn visit_mod_inner(
+    fn visit_mod_from_mac_inner(
         &mut self,
         item: &'c ast::Item,
         sub_mod: Cow<'ast, ast::Mod>,
@@ -140,7 +140,10 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             }
 
             if let ast::ItemKind::Mod(ref sub_mod) = item.node {
-                self.visit_mod_inner(item, Cow::Borrowed(sub_mod))?;
+                let old_directory = self.directory.clone();
+                self.visit_sub_mod(item, &Cow::Borrowed(sub_mod))?;
+                self.visit_mod_from_ast(sub_mod)?;
+                self.directory = old_directory;
             }
         }
         Ok(())
