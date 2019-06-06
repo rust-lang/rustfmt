@@ -765,6 +765,7 @@ pub(crate) fn format_impl(
         }
 
         result.push('{');
+        // this is an impl body snippet(impl SampleImple { /* here */ })
         let snippet = context.snippet(mk_sp(item.span.hi(), self_ty.span.hi()));
         let open_pos = snippet.find_uncommented("{")? + 1;
 
