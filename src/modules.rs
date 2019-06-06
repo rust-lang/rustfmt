@@ -359,7 +359,6 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 .is_some()
             {
                 // If the specfied file is already parsed, then we just use that.
-                println!("{:?} already parsed", actual_path);
                 result.push((
                     actual_path,
                     DirectoryOwnership::Owned { relative: None },
@@ -367,7 +366,6 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 ));
                 continue;
             }
-            println!("Trying to parse {:?}", actual_path);
             let mut parser = new_sub_parser_from_file(
                 self.parse_sess,
                 &actual_path,
@@ -375,7 +373,6 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 None,
                 DUMMY_SP,
             );
-            println!("Created a parser");
             parser.cfg_mods = false;
             let lo = parser.span;
             let mod_attrs = match parse_inner_attributes(&mut parser) {
@@ -386,7 +383,6 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     continue;
                 }
             };
-            println!("Parsed mod_attrs: {:?}", mod_attrs);
             let m = match parse_mod_items(&mut parser, lo) {
                 Ok(m) => m,
                 Err(mut e) => {
@@ -395,7 +391,6 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     continue;
                 }
             };
-            println!("path: {:?}, m: {:?}", path, m.inner);
             result.push((
                 actual_path,
                 DirectoryOwnership::Owned { relative: None },
