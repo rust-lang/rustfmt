@@ -354,6 +354,9 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         for path in path_visitor.paths() {
             let mut actual_path = self.directory.path.clone();
             actual_path.push(&path);
+            if !actual_path.exists() {
+                continue;
+            }
             let file_name = syntax_pos::FileName::Real(actual_path.clone());
             if self
                 .parse_sess
