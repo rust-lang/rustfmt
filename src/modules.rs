@@ -267,14 +267,9 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         }
 
         // Look for nested path, like `#[cfg_attr(feature = "foo", path = "bar.rs")]`.
-        match self.find_mods_ouside_of_ast(attrs, sub_mod) {
-            Some(mods) => {
-                if !mods.is_empty() {
-                    return Ok(SubModKind::MultiExternal(mods));
-                }
-            }
-            _ => (),
-        }
+        let mut mods_outside_ast = self
+            .find_mods_ouside_of_ast(attrs, sub_mod)
+            .unwrap_or(vec![]);
 
         let relative = match self.directory.ownership {
             DirectoryOwnership::Owned { relative } => relative,
@@ -292,7 +287,15 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 path,
                 directory_ownership,
                 ..
-            }) => Ok(SubModKind::External(path, directory_ownership)),
+            }) => Ok(if mods_outside_ast.is_empty() {
+                SubModKind::External(path, directory_ownership)
+            } else {
+                mods_outside_ast.push((path, directory_ownership, sub_mod.clone()));
+                SubModKind::MultiExternal(mods_outside_ast)
+            }),
+            Err(_) if !mods_outside_ast.is_empty() => {
+                Ok(SubModKind::MultiExternal(mods_outside_ast))
+            }
             Err(_) => Err(format!(
                 "Failed to find module {} in {:?} {:?}",
                 mod_name, self.directory.path, relative,
@@ -375,7 +378,8 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             );
             parser.cfg_mods = false;
             let lo = parser.span;
-            let mod_attrs = match parse_inner_attributes(&mut parser) {
+            // FIXME(topecongiro) Format inner attributes (#3606).
+            let _mod_attrs = match parse_inner_attributes(&mut parser) {
                 Ok(attrs) => attrs,
                 Err(mut e) => {
                     e.cancel();
