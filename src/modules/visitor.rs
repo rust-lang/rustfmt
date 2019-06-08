@@ -138,11 +138,7 @@ fn lit_to_str(lit: &ast::Lit) -> String {
 #[cfg(windows)]
 fn lit_to_str(lit: &ast::Lit) -> String {
     match lit.node {
-        ast::LitKind::Str(symbol, ..) => {
-            let mut s = symbol.as_str();
-            s.replace("/", "\\");
-            s.to_owned()
-        }
+        ast::LitKind::Str(symbol, ..) => symtol.as_str().replace("/", "\\"),
         _ => unreachable!(),
     }
 }
