@@ -138,7 +138,7 @@ fn lit_to_str(lit: &ast::Lit) -> String {
 #[cfg(windows)]
 fn lit_to_str(lit: &ast::Lit) -> String {
     match lit.node {
-        ast::LitKind::Str(symbol, ..) => symtol.as_str().replace("/", "\\"),
+        ast::LitKind::Str(symbol, ..) => symbol.as_str().replace("/", "\\"),
         _ => unreachable!(),
     }
 }
