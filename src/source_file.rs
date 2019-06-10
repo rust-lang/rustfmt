@@ -8,7 +8,7 @@ use crate::config::FileName;
 use crate::emitter::{self, Emitter};
 
 #[cfg(test)]
-use crate::config::{Config, EmitMode};
+use crate::config::Config;
 #[cfg(test)]
 use crate::create_emitter;
 #[cfg(test)]
@@ -30,15 +30,11 @@ where
 {
     let mut emitter = create_emitter(config);
 
-    if config.emit_mode() == EmitMode::Checkstyle {
-        write!(out, "{}", crate::checkstyle::header())?;
-    }
+    emitter.emit_header(out)?;
     for &(ref filename, ref text) in source_file {
         write_file(None, filename, text, out, &mut *emitter)?;
     }
-    if config.emit_mode() == EmitMode::Checkstyle {
-        write!(out, "{}", crate::checkstyle::footer())?;
-    }
+    emitter.emit_footer(out)?;
 
     Ok(())
 }

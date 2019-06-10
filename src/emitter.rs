@@ -27,6 +27,14 @@ pub(crate) trait Emitter<W> {
         output: &mut W,
         formatted_file: FormattedFile<'_>,
     ) -> Result<bool, io::Error>;
+
+    fn emit_header(&self, _output: &mut W) -> Result<(), io::Error> {
+        Ok(())
+    }
+
+    fn emit_footer(&self, _output: &mut W) -> Result<(), io::Error> {
+        Ok(())
+    }
 }
 
 fn ensure_real_path(filename: &FileName) -> &Path {

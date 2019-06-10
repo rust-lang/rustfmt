@@ -409,12 +409,12 @@ pub struct Session<'b, T: Write> {
 }
 
 impl<'b, T: Write + 'b> Session<'b, T> {
-    pub fn new(config: Config, out: Option<&'b mut T>) -> Session<'b, T> {
-        if config.emit_mode() == EmitMode::Checkstyle {
-            println!("{}", checkstyle::header());
-        }
-
+    pub fn new(config: Config, mut out: Option<&'b mut T>) -> Session<'b, T> {
         let emitter = create_emitter(&config);
+
+        if let Some(ref mut out) = out {
+            let _ = emitter.emit_header(out);
+        }
 
         Session {
             config,
@@ -493,8 +493,8 @@ where
 
 impl<'b, T: Write + 'b> Drop for Session<'b, T> {
     fn drop(&mut self) {
-        if self.config.emit_mode() == EmitMode::Checkstyle {
-            println!("{}", checkstyle::footer());
+        if let Some(ref mut out) = self.out {
+            let _ = self.emitter.emit_footer(out);
         }
     }
 }
