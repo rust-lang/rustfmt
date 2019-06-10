@@ -22,7 +22,7 @@ pub(crate) struct FormattedFile<'a> {
 }
 
 pub(crate) trait Emitter<W> {
-    fn write_file(
+    fn emit_formatted_file(
         &mut self,
         output: &mut W,
         formatted_file: FormattedFile<'_>,

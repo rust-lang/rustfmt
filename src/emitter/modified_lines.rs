@@ -14,7 +14,7 @@ impl<W> Emitter<W> for ModifiedLinesEmitter
 where
     W: Write,
 {
-    fn write_file(
+    fn emit_formatted_file(
         &mut self,
         output: &mut W,
         FormattedFile {

@@ -10,7 +10,7 @@ impl FilesWithBackupEmitter {
 }
 
 impl<W> Emitter<W> for FilesWithBackupEmitter {
-    fn write_file(
+    fn emit_formatted_file(
         &mut self,
         _output: &mut W,
         FormattedFile {

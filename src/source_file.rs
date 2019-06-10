@@ -84,7 +84,7 @@ where
     };
 
     let mut emitter = create_emitter(config);
-    emitter.write_file(out, formatted_file)
+    emitter.emit_formatted_file(out, formatted_file)
 }
 
 fn create_emitter<'a, W>(config: &'a Config) -> Box<dyn Emitter<W> + 'a>
