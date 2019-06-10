@@ -5,7 +5,7 @@ pub(crate) use self::files_with_backup::*;
 pub(crate) use self::modified_lines::*;
 pub(crate) use self::stdout::*;
 use crate::FileName;
-use std::io;
+use std::io::{self, Write};
 use std::path::Path;
 
 mod checkstyle;
@@ -21,18 +21,18 @@ pub(crate) struct FormattedFile<'a> {
     pub(crate) formatted_text: &'a str,
 }
 
-pub(crate) trait Emitter<W> {
+pub(crate) trait Emitter {
     fn emit_formatted_file(
         &self,
-        output: &mut W,
+        output: &mut dyn Write,
         formatted_file: FormattedFile<'_>,
     ) -> Result<bool, io::Error>;
 
-    fn emit_header(&self, _output: &mut W) -> Result<(), io::Error> {
+    fn emit_header(&self, _output: &mut dyn Write) -> Result<(), io::Error> {
         Ok(())
     }
 
-    fn emit_footer(&self, _output: &mut W) -> Result<(), io::Error> {
+    fn emit_footer(&self, _output: &mut dyn Write) -> Result<(), io::Error> {
         Ok(())
     }
 }

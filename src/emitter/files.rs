@@ -9,10 +9,10 @@ impl FilesEmitter {
     }
 }
 
-impl<W> Emitter<W> for FilesEmitter {
+impl Emitter for FilesEmitter {
     fn emit_formatted_file(
         &self,
-        _output: &mut W,
+        _output: &mut dyn Write,
         FormattedFile {
             filename,
             original_text,

@@ -10,13 +10,10 @@ impl ModifiedLinesEmitter {
     }
 }
 
-impl<W> Emitter<W> for ModifiedLinesEmitter
-where
-    W: Write,
-{
+impl Emitter for ModifiedLinesEmitter {
     fn emit_formatted_file(
         &self,
-        output: &mut W,
+        output: &mut dyn Write,
         FormattedFile {
             original_text,
             formatted_text,

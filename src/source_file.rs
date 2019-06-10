@@ -44,7 +44,7 @@ pub(crate) fn write_file<T>(
     filename: &FileName,
     formatted_text: &str,
     out: &mut T,
-    emitter: &dyn Emitter<T>,
+    emitter: &dyn Emitter,
 ) -> Result<bool, io::Error>
 where
     T: Write,

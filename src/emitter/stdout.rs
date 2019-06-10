@@ -12,13 +12,10 @@ impl StdoutEmitter {
     }
 }
 
-impl<W> Emitter<W> for StdoutEmitter
-where
-    W: Write,
-{
+impl Emitter for StdoutEmitter {
     fn emit_formatted_file(
         &self,
-        output: &mut W,
+        output: &mut dyn Write,
         FormattedFile {
             filename,
             formatted_text,

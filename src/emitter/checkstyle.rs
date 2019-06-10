@@ -11,21 +11,18 @@ impl CheckstyleEmitter {
     }
 }
 
-impl<W> Emitter<W> for CheckstyleEmitter
-where
-    W: Write,
-{
-    fn emit_header(&self, output: &mut W) -> Result<(), io::Error> {
+impl Emitter for CheckstyleEmitter {
+    fn emit_header(&self, output: &mut dyn Write) -> Result<(), io::Error> {
         write!(output, "{}", header())
     }
 
-    fn emit_footer(&self, output: &mut W) -> Result<(), io::Error> {
+    fn emit_footer(&self, output: &mut dyn Write) -> Result<(), io::Error> {
         write!(output, "{}", footer())
     }
 
     fn emit_formatted_file(
         &self,
-        output: &mut W,
+        output: &mut dyn Write,
         FormattedFile {
             filename,
             original_text,

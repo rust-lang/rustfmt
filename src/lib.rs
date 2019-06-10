@@ -405,7 +405,7 @@ pub struct Session<'b, T: Write> {
     pub out: Option<&'b mut T>,
     pub(crate) errors: ReportedErrors,
     source_file: SourceFile,
-    emitter: Box<dyn Emitter<&'b mut T> + 'b>,
+    emitter: Box<dyn Emitter + 'b>,
 }
 
 impl<'b, T: Write + 'b> Session<'b, T> {
@@ -475,10 +475,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
     }
 }
 
-pub(crate) fn create_emitter<'a, W>(config: &Config) -> Box<dyn Emitter<W> + 'a>
-where
-    W: Write,
-{
+pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
     match config.emit_mode() {
         EmitMode::Files if config.make_backup() => Box::new(emitter::FilesWithBackupEmitter::new()),
         EmitMode::Files => Box::new(emitter::FilesEmitter::new()),
