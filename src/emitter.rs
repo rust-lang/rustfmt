@@ -21,12 +21,17 @@ pub(crate) struct FormattedFile<'a> {
     pub(crate) formatted_text: &'a str,
 }
 
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EmitterResult {
+    pub(crate) has_diff: bool,
+}
+
 pub(crate) trait Emitter {
     fn emit_formatted_file(
         &self,
         output: &mut dyn Write,
         formatted_file: FormattedFile<'_>,
-    ) -> Result<bool, io::Error>;
+    ) -> Result<EmitterResult, io::Error>;
 
     fn emit_header(&self, _output: &mut dyn Write) -> Result<(), io::Error> {
         Ok(())

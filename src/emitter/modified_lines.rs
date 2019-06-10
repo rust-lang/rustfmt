@@ -20,11 +20,11 @@ impl Emitter for ModifiedLinesEmitter {
             formatted_text,
             ..
         }: FormattedFile<'_>,
-    ) -> Result<bool, io::Error> {
+    ) -> Result<EmitterResult, io::Error> {
         const CONTEXT_SIZE: usize = 0;
         let mismatch = make_diff(original_text, formatted_text, CONTEXT_SIZE);
         let has_diff = !mismatch.is_empty();
         write!(output, "{}", ModifiedLines::from(mismatch))?;
-        Ok(has_diff)
+        Ok(EmitterResult { has_diff })
     }
 }

@@ -19,7 +19,7 @@ impl Emitter for FilesWithBackupEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
-    ) -> Result<bool, io::Error> {
+    ) -> Result<EmitterResult, io::Error> {
         let filename = ensure_real_path(filename);
         if original_text != formatted_text {
             // Do a little dance to make writing safer - write to a temp file
@@ -32,6 +32,6 @@ impl Emitter for FilesWithBackupEmitter {
             fs::rename(filename, bk_name)?;
             fs::rename(tmp_name, filename)?;
         }
-        Ok(false)
+        Ok(EmitterResult::default())
     }
 }

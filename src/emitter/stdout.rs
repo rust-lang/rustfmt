@@ -22,11 +22,11 @@ impl Emitter for StdoutEmitter {
             formatted_text,
             ..
         }: FormattedFile<'_>,
-    ) -> Result<bool, io::Error> {
+    ) -> Result<EmitterResult, io::Error> {
         if self.verbosity != Verbosity::Quiet {
             println!("{}:\n", filename);
         }
         write!(output, "{}", formatted_text)?;
-        Ok(false)
+        Ok(EmitterResult::default())
     }
 }

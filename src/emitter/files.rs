@@ -19,12 +19,12 @@ impl Emitter for FilesEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
-    ) -> Result<bool, io::Error> {
+    ) -> Result<EmitterResult, io::Error> {
         // Write text directly over original file if there is a diff.
         let filename = ensure_real_path(filename);
         if original_text != formatted_text {
             fs::write(filename, formatted_text)?;
         }
-        Ok(false)
+        Ok(EmitterResult::default())
     }
 }
