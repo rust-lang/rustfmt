@@ -77,9 +77,9 @@ where
     };
 
     let formatted_file = emitter::FormattedFile {
+        filename,
         original_text: &original_text,
         formatted_text,
-        filename,
     };
 
     emitter.emit_formatted_file(out, formatted_file)

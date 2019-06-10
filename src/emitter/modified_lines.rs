@@ -18,8 +18,8 @@ where
         &self,
         output: &mut W,
         FormattedFile {
-            formatted_text,
             original_text,
+            formatted_text,
             ..
         }: FormattedFile<'_>,
     ) -> Result<bool, io::Error> {

@@ -17,10 +17,9 @@ impl<W> Emitter<W> for DiffEmitter {
         &self,
         _output: &mut W,
         FormattedFile {
-            formatted_text,
-            original_text,
             filename,
-            ..
+            original_text,
+            formatted_text,
         }: FormattedFile<'_>,
     ) -> Result<bool, io::Error> {
         let mismatch = make_diff(&original_text, formatted_text, 3);

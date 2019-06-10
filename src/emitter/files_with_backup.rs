@@ -14,10 +14,9 @@ impl<W> Emitter<W> for FilesWithBackupEmitter {
         &self,
         _output: &mut W,
         FormattedFile {
+            filename,
             original_text,
             formatted_text,
-            filename,
-            ..
         }: FormattedFile<'_>,
     ) -> Result<bool, io::Error> {
         let filename = ensure_real_path(filename);

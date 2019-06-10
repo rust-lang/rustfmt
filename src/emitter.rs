@@ -17,8 +17,8 @@ mod stdout;
 
 pub(crate) struct FormattedFile<'a> {
     pub(crate) filename: &'a FileName,
-    pub(crate) formatted_text: &'a str,
     pub(crate) original_text: &'a str,
+    pub(crate) formatted_text: &'a str,
 }
 
 pub(crate) trait Emitter<W> {

@@ -14,10 +14,9 @@ impl<W> Emitter<W> for FilesEmitter {
         &self,
         _output: &mut W,
         FormattedFile {
+            filename,
             original_text,
             formatted_text,
-            filename,
-            ..
         }: FormattedFile<'_>,
     ) -> Result<bool, io::Error> {
         // Write text directly over original file if there is a diff.

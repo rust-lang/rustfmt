@@ -27,10 +27,9 @@ where
         &self,
         output: &mut W,
         FormattedFile {
-            formatted_text,
-            original_text,
             filename,
-            ..
+            original_text,
+            formatted_text,
         }: FormattedFile<'_>,
     ) -> Result<bool, io::Error> {
         let filename = ensure_real_path(filename);
