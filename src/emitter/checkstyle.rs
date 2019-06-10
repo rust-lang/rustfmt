@@ -6,6 +6,7 @@ use std::path::Path;
 
 mod xml;
 
+#[derive(Debug, Default)]
 pub(crate) struct CheckstyleEmitter;
 
 impl CheckstyleEmitter {

@@ -1,6 +1,7 @@
 use super::*;
 use std::fs;
 
+#[derive(Debug, Default)]
 pub(crate) struct FilesEmitter;
 
 impl FilesEmitter {
