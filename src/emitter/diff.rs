@@ -2,17 +2,17 @@ use super::*;
 use crate::config::Config;
 use crate::rustfmt_diff::{make_diff, print_diff};
 
-pub(crate) struct DiffEmitter<'a> {
-    config: &'a Config,
+pub(crate) struct DiffEmitter {
+    config: Config,
 }
 
-impl<'a> DiffEmitter<'a> {
-    pub(crate) fn new(config: &'a Config) -> Self {
+impl DiffEmitter {
+    pub(crate) fn new(config: Config) -> Self {
         Self { config }
     }
 }
 
-impl<'a, W> Emitter<W> for DiffEmitter<'a> {
+impl<W> Emitter<W> for DiffEmitter {
     fn emit_formatted_file(
         &mut self,
         _output: &mut W,
@@ -28,7 +28,7 @@ impl<'a, W> Emitter<W> for DiffEmitter<'a> {
         print_diff(
             mismatch,
             |line_num| format!("Diff in {} at line {}:", filename, line_num),
-            self.config,
+            &self.config,
         );
         return Ok(has_diff);
     }

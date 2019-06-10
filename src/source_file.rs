@@ -4,12 +4,13 @@ use std::path::Path;
 
 use syntax::source_map::SourceMap;
 
-use crate::config::{Config, EmitMode, FileName};
-use crate::emitter::{
-    self, CheckstyleEmitter, DiffEmitter, Emitter, FilesEmitter, FilesWithBackupEmitter,
-    ModifiedLinesEmitter, StdoutEmitter,
-};
+use crate::config::FileName;
+use crate::emitter::{self, Emitter};
 
+#[cfg(test)]
+use crate::config::{Config, EmitMode};
+#[cfg(test)]
+use crate::create_emitter;
 #[cfg(test)]
 use crate::formatting::FileRecord;
 
@@ -27,11 +28,13 @@ pub(crate) fn write_all_files<T>(
 where
     T: Write,
 {
+    let mut emitter = create_emitter(config);
+
     if config.emit_mode() == EmitMode::Checkstyle {
         write!(out, "{}", crate::checkstyle::header())?;
     }
     for &(ref filename, ref text) in source_file {
-        write_file(None, filename, text, out, config)?;
+        write_file(None, filename, text, out, &mut *emitter)?;
     }
     if config.emit_mode() == EmitMode::Checkstyle {
         write!(out, "{}", crate::checkstyle::footer())?;
@@ -45,7 +48,7 @@ pub(crate) fn write_file<T>(
     filename: &FileName,
     formatted_text: &str,
     out: &mut T,
-    config: &Config,
+    emitter: &mut dyn Emitter<T>,
 ) -> Result<bool, io::Error>
 where
     T: Write,
@@ -83,20 +86,5 @@ where
         filename,
     };
 
-    let mut emitter = create_emitter(config);
     emitter.emit_formatted_file(out, formatted_file)
-}
-
-fn create_emitter<'a, W>(config: &'a Config) -> Box<dyn Emitter<W> + 'a>
-where
-    W: Write,
-{
-    match config.emit_mode() {
-        EmitMode::Files if config.make_backup() => Box::new(FilesWithBackupEmitter::new()),
-        EmitMode::Files => Box::new(FilesEmitter::new()),
-        EmitMode::Stdout | EmitMode::Coverage => Box::new(StdoutEmitter::new(config.verbose())),
-        EmitMode::ModifiedLines => Box::new(ModifiedLinesEmitter::new()),
-        EmitMode::Checkstyle => Box::new(CheckstyleEmitter::new()),
-        EmitMode::Diff => Box::new(DiffEmitter::new(config)),
-    }
 }

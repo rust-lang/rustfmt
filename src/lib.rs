@@ -23,6 +23,7 @@ use ignore;
 use syntax::{ast, parse::DirectoryOwnership};
 
 use crate::comment::LineClasses;
+use crate::emitter::Emitter;
 use crate::formatting::{FormatErrorMap, FormattingError, ReportedErrors, SourceFile};
 use crate::issues::Issue;
 use crate::shape::Indent;
@@ -404,6 +405,7 @@ pub struct Session<'b, T: Write> {
     pub out: Option<&'b mut T>,
     pub(crate) errors: ReportedErrors,
     source_file: SourceFile,
+    emitter: Box<dyn Emitter<&'b mut T> + 'b>,
 }
 
 impl<'b, T: Write + 'b> Session<'b, T> {
@@ -412,9 +414,12 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             println!("{}", checkstyle::header());
         }
 
+        let emitter = create_emitter(&config);
+
         Session {
             config,
             out,
+            emitter,
             errors: ReportedErrors::default(),
             source_file: SourceFile::new(),
         }
@@ -467,6 +472,22 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             || self.has_check_errors()
             || self.has_diff())
             || self.errors.has_macro_format_failure
+    }
+}
+
+pub(crate) fn create_emitter<'a, W>(config: &Config) -> Box<dyn Emitter<W> + 'a>
+where
+    W: Write,
+{
+    match config.emit_mode() {
+        EmitMode::Files if config.make_backup() => Box::new(emitter::FilesWithBackupEmitter::new()),
+        EmitMode::Files => Box::new(emitter::FilesEmitter::new()),
+        EmitMode::Stdout | EmitMode::Coverage => {
+            Box::new(emitter::StdoutEmitter::new(config.verbose()))
+        }
+        EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::new()),
+        EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::new()),
+        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
     }
 }
 
