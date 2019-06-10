@@ -46,7 +46,6 @@ mod release_channel;
 
 mod attr;
 mod chains;
-pub(crate) mod checkstyle;
 mod closures;
 mod comment;
 pub(crate) mod config;
