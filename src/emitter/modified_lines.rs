@@ -15,7 +15,7 @@ where
     W: Write,
 {
     fn emit_formatted_file(
-        &mut self,
+        &self,
         output: &mut W,
         FormattedFile {
             formatted_text,

@@ -23,7 +23,7 @@ pub(crate) struct FormattedFile<'a> {
 
 pub(crate) trait Emitter<W> {
     fn emit_formatted_file(
-        &mut self,
+        &self,
         output: &mut W,
         formatted_file: FormattedFile<'_>,
     ) -> Result<bool, io::Error>;

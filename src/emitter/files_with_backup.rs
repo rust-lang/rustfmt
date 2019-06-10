@@ -11,7 +11,7 @@ impl FilesWithBackupEmitter {
 
 impl<W> Emitter<W> for FilesWithBackupEmitter {
     fn emit_formatted_file(
-        &mut self,
+        &self,
         _output: &mut W,
         FormattedFile {
             original_text,

@@ -233,8 +233,7 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
         report: &mut FormatReport,
     ) -> Result<(), ErrorKind> {
         if let Some(ref mut out) = self.out {
-            match source_file::write_file(Some(source_map), &path, &result, out, &mut *self.emitter)
-            {
+            match source_file::write_file(Some(source_map), &path, &result, out, &*self.emitter) {
                 Ok(has_diff) if has_diff => report.add_diff(),
                 Err(e) => {
                     // Create a new error with path_str to help users see which files failed

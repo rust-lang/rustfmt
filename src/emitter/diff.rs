@@ -14,7 +14,7 @@ impl DiffEmitter {
 
 impl<W> Emitter<W> for DiffEmitter {
     fn emit_formatted_file(
-        &mut self,
+        &self,
         _output: &mut W,
         FormattedFile {
             formatted_text,
