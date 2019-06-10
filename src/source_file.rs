@@ -77,7 +77,21 @@ where
         None => fs::read_to_string(ensure_real_path(filename))?,
     };
 
-    let mut emitter: Box<dyn Emitter> = match config.emit_mode() {
+    let formatted_file = emitter::FormattedFile {
+        original_text: &original_text,
+        formatted_text,
+        filename,
+    };
+
+    let mut emitter = create_emitter(config, out);
+    emitter.write_file(formatted_file)
+}
+
+fn create_emitter<'a, W>(config: &'a Config, out: &'a mut W) -> Box<dyn Emitter + 'a>
+where
+    W: Write,
+{
+    match config.emit_mode() {
         EmitMode::Files if config.make_backup() => Box::new(FilesWithBackupEmitter::new()),
         EmitMode::Files => Box::new(FilesEmitter::new()),
         EmitMode::Stdout | EmitMode::Coverage => {
@@ -86,13 +100,5 @@ where
         EmitMode::ModifiedLines => Box::new(ModifiedLinesEmitter::new(out)),
         EmitMode::Checkstyle => Box::new(CheckstyleEmitter::new(out)),
         EmitMode::Diff => Box::new(DiffEmitter::new(config)),
-    };
-
-    let formatted_file = emitter::FormattedFile {
-        original_text: &original_text,
-        formatted_text,
-        filename,
-    };
-
-    emitter.write_file(formatted_file)
+    }
 }
