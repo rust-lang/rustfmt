@@ -4,9 +4,11 @@ use std::path::Path;
 
 use syntax::source_map::SourceMap;
 
-use crate::checkstyle::output_checkstyle_file;
-use crate::config::{Config, EmitMode, FileName, Verbosity};
-use crate::rustfmt_diff::{make_diff, print_diff, ModifiedLines};
+use crate::config::{Config, EmitMode, FileName};
+use crate::emitter::{
+    self, CheckstyleEmitter, DiffEmitter, Emitter, FilesEmitter, FilesWithBackupEmitter,
+    ModifiedLinesEmitter, StdoutEmitter,
+};
 
 #[cfg(test)]
 use crate::formatting::FileRecord;
@@ -75,59 +77,22 @@ where
         None => fs::read_to_string(ensure_real_path(filename))?,
     };
 
-    match config.emit_mode() {
-        EmitMode::Files if config.make_backup() => {
-            let filename = ensure_real_path(filename);
-            if original_text != formatted_text {
-                // Do a little dance to make writing safer - write to a temp file
-                // rename the original to a .bk, then rename the temp file to the
-                // original.
-                let tmp_name = filename.with_extension("tmp");
-                let bk_name = filename.with_extension("bk");
-
-                fs::write(&tmp_name, formatted_text)?;
-                fs::rename(filename, bk_name)?;
-                fs::rename(tmp_name, filename)?;
-            }
-        }
-        EmitMode::Files => {
-            // Write text directly over original file if there is a diff.
-            let filename = ensure_real_path(filename);
-
-            if original_text != formatted_text {
-                fs::write(filename, formatted_text)?;
-            }
-        }
+    let mut emitter: Box<dyn Emitter> = match config.emit_mode() {
+        EmitMode::Files if config.make_backup() => Box::new(FilesWithBackupEmitter::new()),
+        EmitMode::Files => Box::new(FilesEmitter::new()),
         EmitMode::Stdout | EmitMode::Coverage => {
-            if config.verbose() != Verbosity::Quiet {
-                println!("{}:\n", filename);
-            }
-            write!(out, "{}", formatted_text)?;
+            Box::new(StdoutEmitter::new(out, config.verbose()))
         }
-        EmitMode::ModifiedLines => {
-            let mismatch = make_diff(&original_text, formatted_text, 0);
-            let has_diff = !mismatch.is_empty();
-            write!(out, "{}", ModifiedLines::from(mismatch))?;
-            return Ok(has_diff);
-        }
-        EmitMode::Checkstyle => {
-            let filename = ensure_real_path(filename);
+        EmitMode::ModifiedLines => Box::new(ModifiedLinesEmitter::new(out)),
+        EmitMode::Checkstyle => Box::new(CheckstyleEmitter::new(out)),
+        EmitMode::Diff => Box::new(DiffEmitter::new(config)),
+    };
 
-            let diff = make_diff(&original_text, formatted_text, 3);
-            output_checkstyle_file(out, filename, diff)?;
-        }
-        EmitMode::Diff => {
-            let mismatch = make_diff(&original_text, formatted_text, 3);
-            let has_diff = !mismatch.is_empty();
-            print_diff(
-                mismatch,
-                |line_num| format!("Diff in {} at line {}:", filename, line_num),
-                config,
-            );
-            return Ok(has_diff);
-        }
-    }
+    let formatted_file = emitter::FormattedFile {
+        original_text: &original_text,
+        formatted_text,
+        filename,
+    };
 
-    // when we are not in diff mode, don't indicate differing files
-    Ok(false)
+    emitter.write_file(formatted_file)
 }

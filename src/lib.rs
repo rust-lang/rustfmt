@@ -49,6 +49,7 @@ pub(crate) mod checkstyle;
 mod closures;
 mod comment;
 pub(crate) mod config;
+mod emitter;
 mod expr;
 mod format_report_formatter;
 pub(crate) mod formatting;
