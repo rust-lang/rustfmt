@@ -2,23 +2,23 @@ use super::*;
 use crate::config::Verbosity;
 use std::io::Write;
 
-pub(crate) struct StdoutEmitter<'a, W> {
-    out: &'a mut W,
+pub(crate) struct StdoutEmitter {
     verbosity: Verbosity,
 }
 
-impl<'a, W> StdoutEmitter<'a, W> {
-    pub(crate) fn new(out: &'a mut W, verbosity: Verbosity) -> Self {
-        Self { out, verbosity }
+impl StdoutEmitter {
+    pub(crate) fn new(verbosity: Verbosity) -> Self {
+        Self { verbosity }
     }
 }
 
-impl<'a, W> Emitter for StdoutEmitter<'a, W>
+impl<W> Emitter<W> for StdoutEmitter
 where
     W: Write,
 {
     fn write_file(
         &mut self,
+        output: &mut W,
         FormattedFile {
             formatted_text,
             filename,
@@ -28,7 +28,7 @@ where
         if self.verbosity != Verbosity::Quiet {
             println!("{}:\n", filename);
         }
-        write!(self.out, "{}", formatted_text)?;
+        write!(output, "{}", formatted_text)?;
         Ok(false)
     }
 }

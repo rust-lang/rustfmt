@@ -3,22 +3,21 @@ use crate::checkstyle::output_checkstyle_file;
 use crate::rustfmt_diff::make_diff;
 use std::io::Write;
 
-pub(crate) struct CheckstyleEmitter<'a, W> {
-    out: &'a mut W,
-}
+pub(crate) struct CheckstyleEmitter;
 
-impl<'a, W> CheckstyleEmitter<'a, W> {
-    pub(crate) fn new(out: &'a mut W) -> Self {
-        Self { out }
+impl CheckstyleEmitter {
+    pub(crate) fn new() -> Self {
+        Self
     }
 }
 
-impl<'a, W> Emitter for CheckstyleEmitter<'a, W>
+impl<W> Emitter<W> for CheckstyleEmitter
 where
     W: Write,
 {
     fn write_file(
         &mut self,
+        output: &mut W,
         FormattedFile {
             formatted_text,
             original_text,
@@ -28,7 +27,7 @@ where
     ) -> Result<bool, io::Error> {
         let filename = ensure_real_path(filename);
         let diff = make_diff(original_text, formatted_text, 3);
-        output_checkstyle_file(&mut self.out, filename, diff)?;
+        output_checkstyle_file(output, filename, diff)?;
         Ok(false)
     }
 }

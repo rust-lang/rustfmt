@@ -2,22 +2,21 @@ use super::*;
 use crate::rustfmt_diff::{make_diff, ModifiedLines};
 use std::io::Write;
 
-pub(crate) struct ModifiedLinesEmitter<'a, W> {
-    out: &'a mut W,
-}
+pub(crate) struct ModifiedLinesEmitter;
 
-impl<'a, W> ModifiedLinesEmitter<'a, W> {
-    pub(crate) fn new(out: &'a mut W) -> Self {
-        Self { out }
+impl ModifiedLinesEmitter {
+    pub(crate) fn new() -> Self {
+        Self
     }
 }
 
-impl<'a, W> Emitter for ModifiedLinesEmitter<'a, W>
+impl<W> Emitter<W> for ModifiedLinesEmitter
 where
     W: Write,
 {
     fn write_file(
         &mut self,
+        output: &mut W,
         FormattedFile {
             formatted_text,
             original_text,
@@ -26,7 +25,7 @@ where
     ) -> Result<bool, io::Error> {
         let mismatch = make_diff(original_text, formatted_text, 0);
         let has_diff = !mismatch.is_empty();
-        write!(self.out, "{}", ModifiedLines::from(mismatch))?;
+        write!(output, "{}", ModifiedLines::from(mismatch))?;
         Ok(has_diff)
     }
 }

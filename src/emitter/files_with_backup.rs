@@ -9,9 +9,10 @@ impl FilesWithBackupEmitter {
     }
 }
 
-impl Emitter for FilesWithBackupEmitter {
+impl<W> Emitter<W> for FilesWithBackupEmitter {
     fn write_file(
         &mut self,
+        _output: &mut W,
         FormattedFile {
             original_text,
             formatted_text,

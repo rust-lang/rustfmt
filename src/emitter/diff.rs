@@ -12,9 +12,10 @@ impl<'a> DiffEmitter<'a> {
     }
 }
 
-impl<'a> Emitter for DiffEmitter<'a> {
+impl<'a, W> Emitter<W> for DiffEmitter<'a> {
     fn write_file(
         &mut self,
+        _output: &mut W,
         FormattedFile {
             formatted_text,
             original_text,

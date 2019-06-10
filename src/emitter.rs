@@ -21,8 +21,12 @@ pub(crate) struct FormattedFile<'a> {
     pub(crate) original_text: &'a str,
 }
 
-pub(crate) trait Emitter {
-    fn write_file(&mut self, formatted_file: FormattedFile<'_>) -> Result<bool, io::Error>;
+pub(crate) trait Emitter<W> {
+    fn write_file(
+        &mut self,
+        output: &mut W,
+        formatted_file: FormattedFile<'_>,
+    ) -> Result<bool, io::Error>;
 }
 
 fn ensure_real_path(filename: &FileName) -> &Path {
