@@ -35,8 +35,9 @@ impl Emitter for CheckstyleEmitter {
             formatted_text,
         }: FormattedFile<'_>,
     ) -> Result<bool, io::Error> {
+        const CONTEXT_SIZE: usize = 3;
         let filename = ensure_real_path(filename);
-        let diff = make_diff(original_text, formatted_text, 3);
+        let diff = make_diff(original_text, formatted_text, CONTEXT_SIZE);
         output_checkstyle_file(output, filename, diff)?;
         Ok(false)
     }

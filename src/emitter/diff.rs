@@ -22,7 +22,8 @@ impl Emitter for DiffEmitter {
             formatted_text,
         }: FormattedFile<'_>,
     ) -> Result<bool, io::Error> {
-        let mismatch = make_diff(&original_text, formatted_text, 3);
+        const CONTEXT_SIZE: usize = 3;
+        let mismatch = make_diff(&original_text, formatted_text, CONTEXT_SIZE);
         let has_diff = !mismatch.is_empty();
         print_diff(
             mismatch,
