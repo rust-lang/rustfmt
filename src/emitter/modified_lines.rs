@@ -5,12 +5,6 @@ use std::io::Write;
 #[derive(Debug, Default)]
 pub(crate) struct ModifiedLinesEmitter;
 
-impl ModifiedLinesEmitter {
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
 impl Emitter for ModifiedLinesEmitter {
     fn emit_formatted_file(
         &self,

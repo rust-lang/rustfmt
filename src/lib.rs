@@ -476,13 +476,15 @@ impl<'b, T: Write + 'b> Session<'b, T> {
 
 pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
     match config.emit_mode() {
-        EmitMode::Files if config.make_backup() => Box::new(emitter::FilesWithBackupEmitter::new()),
-        EmitMode::Files => Box::new(emitter::FilesEmitter::new()),
+        EmitMode::Files if config.make_backup() => {
+            Box::new(emitter::FilesWithBackupEmitter::default())
+        }
+        EmitMode::Files => Box::new(emitter::FilesEmitter::default()),
         EmitMode::Stdout | EmitMode::Coverage => {
             Box::new(emitter::StdoutEmitter::new(config.verbose()))
         }
-        EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::new()),
-        EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::new()),
+        EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
+        EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
         EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
     }
 }

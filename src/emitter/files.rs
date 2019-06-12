@@ -4,12 +4,6 @@ use std::fs;
 #[derive(Debug, Default)]
 pub(crate) struct FilesEmitter;
 
-impl FilesEmitter {
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
 impl Emitter for FilesEmitter {
     fn emit_formatted_file(
         &self,

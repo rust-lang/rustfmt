@@ -9,12 +9,6 @@ mod xml;
 #[derive(Debug, Default)]
 pub(crate) struct CheckstyleEmitter;
 
-impl CheckstyleEmitter {
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
 impl Emitter for CheckstyleEmitter {
     fn emit_header(&self, output: &mut dyn Write) -> Result<(), io::Error> {
         writeln!(output, r#"<?xml version="1.0" encoding="utf-8"?>"#)?;
