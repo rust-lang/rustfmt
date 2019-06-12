@@ -23,7 +23,7 @@ impl Emitter for CheckstyleEmitter {
     }
 
     fn emit_footer(&self, output: &mut dyn Write) -> Result<(), io::Error> {
-        writeln!(output, "</checkstyle>\n")
+        writeln!(output, "</checkstyle>")
     }
 
     fn emit_formatted_file(
