@@ -346,7 +346,7 @@ fn stdin_formatting_smoke_test() {
     #[cfg(not(windows))]
     assert_eq!(buf, "stdin:\n\nfn main() {}\n".as_bytes());
     #[cfg(windows)]
-    assert_eq!(buf, "stdin:\n\r\nfn main() {}\r\n".as_bytes());
+    assert_eq!(buf, "stdin:\n\nfn main() {}\r\n".as_bytes());
 }
 
 #[test]
