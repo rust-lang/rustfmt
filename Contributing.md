@@ -90,6 +90,9 @@ check. The latter is implemented as an option called `option`. See the section o
 Please try to avoid leaving `TODO`s in the code. There are a few around, but I
 wish there weren't. You can leave `FIXME`s, preferably with an issue number.
 
+### Issue triage [![Open Source Helpers](https://www.codetriage.com/rust-lang-nursery/rustfmt/badges/users.svg)](https://www.codetriage.com/rust-lang-nursery/rustfmt)
+
+You can contribute by triaging issues which may include reproducing bug reports or asking for vital information, such as version numbers or reproduction instructions. If you would like to start triaging issues, one easy way to get started is to [subscribe to rustfmt on CodeTriage](https://www.codetriage.com/rust-lang-nursery/rustfmt).
 
 ### Version-gate formatting changes
 
