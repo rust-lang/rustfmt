@@ -26,16 +26,6 @@ impl<'a> Stmt<'a> {
         self.inner
     }
 
-    pub(crate) fn is_if(&self) -> bool {
-        match self.inner.node {
-            ast::StmtKind::Expr(ref e) => match e.node {
-                ast::ExprKind::If(..) => true,
-                _ => false,
-            },
-            _ => false,
-        }
-    }
-
     pub(crate) fn to_item(&self) -> Option<&ast::Item> {
         match self.inner.node {
             ast::StmtKind::Item(ref item) => Some(&**item),

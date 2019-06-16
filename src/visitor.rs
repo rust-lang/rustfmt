@@ -7,8 +7,7 @@ use syntax::{ast, visit};
 use crate::attr::*;
 use crate::comment::{CodeCharKind, CommentCodeSlices};
 use crate::config::file_lines::FileName;
-use crate::config::{BraceStyle, Config, Version};
-use crate::expr::{format_expr, ExprType};
+use crate::config::{BraceStyle, Config};
 use crate::items::{
     format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
     rewrite_associated_impl_type, rewrite_associated_type, rewrite_existential_impl_type,
@@ -739,27 +738,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             .collect();
 
         if items.is_empty() {
-            // The `if` expression at the end of the block should be formatted in a single
-            // line if possible.
-            if self.config.version() == Version::Two
-                && stmts.len() == 1
-                && stmts[0].is_if()
-                && !contains_skip(get_attrs_from_stmt(stmts[0].as_ast_node()))
-            {
-                let shape = self.shape();
-                let rewrite = self.with_context(|ctx| {
-                    format_expr(
-                        stmt_expr(stmts[0].as_ast_node())?,
-                        ExprType::SubExpression,
-                        ctx,
-                        shape,
-                    )
-                });
-                self.push_rewrite(stmts[0].span(), rewrite);
-            } else {
-                self.visit_stmt(&stmts[0]);
-                self.walk_stmts(&stmts[1..]);
-            }
+            self.visit_stmt(&stmts[0]);
+            self.walk_stmts(&stmts[1..]);
         } else {
             self.visit_items_with_reordering(&items);
             self.walk_stmts(&stmts[items.len()..]);
