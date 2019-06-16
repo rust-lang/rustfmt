@@ -20,6 +20,7 @@ use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
+use crate::stmt::Stmt;
 use crate::utils::{
     self, contains_skip, count_newlines, depr_skip_annotation, get_skip_macro_names,
     inner_attributes, mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
@@ -89,23 +90,27 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         Shape::indented(self.block_indent, self.config)
     }
 
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &Stmt<'_>) {
         debug!(
             "visit_stmt: {:?} {:?}",
-            self.source_map.lookup_char_pos(stmt.span.lo()),
-            self.source_map.lookup_char_pos(stmt.span.hi())
+            self.source_map.lookup_char_pos(stmt.span().lo()),
+            self.source_map.lookup_char_pos(stmt.span().hi())
         );
 
-        match stmt.node {
+        match stmt.as_ast_node().node {
             ast::StmtKind::Item(ref item) => {
                 self.visit_item(item);
                 // Handle potential `;` after the item.
-                self.format_missing(stmt.span.hi());
+                self.format_missing(stmt.span().hi());
             }
             ast::StmtKind::Local(..) | ast::StmtKind::Expr(..) | ast::StmtKind::Semi(..) => {
-                let attrs = get_attrs_from_stmt(stmt);
+                let attrs = get_attrs_from_stmt(stmt.as_ast_node());
                 if contains_skip(attrs) {
-                    self.push_skipped_with_span(attrs, stmt.span(), get_span_without_attrs(stmt));
+                    self.push_skipped_with_span(
+                        attrs,
+                        stmt.span(),
+                        get_span_without_attrs(stmt.as_ast_node()),
+                    );
                 } else {
                     let shape = self.shape();
                     let rewrite = self.with_context(|ctx| stmt.rewrite(&ctx, shape));
@@ -115,11 +120,15 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ast::StmtKind::Mac(ref mac) => {
                 let (ref mac, _macro_style, ref attrs) = **mac;
                 if self.visit_attrs(attrs, ast::AttrStyle::Outer) {
-                    self.push_skipped_with_span(attrs, stmt.span(), get_span_without_attrs(stmt));
+                    self.push_skipped_with_span(
+                        attrs,
+                        stmt.span(),
+                        get_span_without_attrs(stmt.as_ast_node()),
+                    );
                 } else {
                     self.visit_mac(mac, None, MacroPosition::Statement);
                 }
-                self.format_missing(stmt.span.hi());
+                self.format_missing(stmt.span().hi());
             }
         }
     }
@@ -717,14 +726,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.visit_items_with_reordering(&ptr_vec_to_ref_vec(&m.items));
     }
 
-    fn walk_stmts(&mut self, stmts: &[ast::Stmt]) {
-        fn to_stmt_item(stmt: &ast::Stmt) -> Option<&ast::Item> {
-            match stmt.node {
-                ast::StmtKind::Item(ref item) => Some(&**item),
-                _ => None,
-            }
-        }
-
+    fn walk_stmts(&mut self, stmts: &[Stmt<'_>]) {
         if stmts.is_empty() {
             return;
         }
@@ -732,8 +734,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // Extract leading `use ...;`.
         let items: Vec<_> = stmts
             .iter()
-            .take_while(|stmt| to_stmt_item(stmt).map_or(false, is_use_item))
-            .filter_map(|stmt| to_stmt_item(stmt))
+            .take_while(|stmt| stmt.to_item().map_or(false, is_use_item))
+            .filter_map(|stmt| stmt.to_item())
             .collect();
 
         if items.is_empty() {
@@ -741,12 +743,17 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             // line if possible.
             if self.config.version() == Version::Two
                 && stmts.len() == 1
-                && crate::expr::stmt_is_if(&stmts[0])
-                && !contains_skip(get_attrs_from_stmt(&stmts[0]))
+                && stmts[0].is_if()
+                && !contains_skip(get_attrs_from_stmt(stmts[0].as_ast_node()))
             {
                 let shape = self.shape();
                 let rewrite = self.with_context(|ctx| {
-                    format_expr(stmt_expr(&stmts[0])?, ExprType::SubExpression, ctx, shape)
+                    format_expr(
+                        stmt_expr(stmts[0].as_ast_node())?,
+                        ExprType::SubExpression,
+                        ctx,
+                        shape,
+                    )
                 });
                 self.push_rewrite(stmts[0].span(), rewrite);
             } else {
@@ -760,7 +767,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     }
 
     fn walk_block_stmts(&mut self, b: &ast::Block) {
-        self.walk_stmts(&b.stmts)
+        self.walk_stmts(&Stmt::from_ast_nodes(b.stmts.iter()))
     }
 
     fn format_mod(
