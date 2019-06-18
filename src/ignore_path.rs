@@ -43,7 +43,7 @@ mod test {
             // this test requires nightly
             None | Some("nightly") => {
                 let config = Config::from_toml(
-                    r#"ignore = ["foo.rs", "bar_dir/*", "foo\bar"]"#,
+                    r#"ignore = ["foo.rs", "bar_dir/*", "foo\\bar\\abc"]"#,
                     Path::new(""),
                 )
                 .unwrap();
@@ -53,7 +53,10 @@ mod test {
                 assert!(ignore_path_set.is_match(&FileName::Real(PathBuf::from("bar_dir/baz.rs"))));
                 assert!(!ignore_path_set.is_match(&FileName::Real(PathBuf::from("src/bar.rs"))));
                 assert!(
-                    !ignore_path_set.is_match(&FileName::Real(PathBuf::from("foo/bar/true.rs")))
+                    ignore_path_set.is_match(&FileName::Real(PathBuf::from("foo/bar/abc/true.rs")))
+                );
+                assert!(
+                    !ignore_path_set.is_match(&FileName::Real(PathBuf::from("foo/bar/false.rs")))
                 );
             }
             _ => (),
