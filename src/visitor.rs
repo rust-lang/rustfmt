@@ -258,6 +258,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.config.tab_spaces()
             };
 
+            // FIXME this is a temporaly fix
+            // should be remove truncate logic in close_block
             // avoid not to truncate necessary chars
             let truncate_start = total_len - chars_too_many;
             let target_str = &self.buffer[truncate_start..total_len];
