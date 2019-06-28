@@ -11,12 +11,7 @@ impl IgnorePathSet {
         let mut ignore_builder = gitignore::GitignoreBuilder::new(ignore_list.rustfmt_toml_path());
 
         for ignore_path in ignore_list {
-            let ignore_line = ignore_path.to_str().unwrap();
-            if cfg!(windows) {
-                ignore_builder.add_line(None, &ignore_line.replace("\\", "/"))?;
-            } else {
-                ignore_builder.add_line(None, ignore_line)?;
-            };
+            ignore_builder.add_line(None, ignore_path.to_str().unwrap())?;
         }
 
         Ok(IgnorePathSet {
@@ -47,26 +42,14 @@ mod test {
         match option_env!("CFG_RELEASE_CHANNEL") {
             // this test requires nightly
             None | Some("nightly") => {
-                let config = Config::from_toml(
-                    r#"ignore = ["foo.rs", "bar_dir/*", "foo\\bar\\abc"]"#,
-                    Path::new(""),
-                )
-                .unwrap();
+                let config =
+                    Config::from_toml(r#"ignore = ["foo.rs", "bar_dir/*"]"#, Path::new(""))
+                        .unwrap();
                 let ignore_path_set = IgnorePathSet::from_ignore_list(&config.ignore()).unwrap();
 
                 assert!(ignore_path_set.is_match(&FileName::Real(PathBuf::from("src/foo.rs"))));
                 assert!(ignore_path_set.is_match(&FileName::Real(PathBuf::from("bar_dir/baz.rs"))));
                 assert!(!ignore_path_set.is_match(&FileName::Real(PathBuf::from("src/bar.rs"))));
-                if cfg!(windows) {
-                    assert!(
-                        ignore_path_set
-                            .is_match(&FileName::Real(PathBuf::from("foo/bar/abc/true.rs")))
-                    );
-                    assert!(
-                        !ignore_path_set
-                            .is_match(&FileName::Real(PathBuf::from("foo/bar/false.rs")))
-                    );
-                }
             }
             _ => (),
         };
