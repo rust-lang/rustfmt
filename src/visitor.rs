@@ -728,7 +728,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         match segments.len() {
             2 => segments[1].ident.to_string() != "skip",
             3 => {
-                segments[1].ident.to_string() != "skip" || segments[2].ident.to_string() != "macros"
+                segments[1].ident.to_string() != "skip"
+                    || (segments[2].ident.to_string() != "macros"
+                        && segments[2].ident.to_string() != "attributes")
             }
             _ => false,
         }
