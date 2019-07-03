@@ -319,9 +319,13 @@ impl Rewrite for ast::Attribute {
         if self.is_sugared_doc {
             rewrite_doc_comment(snippet, shape.comment(context.config), context.config)
         } else {
+            let should_skip = self
+                .ident()
+                .map(|s| s.name.as_str() == "skip_attr" || s.name.as_str() == "skip_mod_attr"
+            ).unwrap_or(false);
             let prefix = attr_prefix(self);
 
-            if contains_comment(snippet) {
+            if should_skip || contains_comment(snippet) {
                 return Some(snippet.to_owned());
             }
 
