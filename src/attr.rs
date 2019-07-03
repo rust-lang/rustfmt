@@ -321,8 +321,8 @@ impl Rewrite for ast::Attribute {
         } else {
             let should_skip = self
                 .ident()
-                .map(|s| s.name.as_str() == "skip_attr" || s.name.as_str() == "skip_mod_attr"
-            ).unwrap_or(false);
+                .map(|s| s.name.as_str() == "skip_attr" || s.name.as_str() == "skip_mod_attr")
+                .unwrap_or(false);
             let prefix = attr_prefix(self);
 
             if should_skip || contains_comment(snippet) {
