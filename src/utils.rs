@@ -643,6 +643,26 @@ pub(crate) fn get_skip_macro_names(attrs: &[ast::Attribute]) -> Vec<String> {
     skip_macro_names
 }
 
+pub(crate) fn get_skip_attribute_names(attrs: &[ast::Attribute]) -> Vec<String> {
+    let mut skip_attribute_names = vec![];
+    for attr in attrs {
+        // syntax::ast::Path is implemented partialEq
+        // but it is designed for segments.len() == 1
+        if format!("{}", attr.path) != "rustfmt::skip::attributes" {
+            continue;
+        }
+
+        if let Some(list) = attr.meta_item_list() {
+            for nested_meta_item in list {
+                if let Some(name) = nested_meta_item.ident() {
+                    skip_attribute_names.push(name.to_string());
+                }
+            }
+        }
+    }
+    skip_attribute_names
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

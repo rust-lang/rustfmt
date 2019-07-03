@@ -21,8 +21,8 @@ use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt::Stmt;
 use crate::utils::{
-    self, contains_skip, count_newlines, depr_skip_annotation, get_skip_macro_names,
-    inner_attributes, mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
+    self, contains_skip, count_newlines, depr_skip_annotation, get_skip_attribute_names,
+    get_skip_macro_names, inner_attributes, mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
 };
 use crate::{ErrorKind, FormatReport, FormattingError};
 
@@ -68,6 +68,7 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) macro_rewrite_failure: bool,
     pub(crate) report: FormatReport,
     pub(crate) skip_macro_names: RefCell<Vec<String>>,
+    pub(crate) skip_attribute_names: RefCell<Vec<String>>,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -334,6 +335,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.skip_macro_names
             .borrow_mut()
             .append(&mut get_skip_macro_names(&attrs));
+        let temp_skip_attribute_names = self.skip_attribute_names.clone();
+        self.skip_attribute_names
+            .borrow_mut()
+            .append(&mut get_skip_attribute_names(&attrs));
 
         let should_visit_node_again = match item.node {
             // For use/extern crate items, skip rewriting attributes but check for a skip attribute.
@@ -485,6 +490,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             };
         }
         self.skip_macro_names = temp_skip_macro_names;
+        self.skip_attribute_names = temp_skip_attribute_names;
     }
 
     pub(crate) fn visit_trait_item(&mut self, ti: &ast::TraitItem) {
@@ -643,6 +649,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             .skip_macro_names
             .borrow_mut()
             .append(&mut ctx.skip_macro_names.borrow().clone());
+        visitor
+            .skip_attribute_names
+            .borrow_mut()
+            .append(&mut ctx.skip_attribute_names.borrow().clone());
         visitor.set_parent_context(ctx);
         visitor
     }
@@ -668,6 +678,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             macro_rewrite_failure: false,
             report,
             skip_macro_names: RefCell::new(vec![]),
+            skip_attribute_names: RefCell::new(vec![]),
         }
     }
 
@@ -866,6 +877,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             macro_rewrite_failure: RefCell::new(false),
             report: self.report.clone(),
             skip_macro_names: self.skip_macro_names.clone(),
+            skip_attribute_names: self.skip_attribute_names.clone(),
         }
     }
 }

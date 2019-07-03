@@ -40,6 +40,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) macro_rewrite_failure: RefCell<bool>,
     pub(crate) report: FormatReport,
     pub(crate) skip_macro_names: RefCell<Vec<String>>,
+    pub(crate) skip_attribute_names: RefCell<Vec<String>>,
 }
 
 impl<'a> RewriteContext<'a> {
