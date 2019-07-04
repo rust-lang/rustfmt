@@ -321,15 +321,7 @@ impl Rewrite for ast::Attribute {
         } else {
             let should_skip = self
                 .ident()
-                .map(|s| {
-                    context
-                        .skip_attribute_names
-                        .borrow()
-                        .iter()
-                        .filter(|&name| s.name.as_str() == name.as_str())
-                        .next()
-                        .is_some()
-                })
+                .map(|s| context.skip_context.attributes_skip(&*s.name.as_str()))
                 .unwrap_or(false);
             let prefix = attr_prefix(self);
 
