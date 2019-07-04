@@ -247,34 +247,6 @@ impl ConfigCodeBlock {
 
 #[test]
 fn configuration_snippet_tests() {
-    // Read Configurations.md and build a `Vec` of `ConfigCodeBlock` structs with one
-    // entry for each Rust code block found.
-    fn get_code_blocks() -> Vec<ConfigCodeBlock> {
-        let mut file_iter = BufReader::new(
-            fs::File::open(Path::new(CONFIGURATIONS_FILE_NAME))
-                .unwrap_or_else(|_| panic!("couldn't read file {}", CONFIGURATIONS_FILE_NAME)),
-        )
-        .lines()
-        .map(Result::unwrap)
-        .enumerate();
-        let mut code_blocks: Vec<ConfigCodeBlock> = Vec::new();
-        let mut hash_set = Config::hash_set();
-
-        while let Some(cb) =
-            ConfigCodeBlock::extract(&mut file_iter, code_blocks.last(), &mut hash_set)
-        {
-            code_blocks.push(cb);
-        }
-
-        for name in hash_set {
-            if !Config::is_hidden_option(&name) {
-                panic!("{} does not have a configuration guide", name);
-            }
-        }
-
-        code_blocks
-    }
-
     let blocks = get_code_blocks();
     let failures = blocks
         .iter()
@@ -284,4 +256,31 @@ fn configuration_snippet_tests() {
     // Display results.
     println!("Ran {} configurations tests.", blocks.len());
     assert_eq!(failures, 0, "{} configurations tests failed", failures);
+}
+
+// Read Configurations.md and build a `Vec` of `ConfigCodeBlock` structs with one
+// entry for each Rust code block found.
+fn get_code_blocks() -> Vec<ConfigCodeBlock> {
+    let mut file_iter = BufReader::new(
+        fs::File::open(Path::new(CONFIGURATIONS_FILE_NAME))
+            .unwrap_or_else(|_| panic!("couldn't read file {}", CONFIGURATIONS_FILE_NAME)),
+    )
+    .lines()
+    .map(Result::unwrap)
+    .enumerate();
+    let mut code_blocks: Vec<ConfigCodeBlock> = Vec::new();
+    let mut hash_set = Config::hash_set();
+
+    while let Some(cb) = ConfigCodeBlock::extract(&mut file_iter, code_blocks.last(), &mut hash_set)
+    {
+        code_blocks.push(cb);
+    }
+
+    for name in hash_set {
+        if !Config::is_hidden_option(&name) {
+            panic!("{} does not have a configuration guide", name);
+        }
+    }
+
+    code_blocks
 }
