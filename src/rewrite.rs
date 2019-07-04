@@ -8,7 +8,7 @@ use syntax::source_map::{SourceMap, Span};
 
 use crate::config::{Config, IndentStyle};
 use crate::shape::Shape;
-use crate::utils::SkipContext;
+use crate::skip::SkipContext;
 use crate::visitor::SnippetProvider;
 use crate::FormatReport;
 

@@ -17,12 +17,13 @@ use crate::items::{
 use crate::macros::{rewrite_macro, rewrite_macro_def, MacroPosition};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
+use crate::skip::{is_skip_attr, SkipContext};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt::Stmt;
 use crate::utils::{
     self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes, mk_sp,
-    ptr_vec_to_ref_vec, rewrite_ident, stmt_expr, SkipContext,
+    ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
 };
 use crate::{ErrorKind, FormatReport, FormattingError};
 
@@ -719,16 +720,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if segments[0].ident.to_string() != "rustfmt" {
             return false;
         }
-
-        match segments.len() {
-            2 => segments[1].ident.to_string() != "skip",
-            3 => {
-                segments[1].ident.to_string() != "skip"
-                    || (segments[2].ident.to_string() != "macros"
-                        && segments[2].ident.to_string() != "attributes")
-            }
-            _ => false,
-        }
+        !is_skip_attr(segments)
     }
 
     fn walk_mod_items(&mut self, m: &ast::Mod) {
@@ -860,7 +852,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             snippet_provider: self.snippet_provider,
             macro_rewrite_failure: RefCell::new(false),
             report: self.report.clone(),
-            skip_context: self.skip_context.clone().into(),
+            skip_context: self.skip_context.clone(),
         }
     }
 }
