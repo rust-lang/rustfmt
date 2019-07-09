@@ -5,7 +5,7 @@ use std::iter::Peekable;
 
 use syntax::source_map::BytePos;
 
-use crate::comment::{find_comment_end, rewrite_comment, FindUncommented};
+use crate::comment::{find_comment_end, is_last_comment_block, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
 use crate::config::{Config, IndentStyle};
 use crate::rewrite::RewriteContext;
@@ -32,6 +32,8 @@ pub(crate) struct ListFormatting<'a> {
     // Whether comments should be visually aligned.
     align_comments: bool,
     config: &'a Config,
+    item_on_newline: Vec<bool>,
+    padding: bool,
 }
 
 impl<'a> ListFormatting<'a> {
@@ -47,7 +49,19 @@ impl<'a> ListFormatting<'a> {
             nested: false,
             align_comments: true,
             config,
+            item_on_newline: Vec::new(),
+            padding: true,
         }
+    }
+
+    pub(crate) fn padding(mut self, padding: bool) -> Self {
+        self.padding = padding;
+        self
+    }
+
+    pub(crate) fn item_on_newline(mut self, item_on_newline: Vec<bool>) -> Self {
+        self.item_on_newline = item_on_newline;
+        self
     }
 
     pub(crate) fn tactic(mut self, tactic: DefinitiveListTactic) -> Self {
@@ -281,6 +295,7 @@ where
     let mut prev_item_is_nested_import = false;
 
     let mut line_len = 0;
+    let mut first_item_on_line = true;
     let indent_str = &formatting.shape.indent.to_string(formatting.config);
     while let Some((i, item)) = iter.next() {
         let item = item.as_ref();
@@ -310,7 +325,7 @@ where
         }
 
         match tactic {
-            DefinitiveListTactic::Horizontal if !first => {
+            DefinitiveListTactic::Horizontal if !first && formatting.padding => {
                 result.push(' ');
             }
             DefinitiveListTactic::SpecialMacro(num_args_before) => {
@@ -328,6 +343,7 @@ where
             DefinitiveListTactic::Vertical
                 if !first && !inner_item.is_empty() && !result.is_empty() =>
             {
+                first_item_on_line = true;
                 result.push('\n');
                 result.push_str(indent_str);
             }
@@ -335,18 +351,22 @@ where
                 let total_width = total_item_width(item) + item_sep_len;
 
                 // 1 is space between separator and item.
-                if (line_len > 0 && line_len + 1 + total_width > formatting.shape.width)
-                    || prev_item_had_post_comment
-                    || (formatting.nested
-                        && (prev_item_is_nested_import || (!first && inner_item.contains("::"))))
+                if (!formatting.item_on_newline.is_empty() && formatting.item_on_newline[i])
+                    || formatting.item_on_newline.is_empty()
+                        && ((line_len > 0 && line_len + 1 + total_width > formatting.shape.width)
+                            || prev_item_had_post_comment
+                            || (formatting.nested
+                                && (prev_item_is_nested_import
+                                    || (!first && inner_item.contains("::")))))
                 {
                     result.push('\n');
                     result.push_str(indent_str);
                     line_len = 0;
+                    first_item_on_line = true;
                     if formatting.ends_with_newline {
                         trailing_separator = true;
                     }
-                } else if line_len > 0 {
+                } else if formatting.padding && line_len > 0 {
                     result.push(' ');
                     line_len += 1;
                 }
@@ -399,8 +419,14 @@ where
         }
 
         if separate && sep_place.is_front() && !first {
-            result.push_str(formatting.separator.trim());
-            result.push(' ');
+            if formatting.padding {
+                result.push_str(formatting.separator.trim());
+                result.push(' ');
+            } else if first_item_on_line {
+                result.push_str(formatting.separator.trim_start());
+            } else {
+                result.push_str(formatting.separator);
+            }
         }
         result.push_str(inner_item);
 
@@ -414,7 +440,12 @@ where
                 formatting.config,
             )?;
 
-            result.push(' ');
+            if is_last_comment_block(&formatted_comment) {
+                result.push(' ');
+            } else {
+                result.push('\n');
+                result.push_str(indent_str);
+            }
             result.push_str(&formatted_comment);
         }
 
@@ -512,6 +543,7 @@ where
             result.push('\n');
         }
 
+        first_item_on_line = false;
         prev_item_had_post_comment = item.post_comment.is_some();
         prev_item_is_nested_import = inner_item.contains("::");
     }
@@ -599,25 +631,20 @@ pub(crate) fn extract_pre_comment(pre_snippet: &str) -> (Option<String>, ListIte
     }
 }
 
-pub(crate) fn extract_post_comment(
-    post_snippet: &str,
-    comment_end: usize,
-    separator: &str,
-) -> Option<String> {
+fn extract_post_comment(post_snippet: &str, comment_end: usize, separator: &str) -> Option<String> {
     let white_space: &[_] = &[' ', '\t'];
 
     // Cleanup post-comment: strip separators and whitespace.
     let post_snippet = post_snippet[..comment_end].trim();
     let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
         post_snippet[1..].trim_matches(white_space)
+    } else if post_snippet.ends_with(separator) {
+        // the separator is in front of the next item
+        post_snippet[..post_snippet.len() - separator.len()].trim_matches(white_space)
     } else if post_snippet.starts_with(separator) {
         post_snippet[separator.len()..].trim_matches(white_space)
-    }
-    // not comment or over two lines
-    else if post_snippet.ends_with(',')
-        && (!post_snippet.trim().starts_with("//") || post_snippet.trim().contains('\n'))
-    {
-        post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
+    } else if post_snippet.ends_with(',') && !post_snippet.trim_start().starts_with("//") {
+        post_snippet[..post_snippet.len() - 1].trim_matches(white_space)
     } else {
         post_snippet
     };
@@ -633,12 +660,7 @@ pub(crate) fn extract_post_comment(
     }
 }
 
-pub(crate) fn get_comment_end(
-    post_snippet: &str,
-    separator: &str,
-    terminator: &str,
-    is_last: bool,
-) -> usize {
+fn get_comment_end(post_snippet: &str, separator: &str, terminator: &str, is_last: bool) -> usize {
     if is_last {
         return post_snippet
             .find_uncommented(terminator)
@@ -686,7 +708,7 @@ pub(crate) fn get_comment_end(
 
 // Account for extra whitespace between items. This is fiddly
 // because of the way we divide pre- and post- comments.
-pub(crate) fn has_extra_newline(post_snippet: &str, comment_end: usize) -> bool {
+fn has_extra_newline(post_snippet: &str, comment_end: usize) -> bool {
     if post_snippet.is_empty() || comment_end == 0 {
         return false;
     }
@@ -767,7 +789,17 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-// Creates an iterator over a list's items with associated comments.
+/// Creates an iterator over a list's items with associated comments.
+///
+/// - inner is the iterator over items
+/// - terminator is a string that closes the list, used to get comments after the last item
+/// - separator is a string that separates the items
+/// - get_lo is a closure to get the lower bound of an item's span
+/// - get_hi is a closure to get the upper bound of an item's span
+/// - get_item_string is a closure to get the rewritten item as a string
+/// - prev_span_end is the BytePos before the first item
+/// - next_span_start is the BytePos after the last item
+/// - leave_last is a boolean whether or not to rewrite the last item
 pub(crate) fn itemize_list<'a, T, I, F1, F2, F3>(
     snippet_provider: &'a SnippetProvider<'_>,
     inner: I,
@@ -918,5 +950,57 @@ pub(crate) fn struct_lit_formatting<'a>(
         nested: false,
         align_comments: true,
         config: context.config,
+        item_on_newline: Vec::new(),
+        padding: true,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_extract_post_comment() {
+        let data = [
+            (
+                ", // a comment",
+                ", // a comment".len(),
+                ",",
+                "// a comment",
+            ),
+            (
+                ": // a comment",
+                ": // a comment".len(),
+                ":",
+                "// a comment",
+            ),
+            (
+                "// a comment\n    +",
+                "// a comment\n    +".len(),
+                "+",
+                "// a comment\n",
+            ),
+            (
+                "+ // a comment\n    ",
+                "+ // a comment\n    ".len(),
+                "+",
+                "// a comment",
+            ),
+            (
+                "/* a comment */ ,",
+                "/* a comment */ ,".len(),
+                "+",
+                "/* a comment */",
+            ),
+        ];
+
+        for (i, (post_snippet, comment_end, separator, expected)) in data.iter().enumerate() {
+            assert_eq!(
+                extract_post_comment(post_snippet, *comment_end, separator),
+                Some(expected.to_string()),
+                "Failed on input {}",
+                i
+            );
+        }
     }
 }

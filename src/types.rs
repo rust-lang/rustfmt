@@ -802,52 +802,77 @@ fn join_bounds(
     debug_assert!(!items.is_empty());
 
     // Try to join types in a single line
+    let type_strs: Vec<_> = itemize_list(
+        context.snippet_provider,
+        items.iter(),
+        "",
+        "+",
+        |item| item.span().lo(),
+        |item| item.span().hi(),
+        |item| item.rewrite(context, shape),
+        items[0].span().lo(),
+        items[items.len() - 1].span().hi(),
+        false,
+    )
+    .collect();
     let joiner = match context.config.type_punctuation_density() {
         TypeDensity::Compressed => "+",
         TypeDensity::Wide => " + ",
     };
-    let type_strs = items
-        .iter()
-        .map(|item| item.rewrite(context, shape))
-        .collect::<Option<Vec<_>>>()?;
-    let result = type_strs.join(joiner);
+    let fmt = ListFormatting::new(shape, context.config)
+        .padding(false)
+        .separator(joiner)
+        .tactic(DefinitiveListTactic::Horizontal);
+    let result = write_list(&type_strs, &fmt)?;
+
     if items.len() <= 1 || (!result.contains('\n') && result.len() <= shape.width) {
         return Some(result);
     }
 
     // We need to use multiple lines.
-    let (type_strs, offset) = if need_indent {
+    let (type_strs, shape) = if need_indent {
         // Rewrite with additional indentation.
         let nested_shape = shape.block_indent(context.config.tab_spaces());
-        let type_strs = items
-            .iter()
-            .map(|item| item.rewrite(context, nested_shape))
-            .collect::<Option<Vec<_>>>()?;
-        (type_strs, nested_shape.indent)
+        let type_strs: Vec<_> = itemize_list(
+            context.snippet_provider,
+            items.iter(),
+            "",
+            "+",
+            |item| item.span().lo(),
+            |item| item.span().hi(),
+            |item| item.rewrite(context, nested_shape),
+            items[0].span().lo(),
+            items[items.len() - 1].span().hi(),
+            false,
+        )
+        .collect();
+        (type_strs, nested_shape)
     } else {
-        (type_strs, shape.indent)
+        (type_strs, shape)
     };
-
     let is_bound_extendable = |s: &str, b: &ast::GenericBound| match b {
         ast::GenericBound::Outlives(..) => true,
         ast::GenericBound::Trait(..) => last_line_extendable(s),
     };
-    let mut result = String::with_capacity(128);
-    result.push_str(&type_strs[0]);
-    let mut can_be_put_on_the_same_line = is_bound_extendable(&result, &items[0]);
     let generic_bounds_in_order = is_generic_bounds_in_order(items);
-    for (bound, bound_str) in items[1..].iter().zip(type_strs[1..].iter()) {
-        if generic_bounds_in_order && can_be_put_on_the_same_line {
-            result.push_str(joiner);
-        } else {
-            result.push_str(&offset.to_string_with_newline(context.config));
-            result.push_str("+ ");
-        }
-        result.push_str(bound_str);
-        can_be_put_on_the_same_line = is_bound_extendable(bound_str, bound);
-    }
-
-    Some(result)
+    let mut item_on_newline = if generic_bounds_in_order {
+        items
+            .iter()
+            .zip(type_strs.iter())
+            .map(|(bound, bound_str)| !is_bound_extendable(bound_str.inner_as_ref(), bound))
+            .collect::<Vec<bool>>()
+    } else {
+        vec![true; items.len()]
+    };
+    item_on_newline.insert(0, false);
+    let fmt = ListFormatting::new(shape, context.config)
+        .padding(false)
+        .item_on_newline(item_on_newline)
+        .trailing_separator(SeparatorTactic::Always)
+        .separator_place(SeparatorPlace::Front)
+        .separator(joiner)
+        .tactic(DefinitiveListTactic::Mixed);
+    write_list(&type_strs, &fmt)
 }
 
 pub(crate) fn can_be_overflowed_type(

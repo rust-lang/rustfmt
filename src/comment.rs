@@ -1789,7 +1789,7 @@ mod test {
                                           * test3
                                           */"#,
                                       false,
-                                      Shape::legacy(100, Indent::new(0, 0)),
+                                      Shape::legacy(100, Indent::empty()),
                                       &wrap_normalize_config).unwrap();
         assert_eq!("/// test1\n/// test2\n// test3", comment);
 
@@ -1798,7 +1798,7 @@ mod test {
 
                                          // test2"#,
                                       false,
-                                      Shape::legacy(100, Indent::new(0, 0)),
+                                      Shape::legacy(100, Indent::empty()),
                                       &wrap_normalize_config).unwrap();
         assert_eq!("// test1\n\n// test2", comment);
 
@@ -1807,7 +1807,7 @@ mod test {
 
                                          //@ test2"#,
                                       false,
-                                      Shape::legacy(100, Indent::new(0, 0)),
+                                      Shape::legacy(100, Indent::empty()),
                                       &wrap_normalize_config).unwrap();
         assert_eq!("//@ test1\n\n//@ test2", comment);
 
@@ -1819,7 +1819,7 @@ mod test {
                                                 another bare line!
                                           */"#,
                                       false,
-                                      Shape::legacy(100, Indent::new(0, 0)),
+                                      Shape::legacy(100, Indent::empty()),
                                       &wrap_config).unwrap();
         assert_eq!("// test1\n/*\n a bare line!\n\n      another bare line!\n*/", comment);
     }

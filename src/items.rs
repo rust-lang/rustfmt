@@ -994,20 +994,20 @@ pub(crate) fn format_trait(
             rewrite_generics(context, rewrite_ident(context, item.ident), generics, shape)?;
         result.push_str(&generics_str);
 
-        // FIXME(#2055): rustfmt fails to format when there are comments between trait bounds.
         if !generic_bounds.is_empty() {
-            let ident_hi = context
-                .snippet_provider
-                .span_after(item.span, &item.ident.as_str());
-            let bound_hi = generic_bounds.last().unwrap().span().hi();
-            let snippet = context.snippet(mk_sp(ident_hi, bound_hi));
-            if contains_comment(snippet) {
-                return None;
-            }
-
+            let comment_span = mk_sp(generics.span.hi(), generic_bounds[0].span().lo());
+            let after_colon = context.snippet_provider.span_after(comment_span, ":");
+            let comment = recover_missing_comment_in_span(
+                mk_sp(after_colon, comment_span.hi()),
+                shape,
+                context,
+                // 1 = ":"
+                last_line_width(&result) + 1,
+            )
+            .unwrap_or_default();
             result = rewrite_assign_rhs_with(
                 context,
-                result + ":",
+                format!("{}:{}", result, comment),
                 generic_bounds,
                 shape,
                 RhsTactics::ForceNextLineWithoutIndent,
@@ -1052,7 +1052,11 @@ pub(crate) fn format_trait(
             if let Some(lo) = item_snippet.find('/') {
                 // 1 = `{`
                 let comment_hi = body_lo - BytePos(1);
-                let comment_lo = item.span.lo() + BytePos(lo as u32);
+                let comment_lo = if generic_bounds.is_empty() {
+                    item.span.lo() + BytePos(lo as u32)
+                } else {
+                    generic_bounds[generic_bounds.len() - 1].span().hi()
+                };
                 if comment_lo < comment_hi {
                     match recover_missing_comment_in_span(
                         mk_sp(comment_lo, comment_hi),
