@@ -7,7 +7,7 @@ use crate::config::file_lines::FileLines;
 use crate::config::{EmitMode, FileName};
 use crate::shape::{Indent, Shape};
 use crate::source_map::LineRangeUtils;
-use crate::utils::{count_lf_crlf, count_newlines, last_line_width, mk_sp, starts_with_newline};
+use crate::utils::{count_lf_crlf, count_newlines, last_line_width, mk_sp};
 use crate::visitor::FmtVisitor;
 
 struct SnippetStatus {
@@ -176,19 +176,20 @@ impl<'a> FmtVisitor<'a> {
             _ => Cow::from(old_snippet),
         };
 
-        let slice_within_file_lines_range = |file_lines: FileLines, cur_line, s| -> (usize, usize, bool) {
-            let (lf_count, crlf_count) = count_lf_crlf(s);
-            let newline_count = lf_count + crlf_count;
-            let within_file_lines_range = file_lines.contains_range(
-                file_name,
-                cur_line,
-                // if a newline character is at the end of the slice, then the number of newlines
-                // needs to be decreased by 1 so that the range checked against the file_lines is
-                // the visual range one would expect.
-                cur_line + newline_count - if s.ends_with('\n') { 1 } else { 0 },
-            );
-            (lf_count, crlf_count, within_file_lines_range)
-        };
+        let slice_within_file_lines_range =
+            |file_lines: FileLines, cur_line, s| -> (usize, usize, bool) {
+                let (lf_count, crlf_count) = count_lf_crlf(s);
+                let newline_count = lf_count + crlf_count;
+                let within_file_lines_range = file_lines.contains_range(
+                    file_name,
+                    cur_line,
+                    // if a newline character is at the end of the slice, then the number of
+                    // newlines needs to be decreased by 1 so that the range checked against
+                    // the file_lines is the visual range one would expect.
+                    cur_line + newline_count - if s.ends_with('\n') { 1 } else { 0 },
+                );
+                (lf_count, crlf_count, within_file_lines_range)
+            };
         for (kind, offset, subslice) in CommentCodeSlices::new(snippet) {
             debug!("{:?}: {:?}", kind, subslice);
 
