@@ -42,6 +42,7 @@ fn main() {
 
 /// Rustfmt operations.
 enum Operation {
+    Failure(String),
     /// Format files and their child modules.
     Format {
         files: Vec<PathBuf>,
@@ -161,6 +162,10 @@ fn execute(opts: &Options) -> Result<i32, failure::Error> {
     let options = GetOptsOptions::from_matches(&matches)?;
 
     match determine_operation(&matches)? {
+        Operation::Failure(reason) => {
+            print_usage_to_stdout(opts, &reason);
+            Ok(1)
+        }
         Operation::Help(HelpOp::None) => {
             print_usage_to_stdout(opts, "");
             Ok(0)
@@ -395,22 +400,31 @@ fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
         } else if topic == Some("file-lines".to_owned()) {
             return Ok(Operation::Help(HelpOp::FileLines));
         } else {
-            println!("Unknown help topic: `{}`\n", topic.unwrap());
-            return Ok(Operation::Help(HelpOp::None));
+            return Ok(Operation::Failure(format!(
+                "Unknown help topic: `{}`.",
+                topic.unwrap()
+            )));
         }
     }
+    let mut free_matches = matches.free.iter();
 
     let mut minimal_config_path = None;
-    if let Some(ref kind) = matches.opt_str("print-config") {
-        let path = matches.free.get(0).cloned();
-        if kind == "default" {
-            return Ok(Operation::ConfigOutputDefault { path });
-        } else if kind == "current" {
-            return Ok(Operation::ConfigOutputCurrent { path });
-        } else if kind == "minimal" {
-            minimal_config_path = path;
-            if minimal_config_path.is_none() {
-                println!("WARNING: PATH required for `--print-config minimal`");
+    if let Some(kind) = matches.opt_str("print-config") {
+        let path = free_matches.next().cloned();
+        match kind.as_str() {
+            "default" => return Ok(Operation::ConfigOutputDefault { path }),
+            "current" => return Ok(Operation::ConfigOutputCurrent { path }),
+            "minimal" => {
+                minimal_config_path = path;
+                if minimal_config_path.is_none() {
+                    eprintln!("WARNING: PATH required for `--print-config minimal`.");
+                }
+            }
+            _ => {
+                return Ok(Operation::Failure(format!(
+                    "Unknown print-config option: `{}`.",
+                    kind
+                )));
             }
         }
     }
@@ -419,17 +433,7 @@ fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
         return Ok(Operation::Version);
     }
 
-    // if no file argument is supplied, read from stdin
-    if matches.free.is_empty() {
-        let mut buffer = String::new();
-        io::stdin().read_to_string(&mut buffer)?;
-
-        return Ok(Operation::Stdin { input: buffer });
-    }
-
-    let files: Vec<_> = matches
-        .free
-        .iter()
+    let files: Vec<_> = free_matches
         .map(|s| {
             let p = PathBuf::from(s);
             // we will do comparison later, so here tries to canonicalize first
@@ -437,6 +441,19 @@ fn determine_operation(matches: &Matches) -> Result<Operation, ErrorKind> {
             p.canonicalize().unwrap_or(p)
         })
         .collect();
+
+    // if no file argument is supplied, read from stdin
+    if files.is_empty() {
+        if minimal_config_path.is_some() {
+            return Ok(Operation::Failure(
+                "The `--print-config=minimal` option doesn't work with standard input.".to_string(),
+            ));
+        }
+        let mut buffer = String::new();
+        io::stdin().read_to_string(&mut buffer)?;
+
+        return Ok(Operation::Stdin { input: buffer });
+    }
 
     Ok(Operation::Format {
         files,
