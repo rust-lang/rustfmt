@@ -841,9 +841,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     pub(crate) fn skip_empty_lines(&mut self, end_pos: BytePos) {
         while let Some(pos) = self
             .snippet_provider
-            .opt_span_after(mk_sp(self.last_pos, end_pos), "\n")
+            .opt_span_after(self.next_span(end_pos), "\n")
         {
-            if let Some(snippet) = self.opt_snippet(mk_sp(self.last_pos, pos)) {
+            if let Some(snippet) = self.opt_snippet(self.next_span(pos)) {
                 if snippet.trim().is_empty() {
                     self.last_pos = pos;
                 } else {
