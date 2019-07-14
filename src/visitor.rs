@@ -6,7 +6,7 @@ use syntax::{ast, visit};
 
 use crate::attr::*;
 use crate::comment::{CodeCharKind, CommentCodeSlices};
-use crate::config::file_lines::FileName;
+use crate::config::file_lines::LineRange;
 use crate::config::{BraceStyle, Config};
 use crate::items::{
     format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
@@ -87,6 +87,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
     pub(crate) fn shape(&self) -> Shape {
         Shape::indented(self.block_indent, self.config)
+    }
+
+    fn next_span(&self, hi: BytePos) -> Span {
+        mk_sp(self.last_pos, hi)
     }
 
     fn visit_stmt(&mut self, stmt: &Stmt<'_>) {
@@ -234,7 +238,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if unindent_comment {
             self.block_indent = self.block_indent.block_indent(self.config);
         }
-        self.close_block(unindent_comment, b.span);
+        self.close_block(unindent_comment, self.next_span(b.span.hi()));
         self.last_pos = source!(self, b.span).hi();
     }
 
@@ -243,12 +247,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     // The closing brace itself, however, should be indented at a shallower
     // level.
     fn close_block(&mut self, unindent_comment: bool, span: Span) {
-        let file_name: FileName = self.source_map.span_to_filename(span).into();
         let skip_this_line = !self
             .config
             .file_lines()
-            .contains_line(&file_name, self.line_number);
-        if !skip_this_line {
+            .contains(&LineRange::from_span(self.source_map, span));
+        if skip_this_line {
+            self.push_str(self.snippet(span));
+        } else {
             let total_len = self.buffer.len();
             let chars_too_many = if unindent_comment {
                 0
@@ -271,8 +276,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.buffer.push_str("\n");
                 }
             }
+            self.push_str("}");
         }
-        self.push_str("}");
         self.block_indent = self.block_indent.block_unindent(self.config);
     }
 
@@ -800,8 +805,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.block_indent = self.block_indent.block_indent(self.config);
                 self.visit_attrs(attrs, ast::AttrStyle::Inner);
                 self.walk_mod_items(m);
-                self.format_missing_with_indent(source!(self, m.inner).hi() - BytePos(1));
-                self.close_block(false, m.inner);
+                let missing_span = mk_sp(source!(self, m.inner).hi() - BytePos(1), m.inner.hi());
+                self.format_missing_with_indent(missing_span.lo());
+                self.close_block(false, missing_span);
             }
             self.last_pos = source!(self, m.inner).hi();
         } else {
