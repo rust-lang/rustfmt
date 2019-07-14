@@ -1,6 +1,6 @@
 fn main() {
     println!(
-        "{}", //coment
+        "{}", // comment
         111
     );
 }
