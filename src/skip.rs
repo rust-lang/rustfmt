@@ -1,5 +1,9 @@
+//! Module that contains skip related stuffs.
+
 use syntax::ast;
 
+/// Take care of skip name stack. You can update it by attributes slice or
+/// by other context. Query this context to know if you need skip a block.
 #[derive(Default, Clone)]
 pub(crate) struct SkipContext {
     macros: Vec<String>,
@@ -7,7 +11,7 @@ pub(crate) struct SkipContext {
 }
 
 impl SkipContext {
-    pub(crate) fn update_by_attrs(&mut self, attrs: &[ast::Attribute]) {
+    pub(crate) fn update_with_attrs(&mut self, attrs: &[ast::Attribute]) {
         self.macros.append(&mut get_skip_names("macros", attrs));
         self.attributes
             .append(&mut get_skip_names("attributes", attrs));
@@ -18,11 +22,11 @@ impl SkipContext {
         self.attributes.append(&mut other.attributes);
     }
 
-    pub(crate) fn macro_skip(&self, name: &str) -> bool {
+    pub(crate) fn skip_macro(&self, name: &str) -> bool {
         self.macros.iter().any(|n| n == name)
     }
 
-    pub(crate) fn attributes_skip(&self, name: &str) -> bool {
+    pub(crate) fn skip_attribute(&self, name: &str) -> bool {
         self.attributes.iter().any(|n| n == name)
     }
 }
@@ -30,6 +34,7 @@ impl SkipContext {
 static RUSTFMT: &'static str = "rustfmt";
 static SKIP: &'static str = "skip";
 
+/// Say if you're playing with `rustfmt`'s skip attribute
 pub(crate) fn is_skip_attr(segments: &[ast::PathSegment]) -> bool {
     if segments.len() < 2 || segments[0].ident.to_string() != RUSTFMT {
         return false;

@@ -158,7 +158,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             &snippet_provider,
             self.report.clone(),
         );
-        visitor.skip_context.update_by_attrs(&self.krate.attrs);
+        visitor.skip_context.update_with_attrs(&self.krate.attrs);
 
         // Format inner attributes if available.
         if !self.krate.attrs.is_empty() && is_root {

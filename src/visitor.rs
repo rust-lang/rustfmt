@@ -349,7 +349,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let filtered_attrs;
         let mut attrs = &item.attrs;
         let skip_context_saved = self.skip_context.clone();
-        self.skip_context.update_by_attrs(&attrs);
+        self.skip_context.update_with_attrs(&attrs);
 
         let should_visit_node_again = match item.node {
             // For use/extern crate items, skip rewriting attributes but check for a skip attribute.
