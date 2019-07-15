@@ -9,6 +9,8 @@
 - Add new attribute `rustfmt::skip::attributes` to prevent rustfmt 
 from formatting an attribute #3665
 - Add `--manifest-path` support to `cargo fmt` (#3683).
+- Add new attribute `rustfmt::skip::attributes` to prevent rustfmt 
+from formatting an attribute #3665
 
 ### Fixed
 
