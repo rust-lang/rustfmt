@@ -855,23 +855,27 @@ fn join_bounds(
         ast::GenericBound::Trait(..) => last_line_extendable(s),
     };
     let generic_bounds_in_order = is_generic_bounds_in_order(items);
-    let mut item_on_newline = if generic_bounds_in_order {
-        items
-            .iter()
-            .zip(type_strs.iter())
-            .map(|(bound, bound_str)| !is_bound_extendable(bound_str.inner_as_ref(), bound))
-            .collect::<Vec<bool>>()
-    } else {
-        vec![true; items.len()]
-    };
-    item_on_newline.insert(0, false);
     let fmt = ListFormatting::new(shape, context.config)
         .padding(false)
-        .item_on_newline(item_on_newline)
-        .trailing_separator(SeparatorTactic::Always)
-        .separator_place(SeparatorPlace::Front)
         .separator(joiner)
-        .tactic(DefinitiveListTactic::Mixed);
+        .trailing_separator(SeparatorTactic::Always)
+        .separator_place(SeparatorPlace::Front);
+    let fmt = if generic_bounds_in_order {
+        let custom_list_tactic = std::iter::once(false) // no newline before the first bound
+            .chain(
+                items
+                    .iter()
+                    .zip(type_strs.iter())
+                    .map(|(bound, bound_str)| {
+                        // putting a newline before the current bound depends on the previous bound
+                        !is_bound_extendable(bound_str.inner_as_ref(), bound)
+                    }),
+            )
+            .collect::<Vec<bool>>();
+        fmt.custom_list_tactic(custom_list_tactic)
+    } else {
+        fmt.tactic(DefinitiveListTactic::Vertical)
+    };
     write_list(&type_strs, &fmt)
 }
 

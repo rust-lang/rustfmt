@@ -22,17 +22,19 @@ pub(crate) struct ListFormatting<'a> {
     trailing_separator: SeparatorTactic,
     separator_place: SeparatorPlace,
     shape: Shape,
-    // Non-expressions, e.g., items, will have a new line at the end of the list.
-    // Important for comment styles.
+    /// Non-expressions, e.g., items, will have a new line at the end of the list.
+    /// Important for comment styles.
     ends_with_newline: bool,
-    // Remove newlines between list elements for expressions.
+    /// Remove newlines between list elements for expressions.
     preserve_newline: bool,
-    // Nested import lists get some special handling for the "Mixed" list type
+    /// Nested import lists get some special handling for the "Mixed" list type.
     nested: bool,
-    // Whether comments should be visually aligned.
+    /// Whether comments should be visually aligned.
     align_comments: bool,
     config: &'a Config,
-    item_on_newline: Vec<bool>,
+    /// The decision of putting an item on a newline is determined by the caller.
+    custom_list_tactic: Vec<bool>,
+    /// Whether whitespaces should be added around the separator.
     padding: bool,
 }
 
@@ -49,7 +51,7 @@ impl<'a> ListFormatting<'a> {
             nested: false,
             align_comments: true,
             config,
-            item_on_newline: Vec::new(),
+            custom_list_tactic: Vec::new(),
             padding: true,
         }
     }
@@ -59,8 +61,8 @@ impl<'a> ListFormatting<'a> {
         self
     }
 
-    pub(crate) fn item_on_newline(mut self, item_on_newline: Vec<bool>) -> Self {
-        self.item_on_newline = item_on_newline;
+    pub(crate) fn custom_list_tactic(mut self, custom_list_tactic: Vec<bool>) -> Self {
+        self.custom_list_tactic = custom_list_tactic;
         self
     }
 
@@ -325,6 +327,19 @@ where
         }
 
         match tactic {
+            _ if !formatting.custom_list_tactic.is_empty() => {
+                if *formatting
+                    .custom_list_tactic
+                    .get(i)
+                    .expect("invalid custom_list_tactic formatting option")
+                {
+                    result.push('\n');
+                    result.push_str(indent_str);
+                    first_item_on_line = true;
+                } else if formatting.padding && !first_item_on_line {
+                    result.push(' ');
+                }
+            }
             DefinitiveListTactic::Horizontal if !first && formatting.padding => {
                 result.push(' ');
             }
@@ -351,13 +366,10 @@ where
                 let total_width = total_item_width(item) + item_sep_len;
 
                 // 1 is space between separator and item.
-                if (!formatting.item_on_newline.is_empty() && formatting.item_on_newline[i])
-                    || formatting.item_on_newline.is_empty()
-                        && ((line_len > 0 && line_len + 1 + total_width > formatting.shape.width)
-                            || prev_item_had_post_comment
-                            || (formatting.nested
-                                && (prev_item_is_nested_import
-                                    || (!first && inner_item.contains("::")))))
+                if (line_len > 0 && line_len + 1 + total_width > formatting.shape.width)
+                    || prev_item_had_post_comment
+                    || (formatting.nested
+                        && (prev_item_is_nested_import || (!first && inner_item.contains("::"))))
                 {
                     result.push('\n');
                     result.push_str(indent_str);
@@ -950,7 +962,7 @@ pub(crate) fn struct_lit_formatting<'a>(
         nested: false,
         align_comments: true,
         config: context.config,
-        item_on_newline: Vec::new(),
+        custom_list_tactic: Vec::new(),
         padding: true,
     }
 }
