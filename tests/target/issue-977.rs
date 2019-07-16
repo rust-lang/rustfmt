@@ -10,8 +10,7 @@ struct FooC {
 enum MooC {
     // comment
 }
-mod BarC {
-    // comment
+mod BarC { // comment
 }
 extern "C" {
     // comment
