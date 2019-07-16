@@ -48,7 +48,7 @@ script:
   - |
     if [ -z ${INTEGRATION} ]; then
       cargo build
-      cargo test --features "test-binary"
+      cargo test -- --ignored
     else
       ./ci/integration.sh
     fi

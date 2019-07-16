@@ -1,7 +1,5 @@
 // Integration tests for cargo-fmt.
 
-#![cfg(feature = "test-binary")]
-
 use std::env;
 use std::process::Command;
 
@@ -48,6 +46,7 @@ macro_rules! assert_that {
     };
 }
 
+#[ignore]
 #[test]
 fn version() {
     assert_that!(&["--version"], starts_with("rustfmt "));
@@ -56,6 +55,7 @@ fn version() {
     assert_that!(&["--", "--version"], starts_with("rustfmt "));
 }
 
+#[ignore]
 #[test]
 fn print_config() {
     assert_that!(
@@ -64,6 +64,7 @@ fn print_config() {
     );
 }
 
+#[ignore]
 #[test]
 fn rustfmt_help() {
     assert_that!(&["--", "--help"], contains("Format Rust code"));

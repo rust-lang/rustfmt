@@ -1,7 +1,5 @@
 //! Integration tests for rustfmt.
 
-#![cfg(feature = "test-binary")]
-
 use std::env;
 use std::fs::remove_file;
 use std::path::Path;
@@ -50,6 +48,7 @@ macro_rules! assert_that {
     };
 }
 
+#[ignore]
 #[test]
 fn print_config() {
     assert_that!(

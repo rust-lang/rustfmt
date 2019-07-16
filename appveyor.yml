@@ -49,4 +49,4 @@ build: false
 
 test_script:
   - cargo build --verbose
-  - cargo test --features "test-binary"
+  - cargo test -- --ignored
