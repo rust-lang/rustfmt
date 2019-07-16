@@ -2,12 +2,15 @@
 
 ## [Unreleased]
 
-## [1.3.3] 2019-07-15
-
 ### Added
 
 - Add new attribute `rustfmt::skip::attributes` to prevent rustfmt 
 from formatting an attribute #3665
+
+## [1.3.3] 2019-07-15
+
+### Added
+
 - Add `--manifest-path` support to `cargo fmt` (#3683).
 
 ### Fixed
