@@ -1,5 +1,7 @@
 // Integration tests for cargo-fmt.
 
+#![cfg(feature = "test-binary")]
+
 use std::env;
 use std::process::Command;
 

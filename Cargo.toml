@@ -32,6 +32,7 @@ default = ["cargo-fmt", "rustfmt-format-diff"]
 cargo-fmt = []
 rustfmt-format-diff = []
 generic-simd = ["bytecount/generic-simd"]
+test-binary = []
 
 [dependencies]
 atty = "0.2"

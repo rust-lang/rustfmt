@@ -1,5 +1,7 @@
 //! Integration tests for rustfmt.
 
+#![cfg(feature = "test-binary")]
+
 use std::env;
 use std::fs::remove_file;
 use std::path::Path;
