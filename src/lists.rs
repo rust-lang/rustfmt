@@ -644,19 +644,28 @@ pub(crate) fn extract_pre_comment(pre_snippet: &str) -> (Option<String>, ListIte
 }
 
 fn extract_post_comment(post_snippet: &str, comment_end: usize, separator: &str) -> Option<String> {
+    // leading newlines are important but not when they are trailing
     let white_space: &[_] = &[' ', '\t'];
 
     // Cleanup post-comment: strip separators and whitespace.
     let post_snippet = post_snippet[..comment_end].trim();
     let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
-        post_snippet[1..].trim_matches(white_space)
+        post_snippet[1..]
+            .trim_matches(white_space)
+            .trim_end_matches('\n')
     } else if post_snippet.ends_with(separator) {
         // the separator is in front of the next item
-        post_snippet[..post_snippet.len() - separator.len()].trim_matches(white_space)
+        post_snippet[..post_snippet.len() - separator.len()]
+            .trim_matches(white_space)
+            .trim_end_matches('\n')
     } else if post_snippet.starts_with(separator) {
-        post_snippet[separator.len()..].trim_matches(white_space)
+        post_snippet[separator.len()..]
+            .trim_matches(white_space)
+            .trim_end_matches('\n')
     } else if post_snippet.ends_with(',') && !post_snippet.trim_start().starts_with("//") {
-        post_snippet[..post_snippet.len() - 1].trim_matches(white_space)
+        post_snippet[..post_snippet.len() - 1]
+            .trim_matches(white_space)
+            .trim_end_matches('\n')
     } else {
         post_snippet
     };
@@ -990,7 +999,7 @@ mod test {
                 "// a comment\n    +",
                 "// a comment\n    +".len(),
                 "+",
-                "// a comment\n",
+                "// a comment",
             ),
             (
                 "+ // a comment\n    ",
