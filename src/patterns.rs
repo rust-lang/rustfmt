@@ -128,24 +128,18 @@ impl Rewrite for Pat {
                 rewrite_tuple_pat(pat_vec, Some(path_str), self.span, context, shape)
             }
             PatKind::Lit(ref expr) => expr.rewrite(context, shape),
-            PatKind::Slice(ref prefix, ref slice_pat, ref suffix) => {
-                // Rewrite all the sub-patterns.
-                let prefix = prefix.iter().map(|p| p.rewrite(context, shape));
-                let slice_pat = slice_pat
-                    .as_ref()
-                    .and_then(|p| p.rewrite(context, shape))
-                    .map(|rw| Some(format!("{}..", if rw == "_" { "" } else { &rw })));
-                let suffix = suffix.iter().map(|p| p.rewrite(context, shape));
-
-                // Munge them together.
-                let pats: Option<Vec<String>> =
-                    prefix.chain(slice_pat.into_iter()).chain(suffix).collect();
-
-                // Check that all the rewrites succeeded, and if not return `None`.
-                let pats = pats?;
-
-                // Unwrap all the sub-strings and join them with commas.
-                Some(format!("[{}]", pats.join(", ")))
+            PatKind::Slice(ref slice_pat) => {
+                let rw: Vec<String> = slice_pat
+                    .iter()
+                    .map(|p| {
+                        if let Some(rw) = p.rewrite(context, shape) {
+                            format!("{}", if rw == "_" { "" } else { &rw })
+                        } else {
+                            format!("{}", context.snippet(p.span))
+                        }
+                    })
+                    .collect();
+                Some(format!("[{}]", rw.join(", ")))
             }
             PatKind::Struct(ref path, ref fields, ellipsis) => {
                 rewrite_struct_pat(path, fields, ellipsis, self.span, context, shape)
