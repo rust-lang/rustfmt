@@ -37,7 +37,7 @@ pub(crate) fn is_short_pattern(pat: &ast::Pat, pat_str: &str) -> bool {
 
 fn is_short_pattern_inner(pat: &ast::Pat) -> bool {
     match pat.node {
-        ast::PatKind::Wild | ast::PatKind::Lit(_) => true,
+        ast::PatKind::Rest | ast::PatKind::Wild | ast::PatKind::Lit(_) => true,
         ast::PatKind::Ident(_, _, ref pat) => pat.is_none(),
         ast::PatKind::Struct(..)
         | ast::PatKind::Mac(..)
@@ -84,6 +84,13 @@ impl Rewrite for Pat {
             PatKind::Wild => {
                 if 1 <= shape.width {
                     Some("_".to_owned())
+                } else {
+                    None
+                }
+            }
+            PatKind::Rest => {
+                if 1 <= shape.width {
+                    Some("..".to_owned())
                 } else {
                     None
                 }
