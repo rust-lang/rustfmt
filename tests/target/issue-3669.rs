@@ -1,15 +1,15 @@
 pub trait PCG:
     self::sealed::Sealed // comment1
-    + Sized                // comment2
-    + Eq                   // comment3
-    + Hash                 // comment4
-    + Debug                // comment5
-    + Clone                // comment6
-    + Default              // comment7
-    + Serialize            // comment8
+    + Sized              // comment2
+    + Eq                 // comment3
+    + Hash               // comment4
+    + Debug              // comment5
+    + Clone              // comment6
+    + Default            // comment7
+    + Serialize          // comment8
     + for<'a> Deserialize<'a> // comment9
 {
-    type DoubleState: Copy                                // Note(Evrey): Because Rust is drunk. 1
+    type DoubleState: Copy                                   // Note(Evrey): Because Rust is drunk. 1
         + ShrAssign<u8>                       // Note(Evrey): Because Rust is drunk. 2
         + Shl<u8, Output = Self::DoubleState> // Note(Evrey): Because Rust is drunk. 3
         + BitAnd<Output = Self::DoubleState>  // Note(Evrey): Because Rust is drunk. 4
@@ -26,16 +26,16 @@ pub trait PCG:
 
 pub trait Bar:
     self::sealed::Sealed // comment1
-    + Sized                // comment2
-    + Eq                   // comment3
-    + Hash                 // comment4
-    + Debug                // comment5
-    + Clone                // comment6
-    + Default              // comment7
-    + Serialize            // comment8
+    + Sized              // comment2
+    + Eq                 // comment3
+    + Hash               // comment4
+    + Debug              // comment5
+    + Clone              // comment6
+    + Default            // comment7
+    + Serialize          // comment8
     + for<'a> Deserialize<'a> // comment9
 {
-    type DoubleState: Copy                                // Note(Evrey): Because Rust is drunk. 1
+    type DoubleState: Copy                                   // Note(Evrey): Because Rust is drunk. 1
         + ShrAssign<u8>                       // Note(Evrey): Because Rust is drunk. 2
         + Shl<u8, Output = Self::DoubleState> // Note(Evrey): Because Rust is drunk. 3
         + BitAnd<Output = Self::DoubleState>  // Note(Evrey): Because Rust is drunk. 4

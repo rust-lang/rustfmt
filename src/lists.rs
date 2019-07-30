@@ -275,10 +275,9 @@ where
     }
 }
 
-// Format a list of commented items into a string.
-pub(crate) fn write_list<I, T>(items: I, formatting: &ListFormatting<'_>) -> Option<String>
+/// Format a list of commented items into a string.
+pub(crate) fn write_list<T>(items: &[T], formatting: &ListFormatting<'_>) -> Option<String>
 where
-    I: IntoIterator<Item = T> + Clone,
     T: AsRef<ListItem>,
 {
     let tactic = formatting.tactic;
@@ -288,13 +287,37 @@ where
     // will be a trailing separator.
     let mut trailing_separator = formatting.needs_trailing_separator();
     let mut result = String::with_capacity(128);
-    let cloned_items = items.clone();
-    let mut iter = items.into_iter().enumerate().peekable();
+    let mut iter = items.iter().enumerate().peekable();
     let mut item_max_width: Option<usize> = None;
     let sep_place =
         SeparatorPlace::from_tactic(formatting.separator_place, tactic, formatting.separator);
     let mut prev_item_had_post_comment = false;
     let mut prev_item_is_nested_import = false;
+
+    let first_item_len = if let Some(item) = items.iter().nth(0) {
+        item.as_ref().inner_as_ref().len()
+    } else {
+        0
+    };
+    let last_item_len = if let Some(item) = items.iter().last() {
+        item.as_ref().inner_as_ref().len()
+    } else {
+        0
+    };
+    let middle_item_same_len_first = items
+        .iter()
+        // all but first item
+        .skip(1)
+        // check if any of the intermediate items share the size of the first item
+        .map(|item| item.as_ref().inner_as_ref().len())
+        .any(|len| len == first_item_len);
+    let middle_item_same_len_last = items
+        .iter()
+        // all but last item
+        .take(items.len().saturating_sub(1))
+        // check if any of the intermediate items share the size of the last item
+        .map(|item| item.as_ref().inner_as_ref().len())
+        .any(|len| len == last_item_len);
 
     let mut line_len = 0;
     let mut first_item_on_line = true;
@@ -472,7 +495,7 @@ where
             let rewrite_post_comment = |item_max_width: &mut Option<usize>| {
                 if item_max_width.is_none() && !last && !inner_item.contains('\n') {
                     *item_max_width = Some(max_width_of_item_with_post_comment(
-                        &cloned_items,
+                        &items,
                         i,
                         overhead,
                         formatting.config.max_width(),
@@ -507,8 +530,19 @@ where
 
             if !starts_with_newline(comment) {
                 if formatting.align_comments {
-                    let mut comment_alignment =
-                        post_comment_alignment(item_max_width, inner_item.len());
+                    let mut comment_alignment = post_comment_alignment(
+                        item_max_width,
+                        inner_item.len(),
+                        formatting,
+                        sep_place,
+                        first,
+                        middle_item_same_len_first,
+                        item_max_width.unwrap_or_default() == first_item_len,
+                        last,
+                        middle_item_same_len_last,
+                        item_max_width.unwrap_or_default() == last_item_len,
+                        separate,
+                    );
                     if first_line_width(&formatted_comment)
                         + last_line_width(&result)
                         + comment_alignment
@@ -517,21 +551,22 @@ where
                     {
                         item_max_width = None;
                         formatted_comment = rewrite_post_comment(&mut item_max_width)?;
-                        comment_alignment =
-                            post_comment_alignment(item_max_width, inner_item.len());
+                        comment_alignment = post_comment_alignment(
+                            item_max_width,
+                            inner_item.len(),
+                            formatting,
+                            sep_place,
+                            first,
+                            middle_item_same_len_first,
+                            item_max_width.unwrap_or_default() == first_item_len,
+                            last,
+                            middle_item_same_len_last,
+                            item_max_width.unwrap_or_default() == last_item_len,
+                            separate,
+                        );
                     }
-                    for _ in 0..=comment_alignment {
-                        result.push(' ');
-                    }
-                }
-                // An additional space for the missing trailing separator (or
-                // if we skipped alignment above).
-                if !formatting.align_comments
-                    || (last
-                        && item_max_width.is_some()
-                        && !separate
-                        && !formatting.separator.is_empty())
-                {
+                    result.push_str(&" ".repeat(comment_alignment));
+                } else {
                     result.push(' ');
                 }
             } else {
@@ -563,19 +598,18 @@ where
     Some(result)
 }
 
-fn max_width_of_item_with_post_comment<I, T>(
-    items: &I,
+fn max_width_of_item_with_post_comment<T>(
+    items: &[T],
     i: usize,
     overhead: usize,
     max_budget: usize,
 ) -> usize
 where
-    I: IntoIterator<Item = T> + Clone,
     T: AsRef<ListItem>,
 {
     let mut max_width = 0;
     let mut first = true;
-    for item in items.clone().into_iter().skip(i) {
+    for item in items.iter().skip(i) {
         let item = item.as_ref();
         let inner_item_width = item.inner_as_ref().len();
         if !first
@@ -596,8 +630,74 @@ where
     max_width
 }
 
-fn post_comment_alignment(item_max_width: Option<usize>, inner_item_len: usize) -> usize {
-    item_max_width.unwrap_or(0).saturating_sub(inner_item_len)
+fn post_comment_alignment(
+    item_max_width: Option<usize>,
+    inner_item_len: usize,
+    fmt: &ListFormatting<'_>,
+    sep_place: SeparatorPlace,
+    first: bool,
+    middle_item_same_len_first: bool,
+    first_item_longest: bool,
+    last: bool,
+    middle_item_same_len_last: bool,
+    last_item_longest: bool,
+    separate: bool,
+) -> usize {
+    // 1 = whitespace before the post_comment
+    let alignment = item_max_width.unwrap_or(0).saturating_sub(inner_item_len) + 1;
+    if item_max_width.is_none() {
+        return alignment;
+    }
+    let alignment = match sep_place {
+        /*
+         * Front separator: first item is missing the separator and needs to be compensated
+         */
+        SeparatorPlace::Front => {
+            match (first, first_item_longest) {
+                _ if middle_item_same_len_first => {
+                    alignment + if first { fmt.separator.len() } else { 0 }
+                }
+                // first item is the longest: others need to minus the (separator + padding)
+                // to the alignment
+                (false, true) => {
+                    // FIXME: document the trim the leading whitespace
+                    alignment.saturating_sub(fmt.separator.trim_start().len())
+                        - if fmt.padding { 1 } else { 0 }
+                }
+                // first item is not the longest: first needs to add (searator + padding)
+                // to the alignment
+                (true, false) => {
+                    alignment + fmt.separator.trim_start().len() + if fmt.padding { 1 } else { 0 }
+                }
+                _ => alignment,
+            }
+        }
+        /*
+         * Back separator: last item is missing the separator (if it is not trailing)
+         * and needs to be compensated
+         */
+        SeparatorPlace::Back => {
+            match (last, last_item_longest) {
+                _ if middle_item_same_len_last => {
+                    alignment
+                        + if last && !separate {
+                            fmt.separator.len()
+                        } else {
+                            0
+                        }
+                }
+                // last item is the longest: others need to minus the sep to the alignment
+                (false, true) if !fmt.needs_trailing_separator() => {
+                    alignment.saturating_sub(fmt.separator.len())
+                }
+                // last item is not the longest: last needs to add sep to the alignment
+                (true, false) if !separate => alignment + fmt.separator.len(),
+                _ => alignment,
+            }
+        }
+    };
+    // at least 1 for the whitespace before the post_comment
+    if alignment == 0 { 1 } else { alignment }
 }
 
 pub(crate) struct ListItems<'a, I, F1, F2, F3>
@@ -979,6 +1079,206 @@ pub(crate) fn struct_lit_formatting<'a>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::Config;
+    use crate::shape::{Indent, Shape};
+
+    #[test]
+    fn post_comment_alignment() {
+        let config: Config = Default::default();
+
+        let data = [
+            //separator at the front and first item is the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator("+")
+                        .trailing_separator(SeparatorTactic::Always)
+                        .separator_place(SeparatorPlace::Front)
+                },
+                [
+                    ("item1aaaaaaaaaaaaaaa", "// len20"),
+                    ("item2aaaaa", "// len10"),
+                    ("item3aaaaaaaaaa", "// len15"),
+                ],
+                r#"item1aaaaaaaaaaaaaaa // len20
++ item2aaaaa         // len10
++ item3aaaaaaaaaa    // len15"#,
+            ),
+            // separator at the front and second item is the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator("+")
+                        .trailing_separator(SeparatorTactic::Always)
+                        .separator_place(SeparatorPlace::Front)
+                },
+                [
+                    ("item1aaaaa", "// len10"),
+                    ("item2aaaaaaaaaaaaaaa", "// len20"),
+                    ("item3aaaaaaaaaa", "// len15"),
+                ],
+                r#"item1aaaaa             // len10
++ item2aaaaaaaaaaaaaaa // len20
++ item3aaaaaaaaaa      // len15"#,
+            ),
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator("+")
+                        .separator_place(SeparatorPlace::Front)
+                },
+                [
+                    ("item1aaaaaaaaaaaaaaa", "// len20"),
+                    ("item2aaaaa", "// len10"),
+                    ("item3aaaaaaaaaa", "// len15"),
+                ],
+                r#"item1aaaaaaaaaaaaaaa // len20
++ item2aaaaa         // len10
++ item3aaaaaaaaaa    // len15"#,
+            ),
+            // font separator and middle/last items are the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator("+")
+                        .separator_place(SeparatorPlace::Front)
+                },
+                [
+                    ("item1aaaaa", "// len10"),
+                    ("item2aaaaaaaaaaaaaaa", "// len20"),
+                    ("item3aaaaaaaaaaaaaaa", "// len20"),
+                ],
+                r#"item1aaaaa             // len10
++ item2aaaaaaaaaaaaaaa // len20
++ item3aaaaaaaaaaaaaaa // len20"#,
+            ),
+            // font separator and first/middle items are the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator(" +")
+                        .separator_place(SeparatorPlace::Front)
+                },
+                [
+                    ("item1aaaaaaaaaaaaaaa", "// len20"),
+                    ("item2aaaaaaaaaaaaaaa", "// len20"),
+                    ("item3aaaaaaaaaa", "// len15"),
+                ],
+                r#"item1aaaaaaaaaaaaaaa   // len20
++ item2aaaaaaaaaaaaaaa // len20
++ item3aaaaaaaaaa      // len15"#,
+            ),
+            // back separator and first item is the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator(" +")
+                        .separator_place(SeparatorPlace::Back)
+                },
+                [
+                    ("item1aaaaaaaaaaaaaaa", "// len20"),
+                    ("item2aaaaa", "// len10"),
+                    ("item3aaaaaaaaaa", "// len15"),
+                ],
+                r#"item1aaaaaaaaaaaaaaa + // len20
+item2aaaaa +           // len10
+item3aaaaaaaaaa        // len15"#,
+            ),
+            // back separator and last item is the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator(" +")
+                        .separator_place(SeparatorPlace::Back)
+                },
+                [
+                    ("item1aaaaa", "// len10"),
+                    ("item2aaaaaaaaaa", "// len15"),
+                    ("item3aaaaaaaaaaaaaaa", "// len20"),
+                ],
+                r#"item1aaaaa +         // len10
+item2aaaaaaaaaa +    // len15
+item3aaaaaaaaaaaaaaa // len20"#,
+            ),
+            // back separator and middle item is the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator(" +")
+                        .separator_place(SeparatorPlace::Back)
+                },
+                [
+                    ("item1aaaaa", "// len10"),
+                    ("item2aaaaaaaaaaaaaaa", "// len20"),
+                    ("item3aaaaaaaaaa", "// len15"),
+                ],
+                r#"item1aaaaa +           // len10
+item2aaaaaaaaaaaaaaa + // len20
+item3aaaaaaaaaa        // len15"#,
+            ),
+            // back separator and middle/last items are the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator(" +")
+                        .separator_place(SeparatorPlace::Back)
+                },
+                [
+                    ("item1aaaaa", "// len10"),
+                    ("item2aaaaaaaaaaaaaaa", "// len20"),
+                    ("item3aaaaaaaaaaaaaaa", "// len20"),
+                ],
+                r#"item1aaaaa +           // len10
+item2aaaaaaaaaaaaaaa + // len20
+item3aaaaaaaaaaaaaaa   // len20"#,
+            ),
+            // back separator and first/middle items are the longest
+            (
+                {
+                    let shape = Shape::legacy(config.max_width(), Indent::empty());
+                    ListFormatting::new(shape, &config)
+                        .separator(" +")
+                        .separator_place(SeparatorPlace::Back)
+                },
+                [
+                    ("item1aaaaaaaaaaaaaaa", "// len20"),
+                    ("item2aaaaaaaaaaaaaaa", "// len20"),
+                    ("item3aaaaaaaaaa", "// len15"),
+                ],
+                r#"item1aaaaaaaaaaaaaaa + // len20
+item2aaaaaaaaaaaaaaa + // len20
+item3aaaaaaaaaa        // len15"#,
+            ),
+        ];
+
+        for (i, (fmt, items, expected)) in data.into_iter().enumerate() {
+            let items = items
+                .into_iter()
+                .map(|(inner_item, post_comment)| ListItem {
+                    pre_comment_style: ListItemCommentStyle::SameLine,
+                    pre_comment: None,
+                    item: Some(inner_item.to_string()),
+                    post_comment: Some(post_comment.to_string()),
+                    new_lines: false,
+                })
+                .collect::<Vec<ListItem>>();
+            assert_eq!(
+                write_list(&items, &fmt),
+                Some(expected.to_string()),
+                "failed on item {}",
+                i
+            );
+        }
+    }
 
     #[test]
     fn test_extract_post_comment() {
