@@ -275,6 +275,175 @@ where
     }
 }
 
+struct ItemState {
+    first: bool,
+    last: bool,
+    first_item_on_line: bool,
+}
+
+impl ItemState {
+    fn new() -> ItemState {
+        ItemState {
+            first: false,
+            last: false,
+            first_item_on_line: true,
+        }
+    }
+}
+
+struct WriteListState {
+    sep_place: SeparatorPlace,
+    separate: bool,
+    trailing_separator: bool,
+}
+
+impl WriteListState {
+    fn new(formatting: &ListFormatting<'_>) -> WriteListState {
+        WriteListState {
+            sep_place: SeparatorPlace::from_tactic(
+                formatting.separator_place,
+                formatting.tactic,
+                formatting.separator,
+            ),
+            separate: false,
+            // Now that we know how we will layout, we can decide for sure if there
+            // will be a trailing separator.
+            trailing_separator: formatting.needs_trailing_separator(),
+        }
+    }
+
+    fn should_separate(&mut self, item_state: &ItemState) {
+        self.separate = match self.sep_place {
+            SeparatorPlace::Front => !item_state.first,
+            SeparatorPlace::Back => !item_state.last || self.trailing_separator,
+        };
+    }
+
+    fn should_separate_if_front(&self) -> bool {
+        self.separate && self.sep_place.is_front()
+    }
+
+    fn should_separate_if_back(&self) -> bool {
+        self.separate && self.sep_place.is_back()
+    }
+}
+
+struct PostCommentAlignment {
+    first_item_len: usize,
+    middle_item_same_len_first: bool,
+    last_item_len: usize,
+    middle_item_same_len_last: bool,
+}
+
+impl PostCommentAlignment {
+    fn new<T: AsRef<ListItem>>(items: &[T]) -> PostCommentAlignment {
+        let first_item_len = if let Some(item) = items.iter().nth(0) {
+            item.as_ref().inner_as_ref().len()
+        } else {
+            0
+        };
+        let last_item_len = if let Some(item) = items.iter().last() {
+            item.as_ref().inner_as_ref().len()
+        } else {
+            0
+        };
+        let middle_item_same_len_first = items
+            .iter()
+            // all but first item
+            .skip(1)
+            // check if any of the intermediate items share the size of the first item
+            .map(|item| item.as_ref().inner_as_ref().len())
+            .any(|len| len == first_item_len);
+        let middle_item_same_len_last = items
+            .iter()
+            // all but last item
+            .take(items.len().saturating_sub(1))
+            // check if any of the intermediate items share the size of the last item
+            .map(|item| item.as_ref().inner_as_ref().len())
+            .any(|len| len == last_item_len);
+        PostCommentAlignment {
+            first_item_len,
+            middle_item_same_len_first,
+            last_item_len,
+            middle_item_same_len_last,
+        }
+    }
+
+    fn compute(
+        &self,
+        item_state: &ItemState,
+        item_max_width: Option<usize>,
+        inner_item_len: usize,
+        fmt: &ListFormatting<'_>,
+        write_list_state: &WriteListState,
+    ) -> usize {
+        // 1 = whitespace before the post_comment
+        let alignment = item_max_width.unwrap_or(0).saturating_sub(inner_item_len) + 1;
+        if item_max_width.is_none() {
+            return alignment;
+        }
+        let first_item_longest = item_max_width.unwrap() == self.first_item_len;
+        let last_item_longest = item_max_width.unwrap() == self.last_item_len;
+        let alignment = match write_list_state.sep_place {
+            /*
+             * Front separator: first item is missing the separator and needs to be compensated
+             */
+            SeparatorPlace::Front => {
+                match (item_state.first, first_item_longest) {
+                    _ if self.middle_item_same_len_first => {
+                        alignment
+                            + if item_state.first {
+                                fmt.separator.len()
+                            } else {
+                                0
+                            }
+                    }
+                    // first item is the longest: others need to minus the (separator + padding)
+                    // to the alignment
+                    (false, true) => {
+                        // FIXME: document the trim the leading whitespace
+                        alignment.saturating_sub(fmt.separator.trim_start().len())
+                            - if fmt.padding { 1 } else { 0 }
+                    }
+                    // first item is not the longest: first needs to add (searator + padding)
+                    // to the alignment
+                    (true, false) => {
+                        alignment
+                            + fmt.separator.trim_start().len()
+                            + if fmt.padding { 1 } else { 0 }
+                    }
+                    _ => alignment,
+                }
+            }
+            /*
+             * Back separator: last item is missing the separator (if it is not trailing)
+             * and needs to be compensated
+             */
+            SeparatorPlace::Back => {
+                match (item_state.last, last_item_longest) {
+                    _ if self.middle_item_same_len_last => {
+                        alignment
+                            + if item_state.last && !write_list_state.separate {
+                                fmt.separator.len()
+                            } else {
+                                0
+                            }
+                    }
+                    // last item is the longest: others need to minus the sep to the alignment
+                    (false, true) if !fmt.needs_trailing_separator() => {
+                        alignment.saturating_sub(fmt.separator.len())
+                    }
+                    // last item is not the longest: last needs to add sep to the alignment
+                    (true, false) if !write_list_state.separate => alignment + fmt.separator.len(),
+                    _ => alignment,
+                }
+            }
+        };
+        // at least 1 for the whitespace before the post_comment
+        if alignment == 0 { 1 } else { alignment }
+    }
+}
+
 /// Format a list of commented items into a string.
 pub(crate) fn write_list<T>(items: &[T], formatting: &ListFormatting<'_>) -> Option<String>
 where
@@ -283,55 +452,29 @@ where
     let tactic = formatting.tactic;
     let sep_len = formatting.separator.len();
 
-    // Now that we know how we will layout, we can decide for sure if there
-    // will be a trailing separator.
-    let mut trailing_separator = formatting.needs_trailing_separator();
     let mut result = String::with_capacity(128);
     let mut iter = items.iter().enumerate().peekable();
     let mut item_max_width: Option<usize> = None;
-    let sep_place =
-        SeparatorPlace::from_tactic(formatting.separator_place, tactic, formatting.separator);
     let mut prev_item_had_post_comment = false;
     let mut prev_item_is_nested_import = false;
 
-    let first_item_len = if let Some(item) = items.iter().nth(0) {
-        item.as_ref().inner_as_ref().len()
-    } else {
-        0
-    };
-    let last_item_len = if let Some(item) = items.iter().last() {
-        item.as_ref().inner_as_ref().len()
-    } else {
-        0
-    };
-    let middle_item_same_len_first = items
-        .iter()
-        // all but first item
-        .skip(1)
-        // check if any of the intermediate items share the size of the first item
-        .map(|item| item.as_ref().inner_as_ref().len())
-        .any(|len| len == first_item_len);
-    let middle_item_same_len_last = items
-        .iter()
-        // all but last item
-        .take(items.len().saturating_sub(1))
-        // check if any of the intermediate items share the size of the last item
-        .map(|item| item.as_ref().inner_as_ref().len())
-        .any(|len| len == last_item_len);
+    let mut item_state = ItemState::new();
+    let mut write_list_state = WriteListState::new(formatting);
+    let pca = PostCommentAlignment::new(items);
 
     let mut line_len = 0;
-    let mut first_item_on_line = true;
     let indent_str = &formatting.shape.indent.to_string(formatting.config);
     while let Some((i, item)) = iter.next() {
         let item = item.as_ref();
         let inner_item = item.item.as_ref()?;
-        let first = i == 0;
-        let last = iter.peek().is_none();
-        let mut separate = match sep_place {
-            SeparatorPlace::Front => !first,
-            SeparatorPlace::Back => !last || trailing_separator,
+        item_state.first = i == 0;
+        item_state.last = iter.peek().is_none();
+        write_list_state.should_separate(&item_state);
+        let item_sep_len = if write_list_state.separate {
+            sep_len
+        } else {
+            0
         };
-        let item_sep_len = if separate { sep_len } else { 0 };
 
         // Item string may be multi-line. Its length (used for block comment alignment)
         // should be only the length of the last line.
@@ -358,12 +501,12 @@ where
                 {
                     result.push('\n');
                     result.push_str(indent_str);
-                    first_item_on_line = true;
-                } else if formatting.padding && !first_item_on_line {
+                    item_state.first_item_on_line = true;
+                } else if formatting.padding && !item_state.first_item_on_line {
                     result.push(' ');
                 }
             }
-            DefinitiveListTactic::Horizontal if !first && formatting.padding => {
+            DefinitiveListTactic::Horizontal if !item_state.first && formatting.padding => {
                 result.push(' ');
             }
             DefinitiveListTactic::SpecialMacro(num_args_before) => {
@@ -379,9 +522,9 @@ where
                 }
             }
             DefinitiveListTactic::Vertical
-                if !first && !inner_item.is_empty() && !result.is_empty() =>
+                if !item_state.first && !inner_item.is_empty() && !result.is_empty() =>
             {
-                first_item_on_line = true;
+                item_state.first_item_on_line = true;
                 result.push('\n');
                 result.push_str(indent_str);
             }
@@ -392,22 +535,24 @@ where
                 if (line_len > 0 && line_len + 1 + total_width > formatting.shape.width)
                     || prev_item_had_post_comment
                     || (formatting.nested
-                        && (prev_item_is_nested_import || (!first && inner_item.contains("::"))))
+                        && (prev_item_is_nested_import
+                            || (!item_state.first && inner_item.contains("::"))))
                 {
                     result.push('\n');
                     result.push_str(indent_str);
                     line_len = 0;
-                    first_item_on_line = true;
+                    item_state.first_item_on_line = true;
                     if formatting.ends_with_newline {
-                        trailing_separator = true;
+                        write_list_state.trailing_separator = true;
                     }
                 } else if formatting.padding && line_len > 0 {
                     result.push(' ');
                     line_len += 1;
                 }
 
-                if last && formatting.ends_with_newline {
-                    separate = formatting.trailing_separator != SeparatorTactic::Never;
+                if item_state.last && formatting.ends_with_newline {
+                    write_list_state.separate =
+                        formatting.trailing_separator != SeparatorTactic::Never;
                 }
 
                 line_len += total_width;
@@ -453,11 +598,11 @@ where
             item_max_width = None;
         }
 
-        if separate && sep_place.is_front() && !first {
+        if write_list_state.should_separate_if_front() && !item_state.first {
             if formatting.padding {
                 result.push_str(formatting.separator.trim());
                 result.push(' ');
-            } else if first_item_on_line {
+            } else if item_state.first_item_on_line {
                 result.push_str(formatting.separator.trim_start());
             } else {
                 result.push_str(formatting.separator);
@@ -484,7 +629,7 @@ where
             result.push_str(&formatted_comment);
         }
 
-        if separate && sep_place.is_back() {
+        if write_list_state.should_separate_if_back() {
             result.push_str(formatting.separator);
         }
 
@@ -493,7 +638,7 @@ where
             let overhead = last_line_width(&result) + first_line_width(comment.trim());
 
             let rewrite_post_comment = |item_max_width: &mut Option<usize>| {
-                if item_max_width.is_none() && !last && !inner_item.contains('\n') {
+                if item_max_width.is_none() && !item_state.last && !inner_item.contains('\n') {
                     *item_max_width = Some(max_width_of_item_with_post_comment(
                         &items,
                         i,
@@ -514,7 +659,7 @@ where
                 let comment_shape = Shape::legacy(width, offset);
 
                 // Use block-style only for the last item or multiline comments.
-                let block_style = !formatting.ends_with_newline && last
+                let block_style = !formatting.ends_with_newline && item_state.last
                     || comment.trim().contains('\n')
                     || comment.trim().len() > width;
 
@@ -530,18 +675,12 @@ where
 
             if !starts_with_newline(comment) {
                 if formatting.align_comments {
-                    let mut comment_alignment = post_comment_alignment(
+                    let mut comment_alignment = pca.compute(
+                        &item_state,
                         item_max_width,
                         inner_item.len(),
                         formatting,
-                        sep_place,
-                        first,
-                        middle_item_same_len_first,
-                        item_max_width.unwrap_or_default() == first_item_len,
-                        last,
-                        middle_item_same_len_last,
-                        item_max_width.unwrap_or_default() == last_item_len,
-                        separate,
+                        &write_list_state,
                     );
                     if first_line_width(&formatted_comment)
                         + last_line_width(&result)
@@ -551,18 +690,12 @@ where
                     {
                         item_max_width = None;
                         formatted_comment = rewrite_post_comment(&mut item_max_width)?;
-                        comment_alignment = post_comment_alignment(
+                        comment_alignment = pca.compute(
+                            &item_state,
                             item_max_width,
                             inner_item.len(),
                             formatting,
-                            sep_place,
-                            first,
-                            middle_item_same_len_first,
-                            item_max_width.unwrap_or_default() == first_item_len,
-                            last,
-                            middle_item_same_len_last,
-                            item_max_width.unwrap_or_default() == last_item_len,
-                            separate,
+                            &write_list_state,
                         );
                     }
                     result.push_str(&" ".repeat(comment_alignment));
@@ -582,7 +715,7 @@ where
         }
 
         if formatting.preserve_newline
-            && !last
+            && !item_state.last
             && tactic == DefinitiveListTactic::Vertical
             && item.new_lines
         {
@@ -590,7 +723,7 @@ where
             result.push('\n');
         }
 
-        first_item_on_line = false;
+        item_state.first_item_on_line = false;
         prev_item_had_post_comment = item.post_comment.is_some();
         prev_item_is_nested_import = inner_item.contains("::");
     }
@@ -628,76 +761,6 @@ where
         first = false;
     }
     max_width
-}
-
-fn post_comment_alignment(
-    item_max_width: Option<usize>,
-    inner_item_len: usize,
-    fmt: &ListFormatting<'_>,
-    sep_place: SeparatorPlace,
-    first: bool,
-    middle_item_same_len_first: bool,
-    first_item_longest: bool,
-    last: bool,
-    middle_item_same_len_last: bool,
-    last_item_longest: bool,
-    separate: bool,
-) -> usize {
-    // 1 = whitespace before the post_comment
-    let alignment = item_max_width.unwrap_or(0).saturating_sub(inner_item_len) + 1;
-    if item_max_width.is_none() {
-        return alignment;
-    }
-    let alignment = match sep_place {
-        /*
-         * Front separator: first item is missing the separator and needs to be compensated
-         */
-        SeparatorPlace::Front => {
-            match (first, first_item_longest) {
-                _ if middle_item_same_len_first => {
-                    alignment + if first { fmt.separator.len() } else { 0 }
-                }
-                // first item is the longest: others need to minus the (separator + padding)
-                // to the alignment
-                (false, true) => {
-                    // FIXME: document the trim the leading whitespace
-                    alignment.saturating_sub(fmt.separator.trim_start().len())
-                        - if fmt.padding { 1 } else { 0 }
-                }
-                // first item is not the longest: first needs to add (searator + padding)
-                // to the alignment
-                (true, false) => {
-                    alignment + fmt.separator.trim_start().len() + if fmt.padding { 1 } else { 0 }
-                }
-                _ => alignment,
-            }
-        }
-        /*
-         * Back separator: last item is missing the separator (if it is not trailing)
-         * and needs to be compensated
-         */
-        SeparatorPlace::Back => {
-            match (last, last_item_longest) {
-                _ if middle_item_same_len_last => {
-                    alignment
-                        + if last && !separate {
-                            fmt.separator.len()
-                        } else {
-                            0
-                        }
-                }
-                // last item is the longest: others need to minus the sep to the alignment
-                (false, true) if !fmt.needs_trailing_separator() => {
-                    alignment.saturating_sub(fmt.separator.len())
-                }
-                // last item is not the longest: last needs to add sep to the alignment
-                (true, false) if !separate => alignment + fmt.separator.len(),
-                _ => alignment,
-            }
-        }
-    };
-    // at least 1 for the whitespace before the post_comment
-    if alignment == 0 { 1 } else { alignment }
 }
 
 pub(crate) struct ListItems<'a, I, F1, F2, F3>
