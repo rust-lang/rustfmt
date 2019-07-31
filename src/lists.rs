@@ -276,6 +276,7 @@ where
 }
 
 struct ItemState {
+    ith: usize,
     first: bool,
     last: bool,
     first_item_on_line: bool,
@@ -284,6 +285,7 @@ struct ItemState {
 impl ItemState {
     fn new() -> ItemState {
         ItemState {
+            ith: 0,
             first: false,
             last: false,
             first_item_on_line: true,
@@ -329,6 +331,7 @@ impl WriteListState {
 }
 
 struct PostCommentAlignment {
+    item_max_width: Option<usize>,
     first_item_len: usize,
     middle_item_same_len_first: bool,
     last_item_len: usize,
@@ -362,6 +365,7 @@ impl PostCommentAlignment {
             .map(|item| item.as_ref().inner_as_ref().len())
             .any(|len| len == last_item_len);
         PostCommentAlignment {
+            item_max_width: None,
             first_item_len,
             middle_item_same_len_first,
             last_item_len,
@@ -369,21 +373,74 @@ impl PostCommentAlignment {
         }
     }
 
+    fn update_item_max_width<T: AsRef<ListItem>>(
+        &mut self,
+        items: &[T],
+        formatting: &ListFormatting<'_>,
+        item_state: &ItemState,
+        inner_item: &str,
+        overhead: usize,
+    ) {
+        if self.item_max_width.is_none() && !item_state.last && !inner_item.contains('\n') {
+            self.item_max_width = Some(PostCommentAlignment::max_width_of_item_with_post_comment(
+                &items,
+                item_state.ith,
+                overhead,
+                formatting.config.max_width(),
+            ));
+        }
+    }
+
+    fn max_width_of_item_with_post_comment<T>(
+        items: &[T],
+        i: usize,
+        overhead: usize,
+        max_budget: usize,
+    ) -> usize
+    where
+        T: AsRef<ListItem>,
+    {
+        let mut max_width = 0;
+        let mut first = true;
+        for item in items.iter().skip(i) {
+            let item = item.as_ref();
+            let inner_item_width = item.inner_as_ref().len();
+            if !first
+                && (item.is_different_group()
+                    || item.post_comment.is_none()
+                    || inner_item_width + overhead > max_budget)
+            {
+                return max_width;
+            }
+            if max_width < inner_item_width {
+                max_width = inner_item_width;
+            }
+            if item.new_lines {
+                return max_width;
+            }
+            first = false;
+        }
+        max_width
+    }
+
     fn compute(
         &self,
         item_state: &ItemState,
-        item_max_width: Option<usize>,
         inner_item_len: usize,
         fmt: &ListFormatting<'_>,
         write_list_state: &WriteListState,
     ) -> usize {
         // 1 = whitespace before the post_comment
-        let alignment = item_max_width.unwrap_or(0).saturating_sub(inner_item_len) + 1;
-        if item_max_width.is_none() {
+        let alignment = self
+            .item_max_width
+            .unwrap_or(0)
+            .saturating_sub(inner_item_len)
+            + 1;
+        if self.item_max_width.is_none() {
             return alignment;
         }
-        let first_item_longest = item_max_width.unwrap() == self.first_item_len;
-        let last_item_longest = item_max_width.unwrap() == self.last_item_len;
+        let first_item_longest = self.item_max_width.unwrap() == self.first_item_len;
+        let last_item_longest = self.item_max_width.unwrap() == self.last_item_len;
         let alignment = match write_list_state.sep_place {
             /*
              * Front separator: first item is missing the separator and needs to be compensated
@@ -450,28 +507,27 @@ where
     T: AsRef<ListItem>,
 {
     let tactic = formatting.tactic;
-    let sep_len = formatting.separator.len();
 
     let mut result = String::with_capacity(128);
     let mut iter = items.iter().enumerate().peekable();
-    let mut item_max_width: Option<usize> = None;
     let mut prev_item_had_post_comment = false;
     let mut prev_item_is_nested_import = false;
 
     let mut item_state = ItemState::new();
     let mut write_list_state = WriteListState::new(formatting);
-    let pca = PostCommentAlignment::new(items);
+    let mut pca = PostCommentAlignment::new(items);
 
     let mut line_len = 0;
     let indent_str = &formatting.shape.indent.to_string(formatting.config);
     while let Some((i, item)) = iter.next() {
         let item = item.as_ref();
         let inner_item = item.item.as_ref()?;
+        item_state.ith = i;
         item_state.first = i == 0;
         item_state.last = iter.peek().is_none();
         write_list_state.should_separate(&item_state);
         let item_sep_len = if write_list_state.separate {
-            sep_len
+            formatting.separator.len()
         } else {
             0
         };
@@ -595,7 +651,7 @@ where
                     result.push(' ');
                 }
             }
-            item_max_width = None;
+            pca.item_max_width = None;
         }
 
         if write_list_state.should_separate_if_front() && !item_state.first {
@@ -637,18 +693,10 @@ where
             let comment = item.post_comment.as_ref().unwrap();
             let overhead = last_line_width(&result) + first_line_width(comment.trim());
 
-            let rewrite_post_comment = |item_max_width: &mut Option<usize>| {
-                if item_max_width.is_none() && !item_state.last && !inner_item.contains('\n') {
-                    *item_max_width = Some(max_width_of_item_with_post_comment(
-                        &items,
-                        i,
-                        overhead,
-                        formatting.config.max_width(),
-                    ));
-                }
+            let rewrite_post_comment = |item_max_width: Option<usize>| {
                 let overhead = if starts_with_newline(comment) {
                     0
-                } else if let Some(max_width) = *item_max_width {
+                } else if let Some(max_width) = item_max_width {
                     max_width + 2
                 } else {
                     // 1 = space between item and comment.
@@ -671,28 +719,30 @@ where
                 )
             };
 
-            let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
+            pca.update_item_max_width(items, formatting, &item_state, inner_item, overhead);
+            let mut formatted_comment = rewrite_post_comment(pca.item_max_width)?;
 
             if !starts_with_newline(comment) {
                 if formatting.align_comments {
-                    let mut comment_alignment = pca.compute(
-                        &item_state,
-                        item_max_width,
-                        inner_item.len(),
-                        formatting,
-                        &write_list_state,
-                    );
+                    let mut comment_alignment =
+                        pca.compute(&item_state, inner_item.len(), formatting, &write_list_state);
                     if first_line_width(&formatted_comment)
                         + last_line_width(&result)
                         + comment_alignment
                         + 1
                         > formatting.config.max_width()
                     {
-                        item_max_width = None;
-                        formatted_comment = rewrite_post_comment(&mut item_max_width)?;
+                        pca.item_max_width = None;
+                        pca.update_item_max_width(
+                            items,
+                            formatting,
+                            &item_state,
+                            inner_item,
+                            overhead,
+                        );
+                        formatted_comment = rewrite_post_comment(pca.item_max_width)?;
                         comment_alignment = pca.compute(
                             &item_state,
-                            item_max_width,
                             inner_item.len(),
                             formatting,
                             &write_list_state,
@@ -707,11 +757,11 @@ where
                 result.push_str(indent_str);
             }
             if formatted_comment.contains('\n') {
-                item_max_width = None;
+                pca.item_max_width = None;
             }
             result.push_str(&formatted_comment);
         } else {
-            item_max_width = None;
+            pca.item_max_width = None;
         }
 
         if formatting.preserve_newline
@@ -719,7 +769,7 @@ where
             && tactic == DefinitiveListTactic::Vertical
             && item.new_lines
         {
-            item_max_width = None;
+            pca.item_max_width = None;
             result.push('\n');
         }
 
@@ -729,38 +779,6 @@ where
     }
 
     Some(result)
-}
-
-fn max_width_of_item_with_post_comment<T>(
-    items: &[T],
-    i: usize,
-    overhead: usize,
-    max_budget: usize,
-) -> usize
-where
-    T: AsRef<ListItem>,
-{
-    let mut max_width = 0;
-    let mut first = true;
-    for item in items.iter().skip(i) {
-        let item = item.as_ref();
-        let inner_item_width = item.inner_as_ref().len();
-        if !first
-            && (item.is_different_group()
-                || item.post_comment.is_none()
-                || inner_item_width + overhead > max_budget)
-        {
-            return max_width;
-        }
-        if max_width < inner_item_width {
-            max_width = inner_item_width;
-        }
-        if item.new_lines {
-            return max_width;
-        }
-        first = false;
-    }
-    max_width
 }
 
 pub(crate) struct ListItems<'a, I, F1, F2, F3>
