@@ -396,9 +396,7 @@ impl Chain {
             }
             ast::ExprKind::Field(ref subexpr, _)
             | ast::ExprKind::Try(ref subexpr)
-            | ast::ExprKind::Await(ref subexpr) => {
-                Some(Self::convert_try(subexpr, context))
-            }
+            | ast::ExprKind::Await(ref subexpr) => Some(Self::convert_try(subexpr, context)),
             _ => None,
         }
     }
