@@ -5,8 +5,9 @@ use crate::config::IndentStyle;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::utils::{
-    first_line_width, is_single_line, last_line_width, trimmed_last_line_width, wrap_str,
+    first_line_width, is_single_line, last_line_width, mk_sp, trimmed_last_line_width, wrap_str,
 };
+use syntax::source_map::BytePos;
 
 /// Sigils that decorate a binop pair.
 #[derive(new, Clone, Copy)]
@@ -52,24 +53,26 @@ fn rewrite_pairs_one_line<T: Rewrite>(
 
     let mut result = String::new();
     let base_shape = shape.block();
-
-    for ((_, rewrite), s) in list.list.iter().zip(list.separators.iter()) {
-        if let Some(rewrite) = rewrite {
+    let mut has_comment = false;
+    for (item, s) in list.list.iter().zip(list.separators.iter()) {
+        if let Some(rewrite) = &item.rewrite {
             if !is_single_line(&rewrite) || result.len() > shape.width {
                 return None;
             }
 
             result.push_str(&rewrite);
-            result.push(' ');
+            set_pair_string(&mut result, &item.before_comment, base_shape, context);
             result.push_str(s);
-            result.push(' ');
+            set_pair_string(&mut result, &item.after_comment, base_shape, context);
+
+            has_comment = !(item.before_comment.is_none() && item.after_comment.is_none());
         } else {
             return None;
         }
     }
 
     let prefix_len = result.len();
-    let last = list.list.last()?.0;
+    let last = list.list.last()?.item;
     let cur_shape = base_shape.offset_left(last_line_width(&result))?;
     let last_rewrite = last.rewrite(context, cur_shape)?;
     result.push_str(&last_rewrite);
@@ -80,13 +83,31 @@ fn rewrite_pairs_one_line<T: Rewrite>(
 
     // Check the last expression in the list. We sometimes let this expression
     // go over multiple lines, but we check for some ugly conditions.
-    if !(is_single_line(&result) || last_rewrite.starts_with('{'))
+    if !has_comment
+        && !(is_single_line(&result) || last_rewrite.starts_with('{'))
         && (last_rewrite.starts_with('(') || prefix_len > context.config.tab_spaces())
     {
         return None;
     }
 
     wrap_str(result, context.config.max_width(), shape)
+}
+
+fn set_pair_string<'a>(
+    result: &'a mut String,
+    comment: &Option<String>,
+    base_shape: Shape,
+    context: &RewriteContext<'_>,
+) -> &'a String {
+    if let Some(comment) = comment {
+        let indent_str = base_shape.indent.to_string_with_newline(context.config);
+        result.push_str(&format!("{}", indent_str));
+        result.push_str(&format!("{}", comment));
+        result.push_str(&format!("{}", indent_str));
+    } else {
+        result.push(' ');
+    }
+    result
 }
 
 fn rewrite_pairs_multiline<T: Rewrite>(
@@ -105,9 +126,13 @@ fn rewrite_pairs_multiline<T: Rewrite>(
     let indent_str = nested_shape.indent.to_string_with_newline(context.config);
     let mut result = String::new();
 
-    result.push_str(&list.list[0].1.as_ref()?);
+    result.push_str(&list.list[0].rewrite.as_ref()?);
 
-    for ((e, default_rw), s) in list.list[1..].iter().zip(list.separators.iter()) {
+    for (item, s) in list.list[1..].iter().zip(list.separators.iter()) {
+        let e = item.item;
+        let before_comment = &item.before_comment;
+        let after_comment = &item.after_comment;
+        let default_rw = &item.rewrite;
         // The following test checks if we should keep two subexprs on the same
         // line. We do this if not doing so would create an orphan and there is
         // enough space to do so.
@@ -122,9 +147,9 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                 shape.offset_left(s.len() + 2 + trimmed_last_line_width(&result))
             {
                 if let Some(rewrite) = e.rewrite(context, line_shape) {
-                    result.push(' ');
+                    set_pair_string(&mut result, before_comment, line_shape, context);
                     result.push_str(s);
-                    result.push(' ');
+                    set_pair_string(&mut result, after_comment, line_shape, context);
                     result.push_str(&rewrite);
                     continue;
                 }
@@ -133,14 +158,14 @@ fn rewrite_pairs_multiline<T: Rewrite>(
 
         match context.config.binop_separator() {
             SeparatorPlace::Back => {
-                result.push(' ');
+                set_pair_string(&mut result, before_comment, nested_shape, context);
                 result.push_str(s);
                 result.push_str(&indent_str);
             }
             SeparatorPlace::Front => {
                 result.push_str(&indent_str);
                 result.push_str(s);
-                result.push(' ');
+                set_pair_string(&mut result, after_comment, nested_shape, context);
             }
         }
 
@@ -244,8 +269,33 @@ trait FlattenPair: Rewrite + Sized {
 }
 
 struct PairList<'a, 'b, T: Rewrite> {
-    list: Vec<(&'b T, Option<String>)>,
+    list: Vec<ListItem<'b, T>>,
     separators: Vec<&'a str>,
+}
+
+struct ListItem<'a, T: Rewrite> {
+    item: &'a T,
+    rewrite: Option<String>,
+    before_comment: Option<String>,
+    after_comment: Option<String>,
+}
+impl<'a, T> ListItem<'a, T>
+where
+    T: Rewrite,
+{
+    fn new(
+        item: &'a T,
+        rewrite: Option<String>,
+        before_comment: Option<String>,
+        after_comment: Option<String>,
+    ) -> Self {
+        ListItem {
+            item,
+            rewrite,
+            before_comment,
+            after_comment,
+        }
+    }
 }
 
 impl FlattenPair for ast::Expr {
@@ -293,16 +343,28 @@ impl FlattenPair for ast::Expr {
                 _ => {
                     let op_len = separators.last().map_or(0, |s: &&str| s.len());
                     let rw = default_rewrite(node, op_len, list.is_empty());
-                    list.push((node, rw));
+                    let left_hi_span = node.span.hi();
+                    let insert_node = node;
                     if let Some(pop) = stack.pop() {
                         match pop.node {
                             ast::ExprKind::Binary(op, _, ref rhs) => {
+                                let before_comment =
+                                    fetch_comment(context, left_hi_span, op.span.lo());
+                                let after_comment =
+                                    fetch_comment(context, rhs.span.lo(), op.span.hi());
                                 separators.push(op.node.to_string());
                                 node = rhs;
+                                list.push(ListItem::new(
+                                    insert_node,
+                                    rw,
+                                    before_comment,
+                                    after_comment,
+                                ));
                             }
                             _ => unreachable!(),
-                        }
+                        };
                     } else {
+                        list.push(ListItem::new(insert_node, rw, None, None));
                         break;
                     }
                 }
@@ -311,6 +373,19 @@ impl FlattenPair for ast::Expr {
 
         assert_eq!(list.len() - 1, separators.len());
         Some(PairList { list, separators })
+    }
+}
+
+fn fetch_comment(
+    context: &RewriteContext<'_>,
+    before_span: BytePos,
+    after_span: BytePos,
+) -> Option<String> {
+    let result = context.snippet(mk_sp(before_span, after_span)).trim();
+    if result.is_empty() {
+        None
+    } else {
+        Some(result.to_string())
     }
 }
 

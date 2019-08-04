@@ -83,9 +83,8 @@ pub(crate) fn format_expr(
             rewrite_call(context, &callee_str, args, inner_span, shape)
         }
         ast::ExprKind::Paren(ref subexpr) => rewrite_paren(context, subexpr, shape, expr.span),
-        ast::ExprKind::Binary(op, ref lhs, ref rhs) => {
-            // FIXME: format comments between operands and operator
-            rewrite_all_pairs(expr, shape, context).or_else(|| {
+        ast::ExprKind::Binary(op, ref lhs, ref rhs) => rewrite_all_pairs(expr, shape, context)
+            .or_else(|| {
                 rewrite_pair(
                     &**lhs,
                     &**rhs,
@@ -94,8 +93,7 @@ pub(crate) fn format_expr(
                     shape,
                     context.config.binop_separator(),
                 )
-            })
-        }
+            }),
         ast::ExprKind::Unary(op, ref subexpr) => rewrite_unary_op(context, op, subexpr, shape),
         ast::ExprKind::Struct(ref path, ref fields, ref base) => rewrite_struct_lit(
             context,
