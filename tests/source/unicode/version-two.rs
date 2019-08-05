@@ -1,3 +1,4 @@
+// rustfmt-version: Two
 // rustfmt-wrap_comments: true
 
 fn foo() {
@@ -30,4 +31,20 @@ fn baz() {
         NotPresent => Err(e).chain_err(|| "env var wasn't provided"),
         NotUnicode(_) => Err(e).chain_err(|| "env var was very very very borkæ–‡å­—åŒ–ã"),
     });
+}
+
+// issue #3721
+mod test {
+    fn test() {
+        let a = vec![
+            (
+                Datum::Bytes("数据库".as_bytes().to_vec()),
+                Datum::I64(230),
+            ),
+            (
+                Datum::Bytes("Αθήνα".as_bytes().to_vec()),
+                Datum::I64(206),
+            ),
+        ];
+    }
 }

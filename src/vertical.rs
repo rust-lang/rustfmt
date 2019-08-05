@@ -228,6 +228,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     .collect::<Vec<_>>();
 
     let tactic = definitive_tactic(
+        context.config.version(),
         &items,
         ListTactic::HorizontalVertical,
         Separator::Comma,

@@ -252,6 +252,7 @@ fn rewrite_closure_fn_decl(
     // 1 = space between arguments and return type.
     let horizontal_budget = nested_shape.width.saturating_sub(ret_str.len() + 1);
     let tactic = definitive_tactic(
+        context.config.version(),
         &item_vec,
         ListTactic::HorizontalVertical,
         Separator::Comma,

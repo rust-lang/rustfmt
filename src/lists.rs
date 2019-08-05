@@ -7,7 +7,7 @@ use syntax::source_map::BytePos;
 
 use crate::comment::{find_comment_end, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
-use crate::config::{Config, IndentStyle};
+use crate::config::{Config, IndentStyle, Version};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::utils::{
@@ -223,6 +223,7 @@ impl Separator {
 }
 
 pub(crate) fn definitive_tactic<I, T>(
+    version: Version,
     items: I,
     tactic: ListTactic,
     sep: Separator,
@@ -245,7 +246,7 @@ where
         ListTactic::Mixed | ListTactic::HorizontalVertical => width,
     };
 
-    let (sep_count, total_width) = calculate_width(items.clone());
+    let (sep_count, total_width) = calculate_width(version, items.clone());
     let total_sep_len = sep.len() * sep_count.saturating_sub(1);
     let real_total = total_width + total_sep_len;
 
@@ -332,7 +333,8 @@ where
                 result.push_str(indent_str);
             }
             DefinitiveListTactic::Mixed => {
-                let total_width = total_item_width(item) + item_sep_len;
+                let total_width =
+                    total_item_width(formatting.config.version(), item) + item_sep_len;
 
                 // 1 is space between separator and item.
                 if (line_len > 0 && line_len + 1 + total_width > formatting.shape.width)
@@ -380,7 +382,8 @@ where
                     } else {
                         // We will try to keep the comment on the same line with the item here.
                         // 1 = ` `
-                        let total_width = total_item_width(item) + item_sep_len + 1;
+                        let total_width =
+                            total_item_width(formatting.config.version(), item) + item_sep_len + 1;
                         total_width <= formatting.shape.width
                     };
                     if keep_comment {
@@ -389,7 +392,13 @@ where
                         result.push('\n');
                         result.push_str(indent_str);
                         // This is the width of the item (without comments).
-                        line_len = item.item.as_ref().map_or(0, |s| unicode_str_width(&s));
+                        line_len = item.item.as_ref().map_or(0, |s| {
+                            if formatting.config.version() == Version::One {
+                                s.len()
+                            } else {
+                                unicode_str_width(&s)
+                            }
+                        });
                     }
                 } else {
                     result.push(' ');
@@ -801,21 +810,27 @@ where
 }
 
 /// Returns the count and total width of the list items.
-fn calculate_width<I, T>(items: I) -> (usize, usize)
+fn calculate_width<I, T>(version: Version, items: I) -> (usize, usize)
 where
     I: IntoIterator<Item = T>,
     T: AsRef<ListItem>,
 {
     items
         .into_iter()
-        .map(|item| total_item_width(item.as_ref()))
+        .map(|item| total_item_width(version, item.as_ref()))
         .fold((0, 0), |acc, l| (acc.0 + 1, acc.1 + l))
 }
 
-pub(crate) fn total_item_width(item: &ListItem) -> usize {
+pub(crate) fn total_item_width(version: Version, item: &ListItem) -> usize {
     comment_len(item.pre_comment.as_ref().map(|x| &(*x)[..]))
         + comment_len(item.post_comment.as_ref().map(|x| &(*x)[..]))
-        + &item.item.as_ref().map_or(0, |s| unicode_str_width(&s))
+        + &item.item.as_ref().map_or(0, |s| {
+            if version == Version::One {
+                s.len()
+            } else {
+                unicode_str_width(&s)
+            }
+        })
 }
 
 fn comment_len(comment: Option<&str>) -> usize {
@@ -874,7 +889,13 @@ pub(crate) fn struct_lit_tactic(
             _ if context.config.struct_lit_single_line() => ListTactic::HorizontalVertical,
             _ => ListTactic::Vertical,
         };
-        definitive_tactic(items, prelim_tactic, Separator::Comma, h_shape.width)
+        definitive_tactic(
+            context.config.version(),
+            items,
+            prelim_tactic,
+            Separator::Comma,
+            h_shape.width,
+        )
     } else {
         DefinitiveListTactic::Vertical
     }

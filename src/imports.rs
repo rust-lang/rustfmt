@@ -753,6 +753,7 @@ fn rewrite_nested_use_tree(
     };
 
     let tactic = definitive_tactic(
+        context.config.version(),
         &list_items,
         context.config.imports_layout(),
         Separator::Comma,

@@ -468,7 +468,9 @@ fn rewrite_match_body(
         next_line_body_shape.width,
     );
     match (orig_body, next_line_body) {
-        (Some(ref orig_str), Some(ref next_line_str)) if orig_str == next_line_str => {
+        (Some(ref orig_str), Some(ref next_line_str))
+            if context.config.version() == Version::Two && orig_str == next_line_str =>
+        {
             combine_orig_body(orig_str)
         }
         (Some(ref orig_str), Some(ref next_line_str))

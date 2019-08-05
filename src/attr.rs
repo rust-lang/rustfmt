@@ -295,7 +295,13 @@ where
         ListTactic::HorizontalVertical
     };
 
-    let tactic = definitive_tactic(&item_vec, tactic, Separator::Comma, shape.width);
+    let tactic = definitive_tactic(
+        context.config.version(),
+        &item_vec,
+        tactic,
+        Separator::Comma,
+        shape.width,
+    );
     let fmt = ListFormatting::new(shape, context.config)
         .tactic(tactic)
         .ends_with_newline(false);

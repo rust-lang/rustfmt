@@ -62,7 +62,7 @@ use syntax::source_map::{BytePos, Span};
 use syntax::{ast, ptr};
 
 use crate::comment::{rewrite_comment, CharClasses, FullCodeCharKind, RichChar};
-use crate::config::IndentStyle;
+use crate::config::{IndentStyle, Version};
 use crate::expr::rewrite_call;
 use crate::lists::extract_pre_comment;
 use crate::macros::convert_try_mac;
@@ -559,7 +559,13 @@ impl<'a> ChainFormatterShared<'a> {
         } else {
             self.rewrites
                 .iter()
-                .map(|rw| utils::unicode_str_width(&rw))
+                .map(|rw| {
+                    if context.config.version() == Version::One {
+                        rw.len()
+                    } else {
+                        utils::unicode_str_width(&rw)
+                    }
+                })
                 .sum()
         } + last.tries;
         let one_line_budget = if self.child_count == 1 {

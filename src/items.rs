@@ -2360,6 +2360,7 @@ fn rewrite_args(
     .collect();
 
     let tactic = definitive_tactic(
+        context.config.version(),
         &arg_items,
         context
             .config
@@ -2706,7 +2707,13 @@ fn rewrite_where_clause(
     );
     let item_vec = items.collect::<Vec<_>>();
     // FIXME: we don't need to collect here
-    let tactic = definitive_tactic(&item_vec, ListTactic::Vertical, Separator::Comma, budget);
+    let tactic = definitive_tactic(
+        context.config.version(),
+        &item_vec,
+        ListTactic::Vertical,
+        Separator::Comma,
+        budget,
+    );
 
     let mut comma_tactic = context.config.trailing_comma();
     // Kind of a hack because we don't usually have trailing commas in where-clauses.

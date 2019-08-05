@@ -446,6 +446,7 @@ impl<'a> Context<'a> {
 
     fn default_tactic(&self, list_items: &[ListItem]) -> DefinitiveListTactic {
         definitive_tactic(
+            self.context.config.version(),
             list_items,
             ListTactic::LimitedHorizontalVertical(self.item_max_width),
             Separator::Comma,
@@ -499,6 +500,7 @@ impl<'a> Context<'a> {
         };
 
         let mut tactic = definitive_tactic(
+            self.context.config.version(),
             &*list_items,
             ListTactic::LimitedHorizontalVertical(self.item_max_width),
             Separator::Comma,
@@ -548,7 +550,8 @@ impl<'a> Context<'a> {
                     && self.one_line_width != 0
                     && !list_items[0].has_comment()
                     && !list_items[0].inner_as_ref().contains('\n')
-                    && crate::lists::total_item_width(&list_items[0]) <= self.one_line_width
+                    && crate::lists::total_item_width(self.context.config.version(), &list_items[0])
+                        <= self.one_line_width
                 {
                     tactic = DefinitiveListTactic::Horizontal;
                 } else {
@@ -560,12 +563,14 @@ impl<'a> Context<'a> {
                         {
                             let one_line = all_simple
                                 && definitive_tactic(
+                                    self.context.config.version(),
                                     &list_items[..num_args_before],
                                     ListTactic::HorizontalVertical,
                                     Separator::Comma,
                                     self.nested_shape.width,
                                 ) == DefinitiveListTactic::Horizontal
                                 && definitive_tactic(
+                                    self.context.config.version(),
                                     &list_items[num_args_before + 1..],
                                     ListTactic::HorizontalVertical,
                                     Separator::Comma,

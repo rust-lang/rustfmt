@@ -1164,6 +1164,7 @@ pub(crate) fn rewrite_multiple_patterns(
         DefinitiveListTactic::Mixed
     } else {
         definitive_tactic(
+            context.config.version(),
             &items,
             ListTactic::HorizontalVertical,
             Separator::VerticalBar,
@@ -1745,6 +1746,7 @@ fn rewrite_tuple_in_visual_indent_style<'a, T: 'a + IntoOverflowableItem<'a>>(
     );
     let item_vec: Vec<_> = items.collect();
     let tactic = definitive_tactic(
+        context.config.version(),
         &item_vec,
         ListTactic::HorizontalVertical,
         Separator::Comma,
@@ -1910,7 +1912,12 @@ fn choose_rhs<R: Rewrite>(
 ) -> Option<String> {
     match orig_rhs {
         Some(ref new_str)
-            if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
+            if !new_str.contains('\n')
+                && if context.config.version() == Version::One {
+                    new_str.len()
+                } else {
+                    unicode_str_width(new_str)
+                } <= shape.width =>
         {
             Some(format!(" {}", new_str))
         }
