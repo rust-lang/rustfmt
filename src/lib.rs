@@ -496,7 +496,7 @@ pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
 impl<'b, T: Write + 'b> Drop for Session<'b, T> {
     fn drop(&mut self) {
         if let Some(ref mut out) = self.out {
-            let _ = self.emitter.emit_footer(out, self.errors.has_diff);
+            let _ = self.emitter.emit_footer(out);
         }
     }
 }

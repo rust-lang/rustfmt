@@ -30,7 +30,7 @@ pub(crate) struct EmitterResult {
 
 pub(crate) trait Emitter {
     fn emit_formatted_file(
-        &self,
+        &mut self,
         output: &mut dyn Write,
         formatted_file: FormattedFile<'_>,
     ) -> Result<EmitterResult, io::Error>;
@@ -39,7 +39,7 @@ pub(crate) trait Emitter {
         Ok(())
     }
 
-    fn emit_footer(&self, _output: &mut dyn Write, _has_diff: bool) -> Result<(), io::Error> {
+    fn emit_footer(&self, _output: &mut dyn Write) -> Result<(), io::Error> {
         Ok(())
     }
 }
