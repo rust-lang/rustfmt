@@ -34,7 +34,7 @@ where
     for &(ref filename, ref text) in source_file {
         write_file(None, filename, text, out, &*emitter)?;
     }
-    emitter.emit_footer(out)?;
+    emitter.emit_footer(out, false)?;
 
     Ok(())
 }

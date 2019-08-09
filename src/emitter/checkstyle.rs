@@ -16,7 +16,7 @@ impl Emitter for CheckstyleEmitter {
         Ok(())
     }
 
-    fn emit_footer(&self, output: &mut dyn Write) -> Result<(), io::Error> {
+    fn emit_footer(&self, output: &mut dyn Write, _has_diff: bool) -> Result<(), io::Error> {
         writeln!(output, "</checkstyle>")
     }
 
