@@ -98,7 +98,7 @@ fn make_opts() -> Options {
     );
     let is_nightly = is_nightly();
     let emit_opts = if is_nightly {
-        "[files|stdout|coverage|checkstyle]"
+        "[files|stdout|coverage|checkstyle|json]"
     } else {
         "[files|stdout]"
     };
