@@ -29,7 +29,7 @@ impl Emitter for CheckstyleEmitter {
             formatted_text,
         }: FormattedFile<'_>,
     ) -> Result<EmitterResult, io::Error> {
-        const CONTEXT_SIZE: usize = 3;
+        const CONTEXT_SIZE: usize = 0;
         let filename = ensure_real_path(filename);
         let diff = make_diff(original_text, formatted_text, CONTEXT_SIZE);
         output_checkstyle_file(output, filename, diff)?;
@@ -47,13 +47,18 @@ where
 {
     write!(writer, r#"<file name="{}">"#, filename.display())?;
     for mismatch in diff {
+        let begin_line = mismatch.line_number;
+        let mut current_line;
+        let mut line_counter = 0;
         for line in mismatch.lines {
             // Do nothing with `DiffLine::Context` and `DiffLine::Resulting`.
             if let DiffLine::Expected(message) = line {
+                current_line = begin_line + line_counter;
+                line_counter += 1;
                 write!(
                     writer,
                     r#"<error line="{}" severity="warning" message="Should be `{}`" />"#,
-                    mismatch.line_number,
+                    current_line,
                     XmlEscaped(&message)
                 )?;
             }
