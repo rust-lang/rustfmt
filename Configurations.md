@@ -2448,4 +2448,4 @@ Internal option, use `--backup`
 
 ## `print_misformatted_file_names`
 
-Internal option, use `-l` or `--files-with-matches`
+Internal option, use `-l` or `--files-with-diff`

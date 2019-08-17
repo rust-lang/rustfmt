@@ -153,7 +153,7 @@ create_config! {
         "What emit Mode to use when none is supplied";
     make_backup: bool, false, false, "Backup changed files";
     print_misformatted_file_names: bool, false, true,
-        "Prints the names of misformatted files that were formatted. Prints the names of \
+        "Prints the names of mismatched files that were formatted. Prints the names of \
          files that would be formated when used with `--check` mode. ";
 }
 
