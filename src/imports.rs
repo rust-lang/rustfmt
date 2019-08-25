@@ -573,56 +573,56 @@ impl UseTree {
     }
 
     fn merge(&mut self, other: &UseTree) {
-        let mut new_path = vec![];
-        for (a, b) in self
-            .path
-            .clone()
-            .iter_mut()
-            .zip(other.path.clone().into_iter())
-        {
-            if *a == b {
-                new_path.push(b);
+        let mut prefix = 0;
+        for (a, b) in self.path.iter().zip(other.path.iter()) {
+            if *a == *b {
+                prefix += 1;
             } else {
                 break;
             }
         }
-        if let Some(merged) = merge_rest(&self.path, &other.path, new_path.len()) {
-            new_path.push(merged);
+        if let Some(new_path) = merge_rest(&self.path, &other.path, prefix) {
+            self.path = new_path;
             self.span = self.span.to(other.span);
         }
-        self.path = new_path;
     }
 }
 
-fn merge_rest(a: &[UseSegment], b: &[UseSegment], len: usize) -> Option<UseSegment> {
-    let a_rest = &a[len..];
-    let b_rest = &b[len..];
-    if a_rest.is_empty() && b_rest.is_empty() {
+fn merge_rest(a: &[UseSegment], b: &[UseSegment], len: usize) -> Option<Vec<UseSegment>> {
+    if a.len() == len && b.len() == len {
         return None;
     }
-    if a_rest.is_empty() {
-        return Some(UseSegment::List(vec![
+    if a.len() == len {
+        let mut new_path = b[..len].to_vec();
+        new_path.push(UseSegment::List(vec![
             UseTree::from_path(vec![UseSegment::Slf(None)], DUMMY_SP),
-            UseTree::from_path(b_rest.to_vec(), DUMMY_SP),
+            UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
         ]));
+        return Some(new_path);
     }
-    if b_rest.is_empty() {
-        return Some(UseSegment::List(vec![
+    if b.len() == len {
+        let mut new_path = b[..len].to_vec();
+        new_path.push(UseSegment::List(vec![
             UseTree::from_path(vec![UseSegment::Slf(None)], DUMMY_SP),
-            UseTree::from_path(a_rest.to_vec(), DUMMY_SP),
+            UseTree::from_path(a[len..].to_vec(), DUMMY_SP),
         ]));
+        return Some(new_path);
     }
-    if let UseSegment::List(mut list) = a_rest[0].clone() {
-        merge_use_trees_inner(&mut list, UseTree::from_path(b_rest.to_vec(), DUMMY_SP));
+    if let UseSegment::List(mut list) = a[len].clone() {
+        let mut new_path = b[..len].to_vec();
+        merge_use_trees_inner(&mut list, UseTree::from_path(b[len..].to_vec(), DUMMY_SP));
         list.sort();
-        return Some(UseSegment::List(list));
+        new_path.push(UseSegment::List(list));
+        return Some(new_path);
     }
+    let mut new_path = b[..len].to_vec();
     let mut list = vec![
-        UseTree::from_path(a_rest.to_vec(), DUMMY_SP),
-        UseTree::from_path(b_rest.to_vec(), DUMMY_SP),
+        UseTree::from_path(a[len..].to_vec(), DUMMY_SP),
+        UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
     ];
     list.sort();
-    Some(UseSegment::List(list))
+    new_path.push(UseSegment::List(list));
+    Some(new_path)
 }
 
 impl PartialOrd for UseSegment {
