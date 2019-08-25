@@ -588,39 +588,36 @@ impl UseTree {
     }
 }
 
-fn merge_rest(a: &[UseSegment], b: &[UseSegment], len: usize) -> Option<Vec<UseSegment>> {
+fn merge_rest(a: &[UseSegment], b: &[UseSegment], mut len: usize) -> Option<Vec<UseSegment>> {
     if a.len() == len && b.len() == len {
         return None;
     }
-    if a.len() == len {
-        let mut new_path = b[..len].to_vec();
-        new_path.push(UseSegment::List(vec![
-            UseTree::from_path(vec![UseSegment::Slf(None)], DUMMY_SP),
-            UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
-        ]));
-        return Some(new_path);
+    if a.len() != len && b.len() != len {
+        if let UseSegment::List(mut list) = a[len].clone() {
+            merge_use_trees_inner(&mut list, UseTree::from_path(b[len..].to_vec(), DUMMY_SP));
+            list.sort();
+            let mut new_path = b[..len].to_vec();
+            new_path.push(UseSegment::List(list));
+            return Some(new_path);
+        }
+    } else if len == 1 {
+        let rest = if a.len() == len { &b[1..] } else { &a[1..] };
+        return Some(vec![
+            b[0].clone(),
+            UseSegment::List(vec![
+                UseTree::from_path(vec![UseSegment::Slf(None)], DUMMY_SP),
+                UseTree::from_path(rest.to_vec(), DUMMY_SP),
+            ]),
+        ]);
+    } else {
+        len -= 1;
     }
-    if b.len() == len {
-        let mut new_path = b[..len].to_vec();
-        new_path.push(UseSegment::List(vec![
-            UseTree::from_path(vec![UseSegment::Slf(None)], DUMMY_SP),
-            UseTree::from_path(a[len..].to_vec(), DUMMY_SP),
-        ]));
-        return Some(new_path);
-    }
-    if let UseSegment::List(mut list) = a[len].clone() {
-        let mut new_path = b[..len].to_vec();
-        merge_use_trees_inner(&mut list, UseTree::from_path(b[len..].to_vec(), DUMMY_SP));
-        list.sort();
-        new_path.push(UseSegment::List(list));
-        return Some(new_path);
-    }
-    let mut new_path = b[..len].to_vec();
     let mut list = vec![
         UseTree::from_path(a[len..].to_vec(), DUMMY_SP),
         UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
     ];
     list.sort();
+    let mut new_path = b[..len].to_vec();
     new_path.push(UseSegment::List(list));
     Some(new_path)
 }
@@ -989,7 +986,7 @@ mod test {
         }
 
         test_merge!(["a::b::{c, d}", "a::b::{e, f}"], ["a::b::{c, d, e, f}"]);
-        test_merge!(["a::b::c", "a::b"], ["a::b::{self, c}"]);
+        test_merge!(["a::b::c", "a::b"], ["a::{b, b::c}"]);
         test_merge!(["a::b", "a::b"], ["a::b"]);
         test_merge!(["a", "a::b", "a::b::c"], ["a::{self, b::{self, c}}"]);
         test_merge!(
