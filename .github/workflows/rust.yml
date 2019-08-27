@@ -3,25 +3,29 @@ name: Rust
 on: pull_request
 
 jobs:
-  test:
-    name: Test on rust-${{ matrix.channel }} and ${{ matrix.os }}
+  install-rustup:
+    name: Install rustup (only macOS)
+    runs-on: macOS-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install rustup via HomeBrew
+      run: brew install rustup && which rustup
+
+  test_nightly:
+    name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    needs: install-rustup
     strategy:
-      # Beta is likely to fail.
-      fail-fast: false
       matrix:
-        channel: [nightly, beta]
-        os: [ubuntu-latest, windows-latest]
-        exclude:
-          # Run beta only on Linux.
-          - os: windows-latest
-            channel: beta
+        os: [ubuntu-latest, windows-latest, macOS-latest]
 
     steps:
     - uses: actions/checkout@v1
-    - name: Install rust-${{ matrix.channel }}
-      run: rustup update && rustup toolchain install ${{ matrix.channel }}
-    - name: Build with rust-${{ matrix.channel }}
-      run: cargo +${{ matrix.channel }} build --verbose
+    - name: Install nightly
+      run: rustup toolchain install nightly
+    - name: Build
+      run: cargo +nightly build --verbose
     - name: Run tests
-      run: cargo +${{ matrix.channel }} test --verbose
+      run: |
+        cargo +nightly test --verbose
+        cargo +nightly test --verbose -- --ignored
