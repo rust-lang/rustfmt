@@ -1,0 +1,21 @@
+name: Rust
+
+on: pull_request
+
+jobs:
+  test:
+    name: Test on rust-${{ matrix.channel }} and ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        channel: [ nightly, beta ]
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install rust-${{ matrix.channel }}
+      run: rustup update && rustup toolchain install ${{ matrix.channel }}
+    - name: Build with rust-${{ matrix.channel }}
+      run: cargo +${{ matrix.channel }} build --verbose
+    - name: Run tests
+      run: cargo +${{ matrix.channel }} test --verbose
