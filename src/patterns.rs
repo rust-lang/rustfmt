@@ -225,20 +225,30 @@ fn rewrite_struct_pat(
 
 impl Rewrite for FieldPat {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        let pat = self.pat.rewrite(context, shape);
-        if self.is_shorthand {
-            pat
+        let attrs_str = if self.attrs.is_empty() {
+            String::from("")
         } else {
-            let pat_str = pat?;
+            format!(
+                "{}{}",
+                self.attrs.rewrite(context, shape)?,
+                shape.indent.to_string_with_newline(context.config)
+            )
+        };
+
+        let pat_str = self.pat.rewrite(context, shape)?;
+        if self.is_shorthand {
+            Some(format!("{}{}", attrs_str, pat_str))
+        } else {
             let id_str = rewrite_ident(context, self.ident);
             let one_line_width = id_str.len() + 2 + pat_str.len();
             if one_line_width <= shape.width {
-                Some(format!("{}: {}", id_str, pat_str))
+                Some(format!("{}{}: {}", attrs_str, id_str, pat_str))
             } else {
                 let nested_shape = shape.block_indent(context.config.tab_spaces());
                 let pat_str = self.pat.rewrite(context, nested_shape)?;
                 Some(format!(
-                    "{}:\n{}{}",
+                    "{}{}:\n{}{}",
+                    attrs_str,
                     id_str,
                     nested_shape.indent.to_string(context.config),
                     pat_str,
