@@ -14,8 +14,8 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         exclude:
           # Run beta only on Linux.
-          os: windows-latest
-          channel: beta
+          - os: windows-latest
+            channel: beta
 
     steps:
     - uses: actions/checkout@v1
