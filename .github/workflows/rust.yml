@@ -7,9 +7,15 @@ jobs:
     name: Test on rust-${{ matrix.channel }} and ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      # Beta is likely to fail.
+      fail-fast: false
       matrix:
-        channel: [ nightly, beta ]
+        channel: [nightly, beta]
         os: [ubuntu-latest, windows-latest]
+        exclude:
+          # Run beta only on Linux.
+          os: windows-latest
+          channel: beta
 
     steps:
     - uses: actions/checkout@v1
