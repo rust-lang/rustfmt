@@ -278,6 +278,7 @@ fn block_can_be_flattened<'a>(
     match expr.node {
         ast::ExprKind::Block(ref block, _)
             if !is_unsafe_block(block)
+                && !context.inside_macro()
                 && is_simple_block(block, Some(&expr.attrs), context.source_map) =>
         {
             Some(&*block)
@@ -394,7 +395,7 @@ fn rewrite_match_body(
         }
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
-        let (body_prefix, body_suffix) = if context.config.match_arm_blocks() {
+        let (body_prefix, body_suffix) = if context.config.match_arm_blocks() && !context.inside_macro() {
             let comma = if context.config.match_block_trailing_comma() {
                 ","
             } else {
