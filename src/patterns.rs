@@ -179,7 +179,13 @@ fn rewrite_struct_pat(
         fields.iter(),
         terminator,
         ",",
-        |f| f.span.lo(),
+        |f| {
+            if f.node.attrs.is_empty() {
+                f.span.lo()
+            } else {
+                f.node.attrs.first().unwrap().span.lo()
+            }
+        },
         |f| f.span.hi(),
         |f| f.node.rewrite(context, v_shape),
         context.snippet_provider.span_after(span, "{"),
