@@ -707,12 +707,11 @@ impl Ord for UseSegment {
 impl Ord for UseTree {
     fn cmp(&self, other: &UseTree) -> Ordering {
         for (a, b) in self.path.iter().zip(other.path.iter()) {
-            let ord = a.cmp(b);
             // The comparison without aliases is a hack to avoid situations like
             // comparing `a::b` to `a as c` - where the latter should be ordered
             // first since it is shorter.
-            if ord != Ordering::Equal && a.remove_alias().cmp(&b.remove_alias()) != Ordering::Equal
-            {
+            let ord = a.remove_alias().cmp(&b.remove_alias());
+            if ord != Ordering::Equal {
                 return ord;
             }
         }
