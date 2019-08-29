@@ -117,6 +117,26 @@ pub(crate) fn compare_as_versions(left: &str, right: &str) -> Ordering {
     }
 }
 
+/// Compare identifiers, trimming `r#` if present, according to version sort
+pub(crate) fn compare_ident_as_versions(left: &str, right: &str) -> Ordering {
+    compare_as_versions(
+        left.trim_start_matches("r#"),
+        right.trim_start_matches("r#"),
+    )
+}
+
+pub(crate) fn compare_opt_ident_as_versions<S>(left: &Option<S>, right: &Option<S>) -> Ordering
+where
+    S: AsRef<str>,
+{
+    match (left, right) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(left), Some(right)) => compare_ident_as_versions(left.as_ref(), right.as_ref()),
+    }
+}
+
 /// Choose the ordering between the given two items.
 fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
     match (&a.kind, &b.kind) {

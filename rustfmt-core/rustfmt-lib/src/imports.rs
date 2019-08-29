@@ -11,6 +11,7 @@ use crate::config::{Edition, IndentStyle};
 use crate::lists::{
     definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
 };
+use crate::reorder::{compare_as_versions, compare_opt_ident_as_versions};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
@@ -677,18 +678,8 @@ impl Ord for UseSegment {
                 if !is_upper_snake_case(ia) && is_upper_snake_case(ib) {
                     return Ordering::Less;
                 }
-                let ident_ord = ia.cmp(ib);
-                if ident_ord != Ordering::Equal {
-                    return ident_ord;
-                }
-                match (aa, ab) {
-                    (None, Some(_)) => Ordering::Less,
-                    (Some(_), None) => Ordering::Greater,
-                    (Some(aas), Some(abs)) => aas
-                        .trim_start_matches("r#")
-                        .cmp(abs.trim_start_matches("r#")),
-                    (None, None) => Ordering::Equal,
-                }
+
+                compare_as_versions(&ia, &ib).then_with(|| compare_opt_ident_as_versions(&aa, &ab))
             }
             (&List(ref a), &List(ref b)) => {
                 for (a, b) in a.iter().zip(b.iter()) {
