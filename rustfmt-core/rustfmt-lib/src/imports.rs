@@ -655,12 +655,7 @@ impl Ord for UseSegment {
         match (self, other) {
             (&Slf(ref a), &Slf(ref b))
             | (&Super(ref a), &Super(ref b))
-            | (&Crate(ref a), &Crate(ref b)) => match (a, b) {
-                (Some(sa), Some(sb)) => {
-                    sa.trim_start_matches("r#").cmp(sb.trim_start_matches("r#"))
-                }
-                (_, _) => a.cmp(b),
-            },
+            | (&Crate(ref a), &Crate(ref b)) => compare_opt_ident_as_versions(&a, &b),
             (&Glob, &Glob) => Ordering::Equal,
             (&Ident(ref pia, ref aa), &Ident(ref pib, ref ab)) => {
                 let ia = pia.trim_start_matches("r#");
