@@ -15,14 +15,14 @@ use aaa::*;
 mod test {}
 // If item names are equal, order by rename
 
-use test::{a as bb, b};
 use test::{a as aa, c};
+use test::{a as bb, b};
 
 mod test {}
 // If item names are equal, order by rename - no rename comes before a rename
 
-use test::{a as bb, b};
 use test::{a, c};
+use test::{a as bb, b};
 
 mod test {}
 // `self` always comes first

@@ -726,7 +726,8 @@ impl Ord for UseTree {
             }
         }
 
-        self.path.len().cmp(&other.path.len())
+        Ord::cmp(&self.path.len(), &other.path.len())
+            .then(Ord::cmp(&self.path.last(), &other.path.last()))
     }
 }
 
