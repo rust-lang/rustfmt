@@ -29,3 +29,14 @@ mod test {}
 
 use test::{self as bb, b};
 use test::{a as aa, c};
+
+#[path = "empty_file.rs"]
+mod v2;
+#[path = "empty_file.rs"]
+mod v10;
+
+extern crate crate2;
+extern crate crate10;
+
+extern crate my as c2;
+extern crate my as c10;
