@@ -54,11 +54,16 @@ impl<'a, 'ast: 'a> CfgIfVisitor<'a> {
         // extern crate cfg_if;
         // cfg_if! {..}
         // ```
-        if let Some(first_segment) = mac.node.path.segments.first() {
-            if first_segment.ident.name != Symbol::intern("cfg_if") {
+        match mac.node.path.segments.first() {
+            Some(first_segment) => {
+                if first_segment.ident.name != Symbol::intern("cfg_if") {
+                    return Err("Expected cfg_if");
+                }
+            }
+            None => {
                 return Err("Expected cfg_if");
             }
-        }
+        };
 
         let mut parser = stream_to_parser_with_base_dir(
             self.parse_sess,
