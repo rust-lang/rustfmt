@@ -85,10 +85,18 @@ fn inline_config() {
             "--print-config",
             "current",
             ".",
-            "--config=color=Never,edition=2015"
+            "--config=color=Never,edition=2018"
         ],
-        contains("color = \"Never\"") && contains("edition = \"2015\"")
+        contains("color = \"Never\"") && contains("edition = \"2018\"")
     );
 
-    // multiple invocations
+    // multiple overriding invocations
+    assert_that!(
+        &["--print-config", "current", ".",
+        "--config", "color=never,edition=2018",
+        "--config", "color=always,format_strings=true"],
+        contains("color = \"Always\"") &&
+        contains("edition = \"2018\"") &&
+        contains("format_strings = true")
+    );
 }
