@@ -16,7 +16,7 @@ use syntax::parse::new_parser_from_tts;
 use syntax::parse::parser::Parser;
 use syntax::parse::token::{BinOpToken, DelimToken, Token, TokenKind};
 use syntax::print::pprust;
-use syntax::source_map::{BytePos, Span};
+use syntax::source_map::{BytePos, Pos, Span};
 use syntax::symbol::kw;
 use syntax::tokenstream::{Cursor, TokenStream, TokenTree};
 use syntax::ThinVec;
@@ -180,6 +180,11 @@ fn return_macro_parse_failure_fallback(
     if is_like_block_indent_style {
         return trim_left_preserve_layout(context.snippet(span), indent, &context.config);
     }
+
+    context
+        .skipped_range
+        .borrow_mut()
+        .push((span.lo().to_usize(), span.hi().to_usize()));
 
     // Return the snippet unmodified if the macro is not block-like
     Some(context.snippet(span).to_owned())
