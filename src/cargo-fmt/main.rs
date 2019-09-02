@@ -57,6 +57,10 @@ pub struct Opts {
     /// Format all packages (only usable in workspaces)
     #[structopt(long = "all")]
     format_all: bool,
+
+    /// Include all cargo features in the crate
+    #[structopt(long = "all-features")]
+    all_features: bool,
 }
 
 fn main() {
@@ -124,9 +128,16 @@ fn execute() -> i32 {
             &strategy,
             rustfmt_args,
             Some(&manifest_path),
+            opts.all_features,
         ))
     } else {
-        handle_command_status(format_crate(verbosity, &strategy, rustfmt_args, None))
+        handle_command_status(format_crate(
+            verbosity,
+            &strategy,
+            rustfmt_args,
+            None,
+            opts.all_features,
+        ))
     }
 }
 
@@ -230,8 +241,9 @@ fn format_crate(
     strategy: &CargoFmtStrategy,
     rustfmt_args: Vec<String>,
     manifest_path: Option<&Path>,
+    all_features: bool,
 ) -> Result<i32, io::Error> {
-    let targets = get_targets(strategy, manifest_path)?;
+    let targets = get_targets(strategy, manifest_path, all_features)?;
 
     // Currently only bin and lib files get formatted.
     run_rustfmt(&targets, &rustfmt_args, verbosity)
@@ -311,16 +323,20 @@ impl CargoFmtStrategy {
 fn get_targets(
     strategy: &CargoFmtStrategy,
     manifest_path: Option<&Path>,
+    all_features: bool,
 ) -> Result<BTreeSet<Target>, io::Error> {
     let mut targets = BTreeSet::new();
 
     match *strategy {
-        CargoFmtStrategy::Root => get_targets_root_only(manifest_path, &mut targets)?,
-        CargoFmtStrategy::All => {
-            get_targets_recursive(manifest_path, &mut targets, &mut BTreeSet::new())?
-        }
+        CargoFmtStrategy::Root => get_targets_root_only(manifest_path, &mut targets, all_features)?,
+        CargoFmtStrategy::All => get_targets_recursive(
+            manifest_path,
+            &mut targets,
+            &mut BTreeSet::new(),
+            all_features,
+        )?,
         CargoFmtStrategy::Some(ref hitlist) => {
-            get_targets_with_hitlist(manifest_path, hitlist, &mut targets)?
+            get_targets_with_hitlist(manifest_path, hitlist, &mut targets, all_features)?
         }
     }
 
@@ -337,8 +353,9 @@ fn get_targets(
 fn get_targets_root_only(
     manifest_path: Option<&Path>,
     targets: &mut BTreeSet<Target>,
+    all_features: bool,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
+    let metadata = get_cargo_metadata(manifest_path, false, all_features)?;
     let workspace_root_path = PathBuf::from(&metadata.workspace_root).canonicalize()?;
     let (in_workspace_root, current_dir_manifest) = if let Some(target_manifest) = manifest_path {
         (
@@ -381,9 +398,10 @@ fn get_targets_recursive(
     manifest_path: Option<&Path>,
     mut targets: &mut BTreeSet<Target>,
     visited: &mut BTreeSet<String>,
+    all_features: bool,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
-    let metadata_with_deps = get_cargo_metadata(manifest_path, true)?;
+    let metadata = get_cargo_metadata(manifest_path, false, all_features)?;
+    let metadata_with_deps = get_cargo_metadata(manifest_path, true, all_features)?;
 
     for package in metadata.packages {
         add_targets(&package.targets, &mut targets);
@@ -410,7 +428,7 @@ fn get_targets_recursive(
 
             if manifest_path.exists() {
                 visited.insert(dependency.name);
-                get_targets_recursive(Some(&manifest_path), &mut targets, visited)?;
+                get_targets_recursive(Some(&manifest_path), &mut targets, visited, all_features)?;
             }
         }
     }
@@ -422,8 +440,9 @@ fn get_targets_with_hitlist(
     manifest_path: Option<&Path>,
     hitlist: &[String],
     targets: &mut BTreeSet<Target>,
+    all_features: bool,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
+    let metadata = get_cargo_metadata(manifest_path, false, all_features)?;
 
     let mut workspace_hitlist: BTreeSet<&String> = BTreeSet::from_iter(hitlist);
 
@@ -512,6 +531,7 @@ fn run_rustfmt(
 fn get_cargo_metadata(
     manifest_path: Option<&Path>,
     include_deps: bool,
+    all_features: bool,
 ) -> Result<cargo_metadata::Metadata, io::Error> {
     let mut cmd = cargo_metadata::MetadataCommand::new();
     if !include_deps {
@@ -519,6 +539,9 @@ fn get_cargo_metadata(
     }
     if let Some(manifest_path) = manifest_path {
         cmd.manifest_path(manifest_path);
+    }
+    if all_features {
+        cmd.features(cargo_metadata::CargoOpt::AllFeatures);
     }
     match cmd.exec() {
         Ok(metadata) => Ok(metadata),
