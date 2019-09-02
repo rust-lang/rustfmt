@@ -274,6 +274,7 @@ enum PublishedFileVisibility {
         sys::ERemoteStoragePublishedFileVisibility_k_ERemoteStoragePublishedFileVisibilityPrivate,
 }
 
+// #3771
 //#![feature(arbitrary_enum_discriminant)]
 #[repr(u32)]
 pub enum E {
