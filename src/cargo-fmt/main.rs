@@ -3,6 +3,7 @@
 #![deny(warnings)]
 
 use cargo_metadata;
+use ignore::{self, gitignore};
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
@@ -60,6 +61,10 @@ pub struct Opts {
     /// Run rustfmt in check mode
     #[structopt(long = "check")]
     check: bool,
+
+    /// Format files located within subdirectories of `tests` directory
+    #[structopt(long = "include-nested-test-files")]
+    include_nested_test_files: bool,
 }
 
 fn main() {
@@ -122,6 +127,13 @@ fn execute() -> i32 {
         }
     }
 
+    let include_nested_test_files = opts.include_nested_test_files;
+    let ignored_nested_test_files = if include_nested_test_files {
+        opts.ignored_nested_test_files
+    } else {
+        vec![]
+    };
+
     if let Some(specified_manifest_path) = opts.manifest_path {
         if !specified_manifest_path.ends_with("Cargo.toml") {
             print_usage_to_stderr("the manifest-path must be a path to a Cargo.toml file");
@@ -133,9 +145,18 @@ fn execute() -> i32 {
             &strategy,
             rustfmt_args,
             Some(&manifest_path),
+            include_nested_test_files,
+            &ignored_nested_test_files,
         ))
     } else {
-        handle_command_status(format_crate(verbosity, &strategy, rustfmt_args, None))
+        handle_command_status(format_crate(
+            verbosity,
+            &strategy,
+            rustfmt_args,
+            None,
+            include_nested_test_files,
+            &ignored_nested_test_files,
+        ))
     }
 }
 
@@ -239,8 +260,15 @@ fn format_crate(
     strategy: &CargoFmtStrategy,
     rustfmt_args: Vec<String>,
     manifest_path: Option<&Path>,
+    include_nested_test_files: bool,
+    ignored_nested_test_files: &Vec<String>,
 ) -> Result<i32, io::Error> {
-    let targets = get_targets(strategy, manifest_path)?;
+    let targets = get_targets(
+        strategy,
+        manifest_path,
+        include_nested_test_files,
+        &ignored_nested_test_files,
+    )?;
 
     // Currently only bin and lib files get formatted.
     run_rustfmt(&targets, &rustfmt_args, verbosity)
@@ -255,17 +283,27 @@ pub struct Target {
     kind: String,
     /// Rust edition for this target.
     edition: String,
+    // Rust files residing within subdirectories of the tests directory.
+    nested_int_test_files: Vec<PathBuf>,
 }
 
 impl Target {
-    pub fn from_target(target: &cargo_metadata::Target) -> Self {
+    pub fn from_target(
+        target: &cargo_metadata::Target,
+        nested_int_test_files: Option<Vec<PathBuf>>,
+    ) -> Self {
         let path = PathBuf::from(&target.src_path);
         let canonicalized = fs::canonicalize(&path).unwrap_or(path);
+        let test_files = match nested_int_test_files {
+            Some(files) => files,
+            None => vec![],
+        };
 
         Target {
             path: canonicalized,
             kind: target.kind[0].clone(),
             edition: target.edition.clone(),
+            nested_int_test_files: test_files,
         }
     }
 }
@@ -320,17 +358,32 @@ impl CargoFmtStrategy {
 fn get_targets(
     strategy: &CargoFmtStrategy,
     manifest_path: Option<&Path>,
+    include_nested_test_files: bool,
+    ignored_nested_test_files: &Vec<String>,
 ) -> Result<BTreeSet<Target>, io::Error> {
     let mut targets = BTreeSet::new();
 
     match *strategy {
-        CargoFmtStrategy::Root => get_targets_root_only(manifest_path, &mut targets)?,
-        CargoFmtStrategy::All => {
-            get_targets_recursive(manifest_path, &mut targets, &mut BTreeSet::new())?
-        }
-        CargoFmtStrategy::Some(ref hitlist) => {
-            get_targets_with_hitlist(manifest_path, hitlist, &mut targets)?
-        }
+        CargoFmtStrategy::Root => get_targets_root_only(
+            manifest_path,
+            &mut targets,
+            include_nested_test_files,
+            &ignored_nested_test_files,
+        )?,
+        CargoFmtStrategy::All => get_targets_recursive(
+            manifest_path,
+            &mut targets,
+            &mut BTreeSet::new(),
+            include_nested_test_files,
+            &ignored_nested_test_files,
+        )?,
+        CargoFmtStrategy::Some(ref hitlist) => get_targets_with_hitlist(
+            manifest_path,
+            hitlist,
+            &mut targets,
+            include_nested_test_files,
+            &ignored_nested_test_files,
+        )?,
     }
 
     if targets.is_empty() {
@@ -345,7 +398,9 @@ fn get_targets(
 
 fn get_targets_root_only(
     manifest_path: Option<&Path>,
-    targets: &mut BTreeSet<Target>,
+    mut targets: &mut BTreeSet<Target>,
+    include_nested_test_files: bool,
+    ignored_nested_test_files: &Vec<String>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path, false)?;
     let workspace_root_path = PathBuf::from(&metadata.workspace_root).canonicalize()?;
@@ -362,26 +417,36 @@ fn get_targets_root_only(
         )
     };
 
-    let package_targets = match metadata.packages.len() {
-        1 => metadata.packages.into_iter().next().unwrap().targets,
-        _ => metadata
-            .packages
-            .into_iter()
-            .filter(|p| {
-                in_workspace_root
-                    || PathBuf::from(&p.manifest_path)
-                        .canonicalize()
-                        .unwrap_or_default()
-                        == current_dir_manifest
-            })
-            .map(|p| p.targets)
-            .flatten()
-            .collect(),
+    let (package_targets, package_manifest_path) = match metadata.packages.len() {
+        1 => {
+            let package = metadata.packages.into_iter().next().unwrap();
+            (package.targets, PathBuf::from(&package.manifest_path))
+        }
+        _ => (
+            metadata
+                .packages
+                .into_iter()
+                .filter(|p| {
+                    in_workspace_root
+                        || PathBuf::from(&p.manifest_path)
+                            .canonicalize()
+                            .unwrap_or_default()
+                            == current_dir_manifest
+                })
+                .map(|p| p.targets)
+                .flatten()
+                .collect(),
+            PathBuf::from(current_dir_manifest),
+        ),
     };
 
-    for target in package_targets {
-        targets.insert(Target::from_target(&target));
-    }
+    add_targets(
+        &package_manifest_path,
+        &package_targets,
+        &mut targets,
+        include_nested_test_files,
+        &ignored_nested_test_files,
+    );
 
     Ok(())
 }
@@ -390,12 +455,20 @@ fn get_targets_recursive(
     manifest_path: Option<&Path>,
     mut targets: &mut BTreeSet<Target>,
     visited: &mut BTreeSet<String>,
+    include_nested_test_files: bool,
+    ignored_nested_test_files: &Vec<String>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path, false)?;
     let metadata_with_deps = get_cargo_metadata(manifest_path, true)?;
 
     for package in metadata.packages {
-        add_targets(&package.targets, &mut targets);
+        add_targets(
+            &package.manifest_path,
+            &package.targets,
+            &mut targets,
+            include_nested_test_files,
+            &ignored_nested_test_files,
+        );
 
         // Look for local dependencies.
         for dependency in package.dependencies {
@@ -407,19 +480,27 @@ fn get_targets_recursive(
                 .packages
                 .iter()
                 .find(|p| p.name == dependency.name && p.source.is_none());
-            let manifest_path = if dependency_package.is_some() {
-                PathBuf::from(&dependency_package.unwrap().manifest_path)
-            } else {
-                let mut package_manifest_path = PathBuf::from(&package.manifest_path);
-                package_manifest_path.pop();
-                package_manifest_path.push(&dependency.name);
-                package_manifest_path.push("Cargo.toml");
-                package_manifest_path
+
+            let manifest_path = match dependency_package {
+                Some(p) => PathBuf::from(&p.manifest_path),
+                None => {
+                    let mut package_manifest_path = PathBuf::from(&package.manifest_path);
+                    package_manifest_path.pop();
+                    package_manifest_path.push(&dependency.name);
+                    package_manifest_path.push("Cargo.toml");
+                    package_manifest_path
+                }
             };
 
             if manifest_path.exists() {
                 visited.insert(dependency.name);
-                get_targets_recursive(Some(&manifest_path), &mut targets, visited)?;
+                get_targets_recursive(
+                    Some(&manifest_path),
+                    &mut targets,
+                    visited,
+                    include_nested_test_files,
+                    &ignored_nested_test_files,
+                )?;
             }
         }
     }
@@ -430,7 +511,9 @@ fn get_targets_recursive(
 fn get_targets_with_hitlist(
     manifest_path: Option<&Path>,
     hitlist: &[String],
-    targets: &mut BTreeSet<Target>,
+    mut targets: &mut BTreeSet<Target>,
+    include_nested_test_files: bool,
+    ignored_nested_test_files: &Vec<String>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path, false)?;
 
@@ -438,9 +521,13 @@ fn get_targets_with_hitlist(
 
     for package in metadata.packages {
         if workspace_hitlist.remove(&package.name) {
-            for target in package.targets {
-                targets.insert(Target::from_target(&target));
-            }
+            add_targets(
+                &package.manifest_path,
+                &package.targets,
+                &mut targets,
+                include_nested_test_files,
+                &ignored_nested_test_files,
+            );
         }
     }
 
@@ -455,10 +542,99 @@ fn get_targets_with_hitlist(
     }
 }
 
-fn add_targets(target_paths: &[cargo_metadata::Target], targets: &mut BTreeSet<Target>) {
+fn add_targets(
+    manifest_path: &PathBuf,
+    target_paths: &[cargo_metadata::Target],
+    targets: &mut BTreeSet<Target>,
+    include_nested_test_files: bool,
+    ignore_list: &Vec<String>,
+) {
+    let mut test_files_added = false;
     for target in target_paths {
-        targets.insert(Target::from_target(target));
+        // Packages often have more than one `test` target,
+        // so only add the nested files for the first one.
+        let test_files = if include_nested_test_files
+            && !test_files_added
+            && target.kind.iter().any(|t| t == "test")
+        {
+            // If any errors are encountered, just fallback to ignoring
+            // nested files in subdirectories of `tests`
+            match manifest_path.parent() {
+                None => None,
+                Some(package_dir) => {
+                    let target_dir = package_dir.join("tests");
+                    let mut ignore_builder = gitignore::GitignoreBuilder::new(package_dir);
+                    let mut had_ignore_add_error = false;
+
+                    for ignore_path in ignore_list {
+                        if ignore_builder.add_line(None, &ignore_path).is_err() {
+                            had_ignore_add_error = true;
+                            break;
+                        };
+                    }
+
+                    if had_ignore_add_error {
+                        None
+                    } else {
+                        match ignore_builder.build() {
+                            Err(_) => None,
+                            Ok(ignore_set) => {
+                                test_files_added = true;
+                                Some(get_nested_integration_test_files(
+                                    &target_dir,
+                                    &target_dir,
+                                    &ignore_set,
+                                ))
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            None
+        };
+        targets.insert(Target::from_target(target, test_files));
     }
+}
+
+// Returns a `Vec` containing `PathBuf`s of files nested .rs files within a subdirectory
+// under the `tests` directory for a given package.
+// https://github.com/rust-lang/rustfmt/issues/1820
+fn get_nested_integration_test_files(
+    path: &Path,
+    root_dir: &Path,
+    ignore_set: &gitignore::Gitignore,
+) -> Vec<PathBuf> {
+    let mut files = vec![];
+    if path.is_dir()
+        && !ignore_set
+            .matched_path_or_any_parents(&path, true)
+            .is_ignore()
+    {
+        for entry in fs::read_dir(path).expect(&format!(
+            "couldn't read directory {}",
+            path.to_str().unwrap()
+        )) {
+            let entry = entry.expect("couldn't get `DirEntry`");
+            let path = entry.path();
+            if !ignore_set
+                .matched_path_or_any_parents(&path, false)
+                .is_ignore()
+            {
+                let parent = path.parent().expect("couldn't get parent directory");
+                if path.is_dir() {
+                    files.append(&mut get_nested_integration_test_files(
+                        &path,
+                        &root_dir,
+                        &ignore_set,
+                    ));
+                } else if path.extension().map_or(false, |f| f == "rs") && parent != root_dir {
+                    files.push(path);
+                }
+            }
+        }
+    }
+    files
 }
 
 fn run_rustfmt(
@@ -474,7 +650,11 @@ fn run_rustfmt(
             }
         })
         .fold(BTreeMap::new(), |mut h, t| {
-            h.entry(&t.edition).or_insert_with(Vec::new).push(&t.path);
+            let entry = h.entry(&t.edition).or_insert_with(Vec::new);
+            for test_file in &t.nested_int_test_files {
+                entry.push(test_file)
+            }
+            entry.push(&t.path);
             h
         });
 
