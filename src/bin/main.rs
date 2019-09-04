@@ -137,7 +137,7 @@ fn make_opts() -> Options {
         "",
         "config",
         "Set options from command line. These settings take priority over .rustfmt.toml",
-        "[--config 'key1=val1,key2=val2...']",
+        "[key1=val1,key2=val2...]",
     );
 
     if is_nightly {
