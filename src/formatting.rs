@@ -7,8 +7,8 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use syntax::ast;
-use syntax::errors::emitter::{ColorConfig, Emitter};
-use syntax::errors::{DiagnosticBuilder, Handler};
+use syntax::errors::emitter::{ColorConfig, Emitter, EmitterWriter};
+use syntax::errors::{DiagnosticBuilder, Handler, HandlerFlags};
 use syntax::parse::{self, ParseSess};
 use syntax::source_map::{FilePathMapping, SourceMap, Span, DUMMY_SP};
 
@@ -70,13 +70,17 @@ fn format_project<T: FormatHandler>(
         Ok(set) => set,
         Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
     };
-    if config.skip_children() && ignore_path_set.is_match(&main_file) {
+    let is_ignore_match = ignore_path_set.is_match(&main_file);
+    if config.skip_children() && is_ignore_match {
         return Ok(FormatReport::new());
     }
 
     // Parse the crate.
     let source_map = Rc::new(SourceMap::new(FilePathMapping::empty()));
-    let mut parse_session = make_parse_sess(source_map.clone(), config);
+    let mut parse_session = make_parse_sess(source_map.clone(), config, &ignore_path_set);
+    if is_ignore_match {
+        parse_session.span_diagnostic = Handler::with_emitter(true, None, silent_emitter());
+    }
     let mut report = FormatReport::new();
     let directory_ownership = input.to_directory_ownership();
     let krate = match parse_crate(
@@ -90,7 +94,7 @@ fn format_project<T: FormatHandler>(
         // Surface parse error via Session (errors are merged there from report)
         Err(ErrorKind::ParseError) => {
             // https://github.com/rust-lang/rustfmt/issues/3779
-            if ignore_path_set.is_match(&main_file) {
+            if is_ignore_match {
                 return Ok(FormatReport::new());
             }
             return Ok(report);
@@ -689,6 +693,33 @@ fn parse_crate(
     Err(ErrorKind::ParseError)
 }
 
+struct SilentOnIgnoredFilesEmitter {
+    ignore_path_set: IgnorePathSet,
+    source_map: Rc<SourceMap>,
+    emitter: EmitterWriter,
+}
+
+impl Emitter for SilentOnIgnoredFilesEmitter {
+    fn emit_diagnostic(&mut self, db: &DiagnosticBuilder<'_>) {
+        if let Some(primary_span) = &db.span.primary_span() {
+            let file_name = self.source_map.span_to_filename(*primary_span);
+            match file_name {
+                syntax_pos::FileName::Real(ref path) => {
+                    if self
+                        .ignore_path_set
+                        .is_match(&FileName::Real(path.to_path_buf()))
+                    {
+                        db.handler.reset_err_count();
+                        return;
+                    }
+                }
+                _ => (),
+            };
+        }
+        self.emitter.emit_diagnostic(db);
+    }
+}
+
 /// Emitter which discards every error.
 struct SilentEmitter;
 
@@ -700,7 +731,11 @@ fn silent_emitter() -> Box<SilentEmitter> {
     Box::new(SilentEmitter {})
 }
 
-fn make_parse_sess(source_map: Rc<SourceMap>, config: &Config) -> ParseSess {
+fn make_parse_sess(
+    source_map: Rc<SourceMap>,
+    config: &Config,
+    ignore_path_set: &IgnorePathSet,
+) -> ParseSess {
     let tty_handler = if config.hide_parse_errors() {
         let silent_emitter = silent_emitter();
         Handler::with_emitter(true, None, silent_emitter)
@@ -711,7 +746,21 @@ fn make_parse_sess(source_map: Rc<SourceMap>, config: &Config) -> ParseSess {
         } else {
             ColorConfig::Never
         };
-        Handler::with_tty_emitter(color_cfg, true, None, Some(source_map.clone()))
+        let emitter_writer =
+            EmitterWriter::stderr(color_cfg, Some(source_map.clone()), false, false);
+        let emitter = Box::new(SilentOnIgnoredFilesEmitter {
+            ignore_path_set: ignore_path_set.clone(),
+            source_map: source_map.clone(),
+            emitter: emitter_writer,
+        });
+        Handler::with_emitter_and_flags(
+            emitter,
+            HandlerFlags {
+                can_emit_warnings: false,
+                treat_err_as_bug: None,
+                ..Default::default()
+            },
+        )
     };
 
     ParseSess::with_span_handler(tty_handler, source_map)

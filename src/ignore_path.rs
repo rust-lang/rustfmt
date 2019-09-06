@@ -2,6 +2,7 @@ use ignore::{self, gitignore};
 
 use crate::config::{FileName, IgnoreList};
 
+#[derive(Clone)]
 pub(crate) struct IgnorePathSet {
     ignore_set: gitignore::Gitignore,
 }
