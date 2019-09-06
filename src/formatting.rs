@@ -88,7 +88,13 @@ fn format_project<T: FormatHandler>(
     ) {
         Ok(krate) => krate,
         // Surface parse error via Session (errors are merged there from report)
-        Err(ErrorKind::ParseError) => return Ok(report),
+        Err(ErrorKind::ParseError) => {
+            // https://github.com/rust-lang/rustfmt/issues/3779
+            if ignore_path_set.is_match(&main_file) {
+                return Ok(FormatReport::new());
+            }
+            return Ok(report);
+        }
         Err(e) => return Err(e),
     };
     timer = timer.done_parsing();
