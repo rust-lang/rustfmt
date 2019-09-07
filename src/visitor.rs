@@ -23,8 +23,8 @@ use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt::Stmt;
 use crate::utils::{
-    self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes, last_line_width,
-    mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
+    self, add_skipped_range, contains_skip, count_newlines, depr_skip_annotation, inner_attributes,
+    last_line_width, mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
 };
 use crate::{ErrorKind, FormatReport, FormattingError};
 
@@ -127,10 +127,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         get_span_without_attrs(stmt.as_ast_node()),
                     );
                     let context = self.get_context();
-                    context.skipped_range.borrow_mut().push((
-                        context.source_map.lookup_line(span.lo()).unwrap().line,
-                        context.source_map.lookup_line(span.hi()).unwrap().line,
-                    ));
+                    add_skipped_range(&context, span);
                 } else {
                     let shape = self.shape();
                     let rewrite = self.with_context(|ctx| stmt.rewrite(&ctx, shape));
