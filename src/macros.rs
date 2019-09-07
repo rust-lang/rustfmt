@@ -1373,7 +1373,7 @@ impl MacroBranch {
                 |(mut s, need_indent), (i, (kind, ref l))| {
                     if !is_empty_line(l)
                         && need_indent
-                        && !new_body_snippet.is_line_non_formatted(i + 1)
+                        && (!new_body_snippet.is_line_non_formatted(i + 1) || i == 0)
                     {
                         s += &indent_str;
                     }
