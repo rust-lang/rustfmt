@@ -120,11 +120,17 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ast::StmtKind::Local(..) | ast::StmtKind::Expr(..) | ast::StmtKind::Semi(..) => {
                 let attrs = get_attrs_from_stmt(stmt.as_ast_node());
                 if contains_skip(attrs) {
+                    let span = stmt.span();
                     self.push_skipped_with_span(
                         attrs,
-                        stmt.span(),
+                        span,
                         get_span_without_attrs(stmt.as_ast_node()),
                     );
+                    let context = self.get_context();
+                    context.skipped_range.borrow_mut().push((
+                        context.source_map.lookup_line(span.lo()).unwrap().line,
+                        context.source_map.lookup_line(span.hi()).unwrap().line,
+                    ));
                 } else {
                     let shape = self.shape();
                     let rewrite = self.with_context(|ctx| stmt.rewrite(&ctx, shape));
