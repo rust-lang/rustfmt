@@ -1,5 +1,6 @@
 // High level formatting functions.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -70,17 +71,19 @@ fn format_project<T: FormatHandler>(
         Ok(set) => set,
         Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
     };
-    let is_ignore_match = ignore_path_set.is_match(&main_file);
-    if config.skip_children() && is_ignore_match {
+    if config.skip_children() && ignore_path_set.is_match(&main_file) {
         return Ok(FormatReport::new());
     }
 
     // Parse the crate.
+    let can_reset = Rc::new(RefCell::new(false));
     let source_map = Rc::new(SourceMap::new(FilePathMapping::empty()));
-    let mut parse_session = make_parse_sess(source_map.clone(), config, &ignore_path_set);
-    if is_ignore_match {
-        parse_session.span_diagnostic = Handler::with_emitter(true, None, silent_emitter());
-    }
+    let mut parse_session = make_parse_sess(
+        source_map.clone(),
+        config,
+        &ignore_path_set,
+        can_reset.clone(),
+    );
     let mut report = FormatReport::new();
     let directory_ownership = input.to_directory_ownership();
     let krate = match parse_crate(
@@ -89,16 +92,11 @@ fn format_project<T: FormatHandler>(
         config,
         &mut report,
         directory_ownership,
+        can_reset.clone(),
     ) {
         Ok(krate) => krate,
         // Surface parse error via Session (errors are merged there from report)
-        Err(ErrorKind::ParseError) => {
-            // https://github.com/rust-lang/rustfmt/issues/3779
-            if is_ignore_match {
-                return Ok(FormatReport::new());
-            }
-            return Ok(report);
-        }
+        Err(ErrorKind::ParseError) => return Ok(report),
         Err(e) => return Err(e),
     };
     timer = timer.done_parsing();
@@ -630,6 +628,7 @@ fn parse_crate(
     config: &Config,
     report: &mut FormatReport,
     directory_ownership: Option<parse::DirectoryOwnership>,
+    parser_error_resetter: Rc<RefCell<bool>>,
 ) -> Result<ast::Crate, ErrorKind> {
     let input_is_stdin = input.is_text();
 
@@ -677,6 +676,15 @@ fn parse_crate(
             if !parse_session.span_diagnostic.has_errors() {
                 return Ok(c);
             }
+            // This scenario occurs when the parser encountered errors
+            // but was still able to recover. If all of the parser errors
+            // occurred in files that are ignored, then reset
+            // the error count and continue.
+            // https://github.com/rust-lang/rustfmt/issues/3779
+            if *parser_error_resetter.borrow() {
+                parse_session.span_diagnostic.reset_err_count();
+                return Ok(c);
+            }
         }
         Ok(Err(mut diagnostics)) => diagnostics.iter_mut().for_each(DiagnosticBuilder::emit),
         Err(_) => {
@@ -697,6 +705,9 @@ struct SilentOnIgnoredFilesEmitter {
     ignore_path_set: IgnorePathSet,
     source_map: Rc<SourceMap>,
     emitter: EmitterWriter,
+    can_reset: bool,
+    has_non_ignorable_parser_errors: bool,
+    parser_error_resetter: Rc<RefCell<bool>>,
 }
 
 impl Emitter for SilentOnIgnoredFilesEmitter {
@@ -709,13 +720,22 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
                         .ignore_path_set
                         .is_match(&FileName::Real(path.to_path_buf()))
                     {
-                        db.handler.reset_err_count();
+                        if !self.has_non_ignorable_parser_errors && !self.can_reset {
+                            self.can_reset = true;
+                            *self.parser_error_resetter.borrow_mut() = true;
+                        }
                         return;
                     }
                 }
                 _ => (),
             };
         }
+
+        self.has_non_ignorable_parser_errors = true;
+        if self.can_reset {
+            *self.parser_error_resetter.borrow_mut() = false;
+        }
+        self.can_reset = false;
         self.emitter.emit_diagnostic(db);
     }
 }
@@ -735,6 +755,7 @@ fn make_parse_sess(
     source_map: Rc<SourceMap>,
     config: &Config,
     ignore_path_set: &IgnorePathSet,
+    parser_error_resetter: Rc<RefCell<bool>>,
 ) -> ParseSess {
     let tty_handler = if config.hide_parse_errors() {
         let silent_emitter = silent_emitter();
@@ -746,12 +767,16 @@ fn make_parse_sess(
         } else {
             ColorConfig::Never
         };
+
         let emitter_writer =
-            EmitterWriter::stderr(color_cfg, Some(source_map.clone()), false, false);
+            EmitterWriter::stderr(color_cfg, Some(source_map.clone()), false, false, None);
         let emitter = Box::new(SilentOnIgnoredFilesEmitter {
+            has_non_ignorable_parser_errors: false,
+            can_reset: false,
             ignore_path_set: ignore_path_set.clone(),
             source_map: source_map.clone(),
             emitter: emitter_writer,
+            parser_error_resetter,
         });
         Handler::with_emitter_and_flags(
             emitter,
