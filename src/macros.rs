@@ -35,8 +35,8 @@ use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
-    add_skipped_range, format_visibility, indent_next_line, is_empty_line, mk_sp,
-    remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
+    format_visibility, indent_next_line, is_empty_line, mk_sp, remove_trailing_white_spaces,
+    rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
 };
 use crate::visitor::FmtVisitor;
 
@@ -181,7 +181,10 @@ fn return_macro_parse_failure_fallback(
         return trim_left_preserve_layout(context.snippet(span), indent, &context.config);
     }
 
-    add_skipped_range(&context, span);
+    context.skipped_range.borrow_mut().push((
+        context.source_map.lookup_line(span.lo()).unwrap().line,
+        context.source_map.lookup_line(span.hi()).unwrap().line,
+    ));
 
     // Return the snippet unmodified if the macro is not block-like
     Some(context.snippet(span).to_owned())
@@ -1370,7 +1373,7 @@ impl MacroBranch {
                 |(mut s, need_indent), (i, (kind, ref l))| {
                     if !is_empty_line(l)
                         && need_indent
-                        && (!new_body_snippet.is_line_non_formatted(i + 1) || i == 0)
+                        && !new_body_snippet.is_line_non_formatted(i + 1)
                     {
                         s += &indent_str;
                     }

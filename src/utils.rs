@@ -366,13 +366,6 @@ macro_rules! skip_out_of_file_lines_range_visitor {
     };
 }
 
-pub(crate) fn add_skipped_range(context: &RewriteContext<'_>, span: Span) {
-    context.skipped_range.borrow_mut().push((
-        context.source_map.lookup_line(span.lo()).unwrap().line,
-        context.source_map.lookup_line(span.hi()).unwrap().line,
-    ));
-}
-
 // Wraps String in an Option. Returns Some when the string adheres to the
 // Rewrite constraints defined for the Rewrite trait and None otherwise.
 pub(crate) fn wrap_str(s: String, max_width: usize, shape: Shape) -> Option<String> {
