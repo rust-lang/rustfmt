@@ -68,7 +68,7 @@ fn format_project<T: FormatHandler>(
     let input_is_stdin = main_file == FileName::Stdin;
 
     let ignore_path_set = match IgnorePathSet::from_ignore_list(&config.ignore()) {
-        Ok(set) => set,
+        Ok(set) => Rc::new(set),
         Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
     };
     if config.skip_children() && ignore_path_set.is_match(&main_file) {
@@ -81,7 +81,7 @@ fn format_project<T: FormatHandler>(
     let mut parse_session = make_parse_sess(
         source_map.clone(),
         config,
-        &ignore_path_set,
+        ignore_path_set.clone(),
         can_reset.clone(),
     );
     let mut report = FormatReport::new();
@@ -702,7 +702,7 @@ fn parse_crate(
 }
 
 struct SilentOnIgnoredFilesEmitter {
-    ignore_path_set: IgnorePathSet,
+    ignore_path_set: Rc<IgnorePathSet>,
     source_map: Rc<SourceMap>,
     emitter: EmitterWriter,
     can_reset: bool,
@@ -754,7 +754,7 @@ fn silent_emitter() -> Box<SilentEmitter> {
 fn make_parse_sess(
     source_map: Rc<SourceMap>,
     config: &Config,
-    ignore_path_set: &IgnorePathSet,
+    ignore_path_set: Rc<IgnorePathSet>,
     parser_error_resetter: Rc<RefCell<bool>>,
 ) -> ParseSess {
     let tty_handler = if config.hide_parse_errors() {
@@ -773,7 +773,7 @@ fn make_parse_sess(
         let emitter = Box::new(SilentOnIgnoredFilesEmitter {
             has_non_ignorable_parser_errors: false,
             can_reset: false,
-            ignore_path_set: ignore_path_set.clone(),
+            ignore_path_set: ignore_path_set,
             source_map: source_map.clone(),
             emitter: emitter_writer,
             parser_error_resetter,
