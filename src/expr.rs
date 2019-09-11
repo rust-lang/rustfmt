@@ -521,7 +521,7 @@ pub(crate) fn rewrite_block_with_visitor(
     context
         .skipped_range
         .borrow_mut()
-        .append(&mut visitor_context.skipped_range.borrow_mut().clone());
+        .append(&mut visitor_context.skipped_range.replace_with(|_| vec![]));
     Some(format!("{}{}{}", prefix, label_str, visitor.buffer))
 }
 
