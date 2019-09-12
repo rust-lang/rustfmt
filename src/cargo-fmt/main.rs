@@ -3,7 +3,6 @@
 #![deny(warnings)]
 
 use cargo_metadata;
-use ignore::{self, gitignore};
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
@@ -128,11 +127,6 @@ fn execute() -> i32 {
     }
 
     let include_nested_test_files = opts.include_nested_test_files;
-    let ignored_nested_test_files = if include_nested_test_files {
-        opts.ignored_nested_test_files
-    } else {
-        vec![]
-    };
 
     if let Some(specified_manifest_path) = opts.manifest_path {
         if !specified_manifest_path.ends_with("Cargo.toml") {
@@ -146,7 +140,6 @@ fn execute() -> i32 {
             rustfmt_args,
             Some(&manifest_path),
             include_nested_test_files,
-            &ignored_nested_test_files,
         ))
     } else {
         handle_command_status(format_crate(
@@ -155,7 +148,6 @@ fn execute() -> i32 {
             rustfmt_args,
             None,
             include_nested_test_files,
-            &ignored_nested_test_files,
         ))
     }
 }
@@ -261,14 +253,8 @@ fn format_crate(
     rustfmt_args: Vec<String>,
     manifest_path: Option<&Path>,
     include_nested_test_files: bool,
-    ignored_nested_test_files: &Vec<String>,
 ) -> Result<i32, io::Error> {
-    let targets = get_targets(
-        strategy,
-        manifest_path,
-        include_nested_test_files,
-        &ignored_nested_test_files,
-    )?;
+    let targets = get_targets(strategy, manifest_path, include_nested_test_files)?;
 
     // Currently only bin and lib files get formatted.
     run_rustfmt(&targets, &rustfmt_args, verbosity)
@@ -359,30 +345,24 @@ fn get_targets(
     strategy: &CargoFmtStrategy,
     manifest_path: Option<&Path>,
     include_nested_test_files: bool,
-    ignored_nested_test_files: &Vec<String>,
 ) -> Result<BTreeSet<Target>, io::Error> {
     let mut targets = BTreeSet::new();
 
     match *strategy {
-        CargoFmtStrategy::Root => get_targets_root_only(
-            manifest_path,
-            &mut targets,
-            include_nested_test_files,
-            &ignored_nested_test_files,
-        )?,
+        CargoFmtStrategy::Root => {
+            get_targets_root_only(manifest_path, &mut targets, include_nested_test_files)?
+        }
         CargoFmtStrategy::All => get_targets_recursive(
             manifest_path,
             &mut targets,
             &mut BTreeSet::new(),
             include_nested_test_files,
-            &ignored_nested_test_files,
         )?,
         CargoFmtStrategy::Some(ref hitlist) => get_targets_with_hitlist(
             manifest_path,
             hitlist,
             &mut targets,
             include_nested_test_files,
-            &ignored_nested_test_files,
         )?,
     }
 
@@ -400,7 +380,6 @@ fn get_targets_root_only(
     manifest_path: Option<&Path>,
     mut targets: &mut BTreeSet<Target>,
     include_nested_test_files: bool,
-    ignored_nested_test_files: &Vec<String>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path, false)?;
     let workspace_root_path = PathBuf::from(&metadata.workspace_root).canonicalize()?;
@@ -445,7 +424,6 @@ fn get_targets_root_only(
         &package_targets,
         &mut targets,
         include_nested_test_files,
-        &ignored_nested_test_files,
     );
 
     Ok(())
@@ -456,7 +434,6 @@ fn get_targets_recursive(
     mut targets: &mut BTreeSet<Target>,
     visited: &mut BTreeSet<String>,
     include_nested_test_files: bool,
-    ignored_nested_test_files: &Vec<String>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path, false)?;
     let metadata_with_deps = get_cargo_metadata(manifest_path, true)?;
@@ -467,7 +444,6 @@ fn get_targets_recursive(
             &package.targets,
             &mut targets,
             include_nested_test_files,
-            &ignored_nested_test_files,
         );
 
         // Look for local dependencies.
@@ -499,7 +475,6 @@ fn get_targets_recursive(
                     &mut targets,
                     visited,
                     include_nested_test_files,
-                    &ignored_nested_test_files,
                 )?;
             }
         }
@@ -513,7 +488,6 @@ fn get_targets_with_hitlist(
     hitlist: &[String],
     mut targets: &mut BTreeSet<Target>,
     include_nested_test_files: bool,
-    ignored_nested_test_files: &Vec<String>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path, false)?;
 
@@ -526,7 +500,6 @@ fn get_targets_with_hitlist(
                 &package.targets,
                 &mut targets,
                 include_nested_test_files,
-                &ignored_nested_test_files,
             );
         }
     }
@@ -547,7 +520,6 @@ fn add_targets(
     target_paths: &[cargo_metadata::Target],
     targets: &mut BTreeSet<Target>,
     include_nested_test_files: bool,
-    ignore_list: &Vec<String>,
 ) {
     let mut test_files_added = false;
     for target in target_paths {
@@ -563,31 +535,8 @@ fn add_targets(
                 None => None,
                 Some(package_dir) => {
                     let target_dir = package_dir.join("tests");
-                    let mut ignore_builder = gitignore::GitignoreBuilder::new(package_dir);
-                    let mut had_ignore_add_error = false;
-
-                    for ignore_path in ignore_list {
-                        if ignore_builder.add_line(None, &ignore_path).is_err() {
-                            had_ignore_add_error = true;
-                            break;
-                        };
-                    }
-
-                    if had_ignore_add_error {
-                        None
-                    } else {
-                        match ignore_builder.build() {
-                            Err(_) => None,
-                            Ok(ignore_set) => {
-                                test_files_added = true;
-                                Some(get_nested_integration_test_files(
-                                    &target_dir,
-                                    &target_dir,
-                                    &ignore_set,
-                                ))
-                            }
-                        }
-                    }
+                    test_files_added = true;
+                    Some(get_nested_integration_test_files(&target_dir, &target_dir))
                 }
             }
         } else {
@@ -600,37 +549,20 @@ fn add_targets(
 // Returns a `Vec` containing `PathBuf`s of files nested .rs files within a subdirectory
 // under the `tests` directory for a given package.
 // https://github.com/rust-lang/rustfmt/issues/1820
-fn get_nested_integration_test_files(
-    path: &Path,
-    root_dir: &Path,
-    ignore_set: &gitignore::Gitignore,
-) -> Vec<PathBuf> {
+fn get_nested_integration_test_files(path: &Path, root_dir: &Path) -> Vec<PathBuf> {
     let mut files = vec![];
-    if path.is_dir()
-        && !ignore_set
-            .matched_path_or_any_parents(&path, true)
-            .is_ignore()
-    {
+    if path.is_dir() {
         for entry in fs::read_dir(path).expect(&format!(
             "couldn't read directory {}",
             path.to_str().unwrap()
         )) {
             let entry = entry.expect("couldn't get `DirEntry`");
             let path = entry.path();
-            if !ignore_set
-                .matched_path_or_any_parents(&path, false)
-                .is_ignore()
-            {
-                let parent = path.parent().expect("couldn't get parent directory");
-                if path.is_dir() {
-                    files.append(&mut get_nested_integration_test_files(
-                        &path,
-                        &root_dir,
-                        &ignore_set,
-                    ));
-                } else if path.extension().map_or(false, |f| f == "rs") && parent != root_dir {
-                    files.push(path);
-                }
+            let parent = path.parent().expect("couldn't get parent directory");
+            if path.is_dir() {
+                files.append(&mut get_nested_integration_test_files(&path, &root_dir));
+            } else if path.extension().map_or(false, |f| f == "rs") && parent != root_dir {
+                files.push(path);
             }
         }
     }
