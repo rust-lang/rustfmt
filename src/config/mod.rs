@@ -92,7 +92,8 @@ create_config! {
         the same line with the pattern of arms";
     force_multiline_blocks: bool, false, false,
         "Force multiline closure bodies and match arms to be wrapped in a block";
-    fn_args_density: Density, Density::Tall, false, "Argument density in functions";
+    fn_args_layout: Density, Density::Tall, true,
+        "Control the layout of arguments in a function";
     brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
     control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,
         "Brace style for control flow constructs";
@@ -151,6 +152,9 @@ create_config! {
     emit_mode: EmitMode, EmitMode::Files, false,
         "What emit Mode to use when none is supplied";
     make_backup: bool, false, false, "Backup changed files";
+    print_misformatted_file_names: bool, false, true,
+        "Prints the names of mismatched files that were formatted. Prints the names of \
+         files that would be formated when used with `--check` mode. ";
 }
 
 impl PartialConfig {
@@ -160,6 +164,7 @@ impl PartialConfig {
         cloned.file_lines = None;
         cloned.verbose = None;
         cloned.width_heuristics = None;
+        cloned.print_misformatted_file_names = None;
 
         ::toml::to_string(&cloned).map_err(|e| format!("Could not output config: {}", e))
     }
@@ -464,7 +469,8 @@ mod test {
 
     #[test]
     fn test_dump_default_config() {
-        const DEFAULT_CONFIG: &str = r#"max_width = 100
+        let default_config = format!(
+            r#"max_width = 100
 hard_tabs = false
 tab_spaces = 4
 newline_style = "Auto"
@@ -501,7 +507,7 @@ struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
 force_multiline_blocks = false
-fn_args_density = "Tall"
+fn_args_layout = "Tall"
 brace_style = "SameLineWhere"
 control_brace_style = "AlwaysSameLine"
 trailing_semicolon = true
@@ -518,7 +524,7 @@ use_field_init_shorthand = false
 force_explicit_abi = true
 condense_wildcard_suffixes = false
 color = "Auto"
-required_version = "1.2.2"
+required_version = "{}"
 unstable_features = false
 disable_all_formatting = false
 skip_children = false
@@ -530,9 +536,11 @@ report_fixme = "Never"
 ignore = []
 emit_mode = "Files"
 make_backup = false
-"#;
+"#,
+            env!("CARGO_PKG_VERSION")
+        );
         let toml = Config::default().all_options().to_toml().unwrap();
-        assert_eq!(&toml, DEFAULT_CONFIG);
+        assert_eq!(&toml, &default_config);
     }
 
     // FIXME(#2183): these tests cannot be run in parallel because they use env vars.

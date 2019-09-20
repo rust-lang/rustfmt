@@ -2,8 +2,8 @@ use std::collections::{hash_set, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use atty;
-use config_proc_macro::config_type;
+use itertools::Itertools;
+use rustfmt_config_proc_macro::config_type;
 use serde::de::{SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -58,10 +58,11 @@ pub enum IndentStyle {
 
 #[config_type]
 /// How to place a list-like items.
+/// FIXME: Issue-3581: this should be renamed to ItemsLayout when publishing 2.0
 pub enum Density {
     /// Fit as much on one line as possible.
     Compressed,
-    /// Use more lines.
+    /// Items are placed horizontally if sufficient space, vertically otherwise.
     Tall,
     /// Place every item on a separate line.
     Vertical,
@@ -117,6 +118,9 @@ pub enum EmitMode {
     Coverage,
     /// Unfancy stdout
     Checkstyle,
+    /// Writes the resulting diffs in a JSON format. Returns an empty array
+    /// `[]` if there were no diffs.
+    Json,
     /// Output the changed lines (for internal value only)
     ModifiedLines,
     /// Checks if a diff can be generated. If so, rustfmt outputs a diff and
@@ -142,7 +146,7 @@ pub enum Color {
 pub enum Version {
     /// 1.x.y. When specified, rustfmt will format in the same style as 1.0.0.
     One,
-    /// 2.x.y. When specified, rustfmt will formatin the the latest style.
+    /// 2.x.y. When specified, rustfmt will format in the the latest style.
     Two,
 }
 
@@ -150,9 +154,8 @@ impl Color {
     /// Whether we should use a coloured terminal.
     pub fn use_colored_tty(self) -> bool {
         match self {
-            Color::Always => true,
+            Color::Always | Color::Auto => true,
             Color::Never => false,
-            Color::Auto => atty::is(atty::Stream::Stdout),
         }
     }
 }
@@ -190,6 +193,12 @@ pub struct WidthHeuristics {
     // Maximum line length for single line if-else expressions. A value
     // of zero means always break if-else expressions.
     pub single_line_if_else_max_width: usize,
+}
+
+impl fmt::Display for WidthHeuristics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl WidthHeuristics {
@@ -261,6 +270,21 @@ pub struct IgnoreList {
     path_set: HashSet<PathBuf>,
     /// A path to rustfmt.toml.
     rustfmt_toml_path: PathBuf,
+}
+
+impl fmt::Display for IgnoreList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}]",
+            self.path_set
+                .iter()
+                .format_with(", ", |path, f| f(&format_args!(
+                    "{}",
+                    path.to_string_lossy()
+                )))
+        )
+    }
 }
 
 impl Serialize for IgnoreList {

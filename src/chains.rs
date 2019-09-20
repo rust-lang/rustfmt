@@ -16,7 +16,7 @@
 //! following values of `chain_indent`:
 //! Block:
 //!
-//! ```ignore
+//! ```text
 //! let foo = {
 //!     aaaa;
 //!     bbb;
@@ -27,7 +27,7 @@
 //!
 //! Visual:
 //!
-//! ```ignore
+//! ```text
 //! let foo = {
 //!               aaaa;
 //!               bbb;
@@ -41,7 +41,7 @@
 //! the braces.
 //! Block:
 //!
-//! ```ignore
+//! ```text
 //! let a = foo.bar
 //!     .baz()
 //!     .qux
@@ -49,7 +49,7 @@
 //!
 //! Visual:
 //!
-//! ```ignore
+//! ```text
 //! let a = foo.bar
 //!            .baz()
 //!            .qux
@@ -118,6 +118,7 @@ enum ChainItemKind {
     ),
     StructField(ast::Ident),
     TupleField(ast::Ident, bool),
+    Await,
     Comment(String, CommentPosition),
 }
 
@@ -128,6 +129,7 @@ impl ChainItemKind {
             ChainItemKind::MethodCall(..)
             | ChainItemKind::StructField(..)
             | ChainItemKind::TupleField(..)
+            | ChainItemKind::Await
             | ChainItemKind::Comment(..) => false,
         }
     }
@@ -166,6 +168,10 @@ impl ChainItemKind {
                 let span = mk_sp(nested.span.hi(), field.span.hi());
                 (kind, span)
             }
+            ast::ExprKind::Await(ref nested) => {
+                let span = mk_sp(nested.span.hi(), expr.span.hi());
+                (ChainItemKind::Await, span)
+            }
             _ => return (ChainItemKind::Parent(expr.clone()), expr.span),
         };
 
@@ -189,6 +195,7 @@ impl Rewrite for ChainItem {
                 if nested { " " } else { "" },
                 rewrite_ident(context, ident)
             ),
+            ChainItemKind::Await => ".await".to_owned(),
             ChainItemKind::Comment(ref comment, _) => {
                 rewrite_comment(comment, false, shape, context.config)?
             }
@@ -387,9 +394,9 @@ impl Chain {
             ast::ExprKind::MethodCall(_, ref expressions) => {
                 Some(Self::convert_try(&expressions[0], context))
             }
-            ast::ExprKind::Field(ref subexpr, _) | ast::ExprKind::Try(ref subexpr) => {
-                Some(Self::convert_try(subexpr, context))
-            }
+            ast::ExprKind::Field(ref subexpr, _)
+            | ast::ExprKind::Try(ref subexpr)
+            | ast::ExprKind::Await(ref subexpr) => Some(Self::convert_try(subexpr, context)),
             _ => None,
         }
     }
@@ -445,7 +452,7 @@ trait ChainFormatter {
     // Parent is the first item in the chain, e.g., `foo` in `foo.bar.baz()`.
     // Root is the parent plus any other chain items placed on the first line to
     // avoid an orphan. E.g.,
-    // ```ignore
+    // ```text
     // foo.bar
     //     .baz()
     // ```
@@ -507,7 +514,7 @@ impl<'a> ChainFormatterShared<'a> {
     // know whether 'overflowing' the last child make a better formatting:
     //
     // A chain with overflowing the last child:
-    // ```ignore
+    // ```text
     // parent.child1.child2.last_child(
     //     a,
     //     b,
@@ -516,7 +523,7 @@ impl<'a> ChainFormatterShared<'a> {
     // ```
     //
     // A chain without overflowing the last child (in vertical layout):
-    // ```ignore
+    // ```text
     // parent
     //     .child1
     //     .child2
@@ -525,7 +532,7 @@ impl<'a> ChainFormatterShared<'a> {
     //
     // In particular, overflowing is effective when the last child is a method with a multi-lined
     // block-like argument (e.g., closure):
-    // ```ignore
+    // ```text
     // parent.child1.child2.last_child(|a, b, c| {
     //     let x = foo(a, b, c);
     //     let y = bar(a, b, c);
@@ -550,7 +557,10 @@ impl<'a> ChainFormatterShared<'a> {
         let almost_total = if extendable {
             prev_last_line_width
         } else {
-            self.rewrites.iter().map(String::len).sum()
+            self.rewrites
+                .iter()
+                .map(|rw| utils::unicode_str_width(&rw))
+                .sum()
         } + last.tries;
         let one_line_budget = if self.child_count == 1 {
             shape.width
@@ -637,7 +647,7 @@ impl<'a> ChainFormatterShared<'a> {
             Cow::from("")
         } else {
             // Use new lines.
-            if *context.force_one_line_chain.borrow() {
+            if context.force_one_line_chain.get() {
                 return None;
             }
             child_shape.to_string_with_newline(context.config)

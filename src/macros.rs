@@ -10,16 +10,18 @@
 // and those with brackets will be formatted as array literals.
 
 use std::collections::HashMap;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use syntax::parse::new_parser_from_tts;
 use syntax::parse::parser::Parser;
-use syntax::parse::token::{BinOpToken, DelimToken, Token};
+use syntax::parse::token::{BinOpToken, DelimToken, Token, TokenKind};
 use syntax::print::pprust;
 use syntax::source_map::{BytePos, Span};
-use syntax::symbol::keywords;
+use syntax::symbol::kw;
 use syntax::tokenstream::{Cursor, TokenStream, TokenTree};
 use syntax::ThinVec;
 use syntax::{ast, parse, ptr};
+use syntax_pos::{Symbol, DUMMY_SP};
 
 use crate::comment::{
     contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses,
@@ -148,7 +150,7 @@ fn rewrite_macro_name(
         format!("{}!", path)
     };
     match extra_ident {
-        Some(ident) if ident != keywords::Invalid.ident() => format!("{} {}", name, ident),
+        Some(ident) if ident.name != kw::Invalid => format!("{} {}", name, ident),
         _ => name,
     }
 }
@@ -179,26 +181,13 @@ fn return_macro_parse_failure_fallback(
         return trim_left_preserve_layout(context.snippet(span), indent, &context.config);
     }
 
+    context.skipped_range.borrow_mut().push((
+        context.source_map.lookup_line(span.lo()).unwrap().line,
+        context.source_map.lookup_line(span.hi()).unwrap().line,
+    ));
+
     // Return the snippet unmodified if the macro is not block-like
     Some(context.snippet(span).to_owned())
-}
-
-struct InsideMacroGuard<'a> {
-    context: &'a RewriteContext<'a>,
-    is_nested: bool,
-}
-
-impl<'a> InsideMacroGuard<'a> {
-    fn inside_macro_context(context: &'a RewriteContext<'_>) -> InsideMacroGuard<'a> {
-        let is_nested = context.inside_macro.replace(true);
-        InsideMacroGuard { context, is_nested }
-    }
-}
-
-impl<'a> Drop for InsideMacroGuard<'a> {
-    fn drop(&mut self) {
-        self.context.inside_macro.replace(self.is_nested);
-    }
 }
 
 pub(crate) fn rewrite_macro(
@@ -209,33 +198,44 @@ pub(crate) fn rewrite_macro(
     position: MacroPosition,
 ) -> Option<String> {
     let should_skip = context
-        .skip_macro_names
-        .borrow()
-        .contains(&context.snippet(mac.node.path.span).to_owned());
+        .skip_context
+        .skip_macro(&context.snippet(mac.path.span).to_owned());
     if should_skip {
         None
     } else {
-        let guard = InsideMacroGuard::inside_macro_context(context);
-        let result =
-            rewrite_macro_inner(mac, extra_ident, context, shape, position, guard.is_nested);
-        if result.is_none() {
-            context.macro_rewrite_failure.replace(true);
+        let guard = context.enter_macro();
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            rewrite_macro_inner(
+                mac,
+                extra_ident,
+                context,
+                shape,
+                position,
+                guard.is_nested(),
+            )
+        }));
+        match result {
+            Err(..) | Ok(None) => {
+                context.macro_rewrite_failure.replace(true);
+                None
+            }
+            Ok(rw) => rw,
         }
-        result
     }
 }
 
 fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
-    for &keyword in RUST_KEYWORDS.iter() {
+    for &keyword in RUST_KW.iter() {
         if parser.token.is_keyword(keyword)
             && parser.look_ahead(1, |t| {
-                *t == Token::Eof
-                    || *t == Token::Comma
-                    || *t == Token::CloseDelim(DelimToken::NoDelim)
+                t.kind == TokenKind::Eof
+                    || t.kind == TokenKind::Comma
+                    || t.kind == TokenKind::CloseDelim(DelimToken::NoDelim)
             })
         {
-            let macro_arg = MacroArg::Keyword(keyword.ident(), parser.span);
             parser.bump();
+            let macro_arg =
+                MacroArg::Keyword(ast::Ident::with_dummy_span(keyword), parser.prev_span);
             return Some(macro_arg);
         }
     }
@@ -252,14 +252,14 @@ fn rewrite_macro_inner(
 ) -> Option<String> {
     if context.config.use_try_shorthand() {
         if let Some(expr) = convert_try_mac(mac, context) {
-            context.inside_macro.replace(false);
+            context.leave_macro();
             return expr.rewrite(context, shape);
         }
     }
 
     let original_style = macro_style(mac, context);
 
-    let macro_name = rewrite_macro_name(context, &mac.node.path, extra_ident);
+    let macro_name = rewrite_macro_name(context, &mac.path, extra_ident);
 
     let style = if FORCED_BRACKET_MACROS.contains(&&macro_name[..]) && !is_nested_macro {
         DelimToken::Bracket
@@ -267,7 +267,7 @@ fn rewrite_macro_inner(
         original_style
     };
 
-    let ts: TokenStream = mac.node.stream();
+    let ts: TokenStream = mac.stream();
     let has_comment = contains_comment(context.snippet(mac.span));
     if ts.is_empty() && !has_comment {
         return match style {
@@ -297,27 +297,27 @@ fn rewrite_macro_inner(
 
     if DelimToken::Brace != style {
         loop {
-            if let Some(arg) = parse_macro_arg(&mut parser) {
+            if let Some(arg) = check_keyword(&mut parser) {
                 arg_vec.push(arg);
-            } else if let Some(arg) = check_keyword(&mut parser) {
+            } else if let Some(arg) = parse_macro_arg(&mut parser) {
                 arg_vec.push(arg);
             } else {
                 return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
             }
 
-            match parser.token {
-                Token::Eof => break,
-                Token::Comma => (),
-                Token::Semi => {
+            match parser.token.kind {
+                TokenKind::Eof => break,
+                TokenKind::Comma => (),
+                TokenKind::Semi => {
                     // Try to parse `vec![expr; expr]`
                     if FORCED_BRACKET_MACROS.contains(&&macro_name[..]) {
                         parser.bump();
-                        if parser.token != Token::Eof {
+                        if parser.token.kind != TokenKind::Eof {
                             match parse_macro_arg(&mut parser) {
                                 Some(arg) => {
                                     arg_vec.push(arg);
                                     parser.bump();
-                                    if parser.token == Token::Eof && arg_vec.len() == 2 {
+                                    if parser.token.kind == TokenKind::Eof && arg_vec.len() == 2 {
                                         vec_with_semi = true;
                                         break;
                                     }
@@ -340,7 +340,7 @@ fn rewrite_macro_inner(
 
             parser.bump();
 
-            if parser.token == Token::Eof {
+            if parser.token.kind == TokenKind::Eof {
                 trailing_comma = true;
                 break;
             }
@@ -401,7 +401,7 @@ fn rewrite_macro_inner(
                     Some(SeparatorTactic::Never)
                 };
                 if FORCED_BRACKET_MACROS.contains(macro_name) && !is_nested_macro {
-                    context.inside_macro.replace(false);
+                    context.leave_macro();
                     if context.use_block_indent() {
                         force_trailing_comma = Some(SeparatorTactic::Vertical);
                     };
@@ -528,7 +528,7 @@ pub(crate) fn rewrite_macro_def(
             Some(v) => Some(v),
             // if the rewrite returned None because a macro could not be rewritten, then return the
             // original body
-            None if *context.macro_rewrite_failure.borrow() => {
+            None if context.macro_rewrite_failure.get() => {
                 Some(context.snippet(branch.body).trim().to_string())
             }
             None => None,
@@ -623,7 +623,7 @@ fn replace_names(input: &str) -> Option<(String, HashMap<String, String>)> {
 #[derive(Debug, Clone)]
 enum MacroArgKind {
     /// e.g., `$x: expr`.
-    MetaVariable(ast::Ident, String),
+    MetaVariable(ast::Name, String),
     /// e.g., `$($foo: expr),*`
     Repeat(
         /// `()`, `[]` or `{}`.
@@ -731,9 +731,7 @@ impl MacroArgKind {
         };
 
         match *self {
-            MacroArgKind::MetaVariable(ty, ref name) => {
-                Some(format!("${}:{}", name, ty.name.as_str()))
-            }
+            MacroArgKind::MetaVariable(ty, ref name) => Some(format!("${}:{}", name, ty)),
             MacroArgKind::Repeat(delim_tok, ref args, ref another, ref tok) => {
                 let (lhs, inner, rhs) = rewrite_delimited_inner(delim_tok, args)?;
                 let another = another
@@ -791,8 +789,11 @@ struct MacroArgParser {
 
 fn last_tok(tt: &TokenTree) -> Token {
     match *tt {
-        TokenTree::Token(_, ref t) => t.clone(),
-        TokenTree::Delimited(_, delim, _) => Token::CloseDelim(delim),
+        TokenTree::Token(ref t) => t.clone(),
+        TokenTree::Delimited(delim_span, delim, _) => Token {
+            kind: TokenKind::CloseDelim(delim),
+            span: delim_span.close,
+        },
     }
 }
 
@@ -803,8 +804,14 @@ impl MacroArgParser {
             hi: BytePos(0),
             buf: String::new(),
             is_meta_var: false,
-            last_tok: Token::Eof,
-            start_tok: Token::Eof,
+            last_tok: Token {
+                kind: TokenKind::Eof,
+                span: DUMMY_SP,
+            },
+            start_tok: Token {
+                kind: TokenKind::Eof,
+                span: DUMMY_SP,
+            },
             result: vec![],
         }
     }
@@ -842,10 +849,13 @@ impl MacroArgParser {
 
     fn add_meta_variable(&mut self, iter: &mut Cursor) -> Option<()> {
         match iter.next() {
-            Some(TokenTree::Token(sp, Token::Ident(ref ident, _))) => {
+            Some(TokenTree::Token(Token {
+                kind: TokenKind::Ident(name, _),
+                span,
+            })) => {
                 self.result.push(ParsedMacroArg {
-                    kind: MacroArgKind::MetaVariable(*ident, self.buf.clone()),
-                    span: mk_sp(self.lo, sp.hi()),
+                    kind: MacroArgKind::MetaVariable(name, self.buf.clone()),
+                    span: mk_sp(self.lo, span.hi()),
                 });
 
                 self.buf.clear();
@@ -885,14 +895,23 @@ impl MacroArgParser {
             }
 
             match tok {
-                TokenTree::Token(_, Token::BinOp(BinOpToken::Plus))
-                | TokenTree::Token(_, Token::Question)
-                | TokenTree::Token(_, Token::BinOp(BinOpToken::Star)) => {
+                TokenTree::Token(Token {
+                    kind: TokenKind::BinOp(BinOpToken::Plus),
+                    ..
+                })
+                | TokenTree::Token(Token {
+                    kind: TokenKind::Question,
+                    ..
+                })
+                | TokenTree::Token(Token {
+                    kind: TokenKind::BinOp(BinOpToken::Star),
+                    ..
+                }) => {
                     break;
                 }
-                TokenTree::Token(sp, ref t) => {
-                    buffer.push_str(&pprust::token_to_string(t));
-                    hi = sp.hi();
+                TokenTree::Token(ref t) => {
+                    buffer.push_str(&pprust::token_to_string(&t));
+                    hi = t.span.hi();
                 }
                 _ => return None,
             }
@@ -915,18 +934,18 @@ impl MacroArgParser {
         Some(())
     }
 
-    fn update_buffer(&mut self, lo: BytePos, t: &Token) {
+    fn update_buffer(&mut self, t: &Token) {
         if self.buf.is_empty() {
-            self.lo = lo;
+            self.lo = t.span.lo();
             self.start_tok = t.clone();
         } else {
-            let needs_space = match next_space(&self.last_tok) {
+            let needs_space = match next_space(&self.last_tok.kind) {
                 SpaceState::Ident => ident_like(t),
                 SpaceState::Punctuation => !ident_like(t),
                 SpaceState::Always => true,
                 SpaceState::Never => false,
             };
-            if force_space_before(t) || needs_space {
+            if force_space_before(&t.kind) || needs_space {
                 self.buf.push(' ');
             }
         }
@@ -944,12 +963,12 @@ impl MacroArgParser {
             if ident_like(&self.start_tok) {
                 return true;
             }
-            if self.start_tok == Token::Colon {
+            if self.start_tok.kind == TokenKind::Colon {
                 return true;
             }
         }
 
-        if force_space_before(&self.start_tok) {
+        if force_space_before(&self.start_tok.kind) {
             return true;
         }
 
@@ -962,7 +981,10 @@ impl MacroArgParser {
 
         while let Some(tok) = iter.next() {
             match tok {
-                TokenTree::Token(sp, Token::Dollar) => {
+                TokenTree::Token(Token {
+                    kind: TokenKind::Dollar,
+                    span,
+                }) => {
                     // We always want to add a separator before meta variables.
                     if !self.buf.is_empty() {
                         self.add_separator();
@@ -970,16 +992,22 @@ impl MacroArgParser {
 
                     // Start keeping the name of this metavariable in the buffer.
                     self.is_meta_var = true;
-                    self.lo = sp.lo();
-                    self.start_tok = Token::Dollar;
+                    self.lo = span.lo();
+                    self.start_tok = Token {
+                        kind: TokenKind::Dollar,
+                        span,
+                    };
                 }
-                TokenTree::Token(_, Token::Colon) if self.is_meta_var => {
+                TokenTree::Token(Token {
+                    kind: TokenKind::Colon,
+                    ..
+                }) if self.is_meta_var => {
                     self.add_meta_variable(&mut iter)?;
                 }
-                TokenTree::Token(sp, ref t) => self.update_buffer(sp.lo(), t),
+                TokenTree::Token(ref t) => self.update_buffer(t),
                 TokenTree::Delimited(delimited_span, delimited, ref tts) => {
                     if !self.buf.is_empty() {
-                        if next_space(&self.last_tok) == SpaceState::Always {
+                        if next_space(&self.last_tok.kind) == SpaceState::Always {
                             self.add_separator();
                         } else {
                             self.add_other();
@@ -1096,63 +1124,63 @@ enum SpaceState {
     Always,
 }
 
-fn force_space_before(tok: &Token) -> bool {
+fn force_space_before(tok: &TokenKind) -> bool {
     debug!("tok: force_space_before {:?}", tok);
 
     match tok {
-        Token::Eq
-        | Token::Lt
-        | Token::Le
-        | Token::EqEq
-        | Token::Ne
-        | Token::Ge
-        | Token::Gt
-        | Token::AndAnd
-        | Token::OrOr
-        | Token::Not
-        | Token::Tilde
-        | Token::BinOpEq(_)
-        | Token::At
-        | Token::RArrow
-        | Token::LArrow
-        | Token::FatArrow
-        | Token::BinOp(_)
-        | Token::Pound
-        | Token::Dollar => true,
+        TokenKind::Eq
+        | TokenKind::Lt
+        | TokenKind::Le
+        | TokenKind::EqEq
+        | TokenKind::Ne
+        | TokenKind::Ge
+        | TokenKind::Gt
+        | TokenKind::AndAnd
+        | TokenKind::OrOr
+        | TokenKind::Not
+        | TokenKind::Tilde
+        | TokenKind::BinOpEq(_)
+        | TokenKind::At
+        | TokenKind::RArrow
+        | TokenKind::LArrow
+        | TokenKind::FatArrow
+        | TokenKind::BinOp(_)
+        | TokenKind::Pound
+        | TokenKind::Dollar => true,
         _ => false,
     }
 }
 
 fn ident_like(tok: &Token) -> bool {
-    match tok {
-        Token::Ident(..) | Token::Literal(..) | Token::Lifetime(_) => true,
+    match tok.kind {
+        TokenKind::Ident(..) | TokenKind::Literal(..) | TokenKind::Lifetime(_) => true,
         _ => false,
     }
 }
 
-fn next_space(tok: &Token) -> SpaceState {
+fn next_space(tok: &TokenKind) -> SpaceState {
     debug!("next_space: {:?}", tok);
 
     match tok {
-        Token::Not
-        | Token::BinOp(BinOpToken::And)
-        | Token::Tilde
-        | Token::At
-        | Token::Comma
-        | Token::Dot
-        | Token::DotDot
-        | Token::DotDotDot
-        | Token::DotDotEq
-        | Token::Question => SpaceState::Punctuation,
+        TokenKind::Not
+        | TokenKind::BinOp(BinOpToken::And)
+        | TokenKind::Tilde
+        | TokenKind::At
+        | TokenKind::Comma
+        | TokenKind::Dot
+        | TokenKind::DotDot
+        | TokenKind::DotDotDot
+        | TokenKind::DotDotEq
+        | TokenKind::Question => SpaceState::Punctuation,
 
-        Token::ModSep
-        | Token::Pound
-        | Token::Dollar
-        | Token::OpenDelim(_)
-        | Token::CloseDelim(_)
-        | Token::Whitespace => SpaceState::Never,
+        TokenKind::ModSep
+        | TokenKind::Pound
+        | TokenKind::Dollar
+        | TokenKind::OpenDelim(_)
+        | TokenKind::CloseDelim(_)
+        | TokenKind::Whitespace => SpaceState::Never,
 
-        Token::Literal(..) | Token::Ident(..) | Token::Lifetime(_) => SpaceState::Ident,
+        TokenKind::Literal(..) | TokenKind::Ident(..) | TokenKind::Lifetime(_) => SpaceState::Ident,
 
         _ => SpaceState::Always,
     }
@@ -1162,8 +1190,8 @@ fn next_space(tok: &Token) -> SpaceState {
 /// when the macro is not an instance of `try!` (or parsing the inner expression
 /// failed).
 pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> Option<ast::Expr> {
-    if &mac.node.path.to_string() == "try" {
-        let ts: TokenStream = mac.node.tts.clone();
+    if &mac.path.to_string() == "try" {
+        let ts: TokenStream = mac.tts.clone();
         let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
 
         Some(ast::Expr {
@@ -1219,7 +1247,10 @@ impl MacroParser {
         };
         let args = tok.joint();
         match self.toks.next()? {
-            TokenTree::Token(_, Token::FatArrow) => {}
+            TokenTree::Token(Token {
+                kind: TokenKind::FatArrow,
+                ..
+            }) => {}
             _ => return None,
         }
         let (mut hi, body, whole_body) = match self.toks.next()? {
@@ -1233,9 +1264,13 @@ impl MacroParser {
                 )
             }
         };
-        if let Some(TokenTree::Token(sp, Token::Semi)) = self.toks.look_ahead(0) {
+        if let Some(TokenTree::Token(Token {
+            kind: TokenKind::Semi,
+            span,
+        })) = self.toks.look_ahead(0)
+        {
             self.toks.next();
-            hi = sp.hi();
+            hi = span.hi();
         }
         Some(MacroBranch {
             span: mk_sp(lo, hi),
@@ -1375,7 +1410,7 @@ impl MacroBranch {
 ///
 /// # Expected syntax
 ///
-/// ```ignore
+/// ```text
 /// lazy_static! {
 ///     [pub] static ref NAME_1: TYPE_1 = EXPR_1;
 ///     [pub] static ref NAME_2: TYPE_2 = EXPR_2;
@@ -1417,17 +1452,17 @@ fn format_lazy_static(
         }
     }
 
-    while parser.token != Token::Eof {
+    while parser.token.kind != TokenKind::Eof {
         // Parse a `lazy_static!` item.
         let vis = crate::utils::format_visibility(context, &parse_or!(parse_visibility, false));
-        parser.eat_keyword(keywords::Static);
-        parser.eat_keyword(keywords::Ref);
+        parser.eat_keyword(kw::Static);
+        parser.eat_keyword(kw::Ref);
         let id = parse_or!(parse_ident);
-        parser.eat(&Token::Colon);
+        parser.eat(&TokenKind::Colon);
         let ty = parse_or!(parse_ty);
-        parser.eat(&Token::Eq);
+        parser.eat(&TokenKind::Eq);
         let expr = parse_or!(parse_expr);
-        parser.eat(&Token::Semi);
+        parser.eat(&TokenKind::Semi);
 
         // Rewrite as a static item.
         let mut stmt = String::with_capacity(128);
@@ -1444,7 +1479,7 @@ fn format_lazy_static(
             nested_shape.sub_width(1)?,
         )?);
         result.push(';');
-        if parser.token != Token::Eof {
+        if parser.token.kind != TokenKind::Eof {
             result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
         }
     }
@@ -1497,65 +1532,64 @@ fn rewrite_macro_with_items(
     Some(result)
 }
 
-const RUST_KEYWORDS: [keywords::Keyword; 60] = [
-    keywords::PathRoot,
-    keywords::DollarCrate,
-    keywords::Underscore,
-    keywords::As,
-    keywords::Box,
-    keywords::Break,
-    keywords::Const,
-    keywords::Continue,
-    keywords::Crate,
-    keywords::Else,
-    keywords::Enum,
-    keywords::Extern,
-    keywords::False,
-    keywords::Fn,
-    keywords::For,
-    keywords::If,
-    keywords::Impl,
-    keywords::In,
-    keywords::Let,
-    keywords::Loop,
-    keywords::Match,
-    keywords::Mod,
-    keywords::Move,
-    keywords::Mut,
-    keywords::Pub,
-    keywords::Ref,
-    keywords::Return,
-    keywords::SelfLower,
-    keywords::SelfUpper,
-    keywords::Static,
-    keywords::Struct,
-    keywords::Super,
-    keywords::Trait,
-    keywords::True,
-    keywords::Type,
-    keywords::Unsafe,
-    keywords::Use,
-    keywords::Where,
-    keywords::While,
-    keywords::Abstract,
-    keywords::Become,
-    keywords::Do,
-    keywords::Final,
-    keywords::Macro,
-    keywords::Override,
-    keywords::Priv,
-    keywords::Typeof,
-    keywords::Unsized,
-    keywords::Virtual,
-    keywords::Yield,
-    keywords::Dyn,
-    keywords::Async,
-    keywords::Try,
-    keywords::UnderscoreLifetime,
-    keywords::StaticLifetime,
-    keywords::Auto,
-    keywords::Catch,
-    keywords::Default,
-    keywords::Existential,
-    keywords::Union,
+const RUST_KW: [Symbol; 59] = [
+    kw::PathRoot,
+    kw::DollarCrate,
+    kw::Underscore,
+    kw::As,
+    kw::Box,
+    kw::Break,
+    kw::Const,
+    kw::Continue,
+    kw::Crate,
+    kw::Else,
+    kw::Enum,
+    kw::Extern,
+    kw::False,
+    kw::Fn,
+    kw::For,
+    kw::If,
+    kw::Impl,
+    kw::In,
+    kw::Let,
+    kw::Loop,
+    kw::Match,
+    kw::Mod,
+    kw::Move,
+    kw::Mut,
+    kw::Pub,
+    kw::Ref,
+    kw::Return,
+    kw::SelfLower,
+    kw::SelfUpper,
+    kw::Static,
+    kw::Struct,
+    kw::Super,
+    kw::Trait,
+    kw::True,
+    kw::Type,
+    kw::Unsafe,
+    kw::Use,
+    kw::Where,
+    kw::While,
+    kw::Abstract,
+    kw::Become,
+    kw::Do,
+    kw::Final,
+    kw::Macro,
+    kw::Override,
+    kw::Priv,
+    kw::Typeof,
+    kw::Unsized,
+    kw::Virtual,
+    kw::Yield,
+    kw::Dyn,
+    kw::Async,
+    kw::Try,
+    kw::UnderscoreLifetime,
+    kw::StaticLifetime,
+    kw::Auto,
+    kw::Catch,
+    kw::Default,
+    kw::Union,
 ];

@@ -10,7 +10,10 @@ use crate::config::lists::*;
 use crate::config::{Config, IndentStyle};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
-use crate::utils::{count_newlines, first_line_width, last_line_width, mk_sp, starts_with_newline};
+use crate::utils::{
+    count_newlines, first_line_width, last_line_width, mk_sp, starts_with_newline,
+    unicode_str_width,
+};
 use crate::visitor::SnippetProvider;
 
 pub(crate) struct ListFormatting<'a> {
@@ -246,10 +249,7 @@ where
     let total_sep_len = sep.len() * sep_count.saturating_sub(1);
     let real_total = total_width + total_sep_len;
 
-    if real_total <= limit
-        && !pre_line_comments
-        && !items.into_iter().any(|item| item.as_ref().is_multiline())
-    {
+    if real_total <= limit && !items.into_iter().any(|item| item.as_ref().is_multiline()) {
         DefinitiveListTactic::Horizontal
     } else {
         match tactic {
@@ -389,7 +389,7 @@ where
                         result.push('\n');
                         result.push_str(indent_str);
                         // This is the width of the item (without comments).
-                        line_len = item.item.as_ref().map_or(0, String::len);
+                        line_len = item.item.as_ref().map_or(0, |s| unicode_str_width(&s));
                     }
                 } else {
                     result.push(' ');
@@ -612,7 +612,11 @@ pub(crate) fn extract_post_comment(
         post_snippet[1..].trim_matches(white_space)
     } else if post_snippet.starts_with(separator) {
         post_snippet[separator.len()..].trim_matches(white_space)
-    } else if post_snippet.ends_with(',') && !post_snippet.trim().starts_with("//") {
+    }
+    // not comment or over two lines
+    else if post_snippet.ends_with(',')
+        && (!post_snippet.trim().starts_with("//") || post_snippet.trim().contains('\n'))
+    {
         post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
     } else {
         post_snippet
@@ -811,7 +815,7 @@ where
 pub(crate) fn total_item_width(item: &ListItem) -> usize {
     comment_len(item.pre_comment.as_ref().map(|x| &(*x)[..]))
         + comment_len(item.post_comment.as_ref().map(|x| &(*x)[..]))
-        + item.item.as_ref().map_or(0, String::len)
+        + &item.item.as_ref().map_or(0, |s| unicode_str_width(&s))
 }
 
 fn comment_len(comment: Option<&str>) -> usize {

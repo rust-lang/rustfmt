@@ -2,15 +2,15 @@ use std::borrow::Cow;
 use std::io;
 use std::path;
 
-use bytecount;
 use rustc_target::spec::abi;
 use syntax::ast::{
-    self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NestedMetaItemKind,
-    NodeId, Path, Visibility, VisibilityKind,
+    self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
+    VisibilityKind,
 };
 use syntax::ptr;
-use syntax::source_map::{BytePos, Span, NO_EXPANSION};
-use syntax_pos::Mark;
+use syntax::source_map::{BytePos, Span, SyntaxContext};
+use syntax::symbol::{sym, Symbol};
+use syntax_pos::ExpnId;
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
@@ -18,8 +18,15 @@ use crate::config::{Config, Version};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 
-pub(crate) const DEPR_SKIP_ANNOTATION: &str = "rustfmt_skip";
-pub(crate) const SKIP_ANNOTATION: &str = "rustfmt::skip";
+#[inline]
+pub(crate) fn depr_skip_annotation() -> Symbol {
+    Symbol::intern("rustfmt_skip")
+}
+
+#[inline]
+pub(crate) fn skip_annotation() -> Symbol {
+    Symbol::intern("rustfmt::skip")
+}
 
 pub(crate) fn rewrite_ident<'a>(context: &'a RewriteContext<'_>, ident: ast::Ident) -> &'a str {
     context.snippet(ident.span)
@@ -82,7 +89,7 @@ pub(crate) fn format_visibility(
 }
 
 #[inline]
-pub(crate) fn format_async(is_async: ast::IsAsync) -> &'static str {
+pub(crate) fn format_async(is_async: &ast::IsAsync) -> &'static str {
     match is_async {
         ast::IsAsync::Async { .. } => "async ",
         ast::IsAsync::NotAsync => "",
@@ -238,11 +245,11 @@ pub(crate) fn last_line_extendable(s: &str) -> bool {
 fn is_skip(meta_item: &MetaItem) -> bool {
     match meta_item.node {
         MetaItemKind::Word => {
-            let path_str = meta_item.ident.to_string();
-            path_str == SKIP_ANNOTATION || path_str == DEPR_SKIP_ANNOTATION
+            let path_str = meta_item.path.to_string();
+            path_str == skip_annotation().as_str() || path_str == depr_skip_annotation().as_str()
         }
         MetaItemKind::List(ref l) => {
-            meta_item.name() == "cfg_attr" && l.len() == 2 && is_skip_nested(&l[1])
+            meta_item.check_name(sym::cfg_attr) && l.len() == 2 && is_skip_nested(&l[1])
         }
         _ => false,
     }
@@ -250,9 +257,9 @@ fn is_skip(meta_item: &MetaItem) -> bool {
 
 #[inline]
 fn is_skip_nested(meta_item: &NestedMetaItem) -> bool {
-    match meta_item.node {
-        NestedMetaItemKind::MetaItem(ref mi) => is_skip(mi),
-        NestedMetaItemKind::Literal(_) => false,
+    match meta_item {
+        NestedMetaItem::MetaItem(ref mi) => is_skip(mi),
+        NestedMetaItem::Literal(_) => false,
     }
 }
 
@@ -277,10 +284,9 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
 pub(crate) fn semicolon_for_stmt(context: &RewriteContext<'_>, stmt: &ast::Stmt) -> bool {
     match stmt.node {
         ast::StmtKind::Semi(ref expr) => match expr.node {
-            ast::ExprKind::While(..)
-            | ast::ExprKind::WhileLet(..)
-            | ast::ExprKind::Loop(..)
-            | ast::ExprKind::ForLoop(..) => false,
+            ast::ExprKind::While(..) | ast::ExprKind::Loop(..) | ast::ExprKind::ForLoop(..) => {
+                false
+            }
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
                 context.config.trailing_semicolon()
             }
@@ -299,7 +305,22 @@ pub(crate) fn stmt_expr(stmt: &ast::Stmt) -> Option<&ast::Expr> {
     }
 }
 
-#[inline]
+/// Returns the number of LF and CRLF respectively.
+pub(crate) fn count_lf_crlf(input: &str) -> (usize, usize) {
+    let mut lf = 0;
+    let mut crlf = 0;
+    let mut is_crlf = false;
+    for c in input.as_bytes() {
+        match c {
+            b'\r' => is_crlf = true,
+            b'\n' if is_crlf => crlf += 1,
+            b'\n' => lf += 1,
+            _ => is_crlf = false,
+        }
+    }
+    (lf, crlf)
+}
+
 pub(crate) fn count_newlines(input: &str) -> usize {
     // Using bytes to omit UTF-8 decoding
     bytecount::count(input.as_bytes(), b'\n')
@@ -314,7 +335,7 @@ macro_rules! source {
 }
 
 pub(crate) fn mk_sp(lo: BytePos, hi: BytePos) -> Span {
-    Span::new(lo, hi, NO_EXPANSION)
+    Span::new(lo, hi, SyntaxContext::root())
 }
 
 // Returns `true` if the given span does not intersect with file lines.
@@ -431,12 +452,12 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Array(..)
         | ast::ExprKind::Struct(..)
         | ast::ExprKind::While(..)
-        | ast::ExprKind::WhileLet(..)
         | ast::ExprKind::If(..)
-        | ast::ExprKind::IfLet(..)
         | ast::ExprKind::Block(..)
+        | ast::ExprKind::Async(..)
         | ast::ExprKind::Loop(..)
         | ast::ExprKind::ForLoop(..)
+        | ast::ExprKind::TryBlock(..)
         | ast::ExprKind::Match(..) => repr.contains('\n'),
         ast::ExprKind::Paren(ref expr)
         | ast::ExprKind::Binary(_, _, ref expr)
@@ -449,7 +470,25 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         ast::ExprKind::Lit(_) => {
             repr.contains('\n') && trimmed_last_line_width(repr) <= context.config.tab_spaces()
         }
-        _ => false,
+        ast::ExprKind::AddrOf(..)
+        | ast::ExprKind::Assign(..)
+        | ast::ExprKind::AssignOp(..)
+        | ast::ExprKind::Await(..)
+        | ast::ExprKind::Box(..)
+        | ast::ExprKind::Break(..)
+        | ast::ExprKind::Cast(..)
+        | ast::ExprKind::Continue(..)
+        | ast::ExprKind::Err
+        | ast::ExprKind::Field(..)
+        | ast::ExprKind::InlineAsm(..)
+        | ast::ExprKind::Let(..)
+        | ast::ExprKind::Path(..)
+        | ast::ExprKind::Range(..)
+        | ast::ExprKind::Repeat(..)
+        | ast::ExprKind::Ret(..)
+        | ast::ExprKind::Tup(..)
+        | ast::ExprKind::Type(..)
+        | ast::ExprKind::Yield(None) => false,
     }
 }
 
@@ -485,7 +524,7 @@ pub(crate) fn remove_trailing_white_spaces(text: &str) -> String {
 /// Indent each line according to the specified `indent`.
 /// e.g.
 ///
-/// ```rust,ignore
+/// ```rust,compile_fail
 /// foo!{
 /// x,
 /// y,
@@ -499,7 +538,7 @@ pub(crate) fn remove_trailing_white_spaces(text: &str) -> String {
 ///
 /// will become
 ///
-/// ```rust,ignore
+/// ```rust,compile_fail
 /// foo!{
 ///     x,
 ///     y,
@@ -608,7 +647,7 @@ pub(crate) trait NodeIdExt {
 
 impl NodeIdExt for NodeId {
     fn root() -> NodeId {
-        NodeId::placeholder_from_mark(Mark::root())
+        NodeId::placeholder_from_expn_id(ExpnId::root())
     }
 }
 
@@ -655,26 +694,6 @@ pub fn absolute_path<P: AsRef<path::Path>>(p: P) -> io::Result<path::PathBuf> {
 #[cfg(not(windows))]
 pub fn absolute_path<P: AsRef<path::Path>>(p: P) -> io::Result<path::PathBuf> {
     std::fs::canonicalize(p)
-}
-
-pub(crate) fn get_skip_macro_names(attrs: &[ast::Attribute]) -> Vec<String> {
-    let mut skip_macro_names = vec![];
-    for attr in attrs {
-        // syntax::ast::Path is implemented partialEq
-        // but it is designed for segments.len() == 1
-        if format!("{}", attr.path) != "rustfmt::skip::macros" {
-            continue;
-        }
-
-        if let Some(list) = attr.meta_item_list() {
-            for spanned in list {
-                if let Some(name) = spanned.name() {
-                    skip_macro_names.push(name.to_string());
-                }
-            }
-        }
-    }
-    skip_macro_names
 }
 
 #[cfg(test)]

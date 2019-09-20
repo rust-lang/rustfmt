@@ -1,28 +1,30 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 use syntax::parse::ParseSess;
 use syntax::source_map::{self, BytePos, Pos, SourceMap, Span};
 use syntax::{ast, visit};
 
 use crate::attr::*;
-use crate::comment::{CodeCharKind, CommentCodeSlices};
-use crate::config::file_lines::FileName;
-use crate::config::{BraceStyle, Config, Version};
-use crate::expr::{format_expr, ExprType};
+use crate::comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};
+use crate::config::{BraceStyle, Config};
+use crate::coverage::transform_missing_snippet;
 use crate::items::{
     format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
-    rewrite_associated_impl_type, rewrite_associated_type, rewrite_existential_impl_type,
-    rewrite_existential_type, rewrite_extern_crate, rewrite_type_alias, FnSig, StaticParts,
-    StructParts,
+    rewrite_associated_impl_type, rewrite_associated_type, rewrite_extern_crate,
+    rewrite_opaque_impl_type, rewrite_opaque_type, rewrite_type_alias, FnBraceStyle, FnSig,
+    StaticParts, StructParts,
 };
 use crate::macros::{rewrite_macro, rewrite_macro_def, MacroPosition};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
+use crate::skip::{is_skip_attr, SkipContext};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
+use crate::stmt::Stmt;
 use crate::utils::{
-    self, contains_skip, count_newlines, get_skip_macro_names, inner_attributes, mk_sp,
-    ptr_vec_to_ref_vec, rewrite_ident, stmt_expr, DEPR_SKIP_ANNOTATION,
+    self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes, last_line_width,
+    mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
 };
 use crate::{ErrorKind, FormatReport, FormattingError};
 
@@ -64,10 +66,10 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) line_number: usize,
     /// List of 1-based line ranges which were annotated with skip
     /// Both bounds are inclusifs.
-    pub(crate) skipped_range: Vec<(usize, usize)>,
+    pub(crate) skipped_range: Rc<RefCell<Vec<(usize, usize)>>>,
     pub(crate) macro_rewrite_failure: bool,
     pub(crate) report: FormatReport,
-    pub(crate) skip_macro_names: RefCell<Vec<String>>,
+    pub(crate) skip_context: SkipContext,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -89,23 +91,40 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         Shape::indented(self.block_indent, self.config)
     }
 
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+    fn next_span(&self, hi: BytePos) -> Span {
+        mk_sp(self.last_pos, hi)
+    }
+
+    fn visit_stmt(&mut self, stmt: &Stmt<'_>) {
         debug!(
-            "visit_stmt: {:?} {:?}",
-            self.source_map.lookup_char_pos(stmt.span.lo()),
-            self.source_map.lookup_char_pos(stmt.span.hi())
+            "visit_stmt: {:?} {:?} `{}`",
+            self.source_map.lookup_char_pos(stmt.span().lo()),
+            self.source_map.lookup_char_pos(stmt.span().hi()),
+            self.snippet(stmt.span()),
         );
 
-        match stmt.node {
+        // https://github.com/rust-lang/rust/issues/63679.
+        let is_all_semicolons =
+            |snippet: &str| snippet.chars().all(|c| c.is_whitespace() || c == ';');
+        if is_all_semicolons(&self.snippet(stmt.span())) {
+            self.last_pos = stmt.span().hi();
+            return;
+        }
+
+        match stmt.as_ast_node().node {
             ast::StmtKind::Item(ref item) => {
                 self.visit_item(item);
                 // Handle potential `;` after the item.
-                self.format_missing(stmt.span.hi());
+                self.format_missing(stmt.span().hi());
             }
             ast::StmtKind::Local(..) | ast::StmtKind::Expr(..) | ast::StmtKind::Semi(..) => {
-                let attrs = get_attrs_from_stmt(stmt);
+                let attrs = get_attrs_from_stmt(stmt.as_ast_node());
                 if contains_skip(attrs) {
-                    self.push_skipped_with_span(attrs, stmt.span(), get_span_without_attrs(stmt));
+                    self.push_skipped_with_span(
+                        attrs,
+                        stmt.span(),
+                        get_span_without_attrs(stmt.as_ast_node()),
+                    );
                 } else {
                     let shape = self.shape();
                     let rewrite = self.with_context(|ctx| stmt.rewrite(&ctx, shape));
@@ -115,11 +134,43 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ast::StmtKind::Mac(ref mac) => {
                 let (ref mac, _macro_style, ref attrs) = **mac;
                 if self.visit_attrs(attrs, ast::AttrStyle::Outer) {
-                    self.push_skipped_with_span(attrs, stmt.span(), get_span_without_attrs(stmt));
+                    self.push_skipped_with_span(
+                        attrs,
+                        stmt.span(),
+                        get_span_without_attrs(stmt.as_ast_node()),
+                    );
                 } else {
                     self.visit_mac(mac, None, MacroPosition::Statement);
                 }
-                self.format_missing(stmt.span.hi());
+                self.format_missing(stmt.span().hi());
+            }
+        }
+    }
+
+    /// Remove spaces between the opening brace and the first statement or the inner attribute
+    /// of the block.
+    fn trim_spaces_after_opening_brace(
+        &mut self,
+        b: &ast::Block,
+        inner_attrs: Option<&[ast::Attribute]>,
+    ) {
+        if let Some(first_stmt) = b.stmts.first() {
+            let hi = inner_attrs
+                .and_then(|attrs| inner_attributes(attrs).first().map(|attr| attr.span.lo()))
+                .unwrap_or_else(|| first_stmt.span().lo());
+            let missing_span = self.next_span(hi);
+            let snippet = self.snippet(missing_span);
+            let len = CommentCodeSlices::new(snippet)
+                .nth(0)
+                .and_then(|(kind, _, s)| {
+                    if kind == CodeCharKind::Normal {
+                        s.rfind('\n')
+                    } else {
+                        None
+                    }
+                });
+            if let Some(len) = len {
+                self.last_pos = self.last_pos + BytePos::from_usize(len);
             }
         }
     }
@@ -142,39 +193,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.last_pos = self.last_pos + brace_compensation;
         self.block_indent = self.block_indent.block_indent(self.config);
         self.push_str("{");
-
-        if let Some(first_stmt) = b.stmts.first() {
-            let hi = inner_attrs
-                .and_then(|attrs| inner_attributes(attrs).first().map(|attr| attr.span.lo()))
-                .unwrap_or_else(|| first_stmt.span().lo());
-
-            let snippet = self.snippet(mk_sp(self.last_pos, hi));
-            let len = CommentCodeSlices::new(snippet)
-                .nth(0)
-                .and_then(|(kind, _, s)| {
-                    if kind == CodeCharKind::Normal {
-                        s.rfind('\n')
-                    } else {
-                        None
-                    }
-                });
-            if let Some(len) = len {
-                self.last_pos = self.last_pos + BytePos::from_usize(len);
-            }
-        }
+        self.trim_spaces_after_opening_brace(b, inner_attrs);
 
         // Format inner attributes if available.
-        let skip_rewrite = if let Some(attrs) = inner_attrs {
-            self.visit_attrs(attrs, ast::AttrStyle::Inner)
-        } else {
-            false
-        };
-
-        if skip_rewrite {
-            self.push_rewrite(b.span, None);
-            self.close_block(false, b.span);
-            self.last_pos = source!(self, b.span).hi();
-            return;
+        if let Some(attrs) = inner_attrs {
+            self.visit_attrs(attrs, ast::AttrStyle::Inner);
         }
 
         self.walk_block_stmts(b);
@@ -187,72 +210,99 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             }
         }
 
-        let mut remove_len = BytePos(0);
-        if let Some(stmt) = b.stmts.last() {
-            let span_after_last_stmt = mk_sp(
-                stmt.span.hi(),
-                source!(self, b.span).hi() - brace_compensation,
-            );
-            // if the span is outside of a file_lines range, then do not try to remove anything
-            if !out_of_file_lines_range!(self, span_after_last_stmt) {
-                let snippet = self.snippet(span_after_last_stmt);
-                let len = CommentCodeSlices::new(snippet)
-                    .last()
-                    .and_then(|(kind, _, s)| {
-                        if kind == CodeCharKind::Normal && s.trim().is_empty() {
-                            Some(s.len())
-                        } else {
-                            None
-                        }
-                    });
-                if let Some(len) = len {
-                    remove_len = BytePos::from_usize(len);
-                }
-            }
-        }
-
-        let unindent_comment = self.is_if_else_block && !b.stmts.is_empty() && {
-            let end_pos = source!(self, b.span).hi() - brace_compensation - remove_len;
-            let snippet = self.snippet(mk_sp(self.last_pos, end_pos));
-            snippet.contains("//") || snippet.contains("/*")
-        };
-        // FIXME: we should compress any newlines here to just one
-        if unindent_comment {
+        let rest_span = self.next_span(b.span.hi());
+        if out_of_file_lines_range!(self, rest_span) {
+            self.push_str(self.snippet(rest_span));
             self.block_indent = self.block_indent.block_unindent(self.config);
+        } else {
+            // Ignore the closing brace.
+            let missing_span = self.next_span(b.span.hi() - brace_compensation);
+            self.close_block(missing_span, self.unindent_comment_on_closing_brace(b));
         }
-        self.format_missing_with_indent(
-            source!(self, b.span).hi() - brace_compensation - remove_len,
-        );
-        if unindent_comment {
-            self.block_indent = self.block_indent.block_indent(self.config);
-        }
-        self.close_block(unindent_comment, b.span);
         self.last_pos = source!(self, b.span).hi();
     }
 
-    // FIXME: this is a terrible hack to indent the comments between the last
-    // item in the block and the closing brace to the block's level.
-    // The closing brace itself, however, should be indented at a shallower
-    // level.
-    fn close_block(&mut self, unindent_comment: bool, span: Span) {
-        let file_name: FileName = self.source_map.span_to_filename(span).into();
-        let skip_this_line = !self
-            .config
-            .file_lines()
-            .contains_line(&file_name, self.line_number);
-        if !skip_this_line {
-            let total_len = self.buffer.len();
-            let chars_too_many = if unindent_comment {
-                0
-            } else if self.config.hard_tabs() {
-                1
-            } else {
-                self.config.tab_spaces()
-            };
-            self.buffer.truncate(total_len - chars_too_many);
+    fn close_block(&mut self, span: Span, unindent_comment: bool) {
+        let config = self.config;
+
+        let mut last_hi = span.lo();
+        let mut unindented = false;
+        let mut prev_ends_with_newline = false;
+        let mut extra_newline = false;
+
+        let skip_normal = |s: &str| {
+            let trimmed = s.trim();
+            trimmed.is_empty() || trimmed.chars().all(|c| c == ';')
+        };
+
+        for (kind, offset, sub_slice) in CommentCodeSlices::new(self.snippet(span)) {
+            let sub_slice = transform_missing_snippet(config, sub_slice);
+
+            debug!("close_block: {:?} {:?} {:?}", kind, offset, sub_slice);
+
+            match kind {
+                CodeCharKind::Comment => {
+                    if !unindented && unindent_comment {
+                        unindented = true;
+                        self.block_indent = self.block_indent.block_unindent(config);
+                    }
+                    let span_in_between = mk_sp(last_hi, span.lo() + BytePos::from_usize(offset));
+                    let snippet_in_between = self.snippet(span_in_between);
+                    let mut comment_on_same_line = !snippet_in_between.contains("\n");
+
+                    let mut comment_shape =
+                        Shape::indented(self.block_indent, config).comment(config);
+                    if comment_on_same_line {
+                        // 1 = a space before `//`
+                        let offset_len = 1 + last_line_width(&self.buffer)
+                            .saturating_sub(self.block_indent.width());
+                        match comment_shape
+                            .visual_indent(offset_len)
+                            .sub_width(offset_len)
+                        {
+                            Some(shp) => comment_shape = shp,
+                            None => comment_on_same_line = false,
+                        }
+                    };
+
+                    if comment_on_same_line {
+                        self.push_str(" ");
+                    } else {
+                        if count_newlines(snippet_in_between) >= 2 || extra_newline {
+                            self.push_str("\n");
+                        }
+                        self.push_str(&self.block_indent.to_string_with_newline(config));
+                    }
+
+                    let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config);
+                    match comment_str {
+                        Some(ref s) => self.push_str(s),
+                        None => self.push_str(&sub_slice),
+                    }
+                }
+                CodeCharKind::Normal if skip_normal(&sub_slice) => {
+                    extra_newline = prev_ends_with_newline && sub_slice.contains('\n');
+                    continue;
+                }
+                CodeCharKind::Normal => {
+                    self.push_str(&self.block_indent.to_string_with_newline(config));
+                    self.push_str(sub_slice.trim());
+                }
+            }
+            prev_ends_with_newline = sub_slice.ends_with('\n');
+            extra_newline = false;
+            last_hi = span.lo() + BytePos::from_usize(offset + sub_slice.len());
         }
-        self.push_str("}");
+        if unindented {
+            self.block_indent = self.block_indent.block_indent(self.config);
+        }
         self.block_indent = self.block_indent.block_unindent(self.config);
+        self.push_str(&self.block_indent.to_string_with_newline(config));
+        self.push_str("}");
+    }
+
+    fn unindent_comment_on_closing_brace(&self, b: &ast::Block) -> bool {
+        self.is_if_else_block && !b.stmts.is_empty()
     }
 
     // Note that this only gets called for function definitions. Required methods
@@ -271,32 +321,38 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let rewrite = match fk {
             visit::FnKind::ItemFn(ident, _, _, b) | visit::FnKind::Method(ident, _, _, b) => {
                 block = b;
-                self.rewrite_fn(
+                self.rewrite_fn_before_block(
                     indent,
                     ident,
                     &FnSig::from_fn_kind(&fk, generics, fd, defaultness),
                     mk_sp(s.lo(), b.span.lo()),
-                    b,
-                    inner_attrs,
                 )
             }
             visit::FnKind::Closure(_) => unreachable!(),
         };
 
-        if let Some(fn_str) = rewrite {
+        if let Some((fn_str, fn_brace_style)) = rewrite {
             self.format_missing_with_indent(source!(self, s).lo());
-            self.push_str(&fn_str);
-            if let Some(c) = fn_str.chars().last() {
-                if c == '}' {
-                    self.last_pos = source!(self, block.span).hi();
-                    return;
-                }
+
+            if let Some(rw) = self.single_line_fn(&fn_str, block, inner_attrs) {
+                self.push_str(&rw);
+                self.last_pos = s.hi();
+                return;
             }
+
+            self.push_str(&fn_str);
+            match fn_brace_style {
+                FnBraceStyle::SameLine => self.push_str(" "),
+                FnBraceStyle::NextLine => {
+                    self.push_str(&self.block_indent.to_string_with_newline(self.config))
+                }
+                _ => unreachable!(),
+            }
+            self.last_pos = source!(self, block.span).lo();
         } else {
             self.format_missing(source!(self, block.span).lo());
         }
 
-        self.last_pos = source!(self, block.span).lo();
         self.visit_block(block, inner_attrs, true)
     }
 
@@ -309,14 +365,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // the AST lumps them all together.
         let filtered_attrs;
         let mut attrs = &item.attrs;
-        let temp_skip_macro_names = self.skip_macro_names.clone();
-        self.skip_macro_names
-            .borrow_mut()
-            .append(&mut get_skip_macro_names(&attrs));
+        let skip_context_saved = self.skip_context.clone();
+        self.skip_context.update_with_attrs(&attrs);
 
         let should_visit_node_again = match item.node {
-            // For use items, skip rewriting attributes. Just check for a skip attribute.
-            ast::ItemKind::Use(..) => {
+            // For use/extern crate items, skip rewriting attributes but check for a skip attribute.
+            ast::ItemKind::Use(..) | ast::ItemKind::ExternCrate(_) => {
                 if contains_skip(attrs) {
                     self.push_skipped_with_span(attrs.as_slice(), item.span(), item.span());
                     false
@@ -381,8 +435,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.push_rewrite(item.span, rw);
                 }
                 ast::ItemKind::ExternCrate(_) => {
-                    let rw = rewrite_extern_crate(&self.get_context(), item);
-                    self.push_rewrite(item.span, rw);
+                    let rw = rewrite_extern_crate(&self.get_context(), item, self.shape());
+                    let span = if attrs.is_empty() {
+                        item.span
+                    } else {
+                        mk_sp(attrs[0].span.lo(), item.span.hi())
+                    };
+                    self.push_rewrite(span, rw);
                 }
                 ast::ItemKind::Struct(..) | ast::ItemKind::Union(..) => {
                     self.visit_struct(&StructParts::from_item(item));
@@ -418,7 +477,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         Some(&inner_attrs),
                     )
                 }
-                ast::ItemKind::Ty(ref ty, ref generics) => {
+                ast::ItemKind::TyAlias(ref ty, ref generics) => {
                     let rewrite = rewrite_type_alias(
                         &self.get_context(),
                         self.block_indent,
@@ -429,8 +488,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     );
                     self.push_rewrite(item.span, rewrite);
                 }
-                ast::ItemKind::Existential(ref generic_bounds, ref generics) => {
-                    let rewrite = rewrite_existential_type(
+                ast::ItemKind::OpaqueTy(ref generic_bounds, ref generics) => {
+                    let rewrite = rewrite_opaque_type(
                         &self.get_context(),
                         self.block_indent,
                         item.ident,
@@ -458,7 +517,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 }
             };
         }
-        self.skip_macro_names = temp_skip_macro_names;
+        self.skip_context = skip_context_saved;
     }
 
     pub(crate) fn visit_trait_item(&mut self, ti: &ast::TraitItem) {
@@ -526,7 +585,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 );
             }
             ast::ImplItemKind::Const(..) => self.visit_static(&StaticParts::from_impl_item(ii)),
-            ast::ImplItemKind::Type(ref ty) => {
+            ast::ImplItemKind::TyAlias(ref ty) => {
                 let rewrite = rewrite_associated_impl_type(
                     ii.ident,
                     ii.defaultness,
@@ -537,8 +596,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 );
                 self.push_rewrite(ii.span, rewrite);
             }
-            ast::ImplItemKind::Existential(ref generic_bounds) => {
-                let rewrite = rewrite_existential_impl_type(
+            ast::ImplItemKind::OpaqueTy(ref generic_bounds) => {
+                let rewrite = rewrite_opaque_impl_type(
                     &self.get_context(),
                     ii.ident,
                     &ii.generics,
@@ -573,7 +632,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             self.push_str(s);
         } else {
             let snippet = self.snippet(span);
-            self.push_str(snippet);
+            self.push_str(snippet.trim());
         }
         self.last_pos = source!(self, span).hi();
     }
@@ -593,7 +652,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // do not take into account the lines with attributes as part of the skipped range
         let attrs_end = attrs
             .iter()
-            .map(|attr| self.source_map.lookup_char_pos(attr.span().hi()).line)
+            .map(|attr| self.source_map.lookup_char_pos(attr.span.hi()).line)
             .max()
             .unwrap_or(1);
         let first_line = self.source_map.lookup_char_pos(main_span.lo()).line;
@@ -603,7 +662,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let lo = std::cmp::min(attrs_end + 1, first_line);
         self.push_rewrite_inner(item_span, None);
         let hi = self.line_number + 1;
-        self.skipped_range.push((lo, hi));
+        self.skipped_range.borrow_mut().push((lo, hi));
     }
 
     pub(crate) fn from_context(ctx: &'a RewriteContext<'_>) -> FmtVisitor<'a> {
@@ -613,10 +672,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ctx.snippet_provider,
             ctx.report.clone(),
         );
-        visitor
-            .skip_macro_names
-            .borrow_mut()
-            .append(&mut ctx.skip_macro_names.borrow().clone());
+        visitor.skip_context.update(ctx.skip_context.clone());
         visitor.set_parent_context(ctx);
         visitor
     }
@@ -638,10 +694,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             is_if_else_block: false,
             snippet_provider,
             line_number: 0,
-            skipped_range: vec![],
+            skipped_range: Rc::new(RefCell::new(vec![])),
             macro_rewrite_failure: false,
             report,
-            skip_macro_names: RefCell::new(vec![]),
+            skip_context: Default::default(),
         }
     }
 
@@ -656,7 +712,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     // Returns true if we should skip the following item.
     pub(crate) fn visit_attrs(&mut self, attrs: &[ast::Attribute], style: ast::AttrStyle) -> bool {
         for attr in attrs {
-            if attr.name() == DEPR_SKIP_ANNOTATION {
+            if attr.check_name(depr_skip_annotation()) {
                 let file_name = self.source_map.span_to_filename(attr.span).into();
                 self.report.append(
                     file_name,
@@ -698,28 +754,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if segments[0].ident.to_string() != "rustfmt" {
             return false;
         }
-
-        match segments.len() {
-            2 => segments[1].ident.to_string() != "skip",
-            3 => {
-                segments[1].ident.to_string() != "skip" || segments[2].ident.to_string() != "macros"
-            }
-            _ => false,
-        }
+        !is_skip_attr(segments)
     }
 
     fn walk_mod_items(&mut self, m: &ast::Mod) {
         self.visit_items_with_reordering(&ptr_vec_to_ref_vec(&m.items));
     }
 
-    fn walk_stmts(&mut self, stmts: &[ast::Stmt]) {
-        fn to_stmt_item(stmt: &ast::Stmt) -> Option<&ast::Item> {
-            match stmt.node {
-                ast::StmtKind::Item(ref item) => Some(&**item),
-                _ => None,
-            }
-        }
-
+    fn walk_stmts(&mut self, stmts: &[Stmt<'_>]) {
         if stmts.is_empty() {
             return;
         }
@@ -727,27 +769,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // Extract leading `use ...;`.
         let items: Vec<_> = stmts
             .iter()
-            .take_while(|stmt| to_stmt_item(stmt).map_or(false, is_use_item))
-            .filter_map(|stmt| to_stmt_item(stmt))
+            .take_while(|stmt| stmt.to_item().map_or(false, is_use_item))
+            .filter_map(|stmt| stmt.to_item())
             .collect();
 
         if items.is_empty() {
-            // The `if` expression at the end of the block should be formatted in a single
-            // line if possible.
-            if self.config.version() == Version::Two
-                && stmts.len() == 1
-                && crate::expr::stmt_is_if(&stmts[0])
-                && !contains_skip(get_attrs_from_stmt(&stmts[0]))
-            {
-                let shape = self.shape();
-                let rewrite = self.with_context(|ctx| {
-                    format_expr(stmt_expr(&stmts[0])?, ExprType::SubExpression, ctx, shape)
-                });
-                self.push_rewrite(stmts[0].span(), rewrite);
-            } else {
-                self.visit_stmt(&stmts[0]);
-                self.walk_stmts(&stmts[1..]);
-            }
+            self.visit_stmt(&stmts[0]);
+            self.walk_stmts(&stmts[1..]);
         } else {
             self.visit_items_with_reordering(&items);
             self.walk_stmts(&stmts[items.len()..]);
@@ -755,7 +783,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     }
 
     fn walk_block_stmts(&mut self, b: &ast::Block) {
-        self.walk_stmts(&b.stmts)
+        self.walk_stmts(&Stmt::from_ast_nodes(b.stmts.iter()))
     }
 
     fn format_mod(
@@ -795,8 +823,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.block_indent = self.block_indent.block_indent(self.config);
                 self.visit_attrs(attrs, ast::AttrStyle::Inner);
                 self.walk_mod_items(m);
-                self.format_missing_with_indent(source!(self, m.inner).hi() - BytePos(1));
-                self.close_block(false, m.inner);
+                let missing_span = self.next_span(m.inner.hi() - BytePos(1));
+                self.close_block(missing_span, false);
             }
             self.last_pos = source!(self, m.inner).hi();
         } else {
@@ -818,9 +846,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     pub(crate) fn skip_empty_lines(&mut self, end_pos: BytePos) {
         while let Some(pos) = self
             .snippet_provider
-            .opt_span_after(mk_sp(self.last_pos, end_pos), "\n")
+            .opt_span_after(self.next_span(end_pos), "\n")
         {
-            if let Some(snippet) = self.opt_snippet(mk_sp(self.last_pos, pos)) {
+            if let Some(snippet) = self.opt_snippet(self.next_span(pos)) {
                 if snippet.trim().is_empty() {
                     self.last_pos = pos;
                 } else {
@@ -834,15 +862,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     where
         F: Fn(&RewriteContext<'_>) -> Option<String>,
     {
-        // FIXME borrow checker fighting - can be simplified a lot with NLL.
-        let (result, mrf) = {
-            let context = self.get_context();
-            let result = f(&context);
-            let mrf = &context.macro_rewrite_failure.borrow();
-            (result, *std::ops::Deref::deref(mrf))
-        };
+        let context = self.get_context();
+        let result = f(&context);
 
-        self.macro_rewrite_failure |= mrf;
+        self.macro_rewrite_failure |= context.macro_rewrite_failure.get();
         result
     }
 
@@ -851,14 +874,15 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             parse_session: self.parse_session,
             source_map: self.source_map,
             config: self.config,
-            inside_macro: RefCell::new(false),
-            use_block: RefCell::new(false),
-            is_if_else_block: RefCell::new(false),
-            force_one_line_chain: RefCell::new(false),
+            inside_macro: Rc::new(Cell::new(false)),
+            use_block: Cell::new(false),
+            is_if_else_block: Cell::new(false),
+            force_one_line_chain: Cell::new(false),
             snippet_provider: self.snippet_provider,
-            macro_rewrite_failure: RefCell::new(false),
+            macro_rewrite_failure: Cell::new(false),
             report: self.report.clone(),
-            skip_macro_names: self.skip_macro_names.clone(),
+            skip_context: self.skip_context.clone(),
+            skipped_range: self.skipped_range.clone(),
         }
     }
 }

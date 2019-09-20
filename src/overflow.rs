@@ -122,10 +122,11 @@ impl<'a> OverflowableItem<'a> {
     pub(crate) fn is_simple(&self) -> bool {
         match self {
             OverflowableItem::Expr(expr) => is_simple_expr(expr),
+            OverflowableItem::MacroArg(MacroArg::Keyword(..)) => true,
             OverflowableItem::MacroArg(MacroArg::Expr(expr)) => is_simple_expr(expr),
-            OverflowableItem::NestedMetaItem(nested_meta_item) => match nested_meta_item.node {
-                ast::NestedMetaItemKind::Literal(..) => true,
-                ast::NestedMetaItemKind::MetaItem(ref meta_item) => match meta_item.node {
+            OverflowableItem::NestedMetaItem(nested_meta_item) => match nested_meta_item {
+                ast::NestedMetaItem::Literal(..) => true,
+                ast::NestedMetaItem::MetaItem(ref meta_item) => match meta_item.node {
                     ast::MetaItemKind::Word => true,
                     _ => false,
                 },
@@ -172,9 +173,9 @@ impl<'a> OverflowableItem<'a> {
                 MacroArg::Keyword(..) => false,
             },
             OverflowableItem::NestedMetaItem(nested_meta_item) if len == 1 => {
-                match nested_meta_item.node {
-                    ast::NestedMetaItemKind::Literal(..) => false,
-                    ast::NestedMetaItemKind::MetaItem(..) => true,
+                match nested_meta_item {
+                    ast::NestedMetaItem::Literal(..) => false,
+                    ast::NestedMetaItem::MetaItem(..) => true,
                 }
             }
             OverflowableItem::SegmentParam(seg) => match seg {
@@ -414,11 +415,9 @@ impl<'a> Context<'a> {
                     // When overflowing the expressions which consists of a control flow
                     // expression, avoid condition to use multi line.
                     ast::ExprKind::If(..)
-                    | ast::ExprKind::IfLet(..)
                     | ast::ExprKind::ForLoop(..)
                     | ast::ExprKind::Loop(..)
                     | ast::ExprKind::While(..)
-                    | ast::ExprKind::WhileLet(..)
                     | ast::ExprKind::Match(..) => {
                         let multi_line = rewrite_cond(self.context, expr, shape)
                             .map_or(false, |cond| cond.contains('\n'));
@@ -466,7 +465,7 @@ impl<'a> Context<'a> {
         // Replace the last item with its first line to see if it fits with
         // first arguments.
         let placeholder = if overflow_last {
-            let old_value = *self.context.force_one_line_chain.borrow();
+            let old_value = self.context.force_one_line_chain.get();
             match self.last_item() {
                 Some(OverflowableItem::Expr(expr))
                     if !combine_arg_with_callee && is_method_call(expr) =>

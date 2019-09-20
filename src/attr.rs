@@ -2,6 +2,7 @@
 
 use syntax::ast;
 use syntax::source_map::{BytePos, Span, DUMMY_SP};
+use syntax::symbol::sym;
 
 use self::doc_comment::DocCommentFormatter;
 use crate::comment::{contains_comment, rewrite_doc_comment, CommentStyle};
@@ -52,7 +53,7 @@ pub(crate) fn filter_inline_attrs(
 }
 
 fn is_derive(attr: &ast::Attribute) -> bool {
-    attr.check_name("derive")
+    attr.check_name(sym::derive)
 }
 
 /// Returns the arguments of `#[derive(...)]`.
@@ -60,7 +61,7 @@ fn get_derive_spans<'a>(attr: &'a ast::Attribute) -> Option<impl Iterator<Item =
     attr.meta_item_list().map(|meta_item_list| {
         meta_item_list
             .into_iter()
-            .map(|nested_meta_item| nested_meta_item.span)
+            .map(|nested_meta_item| nested_meta_item.span())
     })
 }
 
@@ -189,9 +190,9 @@ fn rewrite_initial_doc_comments(
 
 impl Rewrite for ast::NestedMetaItem {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        match self.node {
-            ast::NestedMetaItemKind::MetaItem(ref meta_item) => meta_item.rewrite(context, shape),
-            ast::NestedMetaItemKind::Literal(ref l) => rewrite_literal(context, l, shape),
+        match self {
+            ast::NestedMetaItem::MetaItem(ref meta_item) => meta_item.rewrite(context, shape),
+            ast::NestedMetaItem::Literal(ref l) => rewrite_literal(context, l, shape),
         }
     }
 }
@@ -219,10 +220,10 @@ impl Rewrite for ast::MetaItem {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         Some(match self.node {
             ast::MetaItemKind::Word => {
-                rewrite_path(context, PathContext::Type, None, &self.ident, shape)?
+                rewrite_path(context, PathContext::Type, None, &self.path, shape)?
             }
             ast::MetaItemKind::List(ref list) => {
-                let path = rewrite_path(context, PathContext::Type, None, &self.ident, shape)?;
+                let path = rewrite_path(context, PathContext::Type, None, &self.path, shape)?;
                 let has_trailing_comma = crate::expr::span_ends_with_comma(context, self.span);
                 overflow::rewrite_with_parens(
                     context,
@@ -240,7 +241,7 @@ impl Rewrite for ast::MetaItem {
                 )?
             }
             ast::MetaItemKind::NameValue(ref literal) => {
-                let path = rewrite_path(context, PathContext::Type, None, &self.ident, shape)?;
+                let path = rewrite_path(context, PathContext::Type, None, &self.path, shape)?;
                 // 3 = ` = `
                 let lit_shape = shape.shrink_left(path.len() + 3)?;
                 // `rewrite_literal` returns `None` when `literal` exceeds max
@@ -318,23 +319,28 @@ impl Rewrite for ast::Attribute {
         if self.is_sugared_doc {
             rewrite_doc_comment(snippet, shape.comment(context.config), context.config)
         } else {
+            let should_skip = self
+                .ident()
+                .map(|s| context.skip_context.skip_attribute(&s.name.as_str()))
+                .unwrap_or(false);
             let prefix = attr_prefix(self);
 
-            if contains_comment(snippet) {
+            if should_skip || contains_comment(snippet) {
                 return Some(snippet.to_owned());
             }
 
             if let Some(ref meta) = self.meta() {
                 // This attribute is possibly a doc attribute needing normalization to a doc comment
-                if context.config.normalize_doc_attributes() && meta.check_name("doc") {
+                if context.config.normalize_doc_attributes() && meta.check_name(sym::doc) {
                     if let Some(ref literal) = meta.value_str() {
                         let comment_style = match self.style {
                             ast::AttrStyle::Inner => CommentStyle::Doc,
                             ast::AttrStyle::Outer => CommentStyle::TripleSlash,
                         };
 
+                        let literal_str = literal.as_str();
                         let doc_comment_formatter =
-                            DocCommentFormatter::new(literal.as_str().get(), comment_style);
+                            DocCommentFormatter::new(&*literal_str, comment_style);
                         let doc_comment = format!("{}", doc_comment_formatter);
                         return rewrite_doc_comment(
                             &doc_comment,
@@ -485,4 +491,37 @@ fn attr_prefix(attr: &ast::Attribute) -> &'static str {
         ast::AttrStyle::Inner => "#!",
         ast::AttrStyle::Outer => "#",
     }
+}
+
+pub(crate) trait MetaVisitor<'ast> {
+    fn visit_meta_item(&mut self, meta_item: &'ast ast::MetaItem) {
+        match meta_item.node {
+            ast::MetaItemKind::Word => self.visit_meta_word(meta_item),
+            ast::MetaItemKind::List(ref list) => self.visit_meta_list(meta_item, list),
+            ast::MetaItemKind::NameValue(ref lit) => self.visit_meta_name_value(meta_item, lit),
+        }
+    }
+
+    fn visit_meta_list(
+        &mut self,
+        _meta_item: &'ast ast::MetaItem,
+        list: &'ast [ast::NestedMetaItem],
+    ) {
+        for nm in list {
+            self.visit_nested_meta_item(nm);
+        }
+    }
+
+    fn visit_meta_word(&mut self, _meta_item: &'ast ast::MetaItem) {}
+
+    fn visit_meta_name_value(&mut self, _meta_item: &'ast ast::MetaItem, _lit: &'ast ast::Lit) {}
+
+    fn visit_nested_meta_item(&mut self, nm: &'ast ast::NestedMetaItem) {
+        match nm {
+            ast::NestedMetaItem::MetaItem(ref meta_item) => self.visit_meta_item(meta_item),
+            ast::NestedMetaItem::Literal(ref lit) => self.visit_literal(lit),
+        }
+    }
+
+    fn visit_literal(&mut self, _lit: &'ast ast::Lit) {}
 }

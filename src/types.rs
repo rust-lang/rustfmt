@@ -3,10 +3,10 @@ use std::ops::Deref;
 
 use syntax::ast::{self, FunctionRetTy, Mutability};
 use syntax::source_map::{self, BytePos, Span};
-use syntax::symbol::keywords;
+use syntax::symbol::kw;
 
 use crate::config::lists::*;
-use crate::config::{IndentStyle, TypeDensity};
+use crate::config::{IndentStyle, TypeDensity, Version};
 use crate::expr::{format_expr, rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix, ExprType};
 use crate::lists::{
     definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
@@ -106,7 +106,7 @@ where
 
     for segment in iter {
         // Indicates a global path, shouldn't be rendered.
-        if segment.ident.name == keywords::PathRoot.name() {
+        if segment.ident.name == kw::PathRoot {
             continue;
         }
         if first {
@@ -137,7 +137,7 @@ pub(crate) enum SegmentParam<'a> {
     Const(&'a ast::AnonConst),
     LifeTime(&'a ast::Lifetime),
     Type(&'a ast::Ty),
-    Binding(&'a ast::TypeBinding),
+    Binding(&'a ast::AssocTyConstraint),
 }
 
 impl<'a> SegmentParam<'a> {
@@ -167,20 +167,39 @@ impl<'a> Rewrite for SegmentParam<'a> {
             SegmentParam::Const(const_) => const_.rewrite(context, shape),
             SegmentParam::LifeTime(lt) => lt.rewrite(context, shape),
             SegmentParam::Type(ty) => ty.rewrite(context, shape),
-            SegmentParam::Binding(binding) => {
-                let mut result = match context.config.type_punctuation_density() {
-                    TypeDensity::Wide => format!("{} = ", rewrite_ident(context, binding.ident)),
-                    TypeDensity::Compressed => {
-                        format!("{}=", rewrite_ident(context, binding.ident))
+            SegmentParam::Binding(assoc_ty_constraint) => {
+                let mut result = match assoc_ty_constraint.kind {
+                    ast::AssocTyConstraintKind::Bound { .. } => {
+                        format!("{}: ", rewrite_ident(context, assoc_ty_constraint.ident))
+                    }
+                    ast::AssocTyConstraintKind::Equality { .. } => {
+                        match context.config.type_punctuation_density() {
+                            TypeDensity::Wide => {
+                                format!("{} = ", rewrite_ident(context, assoc_ty_constraint.ident))
+                            }
+                            TypeDensity::Compressed => {
+                                format!("{}=", rewrite_ident(context, assoc_ty_constraint.ident))
+                            }
+                        }
                     }
                 };
+
                 let budget = shape.width.checked_sub(result.len())?;
-                let rewrite = binding
-                    .ty
+                let rewrite = assoc_ty_constraint
+                    .kind
                     .rewrite(context, Shape::legacy(budget, shape.indent + result.len()))?;
                 result.push_str(&rewrite);
                 Some(result)
             }
+        }
+    }
+}
+
+impl Rewrite for ast::AssocTyConstraintKind {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        match self {
+            ast::AssocTyConstraintKind::Equality { ty } => ty.rewrite(context, shape),
+            ast::AssocTyConstraintKind::Bound { bounds } => bounds.rewrite(context, shape),
         }
     }
 }
@@ -216,13 +235,13 @@ fn rewrite_segment(
     if let Some(ref args) = segment.args {
         match **args {
             ast::GenericArgs::AngleBracketed(ref data)
-                if !data.args.is_empty() || !data.bindings.is_empty() =>
+                if !data.args.is_empty() || !data.constraints.is_empty() =>
             {
                 let param_list = data
                     .args
                     .iter()
                     .map(SegmentParam::from_generic_arg)
-                    .chain(data.bindings.iter().map(|x| SegmentParam::Binding(&*x)))
+                    .chain(data.constraints.iter().map(|x| SegmentParam::Binding(&*x)))
                     .collect::<Vec<_>>();
 
                 // HACK: squeeze out the span between the identifier and the parameters.
@@ -317,8 +336,9 @@ where
         Shape::legacy(budget, offset)
     };
 
+    let is_inputs_empty = inputs.len() == 0;
     let list_lo = context.snippet_provider.span_after(span, "(");
-    let (list_str, tactic) = if inputs.len() == 0 {
+    let (list_str, tactic) = if is_inputs_empty {
         let tactic = get_tactics(&[], &output, shape);
         let list_hi = context.snippet_provider.span_before(span, ")");
         let comment = context
@@ -366,7 +386,10 @@ where
         (write_list(&item_vec, &fmt)?, tactic)
     };
 
-    let args = if tactic == DefinitiveListTactic::Horizontal || !context.use_block_indent() {
+    let args = if tactic == DefinitiveListTactic::Horizontal
+        || !context.use_block_indent()
+        || is_inputs_empty
+    {
         format!("({})", list_str)
     } else {
         format!(
@@ -655,9 +678,35 @@ impl Rewrite for ast::Ty {
             // FIXME: we drop any comments here, even though it's a silly place to put
             // comments.
             ast::TyKind::Paren(ref ty) => {
-                let budget = shape.width.checked_sub(2)?;
-                ty.rewrite(context, Shape::legacy(budget, shape.indent + 1))
-                    .map(|ty_str| format!("({})", ty_str))
+                if context.config.version() == Version::One
+                    || context.config.indent_style() == IndentStyle::Visual
+                {
+                    let budget = shape.width.checked_sub(2)?;
+                    return ty
+                        .rewrite(context, Shape::legacy(budget, shape.indent + 1))
+                        .map(|ty_str| format!("({})", ty_str));
+                }
+
+                // 2 = ()
+                if let Some(sh) = shape.sub_width(2) {
+                    if let Some(ref s) = ty.rewrite(context, sh) {
+                        if !s.contains('\n') {
+                            return Some(format!("({})", s));
+                        }
+                    }
+                }
+
+                let indent_str = shape.indent.to_string_with_newline(context.config);
+                let shape = shape
+                    .block_indent(context.config.tab_spaces())
+                    .with_max_width(context.config);
+                let rw = ty.rewrite(context, shape)?;
+                Some(format!(
+                    "({}{}{})",
+                    shape.to_string_with_newline(context.config),
+                    rw,
+                    indent_str
+                ))
             }
             ast::TyKind::Slice(ref ty) => {
                 let budget = shape.width.checked_sub(4)?;
@@ -693,7 +742,15 @@ impl Rewrite for ast::Ty {
             ast::TyKind::ImplicitSelf => Some(String::from("")),
             ast::TyKind::ImplTrait(_, ref it) => {
                 // Empty trait is not a parser error.
-                it.rewrite(context, shape).map(|it_str| {
+                if it.is_empty() {
+                    return Some("impl".to_owned());
+                }
+                let rw = if context.config.version() == Version::One {
+                    it.rewrite(context, shape)
+                } else {
+                    join_bounds(context, shape, it, false)
+                };
+                rw.map(|it_str| {
                     let space = if it_str.is_empty() { "" } else { " " };
                     format!("impl{}{}", space, it_str)
                 })
@@ -795,7 +852,9 @@ fn join_bounds(
     // We need to use multiple lines.
     let (type_strs, offset) = if need_indent {
         // Rewrite with additional indentation.
-        let nested_shape = shape.block_indent(context.config.tab_spaces());
+        let nested_shape = shape
+            .block_indent(context.config.tab_spaces())
+            .with_max_width(context.config);
         let type_strs = items
             .iter()
             .map(|item| item.rewrite(context, nested_shape))

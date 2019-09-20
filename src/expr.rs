@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::cmp::min;
 
 use itertools::Itertools;
-use syntax::parse::token::DelimToken;
+use syntax::parse::token::{DelimToken, LitKind};
 use syntax::source_map::{BytePos, SourceMap, Span};
 use syntax::{ast, ptr};
 
@@ -16,13 +16,12 @@ use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, IndentStyle, Version};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
-    struct_lit_tactic, write_list, ListFormatting, ListItem, Separator,
+    struct_lit_tactic, write_list, ListFormatting, Separator,
 };
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::matches::rewrite_match;
 use crate::overflow::{self, IntoOverflowableItem, OverflowableItem};
 use crate::pairs::{rewrite_all_pairs, rewrite_pair, PairParts};
-use crate::patterns::is_short_pattern;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
@@ -31,8 +30,8 @@ use crate::string::{rewrite_string, StringFormat};
 use crate::types::{rewrite_path, PathContext};
 use crate::utils::{
     colon_spaces, contains_skip, count_newlines, first_line_ends_with, inner_attributes,
-    last_line_extendable, last_line_width, mk_sp, outer_attributes, ptr_vec_to_ref_vec,
-    semicolon_for_expr, semicolon_for_stmt, wrap_str,
+    last_line_extendable, last_line_width, mk_sp, outer_attributes, semicolon_for_expr,
+    unicode_str_width, wrap_str,
 };
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
@@ -76,7 +75,17 @@ pub(crate) fn format_expr(
             choose_separator_tactic(context, expr.span),
             None,
         ),
-        ast::ExprKind::Lit(ref l) => rewrite_literal(context, l, shape),
+        ast::ExprKind::Lit(ref l) => {
+            if let Some(expr_rw) = rewrite_literal(context, l, shape) {
+                Some(expr_rw)
+            } else {
+                if let LitKind::StrRaw(_) = l.token.kind {
+                    Some(context.snippet(l.span).trim().into())
+                } else {
+                    None
+                }
+            }
+        }
         ast::ExprKind::Call(ref callee, ref args) => {
             let inner_span = mk_sp(callee.span.hi(), expr.span.hi());
             let callee_str = callee.rewrite(context, shape)?;
@@ -102,18 +111,18 @@ pub(crate) fn format_expr(
             path,
             fields,
             base.as_ref().map(|e| &**e),
+            &expr.attrs,
             expr.span,
             shape,
         ),
         ast::ExprKind::Tup(ref items) => {
             rewrite_tuple(context, items.iter(), expr.span, shape, items.len() == 1)
         }
+        ast::ExprKind::Let(..) => None,
         ast::ExprKind::If(..)
-        | ast::ExprKind::IfLet(..)
         | ast::ExprKind::ForLoop(..)
         | ast::ExprKind::Loop(..)
-        | ast::ExprKind::While(..)
-        | ast::ExprKind::WhileLet(..) => to_control_flow(expr, expr_type)
+        | ast::ExprKind::While(..) => to_control_flow(expr, expr_type)
             .and_then(|control_flow| control_flow.rewrite(context, shape)),
         ast::ExprKind::Block(ref block, opt_label) => {
             match expr_type {
@@ -182,9 +191,9 @@ pub(crate) fn format_expr(
                 Some("yield".to_string())
             }
         }
-        ast::ExprKind::Closure(capture, asyncness, movability, ref fn_decl, ref body, _) => {
+        ast::ExprKind::Closure(capture, ref is_async, movability, ref fn_decl, ref body, _) => {
             closures::rewrite_closure(
-                capture, asyncness, movability, fn_decl, body, expr.span, context, shape,
+                capture, is_async, movability, fn_decl, body, expr.span, context, shape,
             )
         }
         ast::ExprKind::Try(..) | ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(..) => {
@@ -334,10 +343,6 @@ pub(crate) fn format_expr(
                 ))
             }
         }
-        ast::ExprKind::ObsoleteInPlace(ref lhs, ref rhs) => lhs
-            .rewrite(context, shape)
-            .map(|s| s + " <-")
-            .and_then(|lhs| rewrite_assign_rhs(context, lhs, &**rhs, shape)),
         ast::ExprKind::Async(capture_by, _node_id, ref block) => {
             let mover = if capture_by == ast::CaptureBy::Value {
                 "move "
@@ -370,6 +375,7 @@ pub(crate) fn format_expr(
                 ))
             }
         }
+        ast::ExprKind::Await(_) => rewrite_chain(expr, context, shape),
         ast::ExprKind::Err => None,
     };
 
@@ -520,6 +526,11 @@ pub(crate) fn rewrite_block_with_visitor(
     let inner_attrs = attrs.map(inner_attributes);
     let label_str = rewrite_label(label);
     visitor.visit_block(block, inner_attrs.as_ref().map(|a| &**a), has_braces);
+    let visitor_context = visitor.get_context();
+    context
+        .skipped_range
+        .borrow_mut()
+        .append(&mut visitor_context.skipped_range.borrow_mut());
     Some(format!("{}{}{}", prefix, label_str, visitor.buffer))
 }
 
@@ -558,28 +569,6 @@ fn rewrite_block(
     result
 }
 
-impl Rewrite for ast::Stmt {
-    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        skip_out_of_file_lines_range!(context, self.span());
-
-        let result = match self.node {
-            ast::StmtKind::Local(ref local) => local.rewrite(context, shape),
-            ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
-                let suffix = if semicolon_for_stmt(context, self) {
-                    ";"
-                } else {
-                    ""
-                };
-
-                let shape = shape.sub_width(suffix.len())?;
-                format_expr(ex, ExprType::Statement, context, shape).map(|s| s + suffix)
-            }
-            ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
-        };
-        result.and_then(|res| recover_comment_removed(res, self.span(), context))
-    }
-}
-
 // Rewrite condition if the given expression has one.
 pub(crate) fn rewrite_cond(
     context: &RewriteContext<'_>,
@@ -612,7 +601,7 @@ struct ControlFlow<'a> {
     block: &'a ast::Block,
     else_block: Option<&'a ast::Expr>,
     label: Option<ast::Label>,
-    pats: Vec<&'a ast::Pat>,
+    pat: Option<&'a ast::Pat>,
     keyword: &'a str,
     matcher: &'a str,
     connector: &'a str,
@@ -622,21 +611,21 @@ struct ControlFlow<'a> {
     span: Span,
 }
 
+fn extract_pats_and_cond(expr: &ast::Expr) -> (Option<&ast::Pat>, &ast::Expr) {
+    match expr.node {
+        ast::ExprKind::Let(ref pat, ref cond) => (Some(pat), cond),
+        _ => (None, expr),
+    }
+}
+
+// FIXME: Refactor this.
 fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow<'_>> {
     match expr.node {
-        ast::ExprKind::If(ref cond, ref if_block, ref else_block) => Some(ControlFlow::new_if(
-            cond,
-            vec![],
-            if_block,
-            else_block.as_ref().map(|e| &**e),
-            expr_type == ExprType::SubExpression,
-            false,
-            expr.span,
-        )),
-        ast::ExprKind::IfLet(ref pat, ref cond, ref if_block, ref else_block) => {
+        ast::ExprKind::If(ref cond, ref if_block, ref else_block) => {
+            let (pat, cond) = extract_pats_and_cond(cond);
             Some(ControlFlow::new_if(
                 cond,
-                ptr_vec_to_ref_vec(pat),
+                pat,
                 if_block,
                 else_block.as_ref().map(|e| &**e),
                 expr_type == ExprType::SubExpression,
@@ -650,41 +639,35 @@ fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow<
         ast::ExprKind::Loop(ref block, label) => {
             Some(ControlFlow::new_loop(block, label, expr.span))
         }
-        ast::ExprKind::While(ref cond, ref block, label) => Some(ControlFlow::new_while(
-            vec![],
-            cond,
-            block,
-            label,
-            expr.span,
-        )),
-        ast::ExprKind::WhileLet(ref pat, ref cond, ref block, label) => Some(
-            ControlFlow::new_while(ptr_vec_to_ref_vec(pat), cond, block, label, expr.span),
-        ),
+        ast::ExprKind::While(ref cond, ref block, label) => {
+            let (pat, cond) = extract_pats_and_cond(cond);
+            Some(ControlFlow::new_while(pat, cond, block, label, expr.span))
+        }
         _ => None,
     }
 }
 
-fn choose_matcher(pats: &[&ast::Pat]) -> &'static str {
-    if pats.is_empty() { "" } else { "let" }
+fn choose_matcher(pat: Option<&ast::Pat>) -> &'static str {
+    pat.map_or("", |_| "let")
 }
 
 impl<'a> ControlFlow<'a> {
     fn new_if(
         cond: &'a ast::Expr,
-        pats: Vec<&'a ast::Pat>,
+        pat: Option<&'a ast::Pat>,
         block: &'a ast::Block,
         else_block: Option<&'a ast::Expr>,
         allow_single_line: bool,
         nested_if: bool,
         span: Span,
     ) -> ControlFlow<'a> {
-        let matcher = choose_matcher(&pats);
+        let matcher = choose_matcher(pat);
         ControlFlow {
             cond: Some(cond),
             block,
             else_block,
             label: None,
-            pats,
+            pat,
             keyword: "if",
             matcher,
             connector: " =",
@@ -700,7 +683,7 @@ impl<'a> ControlFlow<'a> {
             block,
             else_block: None,
             label,
-            pats: vec![],
+            pat: None,
             keyword: "loop",
             matcher: "",
             connector: "",
@@ -711,19 +694,19 @@ impl<'a> ControlFlow<'a> {
     }
 
     fn new_while(
-        pats: Vec<&'a ast::Pat>,
+        pat: Option<&'a ast::Pat>,
         cond: &'a ast::Expr,
         block: &'a ast::Block,
         label: Option<ast::Label>,
         span: Span,
     ) -> ControlFlow<'a> {
-        let matcher = choose_matcher(&pats);
+        let matcher = choose_matcher(pat);
         ControlFlow {
             cond: Some(cond),
             block,
             else_block: None,
             label,
-            pats,
+            pat,
             keyword: "while",
             matcher,
             connector: " =",
@@ -745,7 +728,7 @@ impl<'a> ControlFlow<'a> {
             block,
             else_block: None,
             label,
-            pats: vec![pat],
+            pat: Some(pat),
             keyword: "for",
             matcher: "",
             connector: " in",
@@ -821,10 +804,10 @@ impl<'a> ControlFlow<'a> {
         shape: Shape,
         offset: usize,
     ) -> Option<String> {
-        debug!("rewrite_pat_expr {:?} {:?} {:?}", shape, self.pats, expr);
+        debug!("rewrite_pat_expr {:?} {:?} {:?}", shape, self.pat, expr);
 
         let cond_shape = shape.offset_left(offset)?;
-        if !self.pats.is_empty() {
+        if !self.pat.is_none() {
             let matcher = if self.matcher.is_empty() {
                 self.matcher.to_owned()
             } else {
@@ -833,7 +816,11 @@ impl<'a> ControlFlow<'a> {
             let pat_shape = cond_shape
                 .offset_left(matcher.len())?
                 .sub_width(self.connector.len())?;
-            let pat_string = rewrite_multiple_patterns(context, &self.pats, pat_shape)?;
+            let pat_string = if let Some(pat) = self.pat {
+                pat.rewrite(context, pat_shape)?
+            } else {
+                "".to_owned()
+            };
             let result = format!("{}{}{}", matcher, pat_string, self.connector);
             return rewrite_assign_rhs(context, result, expr, cond_shape);
         }
@@ -937,10 +924,10 @@ impl<'a> ControlFlow<'a> {
             context
                 .snippet_provider
                 .span_after(mk_sp(lo, self.span.hi()), self.keyword.trim()),
-            if self.pats.is_empty() {
+            if self.pat.is_none() {
                 cond_span.lo()
             } else if self.matcher.is_empty() {
-                self.pats[0].span.lo()
+                self.pat.unwrap().span.lo()
             } else {
                 context
                     .snippet_provider
@@ -1032,22 +1019,11 @@ impl<'a> Rewrite for ControlFlow<'a> {
                 // from being formatted on a single line.
                 // Note how we're passing the original shape, as the
                 // cost of "else" should not cascade.
-                ast::ExprKind::IfLet(ref pat, ref cond, ref if_block, ref next_else_block) => {
-                    ControlFlow::new_if(
-                        cond,
-                        ptr_vec_to_ref_vec(pat),
-                        if_block,
-                        next_else_block.as_ref().map(|e| &**e),
-                        false,
-                        true,
-                        mk_sp(else_block.span.lo(), self.span.hi()),
-                    )
-                    .rewrite(context, shape)
-                }
                 ast::ExprKind::If(ref cond, ref if_block, ref next_else_block) => {
+                    let (pats, cond) = extract_pats_and_cond(cond);
                     ControlFlow::new_if(
                         cond,
-                        vec![],
+                        pats,
                         if_block,
                         next_else_block.as_ref().map(|e| &**e),
                         false,
@@ -1179,55 +1155,12 @@ pub(crate) fn stmt_is_expr(stmt: &ast::Stmt) -> bool {
     }
 }
 
-pub(crate) fn stmt_is_if(stmt: &ast::Stmt) -> bool {
-    match stmt.node {
-        ast::StmtKind::Expr(ref e) => match e.node {
-            ast::ExprKind::If(..) => true,
-            _ => false,
-        },
-        _ => false,
-    }
-}
-
 pub(crate) fn is_unsafe_block(block: &ast::Block) -> bool {
     if let ast::BlockCheckMode::Unsafe(..) = block.rules {
         true
     } else {
         false
     }
-}
-
-pub(crate) fn rewrite_multiple_patterns(
-    context: &RewriteContext<'_>,
-    pats: &[&ast::Pat],
-    shape: Shape,
-) -> Option<String> {
-    let pat_strs = pats
-        .iter()
-        .map(|p| p.rewrite(context, shape))
-        .collect::<Option<Vec<_>>>()?;
-
-    let use_mixed_layout = pats
-        .iter()
-        .zip(pat_strs.iter())
-        .all(|(pat, pat_str)| is_short_pattern(pat, pat_str));
-    let items: Vec<_> = pat_strs.into_iter().map(ListItem::from_str).collect();
-    let tactic = if use_mixed_layout {
-        DefinitiveListTactic::Mixed
-    } else {
-        definitive_tactic(
-            &items,
-            ListTactic::HorizontalVertical,
-            Separator::VerticalBar,
-            shape.width,
-        )
-    };
-    let fmt = ListFormatting::new(shape, context.config)
-        .tactic(tactic)
-        .separator(" |")
-        .separator_place(context.config.binop_separator())
-        .ends_with_newline(false);
-    write_list(&items, &fmt)
 }
 
 pub(crate) fn rewrite_literal(
@@ -1354,11 +1287,9 @@ pub(crate) fn can_be_overflowed_expr(
                 || context.config.overflow_delimited_expr()
         }
         ast::ExprKind::If(..)
-        | ast::ExprKind::IfLet(..)
         | ast::ExprKind::ForLoop(..)
         | ast::ExprKind::Loop(..)
-        | ast::ExprKind::While(..)
-        | ast::ExprKind::WhileLet(..) => {
+        | ast::ExprKind::While(..) => {
             context.config.combine_control_expr() && context.use_block_indent() && args_len == 1
         }
 
@@ -1370,8 +1301,8 @@ pub(crate) fn can_be_overflowed_expr(
             context.config.overflow_delimited_expr()
                 || (context.use_block_indent() && args_len == 1)
         }
-        ast::ExprKind::Mac(ref macro_) => {
-            match (macro_.node.delim, context.config.overflow_delimited_expr()) {
+        ast::ExprKind::Mac(ref mac) => {
+            match (mac.delim, context.config.overflow_delimited_expr()) {
                 (ast::MacDelimiter::Bracket, true) | (ast::MacDelimiter::Brace, true) => true,
                 _ => context.use_block_indent() && args_len == 1,
             }
@@ -1570,6 +1501,7 @@ fn rewrite_struct_lit<'a>(
     path: &ast::Path,
     fields: &'a [ast::Field],
     base: Option<&'a ast::Expr>,
+    attrs: &[ast::Attribute],
     span: Span,
     shape: Shape,
 ) -> Option<String> {
@@ -1664,7 +1596,8 @@ fn rewrite_struct_lit<'a>(
         write_list(&item_vec, &fmt)?
     };
 
-    let fields_str = wrap_struct_field(context, &fields_str, shape, v_shape, one_line_width);
+    let fields_str =
+        wrap_struct_field(context, &attrs, &fields_str, shape, v_shape, one_line_width)?;
     Some(format!("{} {{{}}}", path_str, fields_str))
 
     // FIXME if context.config.indent_style() == Visual, but we run out
@@ -1673,25 +1606,39 @@ fn rewrite_struct_lit<'a>(
 
 pub(crate) fn wrap_struct_field(
     context: &RewriteContext<'_>,
+    attrs: &[ast::Attribute],
     fields_str: &str,
     shape: Shape,
     nested_shape: Shape,
     one_line_width: usize,
-) -> String {
-    if context.config.indent_style() == IndentStyle::Block
+) -> Option<String> {
+    let should_vertical = context.config.indent_style() == IndentStyle::Block
         && (fields_str.contains('\n')
             || !context.config.struct_lit_single_line()
-            || fields_str.len() > one_line_width)
-    {
-        format!(
-            "{}{}{}",
+            || fields_str.len() > one_line_width);
+
+    let inner_attrs = &inner_attributes(attrs);
+    if inner_attrs.is_empty() {
+        if should_vertical {
+            Some(format!(
+                "{}{}{}",
+                nested_shape.indent.to_string_with_newline(context.config),
+                fields_str,
+                shape.indent.to_string_with_newline(context.config)
+            ))
+        } else {
+            // One liner or visual indent.
+            Some(format!(" {} ", fields_str))
+        }
+    } else {
+        Some(format!(
+            "{}{}{}{}{}",
+            nested_shape.indent.to_string_with_newline(context.config),
+            inner_attrs.rewrite(context, shape)?,
             nested_shape.indent.to_string_with_newline(context.config),
             fields_str,
             shape.indent.to_string_with_newline(context.config)
-        )
-    } else {
-        // One liner or visual indent.
-        format!(" {} ", fields_str)
+        ))
     }
 }
 
@@ -1947,7 +1894,9 @@ fn choose_rhs<R: Rewrite>(
     rhs_tactics: RhsTactics,
 ) -> Option<String> {
     match orig_rhs {
-        Some(ref new_str) if !new_str.contains('\n') && new_str.len() <= shape.width => {
+        Some(ref new_str)
+            if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
+        {
             Some(format!(" {}", new_str))
         }
         _ => {
@@ -2000,6 +1949,15 @@ fn shape_from_rhs_tactic(
     }
 }
 
+/// Returns true if formatting next_line_rhs is better on a new line when compared to the
+/// original's line formatting.
+///
+/// It is considered better if:
+/// 1. the tactic is ForceNextLineWithoutIndent
+/// 2. next_line_rhs doesn't have newlines
+/// 3. the original line has more newlines than next_line_rhs
+/// 4. the original formatting of the first line ends with `(`, `{`, or `[` and next_line_rhs
+///    doesn't
 pub(crate) fn prefer_next_line(
     orig_rhs: &str,
     next_line_rhs: &str,

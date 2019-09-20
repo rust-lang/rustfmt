@@ -126,8 +126,7 @@ fn issue339() {
         // collapsing here exceeds line length
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffg => {
         }
-        h => {
-            // comment above block
+        h => { // comment above block
         }
         i => {} // comment below block
         j => {
@@ -148,8 +147,7 @@ fn issue339() {
         m => {}
         n => {}
         o => {}
-        p => {
-            // Don't collapse me
+        p => { // Don't collapse me
         }
         q => {}
         r => {}
@@ -573,6 +571,35 @@ fn issue_3005() {
             return NoCalcLength::parse_dimension(context, value, unit)
                 .map(LengthOrPercentage::Length)
                 .map_err(|()| location.new_unexpected_token_error(token.clone()));
+        }
+    }
+}
+
+// #3774
+fn issue_3774() {
+    {
+        {
+            {
+                match foo {
+                    Lam(_, _, _) | Pi(_, _, _) | Let(_, _, _, _) | Embed(_) | Var(_) => unreachab(),
+                    Lam(_, _, _) | Pi(_, _, _) | Let(_, _, _, _) | Embed(_) | Var(_) => unreacha!(),
+                    Lam(_, _, _) | Pi(_, _, _) | Let(_, _, _, _) | Embed(_) | Var(_) => {
+                        unreachabl()
+                    }
+                    Lam(_, _, _) | Pi(_, _, _) | Let(_, _, _, _) | Embed(_) | Var(_) => {
+                        unreachae!()
+                    }
+                    Lam(_, _, _) | Pi(_, _, _) | Let(_, _, _, _) | Embed(_) | Var(_) => {
+                        unreachable()
+                    }
+                    Lam(_, _, _) | Pi(_, _, _) | Let(_, _, _, _) | Embed(_) | Var(_) => {
+                        unreachable!()
+                    }
+                    Lam(_, _, _) | Pi(_, _, _) | Let(_, _, _, _) | Embed(_) | Var(_) => {
+                        rrunreachable!()
+                    }
+                }
+            }
         }
     }
 }

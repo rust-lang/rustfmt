@@ -179,6 +179,16 @@ macro_rules! create_config {
             }
 
             #[allow(unreachable_pub)]
+            pub fn is_valid_key_val(key: &str, val: &str) -> bool {
+                match key {
+                    $(
+                        stringify!($i) => val.parse::<$ty>().is_ok(),
+                    )+
+                        _ => false,
+                }
+            }
+
+            #[allow(unreachable_pub)]
             pub fn used_options(&self) -> PartialConfig {
                 PartialConfig {
                     $(
@@ -249,11 +259,15 @@ macro_rules! create_config {
                             }
                             name_out.push_str(name_raw);
                             name_out.push(' ');
+                            let mut default_str = format!("{}", $def);
+                            if default_str.is_empty() {
+                                default_str = String::from("\"\"");
+                            }
                             writeln!(out,
-                                    "{}{} Default: {:?}{}",
+                                    "{}{} Default: {}{}",
                                     name_out,
                                     <$ty>::doc_hint(),
-                                    $def,
+                                    default_str,
                                     if !$stb { " (unstable)" } else { "" }).unwrap();
                             $(
                                 writeln!(out, "{}{}", space_str, $dstring).unwrap();
