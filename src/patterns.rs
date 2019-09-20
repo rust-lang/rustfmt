@@ -1,13 +1,13 @@
 use syntax::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax};
 use syntax::ptr;
-use syntax::source_map::{self, BytePos, Span};
+use syntax::source_map::{BytePos, Span};
 
-use crate::comment::FindUncommented;
+use crate::comment::{combine_strs_with_missing_comments, FindUncommented};
 use crate::config::lists::*;
 use crate::expr::{can_be_overflowed_expr, rewrite_unary_prefix, wrap_struct_field};
 use crate::lists::{
-    itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape, struct_lit_tactic,
-    write_list,
+    definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
+    struct_lit_tactic, write_list, ListFormatting, ListItem, Separator,
 };
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::overflow;
@@ -51,12 +51,41 @@ fn is_short_pattern_inner(pat: &ast::Pat) -> bool {
         ast::PatKind::Box(ref p) | ast::PatKind::Ref(ref p, _) | ast::PatKind::Paren(ref p) => {
             is_short_pattern_inner(&*p)
         }
+        PatKind::Or(ref pats) => pats.iter().all(|p| is_short_pattern_inner(p)),
     }
 }
 
 impl Rewrite for Pat {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match self.node {
+            PatKind::Or(ref pats) => {
+                let pat_strs = pats
+                    .iter()
+                    .map(|p| p.rewrite(context, shape))
+                    .collect::<Option<Vec<_>>>()?;
+
+                let use_mixed_layout = pats
+                    .iter()
+                    .zip(pat_strs.iter())
+                    .all(|(pat, pat_str)| is_short_pattern(pat, pat_str));
+                let items: Vec<_> = pat_strs.into_iter().map(ListItem::from_str).collect();
+                let tactic = if use_mixed_layout {
+                    DefinitiveListTactic::Mixed
+                } else {
+                    definitive_tactic(
+                        &items,
+                        ListTactic::HorizontalVertical,
+                        Separator::VerticalBar,
+                        shape.width,
+                    )
+                };
+                let fmt = ListFormatting::new(shape, context.config)
+                    .tactic(tactic)
+                    .separator(" |")
+                    .separator_place(context.config.binop_separator())
+                    .ends_with_newline(false);
+                write_list(&items, &fmt)
+            }
             PatKind::Box(ref pat) => rewrite_unary_prefix(context, "box ", &**pat, shape),
             PatKind::Ident(binding_mode, ident, ref sub_pat) => {
                 let (prefix, mutability) = match binding_mode {
@@ -133,7 +162,7 @@ impl Rewrite for Pat {
                     .iter()
                     .map(|p| {
                         if let Some(rw) = p.rewrite(context, shape) {
-                            format!("{}", if rw == "_" { "" } else { &rw })
+                            rw
                         } else {
                             format!("{}", context.snippet(p.span))
                         }
@@ -154,7 +183,7 @@ impl Rewrite for Pat {
 
 fn rewrite_struct_pat(
     path: &ast::Path,
-    fields: &[source_map::Spanned<ast::FieldPat>],
+    fields: &[ast::FieldPat],
     ellipsis: bool,
     span: Span,
     context: &RewriteContext<'_>,
@@ -179,9 +208,15 @@ fn rewrite_struct_pat(
         fields.iter(),
         terminator,
         ",",
-        |f| f.span.lo(),
+        |f| {
+            if f.attrs.is_empty() {
+                f.span.lo()
+            } else {
+                f.attrs.first().unwrap().span.lo()
+            }
+        },
         |f| f.span.hi(),
-        |f| f.node.rewrite(context, v_shape),
+        |f| f.rewrite(context, v_shape),
         context.snippet_provider.span_after(span, "{"),
         span.hi(),
         false,
@@ -225,25 +260,50 @@ fn rewrite_struct_pat(
 
 impl Rewrite for FieldPat {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        let pat = self.pat.rewrite(context, shape);
-        if self.is_shorthand {
-            pat
+        let hi_pos = if let Some(last) = self.attrs.last() {
+            last.span.hi()
         } else {
-            let pat_str = pat?;
+            self.pat.span.lo()
+        };
+
+        let attrs_str = if self.attrs.is_empty() {
+            String::from("")
+        } else {
+            self.attrs.rewrite(context, shape)?
+        };
+
+        let pat_str = self.pat.rewrite(context, shape)?;
+        if self.is_shorthand {
+            combine_strs_with_missing_comments(
+                context,
+                &attrs_str,
+                &pat_str,
+                mk_sp(hi_pos, self.pat.span.lo()),
+                shape,
+                false,
+            )
+        } else {
+            let nested_shape = shape.block_indent(context.config.tab_spaces());
             let id_str = rewrite_ident(context, self.ident);
             let one_line_width = id_str.len() + 2 + pat_str.len();
-            if one_line_width <= shape.width {
-                Some(format!("{}: {}", id_str, pat_str))
+            let pat_and_id_str = if one_line_width <= shape.width {
+                format!("{}: {}", id_str, pat_str)
             } else {
-                let nested_shape = shape.block_indent(context.config.tab_spaces());
-                let pat_str = self.pat.rewrite(context, nested_shape)?;
-                Some(format!(
+                format!(
                     "{}:\n{}{}",
                     id_str,
                     nested_shape.indent.to_string(context.config),
-                    pat_str,
-                ))
-            }
+                    self.pat.rewrite(context, nested_shape)?
+                )
+            };
+            combine_strs_with_missing_comments(
+                context,
+                &attrs_str,
+                &pat_and_id_str,
+                mk_sp(hi_pos, self.pat.span.lo()),
+                nested_shape,
+                false,
+            )
         }
     }
 }
@@ -268,6 +328,18 @@ impl<'a> Spanned for TuplePatField<'a> {
         match *self {
             TuplePatField::Pat(p) => p.span(),
             TuplePatField::Dotdot(span) => span,
+        }
+    }
+}
+
+impl<'a> TuplePatField<'a> {
+    fn is_dotdot(&self) -> bool {
+        match self {
+            TuplePatField::Pat(pat) => match pat.node {
+                ast::PatKind::Rest => true,
+                _ => false,
+            },
+            TuplePatField::Dotdot(_) => true,
         }
     }
 }
@@ -321,7 +393,10 @@ fn rewrite_tuple_pat(
         (&pat_vec[..], span)
     };
 
+    let is_last_pat_dotdot = pat_vec.last().map_or(false, |p| p.is_dotdot());
+    let add_comma = path_str.is_none() && pat_vec.len() == 1 && !is_last_pat_dotdot;
     let path_str = path_str.unwrap_or_default();
+
     overflow::rewrite_with_parens(
         &context,
         &path_str,
@@ -329,7 +404,11 @@ fn rewrite_tuple_pat(
         shape,
         span,
         context.config.max_width(),
-        None,
+        if add_comma {
+            Some(SeparatorTactic::Always)
+        } else {
+            None
+        },
     )
 }
 

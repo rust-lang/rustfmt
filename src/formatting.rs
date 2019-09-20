@@ -188,7 +188,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         format_lines(
             &mut visitor.buffer,
             &path,
-            &visitor.skipped_range,
+            &visitor.skipped_range.borrow(),
             &self.config,
             &self.report,
         );
@@ -203,7 +203,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             self.report.add_macro_format_failure();
         }
         self.report
-            .add_non_formatted_ranges(visitor.skipped_range.clone());
+            .add_non_formatted_ranges(visitor.skipped_range.borrow().clone());
 
         self.handler.handle_formatted_file(
             self.parse_session.source_map(),
@@ -235,7 +235,8 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
         report: &mut FormatReport,
     ) -> Result<(), ErrorKind> {
         if let Some(ref mut out) = self.out {
-            match source_file::write_file(Some(source_map), &path, &result, out, &*self.emitter) {
+            match source_file::write_file(Some(source_map), &path, &result, out, &mut *self.emitter)
+            {
                 Ok(ref result) if result.has_diff => report.add_diff(),
                 Err(e) => {
                     // Create a new error with path_str to help users see which files failed

@@ -10,7 +10,7 @@ use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, IndentStyle, Version};
 use crate::expr::{
     format_expr, is_empty_block, is_simple_block, is_unsafe_block, prefer_next_line, rewrite_cond,
-    rewrite_multiple_patterns, ExprType, RhsTactics,
+    ExprType, RhsTactics,
 };
 use crate::lists::{itemize_list, write_list, ListFormatting};
 use crate::rewrite::{Rewrite, RewriteContext};
@@ -19,7 +19,7 @@ use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
     contains_skip, extra_offset, first_line_width, inner_attributes, last_line_extendable, mk_sp,
-    ptr_vec_to_ref_vec, semicolon_for_expr, trimmed_last_line_width,
+    semicolon_for_expr, trimmed_last_line_width, unicode_str_width,
 };
 
 /// A simple wrapper type against `ast::Arm`. Used inside `write_list()`.
@@ -161,7 +161,7 @@ fn collect_beginning_verts(
     let mut beginning_verts = Vec::with_capacity(arms.len());
     let mut lo = context.snippet_provider.span_after(span, "{");
     for arm in arms {
-        let hi = arm.pats[0].span.lo();
+        let hi = arm.pat.span.lo();
         let missing_span = mk_sp(lo, hi);
         beginning_verts.push(context.snippet_provider.opt_span_before(missing_span, "|"));
         lo = arm.span().hi();
@@ -225,10 +225,7 @@ fn rewrite_match_arm(
                 arm_comma(context.config, body, is_last),
             ));
         }
-        let missing_span = mk_sp(
-            arm.attrs[arm.attrs.len() - 1].span.hi(),
-            arm.pats[0].span.lo(),
-        );
+        let missing_span = mk_sp(arm.attrs[arm.attrs.len() - 1].span.hi(), arm.pat.span.lo());
         (missing_span, arm.attrs.rewrite(context, shape)?)
     } else {
         (mk_sp(arm.span().lo(), arm.span().lo()), String::new())
@@ -237,7 +234,7 @@ fn rewrite_match_arm(
     // Patterns
     // 5 = ` => {`
     let pat_shape = shape.sub_width(5)?;
-    let pats_str = rewrite_multiple_patterns(context, &ptr_vec_to_ref_vec(&arm.pats), pat_shape)?;
+    let pats_str = arm.pat.rewrite(context, pat_shape)?;
 
     // Guard
     let block_like_pat = trimmed_last_line_width(&pats_str) <= context.config.tab_spaces();
@@ -259,7 +256,7 @@ fn rewrite_match_arm(
         false,
     )?;
 
-    let arrow_span = mk_sp(arm.pats.last().unwrap().span.hi(), arm.body.span().lo());
+    let arrow_span = mk_sp(arm.pat.span.hi(), arm.body.span().lo());
     rewrite_match_body(
         context,
         &arm.body,
@@ -278,6 +275,7 @@ fn block_can_be_flattened<'a>(
     match expr.node {
         ast::ExprKind::Block(ref block, _)
             if !is_unsafe_block(block)
+                && !context.inside_macro()
                 && is_simple_block(block, Some(&expr.attrs), context.source_map) =>
         {
             Some(&*block)
@@ -394,25 +392,26 @@ fn rewrite_match_body(
         }
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
-        let (body_prefix, body_suffix) = if context.config.match_arm_blocks() {
-            let comma = if context.config.match_block_trailing_comma() {
-                ","
-            } else {
-                ""
-            };
-            let semicolon = if context.config.version() == Version::One {
-                ""
-            } else {
-                if semicolon_for_expr(context, body) {
-                    ";"
+        let (body_prefix, body_suffix) =
+            if context.config.match_arm_blocks() && !context.inside_macro() {
+                let comma = if context.config.match_block_trailing_comma() {
+                    ","
                 } else {
                     ""
-                }
+                };
+                let semicolon = if context.config.version() == Version::One {
+                    ""
+                } else {
+                    if semicolon_for_expr(context, body) {
+                        ";"
+                    } else {
+                        ""
+                    }
+                };
+                ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
+            } else {
+                ("", String::from(","))
             };
-            ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
-        } else {
-            ("", String::from(","))
-        };
 
         let block_sep = match context.config.control_brace_style() {
             ControlBraceStyle::AlwaysNextLine => format!("{}{}", alt_block_sep, body_prefix),
@@ -450,7 +449,9 @@ fn rewrite_match_body(
 
         match rewrite {
             Some(ref body_str)
-                if is_block || (!body_str.contains('\n') && body_str.len() <= body_shape.width) =>
+                if is_block
+                    || (!body_str.contains('\n')
+                        && unicode_str_width(body_str) <= body_shape.width) =>
             {
                 return combine_orig_body(body_str);
             }
@@ -468,9 +469,6 @@ fn rewrite_match_body(
         next_line_body_shape.width,
     );
     match (orig_body, next_line_body) {
-        (Some(ref orig_str), Some(ref next_line_str)) if orig_str == next_line_str => {
-            combine_orig_body(orig_str)
-        }
         (Some(ref orig_str), Some(ref next_line_str))
             if prefer_next_line(orig_str, next_line_str, RhsTactics::Default) =>
         {
@@ -571,6 +569,7 @@ fn can_flatten_block_around_this(body: &ast::Expr) -> bool {
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Try(ref expr)
         | ast::ExprKind::Unary(_, ref expr)
+        | ast::ExprKind::Index(ref expr, _)
         | ast::ExprKind::Cast(ref expr, _) => can_flatten_block_around_this(expr),
         _ => false,
     }

@@ -1,4 +1,5 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 use syntax::parse::ParseSess;
 use syntax::source_map::{self, BytePos, Pos, SourceMap, Span};
@@ -10,8 +11,8 @@ use crate::config::{BraceStyle, Config};
 use crate::coverage::transform_missing_snippet;
 use crate::items::{
     format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
-    rewrite_associated_impl_type, rewrite_associated_type, rewrite_existential_impl_type,
-    rewrite_existential_type, rewrite_extern_crate, rewrite_type_alias, FnBraceStyle, FnSig,
+    rewrite_associated_impl_type, rewrite_associated_type, rewrite_extern_crate,
+    rewrite_opaque_impl_type, rewrite_opaque_type, rewrite_type_alias, FnBraceStyle, FnSig,
     StaticParts, StructParts,
 };
 use crate::macros::{rewrite_macro, rewrite_macro_def, MacroPosition};
@@ -65,7 +66,7 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) line_number: usize,
     /// List of 1-based line ranges which were annotated with skip
     /// Both bounds are inclusifs.
-    pub(crate) skipped_range: Vec<(usize, usize)>,
+    pub(crate) skipped_range: Rc<RefCell<Vec<(usize, usize)>>>,
     pub(crate) macro_rewrite_failure: bool,
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
@@ -96,10 +97,19 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
     fn visit_stmt(&mut self, stmt: &Stmt<'_>) {
         debug!(
-            "visit_stmt: {:?} {:?}",
+            "visit_stmt: {:?} {:?} `{}`",
             self.source_map.lookup_char_pos(stmt.span().lo()),
-            self.source_map.lookup_char_pos(stmt.span().hi())
+            self.source_map.lookup_char_pos(stmt.span().hi()),
+            self.snippet(stmt.span()),
         );
+
+        // https://github.com/rust-lang/rust/issues/63679.
+        let is_all_semicolons =
+            |snippet: &str| snippet.chars().all(|c| c.is_whitespace() || c == ';');
+        if is_all_semicolons(&self.snippet(stmt.span())) {
+            self.last_pos = stmt.span().hi();
+            return;
+        }
 
         match stmt.as_ast_node().node {
             ast::StmtKind::Item(ref item) => {
@@ -467,7 +477,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         Some(&inner_attrs),
                     )
                 }
-                ast::ItemKind::Ty(ref ty, ref generics) => {
+                ast::ItemKind::TyAlias(ref ty, ref generics) => {
                     let rewrite = rewrite_type_alias(
                         &self.get_context(),
                         self.block_indent,
@@ -478,8 +488,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     );
                     self.push_rewrite(item.span, rewrite);
                 }
-                ast::ItemKind::Existential(ref generic_bounds, ref generics) => {
-                    let rewrite = rewrite_existential_type(
+                ast::ItemKind::OpaqueTy(ref generic_bounds, ref generics) => {
+                    let rewrite = rewrite_opaque_type(
                         &self.get_context(),
                         self.block_indent,
                         item.ident,
@@ -575,7 +585,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 );
             }
             ast::ImplItemKind::Const(..) => self.visit_static(&StaticParts::from_impl_item(ii)),
-            ast::ImplItemKind::Type(ref ty) => {
+            ast::ImplItemKind::TyAlias(ref ty) => {
                 let rewrite = rewrite_associated_impl_type(
                     ii.ident,
                     ii.defaultness,
@@ -586,8 +596,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 );
                 self.push_rewrite(ii.span, rewrite);
             }
-            ast::ImplItemKind::Existential(ref generic_bounds) => {
-                let rewrite = rewrite_existential_impl_type(
+            ast::ImplItemKind::OpaqueTy(ref generic_bounds) => {
+                let rewrite = rewrite_opaque_impl_type(
                     &self.get_context(),
                     ii.ident,
                     &ii.generics,
@@ -622,7 +632,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             self.push_str(s);
         } else {
             let snippet = self.snippet(span);
-            self.push_str(snippet);
+            self.push_str(snippet.trim());
         }
         self.last_pos = source!(self, span).hi();
     }
@@ -652,7 +662,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let lo = std::cmp::min(attrs_end + 1, first_line);
         self.push_rewrite_inner(item_span, None);
         let hi = self.line_number + 1;
-        self.skipped_range.push((lo, hi));
+        self.skipped_range.borrow_mut().push((lo, hi));
     }
 
     pub(crate) fn from_context(ctx: &'a RewriteContext<'_>) -> FmtVisitor<'a> {
@@ -684,7 +694,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             is_if_else_block: false,
             snippet_provider,
             line_number: 0,
-            skipped_range: vec![],
+            skipped_range: Rc::new(RefCell::new(vec![])),
             macro_rewrite_failure: false,
             report,
             skip_context: Default::default(),
@@ -852,15 +862,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     where
         F: Fn(&RewriteContext<'_>) -> Option<String>,
     {
-        // FIXME borrow checker fighting - can be simplified a lot with NLL.
-        let (result, mrf) = {
-            let context = self.get_context();
-            let result = f(&context);
-            let mrf = &context.macro_rewrite_failure.borrow();
-            (result, *std::ops::Deref::deref(mrf))
-        };
+        let context = self.get_context();
+        let result = f(&context);
 
-        self.macro_rewrite_failure |= mrf;
+        self.macro_rewrite_failure |= context.macro_rewrite_failure.get();
         result
     }
 
@@ -869,14 +874,15 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             parse_session: self.parse_session,
             source_map: self.source_map,
             config: self.config,
-            inside_macro: RefCell::new(false),
-            use_block: RefCell::new(false),
-            is_if_else_block: RefCell::new(false),
-            force_one_line_chain: RefCell::new(false),
+            inside_macro: Rc::new(Cell::new(false)),
+            use_block: Cell::new(false),
+            is_if_else_block: Cell::new(false),
+            force_one_line_chain: Cell::new(false),
             snippet_provider: self.snippet_provider,
-            macro_rewrite_failure: RefCell::new(false),
+            macro_rewrite_failure: Cell::new(false),
             report: self.report.clone(),
             skip_context: self.skip_context.clone(),
+            skipped_range: self.skipped_range.clone(),
         }
     }
 }

@@ -1,14 +1,12 @@
 use std::borrow::Cow;
 
-use bytecount;
-
 use rustc_target::spec::abi;
 use syntax::ast::{
     self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
     VisibilityKind,
 };
 use syntax::ptr;
-use syntax::source_map::{BytePos, Span, NO_EXPANSION};
+use syntax::source_map::{BytePos, Span, SyntaxContext};
 use syntax::symbol::{sym, Symbol};
 use syntax_pos::ExpnId;
 use unicode_width::UnicodeWidthStr;
@@ -335,7 +333,7 @@ macro_rules! source {
 }
 
 pub(crate) fn mk_sp(lo: BytePos, hi: BytePos) -> Span {
-    Span::new(lo, hi, NO_EXPANSION)
+    Span::new(lo, hi, SyntaxContext::root())
 }
 
 // Returns `true` if the given span does not intersect with file lines.
@@ -454,8 +452,10 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::While(..)
         | ast::ExprKind::If(..)
         | ast::ExprKind::Block(..)
+        | ast::ExprKind::Async(..)
         | ast::ExprKind::Loop(..)
         | ast::ExprKind::ForLoop(..)
+        | ast::ExprKind::TryBlock(..)
         | ast::ExprKind::Match(..) => repr.contains('\n'),
         ast::ExprKind::Paren(ref expr)
         | ast::ExprKind::Binary(_, _, ref expr)
@@ -468,7 +468,25 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         ast::ExprKind::Lit(_) => {
             repr.contains('\n') && trimmed_last_line_width(repr) <= context.config.tab_spaces()
         }
-        _ => false,
+        ast::ExprKind::AddrOf(..)
+        | ast::ExprKind::Assign(..)
+        | ast::ExprKind::AssignOp(..)
+        | ast::ExprKind::Await(..)
+        | ast::ExprKind::Box(..)
+        | ast::ExprKind::Break(..)
+        | ast::ExprKind::Cast(..)
+        | ast::ExprKind::Continue(..)
+        | ast::ExprKind::Err
+        | ast::ExprKind::Field(..)
+        | ast::ExprKind::InlineAsm(..)
+        | ast::ExprKind::Let(..)
+        | ast::ExprKind::Path(..)
+        | ast::ExprKind::Range(..)
+        | ast::ExprKind::Repeat(..)
+        | ast::ExprKind::Ret(..)
+        | ast::ExprKind::Tup(..)
+        | ast::ExprKind::Type(..)
+        | ast::ExprKind::Yield(None) => false,
     }
 }
 

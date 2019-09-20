@@ -166,21 +166,14 @@ pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
         }
 
         for flattened in use_tree.flatten() {
-            merge_use_trees_inner(&mut result, flattened);
+            if let Some(tree) = result.iter_mut().find(|tree| tree.share_prefix(&flattened)) {
+                tree.merge(&flattened);
+            } else {
+                result.push(flattened);
+            }
         }
     }
     result
-}
-
-fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
-    for tree in trees.iter_mut() {
-        if tree.share_prefix(&use_tree) {
-            tree.merge(&use_tree);
-            return;
-        }
-    }
-
-    trees.push(use_tree);
 }
 
 impl fmt::Debug for UseTree {
@@ -573,56 +566,72 @@ impl UseTree {
     }
 
     fn merge(&mut self, other: &UseTree) {
-        let mut new_path = vec![];
-        for (a, b) in self
-            .path
-            .clone()
-            .iter_mut()
-            .zip(other.path.clone().into_iter())
-        {
-            if *a == b {
-                new_path.push(b);
+        let mut prefix = 0;
+        for (a, b) in self.path.iter().zip(other.path.iter()) {
+            if *a == *b {
+                prefix += 1;
             } else {
                 break;
             }
         }
-        if let Some(merged) = merge_rest(&self.path, &other.path, new_path.len()) {
-            new_path.push(merged);
+        if let Some(new_path) = merge_rest(&self.path, &other.path, prefix) {
+            self.path = new_path;
             self.span = self.span.to(other.span);
         }
-        self.path = new_path;
     }
 }
 
-fn merge_rest(a: &[UseSegment], b: &[UseSegment], len: usize) -> Option<UseSegment> {
-    let a_rest = &a[len..];
-    let b_rest = &b[len..];
-    if a_rest.is_empty() && b_rest.is_empty() {
+fn merge_rest(a: &[UseSegment], b: &[UseSegment], mut len: usize) -> Option<Vec<UseSegment>> {
+    if a.len() == len && b.len() == len {
         return None;
     }
-    if a_rest.is_empty() {
-        return Some(UseSegment::List(vec![
-            UseTree::from_path(vec![UseSegment::Slf(None)], DUMMY_SP),
-            UseTree::from_path(b_rest.to_vec(), DUMMY_SP),
-        ]));
-    }
-    if b_rest.is_empty() {
-        return Some(UseSegment::List(vec![
-            UseTree::from_path(vec![UseSegment::Slf(None)], DUMMY_SP),
-            UseTree::from_path(a_rest.to_vec(), DUMMY_SP),
-        ]));
-    }
-    if let UseSegment::List(mut list) = a_rest[0].clone() {
-        merge_use_trees_inner(&mut list, UseTree::from_path(b_rest.to_vec(), DUMMY_SP));
-        list.sort();
-        return Some(UseSegment::List(list));
+    if a.len() != len && b.len() != len {
+        if let UseSegment::List(mut list) = a[len].clone() {
+            merge_use_trees_inner(&mut list, UseTree::from_path(b[len..].to_vec(), DUMMY_SP));
+            let mut new_path = b[..len].to_vec();
+            new_path.push(UseSegment::List(list));
+            return Some(new_path);
+        }
+    } else if len == 1 {
+        let rest = if a.len() == len { &b[1..] } else { &a[1..] };
+        return Some(vec![
+            b[0].clone(),
+            UseSegment::List(vec![
+                UseTree::from_path(vec![UseSegment::Slf(None)], DUMMY_SP),
+                UseTree::from_path(rest.to_vec(), DUMMY_SP),
+            ]),
+        ]);
+    } else {
+        len -= 1;
     }
     let mut list = vec![
-        UseTree::from_path(a_rest.to_vec(), DUMMY_SP),
-        UseTree::from_path(b_rest.to_vec(), DUMMY_SP),
+        UseTree::from_path(a[len..].to_vec(), DUMMY_SP),
+        UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
     ];
     list.sort();
-    Some(UseSegment::List(list))
+    let mut new_path = b[..len].to_vec();
+    new_path.push(UseSegment::List(list));
+    Some(new_path)
+}
+
+fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
+    let similar_trees = trees.iter_mut().filter(|tree| tree.share_prefix(&use_tree));
+    if use_tree.path.len() == 1 {
+        if let Some(tree) = similar_trees.min_by_key(|tree| tree.path.len()) {
+            if tree.path.len() == 1 {
+                return;
+            }
+        }
+    } else {
+        if let Some(tree) = similar_trees.max_by_key(|tree| tree.path.len()) {
+            if tree.path.len() > 1 {
+                tree.merge(&use_tree);
+                return;
+            }
+        }
+    }
+    trees.push(use_tree);
+    trees.sort();
 }
 
 impl PartialOrd for UseSegment {
@@ -989,9 +998,14 @@ mod test {
         }
 
         test_merge!(["a::b::{c, d}", "a::b::{e, f}"], ["a::b::{c, d, e, f}"]);
-        test_merge!(["a::b::c", "a::b"], ["a::b::{self, c}"]);
+        test_merge!(["a::b::c", "a::b"], ["a::{b, b::c}"]);
         test_merge!(["a::b", "a::b"], ["a::b"]);
-        test_merge!(["a", "a::b", "a::b::c"], ["a::{self, b::{self, c}}"]);
+        test_merge!(["a", "a::b", "a::b::c"], ["a::{self, b, b::c}"]);
+        test_merge!(
+            ["a", "a::b", "a::b::c", "a::b::c::d"],
+            ["a::{self, b, b::{c, c::d}}"]
+        );
+        test_merge!(["a", "a::b", "a::b::c", "a::b"], ["a::{self, b, b::c}"]);
         test_merge!(
             ["a::{b::{self, c}, d::e}", "a::d::f"],
             ["a::{b::{self, c}, d::{e, f}}"]

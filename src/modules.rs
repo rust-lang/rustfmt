@@ -105,7 +105,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         visitor.visit_item(&item);
         for module_item in visitor.mods() {
             if let ast::ItemKind::Mod(ref sub_mod) = module_item.item.node {
-                self.visit_sub_mod(&item, Cow::Owned(sub_mod.clone()))?;
+                self.visit_sub_mod(&module_item.item, Cow::Owned(sub_mod.clone()))?;
             }
         }
         Ok(())
@@ -442,7 +442,7 @@ fn parse_inner_attributes<'a>(parser: &mut parser::Parser<'a>) -> PResult<'a, Ve
             }
             TokenKind::DocComment(s) => {
                 // we need to get the position of this token before we bump.
-                let attr = attr::mk_sugared_doc_attr(attr::mk_attr_id(), s, parser.token.span);
+                let attr = attr::mk_sugared_doc_attr(s, parser.token.span);
                 if attr.style == ast::AttrStyle::Inner {
                     attrs.push(attr);
                     parser.bump();
@@ -477,7 +477,14 @@ fn parse_mod_items<'a>(parser: &mut parser::Parser<'a>, inner_lo: Span) -> PResu
 
 fn is_cfg_if(item: &ast::Item) -> bool {
     match item.node {
-        ast::ItemKind::Mac(..) if item.ident.name == Symbol::intern("cfg_if") => true,
+        ast::ItemKind::Mac(ref mac) => {
+            if let Some(first_segment) = mac.path.segments.first() {
+                if first_segment.ident.name == Symbol::intern("cfg_if") {
+                    return true;
+                }
+            }
+            false
+        }
         _ => false,
     }
 }

@@ -168,7 +168,7 @@ impl ChainItemKind {
                 let span = mk_sp(nested.span.hi(), field.span.hi());
                 (kind, span)
             }
-            ast::ExprKind::Await(ast::AwaitOrigin::FieldLike, ref nested) => {
+            ast::ExprKind::Await(ref nested) => {
                 let span = mk_sp(nested.span.hi(), expr.span.hi());
                 (ChainItemKind::Await, span)
             }
@@ -396,9 +396,7 @@ impl Chain {
             }
             ast::ExprKind::Field(ref subexpr, _)
             | ast::ExprKind::Try(ref subexpr)
-            | ast::ExprKind::Await(ast::AwaitOrigin::FieldLike, ref subexpr) => {
-                Some(Self::convert_try(subexpr, context))
-            }
+            | ast::ExprKind::Await(ref subexpr) => Some(Self::convert_try(subexpr, context)),
             _ => None,
         }
     }
@@ -649,7 +647,7 @@ impl<'a> ChainFormatterShared<'a> {
             Cow::from("")
         } else {
             // Use new lines.
-            if *context.force_one_line_chain.borrow() {
+            if context.force_one_line_chain.get() {
                 return None;
             }
             child_shape.to_string_with_newline(context.config)

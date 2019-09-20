@@ -152,6 +152,9 @@ create_config! {
     emit_mode: EmitMode, EmitMode::Files, false,
         "What emit Mode to use when none is supplied";
     make_backup: bool, false, false, "Backup changed files";
+    print_misformatted_file_names: bool, false, true,
+        "Prints the names of mismatched files that were formatted. Prints the names of \
+         files that would be formated when used with `--check` mode. ";
 }
 
 impl PartialConfig {
@@ -161,6 +164,7 @@ impl PartialConfig {
         cloned.file_lines = None;
         cloned.verbose = None;
         cloned.width_heuristics = None;
+        cloned.print_misformatted_file_names = None;
 
         ::toml::to_string(&cloned).map_err(|e| format!("Could not output config: {}", e))
     }
@@ -465,7 +469,8 @@ mod test {
 
     #[test]
     fn test_dump_default_config() {
-        const DEFAULT_CONFIG: &str = r#"max_width = 100
+        let default_config = format!(
+            r#"max_width = 100
 hard_tabs = false
 tab_spaces = 4
 newline_style = "Auto"
@@ -519,7 +524,7 @@ use_field_init_shorthand = false
 force_explicit_abi = true
 condense_wildcard_suffixes = false
 color = "Auto"
-required_version = "1.4.2"
+required_version = "{}"
 unstable_features = false
 disable_all_formatting = false
 skip_children = false
@@ -531,9 +536,11 @@ report_fixme = "Never"
 ignore = []
 emit_mode = "Files"
 make_backup = false
-"#;
+"#,
+            env!("CARGO_PKG_VERSION")
+        );
         let toml = Config::default().all_options().to_toml().unwrap();
-        assert_eq!(&toml, DEFAULT_CONFIG);
+        assert_eq!(&toml, &default_config);
     }
 
     // FIXME(#2183): these tests cannot be run in parallel because they use env vars.

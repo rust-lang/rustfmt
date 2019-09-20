@@ -136,9 +136,9 @@ language: rust
 before_script:
 - rustup component add rustfmt
 script:
-- cargo fmt --all -- --check
 - cargo build
 - cargo test
+- cargo fmt --all -- --check
 ```
 
 See [this blog post](https://medium.com/@ag_dubs/enforcing-style-in-ci-for-rust-projects-18f6b09ec69d)
@@ -220,6 +220,7 @@ needs to be specified in `rustfmt.toml`, e.g., with `edition = "2018"`.
   | stdout | writes output to stdout | No |
   | coverage | displays how much of the input file was processed | Yes |
   | checkstyle | emits in a checkstyle format | Yes |
+  | json | emits diffs in a json format | Yes |
 
 ## License
 

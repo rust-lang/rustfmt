@@ -181,26 +181,13 @@ fn return_macro_parse_failure_fallback(
         return trim_left_preserve_layout(context.snippet(span), indent, &context.config);
     }
 
+    context.skipped_range.borrow_mut().push((
+        context.source_map.lookup_line(span.lo()).unwrap().line,
+        context.source_map.lookup_line(span.hi()).unwrap().line,
+    ));
+
     // Return the snippet unmodified if the macro is not block-like
     Some(context.snippet(span).to_owned())
-}
-
-struct InsideMacroGuard<'a> {
-    context: &'a RewriteContext<'a>,
-    is_nested: bool,
-}
-
-impl<'a> InsideMacroGuard<'a> {
-    fn inside_macro_context(context: &'a RewriteContext<'_>) -> InsideMacroGuard<'a> {
-        let is_nested = context.inside_macro.replace(true);
-        InsideMacroGuard { context, is_nested }
-    }
-}
-
-impl<'a> Drop for InsideMacroGuard<'a> {
-    fn drop(&mut self) {
-        self.context.inside_macro.replace(self.is_nested);
-    }
 }
 
 pub(crate) fn rewrite_macro(
@@ -212,13 +199,20 @@ pub(crate) fn rewrite_macro(
 ) -> Option<String> {
     let should_skip = context
         .skip_context
-        .skip_macro(&context.snippet(mac.node.path.span).to_owned());
+        .skip_macro(&context.snippet(mac.path.span).to_owned());
     if should_skip {
         None
     } else {
-        let guard = InsideMacroGuard::inside_macro_context(context);
+        let guard = context.enter_macro();
         let result = catch_unwind(AssertUnwindSafe(|| {
-            rewrite_macro_inner(mac, extra_ident, context, shape, position, guard.is_nested)
+            rewrite_macro_inner(
+                mac,
+                extra_ident,
+                context,
+                shape,
+                position,
+                guard.is_nested(),
+            )
         }));
         match result {
             Err(..) | Ok(None) => {
@@ -241,7 +235,7 @@ fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
         {
             parser.bump();
             let macro_arg =
-                MacroArg::Keyword(ast::Ident::with_empty_ctxt(keyword), parser.prev_span);
+                MacroArg::Keyword(ast::Ident::with_dummy_span(keyword), parser.prev_span);
             return Some(macro_arg);
         }
     }
@@ -258,14 +252,14 @@ fn rewrite_macro_inner(
 ) -> Option<String> {
     if context.config.use_try_shorthand() {
         if let Some(expr) = convert_try_mac(mac, context) {
-            context.inside_macro.replace(false);
+            context.leave_macro();
             return expr.rewrite(context, shape);
         }
     }
 
     let original_style = macro_style(mac, context);
 
-    let macro_name = rewrite_macro_name(context, &mac.node.path, extra_ident);
+    let macro_name = rewrite_macro_name(context, &mac.path, extra_ident);
 
     let style = if FORCED_BRACKET_MACROS.contains(&&macro_name[..]) && !is_nested_macro {
         DelimToken::Bracket
@@ -273,7 +267,7 @@ fn rewrite_macro_inner(
         original_style
     };
 
-    let ts: TokenStream = mac.node.stream();
+    let ts: TokenStream = mac.stream();
     let has_comment = contains_comment(context.snippet(mac.span));
     if ts.is_empty() && !has_comment {
         return match style {
@@ -303,9 +297,9 @@ fn rewrite_macro_inner(
 
     if DelimToken::Brace != style {
         loop {
-            if let Some(arg) = parse_macro_arg(&mut parser) {
+            if let Some(arg) = check_keyword(&mut parser) {
                 arg_vec.push(arg);
-            } else if let Some(arg) = check_keyword(&mut parser) {
+            } else if let Some(arg) = parse_macro_arg(&mut parser) {
                 arg_vec.push(arg);
             } else {
                 return return_macro_parse_failure_fallback(context, shape.indent, mac.span);
@@ -407,7 +401,7 @@ fn rewrite_macro_inner(
                     Some(SeparatorTactic::Never)
                 };
                 if FORCED_BRACKET_MACROS.contains(macro_name) && !is_nested_macro {
-                    context.inside_macro.replace(false);
+                    context.leave_macro();
                     if context.use_block_indent() {
                         force_trailing_comma = Some(SeparatorTactic::Vertical);
                     };
@@ -534,7 +528,7 @@ pub(crate) fn rewrite_macro_def(
             Some(v) => Some(v),
             // if the rewrite returned None because a macro could not be rewritten, then return the
             // original body
-            None if *context.macro_rewrite_failure.borrow() => {
+            None if context.macro_rewrite_failure.get() => {
                 Some(context.snippet(branch.body).trim().to_string())
             }
             None => None,
@@ -1196,8 +1190,8 @@ fn next_space(tok: &TokenKind) -> SpaceState {
 /// when the macro is not an instance of `try!` (or parsing the inner expression
 /// failed).
 pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> Option<ast::Expr> {
-    if &mac.node.path.to_string() == "try" {
-        let ts: TokenStream = mac.node.tts.clone();
+    if &mac.path.to_string() == "try" {
+        let ts: TokenStream = mac.tts.clone();
         let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
 
         Some(ast::Expr {
@@ -1538,7 +1532,7 @@ fn rewrite_macro_with_items(
     Some(result)
 }
 
-const RUST_KW: [Symbol; 60] = [
+const RUST_KW: [Symbol; 59] = [
     kw::PathRoot,
     kw::DollarCrate,
     kw::Underscore,
@@ -1597,6 +1591,5 @@ const RUST_KW: [Symbol; 60] = [
     kw::Auto,
     kw::Catch,
     kw::Default,
-    kw::Existential,
     kw::Union,
 ];

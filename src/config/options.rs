@@ -2,7 +2,6 @@ use std::collections::{hash_set, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use atty;
 use itertools::Itertools;
 use rustfmt_config_proc_macro::config_type;
 use serde::de::{SeqAccess, Visitor};
@@ -119,6 +118,9 @@ pub enum EmitMode {
     Coverage,
     /// Unfancy stdout
     Checkstyle,
+    /// Writes the resulting diffs in a JSON format. Returns an empty array
+    /// `[]` if there were no diffs.
+    Json,
     /// Output the changed lines (for internal value only)
     ModifiedLines,
     /// Checks if a diff can be generated. If so, rustfmt outputs a diff and
@@ -144,7 +146,7 @@ pub enum Color {
 pub enum Version {
     /// 1.x.y. When specified, rustfmt will format in the same style as 1.0.0.
     One,
-    /// 2.x.y. When specified, rustfmt will formatin the the latest style.
+    /// 2.x.y. When specified, rustfmt will format in the the latest style.
     Two,
 }
 
@@ -152,9 +154,8 @@ impl Color {
     /// Whether we should use a coloured terminal.
     pub fn use_colored_tty(self) -> bool {
         match self {
-            Color::Always => true,
+            Color::Always | Color::Auto => true,
             Color::Never => false,
-            Color::Auto => atty::is(atty::Stream::Stdout),
         }
     }
 }

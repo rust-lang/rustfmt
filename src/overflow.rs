@@ -122,6 +122,7 @@ impl<'a> OverflowableItem<'a> {
     pub(crate) fn is_simple(&self) -> bool {
         match self {
             OverflowableItem::Expr(expr) => is_simple_expr(expr),
+            OverflowableItem::MacroArg(MacroArg::Keyword(..)) => true,
             OverflowableItem::MacroArg(MacroArg::Expr(expr)) => is_simple_expr(expr),
             OverflowableItem::NestedMetaItem(nested_meta_item) => match nested_meta_item {
                 ast::NestedMetaItem::Literal(..) => true,
@@ -464,7 +465,7 @@ impl<'a> Context<'a> {
         // Replace the last item with its first line to see if it fits with
         // first arguments.
         let placeholder = if overflow_last {
-            let old_value = *self.context.force_one_line_chain.borrow();
+            let old_value = self.context.force_one_line_chain.get();
             match self.last_item() {
                 Some(OverflowableItem::Expr(expr))
                     if !combine_arg_with_callee && is_method_call(expr) =>

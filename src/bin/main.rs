@@ -4,6 +4,7 @@ use io::Error as IoError;
 
 use rustfmt_nightly as rustfmt;
 
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{self, stdout, Read, Write};
@@ -98,7 +99,7 @@ fn make_opts() -> Options {
     );
     let is_nightly = is_nightly();
     let emit_opts = if is_nightly {
-        "[files|stdout|coverage|checkstyle]"
+        "[files|stdout|coverage|checkstyle|json]"
     } else {
         "[files|stdout]"
     };
@@ -125,6 +126,18 @@ fn make_opts() -> Options {
          subset of the current config file used for formatting the current program. \
          `current` writes to stdout current config as if formatting the file at PATH.",
         "[default|minimal|current] PATH",
+    );
+    opts.optflag(
+        "l",
+        "files-with-diff",
+        "Prints the names of mismatched files that were formatted. Prints the names of \
+         files that would be formated when used with `--check` mode. ",
+    );
+    opts.optmulti(
+        "",
+        "config",
+        "Set options from command line. These settings take priority over .rustfmt.toml",
+        "[key1=val1,key2=val2...]",
     );
 
     if is_nightly {
@@ -472,6 +485,7 @@ struct GetOptsOptions {
     quiet: bool,
     verbose: bool,
     config_path: Option<PathBuf>,
+    inline_config: HashMap<String, String>,
     emit_mode: EmitMode,
     backup: bool,
     check: bool,
@@ -480,6 +494,7 @@ struct GetOptsOptions {
     file_lines: FileLines, // Default is all lines in all files.
     unstable_features: bool,
     error_on_unformatted: Option<bool>,
+    print_misformatted_file_names: bool,
 }
 
 impl GetOptsOptions {
@@ -530,6 +545,29 @@ impl GetOptsOptions {
 
         options.config_path = matches.opt_str("config-path").map(PathBuf::from);
 
+        options.inline_config = matches
+            .opt_strs("config")
+            .iter()
+            .flat_map(|config| config.split(","))
+            .map(
+                |key_val| match key_val.char_indices().find(|(_, ch)| *ch == '=') {
+                    Some((middle, _)) => {
+                        let (key, val) = (&key_val[..middle], &key_val[middle + 1..]);
+                        if !Config::is_valid_key_val(key, val) {
+                            Err(format_err!("invalid key=val pair: `{}`", key_val))
+                        } else {
+                            Ok((key.to_string(), val.to_string()))
+                        }
+                    }
+
+                    None => Err(format_err!(
+                        "--config expects comma-separated list of key=val pairs, found `{}`",
+                        key_val
+                    )),
+                },
+            )
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
         options.check = matches.opt_present("check");
         if let Some(ref emit_str) = matches.opt_str("emit") {
             if options.check {
@@ -545,6 +583,10 @@ impl GetOptsOptions {
 
         if matches.opt_present("backup") {
             options.backup = true;
+        }
+
+        if matches.opt_present("files-with-diff") {
+            options.print_misformatted_file_names = true;
         }
 
         if !rust_nightly {
@@ -610,6 +652,13 @@ impl CliOptions for GetOptsOptions {
         if let Some(color) = self.color {
             config.set().color(color);
         }
+        if self.print_misformatted_file_names {
+            config.set().print_misformatted_file_names(true);
+        }
+
+        for (key, val) in self.inline_config {
+            config.override_value(&key, &val);
+        }
     }
 
     fn config_path(&self) -> Option<&Path> {
@@ -631,6 +680,7 @@ fn emit_mode_from_emit_str(emit_str: &str) -> Result<EmitMode, FailureError> {
         "stdout" => Ok(EmitMode::Stdout),
         "coverage" => Ok(EmitMode::Coverage),
         "checkstyle" => Ok(EmitMode::Checkstyle),
+        "json" => Ok(EmitMode::Json),
         _ => Err(format_err!("Invalid value for `--emit`")),
     }
 }

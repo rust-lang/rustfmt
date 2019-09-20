@@ -2,6 +2,71 @@
 
 ## [Unreleased]
 
+## [1.4.8] 2019-09-08
+
+### Changed
+
+- Update `rustc-ap-*` crates to 583.0.0.
+
+## [1.4.7] 2019-09-06
+
+### Added
+
+- Add `--config` command line option.
+
+### Changed
+
+- Update `rustc-ap-*` crates to 581.0.0.
+- rustfmt now do not warn against trailing whitespaces inside macro calls.
+
+### Fixed
+
+- Fix `merge_imports` generating invalid code.
+- Fix removing discriminant values on enum variants.
+- Fix modules defined inside `cfg_if!` not being formatted.
+- Fix minor formatting issues.
+
+## [1.4.6] 2019-08-28
+
+### Added
+
+- Add `--message-format` command line option to `cargo-fmt`.
+- Add `-l,--files-with-diff` command line option to `rustfmt`.
+- Add `json` emit mode. 
+
+### Fixed
+
+- Fix removing attributes on struct pattern's fields.
+- Fix non-idempotent formatting of match arm.
+- Fix `merge_imports` generating invalid code.
+- Fix imports with `#![macro_use]` getting reordered with `reorder_imports`.
+- Fix calculation of line numbers in checkstyle output.
+- Fix poor formatting of complex fn type.
+
+## [1.4.5] 2019-08-13
+
+### Fixed
+
+- Fix generating invalid code when formatting an impl block with const generics inside a where clause.
+- Fix adding a trailing space after a `dyn` keyword which is used as a macro argument by itself.
+
+## [1.4.4] 2019-08-06
+
+### Fixed
+
+- Fix `cargo fmt` incorrectly formatting crates that is not part of the workspace or the path dependencies.
+- Fix removing a trailing comma from a tuple pattern.
+
+## [1.4.3] 2019-08-02
+
+### Changed
+
+- Update `rustc-ap-*` crates to 546.0.0.
+
+### Fixed
+
+- Fix an underscore pattern getting removed.
+
 ## [1.4.2] 2019-07-31
 
 ### Changed
