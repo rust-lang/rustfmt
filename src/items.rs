@@ -1912,7 +1912,7 @@ impl Rewrite for ast::Param {
             let num_attrs = self.attrs.len();
             (
                 mk_sp(self.attrs[num_attrs - 1].span.hi(), self.pat.span.lo()),
-                param_attrs_result.matches("\n").count() > 0,
+                param_attrs_result.contains("\n"),
             )
         } else {
             (mk_sp(self.span.lo(), self.span.lo()), false)
