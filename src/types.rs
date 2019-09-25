@@ -499,7 +499,11 @@ fn rewrite_bounded_lifetime(
             "{}{}{}",
             result,
             colon,
-            join_bounds(context, shape.sub_width(overhead)?, bounds, true)?
+            if context.config.version() == Version::One {
+                join_bounds_v1(context, shape.sub_width(overhead)?, bounds, true)?
+            } else {
+                join_bounds_v2(context, shape.sub_width(overhead)?, bounds, true)?
+            }
         );
         Some(result)
     }
@@ -542,7 +546,11 @@ impl Rewrite for ast::GenericBounds {
             return Some(String::new());
         }
 
-        join_bounds(context, shape, self, true)
+        if context.config.version() == Version::One {
+            join_bounds_v1(context, shape, self, true)
+        } else {
+            join_bounds_v2(context, shape, self, true)
+        }
     }
 }
 
@@ -748,7 +756,7 @@ impl Rewrite for ast::Ty {
                 let rw = if context.config.version() == Version::One {
                     it.rewrite(context, shape)
                 } else {
-                    join_bounds(context, shape, it, false)
+                    join_bounds_v2(context, shape, it, false)
                 };
                 rw.map(|it_str| {
                     let space = if it_str.is_empty() { "" } else { " " };
@@ -827,7 +835,66 @@ fn is_generic_bounds_in_order(generic_bounds: &[ast::GenericBound]) -> bool {
     }
 }
 
-fn join_bounds(
+fn join_bounds_v1(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    items: &[ast::GenericBound],
+    need_indent: bool,
+) -> Option<String> {
+    debug_assert!(!items.is_empty());
+
+    // Try to join types in a single line
+    let joiner = match context.config.type_punctuation_density() {
+        TypeDensity::Compressed => "+",
+        TypeDensity::Wide => " + ",
+    };
+    let type_strs = items
+        .iter()
+        .map(|item| item.rewrite(context, shape))
+        .collect::<Option<Vec<_>>>()?;
+    let result = type_strs.join(joiner);
+    if items.len() <= 1 || (!result.contains('\n') && result.len() <= shape.width) {
+        return Some(result);
+    }
+
+    // We need to use multiple lines.
+    let (type_strs, offset) = if need_indent {
+        // Rewrite with additional indentation.
+        let nested_shape = shape
+            .block_indent(context.config.tab_spaces())
+            .with_max_width(context.config);
+        let type_strs = items
+            .iter()
+            .map(|item| item.rewrite(context, nested_shape))
+            .collect::<Option<Vec<_>>>()?;
+        (type_strs, nested_shape.indent)
+    } else {
+        (type_strs, shape.indent)
+    };
+
+    let is_bound_extendable = |s: &str, b: &ast::GenericBound| match b {
+        ast::GenericBound::Outlives(..) => true,
+        ast::GenericBound::Trait(..) => last_line_extendable(s),
+    };
+    let mut result = String::with_capacity(128);
+    result.push_str(&type_strs[0]);
+    let mut can_be_put_on_the_same_line = is_bound_extendable(&result, &items[0]);
+    let generic_bounds_in_order = is_generic_bounds_in_order(items);
+    for (bound, bound_str) in items[1..].iter().zip(type_strs[1..].iter()) {
+        if generic_bounds_in_order && can_be_put_on_the_same_line {
+            result.push_str(joiner);
+        } else {
+            result.push_str(&offset.to_string_with_newline(context.config));
+            result.push_str("+ ");
+        }
+        result.push_str(bound_str);
+        can_be_put_on_the_same_line = is_bound_extendable(bound_str, bound);
+    }
+
+    Some(result)
+}
+
+fn join_bounds_v2(
     context: &RewriteContext<'_>,
     shape: Shape,
     items: &[ast::GenericBound],

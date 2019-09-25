@@ -1,3 +1,5 @@
+// rustfmt-version: One
+
 pub trait PCG: self::sealed::Sealed // comment1
                      + Sized // comment2
                      + Eq // comment3
@@ -48,21 +50,22 @@ BitOrAssign + // Note(Evrey): Because Rust is drunk. 5
         for<'a> Deserialize<'a>; // Note(Evrey): Because Rust is drunk. 13
 }
 
-pub trait Foo: self::sealed::Sealed
-                     + Sized
-                     + Eq
-                     + Hash
-                     + Debug
-                     + Clone
-                     + Default
-                     + Serialize
-                     + for<'a> Deserialize<'a>
+pub trait Foo:
+    self::sealed::Sealed
+    + Sized
+    + Eq
+    + Hash
+    + Debug
+    + Clone
+    + Default
+    + Serialize
+    + for<'a> Deserialize<'a>
 {
     type DoubleState: Copy
-      + ShrAssign<u8>
-      + Shl<u8, Output = Self::DoubleState>
-+ BitAnd<Output = Self::DoubleState>
-+ BitOrAssign
+        + ShrAssign<u8>
+        + Shl<u8, Output = Self::DoubleState>
+        + BitAnd<Output = Self::DoubleState>
+        + BitOrAssign
         + Sub<Output = Self::DoubleState>
         + Into<u128>
         + Debug

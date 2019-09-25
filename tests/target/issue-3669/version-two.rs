@@ -1,3 +1,5 @@
+// rustfmt-version: Two
+
 pub trait PCG:
     self::sealed::Sealed // comment1
     + Sized              // comment2
@@ -74,4 +76,13 @@ pub trait Foo:
         + Default
         + Serialize
         + for<'a> Deserialize<'a>;
+}
+
+// #2055
+pub trait Foo:
+// A and C
+    A
+    + C // and B
+    + B
+{
 }

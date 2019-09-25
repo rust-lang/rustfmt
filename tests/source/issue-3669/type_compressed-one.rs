@@ -1,3 +1,4 @@
+// rustfmt-version: One
 // rustfmt-type_punctuation_density: Compressed
 
 pub fn do_something<'a, T: Trait1 + Trait2 + 'a>(

@@ -991,16 +991,28 @@ pub(crate) fn format_trait(
         result.push_str(&generics_str);
 
         if !generic_bounds.is_empty() {
-            let comment_span = mk_sp(generics.span.hi(), generic_bounds[0].span().lo());
-            let after_colon = context.snippet_provider.span_after(comment_span, ":");
-            let comment = recover_missing_comment_in_span(
-                mk_sp(after_colon, comment_span.hi()),
-                shape,
-                context,
-                // 1 = ":"
-                last_line_width(&result) + 1,
-            )
-            .unwrap_or_default();
+            let comment = if context.config.version() == Version::Two {
+                let comment_span = mk_sp(generics.span.hi(), generic_bounds[0].span().lo());
+                let after_colon = context.snippet_provider.span_after(comment_span, ":");
+                recover_missing_comment_in_span(
+                    mk_sp(after_colon, comment_span.hi()),
+                    shape,
+                    context,
+                    // 1 = ":"
+                    last_line_width(&result) + 1,
+                )
+                .unwrap_or_default()
+            } else {
+                let ident_hi = context
+                    .snippet_provider
+                    .span_after(item.span, &item.ident.as_str());
+                let bound_hi = generic_bounds.last().unwrap().span().hi();
+                let snippet = context.snippet(mk_sp(ident_hi, bound_hi));
+                if contains_comment(snippet) {
+                    return None;
+                }
+                String::new()
+            };
             result = rewrite_assign_rhs_with(
                 context,
                 format!("{}:{}", result, comment),
