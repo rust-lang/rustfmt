@@ -56,6 +56,10 @@ pub struct Opts {
     /// Format all packages (only usable in workspaces)
     #[structopt(long = "all")]
     format_all: bool,
+
+    /// Run without accessing the network
+    #[structopt(long = "offline")]
+    offline: bool,
 }
 
 fn main() {
@@ -112,6 +116,18 @@ fn execute() -> i32 {
         }
     }
 
+    let mut cargo_metadata_additional_opts: Vec<String> = Vec::new();
+
+    if opts.offline {
+        cargo_metadata_additional_opts.push(String::from("--offline"));
+    }
+
+    let cargo_metadata_opts = if !cargo_metadata_additional_opts.is_empty() {
+        Some(cargo_metadata_additional_opts.as_slice())
+    } else {
+        None
+    };
+
     if let Some(specified_manifest_path) = opts.manifest_path {
         if !specified_manifest_path.ends_with("Cargo.toml") {
             print_usage_to_stderr("the manifest-path must be a path to a Cargo.toml file");
@@ -123,9 +139,16 @@ fn execute() -> i32 {
             &strategy,
             rustfmt_args,
             Some(&manifest_path),
+            cargo_metadata_opts,
         ))
     } else {
-        handle_command_status(format_crate(verbosity, &strategy, rustfmt_args, None))
+        handle_command_status(format_crate(
+            verbosity,
+            &strategy,
+            rustfmt_args,
+            None,
+            cargo_metadata_opts,
+        ))
     }
 }
 
@@ -229,8 +252,9 @@ fn format_crate(
     strategy: &CargoFmtStrategy,
     rustfmt_args: Vec<String>,
     manifest_path: Option<&Path>,
+    cargo_metadata_additional_opts: Option<&[String]>,
 ) -> Result<i32, io::Error> {
-    let targets = get_targets(strategy, manifest_path)?;
+    let targets = get_targets(strategy, manifest_path, cargo_metadata_additional_opts)?;
 
     // Currently only bin and lib files get formatted.
     run_rustfmt(&targets, &rustfmt_args, verbosity)
@@ -310,17 +334,26 @@ impl CargoFmtStrategy {
 fn get_targets(
     strategy: &CargoFmtStrategy,
     manifest_path: Option<&Path>,
+    cargo_metadata_additional_opts: Option<&[String]>,
 ) -> Result<BTreeSet<Target>, io::Error> {
     let mut targets = BTreeSet::new();
 
     match *strategy {
-        CargoFmtStrategy::Root => get_targets_root_only(manifest_path, &mut targets)?,
-        CargoFmtStrategy::All => {
-            get_targets_recursive(manifest_path, &mut targets, &mut BTreeSet::new())?
+        CargoFmtStrategy::Root => {
+            get_targets_root_only(manifest_path, &mut targets, cargo_metadata_additional_opts)?
         }
-        CargoFmtStrategy::Some(ref hitlist) => {
-            get_targets_with_hitlist(manifest_path, hitlist, &mut targets)?
-        }
+        CargoFmtStrategy::All => get_targets_recursive(
+            manifest_path,
+            &mut targets,
+            &mut BTreeSet::new(),
+            cargo_metadata_additional_opts,
+        )?,
+        CargoFmtStrategy::Some(ref hitlist) => get_targets_with_hitlist(
+            manifest_path,
+            hitlist,
+            &mut targets,
+            cargo_metadata_additional_opts,
+        )?,
     }
 
     if targets.is_empty() {
@@ -336,8 +369,9 @@ fn get_targets(
 fn get_targets_root_only(
     manifest_path: Option<&Path>,
     targets: &mut BTreeSet<Target>,
+    cargo_metadata_additional_opts: Option<&[String]>,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
+    let metadata = get_cargo_metadata(manifest_path, false, cargo_metadata_additional_opts)?;
     let workspace_root_path = PathBuf::from(&metadata.workspace_root).canonicalize()?;
     let (in_workspace_root, current_dir_manifest) = if let Some(target_manifest) = manifest_path {
         (
@@ -380,9 +414,11 @@ fn get_targets_recursive(
     manifest_path: Option<&Path>,
     mut targets: &mut BTreeSet<Target>,
     visited: &mut BTreeSet<String>,
+    cargo_metadata_additional_opts: Option<&[String]>,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
-    let metadata_with_deps = get_cargo_metadata(manifest_path, true)?;
+    let metadata = get_cargo_metadata(manifest_path, false, cargo_metadata_additional_opts)?;
+    let metadata_with_deps =
+        get_cargo_metadata(manifest_path, true, cargo_metadata_additional_opts)?;
 
     for package in metadata.packages {
         add_targets(&package.targets, &mut targets);
@@ -409,7 +445,12 @@ fn get_targets_recursive(
 
             if manifest_path.exists() {
                 visited.insert(dependency.name);
-                get_targets_recursive(Some(&manifest_path), &mut targets, visited)?;
+                get_targets_recursive(
+                    Some(&manifest_path),
+                    &mut targets,
+                    visited,
+                    cargo_metadata_additional_opts,
+                )?;
             }
         }
     }
@@ -421,8 +462,9 @@ fn get_targets_with_hitlist(
     manifest_path: Option<&Path>,
     hitlist: &[String],
     targets: &mut BTreeSet<Target>,
+    cargo_metadata_additional_opts: Option<&[String]>,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
+    let metadata = get_cargo_metadata(manifest_path, false, cargo_metadata_additional_opts)?;
 
     let mut workspace_hitlist: BTreeSet<&String> = BTreeSet::from_iter(hitlist);
 
@@ -511,6 +553,7 @@ fn run_rustfmt(
 fn get_cargo_metadata(
     manifest_path: Option<&Path>,
     include_deps: bool,
+    other_opts: Option<&[String]>,
 ) -> Result<cargo_metadata::Metadata, io::Error> {
     let mut cmd = cargo_metadata::MetadataCommand::new();
     if !include_deps {
@@ -518,6 +561,9 @@ fn get_cargo_metadata(
     }
     if let Some(manifest_path) = manifest_path {
         cmd.manifest_path(manifest_path);
+    }
+    if let Some(opts) = other_opts {
+        cmd.other_options(opts);
     }
     match cmd.exec() {
         Ok(metadata) => Ok(metadata),
