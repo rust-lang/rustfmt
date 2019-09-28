@@ -6,9 +6,9 @@ pub type Adder<F, T>
 where
     T: Clone,
     F: Copy,
-= Fn(T) -> T;
+= impl Fn(T) -> T;
 
-pub type Adderrr<T> = Fn(T) -> T;
+pub type Adderrr<T> = impl Fn(T) -> T;
 
 impl Foo for Bar {
     type E = impl Trait;
