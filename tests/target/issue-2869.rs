@@ -16,6 +16,11 @@ struct AuditLog1 {
     actor_context_id:                  Option<String>,
     actor_ip_address:                  Option<IpAddr>,
     azure_active_directory_event_type: Option<u8>,
+
+    #[serde(rename = "very")]
+    aaaaa: String,
+    #[serde(rename = "cool")]
+    bb:    i32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

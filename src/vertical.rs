@@ -6,7 +6,7 @@ use itertools::Itertools;
 use syntax::ast;
 use syntax::source_map::{BytePos, Span};
 
-use crate::comment::{combine_strs_with_missing_comments, contains_comment};
+use crate::comment::combine_strs_with_missing_comments;
 use crate::config::lists::*;
 use crate::expr::rewrite_field;
 use crate::items::{rewrite_struct_field, rewrite_struct_field_prefix};
@@ -253,6 +253,9 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     write_list(&items, &fmt)
 }
 
+/// Returns the index in `fields` up to which a field belongs to the current group.
+/// The returned string is the group separator to use when rewriting the fields.
+/// Groups are defined by blank lines.
 fn group_aligned_items<T: AlignedItem>(
     context: &RewriteContext<'_>,
     fields: &[T],
@@ -262,7 +265,6 @@ fn group_aligned_items<T: AlignedItem>(
         if fields[i].skip() {
             return ("", index);
         }
-        // See if there are comments or empty lines between fields.
         let span = mk_sp(fields[i].get_span().hi(), fields[i + 1].get_span().lo());
         let snippet = context
             .snippet(span)
@@ -270,17 +272,12 @@ fn group_aligned_items<T: AlignedItem>(
             .skip(1)
             .collect::<Vec<_>>()
             .join("\n");
-        let spacings = if snippet
+        let has_blank_line = snippet
             .lines()
             .dropping_back(1)
-            .any(|l| l.trim().is_empty())
-        {
-            "\n"
-        } else {
-            ""
-        };
-        if contains_comment(&snippet) || snippet.lines().count() > 1 {
-            return (spacings, index);
+            .any(|l| l.trim().is_empty());
+        if has_blank_line {
+            return ("\n", index);
         }
         index += 1;
     }
