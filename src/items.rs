@@ -1528,7 +1528,7 @@ pub(crate) fn rewrite_opaque_type(
         context,
         indent,
         "type",
-        " =",
+        " = impl",
         ident,
         generic_bounds,
         generics,
