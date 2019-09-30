@@ -1857,14 +1857,14 @@ pub(crate) fn rewrite_assign_rhs<S: Into<String>, R: Rewrite>(
     rewrite_assign_rhs_with(context, lhs, ex, shape, RhsTactics::Default)
 }
 
-pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
+pub(crate) fn rewrite_assign_rhs_node<R: Rewrite>(
     context: &RewriteContext<'_>,
-    lhs: S,
+    lhs: &str,
     ex: &R,
     shape: Shape,
     rhs_tactics: RhsTactics,
+    has_impl: bool,
 ) -> Option<String> {
-    let lhs = lhs.into();
     let last_line_width = last_line_width(&lhs).saturating_sub(if lhs.contains('\n') {
         shape.indent.width()
     } else {
@@ -1876,13 +1876,25 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
         offset: shape.offset + last_line_width + 1,
         ..shape
     });
-    let rhs = choose_rhs(
+    choose_rhs(
         context,
         ex,
         orig_shape,
         ex.rewrite(context, orig_shape),
         rhs_tactics,
-    )?;
+        has_impl,
+    )
+}
+
+pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
+    context: &RewriteContext<'_>,
+    lhs: S,
+    ex: &R,
+    shape: Shape,
+    rhs_tactics: RhsTactics,
+) -> Option<String> {
+    let lhs = lhs.into();
+    let rhs = rewrite_assign_rhs_node(context, &lhs, ex, shape, rhs_tactics, false)?;
     Some(lhs + &rhs)
 }
 
@@ -1892,12 +1904,14 @@ fn choose_rhs<R: Rewrite>(
     shape: Shape,
     orig_rhs: Option<String>,
     rhs_tactics: RhsTactics,
+    has_impl: bool,
 ) -> Option<String> {
+    let impl_str = if has_impl { "impl " } else { "" };
     match orig_rhs {
         Some(ref new_str)
             if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
         {
-            Some(format!(" {}", new_str))
+            Some(format!(" {}{}", impl_str, new_str))
         }
         _ => {
             // Expression did not fit on the same line as the identifier.
@@ -1914,20 +1928,23 @@ fn choose_rhs<R: Rewrite>(
                     if wrap_str(new_rhs.clone(), context.config.max_width(), new_shape)
                         .is_none() =>
                 {
-                    Some(format!(" {}", orig_rhs))
+                    Some(format!(" {}{}", impl_str, orig_rhs))
                 }
                 (Some(ref orig_rhs), Some(ref new_rhs))
                     if prefer_next_line(orig_rhs, new_rhs, rhs_tactics) =>
                 {
-                    Some(format!("{}{}", new_indent_str, new_rhs))
+                    Some(format!("{}{}{}", new_indent_str, impl_str, new_rhs))
                 }
-                (None, Some(ref new_rhs)) => Some(format!("{}{}", new_indent_str, new_rhs)),
+                (None, Some(ref new_rhs)) => {
+                    Some(format!("{}{}{}", new_indent_str, impl_str, new_rhs))
+                }
                 (None, None) if rhs_tactics == RhsTactics::AllowOverflow => {
                     let shape = shape.infinite_width();
-                    expr.rewrite(context, shape).map(|s| format!(" {}", s))
+                    expr.rewrite(context, shape)
+                        .map(|s| format!(" {}{}", impl_str, s))
                 }
                 (None, None) => None,
-                (Some(orig_rhs), _) => Some(format!(" {}", orig_rhs)),
+                (Some(orig_rhs), _) => Some(format!(" {}{}", impl_str, orig_rhs)),
             }
         }
     }

@@ -18,7 +18,8 @@ use crate::comment::{
 use crate::config::lists::*;
 use crate::config::{BraceStyle, Config, IndentStyle, Version};
 use crate::expr::{
-    is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with, RhsTactics,
+    is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_node,
+    rewrite_assign_rhs_with, RhsTactics,
 };
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
 use crate::macros::{rewrite_macro, MacroPosition};
@@ -1483,6 +1484,7 @@ fn rewrite_type_item<R: Rewrite>(
     rhs: &R,
     generics: &ast::Generics,
     vis: &ast::Visibility,
+    has_impl: bool,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
     result.push_str(&rewrite_type_prefix(
@@ -1502,7 +1504,15 @@ fn rewrite_type_item<R: Rewrite>(
 
     // 1 = ";"
     let rhs_shape = Shape::indented(indent, context.config).sub_width(1)?;
-    rewrite_assign_rhs(context, result, rhs, rhs_shape).map(|s| s + ";")
+    let rhs = rewrite_assign_rhs_node(
+        context,
+        &result,
+        rhs,
+        rhs_shape,
+        RhsTactics::Default,
+        has_impl,
+    )?;
+    Some(format!("{}{};", result, rhs))
 }
 
 pub(crate) fn rewrite_type_alias(
@@ -1513,7 +1523,9 @@ pub(crate) fn rewrite_type_alias(
     generics: &ast::Generics,
     vis: &ast::Visibility,
 ) -> Option<String> {
-    rewrite_type_item(context, indent, "type", " =", ident, ty, generics, vis)
+    rewrite_type_item(
+        context, indent, "type", " =", ident, ty, generics, vis, false,
+    )
 }
 
 pub(crate) fn rewrite_opaque_type(
@@ -1528,11 +1540,12 @@ pub(crate) fn rewrite_opaque_type(
         context,
         indent,
         "type",
-        " = impl",
+        " =",
         ident,
         generic_bounds,
         generics,
         vis,
+        true,
     )
 }
 
