@@ -1410,7 +1410,7 @@ use core::slice;
 
 ## `license_template_path`
 
-Check whether beginnings of files match a license template.
+Check whether beginnings of files match a license template. Value must a valid regexp.
 
 - **Default value**: `""`
 - **Possible values**: path to a license template file
