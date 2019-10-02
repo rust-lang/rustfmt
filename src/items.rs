@@ -1120,18 +1120,13 @@ pub(crate) fn format_trait(
 
 struct GenericBounds<'a> {
     generic_bounds: &'a ast::GenericBounds,
-    has_impl: bool,
 }
 
 impl<'a> Rewrite for GenericBounds<'a> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        self.generic_bounds.rewrite(context, shape).map(|s| {
-            if self.has_impl {
-                format!("impl {}", s)
-            } else {
-                s
-            }
-        })
+        self.generic_bounds
+            .rewrite(context, shape)
+            .map(|s| format!("impl {}", s))
     }
 }
 
@@ -1541,10 +1536,7 @@ pub(crate) fn rewrite_opaque_type(
     generics: &ast::Generics,
     vis: &ast::Visibility,
 ) -> Option<String> {
-    let generic_bounds = GenericBounds {
-        generic_bounds,
-        has_impl: true,
-    };
+    let generic_bounds = GenericBounds { generic_bounds };
     rewrite_type_item(
         context,
         indent,
