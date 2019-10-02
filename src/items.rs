@@ -18,8 +18,7 @@ use crate::comment::{
 use crate::config::lists::*;
 use crate::config::{BraceStyle, Config, IndentStyle, Version};
 use crate::expr::{
-    is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_node,
-    rewrite_assign_rhs_with, RhsTactics,
+    is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with, RhsTactics,
 };
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
 use crate::macros::{rewrite_macro, MacroPosition};
@@ -1119,6 +1118,23 @@ pub(crate) fn format_trait(
     }
 }
 
+struct GenericBounds<'a> {
+    generic_bounds: &'a ast::GenericBounds,
+    has_impl: bool,
+}
+
+impl<'a> Rewrite for GenericBounds<'a> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        self.generic_bounds.rewrite(context, shape).map(|s| {
+            if self.has_impl {
+                format!("impl {}", s)
+            } else {
+                s
+            }
+        })
+    }
+}
+
 pub(crate) struct TraitAliasBounds<'a> {
     generic_bounds: &'a ast::GenericBounds,
     generics: &'a ast::Generics,
@@ -1484,7 +1500,6 @@ fn rewrite_type_item<R: Rewrite>(
     rhs: &R,
     generics: &ast::Generics,
     vis: &ast::Visibility,
-    has_impl: bool,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
     result.push_str(&rewrite_type_prefix(
@@ -1504,15 +1519,7 @@ fn rewrite_type_item<R: Rewrite>(
 
     // 1 = ";"
     let rhs_shape = Shape::indented(indent, context.config).sub_width(1)?;
-    let rhs = rewrite_assign_rhs_node(
-        context,
-        &result,
-        rhs,
-        rhs_shape,
-        RhsTactics::Default,
-        has_impl,
-    )?;
-    Some(format!("{}{};", result, rhs))
+    rewrite_assign_rhs(context, result, rhs, rhs_shape).map(|s| s + ";")
 }
 
 pub(crate) fn rewrite_type_alias(
@@ -1523,9 +1530,7 @@ pub(crate) fn rewrite_type_alias(
     generics: &ast::Generics,
     vis: &ast::Visibility,
 ) -> Option<String> {
-    rewrite_type_item(
-        context, indent, "type", " =", ident, ty, generics, vis, false,
-    )
+    rewrite_type_item(context, indent, "type", " =", ident, ty, generics, vis)
 }
 
 pub(crate) fn rewrite_opaque_type(
@@ -1536,16 +1541,19 @@ pub(crate) fn rewrite_opaque_type(
     generics: &ast::Generics,
     vis: &ast::Visibility,
 ) -> Option<String> {
+    let generic_bounds = GenericBounds {
+        generic_bounds,
+        has_impl: true,
+    };
     rewrite_type_item(
         context,
         indent,
         "type",
         " =",
         ident,
-        generic_bounds,
+        &generic_bounds,
         generics,
         vis,
-        true,
     )
 }
 
