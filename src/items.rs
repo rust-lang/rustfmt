@@ -1118,11 +1118,11 @@ pub(crate) fn format_trait(
     }
 }
 
-struct GenericBounds<'a> {
+struct OpaqueTypeBounds<'a> {
     generic_bounds: &'a ast::GenericBounds,
 }
 
-impl<'a> Rewrite for GenericBounds<'a> {
+impl<'a> Rewrite for OpaqueTypeBounds<'a> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.generic_bounds
             .rewrite(context, shape)
@@ -1536,14 +1536,14 @@ pub(crate) fn rewrite_opaque_type(
     generics: &ast::Generics,
     vis: &ast::Visibility,
 ) -> Option<String> {
-    let generic_bounds = GenericBounds { generic_bounds };
+    let opaque_type_bounds = OpaqueTypeBounds { generic_bounds };
     rewrite_type_item(
         context,
         indent,
         "type",
         " =",
         ident,
-        &generic_bounds,
+        &opaque_type_bounds,
         generics,
         vis,
     )
