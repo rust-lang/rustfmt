@@ -710,7 +710,7 @@ struct SilentOnIgnoredFilesEmitter {
 }
 
 impl Emitter for SilentOnIgnoredFilesEmitter {
-    fn emit_diagnostic(&mut self, db: &DiagnosticBuilder<'_>) {
+    fn emit_diagnostic(&mut self, db: &Diagnostic) {
         if let Some(primary_span) = &db.span.primary_span() {
             let file_name = self.source_map.span_to_filename(*primary_span);
             match file_name {
@@ -763,8 +763,14 @@ fn make_parse_sess(
             ColorConfig::Never
         };
 
-        let emitter_writer =
-            EmitterWriter::stderr(color_cfg, Some(source_map.clone()), false, false, None);
+        let emitter_writer = EmitterWriter::stderr(
+            color_cfg,
+            Some(source_map.clone()),
+            false,
+            false,
+            None,
+            false,
+        );
         let emitter = Box::new(SilentOnIgnoredFilesEmitter {
             has_non_ignorable_parser_errors: false,
             ignore_path_set: ignore_path_set,
