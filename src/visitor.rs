@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use syntax::parse::ParseSess;
@@ -7,6 +7,7 @@ use syntax::{ast, visit};
 
 use crate::attr::*;
 use crate::comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};
+use crate::config::Version;
 use crate::config::{BraceStyle, Config};
 use crate::coverage::transform_missing_snippet;
 use crate::items::{
@@ -111,7 +112,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             return;
         }
 
-        match stmt.as_ast_node().node {
+        match stmt.as_ast_node().kind {
             ast::StmtKind::Item(ref item) => {
                 self.visit_item(item);
                 // Handle potential `;` after the item.
@@ -252,32 +253,60 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
                     let mut comment_shape =
                         Shape::indented(self.block_indent, config).comment(config);
-                    if comment_on_same_line {
-                        // 1 = a space before `//`
-                        let offset_len = 1 + last_line_width(&self.buffer)
-                            .saturating_sub(self.block_indent.width());
-                        match comment_shape
-                            .visual_indent(offset_len)
-                            .sub_width(offset_len)
-                        {
-                            Some(shp) => comment_shape = shp,
-                            None => comment_on_same_line = false,
-                        }
-                    };
-
-                    if comment_on_same_line {
+                    if self.config.version() == Version::Two && comment_on_same_line {
                         self.push_str(" ");
-                    } else {
-                        if count_newlines(snippet_in_between) >= 2 || extra_newline {
-                            self.push_str("\n");
-                        }
-                        self.push_str(&self.block_indent.to_string_with_newline(config));
-                    }
+                        // put the first line of the comment on the same line as the
+                        // block's last line
+                        match sub_slice.find("\n") {
+                            None => {
+                                self.push_str(&sub_slice);
+                            }
+                            Some(offset) if offset + 1 == sub_slice.len() => {
+                                self.push_str(&sub_slice[..offset]);
+                            }
+                            Some(offset) => {
+                                let first_line = &sub_slice[..offset];
+                                self.push_str(first_line);
+                                self.push_str(&self.block_indent.to_string_with_newline(config));
 
-                    let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config);
-                    match comment_str {
-                        Some(ref s) => self.push_str(s),
-                        None => self.push_str(&sub_slice),
+                                // put the other lines below it, shaping it as needed
+                                let other_lines = &sub_slice[offset + 1..];
+                                let comment_str =
+                                    rewrite_comment(other_lines, false, comment_shape, config);
+                                match comment_str {
+                                    Some(ref s) => self.push_str(s),
+                                    None => self.push_str(other_lines),
+                                }
+                            }
+                        }
+                    } else {
+                        if comment_on_same_line {
+                            // 1 = a space before `//`
+                            let offset_len = 1 + last_line_width(&self.buffer)
+                                .saturating_sub(self.block_indent.width());
+                            match comment_shape
+                                .visual_indent(offset_len)
+                                .sub_width(offset_len)
+                            {
+                                Some(shp) => comment_shape = shp,
+                                None => comment_on_same_line = false,
+                            }
+                        };
+
+                        if comment_on_same_line {
+                            self.push_str(" ");
+                        } else {
+                            if count_newlines(snippet_in_between) >= 2 || extra_newline {
+                                self.push_str("\n");
+                            }
+                            self.push_str(&self.block_indent.to_string_with_newline(config));
+                        }
+
+                        let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config);
+                        match comment_str {
+                            Some(ref s) => self.push_str(s),
+                            None => self.push_str(&sub_slice),
+                        }
                     }
                 }
                 CodeCharKind::Normal if skip_normal(&sub_slice) => {
@@ -368,7 +397,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let skip_context_saved = self.skip_context.clone();
         self.skip_context.update_with_attrs(&attrs);
 
-        let should_visit_node_again = match item.node {
+        let should_visit_node_again = match item.kind {
             // For use/extern crate items, skip rewriting attributes but check for a skip attribute.
             ast::ItemKind::Use(..) | ast::ItemKind::ExternCrate(_) => {
                 if contains_skip(attrs) {
@@ -410,7 +439,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         };
 
         if should_visit_node_again {
-            match item.node {
+            match item.kind {
                 ast::ItemKind::Use(ref tree) => self.format_import(item, tree),
                 ast::ItemKind::Impl(..) => {
                     let block_indent = self.block_indent;
@@ -528,7 +557,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             return;
         }
 
-        match ti.node {
+        match ti.kind {
             ast::TraitItemKind::Const(..) => self.visit_static(&StaticParts::from_trait_item(ti)),
             ast::TraitItemKind::Method(ref sig, None) => {
                 let indent = self.block_indent;
@@ -572,7 +601,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             return;
         }
 
-        match ii.node {
+        match ii.kind {
             ast::ImplItemKind::Method(ref sig, ref body) => {
                 let inner_attrs = inner_attributes(&ii.attrs);
                 self.visit_fn(
@@ -862,15 +891,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     where
         F: Fn(&RewriteContext<'_>) -> Option<String>,
     {
-        // FIXME borrow checker fighting - can be simplified a lot with NLL.
-        let (result, mrf) = {
-            let context = self.get_context();
-            let result = f(&context);
-            let mrf = &context.macro_rewrite_failure.borrow();
-            (result, *std::ops::Deref::deref(mrf))
-        };
+        let context = self.get_context();
+        let result = f(&context);
 
-        self.macro_rewrite_failure |= mrf;
+        self.macro_rewrite_failure |= context.macro_rewrite_failure.get();
         result
     }
 
@@ -879,12 +903,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             parse_session: self.parse_session,
             source_map: self.source_map,
             config: self.config,
-            inside_macro: Rc::new(RefCell::new(false)),
-            use_block: RefCell::new(false),
-            is_if_else_block: RefCell::new(false),
-            force_one_line_chain: RefCell::new(false),
+            inside_macro: Rc::new(Cell::new(false)),
+            use_block: Cell::new(false),
+            is_if_else_block: Cell::new(false),
+            force_one_line_chain: Cell::new(false),
             snippet_provider: self.snippet_provider,
-            macro_rewrite_failure: RefCell::new(false),
+            macro_rewrite_failure: Cell::new(false),
             report: self.report.clone(),
             skip_context: self.skip_context.clone(),
             skipped_range: self.skipped_range.clone(),

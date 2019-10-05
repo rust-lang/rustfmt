@@ -4,7 +4,7 @@ use syntax::{ast, ptr};
 use crate::config::lists::*;
 use crate::config::Version;
 use crate::expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond};
-use crate::items::{span_hi_for_arg, span_lo_for_arg};
+use crate::items::{span_hi_for_param, span_lo_for_param};
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
 use crate::overflow::OverflowableItem;
 use crate::rewrite::{Rewrite, RewriteContext};
@@ -40,7 +40,7 @@ pub(crate) fn rewrite_closure(
     // 1 = space between `|...|` and body.
     let body_shape = shape.offset_left(extra_offset)?;
 
-    if let ast::ExprKind::Block(ref block, _) = body.node {
+    if let ast::ExprKind::Block(ref block, _) = body.kind {
         // The body of the closure is an empty block.
         if block.stmts.is_empty() && !block_contains_comment(block, context.source_map) {
             return body
@@ -89,7 +89,7 @@ fn get_inner_expr<'a>(
     prefix: &str,
     context: &RewriteContext<'_>,
 ) -> &'a ast::Expr {
-    if let ast::ExprKind::Block(ref block, _) = expr.node {
+    if let ast::ExprKind::Block(ref block, _) = expr.kind {
         if !needs_block(block, prefix, context) {
             // block.stmts.len() == 1
             if let Some(expr) = stmt_expr(&block.stmts[0]) {
@@ -110,7 +110,7 @@ fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext<'_>) -
 }
 
 fn veto_block(e: &ast::Expr) -> bool {
-    match e.node {
+    match e.kind {
         ast::ExprKind::Call(..)
         | ast::ExprKind::Binary(..)
         | ast::ExprKind::Cast(..)
@@ -141,7 +141,7 @@ fn rewrite_closure_with_block(
     let block = ast::Block {
         stmts: vec![ast::Stmt {
             id: ast::NodeId::root(),
-            node: ast::StmtKind::Expr(ptr::P(body.clone())),
+            kind: ast::StmtKind::Expr(ptr::P(body.clone())),
             span: body.span,
         }],
         id: ast::NodeId::root(),
@@ -161,7 +161,7 @@ fn rewrite_closure_expr(
     shape: Shape,
 ) -> Option<String> {
     fn allow_multi_line(expr: &ast::Expr) -> bool {
-        match expr.node {
+        match expr.kind {
             ast::ExprKind::Match(..)
             | ast::ExprKind::Block(..)
             | ast::ExprKind::TryBlock(..)
@@ -232,24 +232,24 @@ fn rewrite_closure_fn_decl(
         .sub_width(4)?;
 
     // 1 = |
-    let argument_offset = nested_shape.indent + 1;
-    let arg_shape = nested_shape.offset_left(1)?.visual_indent(0);
-    let ret_str = fn_decl.output.rewrite(context, arg_shape)?;
+    let param_offset = nested_shape.indent + 1;
+    let param_shape = nested_shape.offset_left(1)?.visual_indent(0);
+    let ret_str = fn_decl.output.rewrite(context, param_shape)?;
 
-    let arg_items = itemize_list(
+    let param_items = itemize_list(
         context.snippet_provider,
         fn_decl.inputs.iter(),
         "|",
         ",",
-        |arg| span_lo_for_arg(arg),
-        |arg| span_hi_for_arg(context, arg),
-        |arg| arg.rewrite(context, arg_shape),
+        |param| span_lo_for_param(param),
+        |param| span_hi_for_param(context, param),
+        |param| param.rewrite(context, param_shape),
         context.snippet_provider.span_after(span, "|"),
         body.span.lo(),
         false,
     );
-    let item_vec = arg_items.collect::<Vec<_>>();
-    // 1 = space between arguments and return type.
+    let item_vec = param_items.collect::<Vec<_>>();
+    // 1 = space between parameters and return type.
     let horizontal_budget = nested_shape.width.saturating_sub(ret_str.len() + 1);
     let tactic = definitive_tactic(
         &item_vec,
@@ -257,12 +257,12 @@ fn rewrite_closure_fn_decl(
         Separator::Comma,
         horizontal_budget,
     );
-    let arg_shape = match tactic {
-        DefinitiveListTactic::Horizontal => arg_shape.sub_width(ret_str.len() + 1)?,
-        _ => arg_shape,
+    let param_shape = match tactic {
+        DefinitiveListTactic::Horizontal => param_shape.sub_width(ret_str.len() + 1)?,
+        _ => param_shape,
     };
 
-    let fmt = ListFormatting::new(arg_shape, context.config)
+    let fmt = ListFormatting::new(param_shape, context.config)
         .tactic(tactic)
         .preserve_newline(true);
     let list_str = write_list(&item_vec, &fmt)?;
@@ -271,7 +271,7 @@ fn rewrite_closure_fn_decl(
     if !ret_str.is_empty() {
         if prefix.contains('\n') {
             prefix.push('\n');
-            prefix.push_str(&argument_offset.to_string(context.config));
+            prefix.push_str(&param_offset.to_string(context.config));
         } else {
             prefix.push(' ');
         }
@@ -291,9 +291,9 @@ pub(crate) fn rewrite_last_closure(
     shape: Shape,
 ) -> Option<String> {
     if let ast::ExprKind::Closure(capture, ref is_async, movability, ref fn_decl, ref body, _) =
-        expr.node
+        expr.kind
     {
-        let body = match body.node {
+        let body = match body.kind {
             ast::ExprKind::Block(ref block, _)
                 if !is_unsafe_block(block)
                     && !context.inside_macro()
@@ -353,7 +353,7 @@ pub(crate) fn rewrite_last_closure(
 pub(crate) fn args_have_many_closure(args: &[OverflowableItem<'_>]) -> bool {
     args.iter()
         .filter_map(OverflowableItem::to_expr)
-        .filter(|expr| match expr.node {
+        .filter(|expr| match expr.kind {
             ast::ExprKind::Closure(..) => true,
             _ => false,
         })
@@ -371,7 +371,7 @@ fn is_block_closure_forced(context: &RewriteContext<'_>, expr: &ast::Expr) -> bo
 }
 
 fn is_block_closure_forced_inner(expr: &ast::Expr, version: Version) -> bool {
-    match expr.node {
+    match expr.kind {
         ast::ExprKind::If(..) | ast::ExprKind::While(..) | ast::ExprKind::ForLoop(..) => true,
         ast::ExprKind::Loop(..) if version == Version::Two => true,
         ast::ExprKind::AddrOf(_, ref expr)
@@ -392,7 +392,7 @@ fn is_block_closure_forced_inner(expr: &ast::Expr, version: Version) -> bool {
 /// isn't parsed as (if true {...} else {...} | x) | 5
 // From https://github.com/rust-lang/rust/blob/master/src/libsyntax/parse/classify.rs.
 fn expr_requires_semi_to_be_stmt(e: &ast::Expr) -> bool {
-    match e.node {
+    match e.kind {
         ast::ExprKind::If(..)
         | ast::ExprKind::Match(..)
         | ast::ExprKind::Block(..)

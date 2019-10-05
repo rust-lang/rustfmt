@@ -193,19 +193,26 @@ pub(crate) fn is_attributes_extendable(attrs_str: &str) -> bool {
     !attrs_str.contains('\n') && !last_line_contains_single_line_comment(attrs_str)
 }
 
-// The width of the first line in s.
+/// The width of the first line in s.
 #[inline]
 pub(crate) fn first_line_width(s: &str) -> usize {
     unicode_str_width(s.splitn(2, '\n').next().unwrap_or(""))
 }
 
-// The width of the last line in s.
+/// The width of the last line in s.
 #[inline]
 pub(crate) fn last_line_width(s: &str) -> usize {
     unicode_str_width(s.rsplitn(2, '\n').next().unwrap_or(""))
 }
 
-// The total used width of the last line.
+/// The indent width of the last line in s.
+#[inline]
+pub(crate) fn last_line_indent(s: &str) -> usize {
+    let last_line = s.rsplitn(2, '\n').next().unwrap_or("");
+    last_line.chars().take_while(|c| c.is_whitespace()).count()
+}
+
+/// The total used width of the last line.
 #[inline]
 pub(crate) fn last_line_used_width(s: &str, offset: usize) -> usize {
     if s.contains('\n') {
@@ -241,7 +248,7 @@ pub(crate) fn last_line_extendable(s: &str) -> bool {
 
 #[inline]
 fn is_skip(meta_item: &MetaItem) -> bool {
-    match meta_item.node {
+    match meta_item.kind {
         MetaItemKind::Word => {
             let path_str = meta_item.path.to_string();
             path_str == skip_annotation().as_str() || path_str == depr_skip_annotation().as_str()
@@ -270,7 +277,7 @@ pub(crate) fn contains_skip(attrs: &[Attribute]) -> bool {
 
 #[inline]
 pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr) -> bool {
-    match expr.node {
+    match expr.kind {
         ast::ExprKind::Ret(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Break(..) => {
             context.config.trailing_semicolon()
         }
@@ -280,8 +287,8 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
 
 #[inline]
 pub(crate) fn semicolon_for_stmt(context: &RewriteContext<'_>, stmt: &ast::Stmt) -> bool {
-    match stmt.node {
-        ast::StmtKind::Semi(ref expr) => match expr.node {
+    match stmt.kind {
+        ast::StmtKind::Semi(ref expr) => match expr.kind {
             ast::ExprKind::While(..) | ast::ExprKind::Loop(..) | ast::ExprKind::ForLoop(..) => {
                 false
             }
@@ -297,7 +304,7 @@ pub(crate) fn semicolon_for_stmt(context: &RewriteContext<'_>, stmt: &ast::Stmt)
 
 #[inline]
 pub(crate) fn stmt_expr(stmt: &ast::Stmt) -> Option<&ast::Expr> {
-    match stmt.node {
+    match stmt.kind {
         ast::StmtKind::Expr(ref expr) => Some(expr),
         _ => None,
     }
@@ -415,7 +422,7 @@ pub(crate) fn colon_spaces(config: &Config) -> &'static str {
 
 #[inline]
 pub(crate) fn left_most_sub_expr(e: &ast::Expr) -> &ast::Expr {
-    match e.node {
+    match e.kind {
         ast::ExprKind::Call(ref e, _)
         | ast::ExprKind::Binary(_, ref e, _)
         | ast::ExprKind::Cast(ref e, _)
@@ -443,7 +450,7 @@ pub(crate) fn first_line_ends_with(s: &str, c: char) -> bool {
 // States whether an expression's last line exclusively consists of closing
 // parens, braces, and brackets in its idiomatic formatting.
 pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr: &str) -> bool {
-    match expr.node {
+    match expr.kind {
         ast::ExprKind::Mac(..)
         | ast::ExprKind::Call(..)
         | ast::ExprKind::MethodCall(..)
@@ -452,8 +459,10 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::While(..)
         | ast::ExprKind::If(..)
         | ast::ExprKind::Block(..)
+        | ast::ExprKind::Async(..)
         | ast::ExprKind::Loop(..)
         | ast::ExprKind::ForLoop(..)
+        | ast::ExprKind::TryBlock(..)
         | ast::ExprKind::Match(..) => repr.contains('\n'),
         ast::ExprKind::Paren(ref expr)
         | ast::ExprKind::Binary(_, _, ref expr)
@@ -466,7 +475,25 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         ast::ExprKind::Lit(_) => {
             repr.contains('\n') && trimmed_last_line_width(repr) <= context.config.tab_spaces()
         }
-        _ => false,
+        ast::ExprKind::AddrOf(..)
+        | ast::ExprKind::Assign(..)
+        | ast::ExprKind::AssignOp(..)
+        | ast::ExprKind::Await(..)
+        | ast::ExprKind::Box(..)
+        | ast::ExprKind::Break(..)
+        | ast::ExprKind::Cast(..)
+        | ast::ExprKind::Continue(..)
+        | ast::ExprKind::Err
+        | ast::ExprKind::Field(..)
+        | ast::ExprKind::InlineAsm(..)
+        | ast::ExprKind::Let(..)
+        | ast::ExprKind::Path(..)
+        | ast::ExprKind::Range(..)
+        | ast::ExprKind::Repeat(..)
+        | ast::ExprKind::Ret(..)
+        | ast::ExprKind::Tup(..)
+        | ast::ExprKind::Type(..)
+        | ast::ExprKind::Yield(None) => false,
     }
 }
 

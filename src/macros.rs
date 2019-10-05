@@ -528,7 +528,7 @@ pub(crate) fn rewrite_macro_def(
             Some(v) => Some(v),
             // if the rewrite returned None because a macro could not be rewritten, then return the
             // original body
-            None if *context.macro_rewrite_failure.borrow() => {
+            None if context.macro_rewrite_failure.get() => {
                 Some(context.snippet(branch.body).trim().to_string())
             }
             None => None,
@@ -1196,7 +1196,7 @@ pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> O
 
         Some(ast::Expr {
             id: ast::NodeId::root(), // dummy value
-            node: ast::ExprKind::Try(parser.parse_expr().ok()?),
+            kind: ast::ExprKind::Try(parser.parse_expr().ok()?),
             span: mac.span, // incorrect span, but shouldn't matter too much
             attrs: ThinVec::new(),
         })

@@ -63,7 +63,7 @@ implement_spanned!(ast::ImplItem);
 
 impl Spanned for ast::Stmt {
     fn span(&self) -> Span {
-        match self.node {
+        match self.kind {
             ast::StmtKind::Local(ref local) => mk_sp(local.span().lo(), self.span.hi()),
             ast::StmtKind::Item(ref item) => mk_sp(item.span().lo(), self.span.hi()),
             ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => {
@@ -106,7 +106,7 @@ impl Spanned for ast::Arm {
 
 impl Spanned for ast::Param {
     fn span(&self) -> Span {
-        if crate::items::is_named_arg(self) {
+        if crate::items::is_named_param(self) {
             mk_sp(self.pat.span.lo(), self.ty.span.hi())
         } else {
             self.ty.span
