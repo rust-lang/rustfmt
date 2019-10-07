@@ -91,9 +91,12 @@ fn get_inner_expr<'a>(
 ) -> &'a ast::Expr {
     if let ast::ExprKind::Block(ref block, _) = expr.kind {
         if !needs_block(block, prefix, context) {
-            // block.stmts.len() == 1
-            if let Some(expr) = stmt_expr(&block.stmts[0]) {
-                return get_inner_expr(expr, prefix, context);
+            // block.stmts.len() == 1 except with `|| {{}}`;
+            // https://github.com/rust-lang/rustfmt/issues/3844
+            if !block.stmts.is_empty() {
+                if let Some(expr) = stmt_expr(&block.stmts[0]) {
+                    return get_inner_expr(expr, prefix, context);
+                }
             }
         }
     }
