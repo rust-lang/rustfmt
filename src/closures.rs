@@ -93,7 +93,7 @@ fn get_inner_expr<'a>(
         if !needs_block(block, prefix, context) {
             // block.stmts.len() == 1 except with `|| {{}}`;
             // https://github.com/rust-lang/rustfmt/issues/3844
-            if let Some(Some(expr)) = block.stmts.first().map(stmt_expr) {
+            if let Some(expr) = block.stmts.first().and_then(stmt_expr) {
                 return get_inner_expr(expr, prefix, context);
             }
         }
