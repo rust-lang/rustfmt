@@ -103,8 +103,21 @@ fn get_inner_expr<'a>(
 
 // Figure out if a block is necessary.
 fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext<'_>) -> bool {
+    let has_attribute = if let Some(first_stmt) = block.stmts.first() {
+        match first_stmt.kind {
+            ast::StmtKind::Local(ref local) => !local.attrs.is_empty(),
+            ast::StmtKind::Item(ref item) => !item.attrs.is_empty(),
+            ast::StmtKind::Expr(ref expr) => !expr.attrs.is_empty(),
+            ast::StmtKind::Mac(ref mac) => !mac.2.is_empty(),
+            ast::StmtKind::Semi(ref expr) => !expr.attrs.is_empty(),
+        }
+    } else {
+        false
+    };
+
     is_unsafe_block(block)
         || block.stmts.len() > 1
+        || has_attribute
         || block_contains_comment(block, context.source_map)
         || prefix.contains('\n')
 }
