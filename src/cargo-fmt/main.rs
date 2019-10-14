@@ -529,8 +529,6 @@ fn add_targets(
             && !test_files_added
             && target.kind.iter().any(|t| t == "test")
         {
-            // If any errors are encountered, just fallback to ignoring
-            // nested files in subdirectories of `tests`
             match manifest_path.parent() {
                 None => None,
                 Some(package_dir) => {
@@ -902,12 +900,172 @@ mod cargo_fmt_tests {
         #[test]
         fn returns_nested_files() {
             let target_dir = Path::new("tests/nested-test-files/root-and-nested-tests/tests");
+            let exp_baz = PathBuf::from(
+                "tests/nested-test-files/root-and-nested-tests/tests/nested/deeply-nested/baz.rs",
+            );
+            let exp_foo_bar = PathBuf::from(
+                "tests/nested-test-files/root-and-nested-tests/tests/nested/foo_bar.rs",
+            );
+            let exp_other = PathBuf::from(
+                "tests/nested-test-files/root-and-nested-tests/tests/nested/other.rs",
+            );
             assert_eq!(
-                vec![PathBuf::from(
-                    "tests/nested-test-files/root-and-nested-tests/tests/nested/foo_bar.rs"
-                )],
+                vec![exp_baz, exp_foo_bar, exp_other],
                 get_nested_integration_test_files(&target_dir, &target_dir),
             )
+        }
+    }
+
+    mod get_targets_tests {
+        use super::*;
+
+        fn create_stub_target(
+            src_path: &str,
+            test_files: Vec<PathBuf>,
+            kind: &str,
+            edition: &str,
+        ) -> Target {
+            let path = PathBuf::from(src_path);
+            let canonicalized = fs::canonicalize(&path).unwrap_or(path);
+            Target {
+                path: canonicalized,
+                kind: String::from(kind),
+                edition: String::from(edition),
+                nested_int_test_files: test_files,
+            }
+        }
+
+        mod nested_test_files {
+            use super::*;
+
+            #[test]
+            fn does_not_include_nested_test_files_when_disabled() {
+                let edition = "2018";
+                let project_dir_base = "tests/nested-test-files/root-and-nested-tests";
+                let manifest_path = PathBuf::from(format!("{}/Cargo.toml", project_dir_base));
+                let mut exp_targets: BTreeSet<Target> = BTreeSet::new();
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/src/lib.rs", project_dir_base),
+                    vec![],
+                    "lib",
+                    edition,
+                ));
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/tests/bar.rs", project_dir_base),
+                    vec![],
+                    "test",
+                    edition,
+                ));
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/tests/foo.rs", project_dir_base),
+                    vec![],
+                    "test",
+                    edition,
+                ));
+                let strategy = CargoFmtStrategy::Root;
+                let act_targets = get_targets(&strategy, Some(&manifest_path), false);
+                assert_eq!(act_targets.unwrap(), exp_targets);
+            }
+
+            #[test]
+            fn does_include_nested_test_files_when_enabled() {
+                let edition = "2018";
+                let project_dir_base = "tests/nested-test-files/root-and-nested-tests";
+                let manifest_path = PathBuf::from(format!("{}/Cargo.toml", project_dir_base));
+                let exp_baz = PathBuf::from(format!(
+                    "{}/tests/nested/deeply-nested/baz.rs",
+                    project_dir_base
+                ));
+                let exp_foo_bar =
+                    PathBuf::from(format!("{}/tests/nested/foo_bar.rs", project_dir_base));
+                let exp_other =
+                    PathBuf::from(format!("{}/tests/nested/other.rs", project_dir_base));
+                let mut exp_targets: BTreeSet<Target> = BTreeSet::new();
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/src/lib.rs", project_dir_base),
+                    vec![],
+                    "lib",
+                    edition,
+                ));
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/tests/bar.rs", project_dir_base),
+                    vec![exp_baz, exp_foo_bar, exp_other],
+                    "test",
+                    edition,
+                ));
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/tests/foo.rs", project_dir_base),
+                    vec![],
+                    "test",
+                    edition,
+                ));
+                let strategy = CargoFmtStrategy::Root;
+                let act_targets = get_targets(&strategy, Some(&manifest_path), true);
+                assert_eq!(act_targets.unwrap(), exp_targets);
+            }
+
+            #[test]
+            fn returns_correct_targets_with_empty_tests_dir() {
+                let edition = "2015";
+                let project_dir_base = "tests/nested-test-files/empty-tests-dir";
+                let manifest_path = PathBuf::from(format!("{}/Cargo.toml", project_dir_base));
+                let mut exp_targets: BTreeSet<Target> = BTreeSet::new();
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/src/lib.rs", project_dir_base),
+                    vec![],
+                    "lib",
+                    edition,
+                ));
+                let strategy = CargoFmtStrategy::Root;
+                let act_targets = get_targets(&strategy, Some(&manifest_path), true);
+                assert_eq!(act_targets.unwrap(), exp_targets);
+            }
+
+            #[test]
+            fn returns_correct_targets_with_no_tests_dir() {
+                let edition = "2015";
+                let project_dir_base = "tests/nested-test-files/no-tests-dir";
+                let manifest_path = PathBuf::from(format!("{}/Cargo.toml", project_dir_base));
+                let mut exp_targets: BTreeSet<Target> = BTreeSet::new();
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/src/lib.rs", project_dir_base),
+                    vec![],
+                    "lib",
+                    edition,
+                ));
+                let strategy = CargoFmtStrategy::Root;
+                let act_targets = get_targets(&strategy, Some(&manifest_path), true);
+                assert_eq!(act_targets.unwrap(), exp_targets);
+            }
+
+            #[test]
+            fn returns_correct_targets_with_only_root_level_tests() {
+                let edition = "2015";
+                let project_dir_base = "tests/nested-test-files/only-root-level-tests-dir";
+                let manifest_path = PathBuf::from(format!("{}/Cargo.toml", project_dir_base));
+                let mut exp_targets: BTreeSet<Target> = BTreeSet::new();
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/src/lib.rs", project_dir_base),
+                    vec![],
+                    "lib",
+                    edition,
+                ));
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/tests/bar.rs", project_dir_base),
+                    vec![],
+                    "test",
+                    edition,
+                ));
+                exp_targets.insert(create_stub_target(
+                    &format!("{}/tests/foo.rs", project_dir_base),
+                    vec![],
+                    "test",
+                    edition,
+                ));
+                let strategy = CargoFmtStrategy::Root;
+                let act_targets = get_targets(&strategy, Some(&manifest_path), true);
+                assert_eq!(act_targets.unwrap(), exp_targets);
+            }
         }
     }
 }
