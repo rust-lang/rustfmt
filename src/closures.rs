@@ -3,7 +3,7 @@ use syntax::{ast, ptr};
 
 use crate::attr::get_attrs_from_stmt;
 use crate::config::lists::*;
-use crate::config::Version;
+use crate::config::{IndentStyle, Version};
 use crate::expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond};
 use crate::items::{span_hi_for_param, span_lo_for_param};
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
@@ -238,9 +238,21 @@ fn rewrite_closure_fn_decl(
         .shrink_left(is_async.len() + mover.len() + immovable.len())?
         .sub_width(4)?;
 
+    let indent_style = context.config.indent_style();
+    let version = context.config.version();
+
     // 1 = |
     let param_offset = nested_shape.indent + 1;
-    let param_shape = nested_shape.offset_left(1)?.visual_indent(0);
+    let param_shape = match indent_style {
+        IndentStyle::Block => {
+            if version == Version::Two {
+                Shape::indented(shape.indent.block_indent(context.config), context.config)
+            } else {
+                nested_shape.offset_left(1)?.visual_indent(0)
+            }
+        }
+        IndentStyle::Visual => nested_shape.offset_left(1)?.visual_indent(0),
+    };
     let ret_str = fn_decl.output.rewrite(context, param_shape)?;
 
     let param_items = itemize_list(
@@ -273,10 +285,29 @@ fn rewrite_closure_fn_decl(
         .tactic(tactic)
         .preserve_newline(true);
     let list_str = write_list(&item_vec, &fmt)?;
-    let mut prefix = format!("{}{}{}|{}|", is_async, immovable, mover, list_str);
+    let one_line_budget = context.budget(param_shape.indent.width());
+    let (param_str, put_params_in_block) = if match indent_style {
+        IndentStyle::Block => list_str.contains('\n') || list_str.len() > one_line_budget,
+        _ => false,
+    } && !item_vec.is_empty()
+        && version == Version::Two
+    {
+        (
+            format!(
+                "{}{}{}",
+                param_shape.indent.to_string_with_newline(context.config),
+                &list_str,
+                shape.indent.to_string_with_newline(context.config)
+            ),
+            true,
+        )
+    } else {
+        (list_str, false)
+    };
+    let mut prefix = format!("{}{}{}|{}|", is_async, immovable, mover, param_str);
 
     if !ret_str.is_empty() {
-        if prefix.contains('\n') {
+        if prefix.contains('\n') && !put_params_in_block {
             prefix.push('\n');
             prefix.push_str(&param_offset.to_string(context.config));
         } else {
