@@ -146,7 +146,12 @@ mod tests {
 
         let mut writer = Vec::new();
         let exp_json = to_json_string(&mismatched_file).unwrap();
-        let _ = output_json_file(&mut writer, &FileName::Real(PathBuf::from(file)), vec![mismatch], 0);
+        let _ = output_json_file(
+            &mut writer,
+            &FileName::Real(PathBuf::from(file)),
+            vec![mismatch],
+            0,
+        );
         assert_eq!(&writer[..], format!("{}", exp_json).as_bytes());
     }
 
@@ -186,7 +191,12 @@ mod tests {
 
         let mut writer = Vec::new();
         let exp_json = to_json_string(&mismatched_file).unwrap();
-        let _ = output_json_file(&mut writer, &FileName::Real(PathBuf::from(file)), vec![mismatch], 0);
+        let _ = output_json_file(
+            &mut writer,
+            &FileName::Real(PathBuf::from(file)),
+            vec![mismatch],
+            0,
+        );
         assert_eq!(&writer[..], format!("{}", exp_json).as_bytes());
     }
 

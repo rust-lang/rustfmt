@@ -250,7 +250,9 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32, FailureE
         return Err(OperationError::CheckWithStdin.into());
     }
     // emit mode is always Stdout for Stdin.
-    config.set().emit_mode(options.emit_mode.unwrap_or(EmitMode::Stdout));
+    config
+        .set()
+        .emit_mode(options.emit_mode.unwrap_or(EmitMode::Stdout));
     config.set().verbose(Verbosity::Quiet);
 
     // parse file_lines
