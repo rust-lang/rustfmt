@@ -77,10 +77,6 @@ pub enum OperationError {
     /// supported.
     #[fail(display = "The `--check` option is not supported with standard input.")]
     CheckWithStdin,
-    /// Attempt to use --emit=json with stdin, which isn't currently
-    /// supported.
-    #[fail(display = "Using `--emit` other than stdout is not supported with standard input.")]
-    EmitWithStdin,
 }
 
 impl From<IoError> for OperationError {
@@ -253,13 +249,8 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32, FailureE
     if options.check {
         return Err(OperationError::CheckWithStdin.into());
     }
-    if let Some(emit_mode) = options.emit_mode {
-        if emit_mode != EmitMode::Stdout {
-            return Err(OperationError::EmitWithStdin.into());
-        }
-    }
     // emit mode is always Stdout for Stdin.
-    config.set().emit_mode(EmitMode::Stdout);
+    config.set().emit_mode(options.emit_mode.unwrap_or(EmitMode::Stdout));
     config.set().verbose(Verbosity::Quiet);
 
     // parse file_lines
