@@ -1,4 +1,3 @@
-use std::cell::Cell;
 use std::default::Default;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
@@ -6,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 use crate::config::config_type::ConfigType;
 #[allow(unreachable_pub)]
@@ -14,6 +14,9 @@ pub use crate::config::file_lines::{FileLines, FileName, Range};
 pub use crate::config::lists::*;
 #[allow(unreachable_pub)]
 pub use crate::config::options::*;
+use crate::is_nightly_channel;
+
+use rustfmt_config_proc_macro::rustfmt_config;
 
 #[macro_use]
 pub(crate) mod config_type;
@@ -24,155 +27,359 @@ pub(crate) mod file_lines;
 pub(crate) mod license;
 pub(crate) mod lists;
 
+fn rustfmt_version() -> String {
+    env!("CARGO_PKG_VERSION").to_owned()
+}
+
 // This macro defines configuration options used in rustfmt. Each option
 // is defined as follows:
 //
 // `name: value type, default value, is stable, description;`
-create_config! {
-    // Fundamental stuff
-    max_width: usize, 100, true, "Maximum width of each line";
-    hard_tabs: bool, false, true, "Use tab characters for indentation, spaces for alignment";
-    tab_spaces: usize, 4, true, "Number of spaces per tab";
-    newline_style: NewlineStyle, NewlineStyle::Auto, true, "Unix or Windows line endings";
-    use_small_heuristics: Heuristics, Heuristics::Default, true, "Whether to use different \
-        formatting for items and expressions if they satisfy a heuristic notion of 'small'";
-    indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items";
+#[rustfmt_config]
+#[derive(Default, Serialize, Deserialize, Clone)]
+pub struct Config {
+    /// Maximum width of each line.
+    #[rustfmt::config(default(100), stable("1.0.0"), setter(set_max_width_inner))]
+    max_width: usize,
+    /// Use tab characters for indentation, spaces for alignment.
+    #[rustfmt::config(default(false), stable("1.0.0"))]
+    hard_tabs: bool,
+    /// Number of spaces per tab.
+    #[rustfmt::config(default(4), stable("1.0.0"))]
+    tab_spaces: usize,
+    /// Unix or Windows line endings.
+    #[rustfmt::config(default(NewlineStyle::Auto), stable("1.0.0"))]
+    newline_style: NewlineStyle,
+    /// Whether to use different formatting for items and expressions
+    /// if they satisfy a heuristic notion of 'small'.
+    #[rustfmt::config(
+        default(Heuristics::Default),
+        stable("1.0.0"),
+        setter(set_heuristics_inner)
+    )]
+    use_small_heuristics: Heuristics,
+    /// How do we indent expressions or items.
+    #[rustfmt::config(default(IndentStyle::Block), stable("2.0.0"))]
+    indent_style: IndentStyle,
 
     // Comments. macros, and strings
-    wrap_comments: bool, false, false, "Break comments to fit on the line";
-    format_code_in_doc_comments: bool, false, false, "Format the code snippet in doc comments.";
-    comment_width: usize, 80, false,
-        "Maximum length of comments. No effect unless wrap_comments = true";
-    normalize_comments: bool, false, false, "Convert /* */ comments to // comments where possible";
-    normalize_doc_attributes: bool, false, false, "Normalize doc attributes as doc comments";
-    license_template_path: String, String::default(), false,
-        "Beginning of file must match license template";
-    format_strings: bool, false, false, "Format string literals where necessary";
-    format_macro_matchers: bool, false, false,
-        "Format the metavariable matching patterns in macros";
-    format_macro_bodies: bool, true, false, "Format the bodies of macros";
+    /// Break comments to fit on the line.
+    #[rustfmt::config(default(false))]
+    wrap_comments: bool,
+    /// Format the code snippet in doc comments.
+    #[rustfmt::config(default(false))]
+    format_code_in_doc_comments: bool,
+    /// Maximum length of comments. No effect unless `wrap_comments` is set to `true`.
+    #[rustfmt::config(default(80))]
+    comment_width: usize,
+    /// Convert /* */ comments to // comments where possible.
+    #[rustfmt::config(default(false))]
+    normalize_comments: bool,
+    /// Normalize doc attributes as doc comments.
+    #[rustfmt::config(default(false))]
+    normalize_doc_attributes: bool,
+    /// Beginning of file must match license template.
+    #[rustfmt::config(default(String::default()))]
+    license_template_path: String,
+    /// Format string literals where necessary.
+    #[rustfmt::config(default(false))]
+    format_strings: bool,
+    /// Format the metavariable matching patterns in macros.
+    #[rustfmt::config(default(false))]
+    format_macro_matchers: bool,
+    /// Format the bodies of macros.
+    #[rustfmt::config(default(true))]
+    format_macro_bodies: bool,
 
     // Single line expressions and items
-    empty_item_single_line: bool, true, false,
-        "Put empty-body functions and impls on a single line";
-    struct_lit_single_line: bool, true, false,
-        "Put small struct literals on a single line";
-    fn_single_line: bool, false, false, "Put single-expression functions on a single line";
-    where_single_line: bool, false, false, "Force where-clauses to be on a single line";
+    /// Put empty-body functions and impls on a single line.
+    #[rustfmt::config(default(true))]
+    empty_item_single_line: bool,
+    /// Put small struct literals on a single line.
+    #[rustfmt::config(default(true))]
+    struct_lit_single_line: bool,
+    /// Put single-expression functions on a single line.
+    #[rustfmt::config(default(false))]
+    fn_single_line: bool,
+    /// Force where-clauses to be on a single line.
+    #[rustfmt::config(default(false))]
+    where_single_line: bool,
 
     // Imports
-    imports_indent: IndentStyle, IndentStyle::Block, false, "Indent of imports";
-    imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
-    merge_imports: bool, false, false, "Merge imports";
+    /// Indent of imports.
+    #[rustfmt::config(default(IndentStyle::Block))]
+    imports_indent: IndentStyle,
+    /// Item layout inside a import block.
+    #[rustfmt::config(default(ListTactic::Mixed))]
+    imports_layout: ListTactic,
+    /// Merge imports.
+    #[rustfmt::config(default(false))]
+    merge_imports: bool,
 
     // Ordering
-    reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
-    reorder_modules: bool, true, true, "Reorder module statements alphabetically in group";
-    reorder_impl_items: bool, false, false, "Reorder impl items";
+    /// Reorder import and extern crate statements alphabetically.
+    #[rustfmt::config(default(true))]
+    reorder_imports: bool,
+    /// Reorder module statements alphabetically in group.
+    #[rustfmt::config(default(true))]
+    reorder_modules: bool,
+    /// Reorder impl items.
+    #[rustfmt::config(default(false))]
+    reorder_impl_items: bool,
 
     // Spaces around punctuation
-    type_punctuation_density: TypeDensity, TypeDensity::Wide, false,
-        "Determines if '+' or '=' are wrapped in spaces in the punctuation of types";
-    space_before_colon: bool, false, false, "Leave a space before the colon";
-    space_after_colon: bool, true, false, "Leave a space after the colon";
-    spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
-    binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
-        "Where to put a binary operator when a binary expression goes multiline";
+    /// Determines if '+' or '=' are wrapped in spaces in the punctuation of types.
+    #[rustfmt::config(default(TypeDensity::Wide))]
+    type_punctuation_density: TypeDensity,
+    /// Leave a space before the colon.
+    #[rustfmt::config(default(false))]
+    space_before_colon: bool,
+    /// Leave a space after the colon.
+    #[rustfmt::config(default(true))]
+    space_after_colon: bool,
+    /// Put spaces around the  .. and ..= range operators.
+    #[rustfmt::config(default(false))]
+    spaces_around_ranges: bool,
+    /// Where to put a binary operator when a binary expression goes multiline.
+    #[rustfmt::config(default(SeparatorPlace::Front))]
+    binop_separator: SeparatorPlace,
 
     // Misc.
-    remove_nested_parens: bool, true, true, "Remove nested parens";
-    combine_control_expr: bool, true, false, "Combine control expressions with function calls";
-    overflow_delimited_expr: bool, false, false,
-        "Allow trailing bracket/brace delimited expressions to overflow";
-    struct_field_align_threshold: usize, 0, false,
-        "Align struct fields if their diffs fits within threshold";
-    enum_discrim_align_threshold: usize, 0, false,
-        "Align enum variants discrims, if their diffs fit within threshold";
-    match_arm_blocks: bool, true, false, "Wrap the body of arms in blocks when it does not fit on \
-        the same line with the pattern of arms";
-    force_multiline_blocks: bool, false, false,
-        "Force multiline closure bodies and match arms to be wrapped in a block";
-    fn_args_layout: Density, Density::Tall, true,
-        "Control the layout of arguments in a function";
-    brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
-    control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,
-        "Brace style for control flow constructs";
-    trailing_semicolon: bool, true, false,
-        "Add trailing semicolon after break, continue and return";
-    trailing_comma: SeparatorTactic, SeparatorTactic::Vertical, false,
-        "How to handle trailing commas for lists";
-    match_block_trailing_comma: bool, false, false,
-        "Put a trailing comma after a block based match arm (non-block arms are not affected)";
-    blank_lines_upper_bound: usize, 1, false,
-        "Maximum number of blank lines which can be put between items";
-    blank_lines_lower_bound: usize, 0, false,
-        "Minimum number of blank lines which must be put between items";
-    edition: Edition, Edition::Edition2015, true, "The edition of the parser (RFC 2052)";
-    version: Version, Version::One, false, "Version of formatting rules";
-    inline_attribute_width: usize, 0, false,
-        "Write an item and its attribute on the same line \
-        if their combined width is below a threshold";
+    /// Remove nested parens.
+    #[rustfmt::config(default(true))]
+    remove_nested_parens: bool,
+    /// Combine control expressions with function calls.
+    #[rustfmt::config(default(true))]
+    combine_control_expr: bool,
+    /// Allow trailing bracket/brace delimited expressions to overflow.
+    #[rustfmt::config(default(false))]
+    overflow_delimited_expr: bool,
+    /// Align struct fields if their diffs fits within threshold.
+    #[rustfmt::config(default(0))]
+    struct_field_align_threshold: usize,
+    /// Align enum variants discrims, if their diffs fit within threshold.
+    #[rustfmt::config(default(0))]
+    enum_discrim_align_threshold: usize,
+    /// Wrap the body of arms in blocks when it does not fit on the same line
+    /// with the pattern of arms.
+    #[rustfmt::config(default(true))]
+    match_arm_blocks: bool,
+    /// Force multiline closure bodies and match arms to be wrapped in a block.
+    #[rustfmt::config(default(false))]
+    force_multiline_blocks: bool,
+    /// Control the layout of arguments in a function.
+    #[rustfmt::config(default(Density::Tall))]
+    fn_args_layout: Density,
+    /// Brace style for items.
+    #[rustfmt::config(default(BraceStyle::SameLineWhere))]
+    brace_style: BraceStyle,
+    #[rustfmt::config(default(ControlBraceStyle::AlwaysSameLine))]
+    /// Brace style for control flow constructs.
+    control_brace_style: ControlBraceStyle,
+    /// Add trailing semicolon after break, continue and return.
+    #[rustfmt::config(default(true))]
+    trailing_semicolon: bool,
+    /// How to handle trailing commas for lists.
+    #[rustfmt::config(default(SeparatorTactic::Vertical))]
+    trailing_comma: SeparatorTactic,
+    /// Put a trailing comma after a block based match arm (non-block arms are not affected).
+    #[rustfmt::config(default(false))]
+    match_block_trailing_comma: bool,
+    /// Maximum number of blank lines which can be put between items.
+    #[rustfmt::config(default(1))]
+    blank_lines_upper_bound: usize,
+    /// Minimum number of blank lines which must be put between items.
+    #[rustfmt::config(default(0))]
+    blank_lines_lower_bound: usize,
+    /// The edition of the parser (RFC 2052).
+    #[rustfmt::config(default(Edition::Edition2015), stable("1.0.0"))]
+    edition: Edition,
+    /// Version of formatting rules.
+    #[rustfmt::config(default(Version::One))]
+    version: Version,
+    #[rustfmt::config(default(0))]
+    /// Write an item and its attribute on the same line if
+    /// their combined width is below a threshold.
+    inline_attribute_width: usize,
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
-    merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
-    use_try_shorthand: bool, false, true, "Replace uses of the try! macro by the ? shorthand";
-    use_field_init_shorthand: bool, false, true, "Use field initialization shorthand if possible";
-    force_explicit_abi: bool, true, true, "Always print the abi for extern items";
-    condense_wildcard_suffixes: bool, false, false, "Replace strings of _ wildcards by a single .. \
-                                                     in tuple patterns";
+    /// Merge multiple `#[derive(...)]` into a single one.
+    #[rustfmt::config(default(true), stable("1.0.0"))]
+    merge_derives: bool,
+    /// Replace uses of the try! macro by the ? shorthand.
+    #[rustfmt::config(default(false), stable("1.0.0"))]
+    use_try_shorthand: bool,
+    /// Use field initialization shorthand if possible.
+    #[rustfmt::config(default(false), stable("1.0.0"))]
+    use_field_init_shorthand: bool,
+    /// Always print the abi for extern items.
+    #[rustfmt::config(default(true), stable("1.0.0"))]
+    force_explicit_abi: bool,
+    /// Replace strings of _ wildcards by a single `..` in tuple patterns.
+    #[rustfmt::config(default(false))]
+    condense_wildcard_suffixes: bool,
 
     // Control options (changes the operation of rustfmt, rather than the formatting)
-    color: Color, Color::Auto, false,
-        "What Color option to use when none is supplied: Always, Never, Auto";
-    required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
-        "Require a specific version of rustfmt";
-    unstable_features: bool, false, false,
-            "Enables unstable features. Only available on nightly channel";
-    disable_all_formatting: bool, false, false, "Don't reformat anything";
-    skip_children: bool, false, false, "Don't reformat out of line modules";
-    hide_parse_errors: bool, false, false, "Hide errors from the parser";
-    error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
-    error_on_unformatted: bool, false, false,
-        "Error if unable to get comments or string literals within max_width, \
-         or they are left with trailing whitespaces";
-    report_todo: ReportTactic, ReportTactic::Never, false,
-        "Report all, none or unnumbered occurrences of TODO in source file comments";
-    report_fixme: ReportTactic, ReportTactic::Never, false,
-        "Report all, none or unnumbered occurrences of FIXME in source file comments";
-    ignore: IgnoreList, IgnoreList::default(), false,
-        "Skip formatting the specified files and directories";
+    /// What Color option to use when none is supplied: Always, Never, Auto.
+    #[rustfmt::config(default(Color::Auto))]
+    color: Color,
+    /// Require a specific version of rustfmt.
+    #[rustfmt::config(default(rustfmt_version()))]
+    required_version: String,
+    /// Enables unstable features. Only available on nightly channel.
+    #[rustfmt::config(default(false))]
+    unstable_features: bool,
+    /// Don't reformat anything.
+    #[rustfmt::config(default(false))]
+    disable_all_formatting: bool,
+    /// Don't reformat out of line modules.
+    #[rustfmt::config(default(false))]
+    skip_children: bool,
+    /// Hide errors from the parser.
+    #[rustfmt::config(default(false))]
+    hide_parse_errors: bool,
+    /// Error if unable to get all lines within max_width.
+    #[rustfmt::config(default(false))]
+    error_on_line_overflow: bool,
+    /// Error if unable to get comments or string literals within max_width,
+    /// or they are left with trailing whitespaces
+    #[rustfmt::config(default(false))]
+    error_on_unformatted: bool,
+    /// Report all, none or unnumbered occurrences of TODO in source file comments.
+    #[rustfmt::config(default(ReportTactic::Never))]
+    report_todo: ReportTactic,
+    /// Report all, none or unnumbered occurrences of FIXME in source file comments.
+    #[rustfmt::config(default(ReportTactic::Never))]
+    report_fixme: ReportTactic,
+    /// Skip formatting the specified files and directories.
+    #[rustfmt::config(default(IgnoreList::default()))]
+    ignore: IgnoreList,
 
     // Not user-facing
-    verbose: Verbosity, Verbosity::Normal, false, "How much to information to emit to the user";
-    file_lines: FileLines, FileLines::all(), false,
-        "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
-         via the --file-lines option";
-    width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
-        "'small' heuristic values";
-    emit_mode: EmitMode, EmitMode::Files, false,
-        "What emit Mode to use when none is supplied";
-    make_backup: bool, false, false, "Backup changed files";
-    print_misformatted_file_names: bool, false, true,
-        "Prints the names of mismatched files that were formatted. Prints the names of \
-         files that would be formated when used with `--check` mode. ";
-}
+    /// How much to information to emit to the user.
+    #[serde(skip)]
+    pub(crate) verbose: Verbosity,
+    /// Lines to format; this is not supported in rustfmt.toml, and can only be specified
+    /// via the --file-lines option.
+    #[serde(skip)]
+    pub(crate) file_lines: FileLines,
+    /// 'small' heuristic values.
+    #[serde(skip)]
+    pub(crate) width_heuristics: WidthHeuristics,
+    /// What emit Mode to use when none is supplied.
+    #[serde(skip)]
+    pub(crate) emit_mode: EmitMode,
+    /// Backup changed files.
+    #[serde(skip)]
+    pub(crate) make_backup: bool,
+    /// Prints the names of mismatched files that were formatted. Prints the names of
+    /// files that would be formated when used with `--check` mode.
+    #[serde(skip)]
+    pub(crate) print_misformatted_file_names: bool,
 
-impl PartialConfig {
-    pub fn to_toml(&self) -> Result<String, String> {
-        // Non-user-facing options can't be specified in TOML
-        let mut cloned = self.clone();
-        cloned.file_lines = None;
-        cloned.verbose = None;
-        cloned.width_heuristics = None;
-        cloned.print_misformatted_file_names = None;
-
-        ::toml::to_string(&cloned).map_err(|e| format!("Could not output config: {}", e))
-    }
+    #[serde(skip)]
+    pub license_template: Option<Regex>,
 }
 
 impl Config {
+    pub fn license_template(&self) -> Option<&Regex> {
+        self.license_template.as_ref()
+    }
+
+    pub fn print_misformatted_file_names(&self) -> bool {
+        self.print_misformatted_file_names
+    }
+
+    pub fn set_print_misformatted_file_names(&mut self, val: bool) {
+        self.print_misformatted_file_names = val;
+    }
+
+    pub fn make_backup(&self) -> bool {
+        self.make_backup
+    }
+
+    pub fn set_make_backup(&mut self, val: bool) {
+        self.make_backup = val;
+    }
+
+    pub fn emit_mode(&self) -> EmitMode {
+        self.emit_mode.clone()
+    }
+
+    pub fn set_emit_mode(&mut self, val: EmitMode) {
+        self.emit_mode = val;
+    }
+
+    pub fn width_heuristics(&self) -> &WidthHeuristics {
+        &self.width_heuristics
+    }
+
+    pub fn set_width_heuristics(&mut self, val: WidthHeuristics) {
+        self.width_heuristics = val;
+    }
+
+    pub fn file_lines(&self) -> &FileLines {
+        &self.file_lines
+    }
+
+    pub fn set_file_lines(&mut self, val: FileLines) {
+        self.file_lines = val;
+    }
+
+    pub fn verbose(&self) -> Verbosity {
+        self.verbose.clone()
+    }
+
+    pub fn set_verbose(&mut self, val: Verbosity) {
+        self.verbose = val;
+    }
+
+    pub fn to_toml(&self) -> Result<String, ConfigError> {
+        toml::to_string(self).map_err(ConfigError::TomlSerializationError)
+    }
+
+    fn set_max_width_inner(&mut self, val: usize) {
+        self.max_width = Some(val);
+        self.set_heuristics();
+    }
+
+    fn set_heuristics_inner(&mut self, val: Heuristics) {
+        self.use_small_heuristics = Some(val);
+        self.set_heuristics();
+    }
+
+    fn set_heuristics(&mut self) {
+        if self.use_small_heuristics() == Heuristics::Default {
+            let max_width = self.max_width();
+            self.width_heuristics = WidthHeuristics::scaled(max_width);
+        } else if self.use_small_heuristics() == Heuristics::Max {
+            let max_width = self.max_width();
+            self.width_heuristics = WidthHeuristics::set(max_width);
+        } else {
+            self.width_heuristics = WidthHeuristics::null();
+        }
+    }
+
+    fn set_license_template(&mut self) {
+        if self.is_license_template_path_set() {
+            let lt_path = self.license_template_path();
+            if lt_path.len() > 0 {
+                match license::load_and_compile_template(&lt_path) {
+                    Ok(re) => self.license_template = Some(re),
+                    Err(msg) => {
+                        eprintln!("Warning for license template file {:?}: {}", lt_path, msg)
+                    }
+                }
+            }
+        }
+    }
+
+    fn add_ignore_prefix(&mut self, dir: &Path) {
+        self.ignore.as_mut().map(|ignore| ignore.add_prefix(dir));
+    }
+
     pub(crate) fn version_meets_requirement(&self) -> bool {
-        if self.was_set().required_version() {
+        if self.is_required_version_set() {
             let version = env!("CARGO_PKG_VERSION");
             let required_version = self.required_version();
             if version != required_version {
@@ -275,12 +482,15 @@ impl Config {
                 err.push_str(msg)
             }
         }
-        match parsed.try_into() {
-            Ok(parsed_config) => {
+        match parsed.try_into::<Config>() {
+            Ok(mut parsed_config) => {
+                parsed_config.validate().map_err(|e| e.to_string())?;
                 if !err.is_empty() {
                     eprint!("{}", err);
                 }
-                Ok(Config::default().fill_from_parsed_config(parsed_config, dir))
+                parsed_config.add_ignore_prefix(dir);
+                parsed_config.set_license_template();
+                Ok(parsed_config)
             }
             Err(e) => {
                 err.push_str("Error: Decoding config file failed:\n");
@@ -375,96 +585,50 @@ mod test {
     use super::*;
     use std::str;
 
-    #[allow(dead_code)]
-    mod mock {
-        use super::super::*;
-
-        create_config! {
-            // Options that are used by the generated functions
-            max_width: usize, 100, true, "Maximum width of each line";
-            use_small_heuristics: Heuristics, Heuristics::Default, true,
-                "Whether to use different formatting for items and \
-                 expressions if they satisfy a heuristic notion of 'small'.";
-            license_template_path: String, String::default(), false,
-                "Beginning of file must match license template";
-            required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
-                "Require a specific version of rustfmt.";
-            ignore: IgnoreList, IgnoreList::default(), false,
-                "Skip formatting the specified files and directories.";
-            verbose: Verbosity, Verbosity::Normal, false,
-                "How much to information to emit to the user";
-            file_lines: FileLines, FileLines::all(), false,
-                "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
-                    via the --file-lines option";
-            width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
-                "'small' heuristic values";
-
-            // Options that are used by the tests
-            stable_option: bool, false, true, "A stable option";
-            unstable_option: bool, false, false, "An unstable option";
-        }
-    }
+    const STABLE_OPTION_NAME: &str = "max_width";
+    const UNSTABLE_OPTION_NAME: &str = "blank_lines_lower_bound";
 
     #[test]
     fn test_config_set() {
         let mut config = Config::default();
-        config.set().verbose(Verbosity::Quiet);
+        config.set_verbose(Verbosity::Quiet);
         assert_eq!(config.verbose(), Verbosity::Quiet);
-        config.set().verbose(Verbosity::Normal);
+        config.set_verbose(Verbosity::Normal);
         assert_eq!(config.verbose(), Verbosity::Normal);
-    }
-
-    #[test]
-    fn test_config_used_to_toml() {
-        let config = Config::default();
-
-        let merge_derives = config.merge_derives();
-        let skip_children = config.skip_children();
-
-        let used_options = config.used_options();
-        let toml = used_options.to_toml().unwrap();
-        assert_eq!(
-            toml,
-            format!(
-                "merge_derives = {}\nskip_children = {}\n",
-                merge_derives, skip_children,
-            )
-        );
     }
 
     #[test]
     fn test_was_set() {
         let config = Config::from_toml("hard_tabs = true", Path::new("")).unwrap();
 
-        assert_eq!(config.was_set().hard_tabs(), true);
-        assert_eq!(config.was_set().verbose(), false);
+        assert_eq!(config.is_hard_tabs_set(), true);
     }
 
     #[test]
     fn test_print_docs_exclude_unstable() {
-        use self::mock::Config;
+        use self::Config;
 
         let mut output = Vec::new();
-        Config::print_docs(&mut output, false);
+        Config::print_docs(&mut output, false).unwrap();
 
         let s = str::from_utf8(&output).unwrap();
 
-        assert_eq!(s.contains("stable_option"), true);
-        assert_eq!(s.contains("unstable_option"), false);
-        assert_eq!(s.contains("(unstable)"), false);
+        assert_eq!(s.contains(STABLE_OPTION_NAME), true, "\n{}", s);
+        assert_eq!(s.contains(UNSTABLE_OPTION_NAME), false, "\n{}", s);
+        assert_eq!(s.contains("(unstable)"), false, "\n{}", s);
     }
 
     #[test]
     fn test_print_docs_include_unstable() {
-        use self::mock::Config;
+        use self::Config;
 
         let mut output = Vec::new();
-        Config::print_docs(&mut output, true);
+        Config::print_docs(&mut output, true).unwrap();
 
         let s = str::from_utf8(&output).unwrap();
-        assert_eq!(s.contains("stable_option"), true);
-        assert_eq!(s.contains("unstable_option"), true);
-        assert_eq!(s.contains("(unstable)"), true);
+        assert_eq!(s.contains(STABLE_OPTION_NAME), true, "\n{}", s);
+        assert_eq!(s.contains(UNSTABLE_OPTION_NAME), true, "\n{}", s);
+        assert_eq!(s.contains("(unstable)"), true, "\n{}", s);
     }
 
     #[test]
@@ -548,12 +712,10 @@ error_on_unformatted = false
 report_todo = "Never"
 report_fixme = "Never"
 ignore = []
-emit_mode = "Files"
-make_backup = false
 "#,
             env!("CARGO_PKG_VERSION")
         );
-        let toml = Config::default().all_options().to_toml().unwrap();
+        let toml = Config::all_options().to_toml().unwrap();
         assert_eq!(&toml, &default_config);
     }
 

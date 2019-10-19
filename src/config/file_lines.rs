@@ -195,11 +195,6 @@ fn normalize_ranges(ranges: &mut HashMap<FileName, Vec<Range>>) {
 }
 
 impl FileLines {
-    /// Creates a `FileLines` that contains all lines in all files.
-    pub(crate) fn all() -> FileLines {
-        FileLines(None)
-    }
-
     /// Returns `true` if this `FileLines` contains all lines in all files.
     pub(crate) fn is_all(&self) -> bool {
         self.0.is_none()

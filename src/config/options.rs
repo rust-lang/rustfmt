@@ -171,6 +171,12 @@ pub enum Verbosity {
     Quiet,
 }
 
+impl Default for Verbosity {
+    fn default() -> Verbosity {
+        Verbosity::Normal
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct WidthHeuristics {
     // Maximum width of the args of a function call before falling back
@@ -198,6 +204,12 @@ pub struct WidthHeuristics {
 impl fmt::Display for WidthHeuristics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+impl Default for WidthHeuristics {
+    fn default() -> Self {
+        WidthHeuristics::scaled(100)
     }
 }
 
