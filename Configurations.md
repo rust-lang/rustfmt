@@ -2435,17 +2435,3 @@ Break comments to fit on the line
 // exercitation ullamco laboris nisi ut aliquip ex ea
 // commodo consequat.
 ```
-
-# Internal Options
-
-## `emit_mode`
-
-Internal option
-
-## `make_backup`
-
-Internal option, use `--backup`
-
-## `print_misformatted_file_names`
-
-Internal option, use `-l` or `--files-with-diff`
