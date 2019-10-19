@@ -73,6 +73,10 @@ pub enum OperationError {
     /// An io error during reading or writing.
     #[fail(display = "io error: {}", _0)]
     IoError(IoError),
+    /// Attempt to use --check with stdin, which isn't currently
+    /// supported.
+    #[fail(display = "The `--check` option is not supported with standard input.")]
+    CheckWithStdin,
 }
 
 impl From<IoError> for OperationError {
@@ -463,6 +467,9 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
     if files.is_empty() {
         if minimal_config_path.is_some() {
             return Err(OperationError::MinimalPathWithStdin);
+        }
+        if matches.opt_present("check") {
+            return Err(OperationError::CheckWithStdin);
         }
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer)?;
