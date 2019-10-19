@@ -1883,12 +1883,80 @@ pub(crate) fn rewrite_assign_rhs<S: Into<String>, R: Rewrite>(
 
 pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     context: &RewriteContext<'_>,
-    lhs: &str,
+    mut lhs: String,
     ex: &R,
+    local: Option<&ast::Local>,
     shape: Shape,
     rhs_tactics: RhsTactics,
-    has_rhs_comment: bool,
 ) -> Option<String> {
+    let mut has_rhs_comment = false;
+
+    if let Some(ast::Local {
+        ref pat,
+        ref ty,
+        ref init,
+        ref span,
+        ..
+    }) = local
+    {
+        let base_span = if let Some(ref ty) = ty {
+            mk_sp(ty.span.hi(), span.hi())
+        } else {
+            mk_sp(pat.span.hi(), span.hi())
+        };
+
+        if let Some(ex) = init {
+            if let Some(offset) = context.snippet(base_span).find_uncommented("=") {
+                let base_span_lo = base_span.lo();
+
+                let assign_lo = base_span_lo + BytePos(offset as u32);
+                let comment_start_pos = if let Some(ref ty) = ty {
+                    ty.span.hi()
+                } else {
+                    pat.span.hi()
+                };
+                let comment_before_assign =
+                    context.snippet(mk_sp(comment_start_pos, assign_lo)).trim();
+
+                let assign_hi = base_span_lo + BytePos((offset + 1) as u32);
+                let rhs_span_lo = ex.span.lo();
+                let comment_end_pos = if ex.attrs.is_empty() {
+                    rhs_span_lo
+                } else {
+                    let attr_span_lo = ex.attrs.first().unwrap().span.lo();
+                    // for the case using block
+                    // ex. let x = { #![my_attr]do_something(); }
+                    if rhs_span_lo < attr_span_lo {
+                        rhs_span_lo
+                    } else {
+                        attr_span_lo
+                    }
+                };
+                let comment_after_assign =
+                    context.snippet(mk_sp(assign_hi, comment_end_pos)).trim();
+
+                if !comment_before_assign.is_empty() {
+                    let pat_shape = shape.offset_left(4)?;
+                    // 1 = ;
+                    // let pat_shape = pat_shape.sub_width(1)?;
+                    let new_indent_str = &pat_shape
+                        .block_indent(0)
+                        .to_string_with_newline(context.config);
+                    lhs = format!("{}{}{}", comment_before_assign, new_indent_str, lhs);
+                }
+
+                if !comment_after_assign.is_empty() {
+                    let new_indent_str =
+                        &shape.block_indent(0).to_string_with_newline(context.config);
+                    lhs.push_str(new_indent_str);
+                    lhs.push_str(comment_after_assign);
+                    lhs.push_str(new_indent_str);
+                    has_rhs_comment = true;
+                }
+            }
+        }
+    }
+
     let last_line_width = last_line_width(&lhs).saturating_sub(if lhs.contains('\n') {
         shape.indent.width()
     } else {
@@ -1900,14 +1968,15 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
         offset: shape.offset + last_line_width + 1,
         ..shape
     });
-    choose_rhs(
+    let rhs = choose_rhs(
         context,
         ex,
         orig_shape,
         ex.rewrite(context, orig_shape),
         rhs_tactics,
         has_rhs_comment,
-    )
+    )?;
+    Some(lhs + &rhs)
 }
 
 pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
@@ -1918,8 +1987,7 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
     rhs_tactics: RhsTactics,
 ) -> Option<String> {
     let lhs = lhs.into();
-    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics, false)?;
-    Some(lhs + &rhs)
+    rewrite_assign_rhs_expr(context, lhs, ex, None, shape, rhs_tactics)
 }
 
 fn choose_rhs<R: Rewrite>(
