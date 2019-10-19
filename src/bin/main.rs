@@ -334,7 +334,7 @@ fn format(
     // that were used during formatting as TOML.
     if let Some(path) = minimal_config_path {
         let mut file = File::create(path)?;
-        let toml = session.config.used_options().to_toml().map_err(err_msg)?;
+        let toml = session.config.to_toml().map_err(err_msg)?;
         file.write_all(toml.as_bytes())?;
     }
 
