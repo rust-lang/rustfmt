@@ -169,7 +169,7 @@ impl<'a> FmtVisitor<'a> {
         let snippet = &*transform_missing_snippet(self.config, old_snippet);
 
         let slice_within_file_lines_range =
-            |file_lines: FileLines, cur_line, s| -> (usize, usize, bool) {
+            |file_lines: &FileLines, cur_line, s| -> (usize, usize, bool) {
                 let (lf_count, crlf_count) = count_lf_crlf(s);
                 let newline_count = lf_count + crlf_count;
                 let within_file_lines_range = file_lines.contains_range(

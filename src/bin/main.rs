@@ -202,7 +202,7 @@ fn execute(opts: &Options) -> Result<i32, FailureError> {
             Ok(0)
         }
         Operation::Help(HelpOp::Config) => {
-            Config::print_docs(&mut stdout(), options.unstable_features);
+            Config::print_docs(&mut stdout(), options.unstable_features)?;
             Ok(0)
         }
         Operation::Help(HelpOp::FileLines) => {
@@ -214,7 +214,7 @@ fn execute(opts: &Options) -> Result<i32, FailureError> {
             Ok(0)
         }
         Operation::ConfigOutputDefault { path } => {
-            let toml = Config::default().all_options().to_toml().map_err(err_msg)?;
+            let toml = Config::all_options().to_toml().map_err(err_msg)?;
             if let Some(path) = path {
                 let mut file = File::create(path)?;
                 file.write_all(toml.as_bytes())?;
@@ -233,8 +233,7 @@ fn execute(opts: &Options) -> Result<i32, FailureError> {
             let file = file.canonicalize().unwrap_or(file);
 
             let (config, _) = load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
-            let toml = config.all_options().to_toml().map_err(err_msg)?;
-            io::stdout().write_all(toml.as_bytes())?;
+            io::stdout().write_all(config.to_toml()?.as_bytes())?;
 
             Ok(0)
         }
@@ -259,11 +258,11 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32, FailureE
         }
     }
     // emit mode is always Stdout for Stdin.
-    config.set().emit_mode(EmitMode::Stdout);
-    config.set().verbose(Verbosity::Quiet);
+    config.set_emit_mode(EmitMode::Stdout);
+    config.set_verbose(Verbosity::Quiet);
 
     // parse file_lines
-    config.set().file_lines(options.file_lines);
+    config.set_file_lines(options.file_lines);
     for f in config.file_lines().files() {
         match *f {
             FileName::Stdin => {}
@@ -642,40 +641,40 @@ impl GetOptsOptions {
 impl CliOptions for GetOptsOptions {
     fn apply_to(self, config: &mut Config) {
         if self.verbose {
-            config.set().verbose(Verbosity::Verbose);
+            config.set_verbose(Verbosity::Verbose);
         } else if self.quiet {
-            config.set().verbose(Verbosity::Quiet);
+            config.set_verbose(Verbosity::Quiet);
         } else {
-            config.set().verbose(Verbosity::Normal);
+            config.set_verbose(Verbosity::Normal);
         }
-        config.set().file_lines(self.file_lines);
-        config.set().unstable_features(self.unstable_features);
+        config.set_file_lines(self.file_lines);
+        config.set_unstable_features(self.unstable_features);
         if let Some(skip_children) = self.skip_children {
-            config.set().skip_children(skip_children);
+            config.set_skip_children(skip_children);
         }
         if let Some(error_on_unformatted) = self.error_on_unformatted {
-            config.set().error_on_unformatted(error_on_unformatted);
+            config.set_error_on_unformatted(error_on_unformatted);
         }
         if let Some(edition) = self.edition {
-            config.set().edition(edition);
+            config.set_edition(edition);
         }
         if self.check {
-            config.set().emit_mode(EmitMode::Diff);
+            config.set_emit_mode(EmitMode::Diff);
         } else if let Some(emit_mode) = self.emit_mode {
-            config.set().emit_mode(emit_mode);
+            config.set_emit_mode(emit_mode);
         }
         if self.backup {
-            config.set().make_backup(true);
+            config.set_make_backup(true);
         }
         if let Some(color) = self.color {
-            config.set().color(color);
+            config.set_color(color);
         }
         if self.print_misformatted_file_names {
-            config.set().print_misformatted_file_names(true);
+            config.set_print_misformatted_file_names(true);
         }
 
         for (key, val) in self.inline_config {
-            config.override_value(&key, &val);
+            config.override_value(&key, &val).unwrap();
         }
     }
 

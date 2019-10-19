@@ -284,9 +284,9 @@ fn format_snippet(snippet: &str, config: &Config) -> Option<FormattedSnippet> {
     let mut config = config.clone();
     panic::catch_unwind(|| {
         let mut out: Vec<u8> = Vec::with_capacity(snippet.len() * 2);
-        config.set().emit_mode(config::EmitMode::Stdout);
-        config.set().verbose(Verbosity::Quiet);
-        config.set().hide_parse_errors(true);
+        config.emit_mode = config::EmitMode::Stdout;
+        config.verbose = Verbosity::Quiet;
+        config.set_hide_parse_errors(true);
 
         let (formatting_error, result) = {
             let input = Input::Text(snippet.into());
@@ -347,9 +347,7 @@ fn format_code_block(code_snippet: &str, config: &Config) -> Option<FormattedSni
     // not directly outputted by rustfmt command, but used by the comment formatter's input.
     // We have output-file-wide "\n" ==> "\r\n" conversion process after here if it's necessary.
     let mut config_with_unix_newline = config.clone();
-    config_with_unix_newline
-        .set()
-        .newline_style(NewlineStyle::Unix);
+    config_with_unix_newline.set_newline_style(NewlineStyle::Unix);
     let mut formatted = format_snippet(&snippet, &config_with_unix_newline)?;
     // Remove wrapping main block
     formatted.unwrap_code_block();

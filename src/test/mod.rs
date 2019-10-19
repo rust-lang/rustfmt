@@ -413,8 +413,8 @@ fn stdin_works_with_modified_lines() {
 
     let input = Input::Text(input.to_owned());
     let mut config = Config::default();
-    config.set().newline_style(NewlineStyle::Unix);
-    config.set().emit_mode(EmitMode::ModifiedLines);
+    config.set_newline_style(NewlineStyle::Unix);
+    config.set_emit_mode(EmitMode::ModifiedLines);
     let mut buf: Vec<u8> = vec![];
     {
         let mut session = Session::new(config, Some(&mut buf));
@@ -463,7 +463,7 @@ fn format_lines_errors_are_reported() {
     let long_identifier = String::from_utf8(vec![b'a'; 239]).unwrap();
     let input = Input::Text(format!("fn {}() {{}}", long_identifier));
     let mut config = Config::default();
-    config.set().error_on_line_overflow(true);
+    config.set_error_on_line_overflow(true);
     let mut session = Session::<io::Stdout>::new(config, None);
     session.format(input).unwrap();
     assert!(session.has_formatting_errors());
@@ -475,8 +475,8 @@ fn format_lines_errors_are_reported_with_tabs() {
     let long_identifier = String::from_utf8(vec![b'a'; 97]).unwrap();
     let input = Input::Text(format!("fn a() {{\n\t{}\n}}", long_identifier));
     let mut config = Config::default();
-    config.set().error_on_line_overflow(true);
-    config.set().hard_tabs(true);
+    config.set_error_on_line_overflow(true);
+    config.set_hard_tabs(true);
     let mut session = Session::<io::Stdout>::new(config, None);
     session.format(input).unwrap();
     assert!(session.has_formatting_errors());

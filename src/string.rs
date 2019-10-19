@@ -466,7 +466,7 @@ mod test {
         );
 
         let mut config: Config = Default::default();
-        config.set().max_width(27);
+        config.set_max_width(27);
         let fmt = StringFormat::new(Shape::legacy(25, Indent::empty()), &config);
         let rewritten_string = rewrite_string(string, &fmt, 27);
         assert_eq!(

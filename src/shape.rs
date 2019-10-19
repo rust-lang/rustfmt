@@ -325,7 +325,7 @@ mod test {
     #[test]
     fn indent_to_string_hard_tabs() {
         let mut config = Config::default();
-        config.set().hard_tabs(true);
+        config.set_hard_tabs(true);
         let indent = Indent::new(8, 4);
 
         // 2 tabs + 4 spaces

@@ -1334,7 +1334,7 @@ impl MacroBranch {
         let has_block_body = old_body.starts_with('{');
 
         let mut config = context.config.clone();
-        config.set().hide_parse_errors(true);
+        config.set_hide_parse_errors(true);
 
         result += " {";
 
@@ -1344,14 +1344,14 @@ impl MacroBranch {
             shape.indent.block_indent(&config)
         };
         let new_width = config.max_width() - body_indent.width();
-        config.set().max_width(new_width);
+        config.set_max_width(new_width);
 
         // First try to format as items, then as statements.
         let new_body_snippet = match crate::format_snippet(&body_str, &config) {
             Some(new_body) => new_body,
             None => {
                 let new_width = new_width + config.tab_spaces();
-                config.set().max_width(new_width);
+                config.set_max_width(new_width);
                 match crate::format_code_block(&body_str, &config) {
                     Some(new_body) => new_body,
                     None => return None,

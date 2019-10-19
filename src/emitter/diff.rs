@@ -86,7 +86,7 @@ mod tests {
 
         let mut writer = Vec::new();
         let mut config = Config::default();
-        config.set().print_misformatted_file_names(true);
+        config.set_print_misformatted_file_names(true);
         let mut emitter = DiffEmitter::new(config);
         let _ = emitter
             .emit_formatted_file(

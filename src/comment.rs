@@ -655,7 +655,7 @@ impl<'a> CommentRewrite<'a> {
                     _ if self.code_block_buffer.is_empty() => String::new(),
                     _ => {
                         let mut config = self.fmt.config.clone();
-                        config.set().wrap_comments(false);
+                        config.set_wrap_comments(false);
                         if config.format_code_in_doc_comments() {
                             if let Some(s) =
                                 crate::format_code_block(&self.code_block_buffer, &config)
@@ -1744,11 +1744,11 @@ mod test {
     #[rustfmt::skip]
     fn format_doc_comments() {
         let mut wrap_normalize_config: crate::config::Config = Default::default();
-        wrap_normalize_config.set().wrap_comments(true);
-        wrap_normalize_config.set().normalize_comments(true);
+        wrap_normalize_config.set_wrap_comments(true);
+        wrap_normalize_config.set_normalize_comments(true);
 
         let mut wrap_config: crate::config::Config = Default::default();
-        wrap_config.set().wrap_comments(true);
+        wrap_config.set_wrap_comments(true);
 
         let comment = rewrite_comment(" //test",
                                       true,

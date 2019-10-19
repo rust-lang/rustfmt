@@ -95,12 +95,14 @@ impl ConfigCodeBlock {
 
     fn get_block_config(&self) -> Config {
         let mut config = Config::default();
-        config.set().verbose(Verbosity::Quiet);
+        config.set_verbose(Verbosity::Quiet);
         if self.config_name.is_some() && self.config_value.is_some() {
-            config.override_value(
-                self.config_name.as_ref().unwrap(),
-                self.config_value.as_ref().unwrap(),
-            );
+            config
+                .override_value(
+                    self.config_name.as_ref().unwrap(),
+                    self.config_value.as_ref().unwrap(),
+                )
+                .unwrap();
         }
         config
     }
@@ -184,7 +186,7 @@ impl ConfigCodeBlock {
 
         let input = Input::Text(self.code_block.as_ref().unwrap().to_owned());
         let mut config = self.get_block_config();
-        config.set().emit_mode(EmitMode::Stdout);
+        config.set_emit_mode(EmitMode::Stdout);
         let mut buf: Vec<u8> = vec![];
 
         {
@@ -210,7 +212,7 @@ impl ConfigCodeBlock {
     fn extract<I: Iterator<Item = String>>(
         file: &mut Enumerate<I>,
         prev: Option<&ConfigCodeBlock>,
-        hash_set: &mut HashSet<String>,
+        hash_set: &mut HashSet<&str>,
     ) -> Option<ConfigCodeBlock> {
         let mut code_block = ConfigCodeBlock::new();
         code_block.config_name = prev.and_then(|cb| cb.config_name.clone());
@@ -228,7 +230,7 @@ impl ConfigCodeBlock {
                         name
                     );
                     assert!(
-                        hash_set.remove(&name),
+                        hash_set.remove(name.as_str()),
                         "multiple configuration guides found for option {}",
                         name
                     );
