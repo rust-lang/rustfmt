@@ -79,8 +79,8 @@ pub enum OperationError {
     CheckWithStdin,
     /// Attempt to use --emit=json with stdin, which isn't currently
     /// supported.
-    #[fail(display = "Emitting json is not supported with standard input.")]
-    EmitJsonWithStdin,
+    #[fail(display = "Using `--emit` other than stdout is not supported with standard input.")]
+    EmitWithStdin,
 }
 
 impl From<IoError> for OperationError {
@@ -250,6 +250,12 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32, FailureE
     // try to read config from local directory
     let (mut config, _) = load_config(Some(Path::new(".")), Some(options.clone()))?;
 
+    if options.check {
+        return Err(OperationError::CheckWithStdin.into());
+    }
+    if options.emit_mode != EmitMode::Stdout {
+        return Err(OperationError::EmitWithStdin.into());
+    }
     // emit mode is always Stdout for Stdin.
     config.set().emit_mode(EmitMode::Stdout);
     config.set().verbose(Verbosity::Quiet);
@@ -471,14 +477,6 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
     if files.is_empty() {
         if minimal_config_path.is_some() {
             return Err(OperationError::MinimalPathWithStdin);
-        }
-        if matches.opt_present("check") {
-            return Err(OperationError::CheckWithStdin);
-        }
-        if let Some(mode) = matches.opt_str("emit") {
-            if mode == "json" {
-                return Err(OperationError::EmitJsonWithStdin);
-            }
         }
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer)?;
