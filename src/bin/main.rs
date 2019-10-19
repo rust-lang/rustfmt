@@ -77,6 +77,10 @@ pub enum OperationError {
     /// supported.
     #[fail(display = "The `--check` option is not supported with standard input.")]
     CheckWithStdin,
+    /// Attempt to use --emit=json with stdin, which isn't currently
+    /// supported.
+    #[fail(display = "Emitting json is not supported with standard input.")]
+    EmitJsonWithStdin,
 }
 
 impl From<IoError> for OperationError {
@@ -470,6 +474,11 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
         }
         if matches.opt_present("check") {
             return Err(OperationError::CheckWithStdin);
+        }
+        if let Some(mode) = matches.opt_str("emit") {
+            if mode == "json" {
+                return Err(OperationError::EmitJsonWithStdin);
+            }
         }
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer)?;
