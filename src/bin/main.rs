@@ -77,6 +77,10 @@ pub enum OperationError {
     /// supported.
     #[fail(display = "The `--check` option is not supported with standard input.")]
     CheckWithStdin,
+    /// Attempt to use --emit with a mode which is not currently
+    /// supported with stdandard input.
+    #[fail(display = "Emit mode {} not supported with standard output.", _0)]
+    StdinBadEmit(EmitMode),
 }
 
 impl From<IoError> for OperationError {
@@ -248,6 +252,16 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32, FailureE
 
     if options.check {
         return Err(OperationError::CheckWithStdin.into());
+    }
+    match options.emit_mode {
+        // Emit modes which work with standard input
+        // None means default, which is Stdout.
+        None |
+        Some(EmitMode::Stdout) |
+        Some(EmitMode::Json) => {}
+        Some(emit_mode) => {
+            return Err(OperationError::StdinBadEmit(emit_mode).into());
+        },
     }
     // emit mode is always Stdout for Stdin.
     config
