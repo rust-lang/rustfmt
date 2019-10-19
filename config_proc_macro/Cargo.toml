@@ -15,9 +15,11 @@ proc-macro = true
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "1.0", features = ["full", "visit"] }
+thiserror = "1.0"
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
+toml = "0.5"
 
 [features]
 default = []
