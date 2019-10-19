@@ -280,9 +280,7 @@ fn get_code_blocks() -> Vec<ConfigCodeBlock> {
     }
 
     for name in hash_set {
-        if !Config::is_hidden_option(&name) {
-            panic!("{} does not have a configuration guide", name);
-        }
+        panic!("{} does not have a configuration guide", name);
     }
 
     code_blocks

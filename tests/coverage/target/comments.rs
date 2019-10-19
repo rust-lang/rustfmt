@@ -1,4 +1,3 @@
-XX XXXXXXXXXXXXXXXXXX XXXXXXXX
 /// Here's a doc comment!
 fn main() {
     XX XXX XX XXX

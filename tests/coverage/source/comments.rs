@@ -1,4 +1,3 @@
-// rustfmt-emit_mode: coverage
 /// Here's a doc comment!
 fn main() {
     // foo is bar
