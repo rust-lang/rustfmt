@@ -256,13 +256,10 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32, FailureE
     match options.emit_mode {
         // Emit modes which work with standard input
         // None means default, which is Stdout.
-        None |
-        Some(EmitMode::Stdout) |
-        Some(EmitMode::Checkstyle) |
-        Some(EmitMode::Json) => {}
+        None | Some(EmitMode::Stdout) | Some(EmitMode::Checkstyle) | Some(EmitMode::Json) => {}
         Some(emit_mode) => {
             return Err(OperationError::StdinBadEmit(emit_mode).into());
-        },
+        }
     }
     // emit mode is always Stdout for Stdin.
     config

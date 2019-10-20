@@ -75,7 +75,11 @@ mod tests {
     fn emits_empty_record_on_file_with_no_mismatches() {
         let file_name = "src/well_formatted.rs";
         let mut writer = Vec::new();
-        let _ = output_checkstyle_file(&mut writer, &FileName::Real(PathBuf::from(file_name)), vec![]);
+        let _ = output_checkstyle_file(
+            &mut writer,
+            &FileName::Real(PathBuf::from(file_name)),
+            vec![],
+        );
         assert_eq!(
             &writer[..],
             format!(r#"<file name="{}"></file>"#, file_name).as_bytes()
