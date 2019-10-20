@@ -258,6 +258,7 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32, FailureE
         // None means default, which is Stdout.
         None |
         Some(EmitMode::Stdout) |
+        Some(EmitMode::Checkstyle) |
         Some(EmitMode::Json) => {}
         Some(emit_mode) => {
             return Err(OperationError::StdinBadEmit(emit_mode).into());
