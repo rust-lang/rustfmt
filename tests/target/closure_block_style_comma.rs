@@ -9,7 +9,7 @@ fn foo() {
             heading: &str,
             color: &Style,
             show_hints: bool,
-            hints: &[&str]
+            hints: &[&str],
         | -> Option<bool> { Some(true) };
     }
 }
@@ -19,7 +19,7 @@ fn bar() {
         status: &mut Vec<ansi_term::ANSIString>,
         diff: &Diff,
         heading: &str,
-        color: &Style
+        color: &Style,
     | -> Option<bool> { Some(true) };
     let baz = |foo: bool| -> Option<bool> { Some(true) };
 }

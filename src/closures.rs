@@ -3,7 +3,7 @@ use syntax::{ast, ptr};
 
 use crate::attr::get_attrs_from_stmt;
 use crate::config::lists::*;
-use crate::config::{IndentStyle, Version};
+use crate::config::{IndentStyle, SeparatorTactic, Version};
 use crate::expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond};
 use crate::items::{span_hi_for_param, span_lo_for_param};
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
@@ -286,24 +286,29 @@ fn rewrite_closure_fn_decl(
         .preserve_newline(true);
     let list_str = write_list(&item_vec, &fmt)?;
     let one_line_budget = context.budget(param_shape.indent.width());
-    let (param_str, put_params_in_block) = if match indent_style {
+    let multi_line_params = match indent_style {
         IndentStyle::Block => list_str.contains('\n') || list_str.len() > one_line_budget,
         _ => false,
-    } && !item_vec.is_empty()
-        && version == Version::Two
-    {
-        (
-            format!(
-                "{}{}{}",
-                param_shape.indent.to_string_with_newline(context.config),
-                &list_str,
-                shape.indent.to_string_with_newline(context.config)
-            ),
-            true,
-        )
-    } else {
-        (list_str, false)
     };
+    let (param_str, put_params_in_block) =
+        if multi_line_params && !item_vec.is_empty() && version == Version::Two {
+            let trailing_comma = match context.config.trailing_comma() {
+                SeparatorTactic::Never => "",
+                _ => ",",
+            };
+            (
+                format!(
+                    "{}{}{}{}",
+                    param_shape.indent.to_string_with_newline(context.config),
+                    &list_str,
+                    trailing_comma,
+                    shape.indent.to_string_with_newline(context.config)
+                ),
+                true,
+            )
+        } else {
+            (list_str, false)
+        };
     let mut prefix = format!("{}{}{}|{}|", is_async, immovable, mover, param_str);
 
     if !ret_str.is_empty() {
