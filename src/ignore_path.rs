@@ -2,6 +2,8 @@ use ignore::{self, gitignore};
 
 use crate::config::{FileName, IgnoreList};
 
+unsafe impl Send for IgnorePathSet {}
+
 pub(crate) struct IgnorePathSet {
     ignore_set: gitignore::Gitignore,
 }

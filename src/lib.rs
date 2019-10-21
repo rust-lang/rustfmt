@@ -74,6 +74,7 @@ pub(crate) mod source_map;
 mod spanned;
 mod stmt;
 mod string;
+mod syntux;
 #[cfg(test)]
 mod test;
 mod types;
