@@ -269,7 +269,7 @@ pub struct Target {
     kind: String,
     /// Rust edition for this target.
     edition: String,
-    // Rust files residing within subdirectories of the tests directory.
+    /// Rust files residing within subdirectories of the tests directory.
     nested_int_test_files: Vec<PathBuf>,
 }
 
