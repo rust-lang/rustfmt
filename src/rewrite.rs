@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use syntax::ptr;
-use syntax::source_map::{SourceMap, Span};
+use syntax::source_map::Span;
 
 use crate::config::{Config, IndentStyle};
 use crate::shape::Shape;
@@ -26,8 +26,7 @@ impl<T: Rewrite> Rewrite for ptr::P<T> {
 
 #[derive(Clone)]
 pub(crate) struct RewriteContext<'a> {
-    pub(crate) parse_session: &'a ParseSess,
-    pub(crate) source_map: &'a SourceMap,
+    pub(crate) parse_sess: &'a ParseSess,
     pub(crate) config: &'a Config,
     pub(crate) inside_macro: Rc<Cell<bool>>,
     // Force block indent style even if we are using visual indent style.
@@ -37,7 +36,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) is_if_else_block: Cell<bool>,
     // When rewriting chain, veto going multi line except the last element
     pub(crate) force_one_line_chain: Cell<bool>,
-    pub(crate) snippet_provider: &'a SnippetProvider<'a>,
+    pub(crate) snippet_provider: &'a SnippetProvider,
     // Used for `format_snippet`
     pub(crate) macro_rewrite_failure: Cell<bool>,
     pub(crate) report: FormatReport,

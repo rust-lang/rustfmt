@@ -7,8 +7,13 @@ use syntax::errors::emitter::{ColorConfig, Emitter, EmitterWriter};
 use syntax::errors::{Diagnostic, Handler};
 use syntax::parse::ParseSess as RawParseSess;
 use syntax::source_map::{FilePathMapping, SourceMap};
+use syntax_pos::{BytePos, Span};
 
+use crate::config::file_lines::LineRange;
 use crate::ignore_path::IgnorePathSet;
+use crate::source_map::LineRangeUtils;
+use crate::utils::starts_with_newline;
+use crate::visitor::SnippetProvider;
 use crate::{Config, ErrorKind, FileName};
 
 /// ParseSess holds structs necessary for constructing a parser.
@@ -138,12 +143,13 @@ impl ParseSess {
             id,
             relative,
             dir_path,
-            self.source_map(),
+            self.parse_sess.source_map(),
         )
     }
 
     pub(crate) fn is_file_parsed(&self, path: &Path) -> bool {
-        self.source_map()
+        self.parse_sess
+            .source_map()
             .get_source_file(&syntax_pos::FileName::Real(path.to_path_buf()))
             .is_some()
     }
@@ -160,6 +166,32 @@ impl ParseSess {
         self.parse_sess.span_diagnostic = Handler::with_emitter(true, None, silent_emitter());
     }
 
+    pub(crate) fn span_to_filename(&self, span: Span) -> FileName {
+        self.parse_sess.source_map().span_to_filename(span).into()
+    }
+
+    pub(crate) fn span_to_first_line_string(&self, span: Span) -> String {
+        let file_lines = self.parse_sess.source_map().span_to_lines(span).ok();
+
+        let first_line_str = match file_lines {
+            Some(fl) => fl
+                .file
+                .get_line(fl.lines[0].line_index)
+                .map(|s| s.into_owned()),
+            None => return String::new(),
+        };
+
+        first_line_str.unwrap_or(String::new())
+    }
+
+    pub(crate) fn line_of_byte_pos(&self, pos: BytePos) -> usize {
+        self.parse_sess.source_map().lookup_char_pos(pos).line
+    }
+
+    pub(crate) fn span_to_debug_info(&self, span: Span) -> String {
+        self.parse_sess.source_map().span_to_string(span)
+    }
+
     pub(crate) fn inner(&self) -> &RawParseSess {
         &self.parse_sess
     }
@@ -172,13 +204,53 @@ impl ParseSess {
         self.parse_sess.span_diagnostic.reset_err_count();
     }
 
-    fn source_map(&self) -> &SourceMap {
-        &self.parse_sess.source_map()
+    pub(crate) fn snippet_provider(&self, span: Span) -> SnippetProvider {
+        let source_file = self.parse_sess.source_map().lookup_char_pos(span.lo()).file;
+        SnippetProvider::new(
+            source_file.start_pos,
+            source_file.end_pos,
+            Rc::clone(source_file.src.as_ref().unwrap()),
+        )
+    }
+
+    pub(crate) fn get_original_snippet(&self, file_name: &FileName) -> Option<Rc<String>> {
+        self.parse_sess
+            .source_map()
+            .get_source_file(&file_name.into())
+            .and_then(|source_file| source_file.src.clone())
     }
 
     pub(crate) fn emit_diagnostics(&self, diagnostics: Vec<Diagnostic>) {
         for diagnostic in diagnostics {
             self.parse_sess.span_diagnostic.emit_diagnostic(&diagnostic);
+        }
+    }
+}
+
+impl LineRangeUtils for ParseSess {
+    fn lookup_line_range(&self, span: Span) -> LineRange {
+        let snippet = self
+            .parse_sess
+            .source_map()
+            .span_to_snippet(span)
+            .unwrap_or_default();
+        let lo = self.parse_sess.source_map().lookup_line(span.lo()).unwrap();
+        let hi = self.parse_sess.source_map().lookup_line(span.hi()).unwrap();
+
+        debug_assert_eq!(
+            lo.sf.name, hi.sf.name,
+            "span crossed file boundary: lo: {:?}, hi: {:?}",
+            lo, hi
+        );
+
+        // in case the span starts with a newline, the line range is off by 1 without the
+        // adjustment below
+        let offset = 1 + if starts_with_newline(&snippet) { 1 } else { 0 };
+        // Line numbers start at 1
+        LineRange {
+            file: lo.sf.clone(),
+            lo: lo.line + offset,
+            hi: hi.line + offset,
         }
     }
 }

@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use syntax::ast;
-use syntax::source_map;
 use syntax::symbol::sym;
 use syntax::visit::Visitor;
 use syntax_pos::symbol::Symbol;
@@ -66,12 +65,9 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         mut self,
         krate: &'ast ast::Crate,
     ) -> Result<FileModMap<'ast>, String> {
-        let root_filename = self.parse_sess.source_map().span_to_filename(krate.span);
+        let root_filename = self.parse_sess.span_to_filename(krate.span);
         self.directory.path = match root_filename {
-            source_map::FileName::Real(ref path) => path
-                .parent()
-                .expect("Parent directory should exists")
-                .to_path_buf(),
+            FileName::Real(ref p) => p.parent().unwrap_or(Path::new("")).to_path_buf(),
             _ => PathBuf::new(),
         };
 
@@ -81,7 +77,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         }
 
         self.file_map
-            .insert(root_filename.into(), Cow::Borrowed(&krate.module));
+            .insert(root_filename, Cow::Borrowed(&krate.module));
         Ok(self.file_map)
     }
 

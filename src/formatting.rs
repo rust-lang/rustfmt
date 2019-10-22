@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
 use syntax::ast;
-use syntax::source_map::{SourceMap, Span};
+use syntax::source_map::Span;
 
 use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};
@@ -14,7 +14,7 @@ use crate::issues::BadIssueSeeker;
 use crate::syntux::parser::{DirectoryOwnership, Parser, ParserError};
 use crate::syntux::session::ParseSess;
 use crate::utils::count_newlines;
-use crate::visitor::{FmtVisitor, SnippetProvider};
+use crate::visitor::FmtVisitor;
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
 
 mod newline_style;
@@ -141,13 +141,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         module: &ast::Mod,
         is_root: bool,
     ) -> Result<(), ErrorKind> {
-        let source_file = self
-            .parse_session
-            .source_map()
-            .lookup_char_pos(module.inner.lo())
-            .file;
-        let big_snippet = source_file.src.as_ref().unwrap();
-        let snippet_provider = SnippetProvider::new(source_file.start_pos, big_snippet);
+        let snippet_provider = self.parse_session.snippet_provider(module.inner);
         let mut visitor = FmtVisitor::from_source_map(
             &self.parse_session,
             &self.config,
@@ -158,16 +152,16 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
 
         // Format inner attributes if available.
         if !self.krate.attrs.is_empty() && is_root {
-            visitor.skip_empty_lines(source_file.end_pos);
+            visitor.skip_empty_lines(snippet_provider.end_pos());
             if visitor.visit_attrs(&self.krate.attrs, ast::AttrStyle::Inner) {
                 visitor.push_rewrite(module.inner, None);
             } else {
-                visitor.format_separate_mod(module, &*source_file);
+                visitor.format_separate_mod(module, snippet_provider.end_pos());
             }
         } else {
-            visitor.last_pos = source_file.start_pos;
-            visitor.skip_empty_lines(source_file.end_pos);
-            visitor.format_separate_mod(module, &*source_file);
+            visitor.last_pos = snippet_provider.start_pos();
+            visitor.skip_empty_lines(snippet_provider.end_pos());
+            visitor.format_separate_mod(module, snippet_provider.end_pos());
         };
 
         debug_assert_eq!(
@@ -192,7 +186,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         apply_newline_style(
             self.config.newline_style(),
             &mut visitor.buffer,
-            &big_snippet,
+            snippet_provider.entire_snippet(),
         );
 
         if visitor.macro_rewrite_failure {
@@ -202,7 +196,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             .add_non_formatted_ranges(visitor.skipped_range.borrow().clone());
 
         self.handler.handle_formatted_file(
-            self.parse_session.source_map(),
+            &self.parse_session,
             path,
             visitor.buffer.to_owned(),
             &mut self.report,
@@ -214,7 +208,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
 trait FormatHandler {
     fn handle_formatted_file(
         &mut self,
-        source_map: &SourceMap,
+        parse_session: &ParseSess,
         path: FileName,
         result: String,
         report: &mut FormatReport,
@@ -225,14 +219,14 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
     // Called for each formatted file.
     fn handle_formatted_file(
         &mut self,
-        source_map: &SourceMap,
+        parse_session: &ParseSess,
         path: FileName,
         result: String,
         report: &mut FormatReport,
     ) -> Result<(), ErrorKind> {
         if let Some(ref mut out) = self.out {
             match source_file::write_file(
-                Some(source_map),
+                Some(parse_session),
                 &path,
                 &result,
                 out,
@@ -265,23 +259,15 @@ pub(crate) struct FormattingError {
 impl FormattingError {
     pub(crate) fn from_span(
         span: Span,
-        source_map: &SourceMap,
+        parse_sess: &ParseSess,
         kind: ErrorKind,
     ) -> FormattingError {
         FormattingError {
-            line: source_map.lookup_char_pos(span.lo()).line,
+            line: parse_sess.line_of_byte_pos(span.lo()),
             is_comment: kind.is_comment(),
             kind,
             is_string: false,
-            line_buffer: source_map
-                .span_to_lines(span)
-                .ok()
-                .and_then(|fl| {
-                    fl.file
-                        .get_line(fl.lines[0].line_index)
-                        .map(std::borrow::Cow::into_owned)
-                })
-                .unwrap_or_else(String::new),
+            line_buffer: parse_sess.span_to_first_line_string(span),
         }
     }
 
