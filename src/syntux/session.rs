@@ -7,7 +7,7 @@ use syntax::parse::ParseSess as RawParseSess;
 use syntax::source_map::{FilePathMapping, SourceMap};
 
 use crate::ignore_path::IgnorePathSet;
-use crate::FileName;
+use crate::{Config, ErrorKind, FileName};
 
 /// ParseSess holds structs necessary for constructing a parser.
 pub(crate) struct ParseSess {
@@ -62,13 +62,6 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
     }
 }
 
-pub(crate) enum ErrorEmission {
-    /// Do not emit errors from the underlying parser.
-    Silence,
-    /// Emit every parser error except ones from files specified in the `ignore` config option.
-    Default,
-}
-
 fn silent_handler() -> Handler {
     Handler::with_emitter(true, None, silent_emitter())
 }
@@ -107,26 +100,30 @@ fn default_handler(
 }
 
 impl ParseSess {
-    pub(crate) fn new(error_emission: ErrorEmission, ignore_path_set: IgnorePathSet) -> ParseSess {
-        let ignore_path_set = Rc::new(ignore_path_set);
+    pub(crate) fn new(config: &Config) -> Result<ParseSess, ErrorKind> {
+        let ignore_path_set = match IgnorePathSet::from_ignore_list(&config.ignore()) {
+            Ok(ignore_path_set) => Rc::new(ignore_path_set),
+            Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
+        };
         let source_map = Rc::new(SourceMap::new(FilePathMapping::empty()));
         let can_reset_errors = Rc::new(RefCell::new(false));
 
-        let handler = match error_emission {
-            ErrorEmission::Silence => silent_handler(),
-            ErrorEmission::Default => default_handler(
+        let handler = if config.hide_parse_errors() {
+            silent_handler()
+        } else {
+            default_handler(
                 Rc::clone(&source_map),
                 Rc::clone(&ignore_path_set),
                 Rc::clone(&can_reset_errors),
-            ),
+            )
         };
-        let parse_sess = RawParseSess::with_span_handler(handler, Rc::clone(&source_map));
+        let parse_sess = RawParseSess::with_span_handler(handler, source_map);
 
-        ParseSess {
+        Ok(ParseSess {
             parse_sess,
             ignore_path_set,
             can_reset_errors,
-        }
+        })
     }
 
     pub(crate) fn can_reset_errors(&self) -> bool {

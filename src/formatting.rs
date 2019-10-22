@@ -11,10 +11,9 @@ use syntax::source_map::{SourceMap, Span};
 use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};
 use crate::config::{Config, FileName, Verbosity};
-use crate::ignore_path::IgnorePathSet;
 use crate::issues::BadIssueSeeker;
 use crate::syntux::parser::{Parser, ParserError};
-use crate::syntux::session::{ErrorEmission, ParseSess};
+use crate::syntux::session::ParseSess;
 use crate::utils::count_newlines;
 use crate::visitor::{FmtVisitor, SnippetProvider};
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
@@ -64,22 +63,13 @@ fn format_project<T: FormatHandler>(
     let main_file = input.file_name();
     let input_is_stdin = main_file == FileName::Stdin;
 
-    let ignore_path_set = match IgnorePathSet::from_ignore_list(&config.ignore()) {
-        Ok(set) => set,
-        Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
-    };
-    if config.skip_children() && ignore_path_set.is_match(&main_file) {
+    let mut parse_session = ParseSess::new(config)?;
+    if config.skip_children() && parse_session.ignore_file(&main_file) {
         return Ok(FormatReport::new());
     }
 
     // Parse the crate.
     let is_stdin = !input.is_text();
-    let error_emission = if config.hide_parse_errors() {
-        ErrorEmission::Silence
-    } else {
-        ErrorEmission::Default
-    };
-    let mut parse_session = ParseSess::new(error_emission, ignore_path_set);
     let mut report = FormatReport::new();
     let directory_ownership = input.to_directory_ownership();
 
