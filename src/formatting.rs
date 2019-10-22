@@ -142,7 +142,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         is_root: bool,
     ) -> Result<(), ErrorKind> {
         let snippet_provider = self.parse_session.snippet_provider(module.inner);
-        let mut visitor = FmtVisitor::from_source_map(
+        let mut visitor = FmtVisitor::from_parse_sess(
             &self.parse_session,
             &self.config,
             &snippet_provider,

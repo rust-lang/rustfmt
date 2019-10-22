@@ -705,7 +705,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     }
 
     pub(crate) fn from_context(ctx: &'a RewriteContext<'_>) -> FmtVisitor<'a> {
-        let mut visitor = FmtVisitor::from_source_map(
+        let mut visitor = FmtVisitor::from_parse_sess(
             ctx.parse_sess,
             ctx.config,
             ctx.snippet_provider,
@@ -716,7 +716,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         visitor
     }
 
-    pub(crate) fn from_source_map(
+    pub(crate) fn from_parse_sess(
         parse_session: &'a ParseSess,
         config: &'a Config,
         snippet_provider: &'a SnippetProvider,

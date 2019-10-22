@@ -2,7 +2,7 @@ use std::iter::ExactSizeIterator;
 use std::ops::Deref;
 
 use syntax::ast::{self, FunctionRetTy, Mutability};
-use syntax::source_map::{self, BytePos, Span};
+use syntax::source_map::{BytePos, Span, DUMMY_SP};
 use syntax::symbol::kw;
 
 use crate::config::lists::*;
@@ -277,7 +277,7 @@ fn rewrite_segment(
             ast::GenericArgs::Parenthesized(ref data) => {
                 let output = match data.output {
                     Some(ref ty) => FunctionRetTy::Ty(ty.clone()),
-                    None => FunctionRetTy::Default(source_map::DUMMY_SP),
+                    None => FunctionRetTy::Default(DUMMY_SP),
                 };
                 result.push_str(&format_function_type(
                     data.inputs.iter().map(|x| &**x),
