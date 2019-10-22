@@ -1,7 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use syntax::parse::ParseSess;
 use syntax::source_map::{self, BytePos, Pos, SourceMap, Span};
 use syntax::{ast, visit};
 
@@ -23,6 +22,7 @@ use crate::skip::{is_skip_attr, SkipContext};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt::Stmt;
+use crate::syntux::session::ParseSess;
 use crate::utils::{
     self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes, last_line_width,
     mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,

@@ -20,13 +20,14 @@ use std::rc::Rc;
 
 use failure::Fail;
 use ignore;
-use syntax::{ast, parse::DirectoryOwnership};
+use syntax::ast;
 
 use crate::comment::LineClasses;
 use crate::emitter::Emitter;
 use crate::formatting::{FormatErrorMap, FormattingError, ReportedErrors, SourceFile};
 use crate::issues::Issue;
 use crate::shape::Indent;
+use crate::syntux::parser::DirectoryOwnership;
 use crate::utils::indent_next_line;
 
 pub use crate::config::{

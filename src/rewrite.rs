@@ -3,13 +3,13 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use syntax::parse::ParseSess;
 use syntax::ptr;
 use syntax::source_map::{SourceMap, Span};
 
 use crate::config::{Config, IndentStyle};
 use crate::shape::Shape;
 use crate::skip::SkipContext;
+use crate::syntux::session::ParseSess;
 use crate::visitor::SnippetProvider;
 use crate::FormatReport;
 

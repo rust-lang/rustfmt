@@ -290,7 +290,7 @@ fn rewrite_macro_inner(
         }
     }
 
-    let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
+    let mut parser = new_parser_from_tts(context.parse_session.inner(), ts.trees().collect());
     let mut arg_vec = Vec::new();
     let mut vec_with_semi = false;
     let mut trailing_comma = false;
@@ -1192,7 +1192,7 @@ fn next_space(tok: &TokenKind) -> SpaceState {
 pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> Option<ast::Expr> {
     if &mac.path.to_string() == "try" {
         let ts: TokenStream = mac.tts.clone();
-        let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
+        let mut parser = new_parser_from_tts(context.parse_session.inner(), ts.trees().collect());
 
         Some(ast::Expr {
             id: ast::NodeId::root(), // dummy value
@@ -1424,7 +1424,7 @@ fn format_lazy_static(
     ts: &TokenStream,
 ) -> Option<String> {
     let mut result = String::with_capacity(1024);
-    let mut parser = new_parser_from_tts(context.parse_session, ts.trees().collect());
+    let mut parser = new_parser_from_tts(context.parse_session.inner(), ts.trees().collect());
     let nested_shape = shape
         .block_indent(context.config.tab_spaces())
         .with_max_width(context.config);

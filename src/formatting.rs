@@ -5,14 +5,13 @@ use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
 use syntax::ast;
-use syntax::parse;
 use syntax::source_map::{SourceMap, Span};
 
 use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};
 use crate::config::{Config, FileName, Verbosity};
 use crate::issues::BadIssueSeeker;
-use crate::syntux::parser::{Parser, ParserError};
+use crate::syntux::parser::{DirectoryOwnership, Parser, ParserError};
 use crate::syntux::session::ParseSess;
 use crate::utils::count_newlines;
 use crate::visitor::{FmtVisitor, SnippetProvider};
@@ -91,8 +90,8 @@ fn format_project<T: FormatHandler>(
 
     let mut context = FormatContext::new(&krate, report, parse_session, config, handler);
     let files = modules::ModResolver::new(
-        context.parse_session.inner(),
-        directory_ownership.unwrap_or(parse::DirectoryOwnership::UnownedViaMod(true)),
+        &context.parse_session,
+        directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod(true)),
         !(input_is_stdin || config.skip_children()),
     )
     .visit_crate(&krate)
@@ -150,7 +149,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         let big_snippet = source_file.src.as_ref().unwrap();
         let snippet_provider = SnippetProvider::new(source_file.start_pos, big_snippet);
         let mut visitor = FmtVisitor::from_source_map(
-            self.parse_session.inner(),
+            &self.parse_session,
             &self.config,
             &snippet_provider,
             self.report.clone(),

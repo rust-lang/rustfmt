@@ -1,6 +1,8 @@
 use std::cell::RefCell;
+use std::path::Path;
 use std::rc::Rc;
 
+use syntax::ast;
 use syntax::errors::emitter::{ColorConfig, Emitter, EmitterWriter};
 use syntax::errors::{Diagnostic, Handler};
 use syntax::parse::ParseSess as RawParseSess;
@@ -126,7 +128,27 @@ impl ParseSess {
         })
     }
 
-    pub(crate) fn can_reset_errors(&self) -> bool {
+    pub(crate) fn default_submod_path(
+        &self,
+        id: ast::Ident,
+        relative: Option<ast::Ident>,
+        dir_path: &Path,
+    ) -> syntax::parse::parser::ModulePath {
+        syntax::parse::parser::Parser::default_submod_path(
+            id,
+            relative,
+            dir_path,
+            self.source_map(),
+        )
+    }
+
+    pub(crate) fn is_file_parsed(&self, path: &Path) -> bool {
+        self.source_map()
+            .get_source_file(&syntax_pos::FileName::Real(path.to_path_buf()))
+            .is_some()
+    }
+
+    pub(super) fn can_reset_errors(&self) -> bool {
         *self.can_reset_errors.borrow()
     }
 
