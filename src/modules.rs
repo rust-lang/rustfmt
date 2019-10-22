@@ -6,7 +6,7 @@ use syntax::ast;
 use syntax::source_map;
 use syntax::symbol::sym;
 use syntax::visit::Visitor;
-use syntax_pos::{self, symbol::Symbol};
+use syntax_pos::symbol::Symbol;
 
 use crate::attr::MetaVisitor;
 use crate::config::FileName;
@@ -18,6 +18,10 @@ use crate::utils::contains_skip;
 mod visitor;
 
 type FileModMap<'ast> = BTreeMap<FileName, Cow<'ast, ast::Mod>>;
+
+lazy_static! {
+    static ref CFG_IF: Symbol = Symbol::intern("cfg_if");
+}
 
 /// Maps each module to the corresponding file.
 pub(crate) struct ModResolver<'ast, 'sess> {
@@ -370,7 +374,7 @@ fn is_cfg_if(item: &ast::Item) -> bool {
     match item.kind {
         ast::ItemKind::Mac(ref mac) => {
             if let Some(first_segment) = mac.path.segments.first() {
-                if first_segment.ident.name == Symbol::intern("cfg_if") {
+                if first_segment.ident.name == *CFG_IF {
                     return true;
                 }
             }

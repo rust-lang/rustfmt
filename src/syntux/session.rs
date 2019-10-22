@@ -172,7 +172,7 @@ impl ParseSess {
         self.parse_sess.span_diagnostic.reset_err_count();
     }
 
-    pub(crate) fn source_map(&self) -> &SourceMap {
+    fn source_map(&self) -> &SourceMap {
         &self.parse_sess.source_map()
     }
 
