@@ -2,19 +2,18 @@
 
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::{Duration, Instant};
 
 use syntax::ast;
-use syntax::errors::DiagnosticBuilder;
 use syntax::parse;
-use syntax::source_map::{SourceMap, Span, DUMMY_SP};
+use syntax::source_map::{SourceMap, Span};
 
 use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};
 use crate::config::{Config, FileName, Verbosity};
 use crate::ignore_path::IgnorePathSet;
 use crate::issues::BadIssueSeeker;
+use crate::syntux::parser::{Parser, ParserError};
 use crate::syntux::session::{ErrorEmission, ParseSess};
 use crate::utils::count_newlines;
 use crate::visitor::{FmtVisitor, SnippetProvider};
@@ -74,6 +73,7 @@ fn format_project<T: FormatHandler>(
     }
 
     // Parse the crate.
+    let is_stdin = !input.is_text();
     let error_emission = if config.hide_parse_errors() {
         ErrorEmission::Silence
     } else {
@@ -82,17 +82,17 @@ fn format_project<T: FormatHandler>(
     let mut parse_session = ParseSess::new(error_emission, ignore_path_set);
     let mut report = FormatReport::new();
     let directory_ownership = input.to_directory_ownership();
-    let krate = match parse_crate(
-        input,
-        &parse_session,
-        config,
-        &mut report,
-        directory_ownership,
-    ) {
+
+    let krate = match Parser::parse_crate(config, input, directory_ownership, &parse_session) {
         Ok(krate) => krate,
-        // Surface parse error via Session (errors are merged there from report)
-        Err(ErrorKind::ParseError) => return Ok(report),
-        Err(e) => return Err(e),
+        Err(e) => {
+            let forbid_verbose = is_stdin || e != ParserError::ParsePanicError;
+            should_emit_verbose(forbid_verbose, config, || {
+                eprintln!("The Rust parser panicked");
+            });
+            report.add_parsing_error();
+            return Ok(report);
+        }
     };
     timer = timer.done_parsing();
 
@@ -627,93 +627,11 @@ impl<'a> FormatLines<'a> {
     }
 }
 
-fn parse_crate(
-    input: Input,
-    parse_session: &ParseSess,
-    config: &Config,
-    report: &mut FormatReport,
-    directory_ownership: Option<parse::DirectoryOwnership>,
-) -> Result<ast::Crate, ErrorKind> {
-    let input_is_stdin = input.is_text();
-
-    let parser = match input {
-        Input::File(ref file) => {
-            // Use `new_sub_parser_from_file` when we the input is a submodule.
-            Ok(if let Some(dir_own) = directory_ownership {
-                parse::new_sub_parser_from_file(
-                    parse_session.inner(),
-                    file,
-                    dir_own,
-                    None,
-                    DUMMY_SP,
-                )
-            } else {
-                parse::new_parser_from_file(parse_session.inner(), file)
-            })
-        }
-        Input::Text(text) => parse::maybe_new_parser_from_source_str(
-            parse_session.inner(),
-            syntax::source_map::FileName::Custom("stdin".to_owned()),
-            text,
-        )
-        .map(|mut parser| {
-            parser.recurse_into_file_modules = false;
-            parser
-        }),
-    };
-
-    let result = match parser {
-        Ok(mut parser) => {
-            parser.cfg_mods = false;
-            if config.skip_children() {
-                parser.recurse_into_file_modules = false;
-            }
-
-            let mut parser = AssertUnwindSafe(parser);
-            catch_unwind(move || parser.0.parse_crate_mod().map_err(|d| vec![d]))
-        }
-        Err(diagnostics) => {
-            parse_session.emit_diagnostics(diagnostics);
-            report.add_parsing_error();
-            return Err(ErrorKind::ParseError);
-        }
-    };
-
-    match result {
-        Ok(Ok(c)) => {
-            if !parse_session.has_errors() {
-                return Ok(c);
-            }
-            // This scenario occurs when the parser encountered errors
-            // but was still able to recover. If all of the parser errors
-            // occurred in files that are ignored, then reset
-            // the error count and continue.
-            // https://github.com/rust-lang/rustfmt/issues/3779
-            if parse_session.can_reset_errors() {
-                parse_session.reset_errors();
-                return Ok(c);
-            }
-        }
-        Ok(Err(mut diagnostics)) => diagnostics.iter_mut().for_each(DiagnosticBuilder::emit),
-        Err(_) => {
-            // Note that if you see this message and want more information,
-            // then run the `parse_crate_mod` function above without
-            // `catch_unwind` so rustfmt panics and you can get a backtrace.
-            should_emit_verbose(input_is_stdin, config, || {
-                println!("The Rust parser panicked")
-            });
-        }
-    }
-
-    report.add_parsing_error();
-    Err(ErrorKind::ParseError)
-}
-
-fn should_emit_verbose<F>(is_stdin: bool, config: &Config, f: F)
+fn should_emit_verbose<F>(forbid_verbose_output: bool, config: &Config, f: F)
 where
     F: Fn(),
 {
-    if config.verbose() == Verbosity::Verbose && !is_stdin {
+    if config.verbose() == Verbosity::Verbose && !forbid_verbose_output {
         f();
     }
 }
