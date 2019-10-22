@@ -154,10 +154,6 @@ impl ParseSess {
             .is_some()
     }
 
-    pub(super) fn can_reset_errors(&self) -> bool {
-        *self.can_reset_errors.borrow()
-    }
-
     pub(crate) fn ignore_file(&self, path: &FileName) -> bool {
         self.ignore_path_set.as_ref().is_match(&path)
     }
@@ -196,14 +192,6 @@ impl ParseSess {
         &self.parse_sess
     }
 
-    pub(crate) fn has_errors(&self) -> bool {
-        self.parse_sess.span_diagnostic.has_errors()
-    }
-
-    pub(crate) fn reset_errors(&self) {
-        self.parse_sess.span_diagnostic.reset_err_count();
-    }
-
     pub(crate) fn snippet_provider(&self, span: Span) -> SnippetProvider {
         let source_file = self.parse_sess.source_map().lookup_char_pos(span.lo()).file;
         SnippetProvider::new(
@@ -219,11 +207,26 @@ impl ParseSess {
             .get_source_file(&file_name.into())
             .and_then(|source_file| source_file.src.clone())
     }
+}
 
-    pub(crate) fn emit_diagnostics(&self, diagnostics: Vec<Diagnostic>) {
+// Methods that should be restricted within the syntux module.
+impl ParseSess {
+    pub(super) fn emit_diagnostics(&self, diagnostics: Vec<Diagnostic>) {
         for diagnostic in diagnostics {
             self.parse_sess.span_diagnostic.emit_diagnostic(&diagnostic);
         }
+    }
+
+    pub(super) fn can_reset_errors(&self) -> bool {
+        *self.can_reset_errors.borrow()
+    }
+
+    pub(super) fn has_errors(&self) -> bool {
+        self.parse_sess.span_diagnostic.has_errors()
+    }
+
+    pub(super) fn reset_errors(&self) {
+        self.parse_sess.span_diagnostic.reset_err_count();
     }
 }
 

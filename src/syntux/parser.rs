@@ -23,7 +23,7 @@ pub(crate) struct Directory {
 }
 
 impl<'a> Directory {
-    pub(crate) fn to_syntax_directory(&'a self) -> syntax::parse::Directory<'a> {
+    fn to_syntax_directory(&'a self) -> syntax::parse::Directory<'a> {
         syntax::parse::Directory {
             path: Cow::Borrowed(&self.path),
             ownership: self.ownership.clone(),
