@@ -280,10 +280,7 @@ impl Target {
     ) -> Self {
         let path = PathBuf::from(&target.src_path);
         let canonicalized = fs::canonicalize(&path).unwrap_or(path);
-        let test_files = match nested_int_test_files {
-            Some(files) => files,
-            None => vec![],
-        };
+        let test_files = nested_int_test_files.unwrap_or(vec![]);
 
         Target {
             path: canonicalized,
@@ -534,7 +531,7 @@ fn add_targets(
                 Some(package_dir) => {
                     let target_dir = package_dir.join("tests");
                     test_files_added = true;
-                    Some(get_nested_integration_test_files(&target_dir, &target_dir))
+                    get_nested_integration_test_files(&target_dir, &target_dir)
                 }
             }
         } else {
@@ -547,27 +544,33 @@ fn add_targets(
 // Returns a `Vec` containing `PathBuf`s of nested .rs files within subdirectories
 // of the `tests` directory for a given package.
 // https://github.com/rust-lang/rustfmt/issues/1820
-fn get_nested_integration_test_files(path: &Path, root_dir: &Path) -> Vec<PathBuf> {
+fn get_nested_integration_test_files(path: &Path, root_dir: &Path) -> Option<Vec<PathBuf>> {
     let mut files = vec![];
     if path.is_dir() {
-        for entry in fs::read_dir(path).expect(&format!(
-            "couldn't read directory {}",
-            path.to_str().unwrap()
-        )) {
-            let entry = entry.expect("couldn't get nested `DirEntry` in tests");
-            let parent = path;
-            let entry_path = entry.path();
-            if entry_path.is_dir() {
-                files.append(&mut get_nested_integration_test_files(
-                    &entry_path,
-                    &root_dir,
-                ));
-            } else if entry_path.extension().map_or(false, |f| f == "rs") && parent != root_dir {
-                files.push(entry_path);
+        if let Ok(dir) = fs::read_dir(path) {
+            for dir_entry in dir {
+                if let Ok(entry) = dir_entry {
+                    let parent = path;
+                    let entry_path = entry.path();
+                    if entry_path.is_dir() {
+                        files.append(
+                            &mut get_nested_integration_test_files(&entry_path, &root_dir)
+                                .unwrap_or(vec![]),
+                        );
+                    } else if entry_path.extension().map_or(false, |f| f == "rs")
+                        && parent != root_dir
+                    {
+                        files.push(entry_path);
+                    }
+                } else {
+                    return None;
+                }
             }
+        } else {
+            return None;
         }
     }
-    files
+    Some(files)
 }
 
 fn run_rustfmt(
@@ -883,7 +886,7 @@ mod cargo_fmt_tests {
         fn returns_no_files_if_root_not_dir() {
             let target_dir = PathBuf::from("tests/nested-test-files/no-test-dir/Cargo.toml");
             assert_eq!(
-                Vec::new() as Vec<PathBuf>,
+                Some(Vec::new() as Vec<PathBuf>),
                 get_nested_integration_test_files(&target_dir, &target_dir),
             )
         }
@@ -892,7 +895,7 @@ mod cargo_fmt_tests {
         fn returns_no_files_if_tests_has_no_nested_files() {
             let target_dir = Path::new("tests/nested-test-files/only-root-level-tests/tests");
             assert_eq!(
-                Vec::new() as Vec<PathBuf>,
+                Some(Vec::new() as Vec<PathBuf>),
                 get_nested_integration_test_files(&target_dir, &target_dir),
             )
         }
@@ -910,7 +913,7 @@ mod cargo_fmt_tests {
                 "tests/nested-test-files/root-and-nested-tests/tests/nested/other.rs",
             );
             assert_eq!(
-                vec![exp_baz, exp_foo_bar, exp_other],
+                Some(vec![exp_baz, exp_foo_bar, exp_other]),
                 get_nested_integration_test_files(&target_dir, &target_dir),
             )
         }
