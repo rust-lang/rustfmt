@@ -79,7 +79,6 @@ impl<'a> ParserBuilder<'a> {
             Ok(p) => p,
             Err(db) => {
                 sess.emit_diagnostics(db);
-                // report.add_parsing_error();
                 return Err(ParserError::ParserCreationError);
             }
         };
