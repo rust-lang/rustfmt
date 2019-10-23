@@ -509,13 +509,6 @@ pub enum Input {
 }
 
 impl Input {
-    fn is_text(&self) -> bool {
-        match *self {
-            Input::File(_) => false,
-            Input::Text(_) => true,
-        }
-    }
-
     fn file_name(&self) -> FileName {
         match *self {
             Input::File(ref file) => FileName::Real(file.clone()),
