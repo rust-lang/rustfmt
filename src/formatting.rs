@@ -68,14 +68,13 @@ fn format_project<T: FormatHandler>(
     }
 
     // Parse the crate.
-    let is_stdin = !input.is_text();
     let mut report = FormatReport::new();
     let directory_ownership = input.to_directory_ownership();
 
     let krate = match Parser::parse_crate(config, input, directory_ownership, &parse_session) {
         Ok(krate) => krate,
         Err(e) => {
-            let forbid_verbose = is_stdin || e != ParserError::ParsePanicError;
+            let forbid_verbose = input_is_stdin || e != ParserError::ParsePanicError;
             should_emit_verbose(forbid_verbose, config, || {
                 eprintln!("The Rust parser panicked");
             });
