@@ -1957,7 +1957,11 @@ fn choose_rhs<R: Rewrite>(
                     if wrap_str(new_rhs.clone(), context.config.max_width(), new_shape)
                         .is_none() =>
                 {
-                    Some(format!("{}{}", before_space_str, orig_rhs))
+                    let prefix = if orig_rhs.starts_with('\n') || has_rhs_comment {
+                        ""
+                    } else {
+                        " "
+                    };
                 }
                 (Some(ref orig_rhs), Some(ref new_rhs))
                     if prefer_next_line(orig_rhs, new_rhs, rhs_tactics) =>
@@ -1971,7 +1975,14 @@ fn choose_rhs<R: Rewrite>(
                         .map(|s| format!("{}{}", before_space_str, s))
                 }
                 (None, None) => None,
-                (Some(orig_rhs), _) => Some(format!("{}{}", before_space_str, orig_rhs)),
+                (Some(orig_rhs), _) => {
+                    let prefix = if orig_rhs.starts_with('\n') || has_rhs_comment {
+                        ""
+                    } else {
+                        " "
+                    };
+                    Some(format!("{}{}", prefix, orig_rhs))
+                }
             }
         }
     }

@@ -413,12 +413,8 @@ impl Chain {
             _ => expr.clone(),
         }
     }
-}
 
-impl Rewrite for Chain {
-    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        debug!("rewrite chain {:?} {:?}", self, shape);
-
+    fn format(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let mut formatter = match context.config.indent_style() {
             IndentStyle::Block => {
                 Box::new(ChainFormatterBlock::new(self)) as Box<dyn ChainFormatter>
@@ -439,8 +435,39 @@ impl Rewrite for Chain {
         formatter.format_children(context, child_shape)?;
         formatter.format_last_child(context, shape, child_shape)?;
 
-        let result = formatter.join_rewrites(context, child_shape)?;
-        wrap_str(result, context.config.max_width(), shape)
+        formatter.join_rewrites(context, child_shape)
+    }
+}
+
+impl Rewrite for Chain {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        debug!("rewrite chain {:?} {:?}", self, shape);
+
+        let result = self.format(context, shape)?;
+        if context.config.allow_chain_call_overflow() {
+            match context.config.indent_style() {
+                IndentStyle::Block => Some(result),
+                IndentStyle::Visual => match wrap_str(result, context.config.max_width(), shape) {
+                    Some(r) => Some(r),
+                    None => {
+                        let new_shape = Shape::indented(
+                            shape.indent.block_indent(context.config),
+                            context.config,
+                        );
+                        if let Some(result) = self.format(context, new_shape) {
+                            let prefix = shape
+                                .indent
+                                .block_indent(context.config)
+                                .to_string_with_newline(context.config);
+                            return Some(format!("{}{}", prefix, result));
+                        }
+                        None
+                    }
+                },
+            }
+        } else {
+            wrap_str(result, context.config.max_width(), shape)
+        }
     }
 }
 
@@ -693,7 +720,13 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<()> {
-        let mut root_rewrite: String = parent.rewrite(context, shape)?;
+        let mut root_rewrite = if context.config.allow_chain_call_overflow() {
+            parent
+                .rewrite(context, shape)
+                .unwrap_or_else(|| context.snippet(parent.span).to_owned())
+        } else {
+            parent.rewrite(context, shape)?
+        };
 
         let mut root_ends_with_block = parent.kind.is_block_like(context, &root_rewrite);
         let tab_width = context.config.tab_spaces().saturating_sub(shape.offset);
@@ -733,8 +766,14 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
     }
 
     fn format_children(&mut self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<()> {
+        let allow_chain_call_overflow = context.config.allow_chain_call_overflow();
         for item in &self.shared.children[..self.shared.children.len() - 1] {
-            let rewrite = item.rewrite(context, child_shape)?;
+            let rewrite = if allow_chain_call_overflow {
+                item.rewrite(context, child_shape)
+                    .unwrap_or_else(|| context.snippet(item.span).to_owned())
+            } else {
+                item.rewrite(context, child_shape)?
+            };
             self.shared.rewrites.push(rewrite);
         }
         Some(())
@@ -827,8 +866,14 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
     }
 
     fn format_children(&mut self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<()> {
+        let allow_chain_call_overflow = context.config.allow_chain_call_overflow();
         for item in &self.shared.children[..self.shared.children.len() - 1] {
-            let rewrite = item.rewrite(context, child_shape)?;
+            let rewrite = if allow_chain_call_overflow {
+                item.rewrite(context, child_shape)
+                    .unwrap_or_else(|| context.snippet(item.span).to_owned())
+            } else {
+                item.rewrite(context, child_shape)?
+            };
             self.shared.rewrites.push(rewrite);
         }
         Some(())

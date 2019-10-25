@@ -17,6 +17,34 @@ To enable unstable options, set `unstable_features = true` in `rustfmt.toml` or 
 
 Below you find a detailed visual guide on all the supported configuration options of rustfmt:
 
+## `allow_chain_call_overflow`
+
+Wrap elements of a call chain even if one or more lines exceed the `max_width`
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: ...)
+
+#### `false` (default):
+
+```rust
+fn example() {
+    foo("This text is under the max_width limit, and shouldn't cause any problems on its own.").long("But this line is extra long, and doesn't fit within 100 max_width. 1234567890123456789").baz().collect().unwrap();
+}
+```
+
+#### `true`:
+
+```rust
+fn example() {
+    foo("This text is under the max_width limit, and shouldn't cause any problems on its own.")
+        .long("But this line is extra long, and doesn't fit within 100 max_width. 1234567890123456789")
+        .baz()
+        .collect()
+        .unwrap();
+}
+```
+
 
 ## `binop_separator`
 
