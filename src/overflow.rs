@@ -472,9 +472,7 @@ impl<'a> Context<'a> {
                     self.context.force_one_line_chain.replace(true);
                 }
                 Some(OverflowableItem::MacroArg(MacroArg::Expr(expr)))
-                    if !combine_arg_with_callee
-                        && is_method_call(expr)
-                        =>
+                    if !combine_arg_with_callee && is_method_call(expr) =>
                 {
                     self.context.force_one_line_chain.replace(true);
                 }

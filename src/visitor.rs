@@ -274,38 +274,6 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
                     let comment_shape =
                         Shape::indented(self.block_indent, config).comment(config);
-                    if self.config.version() == Version::Two && comment_on_same_line {
-                        self.push_str(" ");
-                        // put the first line of the comment on the same line as the
-                        // block's last line
-                        match sub_slice.find("\n") {
-                            None => {
-                                self.push_str(&sub_slice);
-                            }
-                            Some(offset) if offset + 1 == sub_slice.len() => {
-                                self.push_str(&sub_slice[..offset]);
-                            }
-                            Some(offset) => {
-                                let first_line = &sub_slice[..offset];
-                                self.push_str(first_line);
-
-                                // put the other lines below it, shaping it as needed
-                                let other_lines = &sub_slice[offset + 1..];
-                                if !other_lines.trim().is_empty() {
-                                    self.push_str(
-                                        &self.block_indent.to_string_with_newline(config),
-                                    );
-                                    let comment_str =
-                                        rewrite_comment(other_lines, false, comment_shape, config);
-                                    match comment_str {
-                                        Some(ref s) => self.push_str(s),
-                                        None => self.push_str(other_lines),
-                                    }
-                                }
-                            }
-                        }
-                        self.push_str(&self.block_indent.to_string_with_newline(config));
-                    }
 
                     let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config);
                     match comment_str {

@@ -582,11 +582,7 @@ pub(crate) fn trim_left_preserve_layout(
             // Because there is a veto against trimming and indenting lines within a string,
             // such lines should not be taken into account when computing the minimum.
             match kind {
-                FullCodeCharKind::InStringCommented | FullCodeCharKind::EndStringCommented
-                    =>
-                {
-                    None
-                }
+                FullCodeCharKind::InStringCommented | FullCodeCharKind::EndStringCommented => None,
                 FullCodeCharKind::InString | FullCodeCharKind::EndString => None,
                 _ => prefix_space_width,
             }
