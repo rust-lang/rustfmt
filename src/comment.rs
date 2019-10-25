@@ -112,7 +112,7 @@ impl<'a> CommentStyle<'a> {
     }
 }
 
-fn comment_style(orig: &str, normalize_comments: bool) -> CommentStyle<'_> {
+pub(crate) fn comment_style(orig: &str, normalize_comments: bool) -> CommentStyle<'_> {
     if !normalize_comments {
         if orig.starts_with("/**") && !orig.starts_with("/**/") {
             CommentStyle::DoubleBullet
@@ -1556,10 +1556,10 @@ pub(crate) fn recover_comment_removed(
         // We missed some comments. Warn and keep the original text.
         if context.config.error_on_unformatted() {
             context.report.append(
-                context.source_map.span_to_filename(span).into(),
+                context.parse_sess.span_to_filename(span),
                 vec![FormattingError::from_span(
                     span,
-                    &context.source_map,
+                    &context.parse_sess,
                     ErrorKind::LostComment,
                 )],
             );

@@ -3,14 +3,14 @@ use std::cmp::min;
 
 use itertools::Itertools;
 use syntax::parse::token::{DelimToken, LitKind};
-use syntax::source_map::{BytePos, SourceMap, Span};
+use syntax::source_map::{BytePos, Span};
 use syntax::{ast, ptr};
 
 use crate::chains::rewrite_chain;
 use crate::closures;
 use crate::comment::{
-    combine_strs_with_missing_comments, contains_comment, recover_comment_removed, rewrite_comment,
-    rewrite_missing_comment, CharClasses, FindUncommented,
+    combine_strs_with_missing_comments, comment_style, contains_comment, recover_comment_removed,
+    rewrite_comment, rewrite_missing_comment, CharClasses, FindUncommented,
 };
 use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, IndentStyle, Version};
@@ -430,7 +430,7 @@ fn rewrite_empty_block(
         return None;
     }
 
-    if !block_contains_comment(block, context.source_map) && shape.width >= 2 {
+    if !block_contains_comment(context, block) && shape.width >= 2 {
         return Some(format!("{}{}{{}}", prefix, label_str));
     }
 
@@ -487,7 +487,7 @@ fn rewrite_single_line_block(
     label: Option<ast::Label>,
     shape: Shape,
 ) -> Option<String> {
-    if is_simple_block(block, attrs, context.source_map) {
+    if is_simple_block(context, block, attrs) {
         let expr_shape = shape.offset_left(last_line_width(prefix))?;
         let expr_str = block.stmts[0].rewrite(context, expr_shape)?;
         let label_str = rewrite_label(label);
@@ -750,8 +750,8 @@ impl<'a> ControlFlow<'a> {
         let fixed_cost = self.keyword.len() + "  {  } else {  }".len();
 
         if let ast::ExprKind::Block(ref else_node, _) = else_block.kind {
-            if !is_simple_block(self.block, None, context.source_map)
-                || !is_simple_block(else_node, None, context.source_map)
+            if !is_simple_block(context, self.block, None)
+                || !is_simple_block(context, else_node, None)
                 || pat_expr_str.contains('\n')
             {
                 return None;
@@ -808,7 +808,7 @@ impl<'a> ControlFlow<'a> {
         debug!("rewrite_pat_expr {:?} {:?} {:?}", shape, self.pat, expr);
 
         let cond_shape = shape.offset_left(offset)?;
-        if !self.pat.is_none() {
+        if let Some(pat) = self.pat {
             let matcher = if self.matcher.is_empty() {
                 self.matcher.to_owned()
             } else {
@@ -817,12 +817,41 @@ impl<'a> ControlFlow<'a> {
             let pat_shape = cond_shape
                 .offset_left(matcher.len())?
                 .sub_width(self.connector.len())?;
-            let pat_string = if let Some(pat) = self.pat {
-                pat.rewrite(context, pat_shape)?
+            let pat_string = pat.rewrite(context, pat_shape)?;
+            let comments_lo = context
+                .snippet_provider
+                .span_after(self.span, self.connector.trim());
+            let missing_comments = if let Some(comment) =
+                rewrite_missing_comment(mk_sp(comments_lo, expr.span.lo()), cond_shape, context)
+            {
+                if !self.connector.is_empty() && !comment.is_empty() {
+                    if comment_style(&comment, false).is_line_comment() || comment.contains("\n") {
+                        let newline = &pat_shape
+                            .indent
+                            .block_indent(context.config)
+                            .to_string_with_newline(context.config);
+                        // An extra space is added when the lhs and rhs are joined
+                        // so we need to remove one space from the end to ensure
+                        // the comment and rhs are aligned.
+                        let mut suffix = newline.as_ref().to_string();
+                        if !suffix.is_empty() {
+                            suffix.truncate(suffix.len() - 1);
+                        }
+                        format!("{}{}{}", newline, comment, suffix)
+                    } else {
+                        format!(" {}", comment)
+                    }
+                } else {
+                    comment
+                }
             } else {
                 "".to_owned()
             };
-            let result = format!("{}{}{}", matcher, pat_string, self.connector);
+
+            let result = format!(
+                "{}{}{}{}",
+                matcher, pat_string, self.connector, missing_comments
+            );
             return rewrite_assign_rhs(context, result, expr, cond_shape);
         }
 
@@ -1105,9 +1134,8 @@ fn extract_comment(span: Span, context: &RewriteContext<'_>, shape: Shape) -> Op
     }
 }
 
-pub(crate) fn block_contains_comment(block: &ast::Block, source_map: &SourceMap) -> bool {
-    let snippet = source_map.span_to_snippet(block.span).unwrap();
-    contains_comment(&snippet)
+pub(crate) fn block_contains_comment(context: &RewriteContext<'_>, block: &ast::Block) -> bool {
+    contains_comment(context.snippet(block.span))
 }
 
 // Checks that a block contains no statements, an expression and no comments or
@@ -1115,25 +1143,25 @@ pub(crate) fn block_contains_comment(block: &ast::Block, source_map: &SourceMap)
 // FIXME: incorrectly returns false when comment is contained completely within
 // the expression.
 pub(crate) fn is_simple_block(
+    context: &RewriteContext<'_>,
     block: &ast::Block,
     attrs: Option<&[ast::Attribute]>,
-    source_map: &SourceMap,
 ) -> bool {
     (block.stmts.len() == 1
         && stmt_is_expr(&block.stmts[0])
-        && !block_contains_comment(block, source_map)
+        && !block_contains_comment(context, block)
         && attrs.map_or(true, |a| a.is_empty()))
 }
 
 /// Checks whether a block contains at most one statement or expression, and no
 /// comments or attributes.
 pub(crate) fn is_simple_block_stmt(
+    context: &RewriteContext<'_>,
     block: &ast::Block,
     attrs: Option<&[ast::Attribute]>,
-    source_map: &SourceMap,
 ) -> bool {
     block.stmts.len() <= 1
-        && !block_contains_comment(block, source_map)
+        && !block_contains_comment(context, block)
         && attrs.map_or(true, |a| a.is_empty())
 }
 
@@ -1153,12 +1181,12 @@ fn block_has_statements(block: &ast::Block) -> bool {
 /// Checks whether a block contains no statements, expressions, comments, or
 /// inner attributes.
 pub(crate) fn is_empty_block(
+    context: &RewriteContext<'_>,
     block: &ast::Block,
     attrs: Option<&[ast::Attribute]>,
-    source_map: &SourceMap,
 ) -> bool {
     !block_has_statements(&block)
-        && !block_contains_comment(block, source_map)
+        && !block_contains_comment(context, block)
         && attrs.map_or(true, |a| inner_attributes(a).is_empty())
 }
 

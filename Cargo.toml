@@ -1,7 +1,7 @@
 [package]
 
 name = "rustfmt-nightly"
-version = "1.4.9"
+version = "1.4.10"
 authors = ["Nicholas Cameron <ncameron@mozilla.com>", "The Rustfmt developers"]
 description = "Tool to find and fix Rust formatting issues"
 repository = "https://github.com/rust-lang/rustfmt"
@@ -56,6 +56,7 @@ ignore = "0.4.6"
 annotate-snippets = { version = "0.6", features = ["ansi_term"] }
 structopt = "0.3"
 rustfmt-config_proc_macro = { version = "0.2", path = "config_proc_macro" }
+lazy_static = "1.0.0"
 
 # A noop dependency that changes in the Rust repository, it's a bit of a hack.
 # See the `src/tools/rustc-workspace-hack/README.md` file in `rust-lang/rust`
@@ -74,5 +75,3 @@ version = "610.0.0"
 package = "rustc-ap-syntax_pos"
 version = "610.0.0"
 
-[dev-dependencies]
-lazy_static = "1.0.0"
