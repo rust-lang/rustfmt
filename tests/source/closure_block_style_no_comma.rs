@@ -1,6 +1,5 @@
 // rustfmt-indent_style: Block
 // rustfmt-trailing_comma: Never
-// rustfmt-version: Two
 
 fn foo() {
     {
