@@ -1390,7 +1390,7 @@ impl MacroBranch {
                     {
                         s += &indent_str;
                     }
-                    (s + l + "\n", indent_next_line(kind, &l, &config))
+                    (s + l + "\n", indent_next_line(kind))
                 },
             )
             .0;

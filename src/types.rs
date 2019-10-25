@@ -6,7 +6,7 @@ use syntax::source_map::{BytePos, Span, DUMMY_SP};
 use syntax::symbol::kw;
 
 use crate::config::lists::*;
-use crate::config::{IndentStyle, TypeDensity, Version};
+use crate::config::{IndentStyle, TypeDensity};
 use crate::expr::{format_expr, rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix, ExprType};
 use crate::lists::{
     definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,

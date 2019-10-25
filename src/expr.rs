@@ -13,7 +13,7 @@ use crate::comment::{
     rewrite_comment, rewrite_missing_comment, CharClasses, FindUncommented,
 };
 use crate::config::lists::*;
-use crate::config::{Config, ControlBraceStyle, IndentStyle, Version};
+use crate::config::{Config, ControlBraceStyle, IndentStyle};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
     struct_lit_tactic, write_list, ListFormatting, Separator,

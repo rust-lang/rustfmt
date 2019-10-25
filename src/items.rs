@@ -16,7 +16,7 @@ use crate::comment::{
     FindUncommented,
 };
 use crate::config::lists::*;
-use crate::config::{BraceStyle, Config, IndentStyle, Version};
+use crate::config::{BraceStyle, Config, IndentStyle};
 use crate::expr::{
     is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_expr,
     rewrite_assign_rhs_with, RhsTactics,
@@ -2676,20 +2676,6 @@ fn rewrite_generics(
 
     let params = generics.params.iter();
     overflow::rewrite_with_angle_brackets(context, ident, params, shape, generics.span)
-}
-
-fn generics_shape_from_config(config: &Config, shape: Shape, offset: usize) -> Option<Shape> {
-    match config.indent_style() {
-        IndentStyle::Visual => shape.visual_indent(1 + offset).sub_width(offset + 2),
-        IndentStyle::Block => {
-            // 1 = ","
-            shape
-                .block()
-                .block_indent(config.tab_spaces())
-                .with_max_width(config)
-                .sub_width(1)
-        }
-    }
 }
 
 fn rewrite_where_clause_rfc_style(

@@ -9,7 +9,6 @@ use syntax::{ast, ptr};
 
 use crate::closures;
 use crate::config::lists::*;
-use crate::config::Version;
 use crate::expr::{
     can_be_overflowed_expr, is_every_expr_simple, is_method_call, is_nested_call, is_simple_expr,
     rewrite_cond,

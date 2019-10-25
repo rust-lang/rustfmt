@@ -7,7 +7,7 @@ use syntax::{ast, ptr};
 
 use crate::comment::{combine_strs_with_missing_comments, rewrite_comment};
 use crate::config::lists::*;
-use crate::config::{Config, ControlBraceStyle, IndentStyle, Version};
+use crate::config::{Config, ControlBraceStyle, IndentStyle};
 use crate::expr::{
     format_expr, is_empty_block, is_simple_block, is_unsafe_block, prefer_next_line, rewrite_cond,
     ExprType, RhsTactics,

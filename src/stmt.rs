@@ -2,7 +2,6 @@ use syntax::ast;
 use syntax_pos::Span;
 
 use crate::comment::recover_comment_removed;
-use crate::config::Version;
 use crate::expr::{format_expr, ExprType};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;

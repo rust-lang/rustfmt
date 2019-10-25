@@ -12,7 +12,7 @@ use syntax_pos::ExpnId;
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
-use crate::config::{Config, Version};
+use crate::config::Config;
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 
@@ -617,7 +617,7 @@ pub(crate) fn trim_left_preserve_layout(
 
 /// Based on the given line, determine if the next line can be indented or not.
 /// This allows to preserve the indentation of multi-line literals.
-pub(crate) fn indent_next_line(kind: FullCodeCharKind, _line: &str, config: &Config) -> bool {
+pub(crate) fn indent_next_line(kind: FullCodeCharKind) -> bool {
     !(kind.is_string() || kind.is_commented_string())
 }
 

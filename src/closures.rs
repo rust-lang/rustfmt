@@ -3,7 +3,7 @@ use syntax::{ast, ptr};
 
 use crate::attr::get_attrs_from_stmt;
 use crate::config::lists::*;
-use crate::config::{IndentStyle, SeparatorTactic, Version};
+use crate::config::{IndentStyle, SeparatorTactic};
 use crate::expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond};
 use crate::items::{span_hi_for_param, span_lo_for_param};
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
