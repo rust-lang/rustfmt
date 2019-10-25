@@ -409,19 +409,19 @@ fn is_block_closure_forced(context: &RewriteContext<'_>, expr: &ast::Expr) -> bo
     if context.inside_macro() {
         false
     } else {
-        is_block_closure_forced_inner(expr, context.config.version())
+        is_block_closure_forced_inner(expr)
     }
 }
 
-fn is_block_closure_forced_inner(expr: &ast::Expr, version: Version) -> bool {
+fn is_block_closure_forced_inner(expr: &ast::Expr) -> bool {
     match expr.kind {
         ast::ExprKind::If(..) | ast::ExprKind::While(..) | ast::ExprKind::ForLoop(..) => true,
-        ast::ExprKind::Loop(..) if version == Version::Two => true,
+        ast::ExprKind::Loop(..) => true,
         ast::ExprKind::AddrOf(_, ref expr)
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Try(ref expr)
         | ast::ExprKind::Unary(_, ref expr)
-        | ast::ExprKind::Cast(ref expr, _) => is_block_closure_forced_inner(expr, version),
+        | ast::ExprKind::Cast(ref expr, _) => is_block_closure_forced_inner(expr),
         _ => false,
     }
 }

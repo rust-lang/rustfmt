@@ -678,8 +678,7 @@ impl Rewrite for ast::Ty {
             // FIXME: we drop any comments here, even though it's a silly place to put
             // comments.
             ast::TyKind::Paren(ref ty) => {
-                if context.config.version() == Version::One
-                    || context.config.indent_style() == IndentStyle::Visual
+                if context.config.indent_style() == IndentStyle::Visual
                 {
                     let budget = shape.width.checked_sub(2)?;
                     return ty
@@ -745,11 +744,8 @@ impl Rewrite for ast::Ty {
                 if it.is_empty() {
                     return Some("impl".to_owned());
                 }
-                let rw = if context.config.version() == Version::One {
-                    it.rewrite(context, shape)
-                } else {
-                    join_bounds(context, shape, it, false)
-                };
+                let rw =
+                    join_bounds(context, shape, it, false);
                 rw.map(|it_str| {
                     let space = if it_str.is_empty() { "" } else { " " };
                     format!("impl{}{}", space, it_str)

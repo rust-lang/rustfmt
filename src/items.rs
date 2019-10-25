@@ -860,15 +860,8 @@ fn format_impl_ref_and_type(
         result.push_str(format_defaultness(defaultness));
         result.push_str(format_unsafety(unsafety));
 
-        let shape = if context.config.version() == Version::Two {
-            Shape::indented(offset + last_line_width(&result), context.config)
-        } else {
-            generics_shape_from_config(
-                context.config,
-                Shape::indented(offset + last_line_width(&result), context.config),
-                0,
-            )?
-        };
+        let shape =
+            Shape::indented(offset + last_line_width(&result), context.config);
         let generics_str = rewrite_generics(context, "impl", generics, shape)?;
         result.push_str(&generics_str);
 
@@ -1940,8 +1933,7 @@ impl Rewrite for ast::FunctionRetTy {
         match *self {
             ast::FunctionRetTy::Default(_) => Some(String::new()),
             ast::FunctionRetTy::Ty(ref ty) => {
-                if context.config.version() == Version::One
-                    || context.config.indent_style() == IndentStyle::Visual
+                if context.config.indent_style() == IndentStyle::Visual
                 {
                     let inner_width = shape.width.checked_sub(3)?;
                     return ty
@@ -2296,7 +2288,6 @@ fn rewrite_fn_base(
             .last()
             .map_or(false, |last_line| last_line.contains("//"));
 
-        if context.config.version() == Version::Two {
             if closing_paren_overflow_max_width {
                 result.push(')');
                 result.push_str(&indent.to_string_with_newline(context.config));
@@ -2308,12 +2299,6 @@ fn rewrite_fn_base(
             } else {
                 result.push(')');
             }
-        } else {
-            if closing_paren_overflow_max_width || params_last_line_contains_comment {
-                result.push_str(&indent.to_string_with_newline(context.config));
-            }
-            result.push(')');
-        }
     }
 
     // Return type.
@@ -2339,8 +2324,7 @@ fn rewrite_fn_base(
             }
         };
         let ret_shape = if ret_should_indent {
-            if context.config.version() == Version::One
-                || context.config.indent_style() == IndentStyle::Visual
+            if context.config.indent_style() == IndentStyle::Visual
             {
                 let indent = if param_str.is_empty() {
                     // Aligning with non-existent params looks silly.
@@ -2372,13 +2356,9 @@ fn rewrite_fn_base(
                 ret_shape
             }
         } else {
-            if context.config.version() == Version::Two {
                 if !param_str.is_empty() || !no_params_and_over_max_width {
                     result.push(' ');
                 }
-            } else {
-                result.push(' ');
-            }
 
             let ret_shape = Shape::indented(indent, context.config);
             ret_shape

@@ -568,8 +568,7 @@ pub(crate) fn trim_left_preserve_layout(
 
             // just InString{Commented} in order to allow the start of a string to be indented
             let new_veto_trim_value = (kind == FullCodeCharKind::InString
-                || (config.version() == Version::Two
-                    && kind == FullCodeCharKind::InStringCommented))
+                || kind == FullCodeCharKind::InStringCommented)
                 && !line.ends_with('\\');
             let line = if veto_trim || new_veto_trim_value {
                 veto_trim = new_veto_trim_value;
@@ -584,7 +583,7 @@ pub(crate) fn trim_left_preserve_layout(
             // such lines should not be taken into account when computing the minimum.
             match kind {
                 FullCodeCharKind::InStringCommented | FullCodeCharKind::EndStringCommented
-                    if config.version() == Version::Two =>
+                    =>
                 {
                     None
                 }
@@ -619,7 +618,7 @@ pub(crate) fn trim_left_preserve_layout(
 /// Based on the given line, determine if the next line can be indented or not.
 /// This allows to preserve the indentation of multi-line literals.
 pub(crate) fn indent_next_line(kind: FullCodeCharKind, _line: &str, config: &Config) -> bool {
-    !(kind.is_string() || (config.version() == Version::Two && kind.is_commented_string()))
+    !(kind.is_string() || kind.is_commented_string())
 }
 
 pub(crate) fn is_empty_line(s: &str) -> bool {

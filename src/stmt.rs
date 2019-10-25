@@ -71,7 +71,7 @@ impl<'a> Stmt<'a> {
 
 impl<'a> Rewrite for Stmt<'a> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        let expr_type = if context.config.version() == Version::Two && self.is_last_expr() {
+        let expr_type = if self.is_last_expr() {
             ExprType::SubExpression
         } else {
             ExprType::Statement
