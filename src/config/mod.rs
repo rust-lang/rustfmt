@@ -256,7 +256,7 @@ pub struct Config {
     ignore: IgnoreList,
 
     // Not user-facing
-    /// How much to information to emit to the user.
+    /// How much information to emit to the user.
     #[serde(skip)]
     pub(crate) verbose: Verbosity,
     /// Lines to format; this is not supported in rustfmt.toml, and can only be specified
