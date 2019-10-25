@@ -239,17 +239,12 @@ fn rewrite_closure_fn_decl(
         .sub_width(4)?;
 
     let indent_style = context.config.indent_style();
-    let version = context.config.version();
 
     // 1 = |
     let param_offset = nested_shape.indent + 1;
     let param_shape = match indent_style {
         IndentStyle::Block => {
-            if version == Version::Two {
-                Shape::indented(shape.indent.block_indent(context.config), context.config)
-            } else {
-                nested_shape.offset_left(1)?.visual_indent(0)
-            }
+            Shape::indented(shape.indent.block_indent(context.config), context.config)
         }
         IndentStyle::Visual => nested_shape.offset_left(1)?.visual_indent(0),
     };
@@ -290,25 +285,24 @@ fn rewrite_closure_fn_decl(
         IndentStyle::Block => list_str.contains('\n') || list_str.len() > one_line_budget,
         _ => false,
     };
-    let (param_str, put_params_in_block) =
-        if multi_line_params && !item_vec.is_empty() && version == Version::Two {
-            let trailing_comma = match context.config.trailing_comma() {
-                SeparatorTactic::Never => "",
-                _ => ",",
-            };
-            (
-                format!(
-                    "{}{}{}{}",
-                    param_shape.indent.to_string_with_newline(context.config),
-                    &list_str,
-                    trailing_comma,
-                    shape.indent.to_string_with_newline(context.config)
-                ),
-                true,
-            )
-        } else {
-            (list_str, false)
+    let (param_str, put_params_in_block) = if multi_line_params && !item_vec.is_empty() {
+        let trailing_comma = match context.config.trailing_comma() {
+            SeparatorTactic::Never => "",
+            _ => ",",
         };
+        (
+            format!(
+                "{}{}{}{}",
+                param_shape.indent.to_string_with_newline(context.config),
+                &list_str,
+                trailing_comma,
+                shape.indent.to_string_with_newline(context.config)
+            ),
+            true,
+        )
+    } else {
+        (list_str, false)
+    };
     let mut prefix = format!("{}{}{}|{}|", is_async, immovable, mover, param_str);
 
     if !ret_str.is_empty() {
