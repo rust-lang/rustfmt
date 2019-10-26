@@ -285,23 +285,21 @@ fn rewrite_closure_fn_decl(
         IndentStyle::Block => list_str.contains('\n') || list_str.len() > one_line_budget,
         _ => false,
     };
-    let (param_str, put_params_in_block) = if multi_line_params && !item_vec.is_empty() {
+    let put_params_in_block = multi_line_params && !item_vec.is_empty();
+    let param_str = if put_params_in_block {
         let trailing_comma = match context.config.trailing_comma() {
             SeparatorTactic::Never => "",
             _ => ",",
         };
-        (
-            format!(
-                "{}{}{}{}",
-                param_shape.indent.to_string_with_newline(context.config),
-                &list_str,
-                trailing_comma,
-                shape.indent.to_string_with_newline(context.config)
-            ),
-            true,
+        format!(
+            "{}{}{}{}",
+            param_shape.indent.to_string_with_newline(context.config),
+            &list_str,
+            trailing_comma,
+            shape.indent.to_string_with_newline(context.config)
         )
     } else {
-        (list_str, false)
+        list_str
     };
     let mut prefix = format!("{}{}{}|{}|", is_async, immovable, mover, param_str);
 
