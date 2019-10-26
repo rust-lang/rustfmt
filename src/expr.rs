@@ -421,7 +421,7 @@ fn rewrite_empty_block(
     prefix: &str,
     shape: Shape,
 ) -> Option<String> {
-    if !block.stmts.is_empty() {
+    if block_has_statements(&block) {
         return None;
     }
 
@@ -1165,6 +1165,19 @@ pub(crate) fn is_simple_block_stmt(
         && attrs.map_or(true, |a| a.is_empty())
 }
 
+fn block_has_statements(block: &ast::Block) -> bool {
+    block.stmts.iter().any(|stmt| {
+        if let ast::StmtKind::Semi(ref expr) = stmt.kind {
+            if let ast::ExprKind::Tup(ref tup_exprs) = expr.kind {
+                if tup_exprs.is_empty() {
+                    return false;
+                }
+            }
+        }
+        true
+    })
+}
+
 /// Checks whether a block contains no statements, expressions, comments, or
 /// inner attributes.
 pub(crate) fn is_empty_block(
@@ -1172,7 +1185,7 @@ pub(crate) fn is_empty_block(
     block: &ast::Block,
     attrs: Option<&[ast::Attribute]>,
 ) -> bool {
-    block.stmts.is_empty()
+    !block_has_statements(&block)
         && !block_contains_comment(context, block)
         && attrs.map_or(true, |a| inner_attributes(a).is_empty())
 }
