@@ -1962,6 +1962,7 @@ fn choose_rhs<R: Rewrite>(
                     } else {
                         " "
                     };
+                    Some(format!("{}{}", prefix, orig_rhs))
                 }
                 (Some(ref orig_rhs), Some(ref new_rhs))
                     if prefer_next_line(orig_rhs, new_rhs, rhs_tactics) =>

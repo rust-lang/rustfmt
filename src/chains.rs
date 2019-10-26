@@ -713,6 +713,61 @@ impl<'a> ChainFormatterBlock<'a> {
     }
 }
 
+fn format_chain_item(
+    item: &ChainItem,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> (String, bool) {
+    let orig_result = item.rewrite(context, shape);
+    let new_shape = match Shape::indented(shape.indent.block_indent(context.config), context.config)
+        .sub_width(shape.rhs_overhead(context.config))
+    {
+        Some(shape) => shape,
+        None => return (context.snippet(item.span).to_owned(), false),
+    };
+    let next_line_result = item.rewrite(context, new_shape);
+    match (orig_result, next_line_result) {
+        (Some(orig_result), _)
+            if !orig_result.contains('\n')
+                && utils::unicode_str_width(&orig_result) <= shape.width =>
+        {
+            (orig_result, false)
+        }
+        (Some(orig_result), Some(next_line_result)) => match item.kind {
+            ChainItemKind::Parent(ref expr) if next_line_result.contains('\n') => match expr.kind {
+                ast::ExprKind::MethodCall(_, ref exprs) | ast::ExprKind::Call(_, ref exprs) => {
+                    let contains_non_indentable_args = exprs.iter().any(|e| match e.kind {
+                        ast::ExprKind::Closure(..)
+                        | ast::ExprKind::Lit(..)
+                        | ast::ExprKind::Struct(..) => true,
+                        ast::ExprKind::AddrOf(_, ref expr) => match expr.kind {
+                            ast::ExprKind::Struct(..) => true,
+                            _ => false,
+                        },
+                        _ => false,
+                    });
+                    if context.config.allow_chain_call_overflow() {
+                        if !contains_non_indentable_args {
+                            (next_line_result, true)
+                        } else {
+                            (orig_result, true)
+                        }
+                    } else {
+                        (orig_result, false)
+                    }
+                }
+                _ => (orig_result, context.config.allow_chain_call_overflow()),
+            },
+            _ => (orig_result, false),
+        },
+        (None, Some(next_line_result)) => (next_line_result, true),
+        (Some(orig_result), None) => (orig_result, false),
+        // This only occurs when the chain item exceeds the configured max_width.
+        // Grab the original snippet so that the chain can still be wrapped.
+        (None, None) => (context.snippet(item.span).to_owned(), false),
+    }
+}
+
 impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
     fn format_root(
         &mut self,
@@ -720,13 +775,7 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<()> {
-        let mut root_rewrite = if context.config.allow_chain_call_overflow() {
-            parent
-                .rewrite(context, shape)
-                .unwrap_or_else(|| context.snippet(parent.span).to_owned())
-        } else {
-            parent.rewrite(context, shape)?
-        };
+        let (mut root_rewrite, forced_root_block) = format_chain_item(parent, context, shape);
 
         let mut root_ends_with_block = parent.kind.is_block_like(context, &root_rewrite);
         let tab_width = context.config.tab_spaces().saturating_sub(shape.offset);
@@ -750,7 +799,8 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
             }
         }
         self.shared.rewrites.push(root_rewrite);
-        self.root_ends_with_block = root_ends_with_block;
+        self.root_ends_with_block = root_ends_with_block && !forced_root_block;
+
         Some(())
     }
 
