@@ -111,7 +111,6 @@ impl Rewrite for ast::Local {
 
         result.push_str(&infix);
 
-        let mut has_comment_between_assign_and_rhs = false;
         if let Some(ref ex) = self.init {
             let base_span = if let Some(ref ty) = self.ty {
                 mk_sp(ty.span.hi(), self.span.hi())
@@ -161,7 +160,6 @@ impl Rewrite for ast::Local {
                     result.push_str(new_indent_str);
                     result.push_str(comment_after_assign);
                     result.push_str(new_indent_str);
-                    has_comment_between_assign_and_rhs = true;
                 }
             }
 
@@ -173,7 +171,6 @@ impl Rewrite for ast::Local {
                 &**ex,
                 nested_shape,
                 RhsTactics::Default,
-                has_comment_between_assign_and_rhs,
             )?;
             result = result + &rhs;
         }
