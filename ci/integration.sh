@@ -15,7 +15,7 @@ set -ex
 # it again.
 #
 #which cargo-fmt || cargo install --force
-cargo install --path . --force 
+cargo install --path . --force --locked
 
 echo "Integration tests for: ${INTEGRATION}"
 cargo fmt -- --version
