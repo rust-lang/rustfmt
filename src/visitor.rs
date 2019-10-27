@@ -240,58 +240,95 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     fn close_block(&mut self, span: Span, unindent_comment: bool) {
         let config = self.config;
 
-        let mut last_hi = span.lo();
-        let mut unindented = false;
+        let mut prev_kind = CodeCharKind::Normal;
+        let mut newline_inserted = false;
 
         let skip_normal = |s: &str| {
             let trimmed = s.trim();
-            trimmed.is_empty() || trimmed.chars().all(|c| c == ';')
+            !trimmed.is_empty() && trimmed.chars().all(|c| c == ';')
         };
 
         let last_line_offset = if last_line_contains_single_line_comment(&self.buffer) {
             0
         } else {
-            last_line_width(&self.buffer)
+            last_line_width(&self.buffer) + 1
         };
-        for (kind, offset, sub_slice) in CommentCodeSlices::with_offset(
+
+        if unindent_comment {
+            self.block_indent = self.block_indent.block_unindent(config);
+        }
+
+        let mut iter = CommentCodeSlices::with_offset(
             self.snippet(span),
             last_line_offset,
             self.config.tab_spaces(),
-        ) {
+        )
+        .peekable();
+        while let Some((kind, offset, sub_slice)) = iter.next() {
             let sub_slice = transform_missing_snippet(config, sub_slice);
             debug!("close_block: {:?} {:?} {:?}", kind, offset, sub_slice);
 
             match kind {
                 CodeCharKind::Comment => {
-                    if !unindented && unindent_comment {
-                        unindented = true;
-                        self.block_indent = self.block_indent.block_unindent(config);
-                    }
-                    let span_in_between = mk_sp(last_hi, span.lo() + BytePos::from_usize(offset));
-                    let snippet_in_between = self.snippet(span_in_between);
-                    let mut comment_on_same_line = !snippet_in_between.contains("\n")
-                        && !last_line_contains_single_line_comment(&self.buffer);
-
-                    let comment_shape =
-                        Shape::indented(self.block_indent, config).comment(config);
-
+                    let comment_shape = if newline_inserted {
+                        self.shape().comment(self.config)
+                    } else {
+                        Shape {
+                            width: self.config.comment_width(),
+                            indent: Indent::from_width(self.config, last_line_offset),
+                            offset: 0,
+                        }
+                    };
                     let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config);
+                    if self
+                        .buffer
+                        .chars()
+                        .last()
+                        .map_or(false, |c| !c.is_whitespace() && c != '/')
+                    {
+                        self.push_str(" ");
+                    }
                     match comment_str {
                         Some(ref s) => self.push_str(s),
                         None => self.push_str(&sub_slice),
                     }
                 }
                 CodeCharKind::Normal if skip_normal(&sub_slice) => {
+                    prev_kind = kind;
                     continue;
                 }
                 CodeCharKind::Normal => {
+                    let prev_is_comment = prev_kind == CodeCharKind::Comment;
+                    prev_kind = kind;
+
+                    if iter.peek().is_none() {
+                        continue;
+                    }
+
+                    match count_newlines(&sub_slice) {
+                        0 if !prev_is_comment
+                            || !last_line_contains_single_line_comment(&self.buffer) =>
+                        {
+                            self.push_str(" ");
+                            continue;
+                        }
+                        0 => (),
+                        1 if prev_is_comment
+                            && last_line_contains_single_line_comment(&self.buffer) =>
+                        {
+                            self.push_str("\n")
+                        }
+                        1 => (),
+                        _ => self.push_str("\n"),
+                    }
+                    newline_inserted = true;
+
                     self.push_str(&self.block_indent.to_string_with_newline(config));
-                    self.push_str(sub_slice.trim());
                 }
             }
-            last_hi = span.lo() + BytePos::from_usize(offset + sub_slice.len());
+            prev_kind = kind;
         }
-        if unindented {
+        if unindent_comment {
             self.block_indent = self.block_indent.block_indent(self.config);
         }
         self.block_indent = self.block_indent.block_unindent(self.config);
