@@ -11,6 +11,8 @@ use std::io::{self, stdout, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use ansi_term::Colour::Red;
+
 use getopts::{Matches, Options};
 
 use crate::rustfmt::{
@@ -513,6 +515,11 @@ struct GetOptsOptions {
     print_misformatted_file_names: bool,
 }
 
+fn deprecate_skip_children() {
+    let msg = "Option --skip-children is deprecated since it is now the default to not format submodules of given files (#3587)";
+    eprintln!("{}: {}", Red.bold().paint("Deprecation"), msg);
+}
+
 impl GetOptsOptions {
     pub fn from_matches(matches: &Matches) -> Result<GetOptsOptions, FailureError> {
         let mut options = GetOptsOptions::default();
@@ -529,6 +536,7 @@ impl GetOptsOptions {
 
             if options.unstable_features {
                 if matches.opt_present("skip-children") {
+                    deprecate_skip_children();
                     options.skip_children = Some(true);
                 }
                 if matches.opt_present("error-on-unformatted") {
@@ -540,6 +548,7 @@ impl GetOptsOptions {
             } else {
                 let mut unstable_options = vec![];
                 if matches.opt_present("skip-children") {
+                    deprecate_skip_children();
                     unstable_options.push("`--skip-children`");
                 }
                 if matches.opt_present("error-on-unformatted") {
