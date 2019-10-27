@@ -28,11 +28,13 @@ impl MutStruct {
 }
 
 fn main() {
-    let c = |#[allow(C)] a: u32,
-             #[cfg(something)] b: i32,
-             #[cfg_attr(something, cfg(nothing))]
-             #[deny(C)]
-             c: i32| {};
+    let c = |
+        #[allow(C)] a: u32,
+        #[cfg(something)] b: i32,
+        #[cfg_attr(something, cfg(nothing))]
+        #[deny(C)]
+        c: i32,
+    | {};
     let _ = c(1, 2);
 }
 

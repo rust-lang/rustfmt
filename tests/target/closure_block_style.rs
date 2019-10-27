@@ -1,25 +1,28 @@
+// rustfmt-indent_style: Block
 // rustfmt-normalize_comments: true
 // Closures
 
 fn main() {
     let square = (|i: i32| i * i);
 
-    let commented = |// first
-                     a, // argument
-                     // second
-                     b: WithType, // argument
-                     // ignored
-                     _| {
+    let commented = |
+        // first
+        a, // argument
+        // second
+        b: WithType, // argument
+        // ignored
+        _,
+    | {
         (
             aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
             bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
         )
     };
 
-    let block_body = move |xxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
-                           ref yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy| {
-        xxxxxxxxxxxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
-    };
+    let block_body = move |
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+        ref yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy,
+    | { xxxxxxxxxxxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy };
 
     let loooooooooooooong_name = |field| {
         // format comments.
@@ -247,4 +250,24 @@ fn issue2262() {
             factory,
             slave: None,
         })?;
+}
+
+fn issue_3865() {
+    {
+        let write_status = |
+            status: &mut Vec<ansi_term::ANSIString>,
+            diff: &Diff,
+            heading: &str,
+            color: &Style,
+            show_hints: bool,
+            hints: &[&str],
+        | -> Option<bool> { Some(true) };
+    }
+    let baz = |foo: bool| -> Option<bool> { Some(true) };
+    let write_status = |
+        status: &mut Vec<ansi_term::ANSIString>,
+        diff: &Diff,
+        heading: &str,
+        color: &Style,
+    | -> Option<bool> { Some(true) };
 }
