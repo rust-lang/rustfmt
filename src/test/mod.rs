@@ -428,6 +428,58 @@ fn stdin_works_with_modified_lines() {
     assert_eq!(buf, output.as_bytes());
 }
 
+/// Ensures that `EmitMode::Json` works with input from `stdin`.
+#[test]
+fn stdin_works_with_json() {
+    init_log();
+    let input = "\nfn\n some( )\n{\n}\nfn main () {}\n";
+    #[rustfmt::skip]
+    let output = r#"[{"name":"stdin","mismatches":[{"original_begin_line":1,"original_end_line":6,"expected_begin_line":1,"expected_end_line":2,"original":"\nfn\n some( )\n{\n}\nfn main () {}","expected":"fn some() {}\nfn main() {}"}]}]"#;
+
+    let input = Input::Text(input.to_owned());
+    let mut config = Config::default();
+    config.set().newline_style(NewlineStyle::Unix);
+    config.set().emit_mode(EmitMode::Json);
+    let mut buf: Vec<u8> = vec![];
+    {
+        let mut session = Session::new(config, Some(&mut buf));
+        session.format(input).unwrap();
+        let errors = ReportedErrors {
+            has_diff: true,
+            ..Default::default()
+        };
+        assert_eq!(session.errors, errors);
+    }
+    assert_eq!(buf, output.as_bytes());
+}
+
+/// Ensures that `EmitMode::Checkstyle` works with input from `stdin`.
+#[test]
+fn stdin_works_with_checkstyle() {
+    init_log();
+    let input = "\nfn\n some( )\n{\n}\nfn main () {}\n";
+    #[rustfmt::skip]
+    let output = r#"<?xml version="1.0" encoding="utf-8"?>
+<checkstyle version="4.3"><file name="stdin"><error line="1" severity="warning" message="Should be `fn some() {}`" /><error line="2" severity="warning" message="Should be `fn main() {}`" /></file></checkstyle>
+"#;
+
+    let input = Input::Text(input.to_owned());
+    let mut config = Config::default();
+    config.set().newline_style(NewlineStyle::Unix);
+    config.set().emit_mode(EmitMode::Checkstyle);
+    let mut buf: Vec<u8> = vec![];
+    {
+        let mut session = Session::new(config, Some(&mut buf));
+        session.format(input).unwrap();
+        let errors = ReportedErrors {
+            has_diff: false,
+            ..Default::default()
+        };
+        assert_eq!(session.errors, errors);
+    }
+    assert_eq!(buf, output.as_bytes());
+}
+
 #[test]
 fn stdin_disable_all_formatting_test() {
     init_log();
