@@ -32,9 +32,7 @@ fn foo() -> bool {
 
     {
         {
-            {
-                {}
-            }
+            { {} }
         }
     }
 
@@ -589,7 +587,9 @@ fn issue3457() {
                                                                                         {
                                                                                             {
                                                                                                 {
-                                                                                                    println!("Test");
+                                                                                                    println!(
+                                                                                                        "Test"
+                                                                                                    );
                                                                                                 }
                                                                                             }
                                                                                         }
