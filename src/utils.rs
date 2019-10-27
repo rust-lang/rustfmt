@@ -193,13 +193,13 @@ pub(crate) fn is_attributes_extendable(attrs_str: &str) -> bool {
     !attrs_str.contains('\n') && !last_line_contains_single_line_comment(attrs_str)
 }
 
-/// The width of the first line in s.
+// The width of the first line in s.
 #[inline]
 pub(crate) fn first_line_width(s: &str) -> usize {
     unicode_str_width(s.splitn(2, '\n').next().unwrap_or(""))
 }
 
-/// The width of the last line in s.
+// The width of the last line in s.
 #[inline]
 pub(crate) fn last_line_width(s: &str) -> usize {
     unicode_str_width(s.rsplitn(2, '\n').next().unwrap_or(""))
