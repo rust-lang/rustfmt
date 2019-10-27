@@ -255,9 +255,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         } else {
             last_line_width(&self.buffer)
         };
-        for (kind, offset, sub_slice) in
-            CommentCodeSlices::with_offset(self.snippet(span), last_line_offset)
-        {
+        for (kind, offset, sub_slice) in CommentCodeSlices::with_offset(
+            self.snippet(span),
+            last_line_offset,
+            self.config.tab_spaces(),
+        ) {
             let sub_slice = transform_missing_snippet(config, sub_slice);
             debug!("close_block: {:?} {:?} {:?}", kind, offset, sub_slice);
 

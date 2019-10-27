@@ -188,9 +188,11 @@ impl<'a> FmtVisitor<'a> {
         let last_line_offset = if last_line_contains_single_line_comment(&self.buffer) {
             0
         } else {
-            last_line_width(&self.buffer)
+            last_line_width(&&self.buffer)
         };
-        for (kind, offset, subslice) in CommentCodeSlices::with_offset(snippet, last_line_offset) {
+        for (kind, offset, subslice) in
+            CommentCodeSlices::with_offset(snippet, last_line_offset, self.config.tab_spaces())
+        {
             debug!("{:?}: {:?}", kind, subslice);
 
             let (lf_count, crlf_count, within_file_lines_range) =

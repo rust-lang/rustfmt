@@ -638,6 +638,12 @@ fn get_prefix_space_width(config: &Config, s: &str) -> usize {
     width
 }
 
+pub(crate) fn tab_to_spaces(s: &str, tab_spaces: usize) -> usize {
+    s.chars()
+        .map(|s| if s == '\t' { tab_spaces } else { 1 })
+        .sum()
+}
+
 pub(crate) trait NodeIdExt {
     fn root() -> Self;
 }

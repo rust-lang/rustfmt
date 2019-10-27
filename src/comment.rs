@@ -10,7 +10,8 @@ use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::string::{rewrite_string, StringFormat};
 use crate::utils::{
-    count_newlines, first_line_width, last_line_width, trim_left_preserve_layout, unicode_str_width,
+    count_newlines, first_line_width, last_line_width, tab_to_spaces, trim_left_preserve_layout,
+    unicode_str_width,
 };
 use crate::{ErrorKind, FormattingError};
 
@@ -1478,20 +1479,27 @@ pub(crate) struct CommentCodeSlices<'a> {
     slice: &'a str,
     ungrouped_code_slices: MultiPeek<UngroupedCommentCodeSlices<'a>>,
     offset: Option<usize>,
+    tab_spaces: usize,
 }
 
 impl<'a> CommentCodeSlices<'a> {
     pub(crate) fn new(slice: &'a str) -> CommentCodeSlices<'a> {
         CommentCodeSlices {
             slice,
+            tab_spaces: 4,
             ungrouped_code_slices: multipeek(UngroupedCommentCodeSlices::new(slice)),
             offset: None,
         }
     }
 
-    pub(crate) fn with_offset(slice: &'a str, offset: usize) -> CommentCodeSlices<'a> {
+    pub(crate) fn with_offset(
+        slice: &'a str,
+        offset: usize,
+        tab_spaces: usize,
+    ) -> CommentCodeSlices<'a> {
         CommentCodeSlices {
             slice,
+            tab_spaces,
             ungrouped_code_slices: multipeek(UngroupedCommentCodeSlices::new(slice)),
             offset: Some(offset).filter(|o| *o != 0),
         }
@@ -1519,7 +1527,7 @@ impl<'a> Iterator for CommentCodeSlices<'a> {
                 }
                 CodeCharKind::Comment => break,
                 CodeCharKind::Normal if s.trim().is_empty() && count_newlines(s) == 0 => {
-                    let indent_width = s.len();
+                    let indent_width = tab_to_spaces(s, self.tab_spaces);
                     if self.offset.map_or(false, |comment_offset| {
                         !(indent_width < comment_offset + 2 && comment_offset < indent_width + 2)
                     }) {
@@ -1755,13 +1763,20 @@ if x == 3 {
         let mut iter = CommentCodeSlices::new(input);
 
         assert_eq!(
-            (CodeCharKind::Normal, 0, r#"
+            (
+                CodeCharKind::Normal,
+                0,
+                r#"
 if x == 3 {
     x = 4;
-} "#),
+} "#
+            ),
             iter.next().unwrap()
         );
-        assert_eq!((CodeCharKind::Comment, 26, "// if x == 3\n",), iter.next().unwrap());
+        assert_eq!(
+            (CodeCharKind::Comment, 26, "// if x == 3\n",),
+            iter.next().unwrap()
+        );
         assert_eq!(
             (CodeCharKind::Comment, 39, "// end of block\n"),
             iter.next().unwrap()
