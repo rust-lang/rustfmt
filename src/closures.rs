@@ -3,7 +3,7 @@ use syntax::{ast, ptr};
 
 use crate::attr::get_attrs_from_stmt;
 use crate::config::lists::*;
-use crate::config::Version;
+use crate::config::{IndentStyle, SeparatorTactic, Version};
 use crate::expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond};
 use crate::items::{span_hi_for_param, span_lo_for_param};
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
@@ -43,7 +43,7 @@ pub(crate) fn rewrite_closure(
 
     if let ast::ExprKind::Block(ref block, _) = body.kind {
         // The body of the closure is an empty block.
-        if block.stmts.is_empty() && !block_contains_comment(block, context.source_map) {
+        if block.stmts.is_empty() && !block_contains_comment(context, block) {
             return body
                 .rewrite(context, shape)
                 .map(|s| format!("{} {}", prefix, s));
@@ -112,7 +112,7 @@ fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext<'_>) -
     is_unsafe_block(block)
         || block.stmts.len() > 1
         || has_attributes
-        || block_contains_comment(block, context.source_map)
+        || block_contains_comment(context, block)
         || prefix.contains('\n')
 }
 
@@ -238,9 +238,16 @@ fn rewrite_closure_fn_decl(
         .shrink_left(is_async.len() + mover.len() + immovable.len())?
         .sub_width(4)?;
 
+    let indent_style = context.config.indent_style();
+
     // 1 = |
     let param_offset = nested_shape.indent + 1;
-    let param_shape = nested_shape.offset_left(1)?.visual_indent(0);
+    let param_shape = match indent_style {
+        IndentStyle::Block => {
+            Shape::indented(shape.indent.block_indent(context.config), context.config)
+        }
+        IndentStyle::Visual => nested_shape.offset_left(1)?.visual_indent(0),
+    };
     let ret_str = fn_decl.output.rewrite(context, param_shape)?;
 
     let param_items = itemize_list(
@@ -273,10 +280,31 @@ fn rewrite_closure_fn_decl(
         .tactic(tactic)
         .preserve_newline(true);
     let list_str = write_list(&item_vec, &fmt)?;
-    let mut prefix = format!("{}{}{}|{}|", is_async, immovable, mover, list_str);
+    let one_line_budget = context.budget(param_shape.indent.width());
+    let multi_line_params = match indent_style {
+        IndentStyle::Block => list_str.contains('\n') || list_str.len() > one_line_budget,
+        _ => false,
+    };
+    let put_params_in_block = multi_line_params && !item_vec.is_empty();
+    let param_str = if put_params_in_block {
+        let trailing_comma = match context.config.trailing_comma() {
+            SeparatorTactic::Never => "",
+            _ => ",",
+        };
+        format!(
+            "{}{}{}{}",
+            param_shape.indent.to_string_with_newline(context.config),
+            &list_str,
+            trailing_comma,
+            shape.indent.to_string_with_newline(context.config)
+        )
+    } else {
+        list_str
+    };
+    let mut prefix = format!("{}{}{}|{}|", is_async, immovable, mover, param_str);
 
     if !ret_str.is_empty() {
-        if prefix.contains('\n') {
+        if prefix.contains('\n') && !put_params_in_block {
             prefix.push('\n');
             prefix.push_str(&param_offset.to_string(context.config));
         } else {
@@ -304,7 +332,7 @@ pub(crate) fn rewrite_last_closure(
             ast::ExprKind::Block(ref block, _)
                 if !is_unsafe_block(block)
                     && !context.inside_macro()
-                    && is_simple_block(block, Some(&body.attrs), context.source_map) =>
+                    && is_simple_block(context, block, Some(&body.attrs)) =>
             {
                 stmt_expr(&block.stmts[0]).unwrap_or(body)
             }

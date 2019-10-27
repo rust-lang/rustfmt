@@ -2,9 +2,9 @@
 // crash.
 
 #[cfg(all(foo))]
-#[path = "closure.rs"]
+#[path = "closure_block_style.rs"]
 pub mod imp;
 
 #[cfg(all(bar))]
-#[path = "closure.rs"]
+#[path = "closure_block_style.rs"]
 pub mod imp;
