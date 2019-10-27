@@ -1881,7 +1881,7 @@ specific version of rustfmt is used in your CI, use this option.
 - **Possible values**: any published version (e.g. `"0.3.8"`)
 - **Stable**: No (tracking issue: #3386)
 
-## `skip_children`
+## `skip_children` (DEPRECATED #3587)
 
 Don't reformat out of line modules
 
