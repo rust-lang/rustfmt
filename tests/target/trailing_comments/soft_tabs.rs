@@ -12,7 +12,8 @@ pub const SQ_CREIDX: u16 = 0x0010; // CREATE INDEX
 //const SQ_REVOKE: u16 = 0x0013;	// REVOKE
 
 fn foo() {
-    let f = bar(); // Donec consequat mi. Quisque vitae dolor. Integer lobortis. Maecenas id nulla. Lorem.
+    let f = bar(); // Donec consequat mi. Quisque vitae dolor. Integer lobortis. Maecenas id nulla.
+                   // Lorem.
     // Id turpis. Nam posuere lectus vitae nibh. Etiam tortor orci, sagittis
     // malesuada, rhoncus quis, hendrerit eget, libero. Quisque commodo nulla at
     // nunc. Mauris consequat, enim vitae venenatis sollicitudin, dolor orci
