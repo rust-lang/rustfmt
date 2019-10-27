@@ -6,7 +6,9 @@ use crate::config::FileName;
 use crate::coverage::transform_missing_snippet;
 use crate::shape::{Indent, Shape};
 use crate::source_map::LineRangeUtils;
-use crate::utils::{count_lf_crlf, count_newlines, last_line_width, mk_sp};
+use crate::utils::{
+    count_lf_crlf, count_newlines, last_line_contains_single_line_comment, last_line_width, mk_sp,
+};
 use crate::visitor::FmtVisitor;
 
 struct SnippetStatus {
@@ -183,7 +185,12 @@ impl<'a> FmtVisitor<'a> {
                 );
                 (lf_count, crlf_count, within_file_lines_range)
             };
-        for (kind, offset, subslice) in CommentCodeSlices::new(snippet) {
+        let last_line_offset = if last_line_contains_single_line_comment(&self.buffer) {
+            0
+        } else {
+            last_line_width(&self.buffer)
+        };
+        for (kind, offset, subslice) in CommentCodeSlices::with_offset(snippet, last_line_offset) {
             debug!("{:?}: {:?}", kind, subslice);
 
             let (lf_count, crlf_count, within_file_lines_range) =

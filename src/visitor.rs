@@ -23,8 +23,9 @@ use crate::spanned::Spanned;
 use crate::stmt::Stmt;
 use crate::syntux::session::ParseSess;
 use crate::utils::{
-    self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes, last_line_width,
-    mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
+    self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes,
+    last_line_contains_single_line_comment, last_line_width, mk_sp, ptr_vec_to_ref_vec,
+    rewrite_ident, stmt_expr,
 };
 use crate::{ErrorKind, FormatReport, FormattingError};
 
@@ -249,7 +250,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             trimmed.is_empty() || trimmed.chars().all(|c| c == ';')
         };
 
-        for (kind, offset, sub_slice) in CommentCodeSlices::new(self.snippet(span)) {
+        let last_line_offset = if last_line_contains_single_line_comment(&self.buffer) {
+            0
+        } else {
+            last_line_width(&self.buffer)
+        };
+        for (kind, offset, sub_slice) in
+            CommentCodeSlices::with_offset(self.snippet(span), last_line_offset)
+        {
             let sub_slice = transform_missing_snippet(config, sub_slice);
             debug!("close_block: {:?} {:?} {:?}", kind, offset, sub_slice);
 
@@ -261,7 +269,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     }
                     let span_in_between = mk_sp(last_hi, span.lo() + BytePos::from_usize(offset));
                     let snippet_in_between = self.snippet(span_in_between);
-                    let mut comment_on_same_line = !snippet_in_between.contains("\n");
+                    let mut comment_on_same_line = !snippet_in_between.contains("\n")
+                        && !last_line_contains_single_line_comment(&self.buffer);
 
                     let mut comment_shape =
                         Shape::indented(self.block_indent, config).comment(config);
