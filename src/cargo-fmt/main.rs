@@ -421,7 +421,7 @@ fn get_targets_root_only(
         &package_targets,
         &mut targets,
         include_nested_test_files,
-    );
+    )?;
 
     Ok(())
 }
@@ -441,7 +441,7 @@ fn get_targets_recursive(
             &package.targets,
             &mut targets,
             include_nested_test_files,
-        );
+        )?;
 
         // Look for local dependencies.
         for dependency in package.dependencies {
@@ -497,7 +497,7 @@ fn get_targets_with_hitlist(
                 &package.targets,
                 &mut targets,
                 include_nested_test_files,
-            );
+            )?;
         }
     }
 
@@ -517,57 +517,62 @@ fn add_targets(
     target_paths: &[cargo_metadata::Target],
     targets: &mut BTreeSet<Target>,
     include_nested_test_files: bool,
-) {
+) -> Result<(), io::Error> {
     let mut test_files_added = false;
     for target in target_paths {
         // Packages often have more than one `test` target,
         // so only add the nested files for the first one.
-        let test_files = if include_nested_test_files
+        let check_for_nested_test_files = include_nested_test_files
             && !test_files_added
-            && target.kind.iter().any(|t| t == "test")
-        {
-            match manifest_path.parent() {
-                None => None,
-                Some(package_dir) => {
-                    let target_dir = package_dir.join("tests");
-                    test_files_added = true;
-                    get_nested_integration_test_files(&target_dir, &target_dir)
-                }
+            && target.kind.iter().any(|t| t == "test");
+
+        if !check_for_nested_test_files {
+            targets.insert(Target::from_target(&target, None));
+            continue;
+        }
+
+        if let Some(package_dir) = manifest_path.parent() {
+            let target_dir = package_dir.join("tests");
+            test_files_added = true;
+            let test_files = get_nested_integration_test_files(&target_dir, &target_dir);
+            if test_files.is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Error encountered while searching for nested integration test files",
+                ));
             }
+            targets.insert(Target::from_target(&target, test_files));
         } else {
-            None
-        };
-        targets.insert(Target::from_target(target, test_files));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unable to determine root `tests` directory for /
+                nested integration test file discovery",
+            ));
+        }
     }
+
+    Ok(())
 }
 
 // Returns a `Vec` containing `PathBuf`s of nested .rs files within subdirectories
 // of the `tests` directory for a given package.
 // https://github.com/rust-lang/rustfmt/issues/1820
 fn get_nested_integration_test_files(path: &Path, root_dir: &Path) -> Option<Vec<PathBuf>> {
+    if !path.is_dir() {
+        return Some(vec![]);
+    }
     let mut files = vec![];
-    if path.is_dir() {
-        if let Ok(dir) = fs::read_dir(path) {
-            for dir_entry in dir {
-                if let Ok(entry) = dir_entry {
-                    let parent = path;
-                    let entry_path = entry.path();
-                    if entry_path.is_dir() {
-                        files.append(
-                            &mut get_nested_integration_test_files(&entry_path, &root_dir)
-                                .unwrap_or(vec![]),
-                        );
-                    } else if entry_path.extension().map_or(false, |f| f == "rs")
-                        && parent != root_dir
-                    {
-                        files.push(entry_path);
-                    }
-                } else {
-                    return None;
-                }
-            }
-        } else {
-            return None;
+    let dir = fs::read_dir(path).ok()?;
+
+    for dir_entry in dir {
+        let entry_path = dir_entry.ok()?.path();
+        if entry_path.is_dir() {
+            files.append(&mut get_nested_integration_test_files(
+                &entry_path,
+                &root_dir,
+            )?);
+        } else if entry_path.extension().map_or(false, |f| f == "rs") && path != root_dir {
+            files.push(entry_path);
         }
     }
     Some(files)
