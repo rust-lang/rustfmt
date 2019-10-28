@@ -516,7 +516,8 @@ struct GetOptsOptions {
 }
 
 fn deprecate_skip_children() {
-    let msg = "Option --skip-children is deprecated since it is now the default to not format submodules of given files (#3587)";
+    let msg = "Option --skip-children is deprecated since it is now the default to not format \
+               submodules of given files (#3587)";
     eprintln!("{}: {}", Red.bold().paint("Deprecation"), msg);
 }
 

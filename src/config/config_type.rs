@@ -141,7 +141,8 @@ macro_rules! create_config {
 
             fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Config {
                 let deprecate_skip_children = || {
-                    let msg = "Option skip_children is deprecated since it is now the default to not format submodules of given files (#3587)";
+                    let msg = "Option skip_children is deprecated since it is now the default to \
+                               not format submodules of given files (#3587)";
                     eprintln!("{}: {}", Red.bold().paint("Deprecation"), msg);
                 };
 
