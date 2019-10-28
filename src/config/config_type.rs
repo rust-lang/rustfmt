@@ -227,7 +227,6 @@ macro_rules! create_config {
                 match key {
                     $(
                         stringify!($i) => {
-                dbg!(stringify!($i));
                             self.$i.1 = true;
                             self.$i.2 = val.parse::<$ty>()
                                 .expect(&format!("Failed to parse override for {} (\"{}\") as a {}",
