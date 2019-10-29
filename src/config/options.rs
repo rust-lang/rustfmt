@@ -171,6 +171,18 @@ pub enum Verbosity {
     Quiet,
 }
 
+#[config_type]
+pub enum ChainsBlockParentElementIndent {
+    /// Never indent the contents of a block-like parent element.
+    Never,
+    /// Always indent the contents of a block-like parent element.
+    Always,
+    /// Only indent the contents of a block-like parent element if
+    /// it is call-like, such as a function call that does not include
+    /// any block-like arguments.
+    OnlySimpleCalls,
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct WidthHeuristics {
     // Maximum width of the args of a function call before falling back

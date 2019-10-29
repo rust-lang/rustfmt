@@ -17,35 +17,6 @@ To enable unstable options, set `unstable_features = true` in `rustfmt.toml` or 
 
 Below you find a detailed visual guide on all the supported configuration options of rustfmt:
 
-## `allow_chain_call_overflow`
-
-Wrap elements of a call chain even if one or more lines exceed the `max_width`
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: ...)
-
-#### `false` (default):
-
-```rust
-fn example() {
-    foo("This text is under the max_width limit, and shouldn't cause any problems on its own.").long("But this line is extra long, and doesn't fit within 100 max_width. 1234567890123456789").baz().collect().unwrap();
-}
-```
-
-#### `true`:
-
-```rust
-fn example() {
-    foo("This text is under the max_width limit, and shouldn't cause any problems on its own.")
-        .long("But this line is extra long, and doesn't fit within 100 max_width. 1234567890123456789")
-        .baz()
-        .collect()
-        .unwrap();
-}
-```
-
-
 ## `binop_separator`
 
 Where to put a binary operator when a binary expression goes multiline.
@@ -414,6 +385,94 @@ fn example() {
             bar();
         }
     );
+}
+```
+
+## `chains_block_parent_indent_children`
+Determines whether to indent the child chain items of a chain that beings with a block-like parent element.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: ...)
+
+#### `false` (default):
+
+```rust
+fn example() {
+    StructA {
+        test_test: some_value,
+    }
+    .foo()
+    .bar()
+    .baz()
+    .qux();
+}
+```
+
+#### `true`:
+
+```rust
+fn example() {
+    StructA {
+        test_test: some_value,
+    }
+        .foo()
+        .bar()
+        .baz()
+        .qux();
+}
+```
+
+## `chains_block_parent_indent_parent_item`
+Determines whether block-like chain parents are indented
+
+- **Default value**: `"Never"`
+- **Possible values**: `"Always"`, `"Never"`, `"OnlySimpleCalls"`
+- **Stable**: No (tracking issue: ...)
+
+#### `"Never"` (default):
+
+```rust
+#![rustfmt::skip]
+
+fn example() {
+    StructA {
+        test_test: some_value,
+    }
+        .foo()
+        .bar()
+        .baz()
+        .qux();
+
+    let very_very_very_very_very_very_very_very_very_long_var_name = 13;
+    let all = very_very_very_very_very_long_fun_name(
+        very_very_very_very_very_very_very_very_very_long_var_name,
+    )
+        .iter()
+        .map(|x| x + very_very_very_very_very_very_long_var_name);
+
+    foo(|x| {
+        // ....
+    })
+        .bar()
+        .baz()
+        .unwrap();
+}
+```
+
+#### `"Always"`:
+
+```rust
+#![rustfmt::skip]
+
+fn example() {
+    StructA {
+            test_test: some_value,
+        }
+        .foo()
+        .bar()
+        .baz()
+        .qux();
 }
 ```
 

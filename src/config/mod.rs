@@ -65,6 +65,18 @@ create_config! {
     imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
     merge_imports: bool, false, false, "Merge imports";
 
+    // Chains
+    chains_block_parent_indent_children: bool, false, false,
+        "Determines whether to indent the child chain items of a chain that beings with/
+        a block-like parent element";
+    chains_block_parent_indent_parent_item:
+        ChainsBlockParentElementIndent,
+        ChainsBlockParentElementIndent::Never,
+        false,
+        "Determines whether block-like chain parents are indented";
+    // allow_chain_call_overflow: bool, false, false,
+    //     "Format chains even if it includes a chain call which exceeds the max width";
+
     // Ordering
     reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
     reorder_modules: bool, true, true, "Reorder module statements alphabetically in group";
@@ -112,8 +124,6 @@ create_config! {
     inline_attribute_width: usize, 0, false,
         "Write an item and its attribute on the same line \
         if their combined width is below a threshold";
-    allow_chain_call_overflow: bool, false, false,
-        "Format chains even if it includes a chain call which exceeds the max width";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -511,6 +521,8 @@ where_single_line = false
 imports_indent = "Block"
 imports_layout = "Mixed"
 merge_imports = false
+chains_block_parent_indent_children = false
+chains_block_parent_indent_parent_item = "Never"
 reorder_imports = true
 reorder_modules = true
 reorder_impl_items = false
@@ -537,7 +549,6 @@ blank_lines_lower_bound = 0
 edition = "2015"
 version = "One"
 inline_attribute_width = 0
-allow_chain_call_overflow = false
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false
