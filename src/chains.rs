@@ -414,8 +414,12 @@ impl Chain {
             _ => expr.clone(),
         }
     }
+}
 
-    fn format(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+impl Rewrite for Chain {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        debug!("rewrite chain {:?} {:?}", self, shape);
+
         let mut formatter = match context.config.indent_style() {
             IndentStyle::Block => {
                 Box::new(ChainFormatterBlock::new(self)) as Box<dyn ChainFormatter>
@@ -436,33 +440,7 @@ impl Chain {
         formatter.format_children(context, child_shape)?;
         formatter.format_last_child(context, shape, child_shape)?;
 
-        formatter.join_rewrites(context, child_shape)
-    }
-}
-
-impl Rewrite for Chain {
-    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        debug!("rewrite chain {:?} {:?}", self, shape);
-
-        let result = self.format(context, shape)?;
-        match context.config.indent_style() {
-            IndentStyle::Block => Some(result),
-            IndentStyle::Visual => match wrap_str(result, context.config.max_width(), shape) {
-                Some(r) => Some(r),
-                None => {
-                    let new_shape =
-                        Shape::indented(shape.indent.block_indent(context.config), context.config);
-                    if let Some(result) = self.format(context, new_shape) {
-                        let prefix = shape
-                            .indent
-                            .block_indent(context.config)
-                            .to_string_with_newline(context.config);
-                        return Some(format!("{}{}", prefix, result));
-                    }
-                    None
-                }
-            },
-        }
+        formatter.join_rewrites(context, child_shape, shape)
     }
 }
 
@@ -493,7 +471,12 @@ trait ChainFormatter {
         shape: Shape,
         child_shape: Shape,
     ) -> Option<()>;
-    fn join_rewrites(&self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<String>;
+    fn join_rewrites(
+        &self,
+        context: &RewriteContext<'_>,
+        child_shape: Shape,
+        shape: Shape,
+    ) -> Option<String>;
     // Returns `Some` if the chain is only a root, None otherwise.
     fn pure_root(&mut self) -> Option<String>;
 }
@@ -511,6 +494,12 @@ struct ChainFormatterShared<'a> {
     // The number of children in the chain. This is not equal to `self.children.len()`
     // because `self.children` will change size as we process the chain.
     child_count: usize,
+    // Whether the parent element of the chain exceeds the max width
+    has_long_parent: bool,
+    // Whether one or more of the inner chain items exceed the max width
+    has_long_inner_item: bool,
+    // Whether the final chain item exceeds the max width
+    has_long_tail: bool,
 }
 
 impl<'a> ChainFormatterShared<'a> {
@@ -520,6 +509,9 @@ impl<'a> ChainFormatterShared<'a> {
             rewrites: Vec::with_capacity(chain.children.len() + 1),
             fits_single_line: false,
             child_count: chain.children.len(),
+            has_long_parent: false,
+            has_long_inner_item: false,
+            has_long_tail: false,
         }
     }
 
@@ -658,8 +650,10 @@ impl<'a> ChainFormatterShared<'a> {
             child_shape.sub_width(shape.rhs_overhead(context.config) + last.tries)?
         };
 
-        last_subexpr_str = last_subexpr_str.or_else(|| last.rewrite(context, last_shape));
-        self.rewrites.push(last_subexpr_str?);
+        let (format_last, is_long) = format_chain_item(last, context, last_shape)?;
+        self.has_long_tail = is_long;
+        let last_rewrite = last_subexpr_str.unwrap_or(format_last);
+        self.rewrites.push(last_rewrite);
         Some(())
     }
 
@@ -691,6 +685,10 @@ impl<'a> ChainFormatterShared<'a> {
 
         Some(result)
     }
+
+    fn has_long_item(&self) -> bool {
+        self.has_long_parent || self.has_long_inner_item || self.has_long_tail
+    }
 }
 
 // Formats a chain using block indent.
@@ -708,7 +706,11 @@ impl<'a> ChainFormatterBlock<'a> {
     }
 }
 
-fn format_chain_item(item: &ChainItem, context: &RewriteContext<'_>, shape: Shape) -> String {
+fn format_chain_item(
+    item: &ChainItem,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> Option<(String, bool)> {
     fn contains_multiline_args(
         exprs: &Vec<ptr::P<ast::Expr>>,
         context: &RewriteContext<'_>,
@@ -768,7 +770,7 @@ fn format_chain_item(item: &ChainItem, context: &RewriteContext<'_>, shape: Shap
         .sub_width(shape.rhs_overhead(context.config))
     {
         Some(shape) => shape,
-        None => return context.snippet(item.span).to_owned(),
+        None => return Some((context.snippet(item.span).to_owned(), false)),
     };
     let next_line_result = item.rewrite(context, new_shape);
     let parent_indent_style = context.config.chains_block_parent_indent_parent_item();
@@ -777,24 +779,26 @@ fn format_chain_item(item: &ChainItem, context: &RewriteContext<'_>, shape: Shap
             if !orig_result.contains('\n')
                 && utils::unicode_str_width(&orig_result) <= shape.width =>
         {
-            orig_result
+            Some((orig_result, false))
         }
         (Some(orig_result), Some(next_line_result)) => match item.kind {
             ChainItemKind::Parent(ref expr) => match parent_indent_style {
-                ChainsBlockParentElementIndent::Never => orig_result,
-                ChainsBlockParentElementIndent::Always => next_line_result,
+                ChainsBlockParentElementIndent::Never => Some((orig_result, false)),
+                ChainsBlockParentElementIndent::Always => Some((next_line_result, false)),
                 ChainsBlockParentElementIndent::OnlySimpleCalls => {
                     match is_simple_call_like(&expr.kind, &context, shape) {
-                        true => next_line_result,
-                        false => orig_result,
+                        true => Some((next_line_result, false)),
+                        false => Some((orig_result, false)),
                     }
                 }
             },
-            _ => orig_result,
+            _ => Some((orig_result, false)),
         },
-        (None, None) => context.snippet(item.span).to_owned(),
-        (Some(orig_result), _) => orig_result,
-        (None, Some(next_line_result)) => next_line_result,
+        (None, None) => Some((context.snippet(item.span).to_owned(), true)),
+        (Some(orig_result), _) => Some((orig_result, false)),
+        // This will only occur when the chain is part of the rhs and
+        // will fit with an indent on the next line
+        (None, Some(_)) => None,
     }
 }
 
@@ -805,7 +809,8 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<()> {
-        let mut root_rewrite = format_chain_item(parent, context, shape);
+        let (mut root_rewrite, long_parent) = format_chain_item(parent, context, shape)?;
+        self.shared.has_long_inner_item = long_parent;
 
         let mut root_ends_with_block = parent.kind.is_block_like(context, &root_rewrite);
         let tab_width = context.config.tab_spaces().saturating_sub(shape.offset);
@@ -849,8 +854,10 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
 
     fn format_children(&mut self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<()> {
         for item in &self.shared.children[..self.shared.children.len() - 1] {
-            // let (rewrite, _) = format_chain_item(&item, &context, child_shape);
-            let rewrite = format_chain_item(&item, &context, child_shape);
+            let (rewrite, is_long) = format_chain_item(&item, &context, child_shape)?;
+            if is_long {
+                self.shared.has_long_inner_item = true;
+            }
             self.shared.rewrites.push(rewrite);
         }
         Some(())
@@ -866,7 +873,12 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
             .format_last_child(true, context, shape, child_shape)
     }
 
-    fn join_rewrites(&self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<String> {
+    fn join_rewrites(
+        &self,
+        context: &RewriteContext<'_>,
+        child_shape: Shape,
+        _shape: Shape,
+    ) -> Option<String> {
         self.shared.join_rewrites(context, child_shape)
     }
 
@@ -899,7 +911,8 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
         shape: Shape,
     ) -> Option<()> {
         let parent_shape = shape.visual_indent(0);
-        let mut root_rewrite = parent.rewrite(context, parent_shape)?;
+        let (mut root_rewrite, is_long) = format_chain_item(parent, context, parent_shape)?;
+        self.shared.has_long_parent = is_long;
         let multiline = root_rewrite.contains('\n');
         self.offset = if multiline {
             last_line_width(&root_rewrite).saturating_sub(shape.used_width())
@@ -944,8 +957,10 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
 
     fn format_children(&mut self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<()> {
         for item in &self.shared.children[..self.shared.children.len() - 1] {
-            // let (rewrite, _) = format_chain_item(&item, &context, child_shape);
-            let rewrite = format_chain_item(&item, &context, child_shape);
+            let (rewrite, is_long) = format_chain_item(&item, &context, child_shape)?;
+            if is_long {
+                self.shared.has_long_inner_item = true;
+            }
             self.shared.rewrites.push(rewrite);
         }
         Some(())
@@ -961,8 +976,17 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
             .format_last_child(false, context, shape, child_shape)
     }
 
-    fn join_rewrites(&self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<String> {
-        self.shared.join_rewrites(context, child_shape)
+    fn join_rewrites(
+        &self,
+        context: &RewriteContext<'_>,
+        child_shape: Shape,
+        shape: Shape,
+    ) -> Option<String> {
+        match self.shared.join_rewrites(context, child_shape) {
+            Some(rewrite) if self.shared.has_long_item() => Some(rewrite),
+            Some(rewrite) => wrap_str(rewrite, context.config.max_width(), shape),
+            None => None,
+        }
     }
 
     fn pure_root(&mut self) -> Option<String> {
