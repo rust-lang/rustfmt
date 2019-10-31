@@ -10,6 +10,18 @@ fn issue_3863() {
 }
 
 fn long_parent() {
+    // Args that do not fit
+    let bar = baz("ffffffffffffffffffffffffffffffffffffasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfadfasdfasdfasdfadfasdfasdf")
+        .foo()
+        .bar()
+        .baz();
+
+    baz("ffffffffffffffffffffffffffffffffffffasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfadfasdfasdfasdfadfasdfasdf")
+        .foo()
+        .bar()
+        .baz();
+
+    // Long element no args
     let foo = looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooonnnnnnnnnnnnnnnnnnnnnnnnggggggggggggggggggggggggggggggggggggggggggg()
         .foo()
         .bar()
@@ -20,7 +32,7 @@ fn long_parent() {
         .bar()
         .baz();
 
-    // With args
+    // Long element with args that fit
     let bar = looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooonnnnnnnnnnnnnnnnnnnnnnnnggggggggggggggggggggggggggggggggggggggggggg("ffffffffffffffffffffffffffffffffffff")
         .foo()
         .bar()
@@ -46,21 +58,6 @@ fn long_inner() {
         .bar()
         .baz();
 
-    // Long element no args
-    let foo = bar()
-        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff(
-        )
-        .foo()
-        .bar()
-        .baz();
-
-    qux()
-        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff(
-        )
-        .foo()
-        .bar()
-        .baz();
-
     // Long element with args that fit
     let bar = bar()
         .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff(
@@ -77,9 +74,59 @@ fn long_inner() {
         .foo()
         .bar()
         .baz();
+
+    // Long element no args
+    let foo = bar()
+        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff(
+        )
+        .foo()
+        .bar()
+        .baz();
+
+    qux()
+        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff(
+        )
+        .foo()
+        .bar()
+        .baz();
 }
 
 fn long_tail() {
+    // Args that do not fit
+    bar()
+        .xxxxxxx
+        .map(|x| x + 5)
+        .map(|x| x / 2)
+        .fold(0, |acc, x| acc + x)
+        .baz("fadfasdf39ru8ahsdfasdfasdfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
+    let foo = bar()
+        .xxxxxxx
+        .map(|x| x + 5)
+        .map(|x| x / 2)
+        .fold(0, |acc, x| acc + x)
+        .baz("fadfasdf39ru8ahsdfasdfasdfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
+    // Long element with args that fit
+    bar()
+        .xxxxxxx
+        .map(|x| x + 5)
+        .map(|x| x / 2)
+        .fold(0, |acc, x| acc + x)
+        .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff(
+            "abc123def456",
+        );
+
+    let foo = bar()
+        .xxxxxxx
+        .map(|x| x + 5)
+        .map(|x| x / 2)
+        .fold(0, |acc, x| acc + x)
+        .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff(
+            "abc123def456",
+        );
+
+    // Long element no args
     bar()
         .xxxxxxx
         .map(|x| x + 5)
@@ -94,24 +141,5 @@ fn long_tail() {
         .map(|x| x / 2)
         .fold(0, |acc, x| acc + x)
         .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff(
-        );
-
-    // With args
-    bar()
-        .xxxxxxx
-        .map(|x| x + 5)
-        .map(|x| x / 2)
-        .fold(0, |acc, x| acc + x)
-        .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff(
-            "abcdefghadfasdfasdfasdfasdfadf",
-        );
-
-    let foo = bar()
-        .xxxxxxx
-        .map(|x| x + 5)
-        .map(|x| x / 2)
-        .fold(0, |acc, x| acc + x)
-        .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff(
-            "abcdefghadfasdfasdfasdfasdfadf",
         );
 }

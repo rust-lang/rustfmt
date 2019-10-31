@@ -892,6 +892,7 @@ struct ChainFormatterVisual<'a> {
     shared: ChainFormatterShared<'a>,
     // The extra offset from the chain's shape to the position of the `.`
     offset: usize,
+    has_long_first_child: bool,
 }
 
 impl<'a> ChainFormatterVisual<'a> {
@@ -899,6 +900,7 @@ impl<'a> ChainFormatterVisual<'a> {
         ChainFormatterVisual {
             shared: ChainFormatterShared::new(chain),
             offset: 0,
+            has_long_first_child: false,
         }
     }
 }
@@ -911,8 +913,8 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
         shape: Shape,
     ) -> Option<()> {
         let parent_shape = shape.visual_indent(0);
-        let (mut root_rewrite, is_long) = format_chain_item(parent, context, parent_shape)?;
-        self.shared.has_long_parent = is_long;
+        let (mut root_rewrite, parent_too_long) = format_chain_item(parent, context, parent_shape)?;
+        self.shared.has_long_parent = parent_too_long;
         let multiline = root_rewrite.contains('\n');
         self.offset = if multiline {
             last_line_width(&root_rewrite).saturating_sub(shape.used_width())
@@ -926,18 +928,34 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
                 self.shared.rewrites.push(root_rewrite);
                 return Some(());
             }
-            let child_shape = parent_shape
-                .visual_indent(self.offset)
-                .sub_width(self.offset)?;
-            let rewrite = item.rewrite(context, child_shape)?;
+            let child_shape = if !self.shared.has_long_parent {
+                parent_shape
+                    .visual_indent(self.offset)
+                    .sub_width(self.offset)?
+            } else {
+                let child_shape = shape.visual_indent(0);
+                root_rewrite.push_str(&child_shape.to_string_with_newline(context.config));
+                child_shape
+            };
+
+            let (rewrite, first_child_too_long) = format_chain_item(item, context, child_shape)?;
+            self.has_long_first_child = first_child_too_long;
+
             match wrap_str(rewrite, context.config.max_width(), shape) {
                 Some(rewrite) => root_rewrite.push_str(&rewrite),
                 None => {
                     // We couldn't fit in at the visual indent, try the last
                     // indent.
-                    let rewrite = item.rewrite(context, parent_shape)?;
+                    let (rewrite, too_long) = format_chain_item(item, context, parent_shape)?;
+                    if too_long
+                        || wrap_str(rewrite.clone(), context.config.max_width(), parent_shape)
+                            .is_none()
+                    {
+                        self.has_long_first_child = true;
+                    } else {
+                        self.offset = 0;
+                    }
                     root_rewrite.push_str(&rewrite);
-                    self.offset = 0;
                 }
             }
 
@@ -949,10 +967,14 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
     }
 
     fn child_shape(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<Shape> {
-        shape
-            .with_max_width(context.config)
-            .offset_left(self.offset)
-            .map(|s| s.visual_indent(0))
+        if !self.shared.has_long_parent {
+            shape
+                .with_max_width(context.config)
+                .offset_left(self.offset)
+                .map(|s| s.visual_indent(0))
+        } else {
+            Some(shape.visual_indent(0))
+        }
     }
 
     fn format_children(&mut self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<()> {
@@ -983,7 +1005,9 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
         shape: Shape,
     ) -> Option<String> {
         match self.shared.join_rewrites(context, child_shape) {
-            Some(rewrite) if self.shared.has_long_item() => Some(rewrite),
+            Some(rewrite) if self.shared.has_long_item() || self.has_long_first_child => {
+                Some(rewrite)
+            }
             Some(rewrite) => wrap_str(rewrite, context.config.max_width(), shape),
             None => None,
         }
