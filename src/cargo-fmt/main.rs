@@ -917,10 +917,11 @@ mod cargo_fmt_tests {
             let exp_other = PathBuf::from(
                 "tests/nested-test-files/root-and-nested-tests/tests/nested/other.rs",
             );
-            assert_eq!(
-                Some(vec![exp_baz, exp_foo_bar, exp_other]),
-                get_nested_integration_test_files(&target_dir, &target_dir),
-            )
+            let files = get_nested_integration_test_files(&target_dir, &target_dir).unwrap();
+            assert_eq!(3, files.len());
+            assert!(files.contains(&exp_baz));
+            assert!(files.contains(&exp_foo_bar));
+            assert!(files.contains(&exp_other));
         }
     }
 
