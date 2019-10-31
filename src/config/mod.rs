@@ -74,8 +74,6 @@ create_config! {
         ChainsBlockParentElementIndent::Never,
         false,
         "Determines whether block-like chain parents are indented";
-    // allow_chain_call_overflow: bool, false, false,
-    //     "Format chains even if it includes a chain call which exceeds the max width";
 
     // Ordering
     reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";

@@ -17,6 +17,7 @@ To enable unstable options, set `unstable_features = true` in `rustfmt.toml` or 
 
 Below you find a detailed visual guide on all the supported configuration options of rustfmt:
 
+
 ## `binop_separator`
 
 Where to put a binary operator when a binary expression goes multiline.

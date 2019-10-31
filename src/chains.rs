@@ -792,7 +792,10 @@ fn format_chain_item(
                     }
                 }
             },
-            _ => Some((orig_result, false)),
+            _ => Some((
+                orig_result.clone(),
+                wrap_str(orig_result, context.config.max_width(), shape).is_none(),
+            )),
         },
         (None, None) => Some((context.snippet(item.span).to_owned(), true)),
         (Some(orig_result), _) => Some((orig_result, false)),
