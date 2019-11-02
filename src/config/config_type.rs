@@ -155,7 +155,7 @@ macro_rules! create_config {
                         self.$i.1 = true;
                         self.$i.2 = val;
                     } else {
-                        if crate::is_nightly_channel!() {
+                        if crate::release_channel::is_nightly() {
                             self.$i.1 = true;
                             self.$i.2 = val;
                         } else {

@@ -11,7 +11,7 @@ use std::thread;
 
 use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle, ReportTactic};
 use crate::formatting::{ReportedErrors, SourceFile};
-use crate::is_nightly_channel;
+use crate::release_channel::is_nightly;
 use crate::rustfmt_diff::{make_diff, print_diff, DiffLine, Mismatch, ModifiedChunk, OutputWriter};
 use crate::source_file;
 use crate::{FormatReport, FormatReportFormatterBuilder, Input, Session};
@@ -312,7 +312,7 @@ fn idempotence_tests() {
     init_log();
     run_test_with(&TestSetting::default(), || {
         // these tests require nightly
-        if !is_nightly_channel!() {
+        if !is_nightly() {
             return;
         }
         // Get all files in the tests/target directory.
@@ -336,7 +336,7 @@ fn idempotence_tests() {
 fn self_tests() {
     init_log();
     // Issue-3443: these tests require nightly
-    if !is_nightly_channel!() {
+    if !is_nightly() {
         return;
     }
     let mut files = get_test_files(Path::new("tests"), false);
@@ -491,7 +491,7 @@ fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<Format
 
     for file_name in files {
         let sig_comments = read_significant_comments(&file_name);
-        if sig_comments.contains_key("unstable") && !is_nightly_channel!() {
+        if sig_comments.contains_key("unstable") && !is_nightly() {
             debug!(
                 "Skipping '{}' because it requires unstable \
                  features which are only available on nightly...",

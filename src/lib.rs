@@ -63,7 +63,7 @@ pub(crate) mod modules;
 mod overflow;
 mod pairs;
 mod patterns;
-mod release_channel;
+pub mod release_channel;
 mod reorder;
 mod rewrite;
 pub(crate) mod rustfmt_diff;

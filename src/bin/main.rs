@@ -16,8 +16,8 @@ use ansi_term::Colour::Red;
 use getopts::{Matches, Options};
 
 use crate::rustfmt::{
-    load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
-    FormatReportFormatterBuilder, Input, Session, Verbosity,
+    load_config, release_channel::is_nightly, CliOptions, Color, Config, Edition, EmitMode,
+    FileLines, FileName, FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
 
 fn main() {
@@ -187,10 +187,6 @@ fn make_opts() -> Options {
     );
 
     opts
-}
-
-fn is_nightly() -> bool {
-    option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev")
 }
 
 // Returned i32 is an exit code
