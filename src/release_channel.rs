@@ -8,6 +8,10 @@
 /// If we're being built by cargo (e.g., `cargo +nightly install rustfmt-nightly`),
 /// `CFG_RELEASE_CHANNEL` is not set. As we only support being built against the
 /// nightly compiler when installed from crates.io, default to nightly mode.
+///
+/// Additionally, the RUSTFMT_BOOTSTRAP environment variable can be set to `1` to
+/// allow for use of unstable features when used within the compiler's stage0.
 pub fn is_nightly() -> bool {
     option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev")
+        || std::env::var("RUSTFMT_BOOTSTRAP") == Ok("1".to_string())
 }
