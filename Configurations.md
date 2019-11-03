@@ -2444,7 +2444,7 @@ Internal option
 
 ## `make_backup`
 
-Internal option, use `--backup`
+Internal option, deprecated
 
 ## `print_misformatted_file_names`
 

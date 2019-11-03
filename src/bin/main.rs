@@ -521,6 +521,12 @@ fn deprecate_skip_children() {
     eprintln!("{}: {}", Red.bold().paint("Deprecation"), msg);
 }
 
+fn deprecate_backup() {
+    let msg = "Option --backup is deprecated as this responsibility should be handled \
+               by a version control system";
+    eprintln!("{}: {}", Red.bold().paint("Deprecation"), msg);
+}
+
 impl GetOptsOptions {
     pub fn from_matches(matches: &Matches) -> Result<GetOptsOptions, FailureError> {
         let mut options = GetOptsOptions::default();
@@ -608,6 +614,7 @@ impl GetOptsOptions {
         }
 
         if matches.opt_present("backup") {
+            deprecate_backup();
             options.backup = true;
         }
 
