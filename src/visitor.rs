@@ -248,6 +248,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
         for (kind, offset, sub_slice) in CommentCodeSlices::new(self.snippet(span)) {
             let sub_slice = transform_missing_snippet(config, sub_slice);
+            let sub_slice = sub_slice.trim();
 
             debug!("close_block: {:?} {:?} {:?}", kind, offset, sub_slice);
 
