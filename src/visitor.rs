@@ -293,6 +293,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             }
                         }
                     } else {
+                        let sub_slice = sub_slice.trim();
                         if comment_on_same_line {
                             // 1 = a space before `//`
                             let offset_len = 1 + last_line_width(&self.buffer)
