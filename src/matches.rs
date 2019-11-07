@@ -326,7 +326,7 @@ fn rewrite_match_body(
     arrow_span: Span,
     is_last: bool,
 ) -> Option<String> {
-    let was_block = if let ast::ExprKind::Block(..) = body.node {
+    let was_block = if let ast::ExprKind::Block(..) = body.kind {
         true
     } else {
         false

@@ -31,5 +31,9 @@ fn main() {
         }
         7 => // comment 7
         {}
+        8 =>
+        {
+        // comment 8
+        }
     };
 }

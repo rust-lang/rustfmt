@@ -26,11 +26,13 @@ fn main() {
             4
         }
         5 => 5,
-        6 => {
-            // comment 6
+        6 => { // comment 6
         }
         7 =>
             // comment 7
             {}
+        8 => {
+            // comment 8
+        }
     };
 }
