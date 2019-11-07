@@ -151,7 +151,6 @@ create_config! {
         "'small' heuristic values";
     emit_mode: EmitMode, EmitMode::Files, false,
         "What emit Mode to use when none is supplied";
-    make_backup: bool, false, false, "Backup changed files";
     print_misformatted_file_names: bool, false, true,
         "Prints the names of mismatched files that were formatted. Prints the names of \
          files that would be formated when used with `--check` mode. ";
@@ -552,7 +551,6 @@ report_todo = "Never"
 report_fixme = "Never"
 ignore = []
 emit_mode = "Files"
-make_backup = false
 "#,
             env!("CARGO_PKG_VERSION")
         );
