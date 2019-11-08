@@ -326,6 +326,12 @@ fn rewrite_match_body(
     arrow_span: Span,
     is_last: bool,
 ) -> Option<String> {
+    let was_block = if let ast::ExprKind::Block(..) = body.kind {
+        true
+    } else {
+        false
+    };
+
     let (extend, body) = flatten_arm_body(
         context,
         body,
@@ -368,6 +374,10 @@ fn rewrite_match_body(
         let comment_str = arrow_snippet[arrow_index + 2..].trim();
         if comment_str.is_empty() {
             String::new()
+        } else if (!was_block && !is_block) || is_empty_block {
+            let indent = shape.indent.block_indent(context.config);
+            let shape = Shape::indented(indent, &context.config);
+            rewrite_comment(comment_str, false, shape, &context.config)?
         } else {
             rewrite_comment(comment_str, false, shape, &context.config)?
         }
@@ -375,7 +385,6 @@ fn rewrite_match_body(
 
     let combine_next_line_body = |body_str: &str| {
         let nested_indent_str = next_line_indent.to_string_with_newline(context.config);
-
         if is_block {
             let mut result = pats_str.to_owned();
             result.push_str(" =>");
@@ -413,19 +422,26 @@ fn rewrite_match_body(
         let block_sep = match context.config.control_brace_style() {
             ControlBraceStyle::AlwaysNextLine => format!("{}{}", alt_block_sep, body_prefix),
             _ if body_prefix.is_empty() => "".to_owned(),
-            _ if forbid_same_line || !arrow_comment.is_empty() => {
+            _ if forbid_same_line || (!arrow_comment.is_empty() && was_block) => {
                 format!("{}{}", alt_block_sep, body_prefix)
             }
             _ => format!(" {}", body_prefix),
         } + &nested_indent_str;
 
+        // if match arm was a block consisting of one expression,
+        // and it was flattened, we need to retain comment before
+        // the arm body block.
         let mut result = pats_str.to_owned();
         result.push_str(" =>");
-        if !arrow_comment.is_empty() {
+        if !arrow_comment.is_empty() && was_block {
             result.push_str(&indent_str);
             result.push_str(&arrow_comment);
         }
         result.push_str(&block_sep);
+        if !arrow_comment.is_empty() && !was_block {
+            result.push_str(&arrow_comment);
+            result.push_str(&nested_indent_str);
+        }
         result.push_str(&body_str);
         result.push_str(&body_suffix);
         Some(result)
