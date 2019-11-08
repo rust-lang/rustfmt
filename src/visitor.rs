@@ -248,7 +248,6 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
         for (kind, offset, sub_slice) in CommentCodeSlices::new(self.snippet(span)) {
             let sub_slice = transform_missing_snippet(config, sub_slice);
-
             debug!("close_block: {:?} {:?} {:?}", kind, offset, sub_slice);
 
             match kind {
@@ -277,19 +276,24 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             Some(offset) => {
                                 let first_line = &sub_slice[..offset];
                                 self.push_str(first_line);
-                                self.push_str(&self.block_indent.to_string_with_newline(config));
 
                                 // put the other lines below it, shaping it as needed
                                 let other_lines = &sub_slice[offset + 1..];
-                                let comment_str =
-                                    rewrite_comment(other_lines, false, comment_shape, config);
-                                match comment_str {
-                                    Some(ref s) => self.push_str(s),
-                                    None => self.push_str(other_lines),
+                                if !other_lines.trim().is_empty() {
+                                    self.push_str(
+                                        &self.block_indent.to_string_with_newline(config),
+                                    );
+                                    let comment_str =
+                                        rewrite_comment(other_lines, false, comment_shape, config);
+                                    match comment_str {
+                                        Some(ref s) => self.push_str(s),
+                                        None => self.push_str(other_lines),
+                                    }
                                 }
                             }
                         }
                     } else {
+                        let sub_slice = sub_slice.trim();
                         if comment_on_same_line {
                             // 1 = a space before `//`
                             let offset_len = 1 + last_line_width(&self.buffer)
