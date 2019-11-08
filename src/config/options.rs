@@ -178,9 +178,13 @@ pub enum ChainsBlockParentElementIndent {
     /// Always indent the contents of a block-like parent element.
     Always,
     /// Only indent the contents of a block-like parent element if
-    /// it is call-like, such as a function call that does not include
+    /// it is a simple call-like, such as a function call that does not include
     /// any block-like arguments.
     OnlySimpleCalls,
+    /// Only indent the contents of a block-like parent element if
+    /// it is a tuple lit or a simple call-like, such as a function call that does not include
+    /// any block-like arguments.
+    OnlyTupleLitsAndSimpleCalls,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]

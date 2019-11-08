@@ -54,5 +54,25 @@ fn long_tail() {
     bar().xxxxxxx.map(|x| x + 5).map(|x| x / 2).fold(0, |acc, x| acc + x).doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff();
 
     let foo = bar().xxxxxxx.map(|x| x + 5).map(|x| x / 2).fold(0, |acc, x| acc + x).doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff();
+}
 
+fn raw_str_lit() {
+    fpo.foo().bar.baz.quz.adfasdfasdfasdfasdfasdfasdfasffffffffffffffffffffffffffffffffffdfasf(r#"
+    if foo {
+        a();
+    }
+    else {
+        b();
+    }
+    "#.trim());
+
+
+    fpo.foo().bar.baz.quz.a999999999999999999999999999999999999999999999999999999999999999(r#"
+    if foo {
+        a();
+    }
+    else {
+        b();
+    }
+    "#.trim().foo().bar.baz.qux().unwrap());
 }

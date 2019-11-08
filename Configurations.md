@@ -428,29 +428,117 @@ fn example() {
 Determines whether block-like chain parents are indented
 
 - **Default value**: `"Never"`
-- **Possible values**: `"Always"`, `"Never"`, `"OnlySimpleCalls"`
+- **Possible values**: `"Always"`, `"Never"`, `"OnlySimpleCalls"`, `"OnlyTupleLitsAndSimpleCalls"`
 - **Stable**: No (tracking issue: ...)
 
 #### `"Never"` (default):
+The body of block-like parent chain elements are never indented.
 
 ```rust
 #![rustfmt::skip]
-
 fn example() {
-    StructA {
-        test_test: some_value,
-    }
-        .foo()
-        .bar()
-        .baz()
-        .qux();
-
-    let very_very_very_very_very_very_very_very_very_long_var_name = 13;
     let all = very_very_very_very_very_long_fun_name(
         very_very_very_very_very_very_very_very_very_long_var_name,
     )
+    .iter()
+    .map(|x| x + very_very_very_very_very_very_long_var_name);
+
+    StructA {
+        test_test: some_value,
+    }
+    .do_stuff(StructB {
+        test_test_b: other_value,
+    })
+    .aaa_aaa()
+    .do_stuff(
+        StructB {
+            test_test_b: other_value,
+        }
+        .ddd_ddd()
+        .eee_eee(),
+    )
+    .bbb_bbb()
+    .ccc_ccc();
+
+    foo(|x| {
+        // ....
+    })
+    .bar()
+    .baz()
+    .unwrap();
+}
+```
+
+#### `"Always"`:
+The body of block-like parent chain elements are always indented.
+
+```rust
+#![rustfmt::skip]
+// chains_block_parent_indent_children: true
+
+fn example() {
+    let all = very_very_very_very_very_long_fun_name(
+            very_very_very_very_very_very_very_very_very_long_var_name,
+        )
         .iter()
         .map(|x| x + very_very_very_very_very_very_long_var_name);
+
+    StructA {
+            test_test: some_value,
+        }
+        .do_stuff(StructB {
+            test_test_b: other_value,
+        })
+        .aaa_aaa()
+        .do_stuff(
+            StructB {
+                    test_test_b: other_value,
+                }
+                .ddd_ddd()
+                .eee_eee(),
+        )
+        .bbb_bbb()
+        .ccc_ccc();
+        
+    foo(|x| {
+            // ....
+        })
+        .bar()
+        .baz()
+        .unwrap();
+}
+```
+
+#### `"OnlySimpleCalls"`:
+The body of block-like parent chain elements are only indented when the parent is a simple call-like chain item, such as a method call with no multiline block like arguments (like a closure).
+
+```rust
+#![rustfmt::skip]
+// chains_block_parent_indent_children: true
+
+fn example() {
+    let all = very_very_very_very_very_long_fun_name(
+            very_very_very_very_very_very_very_very_very_long_var_name,
+        )
+        .iter()
+        .map(|x| x + very_very_very_very_very_very_long_var_name);
+
+    StructA {
+        test_test: some_value,
+    }
+        .do_stuff(StructB {
+            test_test_b: other_value,
+        })
+        .aaa_aaa()
+        .do_stuff(
+            StructB {
+                test_test_b: other_value,
+            }
+                .ddd_ddd()
+                .eee_eee(),
+        )
+        .bbb_bbb()
+        .ccc_ccc();
 
     foo(|x| {
         // ....
@@ -461,19 +549,43 @@ fn example() {
 }
 ```
 
-#### `"Always"`:
+#### `"OnlyTupleLitsAndSimpleCalls"`:
+The body of block-like parent chain elements are only indented when the parent is a tuple literal, or a simple call-like chain item, such as a method call with no multiline block like arguments (like a closure).
 
 ```rust
 #![rustfmt::skip]
+// chains_block_parent_indent_children: true
 
 fn example() {
+    let all = very_very_very_very_very_long_fun_name(
+            very_very_very_very_very_very_very_very_very_long_var_name,
+        )
+        .iter()
+        .map(|x| x + very_very_very_very_very_very_long_var_name);
+
     StructA {
             test_test: some_value,
         }
-        .foo()
+        .do_stuff(StructB {
+            test_test_b: other_value,
+        })
+        .aaa_aaa()
+        .do_stuff(
+            StructB {
+                    test_test_b: other_value,
+                }
+                .ddd_ddd()
+                .eee_eee(),
+        )
+        .bbb_bbb()
+        .ccc_ccc();
+
+    foo(|x| {
+        // ....
+    })
         .bar()
         .baz()
-        .qux();
+        .unwrap();
 }
 ```
 

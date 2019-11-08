@@ -28,5 +28,5 @@ fn main() {
     })
 .bar()
 .baz()
-.unwrap()
+.unwrap();
 }

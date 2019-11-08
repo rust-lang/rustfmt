@@ -1,5 +1,5 @@
 // rustfmt-chains_block_parent_indent_children: true
-// rustfmt-chains_block_parent_indent_parent_item: Always
+// rustfmt-chains_block_parent_indent_parent_item: OnlyTupleLitsAndSimpleCalls
 
 fn main() {
     let very_very_very_very_very_very_very_very_very_long_var_name = 13;
@@ -30,8 +30,8 @@ fn main() {
         .map(|x| x + very_very_very_very_very_very_long_var_name);
 
     foo(|x| {
-            // ....
-        })
+        // ....
+    })
         .bar()
         .baz()
         .unwrap();

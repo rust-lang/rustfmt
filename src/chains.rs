@@ -765,6 +765,17 @@ fn format_chain_item(
         }
     }
 
+    fn is_tup_lit_or_simple_call_like(
+        parent_expr_kind: &ast::ExprKind,
+        context: &RewriteContext<'_>,
+        shape: Shape,
+    ) -> bool {
+        match parent_expr_kind {
+            ast::ExprKind::Struct(..) => true,
+            _ => is_simple_call_like(parent_expr_kind, context, shape),
+        }
+    }
+
     let orig_result = item.rewrite(context, shape);
     let new_shape = match Shape::indented(shape.indent.block_indent(context.config), context.config)
         .sub_width(shape.rhs_overhead(context.config))
@@ -783,12 +794,38 @@ fn format_chain_item(
         }
         (Some(orig_result), Some(next_line_result)) => match item.kind {
             ChainItemKind::Parent(ref expr) => match parent_indent_style {
-                ChainsBlockParentElementIndent::Never => Some((orig_result, false)),
-                ChainsBlockParentElementIndent::Always => Some((next_line_result, false)),
+                ChainsBlockParentElementIndent::Never => Some((
+                    orig_result.clone(),
+                    wrap_str(orig_result, context.config.max_width(), shape).is_none(),
+                )),
+                ChainsBlockParentElementIndent::Always => Some((
+                    next_line_result.clone(),
+                    wrap_str(next_line_result, context.config.max_width(), new_shape).is_none(),
+                )),
                 ChainsBlockParentElementIndent::OnlySimpleCalls => {
                     match is_simple_call_like(&expr.kind, &context, shape) {
-                        true => Some((next_line_result, false)),
-                        false => Some((orig_result, false)),
+                        true => Some((
+                            next_line_result.clone(),
+                            wrap_str(next_line_result, context.config.max_width(), new_shape)
+                                .is_none(),
+                        )),
+                        false => Some((
+                            orig_result.clone(),
+                            wrap_str(orig_result, context.config.max_width(), shape).is_none(),
+                        )),
+                    }
+                }
+                ChainsBlockParentElementIndent::OnlyTupleLitsAndSimpleCalls => {
+                    match is_tup_lit_or_simple_call_like(&expr.kind, &context, shape) {
+                        true => Some((
+                            next_line_result.clone(),
+                            wrap_str(next_line_result, context.config.max_width(), new_shape)
+                                .is_none(),
+                        )),
+                        false => Some((
+                            orig_result.clone(),
+                            wrap_str(orig_result, context.config.max_width(), shape).is_none(),
+                        )),
                     }
                 }
             },
@@ -798,7 +835,10 @@ fn format_chain_item(
             )),
         },
         (None, None) => Some((context.snippet(item.span).to_owned(), true)),
-        (Some(orig_result), _) => Some((orig_result, false)),
+        (Some(orig_result), _) => Some((
+            orig_result.clone(),
+            wrap_str(orig_result, context.config.max_width(), shape).is_none(),
+        )),
         // This will only occur when the chain is part of the rhs and
         // will fit with an indent on the next line
         (None, Some(_)) => None,

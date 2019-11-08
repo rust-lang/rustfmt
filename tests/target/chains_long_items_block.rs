@@ -143,3 +143,42 @@ fn long_tail() {
         .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff(
         );
 }
+
+fn raw_str_lit() {
+    fpo.foo()
+        .bar
+        .baz
+        .quz
+        .adfasdfasdfasdfasdfasdfasdfasffffffffffffffffffffffffffffffffffdfasf(
+            r#"
+    if foo {
+        a();
+    }
+    else {
+        b();
+    }
+    "#
+            .trim(),
+        );
+
+    fpo.foo()
+        .bar
+        .baz
+        .quz
+        .a999999999999999999999999999999999999999999999999999999999999999(
+            r#"
+    if foo {
+        a();
+    }
+    else {
+        b();
+    }
+    "#
+            .trim()
+            .foo()
+            .bar
+            .baz
+            .qux()
+            .unwrap(),
+        );
+}
