@@ -2,10 +2,16 @@ use crate::comment::CommentStyle;
 use std::fmt::{self, Display};
 
 /// Formats a string as a doc comment using the given [`CommentStyle`].
-#[derive(new)]
 pub(super) struct DocCommentFormatter<'a> {
     literal: &'a str,
     style: CommentStyle<'a>,
+}
+
+impl<'a> DocCommentFormatter<'a> {
+    /// Constructs a new `DocCommentFormatter`.
+    pub(super) fn new(literal: &'a str, style: CommentStyle<'a>) -> Self {
+        Self { literal, style }
+    }
 }
 
 impl Display for DocCommentFormatter<'_> {

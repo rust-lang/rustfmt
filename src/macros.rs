@@ -1220,14 +1220,18 @@ fn macro_style(mac: &ast::Mac, context: &RewriteContext<'_>) -> DelimToken {
     }
 }
 
-// A very simple parser that just parses a macros 2.0 definition into its branches.
-// Currently we do not attempt to parse any further than that.
-#[derive(new)]
+/// A very simple parser that just parses a macros 2.0 definition into its branches.
+/// Currently we do not attempt to parse any further than that.
 struct MacroParser {
     toks: Cursor,
 }
 
 impl MacroParser {
+    /// Constructs a new `MacroParser`.
+    fn new(toks: Cursor) -> Self {
+        Self { toks }
+    }
+
     // (`(` ... `)` `=>` `{` ... `}`)*
     fn parse(&mut self) -> Option<Macro> {
         let mut branches = vec![];
