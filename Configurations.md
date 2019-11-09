@@ -390,7 +390,7 @@ fn example() {
 ```
 
 ## `chains_block_parent_indent_children`
-Determines whether to indent the child chain items of a chain that beings with a block-like parent element.
+Determines whether to indent the child chain items of a chain that beings with a block-like parent element when `indent_style` is `Block`.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
@@ -424,8 +424,10 @@ fn example() {
 }
 ```
 
+See also: [`indent_style`](#indent_style).
+
 ## `chains_block_parent_indent_parent_item`
-Determines whether block-like chain parents are indented
+Determines whether block-like chain parents are indented when `indent_style` is `Block`.
 
 - **Default value**: `"Never"`
 - **Possible values**: `"Always"`, `"Never"`, `"OnlySimpleCalls"`, `"OnlyTupleLitsAndSimpleCalls"`
@@ -588,6 +590,8 @@ fn example() {
         .unwrap();
 }
 ```
+
+See also: [`indent_style`](#indent_style).
 
 ## `comment_width`
 
