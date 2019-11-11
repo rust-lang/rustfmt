@@ -19,7 +19,6 @@ fn main() {
     }.ddd_ddd().eee_eee())
     .bbb_bbb()
     .ccc_ccc();
-    let more = 13;
     let other = vec![1, 2, 3].iter()
         .map(|x| x + very_very_very_very_very_very_long_var_name);
 
