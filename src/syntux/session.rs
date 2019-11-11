@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
-use rustc_data_structures::sync;
+use rustc_data_structures::sync::Send;
 use syntax::ast;
 use syntax::errors::emitter::{ColorConfig, Emitter, EmitterWriter};
 use syntax::errors::{Diagnostic, Handler, Level as DiagnosticLevel};
@@ -31,7 +31,7 @@ impl Emitter for SilentEmitter {
     fn emit_diagnostic(&mut self, _db: &Diagnostic) {}
 }
 
-fn silent_emitter() -> Box<dyn Emitter + sync::Send> {
+fn silent_emitter() -> Box<dyn Emitter + Send> {
     Box::new(SilentEmitter {})
 }
 
@@ -39,7 +39,7 @@ fn silent_emitter() -> Box<dyn Emitter + sync::Send> {
 struct SilentOnIgnoredFilesEmitter {
     ignore_path_set: Rc<IgnorePathSet>,
     source_map: Rc<SourceMap>,
-    emitter: Box<dyn Emitter + sync::Send>,
+    emitter: Box<dyn Emitter + Send>,
     has_non_ignorable_parser_errors: bool,
     can_reset: Rc<RefCell<bool>>,
 }
@@ -269,6 +269,7 @@ mod tests {
     mod emitter {
         use super::*;
         use crate::config::IgnoreList;
+        use crate::is_nightly_channel;
         use crate::utils::mk_sp;
         use std::path::PathBuf;
         use syntax::source_map::FileName as SourceMapFileName;
@@ -347,6 +348,9 @@ mod tests {
 
         #[test]
         fn handles_recoverable_parse_error_in_ignored_file() {
+            if !is_nightly_channel!() {
+                return;
+            }
             let num_emitted_errors = Rc::new(RefCell::new(0));
             let can_reset_errors = Rc::new(RefCell::new(false));
             let ignore_list = get_ignore_list(r#"ignore = ["foo.rs"]"#);
@@ -368,6 +372,9 @@ mod tests {
 
         #[test]
         fn handles_recoverable_parse_error_in_non_ignored_file() {
+            if !is_nightly_channel!() {
+                return;
+            }
             let num_emitted_errors = Rc::new(RefCell::new(0));
             let can_reset_errors = Rc::new(RefCell::new(false));
             let source_map = Rc::new(SourceMap::new(FilePathMapping::empty()));
@@ -388,6 +395,9 @@ mod tests {
 
         #[test]
         fn handles_mix_of_recoverable_parse_error() {
+            if !is_nightly_channel!() {
+                return;
+            }
             let num_emitted_errors = Rc::new(RefCell::new(0));
             let can_reset_errors = Rc::new(RefCell::new(false));
             let source_map = Rc::new(SourceMap::new(FilePathMapping::empty()));
