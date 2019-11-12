@@ -9,7 +9,7 @@ use crate::utils::{
 };
 
 /// Sigils that decorate a binop pair.
-#[derive(new, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub(crate) struct PairParts<'a> {
     prefix: &'a str,
     infix: &'a str,
@@ -17,6 +17,15 @@ pub(crate) struct PairParts<'a> {
 }
 
 impl<'a> PairParts<'a> {
+    /// Constructs a new `PairParts`.
+    pub(crate) fn new(prefix: &'a str, infix: &'a str, suffix: &'a str) -> Self {
+        Self {
+            prefix,
+            infix,
+            suffix,
+        }
+    }
+
     pub(crate) fn infix(infix: &'a str) -> PairParts<'a> {
         PairParts {
             prefix: "",
