@@ -476,9 +476,6 @@ impl<'b, T: Write + 'b> Session<'b, T> {
 
 pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
     match config.emit_mode() {
-        EmitMode::Files if config.make_backup() => {
-            Box::new(emitter::FilesWithBackupEmitter::default())
-        }
         EmitMode::Files => Box::new(emitter::FilesEmitter::new(
             config.print_misformatted_file_names(),
         )),

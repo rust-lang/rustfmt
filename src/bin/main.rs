@@ -110,7 +110,6 @@ fn make_opts() -> Options {
         "[files|stdout]"
     };
     opts.optopt("", "emit", "What data to emit and how", emit_opts);
-    opts.optflag("", "backup", "Backup any modified files.");
     opts.optopt(
         "",
         "config-path",
@@ -506,7 +505,6 @@ struct GetOptsOptions {
     config_path: Option<PathBuf>,
     inline_config: HashMap<String, String>,
     emit_mode: Option<EmitMode>,
-    backup: bool,
     check: bool,
     edition: Option<Edition>,
     color: Option<Color>,
@@ -608,10 +606,6 @@ impl GetOptsOptions {
             options.edition = Some(edition_from_edition_str(edition_str)?);
         }
 
-        if matches.opt_present("backup") {
-            options.backup = true;
-        }
-
         if matches.opt_present("files-with-diff") {
             options.print_misformatted_file_names = true;
         }
@@ -674,9 +668,6 @@ impl CliOptions for GetOptsOptions {
             config.set().emit_mode(EmitMode::Diff);
         } else if let Some(emit_mode) = self.emit_mode {
             config.set().emit_mode(emit_mode);
-        }
-        if self.backup {
-            config.set().make_backup(true);
         }
         if let Some(color) = self.color {
             config.set().color(color);
