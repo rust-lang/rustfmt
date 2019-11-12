@@ -22,3 +22,7 @@
 .idea/
 .vscode/
 *~
+
+# This directories and files are created by test
+tests/nested-test-files/**/target/
+tests/nested-test-files/**/Cargo.lock
