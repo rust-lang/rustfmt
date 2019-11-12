@@ -1,4 +1,3 @@
-// rustfmt-chains_block_parent_indent_children: true
 // rustfmt-chains_block_parent_indent_parent_item: OnlySimpleCalls
 
 fn main() {
@@ -11,19 +10,19 @@ fn main() {
     StructA {
         test_test: some_value,
     }
-        .do_stuff(StructB {
+    .do_stuff(StructB {
+        test_test_b: other_value,
+    })
+    .aaa_aaa()
+    .do_stuff(
+        StructB {
             test_test_b: other_value,
-        })
-        .aaa_aaa()
-        .do_stuff(
-            StructB {
-                test_test_b: other_value,
-            }
-                .ddd_ddd()
-                .eee_eee(),
-        )
-        .bbb_bbb()
-        .ccc_ccc();
+        }
+        .ddd_ddd()
+        .eee_eee(),
+    )
+    .bbb_bbb()
+    .ccc_ccc();
     let more = 13;
     let other = vec![1, 2, 3]
         .iter()
@@ -32,7 +31,7 @@ fn main() {
     foo(|x| {
         // ....
     })
-        .bar()
-        .baz()
-        .unwrap();
+    .bar()
+    .baz()
+    .unwrap();
 }

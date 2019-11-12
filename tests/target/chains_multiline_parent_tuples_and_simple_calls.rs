@@ -1,4 +1,3 @@
-// rustfmt-chains_block_parent_indent_children: true
 // rustfmt-chains_block_parent_indent_parent_item: OnlyTupleLitsAndSimpleCalls
 
 fn main() {
@@ -32,7 +31,7 @@ fn main() {
     foo(|x| {
         // ....
     })
-        .bar()
-        .baz()
-        .unwrap();
+    .bar()
+    .baz()
+    .unwrap();
 }

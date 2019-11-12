@@ -187,6 +187,14 @@ pub enum ChainsBlockParentElementIndent {
     OnlyTupleLitsAndSimpleCalls,
 }
 
+#[config_type]
+pub enum ChainsBlockParentChildrenIndent {
+    /// Always indent the children chain elements of a block-like parent element.
+    Always,
+    /// Only indent the children chain elements if the block-like parent body is indented.
+    OnlyWithParent,
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct WidthHeuristics {
     // Maximum width of the args of a function call before falling back

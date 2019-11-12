@@ -390,44 +390,98 @@ fn example() {
 ```
 
 ## `chains_block_parent_indent_children`
-Determines whether to indent the child chain items of a chain that beings with a block-like parent element when `indent_style` is `Block`.
+Determines whether to indent the child chain items of a chain that begins with a block-like parent element when `indent_style` is `Block`.
 
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
+- **Default value**: `"OnlyWithParent"`
+- **Possible values**: `"Always"`, `"OnlyWithParent"`
 - **Stable**: No (tracking issue: ...)
 
-#### `false` (default):
+#### `OnlyWithParent` (default):
+Only indent the children chain elements of a block-like parent element if the parent's body was indented.
 
 ```rust
+// chains_block_parent_indent_parent_item: "OnlyTupleLitsAndSimpleCalls"
+#![rustfmt::skip]
 fn example() {
-    StructA {
-        test_test: some_value,
-    }
-    .foo()
+    let all = very_very_very_very_very_long_fun_name(
+            very_very_very_very_very_very_very_very_very_long_var_name,
+        )
+        .iter()
+        .map(|x| x + very_very_very_very_very_very_long_var_name);
+      
+    foo(|x| {
+        // ....
+    })
     .bar()
     .baz()
-    .qux();
+    .unwrap();
+  
+    StructA {
+            test_test: some_value,
+        }
+        .do_stuff(StructB {
+            test_test_b: other_value,
+        })
+        .foo()
+        .aaa_aaa();
+
+    let y = if some_condition {
+        // foo
+        val1
+    } else {
+        // bar
+        val2
+    }
+    .method_call()
+    .other_call()
+    .another();
 }
 ```
 
-#### `true`:
+#### `Always`:
+Always indent the children chain elements of a block-like parent element, regardless of whether the parent element body was indented.
 
 ```rust
 fn example() {
+    let all = very_very_very_very_very_long_fun_name(
+        very_very_very_very_very_very_very_very_very_long_var_name,
+    )
+        .iter()
+        .map(|x| x + very_very_very_very_very_very_long_var_name);
+
+    foo(|x| {
+        // ....
+    })
+        .bar()
+        .baz()
+        .unwrap();
+
     StructA {
         test_test: some_value,
     }
+        .do_stuff(StructB {
+            test_test_b: other_value,
+        })
         .foo()
-        .bar()
-        .baz()
-        .qux();
+        .aaa_aaa();
+
+    let y = if some_condition {
+        // foo
+        val1
+    } else {
+        // bar
+        val2
+    }
+        .method_call()
+        .other_call()
+        .another();
 }
 ```
 
-See also: [`indent_style`](#indent_style).
+See also: [`indent_style`](#indent_style), [`chains_block_parent_indent_parent_item`](#chains_block_parent_indent_parent_item).
 
 ## `chains_block_parent_indent_parent_item`
-Determines whether block-like chain parents are indented when `indent_style` is `Block`.
+Determines whether the body of block-like chain parents are indented when `indent_style` is `Block`.
 
 - **Default value**: `"Never"`
 - **Possible values**: `"Always"`, `"Never"`, `"OnlySimpleCalls"`, `"OnlyTupleLitsAndSimpleCalls"`
@@ -475,9 +529,6 @@ fn example() {
 The body of block-like parent chain elements are always indented.
 
 ```rust
-#![rustfmt::skip]
-// chains_block_parent_indent_children: true
-
 fn example() {
     let all = very_very_very_very_very_long_fun_name(
             very_very_very_very_very_very_very_very_very_long_var_name,
@@ -501,7 +552,7 @@ fn example() {
         )
         .bbb_bbb()
         .ccc_ccc();
-        
+
     foo(|x| {
             // ....
         })
@@ -515,9 +566,6 @@ fn example() {
 The body of block-like parent chain elements are only indented when the parent is a simple call-like chain item, such as a method call with no multiline block like arguments (like a closure).
 
 ```rust
-#![rustfmt::skip]
-// chains_block_parent_indent_children: true
-
 fn example() {
     let all = very_very_very_very_very_long_fun_name(
             very_very_very_very_very_very_very_very_very_long_var_name,
@@ -528,26 +576,26 @@ fn example() {
     StructA {
         test_test: some_value,
     }
-        .do_stuff(StructB {
+    .do_stuff(StructB {
+        test_test_b: other_value,
+    })
+    .aaa_aaa()
+    .do_stuff(
+        StructB {
             test_test_b: other_value,
-        })
-        .aaa_aaa()
-        .do_stuff(
-            StructB {
-                test_test_b: other_value,
-            }
-                .ddd_ddd()
-                .eee_eee(),
-        )
-        .bbb_bbb()
-        .ccc_ccc();
+        }
+        .ddd_ddd()
+        .eee_eee(),
+    )
+    .bbb_bbb()
+    .ccc_ccc();
 
     foo(|x| {
         // ....
     })
-        .bar()
-        .baz()
-        .unwrap();
+    .bar()
+    .baz()
+    .unwrap();
 }
 ```
 
@@ -555,9 +603,6 @@ fn example() {
 The body of block-like parent chain elements are only indented when the parent is a tuple literal, or a simple call-like chain item, such as a method call with no multiline block like arguments (like a closure).
 
 ```rust
-#![rustfmt::skip]
-// chains_block_parent_indent_children: true
-
 fn example() {
     let all = very_very_very_very_very_long_fun_name(
             very_very_very_very_very_very_very_very_very_long_var_name,
@@ -585,9 +630,9 @@ fn example() {
     foo(|x| {
         // ....
     })
-        .bar()
-        .baz()
-        .unwrap();
+    .bar()
+    .baz()
+    .unwrap();
 }
 ```
 

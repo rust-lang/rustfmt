@@ -1,4 +1,3 @@
-// rustfmt-chains_block_parent_indent_children: false
 // rustfmt-chains_block_parent_indent_parent_item: Never
 
 fn main() {

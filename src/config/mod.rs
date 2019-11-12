@@ -66,7 +66,10 @@ create_config! {
     merge_imports: bool, false, false, "Merge imports";
 
     // Chains
-    chains_block_parent_indent_children: bool, false, false,
+    chains_block_parent_indent_children:
+        ChainsBlockParentChildrenIndent,
+        ChainsBlockParentChildrenIndent::OnlyWithParent,
+        false,
         "Determines whether to indent the child chain items of a chain that beings with/
         a block-like parent element";
     chains_block_parent_indent_parent_item:
@@ -519,7 +522,7 @@ where_single_line = false
 imports_indent = "Block"
 imports_layout = "Mixed"
 merge_imports = false
-chains_block_parent_indent_children = false
+chains_block_parent_indent_children = "OnlyWithParent"
 chains_block_parent_indent_parent_item = "Never"
 reorder_imports = true
 reorder_modules = true

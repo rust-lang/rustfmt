@@ -1,4 +1,3 @@
-// rustfmt-chains_block_parent_indent_children: true
 // rustfmt-chains_block_parent_indent_parent_item: Always
 // rustfmt-use_small_heuristics: Off
 

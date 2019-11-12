@@ -1,4 +1,3 @@
-// rustfmt-chains_block_parent_indent_children: true
 // rustfmt-chains_block_parent_indent_parent_item: Always
 // rustfmt-use_small_heuristics: Off
 
@@ -90,10 +89,10 @@ fn main() {
         body.extend(chunk);
         Ok(body)
     })
-        .and_then(move |body| {
-            let req = Request::from_parts(parts, body);
-            f(req).map_err(|_| io::Error::new(io::ErrorKind::Other, ""))
-        });
+    .and_then(move |body| {
+        let req = Request::from_parts(parts, body);
+        f(req).map_err(|_| io::Error::new(io::ErrorKind::Other, ""))
+    });
 
     aaaaaaaaaaaaaaaa
         .map(|x| {
@@ -318,14 +317,14 @@ fn issue_2773() {
         // do stuff
         None
     })
-        .or_else(|| {
-            // do other stuff
-            None
-        })
-        .and_then(|val| {
-            // do this stuff
-            None
-        });
+    .or_else(|| {
+        // do other stuff
+        None
+    })
+    .and_then(|val| {
+        // do this stuff
+        None
+    });
 }
 
 fn issue_3034() {

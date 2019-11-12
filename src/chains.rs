@@ -63,7 +63,7 @@ use syntax::{ast, ptr};
 
 use crate::closures::rewrite_closure;
 use crate::comment::{rewrite_comment, CharClasses, FullCodeCharKind, RichChar};
-use crate::config::{ChainsBlockParentElementIndent, IndentStyle};
+use crate::config::{ChainsBlockParentChildrenIndent, ChainsBlockParentElementIndent, IndentStyle};
 use crate::expr::rewrite_call;
 use crate::lists::extract_pre_comment;
 use crate::macros::convert_try_mac;
@@ -924,12 +924,16 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
     }
 
     fn child_shape(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<Shape> {
-        let always_indent_children = context.config.chains_block_parent_indent_children();
+        let indent_style = context.config.chains_block_parent_indent_children();
+        let use_indented = match indent_style {
+            ChainsBlockParentChildrenIndent::Always => true,
+            ChainsBlockParentChildrenIndent::OnlyWithParent if self.parent_body_forced_indent => {
+                true
+            }
+            _ => false,
+        };
         Some(
-            if !self.root_ends_with_block
-                || always_indent_children
-                || self.parent_body_forced_indent
-            {
+            if !self.root_ends_with_block || use_indented {
                 shape.block_indent(context.config.tab_spaces())
             } else {
                 shape.block_indent(0)
@@ -974,7 +978,6 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
             Some(rewrite) => wrap_str(rewrite, context.config.max_width(), shape),
             None => None,
         }
-        // self.shared.join_rewrites(context, child_shape)
     }
 
     fn pure_root(&mut self) -> Option<String> {
