@@ -156,15 +156,13 @@ fn long_inner() {
 
     // Long element no args
     let foo = bar()
-        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff(
-        )
+        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff()
         .foo()
         .bar()
         .baz();
 
     qux()
-        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff(
-        )
+        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff()
         .foo()
         .bar()
         .baz();
@@ -211,16 +209,14 @@ fn long_tail() {
         .map(|x| x + 5)
         .map(|x| x / 2)
         .fold(0, |acc, x| acc + x)
-        .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff(
-        );
+        .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff();
 
     let foo = bar()
         .xxxxxxx
         .map(|x| x + 5)
         .map(|x| x / 2)
         .fold(0, |acc, x| acc + x)
-        .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff(
-        );
+        .doooooooooooooooooooooooooooooooooooooooooooooooooooooo_stufffffffffffffffffffffffffffffffffffffff();
 }
 
 fn raw_str_lit() {

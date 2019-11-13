@@ -723,142 +723,176 @@ fn format_chain_item(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> FormattedChainItem {
-    fn contains_multiline_args(
-        exprs: &Vec<ptr::P<ast::Expr>>,
+    fn is_long(rewrite: String, max_width: usize, shape: Shape) -> bool {
+        wrap_str(rewrite, max_width, shape).is_none()
+    }
+
+    fn format_chain_parent_inner(
         context: &RewriteContext<'_>,
-        shape: Shape,
-    ) -> bool {
-        exprs.iter().any(|e| match &e.kind {
-            ast::ExprKind::Closure(
-                ref capture,
-                ref is_async,
-                ref mobility,
-                ref fn_decl,
-                ref body,
-                ref span,
-            ) => match rewrite_closure(
-                *capture, is_async, *mobility, fn_decl, body, *span, &context, shape,
-            ) {
-                Some(rewrite) => rewrite.contains('\n'),
-                None => true,
-            },
-            ast::ExprKind::Lit(ref lit) => match lit.kind {
-                ast::LitKind::Str(_, str_style) => match str_style {
-                    ast::StrStyle::Raw(..) => true,
-                    ast::StrStyle::Cooked => false,
+        expr_kind: &ast::ExprKind,
+        orig_result: String,
+        next_line_result: String,
+        orig_shape: Shape,
+        next_shape: Shape,
+    ) -> FormattedChainItem {
+        fn contains_multiline_args(
+            exprs: &Vec<ptr::P<ast::Expr>>,
+            context: &RewriteContext<'_>,
+            shape: Shape,
+        ) -> bool {
+            exprs.iter().any(|e| match &e.kind {
+                ast::ExprKind::Closure(
+                    ref capture,
+                    ref is_async,
+                    ref mobility,
+                    ref fn_decl,
+                    ref body,
+                    ref span,
+                ) => match rewrite_closure(
+                    *capture, is_async, *mobility, fn_decl, body, *span, &context, shape,
+                ) {
+                    Some(rewrite) => rewrite.contains('\n'),
+                    None => true,
                 },
-                _ => false,
-            },
-            ast::ExprKind::Struct(..) => match e.rewrite(&context, shape) {
-                None => true,
-                Some(rewrite) => !rewrite.contains('\n'),
-            },
-            ast::ExprKind::AddrOf(_, ref expr) => match expr.kind {
+                ast::ExprKind::Lit(ref lit) => match lit.kind {
+                    ast::LitKind::Str(_, str_style) => match str_style {
+                        ast::StrStyle::Raw(..) => true,
+                        ast::StrStyle::Cooked => false,
+                    },
+                    _ => false,
+                },
                 ast::ExprKind::Struct(..) => match e.rewrite(&context, shape) {
                     None => true,
                     Some(rewrite) => !rewrite.contains('\n'),
                 },
+                ast::ExprKind::AddrOf(_, ref expr) => match expr.kind {
+                    ast::ExprKind::Struct(..) => match e.rewrite(&context, shape) {
+                        None => true,
+                        Some(rewrite) => !rewrite.contains('\n'),
+                    },
+                    _ => false,
+                },
                 _ => false,
-            },
-            _ => false,
-        })
-    }
+            })
+        }
 
-    fn is_simple_call_like(
-        parent_expr_kind: &ast::ExprKind,
-        context: &RewriteContext<'_>,
-        shape: Shape,
-    ) -> bool {
-        match parent_expr_kind {
-            ast::ExprKind::MethodCall(_, ref exprs) | ast::ExprKind::Call(_, ref exprs) => {
-                !contains_multiline_args(exprs, &context, shape)
+        fn is_simple_call_like(
+            parent_expr_kind: &ast::ExprKind,
+            context: &RewriteContext<'_>,
+            shape: Shape,
+        ) -> bool {
+            match parent_expr_kind {
+                ast::ExprKind::MethodCall(_, ref exprs) | ast::ExprKind::Call(_, ref exprs) => {
+                    !contains_multiline_args(exprs, &context, shape)
+                }
+                _ => false,
             }
-            _ => false,
+        }
+
+        fn is_tup_lit_or_simple_call_like(
+            parent_expr_kind: &ast::ExprKind,
+            context: &RewriteContext<'_>,
+            shape: Shape,
+        ) -> bool {
+            match parent_expr_kind {
+                ast::ExprKind::Struct(..) => true,
+                _ => is_simple_call_like(parent_expr_kind, context, shape),
+            }
+        }
+
+        let parent_indent_style = context.config.chains_block_parent_indent_parent_item();
+        let should_indent = match parent_indent_style {
+            ChainsBlockParentElementIndent::Never => false,
+            ChainsBlockParentElementIndent::Always => true,
+            ChainsBlockParentElementIndent::OnlySimpleCalls => {
+                is_simple_call_like(&expr_kind, &context, orig_shape)
+            }
+            ChainsBlockParentElementIndent::OnlyTupleLitsAndSimpleCalls => {
+                is_tup_lit_or_simple_call_like(&expr_kind, &context, orig_shape)
+            }
+        };
+
+        if should_indent {
+            return FormattedChainItem {
+                rewrite: next_line_result.clone(),
+                exceeds_max_width: is_long(
+                    next_line_result,
+                    context.config.max_width(),
+                    next_shape,
+                ),
+                forced_indent: true,
+            };
+        }
+
+        FormattedChainItem {
+            rewrite: orig_result.clone(),
+            exceeds_max_width: is_long(orig_result, context.config.max_width(), orig_shape),
+            forced_indent: false,
         }
     }
 
-    fn is_tup_lit_or_simple_call_like(
-        parent_expr_kind: &ast::ExprKind,
-        context: &RewriteContext<'_>,
-        shape: Shape,
-    ) -> bool {
-        match parent_expr_kind {
-            ast::ExprKind::Struct(..) => true,
-            _ => is_simple_call_like(parent_expr_kind, context, shape),
-        }
-    }
-
+    let max_width = context.config.max_width();
     let orig_result = item.rewrite(context, shape);
     let new_shape = match Shape::indented(shape.indent.block_indent(context.config), context.config)
         .sub_width(shape.rhs_overhead(context.config))
     {
         Some(shape) => shape,
         None => {
+            let rewrite = context.snippet(item.span).to_owned();
             return FormattedChainItem {
-                rewrite: context.snippet(item.span).to_owned(),
-                exceeds_max_width: false,
+                rewrite: rewrite.clone(),
+                exceeds_max_width: is_long(rewrite, max_width, shape),
                 forced_indent: false,
             };
         }
     };
     let next_line_result = item.rewrite(context, new_shape);
-    let parent_indent_style = context.config.chains_block_parent_indent_parent_item();
     match (orig_result, next_line_result) {
         (Some(orig_result), _)
             if !orig_result.contains('\n')
                 && utils::unicode_str_width(&orig_result) <= shape.width =>
         {
             FormattedChainItem {
-                rewrite: orig_result,
-                exceeds_max_width: false,
+                rewrite: orig_result.clone(),
+                exceeds_max_width: is_long(orig_result, max_width, shape),
                 forced_indent: false,
             }
         }
         (Some(orig_result), Some(next_line_result)) => match item.kind {
-            ChainItemKind::Parent(ref expr) => match parent_indent_style {
-                ChainsBlockParentElementIndent::Never => FormattedChainItem {
-                    rewrite: orig_result.clone(),
+            ChainItemKind::Parent(ref expr) => format_chain_parent_inner(
+                context,
+                &expr.kind,
+                orig_result,
+                next_line_result,
+                shape,
+                new_shape,
+            ),
+            ChainItemKind::MethodCall(_, ref types, ref exprs)
+                if types.is_empty() && exprs.len() == 1 =>
+            {
+                if is_long(orig_result.clone(), max_width, shape) {
+                    if is_long(next_line_result.clone(), max_width, new_shape) {
+                        return FormattedChainItem {
+                            rewrite: context.snippet(item.span).to_owned(),
+                            exceeds_max_width: true,
+                            forced_indent: false,
+                        };
+                    }
+                    return FormattedChainItem {
+                        rewrite: next_line_result,
+                        exceeds_max_width: false,
+                        forced_indent: true,
+                    };
+                }
+                FormattedChainItem {
+                    rewrite: orig_result,
                     exceeds_max_width: false,
                     forced_indent: false,
-                },
-                ChainsBlockParentElementIndent::Always => FormattedChainItem {
-                    rewrite: next_line_result.clone(),
-                    exceeds_max_width: false,
-                    forced_indent: true,
-                },
-                ChainsBlockParentElementIndent::OnlySimpleCalls => {
-                    match is_simple_call_like(&expr.kind, &context, shape) {
-                        true => FormattedChainItem {
-                            rewrite: next_line_result.clone(),
-                            exceeds_max_width: false,
-                            forced_indent: true,
-                        },
-                        false => FormattedChainItem {
-                            rewrite: orig_result.clone(),
-                            exceeds_max_width: false,
-                            forced_indent: false,
-                        },
-                    }
                 }
-                ChainsBlockParentElementIndent::OnlyTupleLitsAndSimpleCalls => {
-                    match is_tup_lit_or_simple_call_like(&expr.kind, &context, shape) {
-                        true => FormattedChainItem {
-                            rewrite: next_line_result.clone(),
-                            exceeds_max_width: false,
-                            forced_indent: true,
-                        },
-                        false => FormattedChainItem {
-                            rewrite: orig_result.clone(),
-                            exceeds_max_width: false,
-                            forced_indent: false,
-                        },
-                    }
-                }
-            },
+            }
             _ => FormattedChainItem {
                 rewrite: orig_result.clone(),
-                exceeds_max_width: wrap_str(orig_result, context.config.max_width(), shape)
-                    .is_none(),
+                exceeds_max_width: is_long(orig_result, max_width, shape),
                 forced_indent: false,
             },
         },
@@ -869,12 +903,12 @@ fn format_chain_item(
         },
         (Some(orig_result), _) => FormattedChainItem {
             rewrite: orig_result.clone(),
-            exceeds_max_width: false,
+            exceeds_max_width: is_long(orig_result, max_width, shape),
             forced_indent: false,
         },
         (None, Some(next_line_result)) => FormattedChainItem {
             rewrite: next_line_result.clone(),
-            exceeds_max_width: false,
+            exceeds_max_width: is_long(next_line_result, max_width, new_shape),
             forced_indent: true,
         },
     }
