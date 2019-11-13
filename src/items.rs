@@ -1813,11 +1813,21 @@ fn rewrite_static(
         let remaining_width = context.budget(offset.block_indent + 1);
         rewrite_assign_rhs(
             context,
-            lhs,
+            &lhs,
             &**expr,
             Shape::legacy(remaining_width, offset.block_only()),
         )
         .and_then(|res| recover_comment_removed(res, static_parts.span, context))
+        .or_else(|| {
+            let nested_indent = offset.block_indent(context.config);
+            let rhs = context.snippet(expr.span).trim();
+            Some(format!(
+                "{}{}{}",
+                lhs,
+                nested_indent.to_string_with_newline(context.config),
+                rhs
+            ))
+        })
         .map(|s| if s.ends_with(';') { s } else { s + ";" })
     } else {
         Some(format!("{}{};", prefix, ty_str))
