@@ -507,6 +507,9 @@ impl<'a> FormatLines<'a> {
 
     // Iterate over the chars in the file map.
     fn iterate(&mut self, text: &mut String) {
+        // List of TODO or FIXME issues on the current line
+        let mut issues_on_line = Vec::new();
+
         for (kind, c) in CharClasses::new(text.chars()) {
             if c == '\r' {
                 continue;
@@ -515,11 +518,17 @@ impl<'a> FormatLines<'a> {
             if self.allow_issue_seek && self.format_line {
                 // Add warnings for bad todos/ fixmes
                 if let Some(issue) = self.issue_seeker.inspect(c) {
-                    self.push_err(ErrorKind::BadIssue(issue), false, false);
+                    issues_on_line.push(issue);
                 }
             }
 
             if c == '\n' {
+                // Accumulate TODO or FIXME issues for the rest of the line so the resulting error
+                // messages contain the entire comment line
+                for issue in issues_on_line.drain(..) {
+                    self.push_err(ErrorKind::BadIssue(issue), false, false);
+                }
+
                 self.new_line(kind);
             } else {
                 self.char(c, kind);
