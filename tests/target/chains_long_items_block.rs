@@ -88,6 +88,21 @@ fn deeply_nested() {
         );
 }
 
+fn inner_chain() {
+    let foo = bar()
+        .asdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff(
+            Foo {
+                field1: val1,
+                field2: val2,
+            }
+            .method_call()
+            .method_call(),
+        )
+        .foo()
+        .bar()
+        .baz();
+}
+
 fn long_parent() {
     // Args that do not fit
     let bar = baz("ffffffffffffffffffffffffffffffffffffasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfadfasdfasdfasdfadfasdfasdf")
@@ -259,7 +274,7 @@ fn raw_str_lit() {
 }
 
 fn comments() {
-    foo // foo
+    foo.z // foo
         // comment after parent
         .x
         .y
