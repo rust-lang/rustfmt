@@ -1720,6 +1720,14 @@ fn example() {
 }
 ```
 
+## `recursive` 
+
+Format all encountered modules recursively, including those defined in external files.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: Yes
+
 ## `remove_nested_parens`
 
 Remove nested parens.

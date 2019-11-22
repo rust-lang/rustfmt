@@ -170,7 +170,11 @@ fn make_opts() -> Options {
             "Don't reformat child modules (unstable).",
         );
     }
-
+    opts.optflag(
+        "r",
+        "recursive",
+        "Format all encountered modules recursively, including those defined in external files.",
+    );
     opts.optflag("v", "verbose", "Print verbose output");
     opts.optflag("q", "quiet", "Print less output");
     opts.optflag("V", "version", "Show version information");
@@ -500,6 +504,7 @@ const STABLE_EMIT_MODES: [EmitMode; 3] = [EmitMode::Files, EmitMode::Stdout, Emi
 #[derive(Clone, Debug, Default)]
 struct GetOptsOptions {
     skip_children: Option<bool>,
+    recursive: Option<bool>,
     quiet: bool,
     verbose: bool,
     config_path: Option<PathBuf>,
@@ -566,6 +571,19 @@ impl GetOptsOptions {
                     ));
                 }
             }
+        }
+
+        if matches.opt_present("recursive") {
+            if let Some(skip) = options.skip_children {
+                if skip {
+                    return Err(format_err!(
+                        "Conflicting config options `skip_children` and `recursive` are \
+                        both enabled. `skip_children` has been deprecated and should be \
+                        removed from your config.",
+                    ));
+                }
+            }
+            options.recursive = Some(true);
         }
 
         options.config_path = matches.opt_str("config-path").map(PathBuf::from);
@@ -657,6 +675,9 @@ impl CliOptions for GetOptsOptions {
         config.set().unstable_features(self.unstable_features);
         if let Some(skip_children) = self.skip_children {
             config.set().skip_children(skip_children);
+        }
+        if let Some(recursive) = self.recursive {
+            config.set().recursive(recursive);
         }
         if let Some(error_on_unformatted) = self.error_on_unformatted {
             config.set().error_on_unformatted(error_on_unformatted);

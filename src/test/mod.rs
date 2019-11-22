@@ -40,6 +40,10 @@ const SKIP_FILE_WHITE_LIST: &[&str] = &[
     "cfg_mod/bar.rs",
     "cfg_mod/foo.rs",
     "cfg_mod/wasm32.rs",
+    // We want to ensure `recursive` is working correctly, so do not test
+    // these files directly
+    "configs/recursive/disabled/foo.rs",
+    "configs/recursive/enabled/foo.rs",
 ];
 
 fn init_log() {

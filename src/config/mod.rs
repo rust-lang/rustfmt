@@ -130,6 +130,8 @@ create_config! {
             "Enables unstable features. Only available on nightly channel";
     disable_all_formatting: bool, false, false, "Don't reformat anything";
     skip_children: bool, false, false, "Don't reformat out of line modules";
+    recursive: bool, false, true,
+        "Format all encountered modules recursively, including those defined in external files.";
     hide_parse_errors: bool, false, false, "Hide errors from the parser";
     error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
     error_on_unformatted: bool, false, false,
@@ -279,7 +281,15 @@ impl Config {
                 if !err.is_empty() {
                     eprint!("{}", err);
                 }
-                Ok(Config::default().fill_from_parsed_config(parsed_config, dir))
+                let config = Config::default().fill_from_parsed_config(parsed_config, dir);
+                if config.skip_children() && config.recursive() {
+                    return Err(String::from(
+                        "Error: Conflicting config options `skip_children` and `recursive` are \
+                        both enabled. `skip_children` has been deprecated and should be \
+                        removed from your config.",
+                    ));
+                }
+                Ok(config)
             }
             Err(e) => {
                 err.push_str("Error: Decoding config file failed:\n");
@@ -484,6 +494,25 @@ mod test {
     }
 
     #[test]
+    fn test_conflicting_recursive_skip_children() {
+        if !crate::is_nightly_channel!() {
+            return;
+        }
+
+        let toml = "skip_children = true\nrecursive = true";
+        // Update to `contains_err()` once it lands
+        // https://github.com/rust-lang/rust/issues/62358
+        // https://doc.rust-lang.org/std/result/enum.Result.html#method.contains_err
+        match Config::from_toml(toml, Path::new("")) {
+            Ok(_) => panic!("Expected configuration error"),
+            Err(msg) => assert_eq!(
+                msg,
+                "Error: Conflicting config options `skip_children` and `recursive` are both enabled. `skip_children` has been deprecated and should be removed from your config.",
+            ),
+        }
+    }
+
+    #[test]
     fn test_dump_default_config() {
         let default_config = format!(
             r#"max_width = 100
@@ -544,6 +573,7 @@ required_version = "{}"
 unstable_features = false
 disable_all_formatting = false
 skip_children = false
+recursive = false
 hide_parse_errors = false
 error_on_line_overflow = false
 error_on_unformatted = false
