@@ -1194,9 +1194,13 @@ pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> O
         let ts: TokenStream = mac.tts.clone();
         let mut parser = new_parser_from_tts(context.parse_sess.inner(), ts.trees().collect());
 
+        let mut kind = parser.parse_expr().ok()?;
+        // take the end pos of mac so that the Try expression includes the closing parenthesis of
+        // the try! macro
+        kind.span = mk_sp(kind.span.lo(), mac.span.hi());
         Some(ast::Expr {
             id: ast::NodeId::root(), // dummy value
-            kind: ast::ExprKind::Try(parser.parse_expr().ok()?),
+            kind: ast::ExprKind::Try(kind),
             span: mac.span, // incorrect span, but shouldn't matter too much
             attrs: ThinVec::new(),
         })
