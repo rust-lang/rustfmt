@@ -574,14 +574,11 @@ impl GetOptsOptions {
         }
 
         if matches.opt_present("recursive") {
-            if let Some(skip) = options.skip_children {
-                if skip {
-                    return Err(format_err!(
-                        "Conflicting config options `skip_children` and `recursive` are \
-                        both enabled. `skip_children` has been deprecated and should be \
-                        removed from your config.",
-                    ));
-                }
+            if let Some(true) = options.skip_children {
+                return Err(format_err!(
+                    "Conflicting options `skip_children` and `recursive` were specified. \
+                    `skip_children` has been deprecated and should no longer be used. ",
+                ));
             }
             options.recursive = Some(true);
         }

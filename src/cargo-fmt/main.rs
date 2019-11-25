@@ -111,11 +111,8 @@ fn execute() -> i32 {
     }
 
     let strategy = CargoFmtStrategy::from_opts(&opts);
-    let mut rustfmt_args = opts.rustfmt_options;
-    let cargo_fmt_check = opts.check;
-    if let Err(ref msg) =
-        build_rustfmt_args(opts.message_format, &mut rustfmt_args, cargo_fmt_check)
-    {
+    let mut rustfmt_args = opts.rustfmt_options.to_owned();
+    if let Err(ref msg) = build_rustfmt_args(&opts, &mut rustfmt_args) {
         print_usage_to_stderr(msg);
         return FAILURE;
     }
@@ -145,11 +142,7 @@ fn execute() -> i32 {
     }
 }
 
-fn build_rustfmt_args(
-    message_format: Option<String>,
-    rustfmt_args: &mut Vec<String>,
-    check: bool,
-) -> Result<(), String> {
+fn build_rustfmt_args(opts: &Opts, rustfmt_args: &mut Vec<String>) -> Result<(), String> {
     let mut contains_check = false;
     let mut contains_emit_mode = false;
     let mut contains_list_files = false;
@@ -170,7 +163,7 @@ fn build_rustfmt_args(
         }
     }
 
-    if check && !contains_check {
+    if opts.check && !contains_check {
         rustfmt_args.push(String::from("--check"));
     }
 
@@ -178,7 +171,7 @@ fn build_rustfmt_args(
         rustfmt_args.push(String::from("--recursive"));
     }
 
-    if let Some(format) = message_format {
+    if let Some(ref format) = opts.message_format {
         return match format.as_ref() {
             "short" => {
                 if !contains_list_files {
@@ -818,8 +811,9 @@ mod cargo_fmt_tests {
 
         #[test]
         fn invalid_message_format() {
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--message-format", "awesome"]);
             assert_eq!(
-                build_rustfmt_args(Some(String::from("awesome")), &mut vec![], false),
+                build_rustfmt_args(&cargo_fmt_opts, &mut vec![]),
                 Err(String::from(
                     "invalid --message-format value: awesome. Allowed values are: short|json|human"
                 )),
@@ -828,9 +822,10 @@ mod cargo_fmt_tests {
 
         #[test]
         fn json_message_format_and_check_arg() {
-            let mut args = vec![String::from("--check")];
+            let mut rustfmt_args = vec![String::from("--check")];
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--message-format", "json"]);
             assert_eq!(
-                build_rustfmt_args(Some(String::from("json")), &mut args, false),
+                build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args),
                 Err(String::from(
                     "cannot include --check arg when --message-format is set to json"
                 )),
@@ -839,9 +834,10 @@ mod cargo_fmt_tests {
 
         #[test]
         fn json_message_format_and_emit_arg() {
-            let mut args = vec![String::from("--emit"), String::from("checkstyle")];
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--message-format", "json"]);
+            let mut rustfmt_args = vec![String::from("--emit"), String::from("checkstyle")];
             assert_eq!(
-                build_rustfmt_args(Some(String::from("json")), &mut args, false),
+                build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args),
                 Err(String::from(
                     "cannot include --emit arg when --message-format is set to json"
                 )),
@@ -850,14 +846,15 @@ mod cargo_fmt_tests {
 
         #[test]
         fn json_message_format() {
-            let mut args = vec![
+            let mut rustfmt_args = vec![
                 String::from("--edition"),
                 String::from("2018"),
                 String::from("--recursive"),
             ];
-            assert!(build_rustfmt_args(Some(String::from("json")), &mut args, false).is_ok());
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--message-format", "json"]);
+            assert!(build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args).is_ok());
             assert_eq!(
-                args,
+                rustfmt_args,
                 vec![
                     String::from("--edition"),
                     String::from("2018"),
@@ -875,17 +872,19 @@ mod cargo_fmt_tests {
                 String::from("json"),
                 String::from("--recursive"),
             ];
-            let mut act_args = exp_args.clone();
-            assert!(build_rustfmt_args(Some(String::from("human")), &mut act_args, false).is_ok());
-            assert_eq!(act_args, exp_args);
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--message-format", "human"]);
+            let mut rustfmt_args = exp_args.clone();
+            assert!(build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args).is_ok());
+            assert_eq!(rustfmt_args, exp_args);
         }
 
         #[test]
         fn short_message_format() {
-            let mut args = vec![String::from("--check"), String::from("--recursive")];
-            assert!(build_rustfmt_args(Some(String::from("short")), &mut args, false).is_ok());
+            let mut rustfmt_args = vec![String::from("--check"), String::from("--recursive")];
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--message-format", "short"]);
+            assert!(build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args).is_ok());
             assert_eq!(
-                args,
+                rustfmt_args,
                 vec![
                     String::from("--check"),
                     String::from("--recursive"),
@@ -896,14 +895,15 @@ mod cargo_fmt_tests {
 
         #[test]
         fn short_message_format_included_short_list_files_flag() {
-            let mut args = vec![
+            let mut rustfmt_args = vec![
                 String::from("--check"),
                 String::from("-l"),
                 String::from("--recursive"),
             ];
-            assert!(build_rustfmt_args(Some(String::from("short")), &mut args, false).is_ok());
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--message-format", "short"]);
+            assert!(build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args).is_ok());
             assert_eq!(
-                args,
+                rustfmt_args,
                 vec![
                     String::from("--check"),
                     String::from("-l"),
@@ -914,14 +914,15 @@ mod cargo_fmt_tests {
 
         #[test]
         fn short_message_format_included_long_list_files_flag() {
-            let mut args = vec![
+            let mut rustfmt_args = vec![
                 String::from("--check"),
                 String::from("--files-with-diff"),
                 String::from("--recursive"),
             ];
-            assert!(build_rustfmt_args(Some(String::from("short")), &mut args, false).is_ok());
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--message-format", "short"]);
+            assert!(build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args).is_ok());
             assert_eq!(
-                args,
+                rustfmt_args,
                 vec![
                     String::from("--check"),
                     String::from("--files-with-diff"),
@@ -932,60 +933,67 @@ mod cargo_fmt_tests {
 
         #[test]
         fn recursive_shorthand_not_duplicated() {
-            let mut args = vec![String::from("-r")];
-            assert!(build_rustfmt_args(None, &mut args, false).is_ok());
-            assert_eq!(args, vec![String::from("-r")]);
+            let mut rustfmt_args = vec![String::from("-r")];
+            let empty: Vec<String> = vec![];
+            assert!(build_rustfmt_args(&Opts::from_iter(&empty), &mut rustfmt_args).is_ok());
+            assert_eq!(rustfmt_args, vec![String::from("-r")]);
         }
 
         #[test]
         fn recursive_long_not_duplicated() {
-            let mut args = vec![String::from("--recursive")];
-            assert!(build_rustfmt_args(None, &mut args, false).is_ok());
-            assert_eq!(args, vec![String::from("--recursive")]);
+            let mut rustfmt_args = vec![String::from("--recursive")];
+            let empty: Vec<String> = vec![];
+            assert!(build_rustfmt_args(&Opts::from_iter(&empty), &mut rustfmt_args).is_ok());
+            assert_eq!(rustfmt_args, vec![String::from("--recursive")]);
         }
 
         #[test]
         fn recursive_added() {
-            let mut args = vec![];
-            assert!(build_rustfmt_args(None, &mut args, false).is_ok());
-            assert_eq!(args, vec![String::from("--recursive")]);
+            let mut rustfmt_args = vec![];
+            let empty: Vec<String> = vec![];
+            assert!(build_rustfmt_args(&Opts::from_iter(&empty), &mut rustfmt_args).is_ok());
+            assert_eq!(rustfmt_args, vec![String::from("--recursive")]);
         }
 
         #[test]
         fn check_not_duplicated_when_included_in_cargo_fmt() {
-            let mut args = vec![String::from("--check"), String::from("--recursive")];
-            assert!(build_rustfmt_args(None, &mut args, true).is_ok());
+            let mut rustfmt_args = vec![String::from("--check"), String::from("--recursive")];
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--check"]);
+            assert!(build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args).is_ok());
             assert_eq!(
-                args,
+                rustfmt_args,
                 vec![String::from("--check"), String::from("--recursive")],
             );
         }
 
         #[test]
         fn check_still_passed_through_when_not_included_in_cargo_fmt() {
-            let mut args = vec![String::from("--check"), String::from("--recursive")];
-            assert!(build_rustfmt_args(None, &mut args, false).is_ok());
+            let mut rustfmt_args = vec![String::from("--check"), String::from("--recursive")];
+            let empty: Vec<String> = vec![];
+            assert!(build_rustfmt_args(&Opts::from_iter(&empty), &mut rustfmt_args).is_ok());
             assert_eq!(
-                args,
+                rustfmt_args,
                 vec![String::from("--check"), String::from("--recursive")],
             );
         }
 
         #[test]
         fn check_added() {
-            let mut args = vec![String::from("--recursive")];
-            assert!(build_rustfmt_args(None, &mut args, true).is_ok());
+            let mut rustfmt_args = vec![String::from("--recursive")];
+            let cargo_fmt_opts = Opts::from_iter(&["test", "--check"]);
+            assert!(build_rustfmt_args(&cargo_fmt_opts, &mut rustfmt_args).is_ok());
             assert_eq!(
-                args,
+                rustfmt_args,
                 vec![String::from("--recursive"), String::from("--check")],
             );
         }
 
         #[test]
-        fn check_not_added() {
-            let mut args = vec![String::from("--recursive")];
-            assert!(build_rustfmt_args(None, &mut args, false).is_ok());
-            assert_eq!(args, vec![String::from("--recursive")]);
+        fn check_not_added_when_flag_disabled() {
+            let mut rustfmt_args = vec![String::from("--recursive")];
+            let empty: Vec<String> = vec![];
+            assert!(build_rustfmt_args(&Opts::from_iter(&empty), &mut rustfmt_args).is_ok());
+            assert_eq!(rustfmt_args, vec![String::from("--recursive")]);
         }
     }
 
