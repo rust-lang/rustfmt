@@ -173,7 +173,8 @@ fn make_opts() -> Options {
     opts.optflag(
         "r",
         "recursive",
-        "Format all encountered modules recursively, including those defined in external files.",
+        "Format all encountered modules recursively regardless of whether the modules\
+         are defined inline or in another file",
     );
     opts.optflag("v", "verbose", "Print verbose output");
     opts.optflag("q", "quiet", "Print less output");

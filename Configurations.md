@@ -1722,7 +1722,7 @@ fn example() {
 
 ## `recursive` 
 
-Format all encountered modules recursively, including those defined in external files.
+Format all encountered modules recursively regardless of whether the modules are defined inline or in another file
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
