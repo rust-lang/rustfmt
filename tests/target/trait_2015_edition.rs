@@ -1,3 +1,4 @@
+// rustfmt-edition: 2015
 // Test traits
 
 trait Foo {
@@ -22,7 +23,9 @@ trait Foo {
 }
 
 pub trait WriteMessage {
-    fn write_message(&mut self, fm: &FrontendMessage) -> io::Result<()>;
+    // Note that support for anonymous trait parameters was dropped in the 2018 Edition
+    // https://doc.rust-lang.org/nightly/edition-guide/rust-2018/trait-system/no-anon-params.html
+    fn write_message(&mut self, &FrontendMessage) -> io::Result<()>;
 }
 
 trait Runnable {

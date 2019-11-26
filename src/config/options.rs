@@ -380,7 +380,7 @@ pub enum Edition {
 
 impl Default for Edition {
     fn default() -> Edition {
-        Edition::Edition2015
+        Edition::Edition2018
     }
 }
 

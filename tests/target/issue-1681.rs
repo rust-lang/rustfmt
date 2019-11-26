@@ -9,11 +9,11 @@ fn foo() {
             Occupied(entry) => Ok(entry.into_mut()),
             Vacant(entry) => {
                 let statement = {
-                    let sql = try!(entry.key().sql(source));
+                    let sql = r#try!(entry.key().sql(source));
                     prepare_fn(&sql)
                 };
 
-                Ok(entry.insert(try!(statement)))
+                Ok(entry.insert(r#try!(statement)))
             }
         }
     })

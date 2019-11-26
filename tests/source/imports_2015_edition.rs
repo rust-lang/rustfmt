@@ -1,4 +1,5 @@
 // rustfmt-normalize_comments: true
+// rustfmt-edition: 2015
 
 // Imports.
 
@@ -62,7 +63,7 @@ use foo::{baz, qux as bar};
 use ::foo;
 use ::foo::{Bar};
 use ::foo::{Bar, Baz};
-use ::{qux};
+use ::{Foo};
 use ::{Bar, Baz};
 
 // Root globs
