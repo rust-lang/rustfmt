@@ -5,7 +5,7 @@ macro_rules! foo {
 bar1()
 // baz1
 .expect("Qux1");
-try!(try!(try!(bar2())
+r#try!(r#try!(r#try!(bar2())
 // baz2a
 .expect("Qux2a"))
 // baz2b
@@ -17,7 +17,7 @@ bar3()?
 }
 
 fn foo() {
-try!(try!(bar4())
+r#try!(r#try!(bar4())
 // baz4
 .expect("Qux4"));
 }
