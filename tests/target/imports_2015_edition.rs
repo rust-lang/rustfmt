@@ -1,4 +1,5 @@
 // rustfmt-normalize_comments: true
+// rustfmt-edition: 2015
 
 // Imports.
 
@@ -59,14 +60,14 @@ use foo::{self as bar, baz};
 use foo::{baz, qux as bar};
 
 // With absolute paths
-use ::foo;
-use ::foo::Bar;
-use ::foo::{Bar, Baz};
-use ::qux;
-use ::{Bar, Baz};
+use foo;
+use foo::Bar;
+use foo::{Bar, Baz};
+use Foo;
+use {Bar, Baz};
 
 // Root globs
-use ::*;
+use *;
 use *;
 
 // spaces used to cause glob imports to disappear (#1356)

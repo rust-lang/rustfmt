@@ -32,11 +32,11 @@ fn main() {
     }
 
     // nesting macro and function call
-    try!(foo(
+    r#try!(foo(
         xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
         xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     ));
-    try!(foo(try!(
+    r#try!(foo(r#try!(
         xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
         xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     )));

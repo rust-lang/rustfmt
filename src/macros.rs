@@ -1190,7 +1190,12 @@ fn next_space(tok: &TokenKind) -> SpaceState {
 /// when the macro is not an instance of `try!` (or parsing the inner expression
 /// failed).
 pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> Option<ast::Expr> {
-    if &mac.path.to_string() == "try" {
+    // The `try!` macro was deprecated in Rust 1.39.0 and `try` is a
+    // reserved keyword in the 2018 Edition so the raw identifier
+    // `r#try!` must be used in the 2018 Edition.
+    // https://doc.rust-lang.org/std/macro.try.html
+    // https://github.com/rust-lang/rust/pull/62672
+    if &mac.path.to_string() == "try" || &mac.path.to_string() == "r#try" {
         let ts: TokenStream = mac.tts.clone();
         let mut parser = new_parser_from_tts(context.parse_sess.inner(), ts.trees().collect());
 
