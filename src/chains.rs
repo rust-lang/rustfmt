@@ -331,33 +331,26 @@ impl Chain {
             }
         }
         while let Some(chain_item) = iter.next() {
-            let comment_snippet = context.snippet(chain_item.span);
-            // FIXME: Figure out the way to get a correct span when converting `try!` to `?`.
-            let handle_comment =
-                !(context.config.use_try_shorthand() || is_tries(comment_snippet.trim()));
-
             // Pre-comment
-            if handle_comment {
-                let pre_comment_span = mk_sp(prev_span_end, chain_item.span.lo());
-                let pre_comment_snippet = trim_tries(context.snippet(pre_comment_span));
-                let (pre_comment, _) = extract_pre_comment(&pre_comment_snippet);
-                match pre_comment {
-                    Some(ref comment) if !comment.is_empty() => {
-                        children.push(ChainItem::comment(
-                            pre_comment_span,
-                            comment.to_owned(),
-                            CommentPosition::Top,
-                        ));
-                    }
-                    _ => (),
+            let pre_comment_span = mk_sp(prev_span_end, chain_item.span.lo());
+            let pre_comment_snippet = trim_tries(context.snippet(pre_comment_span));
+            let (pre_comment, _) = extract_pre_comment(&pre_comment_snippet);
+            match pre_comment {
+                Some(ref comment) if !comment.is_empty() => {
+                    children.push(ChainItem::comment(
+                        pre_comment_span,
+                        comment.to_owned(),
+                        CommentPosition::Top,
+                    ));
                 }
+                _ => (),
             }
 
             prev_span_end = chain_item.span.hi();
             children.push(chain_item);
 
             // Post-comment
-            if !handle_comment || iter.peek().is_none() {
+            if iter.peek().is_none() {
                 continue;
             }
 
