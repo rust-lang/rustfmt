@@ -1720,14 +1720,6 @@ fn example() {
 }
 ```
 
-## `recursive` 
-
-Format all encountered modules recursively regardless of whether the modules are defined inline or in another file
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: Yes
-
 ## `remove_nested_parens`
 
 Remove nested parens.
@@ -2453,3 +2445,6 @@ Internal option
 ## `print_misformatted_file_names`
 
 Internal option, use `-l` or `--files-with-diff`
+
+## `recursive`
+Internal option, use `-r` or `--recursive`

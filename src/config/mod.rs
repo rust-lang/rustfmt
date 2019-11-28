@@ -130,8 +130,6 @@ create_config! {
             "Enables unstable features. Only available on nightly channel";
     disable_all_formatting: bool, false, false, "Don't reformat anything";
     skip_children: bool, false, false, "Don't reformat out of line modules";
-    recursive: bool, false, true,
-        "Format all encountered modules recursively, including those defined in external files.";
     hide_parse_errors: bool, false, false, "Hide errors from the parser";
     error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
     error_on_unformatted: bool, false, false,
@@ -156,6 +154,8 @@ create_config! {
     print_misformatted_file_names: bool, false, true,
         "Prints the names of mismatched files that were formatted. Prints the names of \
          files that would be formated when used with `--check` mode. ";
+    recursive: bool, false, true,
+        "Format all encountered modules recursively, including those defined in external files.";
 }
 
 impl PartialConfig {
@@ -166,6 +166,7 @@ impl PartialConfig {
         cloned.verbose = None;
         cloned.width_heuristics = None;
         cloned.print_misformatted_file_names = None;
+        cloned.recursive = None;
 
         ::toml::to_string(&cloned).map_err(|e| format!("Could not output config: {}", e))
     }
@@ -573,7 +574,6 @@ required_version = "{}"
 unstable_features = false
 disable_all_formatting = false
 skip_children = false
-recursive = false
 hide_parse_errors = false
 error_on_line_overflow = false
 error_on_unformatted = false
