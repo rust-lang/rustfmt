@@ -57,6 +57,7 @@ structopt = "0.3"
 rustfmt-config_proc_macro = { version = "0.2", path = "config_proc_macro" }
 lazy_static = "1.0.0"
 ansi_term = "0.12"
+anyhow = "1.0"
 thiserror = "1.0"
 
 # A noop dependency that changes in the Rust repository, it's a bit of a hack.
