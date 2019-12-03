@@ -1,6 +1,7 @@
+use anyhow::{format_err, Result};
 use env_logger;
-use failure::{err_msg, format_err, Error as FailureError, Fail};
 use io::Error as IoError;
+use thiserror::Error;
 
 use rustfmt_nightly as rustfmt;
 
@@ -61,23 +62,23 @@ enum Operation {
 }
 
 /// Rustfmt operations errors.
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
 pub enum OperationError {
     /// An unknown help topic was requested.
-    #[fail(display = "Unknown help topic: `{}`.", _0)]
+    #[error("Unknown help topic: `{0}`.")]
     UnknownHelpTopic(String),
     /// An unknown print-config option was requested.
-    #[fail(display = "Unknown print-config option: `{}`.", _0)]
+    #[error("Unknown print-config option: `{0}`.")]
     UnknownPrintConfigTopic(String),
     /// Attempt to generate a minimal config from standard input.
-    #[fail(display = "The `--print-config=minimal` option doesn't work with standard input.")]
+    #[error("The `--print-config=minimal` option doesn't work with standard input.")]
     MinimalPathWithStdin,
     /// An io error during reading or writing.
-    #[fail(display = "io error: {}", _0)]
+    #[error("io error: {0}")]
     IoError(IoError),
     /// Attempt to use --emit with a mode which is not currently
     /// supported with stdandard input.
-    #[fail(display = "Emit mode {} not supported with standard output.", _0)]
+    #[error("Emit mode {0} not supported with standard output.")]
     StdinBadEmit(EmitMode),
 }
 
@@ -189,7 +190,7 @@ fn is_nightly() -> bool {
 }
 
 // Returned i32 is an exit code
-fn execute(opts: &Options) -> Result<i32, FailureError> {
+fn execute(opts: &Options) -> Result<i32> {
     let matches = opts.parse(env::args().skip(1))?;
     let options = GetOptsOptions::from_matches(&matches)?;
 
@@ -211,7 +212,7 @@ fn execute(opts: &Options) -> Result<i32, FailureError> {
             Ok(0)
         }
         Operation::ConfigOutputDefault { path } => {
-            let toml = Config::default().all_options().to_toml().map_err(err_msg)?;
+            let toml = Config::default().all_options().to_toml()?;
             if let Some(path) = path {
                 let mut file = File::create(path)?;
                 file.write_all(toml.as_bytes())?;
@@ -230,7 +231,7 @@ fn execute(opts: &Options) -> Result<i32, FailureError> {
             let file = file.canonicalize().unwrap_or(file);
 
             let (config, _) = load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
-            let toml = config.all_options().to_toml().map_err(err_msg)?;
+            let toml = config.all_options().to_toml()?;
             io::stdout().write_all(toml.as_bytes())?;
 
             Ok(0)
@@ -243,7 +244,7 @@ fn execute(opts: &Options) -> Result<i32, FailureError> {
     }
 }
 
-fn format_string(input: String, options: GetOptsOptions) -> Result<i32, FailureError> {
+fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
     // try to read config from local directory
     let (mut config, _) = load_config(Some(Path::new(".")), Some(options.clone()))?;
 
@@ -289,7 +290,7 @@ fn format(
     files: Vec<PathBuf>,
     minimal_config_path: Option<String>,
     options: &GetOptsOptions,
-) -> Result<i32, FailureError> {
+) -> Result<i32> {
     options.verify_file_lines(&files);
     let (config, config_path) = load_config(None, Some(options.clone()))?;
 
@@ -337,7 +338,7 @@ fn format(
     // that were used during formatting as TOML.
     if let Some(path) = minimal_config_path {
         let mut file = File::create(path)?;
-        let toml = session.config.used_options().to_toml().map_err(err_msg)?;
+        let toml = session.config.used_options().to_toml()?;
         file.write_all(toml.as_bytes())?;
     }
 
@@ -521,7 +522,7 @@ fn deprecate_skip_children() {
 }
 
 impl GetOptsOptions {
-    pub fn from_matches(matches: &Matches) -> Result<GetOptsOptions, FailureError> {
+    pub fn from_matches(matches: &Matches) -> Result<GetOptsOptions> {
         let mut options = GetOptsOptions::default();
         options.verbose = matches.opt_present("verbose");
         options.quiet = matches.opt_present("quiet");
@@ -543,7 +544,7 @@ impl GetOptsOptions {
                     options.error_on_unformatted = Some(true);
                 }
                 if let Some(ref file_lines) = matches.opt_str("file-lines") {
-                    options.file_lines = file_lines.parse().map_err(err_msg)?;
+                    options.file_lines = file_lines.parse()?;
                 }
             } else {
                 let mut unstable_options = vec![];
@@ -686,7 +687,7 @@ impl CliOptions for GetOptsOptions {
     }
 }
 
-fn edition_from_edition_str(edition_str: &str) -> Result<Edition, FailureError> {
+fn edition_from_edition_str(edition_str: &str) -> Result<Edition> {
     match edition_str {
         "2015" => Ok(Edition::Edition2015),
         "2018" => Ok(Edition::Edition2018),
@@ -694,7 +695,7 @@ fn edition_from_edition_str(edition_str: &str) -> Result<Edition, FailureError> 
     }
 }
 
-fn emit_mode_from_emit_str(emit_str: &str) -> Result<EmitMode, FailureError> {
+fn emit_mode_from_emit_str(emit_str: &str) -> Result<EmitMode> {
     match emit_str {
         "files" => Ok(EmitMode::Files),
         "stdout" => Ok(EmitMode::Stdout),
