@@ -279,7 +279,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             offset: 0,
                         }
                     };
-                    let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config);
+                    let comment_str =
+                        rewrite_comment(sub_slice.trim(), false, comment_shape, config);
                     if self
                         .buffer
                         .chars()
