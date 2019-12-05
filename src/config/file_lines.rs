@@ -217,18 +217,17 @@ impl FileLines {
     }
 
     /// Returns JSON representation as accepted by the `--file-lines JSON` arg.
-    pub fn to_json_spans(&self) -> Vec<JsonSpan> {
-        match &self.0 {
-            None => vec![],
-            Some(file_ranges) => file_ranges
+    pub fn to_json_spans(&self) -> Option<Vec<JsonSpan>> {
+        self.0.as_ref().map(|file_ranges| {
+            file_ranges
                 .iter()
                 .flat_map(|(file, ranges)| ranges.iter().map(move |r| (file, r)))
                 .map(|(file, range)| JsonSpan {
                     file: file.to_owned(),
                     range: (range.lo, range.hi),
                 })
-                .collect(),
-        }
+                .collect()
+        })
     }
 
     /// Returns `true` if `self` includes all lines in all files. Otherwise runs `f` on all ranges
@@ -302,6 +301,10 @@ impl str::FromStr for FileLines {
     type Err = FileLinesError;
 
     fn from_str(s: &str) -> Result<FileLines, Self::Err> {
+        // https://github.com/rust-lang/rustfmt/issues/3649
+        if s == "null" {
+            return Ok(FileLines::all());
+        }
         let v: Vec<JsonSpan> = json::from_str(s).map_err(FileLinesError::Json)?;
         let mut m = HashMap::new();
         for js in v {
@@ -407,6 +410,7 @@ mod test {
 
     use super::json::{self, json};
     use super::{FileLines, FileName};
+    use std::str::FromStr;
     use std::{collections::HashMap, path::PathBuf};
 
     #[test]
@@ -426,7 +430,7 @@ mod test {
         .collect();
 
         let file_lines = FileLines::from_ranges(ranges);
-        let mut spans = file_lines.to_json_spans();
+        let mut spans = file_lines.to_json_spans().unwrap();
         spans.sort();
         let json = json::to_value(&spans).unwrap();
         assert_eq!(
@@ -436,6 +440,25 @@ mod test {
                 {"file": "src/main.rs", "range": [1, 3]},
                 {"file": "src/main.rs", "range": [5, 7]},
             ]}
+        );
+    }
+
+    #[test]
+    fn to_json_spans_with_file_lines_all() {
+        assert!(FileLines::all().to_json_spans().is_none());
+    }
+
+    #[test]
+    fn file_lines_from_string_null() {
+        assert_eq!(FileLines::all(), FileLines::from_str("null").unwrap());
+    }
+
+    #[test]
+    fn file_lines_consistent_ser_and_der() {
+        let all_spans = FileLines::all().to_json_spans();
+        assert_eq!(
+            FileLines::all(),
+            FileLines::from_str(&json::to_string(&all_spans).unwrap()).unwrap(),
         );
     }
 }
