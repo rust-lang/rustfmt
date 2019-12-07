@@ -100,6 +100,10 @@ impl<'a> FmtVisitor<'a> {
         }
 
         if snippet.trim().is_empty() && !out_of_file_lines_range!(self, span) {
+            if self.is_start_span(span) {
+                return;
+            }
+
             // Keep vertical spaces within range.
             self.push_vertical_spaces(count_newlines(snippet));
             process_last_snippet(self, "", snippet);

@@ -46,6 +46,10 @@ impl SnippetProvider {
         Some(&self.big_snippet[start_index..end_index])
     }
 
+    pub(crate) fn is_start_span(&self, span: Span) -> bool {
+        span.lo().to_usize() == self.start_pos
+    }
+
     pub(crate) fn new(start_pos: BytePos, end_pos: BytePos, big_snippet: Rc<String>) -> Self {
         let start_pos = start_pos.to_usize();
         let end_pos = end_pos.to_usize();
@@ -749,6 +753,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
     pub(crate) fn snippet(&'b self, span: Span) -> &'a str {
         self.opt_snippet(span).unwrap()
+    }
+
+    pub(crate) fn is_start_span(&'b self, span: Span) -> bool {
+        self.snippet_provider.is_start_span(span)
     }
 
     // Returns true if we should skip the following item.
