@@ -95,7 +95,9 @@ impl<'a> FmtVisitor<'a> {
         let snippet = self.snippet(span);
 
         // Do nothing for spaces in the beginning of the file
-        if start == BytePos(0) && end.0 as usize == snippet.len() && snippet.trim().is_empty() {
+        let is_start_span =
+            (start == BytePos(0) && end.0 as usize == snippet.len()) || self.is_start_span(span);
+        if is_start_span && snippet.trim().is_empty() {
             return;
         }
 
