@@ -95,15 +95,13 @@ impl<'a> FmtVisitor<'a> {
         let snippet = self.snippet(span);
 
         // Do nothing for spaces in the beginning of the file
-        if start == BytePos(0) && end.0 as usize == snippet.len() && snippet.trim().is_empty() {
+        let is_start_span =
+            (start == BytePos(0) && end.0 as usize == snippet.len()) || self.is_start_span(span);
+        if is_start_span && snippet.trim().is_empty() {
             return;
         }
 
         if snippet.trim().is_empty() && !out_of_file_lines_range!(self, span) {
-            if self.is_start_span(span) {
-                return;
-            }
-
             // Keep vertical spaces within range.
             self.push_vertical_spaces(count_newlines(snippet));
             process_last_snippet(self, "", snippet);
