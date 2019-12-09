@@ -2445,3 +2445,6 @@ Internal option
 ## `print_misformatted_file_names`
 
 Internal option, use `-l` or `--files-with-diff`
+
+## `recursive`
+Internal option, use `-r` or `--recursive`

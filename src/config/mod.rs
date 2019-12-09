@@ -155,6 +155,8 @@ create_config! {
     print_misformatted_file_names: bool, false, true,
         "Prints the names of mismatched files that were formatted. Prints the names of \
          files that would be formated when used with `--check` mode. ";
+    recursive: bool, false, true,
+        "Format all encountered modules recursively, including those defined in external files.";
 }
 
 #[derive(Error, Debug)]
@@ -169,6 +171,7 @@ impl PartialConfig {
         cloned.verbose = None;
         cloned.width_heuristics = None;
         cloned.print_misformatted_file_names = None;
+        cloned.recursive = None;
 
         ::toml::to_string(&cloned).map_err(ToTomlError)
     }
@@ -284,7 +287,15 @@ impl Config {
                 if !err.is_empty() {
                     eprint!("{}", err);
                 }
-                Ok(Config::default().fill_from_parsed_config(parsed_config, dir))
+                let config = Config::default().fill_from_parsed_config(parsed_config, dir);
+                if config.skip_children() && config.recursive() {
+                    return Err(String::from(
+                        "Error: Conflicting config options `skip_children` and `recursive` are \
+                        both enabled. `skip_children` has been deprecated and should be \
+                        removed from your config.",
+                    ));
+                }
+                Ok(config)
             }
             Err(e) => {
                 err.push_str("Error: Decoding config file failed:\n");
@@ -486,6 +497,25 @@ mod test {
         let toml = r#"license_template_path = "tests/license-template/lt.txt""#;
         let config = Config::from_toml(toml, Path::new("")).unwrap();
         assert!(config.license_template.is_some());
+    }
+
+    #[test]
+    fn test_conflicting_recursive_skip_children() {
+        if !crate::is_nightly_channel!() {
+            return;
+        }
+
+        let toml = "skip_children = true\nrecursive = true";
+        // Update to `contains_err()` once it lands
+        // https://github.com/rust-lang/rust/issues/62358
+        // https://doc.rust-lang.org/std/result/enum.Result.html#method.contains_err
+        match Config::from_toml(toml, Path::new("")) {
+            Ok(_) => panic!("Expected configuration error"),
+            Err(msg) => assert_eq!(
+                msg,
+                "Error: Conflicting config options `skip_children` and `recursive` are both enabled. `skip_children` has been deprecated and should be removed from your config.",
+            ),
+        }
     }
 
     #[test]
