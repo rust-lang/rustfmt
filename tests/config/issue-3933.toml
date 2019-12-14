@@ -1,0 +1,6 @@
+ignore = [
+  "tests/**/issue-3933/imp-a.rs",
+  "tests/**/issue-3933/imp-b.rs",
+  "tests/**/issue-3933/utils.rs"
+]
+recursive = true
