@@ -16,7 +16,7 @@ use crate::comment::{
     FindUncommented,
 };
 use crate::config::lists::*;
-use crate::config::{BraceStyle, Config, IndentStyle, Version};
+use crate::config::{BraceStyle, Config, IndentStyle};
 use crate::expr::{
     is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_expr,
     rewrite_assign_rhs_with, RhsTactics,
@@ -860,15 +860,7 @@ fn format_impl_ref_and_type(
         result.push_str(format_defaultness(defaultness));
         result.push_str(format_unsafety(unsafety));
 
-        let shape = if context.config.version() == Version::Two {
-            Shape::indented(offset + last_line_width(&result), context.config)
-        } else {
-            generics_shape_from_config(
-                context.config,
-                Shape::indented(offset + last_line_width(&result), context.config),
-                0,
-            )?
-        };
+        let shape = Shape::indented(offset + last_line_width(&result), context.config);
         let generics_str = rewrite_generics(context, "impl", generics, shape)?;
         result.push_str(&generics_str);
 
@@ -1940,9 +1932,7 @@ impl Rewrite for ast::FunctionRetTy {
         match *self {
             ast::FunctionRetTy::Default(_) => Some(String::new()),
             ast::FunctionRetTy::Ty(ref ty) => {
-                if context.config.version() == Version::One
-                    || context.config.indent_style() == IndentStyle::Visual
-                {
+                if context.config.indent_style() == IndentStyle::Visual {
                     let inner_width = shape.width.checked_sub(3)?;
                     return ty
                         .rewrite(context, Shape::legacy(inner_width, shape.indent + 3))
@@ -2296,22 +2286,15 @@ fn rewrite_fn_base(
             .last()
             .map_or(false, |last_line| last_line.contains("//"));
 
-        if context.config.version() == Version::Two {
-            if closing_paren_overflow_max_width {
-                result.push(')');
-                result.push_str(&indent.to_string_with_newline(context.config));
-                no_params_and_over_max_width = true;
-            } else if params_last_line_contains_comment {
-                result.push_str(&indent.to_string_with_newline(context.config));
-                result.push(')');
-                no_params_and_over_max_width = true;
-            } else {
-                result.push(')');
-            }
+        if closing_paren_overflow_max_width {
+            result.push(')');
+            result.push_str(&indent.to_string_with_newline(context.config));
+            no_params_and_over_max_width = true;
+        } else if params_last_line_contains_comment {
+            result.push_str(&indent.to_string_with_newline(context.config));
+            result.push(')');
+            no_params_and_over_max_width = true;
         } else {
-            if closing_paren_overflow_max_width || params_last_line_contains_comment {
-                result.push_str(&indent.to_string_with_newline(context.config));
-            }
             result.push(')');
         }
     }
@@ -2339,9 +2322,7 @@ fn rewrite_fn_base(
             }
         };
         let ret_shape = if ret_should_indent {
-            if context.config.version() == Version::One
-                || context.config.indent_style() == IndentStyle::Visual
-            {
+            if context.config.indent_style() == IndentStyle::Visual {
                 let indent = if param_str.is_empty() {
                     // Aligning with non-existent params looks silly.
                     force_new_line_for_brace = true;
@@ -2372,11 +2353,7 @@ fn rewrite_fn_base(
                 ret_shape
             }
         } else {
-            if context.config.version() == Version::Two {
-                if !param_str.is_empty() || !no_params_and_over_max_width {
-                    result.push(' ');
-                }
-            } else {
+            if !param_str.is_empty() || !no_params_and_over_max_width {
                 result.push(' ');
             }
 
@@ -2696,20 +2673,6 @@ fn rewrite_generics(
 
     let params = generics.params.iter();
     overflow::rewrite_with_angle_brackets(context, ident, params, shape, generics.span)
-}
-
-fn generics_shape_from_config(config: &Config, shape: Shape, offset: usize) -> Option<Shape> {
-    match config.indent_style() {
-        IndentStyle::Visual => shape.visual_indent(1 + offset).sub_width(offset + 2),
-        IndentStyle::Block => {
-            // 1 = ","
-            shape
-                .block()
-                .block_indent(config.tab_spaces())
-                .with_max_width(config)
-                .sub_width(1)
-        }
-    }
 }
 
 fn rewrite_where_clause_rfc_style(

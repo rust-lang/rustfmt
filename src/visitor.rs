@@ -6,7 +6,6 @@ use syntax::{ast, visit};
 
 use crate::attr::*;
 use crate::comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};
-use crate::config::Version;
 use crate::config::{BraceStyle, Config};
 use crate::coverage::transform_missing_snippet;
 use crate::items::{
@@ -24,8 +23,9 @@ use crate::spanned::Spanned;
 use crate::stmt::Stmt;
 use crate::syntux::session::ParseSess;
 use crate::utils::{
-    self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes, last_line_width,
-    mk_sp, ptr_vec_to_ref_vec, rewrite_ident, stmt_expr,
+    self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes,
+    last_line_contains_single_line_comment, last_line_width, mk_sp, ptr_vec_to_ref_vec,
+    rewrite_ident, stmt_expr,
 };
 use crate::{ErrorKind, FormatReport, FormattingError};
 
@@ -240,107 +240,96 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     fn close_block(&mut self, span: Span, unindent_comment: bool) {
         let config = self.config;
 
-        let mut last_hi = span.lo();
-        let mut unindented = false;
-        let mut prev_ends_with_newline = false;
-        let mut extra_newline = false;
+        let mut prev_kind = CodeCharKind::Normal;
+        let mut newline_inserted = false;
 
         let skip_normal = |s: &str| {
             let trimmed = s.trim();
-            trimmed.is_empty() || trimmed.chars().all(|c| c == ';')
+            !trimmed.is_empty() && trimmed.chars().all(|c| c == ';')
         };
 
-        for (kind, offset, sub_slice) in CommentCodeSlices::new(self.snippet(span)) {
+        let last_line_offset = if last_line_contains_single_line_comment(&self.buffer) {
+            0
+        } else {
+            last_line_width(&self.buffer) + 1
+        };
+
+        if unindent_comment {
+            self.block_indent = self.block_indent.block_unindent(config);
+        }
+
+        let mut iter = CommentCodeSlices::with_offset(
+            self.snippet(span),
+            last_line_offset,
+            self.config.tab_spaces(),
+        )
+        .peekable();
+        while let Some((kind, offset, sub_slice)) = iter.next() {
             let sub_slice = transform_missing_snippet(config, sub_slice);
             debug!("close_block: {:?} {:?} {:?}", kind, offset, sub_slice);
 
             match kind {
                 CodeCharKind::Comment => {
-                    if !unindented && unindent_comment {
-                        unindented = true;
-                        self.block_indent = self.block_indent.block_unindent(config);
-                    }
-                    let span_in_between = mk_sp(last_hi, span.lo() + BytePos::from_usize(offset));
-                    let snippet_in_between = self.snippet(span_in_between);
-                    let mut comment_on_same_line = !snippet_in_between.contains("\n");
-
-                    let mut comment_shape =
-                        Shape::indented(self.block_indent, config).comment(config);
-                    if self.config.version() == Version::Two && comment_on_same_line {
-                        self.push_str(" ");
-                        // put the first line of the comment on the same line as the
-                        // block's last line
-                        match sub_slice.find("\n") {
-                            None => {
-                                self.push_str(&sub_slice);
-                            }
-                            Some(offset) if offset + 1 == sub_slice.len() => {
-                                self.push_str(&sub_slice[..offset]);
-                            }
-                            Some(offset) => {
-                                let first_line = &sub_slice[..offset];
-                                self.push_str(first_line);
-
-                                // put the other lines below it, shaping it as needed
-                                let other_lines = &sub_slice[offset + 1..];
-                                if !other_lines.trim().is_empty() {
-                                    self.push_str(
-                                        &self.block_indent.to_string_with_newline(config),
-                                    );
-                                    let comment_str =
-                                        rewrite_comment(other_lines, false, comment_shape, config);
-                                    match comment_str {
-                                        Some(ref s) => self.push_str(s),
-                                        None => self.push_str(other_lines),
-                                    }
-                                }
-                            }
-                        }
+                    let comment_shape = if newline_inserted {
+                        self.shape().comment(self.config)
                     } else {
-                        let sub_slice = sub_slice.trim();
-                        if comment_on_same_line {
-                            // 1 = a space before `//`
-                            let offset_len = 1 + last_line_width(&self.buffer)
-                                .saturating_sub(self.block_indent.width());
-                            match comment_shape
-                                .visual_indent(offset_len)
-                                .sub_width(offset_len)
-                            {
-                                Some(shp) => comment_shape = shp,
-                                None => comment_on_same_line = false,
-                            }
-                        };
-
-                        if comment_on_same_line {
-                            self.push_str(" ");
-                        } else {
-                            if count_newlines(snippet_in_between) >= 2 || extra_newline {
-                                self.push_str("\n");
-                            }
-                            self.push_str(&self.block_indent.to_string_with_newline(config));
+                        Shape {
+                            width: self.config.comment_width(),
+                            indent: Indent::from_width(self.config, last_line_offset),
+                            offset: 0,
                         }
-
-                        let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config);
-                        match comment_str {
-                            Some(ref s) => self.push_str(s),
-                            None => self.push_str(&sub_slice),
-                        }
+                    };
+                    let comment_str =
+                        rewrite_comment(sub_slice.trim(), false, comment_shape, config);
+                    if self
+                        .buffer
+                        .chars()
+                        .last()
+                        .map_or(false, |c| !c.is_whitespace() && c != '/')
+                    {
+                        self.push_str(" ");
+                    }
+                    match comment_str {
+                        Some(ref s) => self.push_str(s),
+                        None => self.push_str(&sub_slice),
                     }
                 }
                 CodeCharKind::Normal if skip_normal(&sub_slice) => {
-                    extra_newline = prev_ends_with_newline && sub_slice.contains('\n');
+                    prev_kind = kind;
                     continue;
                 }
                 CodeCharKind::Normal => {
+                    let prev_is_comment = prev_kind == CodeCharKind::Comment;
+                    prev_kind = kind;
+
+                    if iter.peek().is_none() {
+                        continue;
+                    }
+
+                    match count_newlines(&sub_slice) {
+                        0 if !prev_is_comment
+                            || !last_line_contains_single_line_comment(&self.buffer) =>
+                        {
+                            self.push_str(" ");
+                            continue;
+                        }
+                        0 => (),
+                        1 if prev_is_comment
+                            && last_line_contains_single_line_comment(&self.buffer) =>
+                        {
+                            self.push_str("\n")
+                        }
+                        1 => (),
+                        _ => self.push_str("\n"),
+                    }
+                    newline_inserted = true;
+
                     self.push_str(&self.block_indent.to_string_with_newline(config));
-                    self.push_str(sub_slice.trim());
                 }
             }
-            prev_ends_with_newline = sub_slice.ends_with('\n');
-            extra_newline = false;
-            last_hi = span.lo() + BytePos::from_usize(offset + sub_slice.len());
+            prev_kind = kind;
         }
-        if unindented {
+        if unindent_comment {
             self.block_indent = self.block_indent.block_indent(self.config);
         }
         self.block_indent = self.block_indent.block_unindent(self.config);

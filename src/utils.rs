@@ -12,7 +12,7 @@ use syntax_pos::ExpnId;
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
-use crate::config::{Config, Version};
+use crate::config::Config;
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 
@@ -568,8 +568,7 @@ pub(crate) fn trim_left_preserve_layout(
 
             // just InString{Commented} in order to allow the start of a string to be indented
             let new_veto_trim_value = (kind == FullCodeCharKind::InString
-                || (config.version() == Version::Two
-                    && kind == FullCodeCharKind::InStringCommented))
+                || kind == FullCodeCharKind::InStringCommented)
                 && !line.ends_with('\\');
             let line = if veto_trim || new_veto_trim_value {
                 veto_trim = new_veto_trim_value;
@@ -583,11 +582,7 @@ pub(crate) fn trim_left_preserve_layout(
             // Because there is a veto against trimming and indenting lines within a string,
             // such lines should not be taken into account when computing the minimum.
             match kind {
-                FullCodeCharKind::InStringCommented | FullCodeCharKind::EndStringCommented
-                    if config.version() == Version::Two =>
-                {
-                    None
-                }
+                FullCodeCharKind::InStringCommented | FullCodeCharKind::EndStringCommented => None,
                 FullCodeCharKind::InString | FullCodeCharKind::EndString => None,
                 _ => prefix_space_width,
             }
@@ -618,8 +613,8 @@ pub(crate) fn trim_left_preserve_layout(
 
 /// Based on the given line, determine if the next line can be indented or not.
 /// This allows to preserve the indentation of multi-line literals.
-pub(crate) fn indent_next_line(kind: FullCodeCharKind, _line: &str, config: &Config) -> bool {
-    !(kind.is_string() || (config.version() == Version::Two && kind.is_commented_string()))
+pub(crate) fn indent_next_line(kind: FullCodeCharKind) -> bool {
+    !(kind.is_string() || kind.is_commented_string())
 }
 
 pub(crate) fn is_empty_line(s: &str) -> bool {
@@ -636,6 +631,12 @@ fn get_prefix_space_width(config: &Config, s: &str) -> usize {
         }
     }
     width
+}
+
+pub(crate) fn tab_to_spaces(s: &str, tab_spaces: usize) -> usize {
+    s.chars()
+        .map(|s| if s == '\t' { tab_spaces } else { 1 })
+        .sum()
 }
 
 pub(crate) trait NodeIdExt {
