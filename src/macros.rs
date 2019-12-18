@@ -234,7 +234,7 @@ fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
             parser.bump();
             return Some(MacroArg::Keyword(
                 ast::Ident::with_dummy_span(keyword),
-                parser.prev_span
+                parser.prev_span,
             ));
         }
     }

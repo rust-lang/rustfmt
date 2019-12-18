@@ -303,12 +303,8 @@ mod tests {
             let emitter_writer = TestEmitter { num_emitted_errors };
             let source_map =
                 source_map.unwrap_or_else(|| Rc::new(SourceMap::new(FilePathMapping::empty())));
-            let ignore_path_set = Rc::new(
-                IgnorePathSet::from_ignore_list(
-                    &ignore_list.unwrap_or_default(),
-                )
-                .unwrap(),
-            );
+            let ignore_path_set =
+                Rc::new(IgnorePathSet::from_ignore_list(&ignore_list.unwrap_or_default()).unwrap());
             SilentOnIgnoredFilesEmitter {
                 has_non_ignorable_parser_errors: false,
                 source_map,

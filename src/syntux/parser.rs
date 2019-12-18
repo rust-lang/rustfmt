@@ -86,7 +86,6 @@ impl<'a> ParserBuilder<'a> {
         parser.cfg_mods = false;
         parser.recurse_into_file_modules = config.recursive();
 
-
         Ok(Parser { parser, sess })
     }
 
