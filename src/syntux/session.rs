@@ -173,15 +173,13 @@ impl ParseSess {
     pub(crate) fn span_to_first_line_string(&self, span: Span) -> String {
         let file_lines = self.parse_sess.source_map().span_to_lines(span).ok();
 
-        let first_line_str = match file_lines {
+        match file_lines {
             Some(fl) => fl
                 .file
                 .get_line(fl.lines[0].line_index)
-                .map(|s| s.into_owned()),
-            None => return String::new(),
-        };
-
-        first_line_str.unwrap_or(String::new())
+                .map_or_else(String::new, |s| s.to_string()),
+            None => String::new(),
+        }
     }
 
     pub(crate) fn line_of_byte_pos(&self, pos: BytePos) -> usize {
@@ -292,7 +290,7 @@ mod tests {
                 message: vec![],
                 children: vec![],
                 suggestions: vec![],
-                span: span.unwrap_or_else(|| MultiSpan::new()),
+                span: span.unwrap_or_else(MultiSpan::new),
             }
         }
 
@@ -307,7 +305,7 @@ mod tests {
                 source_map.unwrap_or_else(|| Rc::new(SourceMap::new(FilePathMapping::empty())));
             let ignore_path_set = Rc::new(
                 IgnorePathSet::from_ignore_list(
-                    &ignore_list.unwrap_or_else(|| IgnoreList::default()),
+                    &ignore_list.unwrap_or_default(),
                 )
                 .unwrap(),
             );

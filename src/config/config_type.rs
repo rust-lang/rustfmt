@@ -271,7 +271,7 @@ macro_rules! create_config {
                             }
                             name_out.push_str(name_raw);
                             name_out.push(' ');
-                            let mut default_str = format!("{}", $def);
+                            let mut default_str = $def.to_string();
                             if default_str.is_empty() {
                                 default_str = String::from("\"\"");
                             }

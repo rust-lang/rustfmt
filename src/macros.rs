@@ -225,18 +225,17 @@ pub(crate) fn rewrite_macro(
 }
 
 fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
+    let is_delim = |kind| match kind {
+        TokenKind::Eof | TokenKind::Comma | TokenKind::CloseDelim(DelimToken::NoDelim) => true,
+        _ => false,
+    };
     for &keyword in RUST_KW.iter() {
-        if parser.token.is_keyword(keyword)
-            && parser.look_ahead(1, |t| {
-                t.kind == TokenKind::Eof
-                    || t.kind == TokenKind::Comma
-                    || t.kind == TokenKind::CloseDelim(DelimToken::NoDelim)
-            })
-        {
+        if parser.token.is_keyword(keyword) && parser.look_ahead(1, |t| is_delim(t.kind.clone())) {
             parser.bump();
-            let macro_arg =
-                MacroArg::Keyword(ast::Ident::with_dummy_span(keyword), parser.prev_span);
-            return Some(macro_arg);
+            return Some(MacroArg::Keyword(
+                ast::Ident::with_dummy_span(keyword),
+                parser.prev_span
+            ));
         }
     }
     None

@@ -101,9 +101,9 @@ fn is_file_skip(path: &Path) -> bool {
 fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
     let mut files = vec![];
     if path.is_dir() {
-        for entry in fs::read_dir(path).expect(&format!(
+        for entry in fs::read_dir(path).unwrap_or_else(|_| panic!(
             "couldn't read directory {}",
-            path.to_str().unwrap()
+            path.display()
         )) {
             let entry = entry.expect("couldn't get `DirEntry`");
             let path = entry.path();
@@ -118,9 +118,9 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
 }
 
 fn verify_config_used(path: &Path, config_name: &str) {
-    for entry in fs::read_dir(path).expect(&format!(
+    for entry in fs::read_dir(path).unwrap_or_else(|_| panic!(
         "couldn't read {} directory",
-        path.to_str().unwrap()
+        path.display()
     )) {
         let entry = entry.expect("couldn't get directory entry");
         let path = entry.path();
@@ -435,9 +435,9 @@ fn stdin_formatting_smoke_test() {
     }
 
     #[cfg(not(windows))]
-    assert_eq!(buf, "stdin:\n\nfn main() {}\n".as_bytes());
+    assert_eq!(buf, b"stdin:\n\nfn main() {}\n");
     #[cfg(windows)]
-    assert_eq!(buf, "stdin:\n\nfn main() {}\r\n".as_bytes());
+    assert_eq!(buf, b"stdin:\n\nfn main() {}\r\n");
 }
 
 #[test]
@@ -459,7 +459,7 @@ fn stdin_parser_panic_caught() {
 fn stdin_works_with_modified_lines() {
     init_log();
     let input = "\nfn\n some( )\n{\n}\nfn main () {}\n";
-    let output = "1 6 2\nfn some() {}\nfn main() {}\n";
+    let output = b"1 6 2\nfn some() {}\nfn main() {}\n";
 
     let input = Input::Text(input.to_owned());
     let mut config = Config::default();
@@ -475,7 +475,7 @@ fn stdin_works_with_modified_lines() {
         };
         assert_eq!(session.errors, errors);
     }
-    assert_eq!(buf, output.as_bytes());
+    assert_eq!(buf, output);
 }
 
 /// Ensures that `EmitMode::Json` works with input from `stdin`.
@@ -510,8 +510,8 @@ fn stdin_disable_all_formatting_test() {
         // These tests require nightly.
         _ => return,
     }
-    let input = String::from("fn main() { println!(\"This should not be formatted.\"); }");
-    let mut child = Command::new(rustfmt().to_str().unwrap())
+    let input = "fn main() { println!(\"This should not be formatted.\"); }";
+    let mut child = Command::new(rustfmt())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .arg("--config-path=./tests/config/disable_all_formatting.toml")
@@ -890,8 +890,8 @@ fn make_temp_file(file_name: &'static str) -> TempFile {
     let path = Path::new(&target_dir).join(file_name);
 
     let mut file = File::create(&path).expect("couldn't create temp file");
-    let content = "fn main() {}\n";
-    file.write_all(content.as_bytes())
+    let content = b"fn main() {}\n";
+    file.write_all(content)
         .expect("couldn't write temp file");
     TempFile { path }
 }
@@ -933,9 +933,9 @@ fn verify_check_works() {
     init_log();
     let temp_file = make_temp_file("temp_check.rs");
 
-    Command::new(rustfmt().to_str().unwrap())
+    Command::new(rustfmt())
         .arg("--check")
-        .arg(temp_file.path.to_str().unwrap())
+        .arg(&temp_file.path)
         .status()
         .expect("run with check option failed");
 }
@@ -944,7 +944,7 @@ fn verify_check_works() {
 fn verify_check_works_with_stdin() {
     init_log();
 
-    let mut child = Command::new(rustfmt().to_str().unwrap())
+    let mut child = Command::new(rustfmt())
         .arg("--check")
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
@@ -954,7 +954,7 @@ fn verify_check_works_with_stdin() {
     {
         let stdin = child.stdin.as_mut().expect("Failed to open stdin");
         stdin
-            .write_all("fn main() {}\n".as_bytes())
+            .write_all(b"fn main() {}\n")
             .expect("Failed to write to rustfmt --check");
     }
     let output = child
@@ -967,7 +967,7 @@ fn verify_check_works_with_stdin() {
 fn verify_check_l_works_with_stdin() {
     init_log();
 
-    let mut child = Command::new(rustfmt().to_str().unwrap())
+    let mut child = Command::new(rustfmt())
         .arg("--check")
         .arg("-l")
         .stdin(Stdio::piped())
@@ -979,7 +979,7 @@ fn verify_check_l_works_with_stdin() {
     {
         let stdin = child.stdin.as_mut().expect("Failed to open stdin");
         stdin
-            .write_all("fn main()\n{}\n".as_bytes())
+            .write_all(b"fn main()\n{}\n")
             .expect("Failed to write to rustfmt --check");
     }
     let output = child

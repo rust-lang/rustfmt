@@ -26,7 +26,7 @@ impl<'a> Directory {
     fn to_syntax_directory(&'a self) -> syntax::parse::Directory<'a> {
         syntax::parse::Directory {
             path: Cow::Borrowed(&self.path),
-            ownership: self.ownership.clone(),
+            ownership: self.ownership,
         }
     }
 }
@@ -209,7 +209,7 @@ impl<'a> Parser<'a> {
             }
 
             match Parser::parse_mod_items(&mut parser, lo) {
-                Ok(m) => Some(m.clone()),
+                Ok(m) => Some(m),
                 Err(mut db) => {
                     db.cancel();
                     sess.reset_errors();

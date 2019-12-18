@@ -102,11 +102,11 @@ fn execute() -> i32 {
     if opts.version {
         return handle_command_status(get_rustfmt_info(&[String::from("--version")]));
     }
-    if opts.rustfmt_options.iter().any(|s| {
-        ["--print-config", "-h", "--help", "-V", "--version"].contains(&s.as_str())
-            || s.starts_with("--help=")
-            || s.starts_with("--print-config=")
-    }) {
+    if opts
+        .rustfmt_options
+        .iter()
+        .any(|s| is_status_options(s.as_str()))
+    {
         return handle_command_status(get_rustfmt_info(&opts.rustfmt_options));
     }
 
@@ -140,6 +140,12 @@ fn execute() -> i32 {
             include_nested_test_files,
         ))
     }
+}
+
+fn is_status_options(s: &str) -> bool {
+    ["--print-config", "-h", "--help", "-V", "--version"].contains(&s)
+        || s.starts_with("--help=")
+        || s.starts_with("--print-config=")
 }
 
 fn build_rustfmt_args(opts: &Opts, rustfmt_args: &mut Vec<String>) -> Result<(), String> {
@@ -285,9 +291,9 @@ impl Target {
     ) -> Self {
         let path = PathBuf::from(&target.src_path);
         let canonicalized = fs::canonicalize(&path).unwrap_or(path);
-        let test_files = nested_int_test_files.unwrap_or(vec![]);
+        let test_files = nested_int_test_files.unwrap_or_else(Vec::new);
 
-        Target {
+        Self {
             path: canonicalized,
             kind: target.kind[0].clone(),
             edition: target.edition.clone(),
@@ -417,7 +423,7 @@ fn get_targets_root_only(
                 .map(|p| p.targets)
                 .flatten()
                 .collect(),
-            PathBuf::from(current_dir_manifest),
+            current_dir_manifest,
         ),
     };
 
@@ -660,7 +666,7 @@ fn get_cargo_metadata(
     match cmd.exec() {
         Ok(metadata) => Ok(metadata),
         Err(_) => {
-            cmd.other_options(vec![]);
+            cmd.other_options(&[]);
             match cmd.exec() {
                 Ok(metadata) => Ok(metadata),
                 Err(error) => Err(io::Error::new(io::ErrorKind::Other, error.to_string())),

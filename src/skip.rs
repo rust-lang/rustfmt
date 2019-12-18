@@ -31,21 +31,21 @@ impl SkipContext {
     }
 }
 
-static RUSTFMT: &'static str = "rustfmt";
-static SKIP: &'static str = "skip";
+static RUSTFMT: &str = "rustfmt";
+static SKIP: &str = "skip";
 
 /// Say if you're playing with `rustfmt`'s skip attribute
 pub(crate) fn is_skip_attr(segments: &[ast::PathSegment]) -> bool {
-    if segments.len() < 2 || segments[0].ident.to_string() != RUSTFMT {
+    if segments.len() < 2 || segments[0].ident.as_str() != RUSTFMT {
         return false;
     }
     match segments.len() {
-        2 => segments[1].ident.to_string() == SKIP,
+        2 => segments[1].ident.as_str() == SKIP,
         3 => {
-            segments[1].ident.to_string() == SKIP
+            segments[1].ident.as_str() == SKIP
                 && ["macros", "attributes"]
                     .iter()
-                    .any(|&n| n == &segments[2].ident.name.as_str())
+                    .any(|&n| n == segments[2].ident.name.as_str())
         }
         _ => false,
     }

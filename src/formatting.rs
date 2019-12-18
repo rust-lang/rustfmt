@@ -91,7 +91,7 @@ fn format_project<T: FormatHandler>(
     let files = modules::ModResolver::new(
         &context.parse_session,
         directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod(true)),
-        !(input_is_stdin || !config.recursive()),
+        !input_is_stdin && config.recursive(),
     )
     .visit_crate(&krate)
     .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;

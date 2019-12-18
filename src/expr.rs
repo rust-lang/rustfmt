@@ -600,7 +600,7 @@ pub(crate) fn rewrite_cond(
                 String::from("\n") + &shape.indent.block_only().to_string(context.config);
             control_flow
                 .rewrite_cond(context, shape, &alt_block_sep)
-                .and_then(|rw| Some(rw.0))
+                .map(|rw| rw.0)
         }),
     }
 }
@@ -835,7 +835,7 @@ impl<'a> ControlFlow<'a> {
                 rewrite_missing_comment(mk_sp(comments_lo, expr.span.lo()), cond_shape, context)
             {
                 if !self.connector.is_empty() && !comment.is_empty() {
-                    if comment_style(&comment, false).is_line_comment() || comment.contains("\n") {
+                    if comment_style(&comment, false).is_line_comment() || comment.contains('\n') {
                         let newline = &pat_shape
                             .indent
                             .block_indent(context.config)
