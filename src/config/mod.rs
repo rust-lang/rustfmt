@@ -513,7 +513,9 @@ mod test {
             Ok(_) => panic!("Expected configuration error"),
             Err(msg) => assert_eq!(
                 msg,
-                "Error: Conflicting config options `skip_children` and `recursive` are both enabled. `skip_children` has been deprecated and should be removed from your config.",
+                "Error: Conflicting config options `skip_children` and `recursive` \
+                are both enabled. `skip_children` has been deprecated and should be \
+                removed from your config.",
             ),
         }
     }

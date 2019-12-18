@@ -248,8 +248,10 @@ macro_rules! create_config {
 
             #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
-                const HIDE_OPTIONS: [&str; 6] =
-                    ["verbose", "verbose_diff", "file_lines", "width_heuristics", "recursive", "print_misformatted_file_names"];
+                const HIDE_OPTIONS: [&str; 6] = [
+                    "verbose", "verbose_diff", "file_lines", "width_heuristics",
+                    "recursive", "print_misformatted_file_names",
+                ];
                 HIDE_OPTIONS.contains(&name)
             }
 
