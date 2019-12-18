@@ -903,29 +903,34 @@ impl Drop for TempFile {
     }
 }
 
-fn rustfmt() -> PathBuf {
-    let mut me = env::current_exe().expect("failed to get current executable");
-    // Chop of the test name.
-    me.pop();
-    // Chop off `deps`.
-    me.pop();
+fn rustfmt() -> &'static Path {
+    lazy_static! {
+        static ref RUSTFMT_PATH: PathBuf = {
+            let mut me = env::current_exe().expect("failed to get current executable");
+            // Chop of the test name.
+            me.pop();
+            // Chop off `deps`.
+            me.pop();
 
-    // If we run `cargo test --release`, we might only have a release build.
-    if cfg!(release) {
-        // `../release/`
-        me.pop();
-        me.push("release");
+            // If we run `cargo test --release`, we might only have a release build.
+            if cfg!(release) {
+                // `../release/`
+                me.pop();
+                me.push("release");
+            }
+            me.push("rustfmt");
+            assert!(
+                me.is_file() || me.with_extension("exe").is_file(),
+                if cfg!(release) {
+                    "no rustfmt bin, try running `cargo build --release` before testing"
+                } else {
+                    "no rustfmt bin, try running `cargo build` before testing"
+                }
+            );
+            me
+        };
     }
-    me.push("rustfmt");
-    assert!(
-        me.is_file() || me.with_extension("exe").is_file(),
-        if cfg!(release) {
-            "no rustfmt bin, try running `cargo build --release` before testing"
-        } else {
-            "no rustfmt bin, try running `cargo build` before testing"
-        }
-    );
-    me
+    &RUSTFMT_PATH
 }
 
 #[test]
