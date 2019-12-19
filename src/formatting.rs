@@ -76,7 +76,10 @@ fn format_project<T: FormatHandler>(
         Err(e) => {
             let forbid_verbose = input_is_stdin || e != ParserError::ParsePanicError;
             should_emit_verbose(forbid_verbose, config, || {
-                eprintln!("The Rust parser panicked");
+                eprintln!(
+                    "The Rust parser panicked while parsing input: {:?}: {:?}",
+                    main_file, e
+                );
             });
             report.add_parsing_error();
             return Ok(report);
