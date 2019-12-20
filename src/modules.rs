@@ -264,12 +264,19 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 path,
                 directory_ownership,
                 ..
-            }) => Ok(if mods_outside_ast.is_empty() {
-                SubModKind::External(path, directory_ownership)
-            } else {
-                mods_outside_ast.push((path, directory_ownership, sub_mod.clone()));
-                SubModKind::MultiExternal(mods_outside_ast)
-            }),
+            }) => {
+                if mods_outside_ast.is_empty() {
+                    Ok(SubModKind::External(path, directory_ownership))
+                } else {
+                    let should_insert = !mods_outside_ast
+                        .iter()
+                        .any(|(outside_path, _, _)| outside_path == &path);
+                    if should_insert {
+                        mods_outside_ast.push((path, directory_ownership, sub_mod.clone()));
+                    }
+                    Ok(SubModKind::MultiExternal(mods_outside_ast))
+                }
+            }
             Err(_) if !mods_outside_ast.is_empty() => {
                 Ok(SubModKind::MultiExternal(mods_outside_ast))
             }
