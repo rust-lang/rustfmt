@@ -326,7 +326,7 @@ macro_rules! create_config {
             pub fn is_default(&self, key: &str) -> bool {
                 match key {
                     $(
-                        stringify!($i) => self.$i.1 && self.$i.2 == $def,
+                        stringify!($i) => self.$i.1 && { let default = $def; self.$i.2 == default},
                     )+
                     _ => false,
                 }
