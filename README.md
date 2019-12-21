@@ -138,7 +138,7 @@ before_script:
 script:
 - cargo build
 - cargo test
-- cargo fmt --all -- --check
+- cargo fmt -- --check
 ```
 
 See [this blog post](https://medium.com/@ag_dubs/enforcing-style-in-ci-for-rust-projects-18f6b09ec69d)
