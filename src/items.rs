@@ -1210,7 +1210,7 @@ impl<'a> Rewrite for TraitAliasBounds<'a> {
 
         let fits_single_line = !generic_bounds_str.contains('\n')
             && !where_str.contains('\n')
-            && generic_bounds_str.len() + where_str.len() + 1 <= shape.width;
+            && generic_bounds_str.len() + where_str.len() < shape.width;
         let space = if generic_bounds_str.is_empty() || where_str.is_empty() {
             Cow::from("")
         } else if fits_single_line {
@@ -1998,7 +1998,7 @@ impl Rewrite for ast::Param {
             let num_attrs = self.attrs.len();
             (
                 mk_sp(self.attrs[num_attrs - 1].span.hi(), self.pat.span.lo()),
-                param_attrs_result.contains("\n"),
+                param_attrs_result.contains('\n'),
             )
         } else {
             (mk_sp(self.span.lo(), self.span.lo()), false)

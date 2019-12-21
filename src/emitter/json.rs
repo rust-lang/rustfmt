@@ -136,7 +136,7 @@ mod tests {
             ],
         };
 
-        let _ = emitter
+        emitter
             .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
             .unwrap();
 
@@ -181,7 +181,7 @@ mod tests {
             ],
         };
 
-        let _ = emitter
+        emitter
             .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
             .unwrap();
 
@@ -206,7 +206,7 @@ mod tests {
             .unwrap();
         let _ = emitter.emit_footer(&mut writer);
         assert_eq!(result.has_diff, false);
-        assert_eq!(&writer[..], "[]\n".as_bytes());
+        assert_eq!(&writer[..], b"[]\n");
     }
 
     #[test]

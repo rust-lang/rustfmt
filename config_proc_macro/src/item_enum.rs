@@ -123,11 +123,11 @@ fn impl_from_str(ident: &syn::Ident, variants: &Variants) -> TokenStream {
 }
 
 fn doc_hint_of_variant(variant: &syn::Variant) -> String {
-    find_doc_hint(&variant.attrs).unwrap_or(variant.ident.to_string())
+    find_doc_hint(&variant.attrs).unwrap_or_else(|| variant.ident.to_string())
 }
 
 fn config_value_of_variant(variant: &syn::Variant) -> String {
-    find_config_value(&variant.attrs).unwrap_or(variant.ident.to_string())
+    find_config_value(&variant.attrs).unwrap_or_else(|| variant.ident.to_string())
 }
 
 fn impl_serde(ident: &syn::Ident, variants: &Variants) -> TokenStream {

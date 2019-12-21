@@ -139,7 +139,7 @@ macro_rules! create_config {
                 ConfigWasSet(self)
             }
 
-            fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Config {
+            fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Self {
                 let deprecate_skip_children = || {
                     let msg = "Option skip_children is deprecated since it is now the default to \
                                not format submodules of given files (#3587)";
@@ -248,8 +248,10 @@ macro_rules! create_config {
 
             #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
-                const HIDE_OPTIONS: [&str; 6] =
-                    ["verbose", "verbose_diff", "file_lines", "width_heuristics", "recursive", "print_misformatted_file_names"];
+                const HIDE_OPTIONS: [&str; 6] = [
+                    "verbose", "verbose_diff", "file_lines", "width_heuristics",
+                    "recursive", "print_misformatted_file_names",
+                ];
                 HIDE_OPTIONS.contains(&name)
             }
 
@@ -271,7 +273,7 @@ macro_rules! create_config {
                             }
                             name_out.push_str(name_raw);
                             name_out.push(' ');
-                            let mut default_str = format!("{}", $def);
+                            let mut default_str = $def.to_string();
                             if default_str.is_empty() {
                                 default_str = String::from("\"\"");
                             }
@@ -322,19 +324,19 @@ macro_rules! create_config {
             #[allow(unreachable_pub)]
             /// Returns `true` if the config key was explicitly set and is the default value.
             pub fn is_default(&self, key: &str) -> bool {
-                $(
-                    if let stringify!($i) = key {
-                        return self.$i.1 && self.$i.2 == $def;
-                    }
-                 )+
-                false
+                match key {
+                    $(
+                        stringify!($i) => self.$i.1 && self.$i.2 == $def,
+                    )+
+                    _ => false,
+                }
             }
         }
 
         // Template for the default configuration
         impl Default for Config {
-            fn default() -> Config {
-                Config {
+            fn default() -> Self {
+                Self {
                     license_template: None,
                     $(
                         $i: (Cell::new(false), false, $def, $stb),

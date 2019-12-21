@@ -235,7 +235,7 @@ fn execute(opts: &Options) -> Result<i32> {
             let file = PathBuf::from(path);
             let file = file.canonicalize().unwrap_or(file);
 
-            let (config, _) = load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
+            let (config, _) = load_config(Some(file.parent().unwrap()), Some(options))?;
             let toml = config.all_options().to_toml()?;
             io::stdout().write_all(toml.as_bytes())?;
 
@@ -590,7 +590,7 @@ impl GetOptsOptions {
         options.inline_config = matches
             .opt_strs("config")
             .iter()
-            .flat_map(|config| config.split(","))
+            .flat_map(|config| config.split(','))
             .map(
                 |key_val| match key_val.char_indices().find(|(_, ch)| *ch == '=') {
                     Some((middle, _)) => {
