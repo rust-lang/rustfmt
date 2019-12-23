@@ -109,7 +109,6 @@ create_config! {
     blank_lines_lower_bound: usize, 0, false,
         "Minimum number of blank lines which must be put between items";
     edition: Edition, Edition::Edition2018, true, "The edition of the parser (RFC 2052)";
-    version: Version, Version::One, false, "Version of formatting rules";
     inline_attribute_width: usize, 0, false,
         "Write an item and its attribute on the same line \
         if their combined width is below a threshold";
@@ -569,7 +568,6 @@ match_block_trailing_comma = false
 blank_lines_upper_bound = 1
 blank_lines_lower_bound = 0
 edition = "2018"
-version = "One"
 inline_attribute_width = 0
 merge_derives = true
 use_try_shorthand = false

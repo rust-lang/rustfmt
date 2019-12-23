@@ -141,15 +141,6 @@ pub enum Color {
     Auto,
 }
 
-#[config_type]
-/// rustfmt format style version.
-pub enum Version {
-    /// 1.x.y. When specified, rustfmt will format in the same style as 1.0.0.
-    One,
-    /// 2.x.y. When specified, rustfmt will format in the the latest style.
-    Two,
-}
-
 impl Color {
     /// Whether we should use a coloured terminal.
     pub fn use_colored_tty(self) -> bool {
