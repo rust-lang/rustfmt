@@ -1,5 +1,3 @@
-// rustfmt-version: Two
-
 fn main() {
     assert!(HAYSTACK
             .par_iter()

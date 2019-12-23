@@ -1,5 +1,3 @@
-// rustfmt-version: Two
-
 fn plain_if(x: bool) -> u8 {
     if x { 0 } else { 1 }
 }

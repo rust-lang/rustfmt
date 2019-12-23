@@ -1,5 +1,3 @@
-// rustfmt-version: Two
-
 // #2652
 // Preserve trailing comma inside macro, even if it looks an array.
 macro_rules! bar {

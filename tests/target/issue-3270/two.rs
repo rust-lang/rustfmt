@@ -1,5 +1,3 @@
-// rustfmt-version: Two
-
 pub fn main() {
     /*   let s = String::from(
         "
