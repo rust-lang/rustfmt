@@ -1,5 +1,4 @@
 use anyhow::{format_err, Result};
-use env_logger;
 use io::Error as IoError;
 use thiserror::Error;
 
