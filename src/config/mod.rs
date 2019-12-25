@@ -359,12 +359,12 @@ fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
 }
 
 fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
-    let config_path_not_found = |path: &str| -> Result<Option<PathBuf>, Error> {
+    let config_path_not_found = |path: &Path| -> Result<Option<PathBuf>, Error> {
         Err(Error::new(
             ErrorKind::NotFound,
             format!(
                 "Error: unable to find a config file for the given path: `{}`",
-                path
+                path.display(),
             ),
         ))
     };
@@ -372,13 +372,13 @@ fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
     // Read the config_path and convert to parent dir if a file is provided.
     // If a config file cannot be found from the given path, return error.
     match options.config_path() {
-        Some(path) if !path.exists() => config_path_not_found(path.to_str().unwrap()),
+        Some(path) if !path.exists() => config_path_not_found(path),
         Some(path) if path.is_dir() => {
             let config_file_path = get_toml_path(path)?;
             if config_file_path.is_some() {
                 Ok(config_file_path)
             } else {
-                config_path_not_found(path.to_str().unwrap())
+                config_path_not_found(path)
             }
         }
         path => Ok(path.map(ToOwned::to_owned)),

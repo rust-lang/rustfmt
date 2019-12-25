@@ -2,7 +2,6 @@ use std::collections::{hash_set, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use itertools::Itertools;
 use rustfmt_config_proc_macro::config_type;
 use serde::de::{SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
@@ -249,7 +248,7 @@ impl WidthHeuristics {
     }
 }
 
-impl ::std::str::FromStr for WidthHeuristics {
+impl std::str::FromStr for WidthHeuristics {
     type Err = &'static str;
 
     fn from_str(_: &str) -> Result<Self, Self::Err> {
@@ -274,16 +273,7 @@ pub struct IgnoreList {
 
 impl fmt::Display for IgnoreList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "[{}]",
-            self.path_set
-                .iter()
-                .format_with(", ", |path, f| f(&format_args!(
-                    "{}",
-                    path.to_string_lossy()
-                )))
-        )
+        f.debug_list().entries(self.path_set.iter()).finish()
     }
 }
 
@@ -350,7 +340,7 @@ impl IgnoreList {
     }
 }
 
-impl ::std::str::FromStr for IgnoreList {
+impl std::str::FromStr for IgnoreList {
     type Err = &'static str;
 
     fn from_str(_: &str) -> Result<Self, Self::Err> {
@@ -365,7 +355,7 @@ pub trait CliOptions {
     fn config_path(&self) -> Option<&Path>;
 }
 
-/// The edition of the syntax and semntics of code (RFC 2052).
+/// The edition of the syntax and semantics of code (RFC 2052).
 #[config_type]
 pub enum Edition {
     #[value = "2015"]
@@ -379,16 +369,16 @@ pub enum Edition {
 }
 
 impl Default for Edition {
-    fn default() -> Edition {
-        Edition::Edition2018
+    fn default() -> Self {
+        Self::Edition2018
     }
 }
 
-impl Edition {
-    pub(crate) fn to_libsyntax_pos_edition(self) -> syntax_pos::edition::Edition {
-        match self {
-            Edition::Edition2015 => syntax_pos::edition::Edition::Edition2015,
-            Edition::Edition2018 => syntax_pos::edition::Edition::Edition2018,
+impl From<Edition> for syntax_pos::edition::Edition {
+    fn from(edition: Edition) -> Self {
+        match edition {
+            Edition::Edition2015 => Self::Edition2015,
+            Edition::Edition2018 => Self::Edition2018,
         }
     }
 }

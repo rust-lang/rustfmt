@@ -29,7 +29,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             return Err(ErrorKind::VersionMismatch);
         }
 
-        syntax::with_globals(self.config.edition().to_libsyntax_pos_edition(), || {
+        syntax::with_globals(self.config.edition().into(), || {
             if self.config.disable_all_formatting() {
                 // When the input is from stdin, echo back the input.
                 if let Input::Text(ref buf) = input {

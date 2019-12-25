@@ -51,7 +51,7 @@ impl ConfigType for IgnoreList {
 }
 
 macro_rules! create_config {
-    ($($i:ident: $Ty:ty, $def:expr, $stb:expr, $( $dstring:expr ),+ );+ $(;)*) => (
+    ($($i:ident: $Ty:ty, $def:expr, $is_stable:literal, $dstring:literal;)+) => (
         #[cfg(test)]
         use std::collections::HashSet;
         use std::io::Write;
@@ -69,7 +69,7 @@ macro_rules! create_config {
             pub license_template: Option<Regex>,
             // For each config item, we store a bool indicating whether it has
             // been accessed and the value, and a bool whether the option was
-            // manually initialised, or taken from the default,
+            // manually initialized, or taken from the default,
             $($i: (Cell<bool>, bool, $Ty, bool)),+
         }
 
@@ -257,12 +257,13 @@ macro_rules! create_config {
             #[allow(unreachable_pub)]
             pub fn print_docs(out: &mut dyn Write, include_unstable: bool) {
                 use std::cmp;
-                let max = 0;
-                $( let max = cmp::max(max, stringify!($i).len()+1); )+
+                let mut max = 0;
+                $( max = cmp::max(max, stringify!($i).len()); )+
+                max += 1;
                 let space_str = " ".repeat(max);
                 writeln!(out, "Configuration Options:").unwrap();
                 $(
-                    if $stb || include_unstable {
+                    if $is_stable || include_unstable {
                         let name_raw = stringify!($i);
 
                         if !Config::is_hidden_option(name_raw) {
@@ -276,16 +277,15 @@ macro_rules! create_config {
                             if default_str.is_empty() {
                                 default_str = String::from("\"\"");
                             }
-                            writeln!(out,
-                                    "{}{} Default: {}{}",
-                                    name_out,
-                                    <$Ty>::doc_hint(),
-                                    default_str,
-                                    if !$stb { " (unstable)" } else { "" }).unwrap();
-                            $(
-                                writeln!(out, "{}{}", space_str, $dstring).unwrap();
-                            )+
-                            writeln!(out).unwrap();
+                            writeln!(
+                                out,
+                                "{}{} Default: {}{}",
+                                name_out,
+                                <$Ty>::doc_hint(),
+                                default_str,
+                                if !$is_stable { " (unstable)" } else { "" },
+                            ).unwrap();
+                            writeln!(out, "{}{}\n", space_str, $dstring).unwrap();
                         }
                     }
                 )+
@@ -338,7 +338,7 @@ macro_rules! create_config {
                 Self {
                     license_template: None,
                     $(
-                        $i: (Cell::new(false), false, $def, $stb),
+                        $i: (Cell::new(false), false, $def, $is_stable),
                     )+
                 }
             }
