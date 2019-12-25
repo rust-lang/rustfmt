@@ -40,7 +40,7 @@ install:
   - if "%TARGET%" == "i686-pc-windows-gnu" set PATH=%PATH%;C:\msys64\mingw32\bin
   - if "%TARGET%" == "x86_64-pc-windows-gnu" set PATH=%PATH%;C:\msys64\mingw64\bin
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
-  - rustup-init.exe --default-host %TARGET% --default-toolchain %CHANNEL% -y
+  - rustup-init.exe --default-host %TARGET% --default-toolchain %CHANNEL% --profile minimal -y
   - rustc -Vv
   - cargo -V
 
