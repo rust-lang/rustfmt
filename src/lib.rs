@@ -15,7 +15,6 @@ use std::panic;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use ignore;
 use syntax::ast;
 use thiserror::Error;
 

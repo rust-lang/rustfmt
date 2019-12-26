@@ -199,7 +199,7 @@ impl ConfigCodeBlock {
     }
 
     // Extract a code block from the iterator. Behavior:
-    // - Rust code blocks are identifed by lines beginning with "```rust".
+    // - Rust code blocks are identified by lines beginning with "```rust".
     // - One explicit configuration setting is supported per code block.
     // - Rust code blocks with no configuration setting are illegal and cause an
     //   assertion failure, unless the snippet begins with #![rustfmt::skip].
@@ -210,7 +210,7 @@ impl ConfigCodeBlock {
     fn extract<I: Iterator<Item = String>>(
         file: &mut Enumerate<I>,
         prev: Option<&ConfigCodeBlock>,
-        hash_set: &mut HashSet<String>,
+        hash_set: &mut HashSet<&str>,
     ) -> Option<ConfigCodeBlock> {
         let mut code_block = ConfigCodeBlock::new();
         code_block.config_name = prev.and_then(|cb| cb.config_name.clone());
@@ -228,7 +228,7 @@ impl ConfigCodeBlock {
                         name
                     );
                     assert!(
-                        hash_set.remove(&name),
+                        hash_set.remove(name.as_str()),
                         "multiple configuration guides found for option {}",
                         name
                     );

@@ -51,7 +51,7 @@ impl ConfigType for IgnoreList {
 }
 
 macro_rules! create_config {
-    ($($i:ident: $ty:ty, $def:expr, $stb:expr, $( $dstring:expr ),+ );+ $(;)*) => (
+    ($($i:ident: $Ty:ty, $def:expr, $is_stable:literal, $dstring:literal;)+) => (
         #[cfg(test)]
         use std::collections::HashSet;
         use std::io::Write;
@@ -69,8 +69,8 @@ macro_rules! create_config {
             pub license_template: Option<Regex>,
             // For each config item, we store a bool indicating whether it has
             // been accessed and the value, and a bool whether the option was
-            // manually initialised, or taken from the default,
-            $($i: (Cell<bool>, bool, $ty, bool)),+
+            // manually initialized, or taken from the default,
+            $($i: (Cell<bool>, bool, $Ty, bool)),+
         }
 
         // Just like the Config struct but with each property wrapped
@@ -81,7 +81,7 @@ macro_rules! create_config {
         #[derive(Deserialize, Serialize, Clone)]
         #[allow(unreachable_pub)]
         pub struct PartialConfig {
-            $(pub $i: Option<$ty>),+
+            $(pub $i: Option<$Ty>),+
         }
 
         // Macro hygiene won't allow us to make `set_$i()` methods on Config
@@ -95,7 +95,7 @@ macro_rules! create_config {
         impl<'a> ConfigSetter<'a> {
             $(
             #[allow(unreachable_pub)]
-            pub fn $i(&mut self, value: $ty) {
+            pub fn $i(&mut self, value: $Ty) {
                 (self.0).$i.2 = value;
                 match stringify!($i) {
                     "max_width" | "use_small_heuristics" => self.0.set_heuristics(),
@@ -123,7 +123,7 @@ macro_rules! create_config {
         impl Config {
             $(
             #[allow(unreachable_pub)]
-            pub fn $i(&self) -> $ty {
+            pub fn $i(&self) -> $Ty {
                 self.$i.0.set(true);
                 self.$i.2.clone()
             }
@@ -173,12 +173,11 @@ macro_rules! create_config {
 
             /// Returns a hash set initialized with every user-facing config option name.
             #[cfg(test)]
-            pub(crate) fn hash_set() -> HashSet<String> {
-                let mut hash_set = HashSet::new();
-                $(
-                    hash_set.insert(stringify!($i).to_owned());
-                )+
-                hash_set
+            pub(crate) fn hash_set() -> HashSet<&'static str> {
+                [$(
+                    stringify!($i),
+                )+]
+                .iter().copied().collect()
             }
 
             pub(crate) fn is_valid_name(name: &str) -> bool {
@@ -194,7 +193,7 @@ macro_rules! create_config {
             pub fn is_valid_key_val(key: &str, val: &str) -> bool {
                 match key {
                     $(
-                        stringify!($i) => val.parse::<$ty>().is_ok(),
+                        stringify!($i) => val.parse::<$Ty>().is_ok(),
                     )+
                         _ => false,
                 }
@@ -229,11 +228,11 @@ macro_rules! create_config {
                     $(
                         stringify!($i) => {
                             self.$i.1 = true;
-                            self.$i.2 = val.parse::<$ty>()
+                            self.$i.2 = val.parse::<$Ty>()
                                 .expect(&format!("Failed to parse override for {} (\"{}\") as a {}",
                                                  stringify!($i),
                                                  val,
-                                                 stringify!($ty)));
+                                                 stringify!($Ty)));
                         }
                     )+
                     _ => panic!("Unknown config key in override: {}", key)
@@ -258,12 +257,13 @@ macro_rules! create_config {
             #[allow(unreachable_pub)]
             pub fn print_docs(out: &mut dyn Write, include_unstable: bool) {
                 use std::cmp;
-                let max = 0;
-                $( let max = cmp::max(max, stringify!($i).len()+1); )+
+                let mut max = 0;
+                $( max = cmp::max(max, stringify!($i).len()); )+
+                max += 1;
                 let space_str = " ".repeat(max);
                 writeln!(out, "Configuration Options:").unwrap();
                 $(
-                    if $stb || include_unstable {
+                    if $is_stable || include_unstable {
                         let name_raw = stringify!($i);
 
                         if !Config::is_hidden_option(name_raw) {
@@ -277,16 +277,15 @@ macro_rules! create_config {
                             if default_str.is_empty() {
                                 default_str = String::from("\"\"");
                             }
-                            writeln!(out,
-                                    "{}{} Default: {}{}",
-                                    name_out,
-                                    <$ty>::doc_hint(),
-                                    default_str,
-                                    if !$stb { " (unstable)" } else { "" }).unwrap();
-                            $(
-                                writeln!(out, "{}{}", space_str, $dstring).unwrap();
-                            )+
-                            writeln!(out).unwrap();
+                            writeln!(
+                                out,
+                                "{}{} Default: {}{}",
+                                name_out,
+                                <$Ty>::doc_hint(),
+                                default_str,
+                                if !$is_stable { " (unstable)" } else { "" },
+                            ).unwrap();
+                            writeln!(out, "{}{}\n", space_str, $dstring).unwrap();
                         }
                     }
                 )+
@@ -339,7 +338,7 @@ macro_rules! create_config {
                 Self {
                     license_template: None,
                     $(
-                        $i: (Cell::new(false), false, $def, $stb),
+                        $i: (Cell::new(false), false, $def, $is_stable),
                     )+
                 }
             }
