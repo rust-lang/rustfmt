@@ -4,6 +4,7 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: windows-latest
+    name: (${{ matrix.target }}, ${{ matrix.channel }})
     strategy:
       fail-fast: false
       matrix:

@@ -6,6 +6,7 @@ jobs:
     # https://help.github.com/en/actions/automating-your-workflow-with-github-actions/virtual-environments-for-github-hosted-runners#supported-runners-and-hardware-resources
     # macOS Catalina 10.15
     runs-on: macos-latest
+    name: (${{ matrix.target }}, ${{ matrix.channel }})
     strategy:
       fail-fast: false
       matrix:
