@@ -38,7 +38,7 @@ macro_rules! is_arm_feature_detected {
 #[doc(hidden)]
 #[allow(non_camel_case_types)]
 #[repr(u8)]
-#[unstable(feature = "stdsimd_internal", issue = "0")]
+#[unstable(feature = "stdsimd_internal", issue = "none")]
 pub enum Feature {
     /// ARM Advanced SIMD (NEON) - Aarch32
     neon,

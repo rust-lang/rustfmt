@@ -244,7 +244,7 @@ macro_rules! is_x86_feature_detected {
 #[allow(non_camel_case_types)]
 #[repr(u8)]
 #[doc(hidden)]
-#[unstable(feature = "stdsimd_internal", issue = "0")]
+#[unstable(feature = "stdsimd_internal", issue = "none")]
 pub enum Feature {
     /// AES (Advanced Encryption Standard New Instructions AES-NI)
     aes,
