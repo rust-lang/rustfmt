@@ -93,19 +93,38 @@ fn format_stmt(
 ) -> Option<String> {
     skip_out_of_file_lines_range!(context, stmt.span());
 
+    let mut has_doc_comment = false;
     let result = match stmt.kind {
-        ast::StmtKind::Local(ref local) => local.rewrite(context, shape),
+        ast::StmtKind::Local(ref local) => {
+            has_doc_comment = local.attrs.iter().any(|attr| {
+                has_doc_attr(attr)
+            });
+            local.rewrite(context, shape)
+        },
         ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
             let suffix = if semicolon_for_stmt(context, stmt) {
                 ";"
             } else {
                 ""
             };
-
+            has_doc_comment = ex.attrs.iter().any(|attr| has_doc_attr(attr));
             let shape = shape.sub_width(suffix.len())?;
             format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
         }
         ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
     };
-    result.and_then(|res| recover_comment_removed(res, stmt.span(), context))
+
+    if has_doc_comment {
+        return result
+    }
+
+    result.and_then(|res| {
+        recover_comment_removed(res, stmt.span(), context)
+    })
+}
+
+// field 'is_sugared_doc' is always false
+// so need to implementation other way
+fn has_doc_attr(attr: &ast::AttrItem) -> bool {
+    attr.path.to_string() == "doc"
 }
