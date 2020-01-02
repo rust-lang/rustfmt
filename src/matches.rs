@@ -22,21 +22,38 @@ use crate::utils::{
     semicolon_for_expr, trimmed_last_line_width, unicode_str_width,
 };
 
+enum ArmRewriteResult {
+    Rewritten {
+        /// The rewritten left-hand side -- the pattern and optional guard -- of the match arm.
+        lhs_str: String,
+        /// The rewritten arrow and body of the match arm.
+        body_str: String,
+        /// `true` if the rewritten body is a block expression.
+        is_block: bool,
+    },
+    Skipped {
+        /// The unmodified original match arm.
+        arm_str: String,
+    },
+}
+
 /// A simple wrapper type against `ast::Arm`. Used inside `write_list()`.
 struct ArmWrapper<'a> {
     arm: &'a ast::Arm,
-    /// `true` if the arm is the last one in match expression. Used to decide on whether we should
-    /// add trailing comma to the match arm when `config.trailing_comma() == Never`.
-    is_last: bool,
+    rewrite: ArmRewriteResult,
     /// Holds a byte position of `|` at the beginning of the arm pattern, if available.
     beginning_vert: Option<BytePos>,
 }
 
 impl<'a> ArmWrapper<'a> {
-    fn new(arm: &'a ast::Arm, is_last: bool, beginning_vert: Option<BytePos>) -> ArmWrapper<'a> {
+    fn new(
+        arm: &'a ast::Arm,
+        rewrite: ArmRewriteResult,
+        beginning_vert: Option<BytePos>,
+    ) -> ArmWrapper<'a> {
         ArmWrapper {
             arm,
-            is_last,
+            rewrite,
             beginning_vert,
         }
     }
@@ -54,8 +71,13 @@ impl<'a> Spanned for ArmWrapper<'a> {
 }
 
 impl<'a> Rewrite for ArmWrapper<'a> {
-    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        rewrite_match_arm(context, self.arm, shape, self.is_last)
+    fn rewrite(&self, _context: &RewriteContext<'_>, _shape: Shape) -> Option<String> {
+        match &self.rewrite {
+            ArmRewriteResult::Rewritten {
+                lhs_str, body_str, ..
+            } => Some(format!("{}{}", lhs_str, body_str)),
+            ArmRewriteResult::Skipped { arm_str } => Some(arm_str.clone()),
+        }
     }
 }
 
@@ -186,12 +208,23 @@ fn rewrite_match_arms(
         .take(arm_len.saturating_sub(1))
         .chain(repeat(true));
     let beginning_verts = collect_beginning_verts(context, arms, span);
+
+    let mut rewrites = arms
+        .iter()
+        .zip(is_last_iter)
+        .map(|(arm, is_last)| rewrite_match_arm(context, arm, arm_shape, is_last))
+        .collect::<Option<Vec<_>>>()?;
+
+    if context.config.match_arm_align_threshold() > 0 {
+        align_match_arms(context, &mut rewrites, arm_shape);
+    }
+
     let items = itemize_list(
         context.snippet_provider,
         arms.iter()
-            .zip(is_last_iter)
+            .zip(rewrites.into_iter())
             .zip(beginning_verts.into_iter())
-            .map(|((arm, is_last), beginning_vert)| ArmWrapper::new(arm, is_last, beginning_vert)),
+            .map(|((arm, rewrite), beginning_vert)| ArmWrapper::new(arm, rewrite, beginning_vert)),
         "}",
         "|",
         |arm| arm.span().lo(),
@@ -210,21 +243,56 @@ fn rewrite_match_arms(
     write_list(&arms_vec, &fmt)
 }
 
+fn align_match_arms(context: &RewriteContext<'_>, arms: &mut [ArmRewriteResult], shape: Shape) {
+    let mut align_arms_groups = Vec::new();
+    let mut align_arms_group = Vec::new();
+    for arm in arms.iter_mut() {
+        match arm {
+            ArmRewriteResult::Rewritten { lhs_str, is_block, .. } => {
+                let end_offset = extra_offset(lhs_str, shape);
+                align_arms_group.push((lhs_str, end_offset));
+                if *is_block {
+                    align_arms_groups.push(std::mem::take(&mut align_arms_group));
+                }
+            }
+            ArmRewriteResult::Skipped { .. } => {
+                align_arms_groups.push(std::mem::take(&mut align_arms_group));
+            }
+        }
+    }
+    let align_arms_groups = align_arms_groups.into_iter().chain(std::iter::once(align_arms_group));
+
+    for arms in align_arms_groups {
+        let end_offsets = arms.iter().map(|(_lhs_str, end_offset)| *end_offset);
+        let min_end_offset = end_offsets.clone().min().unwrap_or_default();
+        let max_end_offset = end_offsets.max().unwrap_or_default();
+
+        if max_end_offset - min_end_offset < context.config.match_arm_align_threshold() {
+            for (lhs_str, end_offset) in arms {
+                let align_len = max_end_offset.checked_sub(end_offset).unwrap();
+                lhs_str.extend(repeat(' ').take(align_len));
+            }
+        }
+    }
+}
+
 fn rewrite_match_arm(
     context: &RewriteContext<'_>,
     arm: &ast::Arm,
     shape: Shape,
     is_last: bool,
-) -> Option<String> {
+) -> Option<ArmRewriteResult> {
     let (missing_span, attrs_str) = if !arm.attrs.is_empty() {
         if contains_skip(&arm.attrs) {
             let (_, body) = flatten_arm_body(context, &arm.body, None);
             // `arm.span()` does not include trailing comma, add it manually.
-            return Some(format!(
-                "{}{}",
-                context.snippet(arm.span()),
-                arm_comma(context.config, body, is_last),
-            ));
+            return Some(ArmRewriteResult::Skipped {
+                arm_str: format!(
+                    "{}{}",
+                    context.snippet(arm.span()),
+                    arm_comma(context.config, body, is_last),
+                ),
+            });
         }
         let missing_span = mk_sp(arm.attrs[arm.attrs.len() - 1].span.hi(), arm.pat.span.lo());
         (missing_span, arm.attrs.rewrite(context, shape)?)
@@ -258,7 +326,7 @@ fn rewrite_match_arm(
     )?;
 
     let arrow_span = mk_sp(arm.pat.span.hi(), arm.body.span().lo());
-    rewrite_match_body(
+    let (is_block, body_str) = rewrite_match_body(
         context,
         &arm.body,
         &lhs_str,
@@ -266,7 +334,13 @@ fn rewrite_match_arm(
         guard_str.contains('\n'),
         arrow_span,
         is_last,
-    )
+    )?;
+
+    Some(ArmRewriteResult::Rewritten {
+        lhs_str,
+        body_str,
+        is_block,
+    })
 }
 
 fn block_can_be_flattened<'a>(
@@ -318,6 +392,9 @@ fn flatten_arm_body<'a>(
     }
 }
 
+// (is_block, body)
+// @is_block: true if the rewritten body is a block expression
+// @body: rewritten body
 fn rewrite_match_body(
     context: &RewriteContext<'_>,
     body: &ptr::P<ast::Expr>,
@@ -326,7 +403,7 @@ fn rewrite_match_body(
     has_guard: bool,
     arrow_span: Span,
     is_last: bool,
-) -> Option<String> {
+) -> Option<(bool, String)> {
     let was_block = if let ast::ExprKind::Block(..) = body.kind {
         true
     } else {
@@ -353,7 +430,7 @@ fn rewrite_match_body(
             _ => " ",
         };
 
-        Some(format!("{} =>{}{}{}", pats_str, block_sep, body_str, comma))
+        Some((is_block, format!(" =>{}{}{}", block_sep, body_str, comma)))
     };
 
     let next_line_indent = if !is_block || is_empty_block {
@@ -387,7 +464,7 @@ fn rewrite_match_body(
     let combine_next_line_body = |body_str: &str| {
         let nested_indent_str = next_line_indent.to_string_with_newline(context.config);
         if is_block {
-            let mut result = pats_str.to_owned();
+            let mut result = String::new();
             result.push_str(" =>");
             if !arrow_comment.is_empty() {
                 result.push_str(&nested_indent_str);
@@ -395,7 +472,7 @@ fn rewrite_match_body(
             }
             result.push_str(&nested_indent_str);
             result.push_str(&body_str);
-            return Some(result);
+            return Some((is_block, result));
         }
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
@@ -428,7 +505,7 @@ fn rewrite_match_body(
         // if match arm was a block consisting of one expression,
         // and it was flattened, we need to retain comment before
         // the arm body block.
-        let mut result = pats_str.to_owned();
+        let mut result = String::new();
         result.push_str(" =>");
         if !arrow_comment.is_empty() && was_block {
             result.push_str(&indent_str);
@@ -441,7 +518,7 @@ fn rewrite_match_body(
         }
         result.push_str(&body_str);
         result.push_str(&body_suffix);
-        Some(result)
+        Some((is_block, result))
     };
 
     // Let's try and get the arm body on the same line as the condition.

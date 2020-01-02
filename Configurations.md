@@ -1463,6 +1463,48 @@ fn main() {
 
 See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 
+
+## `match_arm_align_threshold`
+
+Maximum number of spaces between `match` statement patterns for its arms to be aligned with each other. Alignment is reset after arms with block bodies. The default value of `0` will never align match arms.
+
+- **Default value**: `0`
+- **Possible values**: any positive integer
+
+#### `0` (default):
+```rust
+fn main() {
+    match lorem {
+        Lorem::Ipsum => {
+            lorem();
+            ipsum();
+        }
+        Lorem::DolorSitAmetConsectetur => (),
+        Lorem::Adipiscing => {
+            lorem();
+            ipsum();
+        }
+    }
+}
+```
+
+#### `20`:
+```rust
+fn main() {
+    match lorem {
+        Lorem::Ipsum => {
+            lorem();
+            ipsum();
+        }
+        Lorem::DolorSitAmetConsectetur => (),
+        Lorem::Adipiscing              => {
+            lorem();
+            ipsum();
+        }
+    }
+}
+```
+
 ## `match_block_trailing_comma`
 
 Put a trailing comma after a block based match arm (non-block arms are not affected)
