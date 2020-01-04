@@ -31,52 +31,27 @@ path = "src/git-rustfmt/main.rs"
 default = ["cargo-fmt", "rustfmt-format-diff"]
 cargo-fmt = []
 rustfmt-format-diff = []
-generic-simd = ["bytecount/generic-simd"]
 
 [dependencies]
-itertools = "0.8"
-toml = "0.5"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-unicode-segmentation = "1.0.0"
-regex = "1.0"
-term = "0.6"
-diff = "0.1"
-log = "0.4"
-env_logger = "0.7"
-getopts = "0.2"
-cargo_metadata = "0.9"
-bytecount = "0.6"
-unicode-width = "0.1.5"
-unicode_categories = "0.1.1"
-dirs = "2.0.1"
-ignore = "0.4.6"
-annotate-snippets = { version = "0.6", features = ["ansi_term"] }
-structopt = "0.3"
-rustfmt-config_proc_macro = { version = "0.2", path = "config_proc_macro" }
-lazy_static = "1.0.0"
 ansi_term = "0.12"
 anyhow = "1.0"
+cargo_metadata = "0.9"
+env_logger = "0.7"
+getopts = "0.2"
+log = "0.4"
+regex = "1.0"
+serde = "1.0"
+serde_json = "1.0"
+structopt = "0.3"
+term = "0.6"
 thiserror = "1.0"
+
+rustfmt_core = { path = "rustfmt-core" }
+
+[dev-dependencies]
+lazy_static = "1.0"
 
 # A noop dependency that changes in the Rust repository, it's a bit of a hack.
 # See the `src/tools/rustc-workspace-hack/README.md` file in `rust-lang/rust`
 # for more information.
 rustc-workspace-hack = "1.0.0"
-
-[dependencies.rustc_target]
-package = "rustc-ap-rustc_target"
-version = "610.0.0"
-
-[dependencies.syntax]
-package = "rustc-ap-syntax"
-version = "610.0.0"
-
-[dependencies.syntax_pos]
-package = "rustc-ap-syntax_pos"
-version = "610.0.0"
-
-[dependencies.rustc_data_structures]
-package = "rustc-ap-rustc_data_structures"
-version = "610.0.0"
-

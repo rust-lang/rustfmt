@@ -9,7 +9,7 @@ use crate::config::{Config, EmitMode, Verbosity};
 use crate::rustfmt_diff::{make_diff, Mismatch};
 use crate::{Input, Session};
 
-const CONFIGURATIONS_FILE_NAME: &str = "Configurations.md";
+const CONFIGURATIONS_FILE_NAME: &str = "../Configurations.md";
 
 // This enum is used to represent one of three text features in Configurations.md: a block of code
 // with its starting line number, the name of a rustfmt configuration option, or the value of a

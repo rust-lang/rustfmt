@@ -1,11 +1,9 @@
 use std::collections::HashMap;
-use std::env;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader, Read};
 use std::iter::Peekable;
 use std::mem;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::str::Chars;
 use std::thread;
 
@@ -388,16 +386,9 @@ fn self_tests() {
         return;
     }
     let mut files = get_test_files(Path::new("tests"), false);
-    let bin_directories = vec!["cargo-fmt", "git-rustfmt", "bin", "format-diff"];
-    for dir in bin_directories {
-        let mut path = PathBuf::from("src");
-        path.push(dir);
-        path.push("main.rs");
-        files.push(path);
-    }
     files.push(PathBuf::from("src/lib.rs"));
 
-    let (reports, count, fails) = check_files(files, &Some(PathBuf::from("rustfmt.toml")));
+    let (reports, count, fails) = check_files(files, &Some(PathBuf::from("../rustfmt.toml")));
     let mut warnings = 0;
 
     // Display results.
@@ -498,35 +489,6 @@ fn stdin_works_with_checkstyle() {
         EmitMode::Checkstyle,
         false,
     );
-}
-
-#[test]
-fn stdin_disable_all_formatting_test() {
-    init_log();
-    match option_env!("CFG_RELEASE_CHANNEL") {
-        None | Some("nightly") => {}
-        // These tests require nightly.
-        _ => return,
-    }
-    let input = "fn main() { println!(\"This should not be formatted.\"); }";
-    let mut child = Command::new(rustfmt())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .arg("--config-path=./tests/config/disable_all_formatting.toml")
-        .spawn()
-        .expect("failed to execute child");
-
-    {
-        let stdin = child.stdin.as_mut().expect("failed to get stdin");
-        stdin
-            .write_all(input.as_bytes())
-            .expect("failed to write stdin");
-    }
-
-    let output = child.wait_with_output().expect("failed to wait on child");
-    assert!(output.status.success());
-    assert!(output.stderr.is_empty());
-    assert_eq!(input, String::from_utf8(output.stdout).unwrap());
 }
 
 #[test]
@@ -875,118 +837,3 @@ fn string_eq_ignore_newline_repr_test() {
     assert!(!string_eq_ignore_newline_repr("a\r\nbcd", "a\nbcdefghijk"));
 }
 
-struct TempFile {
-    path: PathBuf,
-}
-
-fn make_temp_file(file_name: &'static str) -> TempFile {
-    use std::env::var;
-    use std::fs::File;
-
-    // Used in the Rust build system.
-    let target_dir = var("RUSTFMT_TEST_DIR").unwrap_or_else(|_| ".".to_owned());
-    let path = Path::new(&target_dir).join(file_name);
-
-    let mut file = File::create(&path).expect("couldn't create temp file");
-    let content = b"fn main() {}\n";
-    file.write_all(content).expect("couldn't write temp file");
-    TempFile { path }
-}
-
-impl Drop for TempFile {
-    fn drop(&mut self) {
-        use std::fs::remove_file;
-        remove_file(&self.path).expect("couldn't delete temp file");
-    }
-}
-
-fn rustfmt() -> &'static Path {
-    lazy_static! {
-        static ref RUSTFMT_PATH: PathBuf = {
-            let mut me = env::current_exe().expect("failed to get current executable");
-            // Chop of the test name.
-            me.pop();
-            // Chop off `deps`.
-            me.pop();
-
-            // If we run `cargo test --release`, we might only have a release build.
-            if cfg!(release) {
-                // `../release/`
-                me.pop();
-                me.push("release");
-            }
-            me.push("rustfmt");
-            assert!(
-                me.is_file() || me.with_extension("exe").is_file(),
-                if cfg!(release) {
-                    "no rustfmt bin, try running `cargo build --release` before testing"
-                } else {
-                    "no rustfmt bin, try running `cargo build` before testing"
-                }
-            );
-            me
-        };
-    }
-    &RUSTFMT_PATH
-}
-
-#[test]
-fn verify_check_works() {
-    init_log();
-    let temp_file = make_temp_file("temp_check.rs");
-
-    Command::new(rustfmt())
-        .arg("--check")
-        .arg(&temp_file.path)
-        .status()
-        .expect("run with check option failed");
-}
-
-#[test]
-fn verify_check_works_with_stdin() {
-    init_log();
-
-    let mut child = Command::new(rustfmt())
-        .arg("--check")
-        .stdin(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("run with check option failed");
-
-    {
-        let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-        stdin
-            .write_all(b"fn main() {}\n")
-            .expect("Failed to write to rustfmt --check");
-    }
-    let output = child
-        .wait_with_output()
-        .expect("Failed to wait on rustfmt child");
-    assert!(output.status.success());
-}
-
-#[test]
-fn verify_check_l_works_with_stdin() {
-    init_log();
-
-    let mut child = Command::new(rustfmt())
-        .arg("--check")
-        .arg("-l")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("run with check option failed");
-
-    {
-        let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-        stdin
-            .write_all(b"fn main()\n{}\n")
-            .expect("Failed to write to rustfmt --check");
-    }
-    let output = child
-        .wait_with_output()
-        .expect("Failed to wait on rustfmt child");
-    assert!(output.status.success());
-    assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "stdin\n");
-}

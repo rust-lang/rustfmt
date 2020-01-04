@@ -1,21 +1,15 @@
-use anyhow::{format_err, Result};
-use io::Error as IoError;
-use thiserror::Error;
-
-use rustfmt_nightly as rustfmt;
-
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
-use std::io::{self, stdout, Read, Write};
+use std::io::{self, stdout, Error as IoError, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use ansi_term::Colour::Red;
-
+use anyhow::{format_err, Result};
 use getopts::{Matches, Options};
+use thiserror::Error;
 
-use crate::rustfmt::{
+use rustfmt_core::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
     FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
@@ -218,7 +212,7 @@ fn execute(opts: &Options) -> Result<i32> {
         Operation::ConfigOutputDefault { path } => {
             let toml = Config::default().all_options().to_toml()?;
             if let Some(path) = path {
-                let mut file = File::create(path)?;
+                let mut file = std::fs::File::create(path)?;
                 file.write_all(toml.as_bytes())?;
             } else {
                 io::stdout().write_all(toml.as_bytes())?;
@@ -341,7 +335,7 @@ fn format(
     // If we were given a path via dump-minimal-config, output any options
     // that were used during formatting as TOML.
     if let Some(path) = minimal_config_path {
-        let mut file = File::create(path)?;
+        let mut file = std::fs::File::create(path)?;
         let toml = session.config.used_options().to_toml()?;
         file.write_all(toml.as_bytes())?;
     }
@@ -721,5 +715,189 @@ fn emit_mode_from_emit_str(emit_str: &str) -> Result<EmitMode> {
         "checkstyle" => Ok(EmitMode::Checkstyle),
         "json" => Ok(EmitMode::Json),
         _ => Err(format_err!("Invalid value for `--emit`")),
+    }
+}
+
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::process::{Command, Stdio};
+
+    fn init_log() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
+
+    #[test]
+    fn stdin_disable_all_formatting_test() {
+        init_log();
+        match option_env!("CFG_RELEASE_CHANNEL") {
+            None | Some("nightly") => {}
+            // These tests require nightly.
+            _ => return,
+        }
+        let input = "fn main() { println!(\"This should not be formatted.\"); }";
+        let mut child = Command::new(rustfmt())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .arg("--config-path=./tests/config/disable_all_formatting.toml")
+            .spawn()
+            .expect("failed to execute child");
+
+        {
+            let stdin = child.stdin.as_mut().expect("failed to get stdin");
+            stdin
+                .write_all(input.as_bytes())
+                .expect("failed to write stdin");
+        }
+
+        let output = child.wait_with_output().expect("failed to wait on child");
+        assert!(output.status.success());
+        assert!(output.stderr.is_empty());
+        assert_eq!(input, String::from_utf8(output.stdout).unwrap());
+    }
+
+    #[test]
+    fn format_lines_errors_are_reported() {
+        init_log();
+        let long_identifier = String::from_utf8(vec![b'a'; 239]).unwrap();
+        let input = Input::Text(format!("fn {}() {{}}", long_identifier));
+        let mut config = Config::default();
+        config.set().error_on_line_overflow(true);
+        let mut session = Session::<io::Stdout>::new(config, None);
+        session.format(input).unwrap();
+        assert!(session.has_formatting_errors());
+    }
+
+    #[test]
+    fn format_lines_errors_are_reported_with_tabs() {
+        init_log();
+        let long_identifier = String::from_utf8(vec![b'a'; 97]).unwrap();
+        let input = Input::Text(format!("fn a() {{\n\t{}\n}}", long_identifier));
+        let mut config = Config::default();
+        config.set().error_on_line_overflow(true);
+        config.set().hard_tabs(true);
+        let mut session = Session::<io::Stdout>::new(config, None);
+        session.format(input).unwrap();
+        assert!(session.has_formatting_errors());
+    }
+
+    struct TempFile {
+        path: PathBuf,
+    }
+
+    fn make_temp_file(file_name: &'static str) -> TempFile {
+        use std::env::var;
+        use std::fs::File;
+
+        // Used in the Rust build system.
+        let target_dir = var("RUSTFMT_TEST_DIR").unwrap_or_else(|_| ".".to_owned());
+        let path = Path::new(&target_dir).join(file_name);
+
+        let mut file = File::create(&path).expect("couldn't create temp file");
+        let content = b"fn main() {}\n";
+        file.write_all(content).expect("couldn't write temp file");
+        TempFile { path }
+    }
+
+    impl Drop for TempFile {
+        fn drop(&mut self) {
+            use std::fs::remove_file;
+            remove_file(&self.path).expect("couldn't delete temp file");
+        }
+    }
+
+    fn rustfmt() -> &'static Path {
+        lazy_static! {
+            static ref RUSTFMT_PATH: PathBuf = {
+                let mut me = env::current_exe().expect("failed to get current executable");
+                // Chop of the test name.
+                me.pop();
+                // Chop off `deps`.
+                me.pop();
+
+                // If we run `cargo test --release`, we might only have a release build.
+                if cfg!(release) {
+                    // `../release/`
+                    me.pop();
+                    me.push("release");
+                }
+                me.push("rustfmt");
+                assert!(
+                    me.is_file() || me.with_extension("exe").is_file(),
+                    if cfg!(release) {
+                        "no rustfmt bin, try running `cargo build --release` before testing"
+                    } else {
+                        "no rustfmt bin, try running `cargo build` before testing"
+                    }
+                );
+                me
+            };
+        }
+        &RUSTFMT_PATH
+    }
+
+    #[test]
+    fn verify_check_works() {
+        init_log();
+        let temp_file = make_temp_file("temp_check.rs");
+
+        Command::new(rustfmt())
+            .arg("--check")
+            .arg(&temp_file.path)
+            .status()
+            .expect("run with check option failed");
+    }
+
+    #[test]
+    fn verify_check_works_with_stdin() {
+        init_log();
+
+        let mut child = Command::new(rustfmt())
+            .arg("--check")
+            .stdin(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("run with check option failed");
+
+        {
+            let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+            stdin
+                .write_all(b"fn main() {}\n")
+                .expect("Failed to write to rustfmt --check");
+        }
+        let output = child
+            .wait_with_output()
+            .expect("Failed to wait on rustfmt child");
+        assert!(output.status.success());
+    }
+
+    #[test]
+    fn verify_check_l_works_with_stdin() {
+        init_log();
+
+        let mut child = Command::new(rustfmt())
+            .arg("--check")
+            .arg("-l")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("run with check option failed");
+
+        {
+            let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+            stdin
+                .write_all(b"fn main()\n{}\n")
+                .expect("Failed to write to rustfmt --check");
+        }
+        let output = child
+            .wait_with_output()
+            .expect("Failed to wait on rustfmt child");
+        assert!(output.status.success());
+        assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "stdin\n");
     }
 }
