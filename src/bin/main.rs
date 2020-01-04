@@ -9,7 +9,7 @@ use anyhow::{format_err, Result};
 use getopts::{Matches, Options};
 use thiserror::Error;
 
-use rustfmt_core::{
+use rustfmt_lib::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
     FormatReportFormatterBuilder, Input, Session, Verbosity,
 };

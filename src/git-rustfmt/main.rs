@@ -9,7 +9,7 @@ use std::str::FromStr;
 
 use getopts::{Matches, Options};
 
-use rustfmt_core::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
+use rustfmt_lib::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
     let prefixes: Vec<_> = files
@@ -77,7 +77,7 @@ fn fmt_files(files: &[&str]) -> i32 {
 struct NullOptions;
 
 impl CliOptions for NullOptions {
-    fn apply_to(self, _: &mut rustfmt_core::Config) {
+    fn apply_to(self, _: &mut rustfmt_lib::Config) {
         unreachable!();
     }
     fn config_path(&self) -> Option<&Path> {

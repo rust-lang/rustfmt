@@ -1,9 +1,9 @@
 [package]
-name = "rustfmt_core"
+name = "rustfmt_lib"
 version = "1.0.0"
 authors = ["topecongiro <seuchida@gmail.com>"]
 edition = "2018"
-description = "Rustfmt core library"
+description = "Rustfmt as a library"
 license = "Apache-2.0/MIT"
 repository = "https://github.com/rust-lang/rustfmt"
 

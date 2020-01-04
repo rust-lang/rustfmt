@@ -1,7 +1,7 @@
 [package]
 
 name = "rustfmt-nightly"
-version = "1.4.10"
+version = "2.0.0-rc.1"
 authors = ["Nicholas Cameron <ncameron@mozilla.com>", "The Rustfmt developers"]
 description = "Tool to find and fix Rust formatting issues"
 repository = "https://github.com/rust-lang/rustfmt"
@@ -31,7 +31,7 @@ path = "src/git-rustfmt/main.rs"
 default = ["cargo-fmt", "rustfmt-format-diff"]
 cargo-fmt = []
 rustfmt-format-diff = []
-generic-simd = ["rustfmt_core/generic-simd"]
+generic-simd = ["rustfmt_lib/generic-simd"]
 
 [dependencies]
 ansi_term = "0.12"
@@ -47,7 +47,7 @@ structopt = "0.3"
 term = "0.6"
 thiserror = "1.0"
 
-rustfmt_core = { path = "rustfmt-lib/rustfmt-core" }
+rustfmt_lib = { path = "rustfmt-core/rustfmt-lib", version = "1.0" }
 
 [dev-dependencies]
 lazy_static = "1.0"
