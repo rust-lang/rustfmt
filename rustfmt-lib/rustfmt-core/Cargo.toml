@@ -6,6 +6,9 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+generic-simd = ["bytecount/generic-simd"]
+
 [dependencies]
 annotate-snippets = { version = "0.6", features = ["ansi_term"] }
 anyhow = "1.0"

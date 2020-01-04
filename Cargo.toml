@@ -31,6 +31,7 @@ path = "src/git-rustfmt/main.rs"
 default = ["cargo-fmt", "rustfmt-format-diff"]
 cargo-fmt = []
 rustfmt-format-diff = []
+generic-simd = ["rustfmt_core/generic-simd"]
 
 [dependencies]
 ansi_term = "0.12"
