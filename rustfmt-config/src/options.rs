@@ -7,8 +7,8 @@ use serde::de::{SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::config::lists::*;
-use crate::config::Config;
+use crate::lists::*;
+use crate::Config;
 
 #[config_type]
 pub enum NewlineStyle {

@@ -8,22 +8,19 @@ use std::{env, fs};
 use regex::Regex;
 use thiserror::Error;
 
-use crate::config::config_type::ConfigType;
-#[allow(unreachable_pub)]
-pub use crate::config::file_lines::{FileLines, FileName, Range};
-#[allow(unreachable_pub)]
-pub use crate::config::lists::*;
-#[allow(unreachable_pub)]
-pub use crate::config::options::*;
+use crate::config_type::ConfigType;
+pub use crate::file_lines::{FileLines, FileName, Range};
+pub use crate::lists::*;
+pub use crate::options::*;
 
 #[macro_use]
-pub(crate) mod config_type;
+pub mod config_type;
 #[macro_use]
-pub(crate) mod options;
+pub mod options;
 
-pub(crate) mod file_lines;
-pub(crate) mod license;
-pub(crate) mod lists;
+pub mod file_lines;
+pub mod license;
+pub mod lists;
 
 // This macro defines configuration options used in rustfmt. Each option
 // is defined as follows:
@@ -178,7 +175,7 @@ impl PartialConfig {
 }
 
 impl Config {
-    pub(crate) fn version_meets_requirement(&self) -> bool {
+    pub fn version_meets_requirement(&self) -> bool {
         if self.was_set().required_version() {
             let version = env!("CARGO_PKG_VERSION");
             let required_version = self.required_version();
@@ -201,7 +198,7 @@ impl Config {
     ///
     /// Returns a `Config` if the config could be read and parsed from
     /// the file, otherwise errors.
-    pub(super) fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
+    pub fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
         let mut file = File::open(&file_path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
@@ -218,7 +215,7 @@ impl Config {
     ///
     /// Returns the `Config` to use, and the path of the project file if there was
     /// one.
-    pub(super) fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<PathBuf>), Error> {
+    pub fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<PathBuf>), Error> {
         /// Try to find a project file in the given directory and its parents.
         /// Returns the path of a the nearest project file if one exists,
         /// or `None` if no project file was found.
@@ -268,7 +265,7 @@ impl Config {
         }
     }
 
-    pub(crate) fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
+    pub fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
         let parsed: ::toml::Value = toml
             .parse()
             .map_err(|e| format!("Could not parse TOML: {}", e))?;

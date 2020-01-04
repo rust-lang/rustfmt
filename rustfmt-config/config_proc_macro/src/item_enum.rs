@@ -61,7 +61,7 @@ fn impl_doc_hint(ident: &syn::Ident, variants: &Variants) -> TokenStream {
         .join("|");
     let doc_hint = format!("[{}]", doc_hint);
     quote! {
-        use crate::config::ConfigType;
+        use crate::ConfigType;
         impl ConfigType for #ident {
             fn doc_hint() -> String {
                 #doc_hint.to_owned()

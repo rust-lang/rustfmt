@@ -15,6 +15,7 @@ use std::panic;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use rustfmt_config as config;
 use syntax::ast;
 use thiserror::Error;
 
@@ -42,7 +43,6 @@ mod attr;
 mod chains;
 mod closures;
 mod comment;
-pub(crate) mod config;
 mod coverage;
 mod emitter;
 mod expr;
