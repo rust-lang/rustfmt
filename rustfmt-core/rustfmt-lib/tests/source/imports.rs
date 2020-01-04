@@ -27,6 +27,9 @@ use self;
 use std::io::{self};
 use std::io::self;
 
+use a::{/* comment */ item};
+use a::{item /* comment */};
+
 mod Foo {
     pub use syntax::ast::{
         ItemForeignMod,
