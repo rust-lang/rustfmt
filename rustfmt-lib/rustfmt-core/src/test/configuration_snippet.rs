@@ -4,12 +4,13 @@ use std::io::{BufRead, BufReader, Write};
 use std::iter::Enumerate;
 use std::path::{Path, PathBuf};
 
-use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
-use crate::config::{Config, EmitMode, Verbosity};
-use crate::rustfmt_diff::{make_diff, Mismatch};
-use crate::{Input, Session};
+use rustfmt_emitter::rustfmt_diff::{make_diff, Mismatch};
 
-const CONFIGURATIONS_FILE_NAME: &str = "../Configurations.md";
+use crate::config::{Config, EmitMode, Verbosity};
+use crate::{Input, Session};
+use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
+
+const CONFIGURATIONS_FILE_NAME: &str = "../../Configurations.md";
 
 // This enum is used to represent one of three text features in Configurations.md: a block of code
 // with its starting line number, the name of a rustfmt configuration option, or the value of a

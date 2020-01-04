@@ -7,10 +7,13 @@ use std::path::{Path, PathBuf};
 use std::str::Chars;
 use std::thread;
 
+use rustfmt_emitter::rustfmt_diff::{
+    make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter,
+};
+
 use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle, ReportTactic};
 use crate::formatting::{ReportedErrors, SourceFile};
 use crate::is_nightly_channel;
-use crate::rustfmt_diff::{make_diff, print_diff, DiffLine, Mismatch, ModifiedChunk, OutputWriter};
 use crate::source_file;
 use crate::{FormatReport, FormatReportFormatterBuilder, Input, Session};
 
@@ -388,7 +391,7 @@ fn self_tests() {
     let mut files = get_test_files(Path::new("tests"), false);
     files.push(PathBuf::from("src/lib.rs"));
 
-    let (reports, count, fails) = check_files(files, &Some(PathBuf::from("../rustfmt.toml")));
+    let (reports, count, fails) = check_files(files, &Some(PathBuf::from("../../rustfmt.toml")));
     let mut warnings = 0;
 
     // Display results.

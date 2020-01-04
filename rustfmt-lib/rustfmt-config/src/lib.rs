@@ -488,7 +488,7 @@ mod test {
 
     #[test]
     fn test_valid_license_template_path() {
-        if !crate::is_nightly_channel!() {
+        if !option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev") {
             return;
         }
         let toml = r#"license_template_path = "tests/license-template/lt.txt""#;
@@ -498,7 +498,7 @@ mod test {
 
     #[test]
     fn test_conflicting_recursive_skip_children() {
-        if !crate::is_nightly_channel!() {
+        if !option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev") {
             return;
         }
 
