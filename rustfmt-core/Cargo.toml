@@ -8,11 +8,9 @@ edition = "2018"
 
 [dependencies]
 annotate-snippets = { version = "0.6", features = ["ansi_term"] }
-ansi_term = "0.12"
 anyhow = "1.0"
 bytecount = "0.6"
 diff = "0.1"
-dirs = "2.0.1"
 ignore = { git = "https://github.com/topecongiro/ripgrep", branch = "update-crossbeam" }
 itertools = "0.8"
 lazy_static = "1.0.0"
@@ -23,7 +21,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 term = "0.6"
 thiserror = "1.0"
-toml = "0.5"
 unicode_categories = "0.1.1"
 unicode-segmentation = "1.0.0"
 unicode-width = "0.1.5"

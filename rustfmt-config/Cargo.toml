@@ -17,10 +17,6 @@ serde_json = "1.0"
 thiserror = "1.0"
 toml = "0.5"
 
-[dependencies.syntax]
-package = "rustc-ap-syntax"
-version = "610.0.0"
-
 [dependencies.syntax_pos]
 package = "rustc-ap-syntax_pos"
 version = "610.0.0"

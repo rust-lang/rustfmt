@@ -10,7 +10,7 @@ use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json as json;
 use thiserror::Error;
 
-use syntax::source_map::{self, SourceFile};
+use syntax_pos::{self, SourceFile};
 
 /// A range of lines in a file, inclusive of both ends.
 pub struct LineRange {
@@ -26,11 +26,11 @@ pub enum FileName {
     Stdin,
 }
 
-impl From<source_map::FileName> for FileName {
-    fn from(name: source_map::FileName) -> FileName {
+impl From<syntax_pos::FileName> for FileName {
+    fn from(name: syntax_pos::FileName) -> FileName {
         match name {
-            source_map::FileName::Real(p) => FileName::Real(p),
-            source_map::FileName::Custom(ref f) if f == "stdin" => FileName::Stdin,
+            syntax_pos::FileName::Real(p) => FileName::Real(p),
+            syntax_pos::FileName::Custom(ref f) if f == "stdin" => FileName::Stdin,
             _ => unreachable!(),
         }
     }
