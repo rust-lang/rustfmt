@@ -15,7 +15,7 @@ use std::panic;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use rustfmt_config as config;
+use rustfmt_configuration as config;
 use syntax::ast;
 use thiserror::Error;
 

@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use rustfmt_config::Verbosity;
+use rustfmt_configuration::Verbosity;
 
 use super::*;
 

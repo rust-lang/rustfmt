@@ -1,4 +1,4 @@
-use rustfmt_config::Config;
+use rustfmt_configuration::Config;
 
 use crate::rustfmt_diff::{make_diff, print_diff};
 use super::*;

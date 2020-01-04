@@ -1,5 +1,5 @@
 [package]
-name = "rustfmt_config"
+name = "rustfmt_configuration"
 version = "1.0.0"
 authors = ["topecongiro <seuchida@gmail.com>"]
 edition = "2018"

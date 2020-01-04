@@ -3,7 +3,7 @@ use std::fmt;
 use std::io;
 use std::io::Write;
 
-use rustfmt_config::{Color, Config, Verbosity};
+use rustfmt_configuration::{Color, Config, Verbosity};
 
 #[derive(Debug, PartialEq)]
 pub enum DiffLine {

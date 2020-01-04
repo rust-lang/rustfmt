@@ -10,7 +10,7 @@ license = "Apache-2.0/MIT"
 
 [dependencies]
 diff = "0.1"
-rustfmt_config = { path = "../rustfmt-config" }
+rustfmt_configuration = { path = "../rustfmt-config" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 term = "0.6"
