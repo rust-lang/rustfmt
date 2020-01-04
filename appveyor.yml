@@ -51,3 +51,5 @@ test_script:
   - cargo build --verbose
   - cargo test
   - cargo test -- --ignored
+  - cargo test --manifest-path rustfmt-core/Cargo.toml
+  - cargo test --manifest-path rustfmt-core/Cargo.toml -- --ignored

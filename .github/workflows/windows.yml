@@ -62,3 +62,9 @@ jobs:
     - name: 'test ignored'
       run: cargo test -- --ignored
       shell: cmd
+    - name: 'test rustfmt-core'
+      run: cargo test --manifest-path rustfmt-core/Cargo.toml
+      shell: cmd
+    - name: 'test rustfmt-core ignored'
+      run: cargo test --manifest-path rustfmt-core/Cargo.toml -- --ignored
+      shell: cmd
