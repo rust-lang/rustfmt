@@ -92,6 +92,7 @@ fn format_stmt(
     expr_type: ExprType,
 ) -> Option<String> {
     skip_out_of_file_lines_range!(context, stmt.span());
+
     let result = match stmt.kind {
         ast::StmtKind::Local(ref local) => local.rewrite(context, shape),
         ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
@@ -100,12 +101,12 @@ fn format_stmt(
             } else {
                 ""
             };
+
             let shape = shape.sub_width(suffix.len())?;
             format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
         }
         ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
     };
-
     result.and_then(|res| {
         recover_comment_removed(res, stmt.span(), context)
     })

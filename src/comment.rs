@@ -1565,7 +1565,7 @@ pub(crate) fn recover_comment_removed(
     context: &RewriteContext<'_>,
 ) -> Option<String> {
     let snippet = context.snippet(span);
-    let includes_comment = snippet.contains("//") || snippet.contains("/*");
+    let includes_comment = contains_comment(snippet);
     if snippet != new && includes_comment && changed_comment_content(snippet, &new) {
         // We missed some comments. Warn and keep the original text.
         if context.config.error_on_unformatted() {
