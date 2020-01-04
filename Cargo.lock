@@ -829,7 +829,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-workspace-hack 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustfmt_core 0.1.0",
+ "rustfmt_core 1.0.0",
  "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.41 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -839,7 +839,7 @@ dependencies = [
 
 [[package]]
 name = "rustfmt_config"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "ansi_term 0.12.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "dirs 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -855,7 +855,7 @@ dependencies = [
 
 [[package]]
 name = "rustfmt_core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "annotate-snippets 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "anyhow 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -869,8 +869,8 @@ dependencies = [
  "rustc-ap-rustc_target 610.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-ap-syntax 610.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-ap-syntax_pos 610.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustfmt_config 0.1.0",
- "rustfmt_emitter 0.1.0",
+ "rustfmt_config 1.0.0",
+ "rustfmt_emitter 1.0.0",
  "term 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-segmentation 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -880,10 +880,10 @@ dependencies = [
 
 [[package]]
 name = "rustfmt_emitter"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "diff 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustfmt_config 0.1.0",
+ "rustfmt_config 1.0.0",
  "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.41 (registry+https://github.com/rust-lang/crates.io-index)",
  "term 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
