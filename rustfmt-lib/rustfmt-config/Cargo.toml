@@ -3,6 +3,8 @@ name = "rustfmt_config"
 version = "1.0.0"
 authors = ["topecongiro <seuchida@gmail.com>"]
 edition = "2018"
+description = "Rustfmt configuration library"
+license = "Apache-2.0/MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
