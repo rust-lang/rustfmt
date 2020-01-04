@@ -16,7 +16,6 @@ generic-simd = ["bytecount/generic-simd"]
 annotate-snippets = { version = "0.6", features = ["ansi_term"] }
 anyhow = "1.0"
 bytecount = "0.6"
-ignore = { git = "https://github.com/topecongiro/ripgrep", branch = "update-crossbeam", version = "0.4" }
 itertools = "0.8"
 lazy_static = "1.0.0"
 log = "0.4"
@@ -31,6 +30,10 @@ unicode-width = "0.1.5"
 
 [dev-dependencies]
 env_logger = "0.7"
+
+[dependencies.ignore]
+package = "rustfmt_ignore"
+version = "0.4.10"
 
 [dependencies.rustc_target]
 package = "rustc-ap-rustc_target"
