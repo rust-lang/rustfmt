@@ -6,7 +6,7 @@ use std::io::{self, Write};
 mod xml;
 
 #[derive(Debug, Default)]
-pub(crate) struct CheckstyleEmitter;
+pub struct CheckstyleEmitter;
 
 impl Emitter for CheckstyleEmitter {
     fn emit_header(&self, output: &mut dyn Write) -> Result<(), io::Error> {
@@ -35,7 +35,7 @@ impl Emitter for CheckstyleEmitter {
     }
 }
 
-pub(crate) fn output_checkstyle_file<T>(
+pub fn output_checkstyle_file<T>(
     mut writer: T,
     filename: &FileName,
     diff: Vec<Mismatch>,

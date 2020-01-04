@@ -5,7 +5,7 @@ use serde_json::to_string as to_json_string;
 use std::io::{self, Write};
 
 #[derive(Debug, Default)]
-pub(crate) struct JsonEmitter {
+pub struct JsonEmitter {
     mismatched_files: Vec<MismatchedFile>,
 }
 

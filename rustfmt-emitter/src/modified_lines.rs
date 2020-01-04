@@ -1,9 +1,9 @@
-use super::*;
 use crate::rustfmt_diff::{make_diff, ModifiedLines};
-use std::io::Write;
+
+use super::*;
 
 #[derive(Debug, Default)]
-pub(crate) struct ModifiedLinesEmitter;
+pub struct ModifiedLinesEmitter;
 
 impl Emitter for ModifiedLinesEmitter {
     fn emit_formatted_file(

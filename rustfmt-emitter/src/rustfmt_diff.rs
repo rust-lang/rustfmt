@@ -3,7 +3,7 @@ use std::fmt;
 use std::io;
 use std::io::Write;
 
-use crate::config::{Color, Config, Verbosity};
+use rustfmt_config::{Color, Config, Verbosity};
 
 #[derive(Debug, PartialEq)]
 pub enum DiffLine {
@@ -144,14 +144,14 @@ impl std::str::FromStr for ModifiedLines {
 
 // This struct handles writing output to stdout and abstracts away the logic
 // of printing in color, if it's possible in the executing environment.
-pub(crate) struct OutputWriter {
+pub struct OutputWriter {
     terminal: Option<Box<dyn term::Terminal<Output = io::Stdout>>>,
 }
 
 impl OutputWriter {
     // Create a new OutputWriter instance based on the caller's preference
     // for colorized output and the capabilities of the terminal.
-    pub(crate) fn new(color: Color) -> Self {
+    pub fn new(color: Color) -> Self {
         if let Some(t) = term::stdout() {
             if color.use_colored_tty() && t.supports_color() {
                 return OutputWriter { terminal: Some(t) };
@@ -163,7 +163,7 @@ impl OutputWriter {
     // Write output in the optionally specified color. The output is written
     // in the specified color if this OutputWriter instance contains a
     // Terminal in its `terminal` field.
-    pub(crate) fn writeln(&mut self, msg: &str, color: Option<term::color::Color>) {
+    pub fn writeln(&mut self, msg: &str, color: Option<term::color::Color>) {
         match &mut self.terminal {
             Some(ref mut t) => {
                 if let Some(color) = color {
@@ -180,7 +180,7 @@ impl OutputWriter {
 }
 
 // Produces a diff between the expected output and actual output of rustfmt.
-pub(crate) fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Mismatch> {
+pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Mismatch> {
     let mut line_number = 1;
     let mut line_number_orig = 1;
     let mut context_queue: VecDeque<&str> = VecDeque::with_capacity(context_size);
@@ -248,7 +248,7 @@ pub(crate) fn make_diff(expected: &str, actual: &str, context_size: usize) -> Ve
     results
 }
 
-pub(crate) fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config)
+pub fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config)
 where
     F: Fn(u32) -> String,
 {
@@ -286,8 +286,7 @@ where
 #[cfg(test)]
 mod test {
     use super::DiffLine::*;
-    use super::{make_diff, Mismatch};
-    use super::{ModifiedChunk, ModifiedLines};
+    use super::*;
 
     #[test]
     fn diff_simple() {
@@ -400,4 +399,30 @@ mod test {
         let src = "1 5 3\na\nb";
         assert_eq!(ModifiedLines::from_str(src), Err(()));
     }
+
+    #[test]
+    fn rustfmt_diff_make_diff_tests() {
+        let diff = make_diff("a\nb\nc\nd", "a\ne\nc\nd", 3);
+        assert_eq!(
+            diff,
+            vec![Mismatch {
+                line_number: 1,
+                line_number_orig: 1,
+                lines: vec![
+                    DiffLine::Context("a".into()),
+                    DiffLine::Resulting("b".into()),
+                    DiffLine::Expected("e".into()),
+                    DiffLine::Context("c".into()),
+                    DiffLine::Context("d".into()),
+                ],
+            }]
+        );
+    }
+
+    #[test]
+    fn rustfmt_diff_no_diff_test() {
+        let diff = make_diff("a\nb\nc\nd", "a\nb\nc\nd", 3);
+        assert_eq!(diff, vec![]);
+    }
+
 }

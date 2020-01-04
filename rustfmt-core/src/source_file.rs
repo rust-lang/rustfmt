@@ -1,9 +1,9 @@
 use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
+use std::rc::Rc;
 
 use crate::config::FileName;
-use crate::emitter::{self, Emitter};
 use crate::syntux::session::ParseSess;
 use crate::NewlineStyle;
 
@@ -13,7 +13,8 @@ use crate::config::Config;
 use crate::create_emitter;
 #[cfg(test)]
 use crate::formatting::FileRecord;
-use std::rc::Rc;
+
+use rustfmt_emitter::{self as emitter, Emitter};
 
 // Append a newline to the end of each file.
 pub(crate) fn append_newline(s: &mut String) {

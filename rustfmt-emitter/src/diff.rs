@@ -1,13 +1,14 @@
-use super::*;
-use crate::config::Config;
-use crate::rustfmt_diff::{make_diff, print_diff};
+use rustfmt_config::Config;
 
-pub(crate) struct DiffEmitter {
+use crate::rustfmt_diff::{make_diff, print_diff};
+use super::*;
+
+pub struct DiffEmitter {
     config: Config,
 }
 
 impl DiffEmitter {
-    pub(crate) fn new(config: Config) -> Self {
+    pub fn new(config: Config) -> Self {
         Self { config }
     }
 }
@@ -51,7 +52,6 @@ impl Emitter for DiffEmitter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
     use crate::FileName;
     use std::path::PathBuf;
 

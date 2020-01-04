@@ -2,12 +2,12 @@ use super::*;
 use std::fs;
 
 #[derive(Debug, Default)]
-pub(crate) struct FilesEmitter {
+pub struct FilesEmitter {
     print_misformatted_file_names: bool,
 }
 
 impl FilesEmitter {
-    pub(crate) fn new(print_misformatted_file_names: bool) -> Self {
+    pub fn new(print_misformatted_file_names: bool) -> Self {
         Self {
             print_misformatted_file_names,
         }

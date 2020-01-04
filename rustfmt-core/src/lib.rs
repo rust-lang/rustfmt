@@ -20,7 +20,6 @@ use syntax::ast;
 use thiserror::Error;
 
 use crate::comment::LineClasses;
-use crate::emitter::Emitter;
 use crate::formatting::{FormatErrorMap, FormattingError, ReportedErrors, SourceFile};
 use crate::issues::Issue;
 use crate::shape::Indent;
@@ -34,7 +33,8 @@ pub use crate::config::{
 
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
 
-pub use crate::rustfmt_diff::{ModifiedChunk, ModifiedLines};
+pub use rustfmt_emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
+use rustfmt_emitter::{self as emitter, Emitter};
 
 #[macro_use]
 mod utils;
@@ -44,7 +44,6 @@ mod chains;
 mod closures;
 mod comment;
 mod coverage;
-mod emitter;
 mod expr;
 mod format_report_formatter;
 pub(crate) mod formatting;
@@ -63,7 +62,6 @@ mod patterns;
 mod release_channel;
 mod reorder;
 mod rewrite;
-pub(crate) mod rustfmt_diff;
 mod shape;
 mod skip;
 pub(crate) mod source_file;

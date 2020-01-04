@@ -771,33 +771,6 @@ fn get_target(file_name: &Path, target: Option<&str>) -> PathBuf {
     }
 }
 
-#[test]
-fn rustfmt_diff_make_diff_tests() {
-    init_log();
-    let diff = make_diff("a\nb\nc\nd", "a\ne\nc\nd", 3);
-    assert_eq!(
-        diff,
-        vec![Mismatch {
-            line_number: 1,
-            line_number_orig: 1,
-            lines: vec![
-                DiffLine::Context("a".into()),
-                DiffLine::Resulting("b".into()),
-                DiffLine::Expected("e".into()),
-                DiffLine::Context("c".into()),
-                DiffLine::Context("d".into()),
-            ],
-        }]
-    );
-}
-
-#[test]
-fn rustfmt_diff_no_diff_test() {
-    init_log();
-    let diff = make_diff("a\nb\nc\nd", "a\nb\nc\nd", 3);
-    assert_eq!(diff, vec![]);
-}
-
 // Compare strings without distinguishing between CRLF and LF
 fn string_eq_ignore_newline_repr(left: &str, right: &str) -> bool {
     let left = CharsIgnoreNewlineRepr(left.chars().peekable());

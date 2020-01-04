@@ -1,14 +1,16 @@
-use super::*;
-use crate::config::Verbosity;
 use std::io::Write;
 
+use rustfmt_config::Verbosity;
+
+use super::*;
+
 #[derive(Debug)]
-pub(crate) struct StdoutEmitter {
+pub struct StdoutEmitter {
     verbosity: Verbosity,
 }
 
 impl StdoutEmitter {
-    pub(crate) fn new(verbosity: Verbosity) -> Self {
+    pub fn new(verbosity: Verbosity) -> Self {
         Self { verbosity }
     }
 }

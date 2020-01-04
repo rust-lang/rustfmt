@@ -1,32 +1,35 @@
-pub(crate) use self::checkstyle::*;
-pub(crate) use self::diff::*;
-pub(crate) use self::files::*;
-pub(crate) use self::json::*;
-pub(crate) use self::modified_lines::*;
-pub(crate) use self::stdout::*;
-use crate::FileName;
+pub use self::checkstyle::*;
+pub use self::diff::*;
+pub use self::files::*;
+pub use self::json::*;
+pub use self::modified_lines::*;
+pub use self::stdout::*;
+
 use std::io::{self, Write};
 use std::path::Path;
 
-mod checkstyle;
-mod diff;
-mod files;
-mod json;
-mod modified_lines;
-mod stdout;
+use rustfmt_config::FileName;
 
-pub(crate) struct FormattedFile<'a> {
-    pub(crate) filename: &'a FileName,
-    pub(crate) original_text: &'a str,
-    pub(crate) formatted_text: &'a str,
+pub mod checkstyle;
+pub mod diff;
+pub mod files;
+pub mod json;
+pub mod modified_lines;
+pub mod rustfmt_diff;
+pub mod stdout;
+
+pub struct FormattedFile<'a> {
+    pub filename: &'a FileName,
+    pub original_text: &'a str,
+    pub formatted_text: &'a str,
 }
 
 #[derive(Debug, Default, Clone)]
-pub(crate) struct EmitterResult {
-    pub(crate) has_diff: bool,
+pub struct EmitterResult {
+    pub has_diff: bool,
 }
 
-pub(crate) trait Emitter {
+pub trait Emitter {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,
