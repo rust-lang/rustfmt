@@ -1703,9 +1703,18 @@ pub(crate) fn rewrite_field(
         let overhead = name.len() + separator.len();
         let expr_shape = shape.offset_left(overhead)?;
         let expr = field.expr.rewrite(context, expr_shape);
+        let is_tuple_field = if let ast::ExprKind::Lit(ref lit) = field.expr.kind {
+            lit.kind.is_numeric()
+        } else {
+            false
+        };
 
         match expr {
-            Some(ref e) if e.as_str() == name && context.config.use_field_init_shorthand() => {
+            Some(ref e)
+                if e.as_str() == name
+                    && context.config.use_field_init_shorthand()
+                    && !is_tuple_field =>
+            {
                 Some(attrs_str + name)
             }
             Some(e) => Some(format!("{}{}{}{}", attrs_str, name, separator, e)),
