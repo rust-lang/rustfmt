@@ -7,8 +7,6 @@ description = "Rustfmt configuration library"
 license = "Apache-2.0/MIT"
 repository = "https://github.com/rust-lang/rustfmt"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 ansi_term = "0.12"
 dirs = "2.0"

@@ -7,8 +7,6 @@ description = "Rustfmt emitter library"
 license = "Apache-2.0/MIT"
 repository = "https://github.com/rust-lang/rustfmt"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 diff = "0.1"
 rustfmt_configuration = { path = "../rustfmt-config", version = "1.0" }
