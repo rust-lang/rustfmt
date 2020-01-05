@@ -46,7 +46,7 @@ matrix:
 script:
   - |
     if [ -z ${INTEGRATION} ]; then
-      cargo build && cargo test && cargo test -- --ignored
+      cargo build && cargo test && cargo test -- --ignored && cargo test --manifest-path rustfmt-core/Cargo.toml && cargo test --manifest-path rustfmt-core/Cargo.toml -- --ignored
     else
       ./ci/integration.sh
     fi
