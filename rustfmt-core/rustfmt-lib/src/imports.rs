@@ -471,7 +471,7 @@ impl UseTree {
 
         // Normalise foo::{bar} -> foo::bar
         if let UseSegment::List(ref list) = last {
-            if list.len() == 1 && list[0].to_string() != "self" {
+            if list.len() == 1 && !list[0].has_comment() && list[0].to_string() != "self" {
                 normalize_sole_list = true;
             }
         }
@@ -538,11 +538,8 @@ impl UseTree {
     }
 
     fn flatten(self) -> Vec<UseTree> {
-        if self.path.is_empty() {
-            return vec![self];
-        }
-        match self.path.clone().last().unwrap() {
-            UseSegment::List(list) => {
+        match self.path.clone().last() {
+            Some(UseSegment::List(list)) => {
                 if list.len() == 1 && list[0].path.len() == 1 {
                     match list[0].path[0] {
                         UseSegment::Slf(..) => return vec![self],
@@ -552,9 +549,9 @@ impl UseTree {
                 let prefix = &self.path[..self.path.len() - 1];
                 let mut result = vec![];
                 for nested_use_tree in list {
-                    for flattend in &mut nested_use_tree.clone().flatten() {
+                    for flattened in &mut nested_use_tree.clone().flatten() {
                         let mut new_path = prefix.to_vec();
-                        new_path.append(&mut flattend.path);
+                        new_path.append(&mut flattened.path);
                         result.push(UseTree {
                             path: new_path,
                             span: self.span,
