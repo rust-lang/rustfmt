@@ -148,7 +148,7 @@ for more info.
 
 `cargo build` to build.
 
-`cargo test` to run all tests.
+`cargo test && cargo test --manifest-path rustfmt-core/Cargo.toml` to run all tests.
 
 To run rustfmt after this, use `cargo run --bin rustfmt -- filename`. See the
 notes above on running rustfmt.
