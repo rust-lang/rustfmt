@@ -1,7 +1,8 @@
 [package]
-name = "root-and-nested-tests"
+name = "empty-tests-dir"
 version = "0.1.0"
 authors = ["rustfmt devs <awesome@gmail.com>"]
-edition = "2018"
 
 [dependencies]
+
+[workspace]

@@ -1,6 +1,8 @@
 [package]
-name = "empty-tests-dir"
+name = "no-tests"
 version = "0.1.0"
 authors = ["rustfmt devs <awesome@gmail.com>"]
 
 [dependencies]
+
+[workspace]
