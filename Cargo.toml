@@ -7,25 +7,29 @@ description = "Tool to find and fix Rust formatting issues"
 repository = "https://github.com/rust-lang/rustfmt"
 readme = "README.md"
 license = "Apache-2.0/MIT"
-build = "build.rs"
+build = "rustfmt-core/rustfmt-bin/build.rs"
 categories = ["development-tools"]
 edition = "2018"
 
 [[bin]]
 name = "rustfmt"
-path = "src/bin/main.rs"
+path = "rustfmt-core/rustfmt-bin/src/bin/main.rs"
+test = false
 
 [[bin]]
 name = "cargo-fmt"
-path = "src/cargo-fmt/main.rs"
+path = "rustfmt-core/rustfmt-bin/src/cargo-fmt/main.rs"
+test = false
 
 [[bin]]
 name = "rustfmt-format-diff"
-path = "src/format-diff/main.rs"
+path = "rustfmt-core/rustfmt-bin/src/format-diff/main.rs"
+test = false
 
 [[bin]]
 name = "git-rustfmt"
-path = "src/git-rustfmt/main.rs"
+path = "rustfmt-core/rustfmt-bin/src/git-rustfmt/main.rs"
+test = false
 
 [features]
 default = ["cargo-fmt", "rustfmt-format-diff"]
