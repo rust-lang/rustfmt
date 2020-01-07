@@ -589,7 +589,7 @@ impl UseTree {
 
         // Normalise foo::{bar} -> foo::bar
         if let UseSegmentKind::List(ref list) = last.kind {
-            if list.len() == 1 && list[0].to_string() != "self" {
+            if list.len() == 1 && !list[0].has_comment() && list[0].to_string() != "self" {
                 normalize_sole_list = true;
             }
         }
@@ -683,9 +683,9 @@ impl UseTree {
                 let prefix = &self.path[..self.path.len() - 1];
                 let mut result = vec![];
                 for nested_use_tree in list {
-                    for flattend in &mut nested_use_tree.clone().flatten(import_granularity) {
+                    for flattened in &mut nested_use_tree.clone().flatten(import_granularity) {
                         let mut new_path = prefix.to_vec();
-                        new_path.append(&mut flattend.path);
+                        new_path.append(&mut flattened.path);
                         result.push(UseTree {
                             path: new_path,
                             span: self.span,
