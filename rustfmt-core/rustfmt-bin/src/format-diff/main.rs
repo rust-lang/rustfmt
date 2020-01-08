@@ -27,8 +27,6 @@ const DEFAULT_PATTERN: &str = r".*\.rs";
 #[derive(Error, Debug)]
 enum FormatDiffError {
     #[error("{0}")]
-    IncorrectOptions(#[from] getopts::Fail),
-    #[error("{0}")]
     IncorrectFilter(#[from] regex::Error),
     #[error("{0}")]
     IoError(#[from] io::Error),
