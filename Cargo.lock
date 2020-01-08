@@ -15,7 +15,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7021ce4924a3f25f802b2cccd1af585e39ea1a363a1aa2e72afe54b67a3a7a7"
 dependencies = [
- "ansi_term 0.11.0",
+ "ansi_term",
 ]
 
 [[package]]
@@ -23,15 +23,6 @@ name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
-dependencies = [
- "winapi 0.3.8",
-]
-
-[[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
 dependencies = [
  "winapi 0.3.8",
 ]
@@ -172,7 +163,7 @@ version = "2.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5067f5bb2d80ef5d68b4c87db81601f0b75bca627bc2ef76b141d7b846a3c6d9"
 dependencies = [
- "ansi_term 0.11.0",
+ "ansi_term",
  "atty",
  "bitflags",
  "strsim",
@@ -348,15 +339,6 @@ name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
-
-[[package]]
-name = "getopts"
-version = "0.2.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
-dependencies = [
- "unicode-width",
-]
 
 [[package]]
 name = "getrandom"
@@ -901,11 +883,9 @@ dependencies = [
 name = "rustfmt-nightly"
 version = "2.0.0-rc.1"
 dependencies = [
- "ansi_term 0.12.1",
  "anyhow",
  "cargo_metadata",
  "env_logger",
- "getopts",
  "lazy_static",
  "log",
  "regex",
@@ -920,9 +900,8 @@ dependencies = [
 
 [[package]]
 name = "rustfmt_configuration"
-version = "1.0.0"
+version = "2.0.0-rc.1"
 dependencies = [
- "ansi_term 0.12.1",
  "dirs",
  "itertools",
  "regex",
@@ -936,7 +915,7 @@ dependencies = [
 
 [[package]]
 name = "rustfmt_emitter"
-version = "1.0.0"
+version = "2.0.0-rc.1"
 dependencies = [
  "diff",
  "rustfmt_configuration",
@@ -965,7 +944,7 @@ dependencies = [
 
 [[package]]
 name = "rustfmt_lib"
-version = "1.0.0"
+version = "2.0.0-rc.1"
 dependencies = [
  "annotate-snippets",
  "anyhow",
