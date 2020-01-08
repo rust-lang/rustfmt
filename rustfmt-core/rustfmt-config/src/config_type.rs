@@ -92,11 +92,14 @@ macro_rules! create_config {
             $(
             #[allow(unreachable_pub)]
             pub fn $i(&mut self, value: $Ty) {
-                (self.0).$i.2 = value;
-                match stringify!($i) {
-                    "max_width" | "use_small_heuristics" => self.0.set_heuristics(),
-                    "license_template_path" => self.0.set_license_template(),
-                    &_ => (),
+                if value != (self.0).$i.2 {
+                    (self.0).$i.1 = true;
+                    (self.0).$i.2 = value;
+                    match stringify!($i) {
+                        "max_width" | "use_small_heuristics" => self.0.set_heuristics(),
+                        "license_template_path" => self.0.set_license_template(),
+                        &_ => (),
+                    }
                 }
             }
             )+
@@ -189,7 +192,7 @@ macro_rules! create_config {
             pub fn used_options(&self) -> PartialConfig {
                 PartialConfig {
                     $(
-                        $i: if self.$i.0.get() {
+                        $i: if self.$i.1 && self.$i.2 != $def {
                                 Some(self.$i.2.clone())
                             } else {
                                 None
