@@ -301,10 +301,10 @@ impl Config {
 /// file system (including searching the file system for overrides).
 pub fn load_config<O: CliOptions>(
     file_path: Option<&Path>,
-    options: Option<O>,
+    options: Option<&O>,
 ) -> Result<(Config, Option<PathBuf>), Error> {
     let over_ride = match options {
-        Some(ref opts) => config_path(opts)?,
+        Some(opts) => config_path(opts)?,
         None => None,
     };
 

@@ -75,7 +75,7 @@ fn fmt_files(files: &[&str]) -> i32 {
 struct NullOptions;
 
 impl CliOptions for NullOptions {
-    fn apply_to(self, _: &mut rustfmt_lib::Config) {
+    fn apply_to(&self, _: &mut rustfmt_lib::Config) {
         unreachable!();
     }
     fn config_path(&self) -> Option<&Path> {
