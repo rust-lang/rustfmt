@@ -51,7 +51,7 @@ pub(crate) fn rewrite_closure(
 
         let result = match fn_decl.output {
             ast::FunctionRetTy::Default(_) if !context.inside_macro() => {
-                try_rewrite_without_block(body, &prefix, context, shape, body_shape)
+                try_rewrite_without_block(body, &prefix, capture, context, shape, body_shape)
             }
             _ => None,
         };
@@ -72,13 +72,14 @@ pub(crate) fn rewrite_closure(
 fn try_rewrite_without_block(
     expr: &ast::Expr,
     prefix: &str,
+    capture: ast::CaptureBy,
     context: &RewriteContext<'_>,
     shape: Shape,
     body_shape: Shape,
 ) -> Option<String> {
     let expr = get_inner_expr(expr, prefix, context);
 
-    if is_block_closure_forced(context, expr) {
+    if is_block_closure_forced(context, expr, capture) {
         rewrite_closure_with_block(expr, prefix, context, shape)
     } else {
         rewrite_closure_expr(expr, prefix, context, body_shape)
@@ -357,7 +358,7 @@ pub(crate) fn rewrite_last_closure(
         let body_shape = shape.offset_left(extra_offset)?;
 
         // We force to use block for the body of the closure for certain kinds of expressions.
-        if is_block_closure_forced(context, body) {
+        if is_block_closure_forced(context, body, capture) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(
                 |body_str| {
                     // If the expression can fit in a single line, we need not force block closure.
@@ -404,19 +405,32 @@ pub(crate) fn args_have_many_closure(args: &[OverflowableItem<'_>]) -> bool {
         > 1
 }
 
-fn is_block_closure_forced(context: &RewriteContext<'_>, expr: &ast::Expr) -> bool {
+fn is_block_closure_forced(
+    context: &RewriteContext<'_>,
+    expr: &ast::Expr,
+    capture: ast::CaptureBy,
+) -> bool {
     // If we are inside macro, we do not want to add or remove block from closure body.
     if context.inside_macro() {
         false
     } else {
-        is_block_closure_forced_inner(expr)
+        if let ast::ExprKind::Match(..) = expr.kind {
+          let is_move_closure_without_brace =
+              capture == ast::CaptureBy::Value && !context.snippet(expr.span).trim().starts_with("{");
+
+            is_block_closure_forced_inner(expr) || is_move_closure_without_brace
+        } else {
+            is_block_closure_forced_inner(expr)
+        }
     }
 }
 
 fn is_block_closure_forced_inner(expr: &ast::Expr) -> bool {
     match expr.kind {
-        ast::ExprKind::If(..) | ast::ExprKind::While(..) | ast::ExprKind::ForLoop(..) => true,
-        ast::ExprKind::Loop(..) => true,
+        ast::ExprKind::If(..)
+        | ast::ExprKind::While(..)
+        | ast::ExprKind::ForLoop(..)
+        | ast::ExprKind::Loop(..) => true,
         ast::ExprKind::AddrOf(_, ref expr)
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Try(ref expr)
