@@ -1,6 +1,6 @@
 [package]
 name = "rustfmt_emitter"
-version = "1.0.0"
+version = "2.0.0-rc.1"
 authors = ["topecongiro <seuchida@gmail.com>"]
 edition = "2018"
 description = "Rustfmt emitter library"
@@ -9,7 +9,7 @@ repository = "https://github.com/rust-lang/rustfmt"
 
 [dependencies]
 diff = "0.1"
-rustfmt_configuration = { path = "../rustfmt-config", version = "1.0" }
+rustfmt_configuration = { path = "../rustfmt-config", version = "2.0.0-rc.1" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 term = "0.6"

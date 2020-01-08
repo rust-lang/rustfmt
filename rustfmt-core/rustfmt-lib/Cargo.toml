@@ -1,6 +1,6 @@
 [package]
 name = "rustfmt_lib"
-version = "1.0.0"
+version = "2.0.0-rc.1"
 authors = ["topecongiro <seuchida@gmail.com>"]
 edition = "2018"
 description = "Rustfmt as a library"
@@ -18,8 +18,8 @@ itertools = "0.8"
 lazy_static = "1.0.0"
 log = "0.4"
 regex = "1.0"
-rustfmt_configuration = { path = "../rustfmt-config", version = "1.0" }
-rustfmt_emitter =  { path = "../rustfmt-emitter", version = "1.0" }
+rustfmt_configuration = { path = "../rustfmt-config", version = "2.0.0-rc.1" }
+rustfmt_emitter =  { path = "../rustfmt-emitter", version = "2.0.0-rc.1" }
 term = "0.6"
 thiserror = "1.0"
 unicode_categories = "0.1.1"
