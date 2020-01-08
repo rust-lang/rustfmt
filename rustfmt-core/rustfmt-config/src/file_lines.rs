@@ -251,7 +251,7 @@ impl FileLines {
             Some(ref map) => map,
         };
 
-        match canonicalize_path_string(file_name).and_then(|file| map.get(&file)) {
+        match canonicalize_path_string(file_name).ok().and_then(|file| map.get(&file)) {
             Some(ranges) => ranges.iter().any(f),
             None => false,
         }
@@ -290,10 +290,10 @@ impl<'a> iter::Iterator for Files<'a> {
     }
 }
 
-fn canonicalize_path_string(file: &FileName) -> Option<FileName> {
+fn canonicalize_path_string(file: &FileName) -> std::io::Result<FileName> {
     match *file {
-        FileName::Real(ref path) => path.canonicalize().ok().map(FileName::Real),
-        _ => Some(file.clone()),
+        FileName::Real(ref path) => path.canonicalize().map(FileName::Real),
+        _ => Ok(file.clone()),
     }
 }
 
@@ -301,8 +301,8 @@ fn canonicalize_path_string(file: &FileName) -> Option<FileName> {
 pub enum FileLinesError {
     #[error("{0}")]
     Json(json::Error),
-    #[error("Can't canonicalize {0}")]
-    CannotCanonicalize(FileName),
+    #[error("Can't canonicalize {0}: {1}")]
+    CannotCanonicalize(FileName, std::io::Error),
 }
 
 // This impl is needed for `Config::override_value` to work for use in tests.
@@ -335,7 +335,7 @@ impl JsonSpan {
     fn into_tuple(self) -> Result<(FileName, Range), FileLinesError> {
         let (lo, hi) = self.range;
         let canonical = canonicalize_path_string(&self.file)
-            .ok_or_else(|| FileLinesError::CannotCanonicalize(self.file))?;
+            .map_err(|e| FileLinesError::CannotCanonicalize(self.file, e))?;
         Ok((canonical, Range::new(lo, hi)))
     }
 }
