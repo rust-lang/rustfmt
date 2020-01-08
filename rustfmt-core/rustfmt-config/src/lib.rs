@@ -285,13 +285,6 @@ impl Config {
                     eprint!("{}", err);
                 }
                 let config = Config::default().fill_from_parsed_config(parsed_config, dir);
-                if config.skip_children() && config.recursive() {
-                    return Err(String::from(
-                        "Error: Conflicting config options `skip_children` and `recursive` are \
-                        both enabled. `skip_children` has been deprecated and should be \
-                        removed from your config.",
-                    ));
-                }
                 Ok(config)
             }
             Err(e) => {
@@ -431,16 +424,12 @@ mod test {
         let config = Config::default();
 
         let merge_derives = config.merge_derives();
-        let skip_children = config.skip_children();
 
         let used_options = config.used_options();
         let toml = used_options.to_toml().unwrap();
         assert_eq!(
             toml,
-            format!(
-                "merge_derives = {}\nskip_children = {}\n",
-                merge_derives, skip_children,
-            )
+            "merge_derives = false\n"
         );
     }
 
@@ -494,27 +483,6 @@ mod test {
         let toml = r#"license_template_path = "tests/license-template/lt.txt""#;
         let config = Config::from_toml(toml, Path::new("")).unwrap();
         assert!(config.license_template.is_some());
-    }
-
-    #[test]
-    fn test_conflicting_recursive_skip_children() {
-        if !option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev") {
-            return;
-        }
-
-        let toml = "skip_children = true\nrecursive = true";
-        // Update to `contains_err()` once it lands
-        // https://github.com/rust-lang/rust/issues/62358
-        // https://doc.rust-lang.org/std/result/enum.Result.html#method.contains_err
-        match Config::from_toml(toml, Path::new("")) {
-            Ok(_) => panic!("Expected configuration error"),
-            Err(msg) => assert_eq!(
-                msg,
-                "Error: Conflicting config options `skip_children` and `recursive` \
-                are both enabled. `skip_children` has been deprecated and should be \
-                removed from your config.",
-            ),
-        }
     }
 
     #[test]
@@ -577,7 +545,6 @@ color = "Auto"
 required_version = "{}"
 unstable_features = false
 disable_all_formatting = false
-skip_children = false
 hide_parse_errors = false
 error_on_line_overflow = false
 error_on_unformatted = false

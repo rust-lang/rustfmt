@@ -8,7 +8,6 @@ license = "Apache-2.0/MIT"
 repository = "https://github.com/rust-lang/rustfmt"
 
 [dependencies]
-ansi_term = "0.12"
 dirs = "2.0"
 itertools = "0.8"
 regex = "1.3"

@@ -57,9 +57,6 @@ macro_rules! create_config {
 
         use serde::{Deserialize, Serialize};
 
-        // for error messages
-        use ansi_term::Colour::Red;
-
         #[derive(Clone)]
         #[allow(unreachable_pub)]
         pub struct Config {
@@ -139,17 +136,8 @@ macro_rules! create_config {
             }
 
             fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Self {
-                let deprecate_skip_children = || {
-                    let msg = "Option skip_children is deprecated since it is now the default to \
-                               not format submodules of given files (#3587)";
-                    eprintln!("{}: {}", Red.bold().paint("Deprecation"), msg);
-                };
-
             $(
                 if let Some(val) = parsed.$i {
-                    if stringify!($i) == "skip_children" {
-                        deprecate_skip_children()
-                    }
                     if self.$i.3 {
                         self.$i.1 = true;
                         self.$i.2 = val;
