@@ -77,17 +77,12 @@ jobs:
       run: |
         rustc -Vv
         cargo -V
-        cargo build
+        cargo build --manifest-path rustfmt-core/Cargo.toml --workspace
       shell: cmd
+
     - name: test
-      run: cargo test
+      run: cargo test-all
       shell: cmd
-    - name: 'test ignored'
-      run: cargo test -- --ignored
-      shell: cmd
-    - name: 'test rustfmt-core'
-      run: cargo test --manifest-path rustfmt-core/Cargo.toml
-      shell: cmd
-    - name: 'test rustfmt-core ignored'
-      run: cargo test --manifest-path rustfmt-core/Cargo.toml -- --ignored
+    - name: test ignored
+      run: cargo test-all -- --ignored
       shell: cmd
