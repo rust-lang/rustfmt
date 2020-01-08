@@ -422,9 +422,10 @@ mod test {
 
     #[test]
     fn test_config_used_to_toml() {
-        let config = Config::default();
+        let mut config = Config::default();
 
-        let merge_derives = config.merge_derives();
+        config.set().merge_derives(false);
+        config.set().max_width(100);
 
         let used_options = config.used_options();
         let toml = used_options.to_toml().unwrap();
