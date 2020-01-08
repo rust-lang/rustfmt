@@ -169,6 +169,7 @@ impl PartialConfig {
         cloned.width_heuristics = None;
         cloned.print_misformatted_file_names = None;
         cloned.recursive = None;
+        cloned.emit_mode = None;
 
         ::toml::to_string(&cloned).map_err(ToTomlError)
     }
@@ -551,7 +552,6 @@ error_on_unformatted = false
 report_todo = "Never"
 report_fixme = "Never"
 ignore = []
-emit_mode = "Files"
 "#,
             env!("CARGO_PKG_VERSION")
         );
