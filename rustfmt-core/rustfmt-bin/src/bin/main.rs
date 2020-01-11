@@ -50,7 +50,8 @@ struct Opt {
     #[structopt(short, long)]
     check: bool,
     /// Specify the format of rustfmt's output.
-    #[structopt(long)]
+    #[cfg_attr(nightly, structopt(long, name= "files|stdout|checkstyle|json"))]
+    #[cfg_attr(not(nightly), structopt(long, name= "files|stdout"))]
     emit: Option<Emit>,
     /// A path to the configuration file.
     #[structopt(long = "config-path", parse(from_os_str))]
