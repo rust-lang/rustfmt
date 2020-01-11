@@ -64,7 +64,7 @@ struct Opt {
     ///
     /// `default` will print the default configuration options. `current` will print the
     /// current configuration options. `minimal` will print the minimal subset of the
-    /// current configuration options.
+    /// current configuration options that have non-default values.
     #[structopt(long = "print-config", name = "default|current|minimal")]
     print_config: Option<PrintConfig>,
     /// Prints the names of files with diff.
