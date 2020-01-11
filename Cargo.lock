@@ -410,6 +410,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ignore"
+version = "0.4.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "522daefc3b69036f80c7d2990b28ff9e0471c683bad05ca258e0a01dd22c5a1e"
+dependencies = [
+ "crossbeam-channel",
+ "globset",
+ "lazy_static",
+ "log",
+ "memchr",
+ "regex",
+ "same-file",
+ "thread_local 1.0.0",
+ "walkdir",
+ "winapi-util",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -665,7 +683,7 @@ dependencies = [
  "aho-corasick",
  "memchr",
  "regex-syntax",
- "thread_local",
+ "thread_local 0.3.6",
 ]
 
 [[package]]
@@ -946,30 +964,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustfmt_ignore"
-version = "0.4.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "857177e8ff2607b7fb1862782d9754e20661e0772f25c54ad1a160ce563d8863"
-dependencies = [
- "crossbeam-channel",
- "globset",
- "lazy_static",
- "log",
- "memchr",
- "regex",
- "same-file",
- "thread_local",
- "walkdir",
- "winapi-util",
-]
-
-[[package]]
 name = "rustfmt_lib"
 version = "1.0.0"
 dependencies = [
  "annotate-snippets",
  "anyhow",
  "bytecount",
+ "ignore",
  "itertools",
  "lazy_static",
  "log",
@@ -980,7 +981,6 @@ dependencies = [
  "rustc-ap-syntax_pos",
  "rustfmt_configuration",
  "rustfmt_emitter",
- "rustfmt_ignore",
  "term",
  "thiserror",
  "unicode-segmentation",
@@ -1215,6 +1215,15 @@ name = "thread_local"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
+name = "thread_local"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88ddf1ad580c7e3d1efff877d972bcc93f995556b9087a5a259630985c88ceab"
 dependencies = [
  "lazy_static",
 ]
