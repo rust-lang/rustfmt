@@ -351,7 +351,7 @@ impl std::str::FromStr for IgnoreList {
 /// Maps client-supplied options to Rustfmt's internals, mostly overriding
 /// values in a config with values from the command line.
 pub trait CliOptions {
-    fn apply_to(self, config: &mut Config);
+    fn apply_to(&self, config: &mut Config);
     fn config_path(&self) -> Option<&Path>;
 }
 

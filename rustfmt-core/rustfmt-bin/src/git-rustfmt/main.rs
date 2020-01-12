@@ -1,13 +1,11 @@
 #[macro_use]
 extern crate log;
 
-use std::env;
 use std::io::stdout;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::str::FromStr;
 
-use getopts::{Matches, Options};
+use structopt::StructOpt;
 
 use rustfmt_lib::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
 
@@ -37,10 +35,10 @@ fn prune_files(files: Vec<&str>) -> Vec<&str> {
         .collect()
 }
 
-fn git_diff(commits: &str) -> String {
+fn git_diff(commits: u64) -> String {
     let mut cmd = Command::new("git");
     cmd.arg("diff");
-    if commits != "0" {
+    if commits != 0 {
         cmd.arg(format!("HEAD~{}", commits));
     }
     let output = cmd.output().expect("Couldn't execute `git diff`");
@@ -77,7 +75,7 @@ fn fmt_files(files: &[&str]) -> i32 {
 struct NullOptions;
 
 impl CliOptions for NullOptions {
-    fn apply_to(self, _: &mut rustfmt_lib::Config) {
+    fn apply_to(&self, _: &mut rustfmt_lib::Config) {
         unreachable!();
     }
     fn config_path(&self) -> Option<&Path> {
@@ -114,77 +112,28 @@ fn check_uncommitted() {
     }
 }
 
-fn make_opts() -> Options {
-    let mut opts = Options::new();
-    opts.optflag("h", "help", "show this message");
-    opts.optflag("c", "check", "check only, don't format (unimplemented)");
-    opts.optflag("u", "uncommitted", "format uncommitted files");
-    opts
-}
-
-struct Config {
-    commits: String,
-    uncommitted: bool,
+#[derive(Debug, StructOpt)]
+struct Opt {
+    /// Check only.
+    #[structopt(short, long)]
     check: bool,
-}
-
-impl Config {
-    fn from_args(matches: &Matches, opts: &Options) -> Config {
-        // `--help` display help message and quit
-        if matches.opt_present("h") {
-            let message = format!(
-                "\nusage: {} <commits> [options]\n\n\
-                 commits: number of commits to format, default: 1",
-                env::args_os().next().unwrap().to_string_lossy()
-            );
-            println!("{}", opts.usage(&message));
-            std::process::exit(0);
-        }
-
-        let mut config = Config {
-            commits: "1".to_owned(),
-            uncommitted: false,
-            check: false,
-        };
-
-        if matches.opt_present("c") {
-            config.check = true;
-            unimplemented!();
-        }
-
-        if matches.opt_present("u") {
-            config.uncommitted = true;
-        }
-
-        if matches.free.len() > 1 {
-            panic!("unknown arguments, use `-h` for usage");
-        }
-        if matches.free.len() == 1 {
-            let commits = matches.free[0].trim();
-            if u32::from_str(commits).is_err() {
-                panic!("Couldn't parse number of commits");
-            }
-            config.commits = commits.to_owned();
-        }
-
-        config
-    }
+    /// Format uncommitted files.
+    #[structopt(short, long)]
+    uncommitted: bool,
+    #[structopt(short, long)]
+    commits: u64,
 }
 
 fn main() {
     env_logger::init();
 
-    let opts = make_opts();
-    let matches = opts
-        .parse(env::args().skip(1))
-        .expect("Couldn't parse command line");
-    let config = Config::from_args(&matches, &opts);
+    let opt: Opt = Opt::from_args();
 
-    if !config.uncommitted {
+    if !opt.uncommitted {
         check_uncommitted();
     }
 
-    let stdout = git_diff(&config.commits);
+    let stdout = git_diff(opt.commits);
     let files = get_files(&stdout);
     debug!("files: {:?}", files);
     let files = prune_files(files);

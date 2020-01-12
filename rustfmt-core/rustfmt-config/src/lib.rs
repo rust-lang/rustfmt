@@ -127,7 +127,6 @@ create_config! {
     unstable_features: bool, false, false,
             "Enables unstable features. Only available on nightly channel";
     disable_all_formatting: bool, false, false, "Don't reformat anything";
-    skip_children: bool, false, false, "Don't reformat out of line modules";
     hide_parse_errors: bool, false, false, "Hide errors from the parser";
     error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
     error_on_unformatted: bool, false, false,
@@ -169,6 +168,7 @@ impl PartialConfig {
         cloned.width_heuristics = None;
         cloned.print_misformatted_file_names = None;
         cloned.recursive = None;
+        cloned.emit_mode = None;
 
         ::toml::to_string(&cloned).map_err(ToTomlError)
     }
@@ -285,13 +285,6 @@ impl Config {
                     eprint!("{}", err);
                 }
                 let config = Config::default().fill_from_parsed_config(parsed_config, dir);
-                if config.skip_children() && config.recursive() {
-                    return Err(String::from(
-                        "Error: Conflicting config options `skip_children` and `recursive` are \
-                        both enabled. `skip_children` has been deprecated and should be \
-                        removed from your config.",
-                    ));
-                }
                 Ok(config)
             }
             Err(e) => {
@@ -308,10 +301,10 @@ impl Config {
 /// file system (including searching the file system for overrides).
 pub fn load_config<O: CliOptions>(
     file_path: Option<&Path>,
-    options: Option<O>,
+    options: Option<&O>,
 ) -> Result<(Config, Option<PathBuf>), Error> {
     let over_ride = match options {
-        Some(ref opts) => config_path(opts)?,
+        Some(opts) => config_path(opts)?,
         None => None,
     };
 
@@ -428,19 +421,16 @@ mod test {
 
     #[test]
     fn test_config_used_to_toml() {
-        let config = Config::default();
+        let mut config = Config::default();
 
-        let merge_derives = config.merge_derives();
-        let skip_children = config.skip_children();
+        config.set().merge_derives(false);
+        config.set().max_width(100);
 
         let used_options = config.used_options();
         let toml = used_options.to_toml().unwrap();
         assert_eq!(
             toml,
-            format!(
-                "merge_derives = {}\nskip_children = {}\n",
-                merge_derives, skip_children,
-            )
+            "merge_derives = false\n"
         );
     }
 
@@ -494,27 +484,6 @@ mod test {
         let toml = r#"license_template_path = "tests/license-template/lt.txt""#;
         let config = Config::from_toml(toml, Path::new("")).unwrap();
         assert!(config.license_template.is_some());
-    }
-
-    #[test]
-    fn test_conflicting_recursive_skip_children() {
-        if !option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev") {
-            return;
-        }
-
-        let toml = "skip_children = true\nrecursive = true";
-        // Update to `contains_err()` once it lands
-        // https://github.com/rust-lang/rust/issues/62358
-        // https://doc.rust-lang.org/std/result/enum.Result.html#method.contains_err
-        match Config::from_toml(toml, Path::new("")) {
-            Ok(_) => panic!("Expected configuration error"),
-            Err(msg) => assert_eq!(
-                msg,
-                "Error: Conflicting config options `skip_children` and `recursive` \
-                are both enabled. `skip_children` has been deprecated and should be \
-                removed from your config.",
-            ),
-        }
     }
 
     #[test]
@@ -577,14 +546,12 @@ color = "Auto"
 required_version = "{}"
 unstable_features = false
 disable_all_formatting = false
-skip_children = false
 hide_parse_errors = false
 error_on_line_overflow = false
 error_on_unformatted = false
 report_todo = "Never"
 report_fixme = "Never"
 ignore = []
-emit_mode = "Files"
 "#,
             env!("CARGO_PKG_VERSION")
         );

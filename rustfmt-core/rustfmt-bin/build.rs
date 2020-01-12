@@ -12,10 +12,13 @@ fn main() {
     }
 
     println!("cargo:rerun-if-env-changed=CFG_RELEASE_CHANNEL");
+    if option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev") {
+        println!("cargo:rustc-cfg=nightly");
+    }
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
-    File::create(out_dir.join("commit-info.txt"))
+    File::create(out_dir.join("version-info.txt"))
         .unwrap()
         .write_all(commit_info().as_bytes())
         .unwrap();
@@ -25,7 +28,10 @@ fn main() {
 // (git not installed or if this is not a git repository) just return an empty string.
 fn commit_info() -> String {
     match (channel(), commit_hash(), commit_date()) {
-        (channel, Some(hash), Some(date)) => format!("{} ({} {})", channel, hash.trim_end(), date),
+        (channel, Some(hash), Some(date)) => {
+            format!("{}-{} ({} {})", option_env!("CARGO_PKG_VERSION")
+                .unwrap_or("unknown"), channel, hash.trim_end(), date)
+        },
         _ => String::new(),
     }
 }

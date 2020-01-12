@@ -1,8 +1,6 @@
 //! Integration tests for rustfmt.
 
 use std::env;
-use std::fs::remove_file;
-use std::path::Path;
 use std::process::Command;
 
 /// Run the rustfmt executable and return its output.
@@ -52,28 +50,13 @@ macro_rules! assert_that {
 fn print_config() {
     assert_that!(
         &["--print-config", "unknown"],
-        starts_with("Unknown print-config option")
+        starts_with("error: Invalid value for '--print-config")
     );
     assert_that!(&["--print-config", "default"], contains("max_width = 100"));
-    assert_that!(&["--print-config", "minimal"], contains("PATH required"));
-    assert_that!(
-        &["--print-config", "minimal", "minimal-config"],
-        contains("doesn't work with standard input.")
-    );
-
-    let (stdout, stderr) = rustfmt(&[
-        "--print-config",
-        "minimal",
-        "minimal-config",
-        "src/shape.rs",
-    ]);
-    assert!(
-        Path::new("minimal-config").exists(),
-        "stdout:\n{}\nstderr:\n{}",
-        stdout,
-        stderr
-    );
-    remove_file("minimal-config").unwrap();
+    assert_that!(&["--print-config", "current"], contains("max_width = 100"));
+    assert_that!(&["--config", "max_width=120", "--print-config", "current"], contains("max_width = 120"));
+    assert_that!(&["--config", "max_width=120", "--print-config", "minimal"], contains("max_width = 120"));
+    assert_that!(&["--config", "max_width=100", "--print-config", "minimal"], eq(""));
 }
 
 #[ignore]

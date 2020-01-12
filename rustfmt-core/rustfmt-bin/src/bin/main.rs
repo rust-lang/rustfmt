@@ -1,24 +1,28 @@
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
+
 use std::collections::HashMap;
 use std::env;
-use std::io::{self, stdout, Error as IoError, Read, Write};
+use std::fmt;
+use std::io::{self, stdout, Error as IoError, Read, Write, stdin};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use ansi_term::Colour::Red;
 use anyhow::{format_err, Result};
-use getopts::{Matches, Options};
+use structopt::StructOpt;
 use thiserror::Error;
 
 use rustfmt_lib::{
-    load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
+    load_config, CliOptions, Config, Edition, EmitMode, FileLines, FileName,
     FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
 
 fn main() {
     env_logger::init();
-    let opts = make_opts();
+    let opt: Opt = Opt::from_args();
 
-    let exit_code = match execute(&opts) {
+    let exit_code = match execute(opt) {
         Ok(code) => code,
         Err(e) => {
             eprintln!("{}", e.to_string());
@@ -35,24 +39,247 @@ fn main() {
     std::process::exit(exit_code);
 }
 
-/// Rustfmt operations.
-enum Operation {
-    /// Format files and their child modules.
-    Format {
-        files: Vec<PathBuf>,
-        minimal_config_path: Option<String>,
-    },
-    /// Print the help message.
-    Help(HelpOp),
-    /// Print version information
-    Version,
-    /// Output default config to a file, or stdout if None
-    ConfigOutputDefault { path: Option<String> },
-    /// Output current config (as if formatting to a file) to stdout
-    ConfigOutputCurrent { path: Option<String> },
-    /// No file specified, read from stdin
-    Stdin { input: String },
+/// Format Rust code
+#[derive(Debug, StructOpt, Clone)]
+#[structopt(name = "rustfmt", version = include_str!(concat!(env!("OUT_DIR"), "/version-info.txt")))]
+struct Opt {
+    /// Run in 'check' mode.
+    ///
+    /// Exits with 0 if input is formatted correctly.
+    /// Exits with 1 and prints a diff if formatting is required.
+    #[structopt(short, long)]
+    check: bool,
+    /// Specify the format of rustfmt's output.
+    #[cfg_attr(nightly, structopt(long, name= "files|stdout|checkstyle|json"))]
+    #[cfg_attr(not(nightly), structopt(long, name= "files|stdout"))]
+    emit: Option<Emit>,
+    /// A path to the configuration file.
+    #[structopt(long = "config-path", parse(from_os_str))]
+    config_path: Option<PathBuf>,
+    /// Rust compiler edition
+    ///
+    /// Specify which edition of the compiler to use when formatting code.
+    #[structopt(long, name = "2015|2018")]
+    edition: Option<Edition>,
+    /// Print configuration options.
+    ///
+    /// `default` will print the default configuration options. `current` will print the
+    /// current configuration options. `minimal` will print the minimal subset of the
+    /// current configuration options that have non-default values.
+    #[structopt(long = "print-config", name = "default|current|minimal")]
+    print_config: Option<PrintConfig>,
+    /// Prints the names of files with diff.
+    #[structopt(short = "l", long = "files-with-diff")]
+    files_with_diff: bool,
+    /// Set options from command line.
+    ///
+    /// Set configuration options via command line by specifying a list of key-value pairs
+    /// separated by commas (e.g., rustfmt --config=max_width=100,merge_imports=true).
+    /// These settings precedes any other settings specified in configuration files.
+    #[structopt(long = "config")]
+    inline_config: Option<Vec<InlineConfig>>,
+    /// Recursively format submodules.
+    ///
+    /// Format all encountered modules recursively regardless of whether the modules
+    /// are defined inline or in another file.
+    #[structopt(short, long)]
+    recursive: bool,
+    /// Print no output.
+    #[structopt(short, long)]
+    quiet: bool,
+    /// Print verbose output.
+    #[structopt(short, long)]
+    verbose: bool,
+
+    // Nightly-only options.
+
+    /// Limit formatting to specified ranges.
+    ///
+    /// If you want to restrict reformatting to specific sets of lines, you can
+    /// use the `--file-lines` option. Its argument is a JSON array of objects
+    /// with `file` and `range` properties, where `file` is a file name, and
+    /// `range` is an array representing a range of lines like `[7,13]`. Ranges
+    /// are 1-based and inclusive of both end points. Specifying an empty array
+    /// will result in no files being formatted. For example,
+    ///
+    /// ```
+    /// rustfmt --file-lines '[
+    ///    {{\"file\":\"src/lib.rs\",\"range\":[7,13]}},
+    ///    {{\"file\":\"src/lib.rs\",\"range\":[21,29]}},
+    ///    {{\"file\":\"src/foo.rs\",\"range\":[10,11]}},
+    ///    {{\"file\":\"src/foo.rs\",\"range\":[15,15]}}]'
+    /// ```
+    ///
+    /// would format lines `7-13` and `21-29` of `src/lib.rs`, and lines `10-11`,
+    /// and `15` of `src/foo.rs`. No other files would be formatted, even if they
+    /// are included as out of line modules from `src/lib.rs`.
+    #[cfg_attr(nightly, structopt(long = "file-lines", default_value = "null"))]
+    #[cfg_attr(not(nightly), structopt(skip))]
+    file_lines: FileLines,
+
+    /// Error if unable to get comments or string literals within max_width,
+    /// or they are left with trailing whitespaces (unstable).
+    #[cfg_attr(nightly, structopt(long = "error_on_unformatted"))]
+    #[cfg_attr(not(nightly), structopt(skip))]
+    error_on_unformatted: bool,
+
+    // Positional arguments.
+
+    #[structopt(parse(from_os_str))]
+    files: Vec<PathBuf>,
 }
+
+#[derive(Debug, Clone)]
+struct InlineConfig(HashMap<String, String>, bool /* is help */);
+
+impl InlineConfig {
+    fn is_help(&self) -> bool {
+        self.1
+    }
+}
+
+impl FromStr for InlineConfig {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.trim() == "help" {
+            return Ok(InlineConfig(HashMap::default(), true));
+        }
+
+        s.split(',')
+            .map(
+            |key_val| match key_val.char_indices().find(|(_, ch)| *ch == '=') {
+                Some((middle, _)) => {
+                    let (key, val) = (&key_val[..middle], &key_val[middle + 1..]);
+                    if !Config::is_valid_key_val(key, val) {
+                        Err(format_err!("invalid key=val pair: `{}`", key_val))
+                    } else {
+                        Ok((key.to_string(), val.to_string()))
+                    }
+                }
+
+                None => Err(format_err!(
+                        "--config expects comma-separated list of key=val pairs, found `{}`",
+                        key_val
+                    )),
+            },
+        ).collect::<Result<HashMap<_, _>, _>>()
+            .map(|map| InlineConfig(map, false))
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum PrintConfig {
+    Default,
+    Minimal,
+    Current,
+}
+
+impl FromStr for PrintConfig {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "default" => Ok(PrintConfig::Default),
+            "minimal" => Ok(PrintConfig::Minimal),
+            "current" => Ok(PrintConfig::Current),
+            _ => Err(format!("expected one of [current,default,minimal], found `{}`", s)),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Emit {
+    Files,
+    Stdout,
+    Checkstyle,
+    Json,
+}
+
+impl Emit {
+    fn to_emit_mode(self) -> EmitMode {
+        match self {
+            Emit::Files => EmitMode::Files,
+            Emit::Json => EmitMode::Json,
+            Emit::Checkstyle => EmitMode::Checkstyle,
+            Emit::Stdout => EmitMode::Stdout,
+        }
+    }
+}
+
+impl fmt::Display for Emit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Emit::Files => f.write_str("files"),
+            Emit::Stdout => f.write_str("stdout"),
+            Emit::Checkstyle => f.write_str("checkstyle"),
+            Emit::Json => f.write_str("json"),
+        }
+    }
+}
+
+impl FromStr for Emit {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "files" => Ok(Emit::Files),
+            "stdout" => Ok(Emit::Stdout),
+            "checkstyle" => Ok(Emit::Checkstyle),
+            "json" => Ok(Emit::Json),
+            _ => Err(format!("unknown --emit mode: {}", s)),
+        }
+    }
+}
+
+/// Rustfmt command line option errors.
+#[derive(Error, Debug)]
+enum OptError {
+    /// Attempt to use --quiet and --verbose at once.
+    #[error("--quiet and --verbose cannot be used at once.")]
+    QuietAndVerbose,
+    /// Attempt to use --emit and --check at once.
+    #[error("--emit and --check cannot be used at once.")]
+    EmitAndCheck,
+    /// Attempt to use --emit with a mode which is not currently
+    /// supported with standard input.
+    #[error("Emit mode {0} not supported with standard output.")]
+    StdinBadEmit(Emit),
+}
+
+impl Opt {
+    fn canonicalize(&mut self) {
+        for f in &mut self.files {
+            if let Ok(canonical_path) = f.canonicalize() {
+                *f = canonical_path;
+            }
+        }
+    }
+
+    fn verify(&self) -> Result<(), OptError> {
+        if self.quiet && self.verbose {
+            return Err(OptError::QuietAndVerbose);
+        }
+
+        if self.check && self.emit.is_some() {
+            return Err(OptError::EmitAndCheck);
+        }
+
+        if self.files.is_empty() {
+            match self.emit {
+                // Emit modes which work with standard input
+                // None means default, which is Stdout.
+                None | Some(Emit::Stdout) | Some(Emit::Checkstyle) | Some(Emit::Json) => {}
+                Some(emit_mode) => {
+                    return Err(OptError::StdinBadEmit(emit_mode));
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 
 /// Rustfmt operations errors.
 #[derive(Error, Debug)]
@@ -69,10 +296,6 @@ pub enum OperationError {
     /// An io error during reading or writing.
     #[error("io error: {0}")]
     IoError(IoError),
-    /// Attempt to use --emit with a mode which is not currently
-    /// supported with stdandard input.
-    #[error("Emit mode {0} not supported with standard output.")]
-    StdinBadEmit(EmitMode),
 }
 
 impl From<IoError> for OperationError {
@@ -81,190 +304,103 @@ impl From<IoError> for OperationError {
     }
 }
 
-/// Arguments to `--help`
-enum HelpOp {
-    None,
-    Config,
-    FileLines,
-}
-
-fn make_opts() -> Options {
-    let mut opts = Options::new();
-
-    opts.optflag(
-        "",
-        "check",
-        "Run in 'check' mode. Exits with 0 if input is formatted correctly. Exits \
-         with 1 and prints a diff if formatting is required.",
-    );
-    let is_nightly = is_nightly();
-    let emit_opts = if is_nightly {
-        "[files|stdout|coverage|checkstyle|json]"
-    } else {
-        "[files|stdout]"
-    };
-    opts.optopt("", "emit", "What data to emit and how", emit_opts);
-    opts.optopt(
-        "",
-        "config-path",
-        "Recursively searches the given path for the rustfmt.toml config file. If not \
-         found reverts to the input file path",
-        "[Path for the configuration file]",
-    );
-    opts.optopt("", "edition", "Rust edition to use", "[2015|2018]");
-    opts.optopt(
-        "",
-        "color",
-        "Use colored output (if supported)",
-        "[always|never|auto]",
-    );
-    opts.optopt(
-        "",
-        "print-config",
-        "Dumps a default or minimal config to PATH. A minimal config is the \
-         subset of the current config file used for formatting the current program. \
-         `current` writes to stdout current config as if formatting the file at PATH.",
-        "[default|minimal|current] PATH",
-    );
-    opts.optflag(
-        "l",
-        "files-with-diff",
-        "Prints the names of mismatched files that were formatted. Prints the names of \
-         files that would be formated when used with `--check` mode. ",
-    );
-    opts.optmulti(
-        "",
-        "config",
-        "Set options from command line. These settings take priority over .rustfmt.toml",
-        "[key1=val1,key2=val2...]",
-    );
-
-    if is_nightly {
-        opts.optflag(
-            "",
-            "unstable-features",
-            "Enables unstable features. Only available on nightly channel.",
-        );
-        opts.optopt(
-            "",
-            "file-lines",
-            "Format specified line ranges. Run with `--help=file-lines` for \
-             more detail (unstable).",
-            "JSON",
-        );
-        opts.optflag(
-            "",
-            "error-on-unformatted",
-            "Error if unable to get comments or string literals within max_width, \
-             or they are left with trailing whitespaces (unstable).",
-        );
-        opts.optflag(
-            "",
-            "skip-children",
-            "Don't reformat child modules (unstable).",
-        );
+impl CliOptions for Opt {
+    fn apply_to(&self, config: &mut Config) {
+        if self.verbose {
+            config.set().verbose(Verbosity::Verbose);
+        } else if self.quiet {
+            config.set().verbose(Verbosity::Quiet);
+        }
+        config.set().file_lines(self.file_lines.clone());
+        if self.recursive {
+            config.set().recursive(true);
+        }
+        if self.error_on_unformatted {
+            config.set().error_on_unformatted(true);
+        }
+        if let Some(ref edition) = self.edition {
+            config.set().edition((*edition).clone());
+        }
+        if self.check {
+            config.set().emit_mode(EmitMode::Diff);
+        } else if let Some(emit) = self.emit {
+            config.set().emit_mode(emit.to_emit_mode());
+        }
+        if self.files_with_diff {
+            config.set().print_misformatted_file_names(true);
+        }
+        if let Some(ref inline_configs) = self.inline_config {
+            for inline_config in inline_configs {
+                for (k, v) in &inline_config.0 {
+                    config.override_value(k, v);
+                }
+            }
+        }
     }
-    opts.optflag(
-        "r",
-        "recursive",
-        "Format all encountered modules recursively regardless of whether the modules\
-         are defined inline or in another file",
-    );
-    opts.optflag("v", "verbose", "Print verbose output");
-    opts.optflag("q", "quiet", "Print less output");
-    opts.optflag("V", "version", "Show version information");
-    opts.optflagopt(
-        "h",
-        "help",
-        "Show this message or help about a specific topic: `config` or `file-lines`",
-        "=TOPIC",
-    );
 
-    opts
-}
-
-fn is_nightly() -> bool {
-    option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev")
+    fn config_path(&self) -> Option<&Path> {
+        self.config_path.as_ref().map(PathBuf::as_path)
+    }
 }
 
 // Returned i32 is an exit code
-fn execute(opts: &Options) -> Result<i32> {
-    let matches = opts.parse(env::args().skip(1))?;
-    let options = GetOptsOptions::from_matches(&matches)?;
+fn execute(mut opt: Opt) -> Result<i32> {
+    opt.verify()?;
 
-    match determine_operation(&matches)? {
-        Operation::Help(HelpOp::None) => {
-            print_usage_to_stdout(opts, "");
-            Ok(0)
-        }
-        Operation::Help(HelpOp::Config) => {
-            Config::print_docs(&mut stdout(), options.unstable_features);
-            Ok(0)
-        }
-        Operation::Help(HelpOp::FileLines) => {
-            print_help_file_lines();
-            Ok(0)
-        }
-        Operation::Version => {
-            print_version();
-            Ok(0)
-        }
-        Operation::ConfigOutputDefault { path } => {
-            let toml = Config::default().all_options().to_toml()?;
-            if let Some(path) = path {
-                let mut file = std::fs::File::create(path)?;
-                file.write_all(toml.as_bytes())?;
-            } else {
-                io::stdout().write_all(toml.as_bytes())?;
-            }
-            Ok(0)
-        }
-        Operation::ConfigOutputCurrent { path } => {
-            let path = match path {
-                Some(path) => path,
-                None => return Err(format_err!("PATH required for `--print-config current`")),
-            };
+    if opt.inline_config.as_ref().map_or(false, |inline_configs| inline_configs.iter().any(InlineConfig::is_help)) {
+        Config::print_docs(&mut stdout(), cfg!(nightly));
+        return Ok(0);
+    }
 
-            let file = PathBuf::from(path);
-            let file = file.canonicalize().unwrap_or(file);
+    opt.canonicalize();
 
-            let (config, _) = load_config(Some(file.parent().unwrap()), Some(options))?;
-            let toml = config.all_options().to_toml()?;
-            io::stdout().write_all(toml.as_bytes())?;
-
-            Ok(0)
-        }
-        Operation::Stdin { input } => format_string(input, options),
-        Operation::Format {
-            files,
-            minimal_config_path,
-        } => format(files, minimal_config_path, &options),
+    match opt.print_config {
+        Some(PrintConfig::Default) => print_default_config(),
+        Some(PrintConfig::Minimal) => print_config(&opt, PrintConfig::Minimal),
+        Some(PrintConfig::Current) => print_config(&opt, PrintConfig::Current),
+        None => format(opt),
     }
 }
 
-fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
-    // try to read config from local directory
-    let (mut config, _) = load_config(Some(Path::new(".")), Some(options.clone()))?;
+fn print_default_config() -> Result<i32> {
+    let toml = Config::default().all_options().to_toml()?;
+    io::stdout().write_all(toml.as_bytes())?;
+    Ok(0)
+}
 
-    if options.check {
+fn print_config(opt: &Opt, print_config: PrintConfig) -> Result<i32> {
+    let (config, config_path) =
+        load_config(env::current_dir().ok().as_ref().map(PathBuf::as_path), Some(opt))?;
+    let actual_config = FileConfigPairIter::new(&opt, config_path.is_some())
+        .find_map(|pair| match pair.config {
+            FileConfig::Local(config, Some(_)) => Some(config),
+            _ => None,
+        });
+    let used_config = actual_config.unwrap_or(config);
+    let toml = if print_config == PrintConfig::Minimal {
+        used_config.used_options().to_toml()?
+    } else {
+        used_config.all_options().to_toml()?
+    };
+    io::stdout().write_all(toml.as_bytes())?;
+    Ok(0)
+}
+
+fn format_string(input: String, opt: Opt) -> Result<i32> {
+    // try to read config from local directory
+    let (mut config, _) = load_config(Some(Path::new(".")), Some(&opt))?;
+
+    if opt.check {
         config.set().emit_mode(EmitMode::Diff);
     } else {
-        match options.emit_mode {
-            // Emit modes which work with standard input
-            // None means default, which is Stdout.
-            None | Some(EmitMode::Stdout) | Some(EmitMode::Checkstyle) | Some(EmitMode::Json) => {}
-            Some(emit_mode) => {
-                return Err(OperationError::StdinBadEmit(emit_mode).into());
-            }
-        }
         config
             .set()
-            .emit_mode(options.emit_mode.unwrap_or(EmitMode::Stdout));
+            .emit_mode(opt.emit.map_or(EmitMode::Stdout, Emit::to_emit_mode));
     }
     config.set().verbose(Verbosity::Quiet);
 
     // parse file_lines
-    config.set().file_lines(options.file_lines);
+    config.set().file_lines(opt.file_lines);
     for f in config.file_lines().files() {
         match *f {
             FileName::Stdin => {}
@@ -284,13 +420,61 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
     Ok(exit_code)
 }
 
+enum FileConfig {
+    Default,
+    Local(Config, Option<PathBuf>),
+}
+
+struct FileConfigPair<'a> {
+    file: &'a Path,
+    config: FileConfig,
+}
+
+struct FileConfigPairIter<'a> {
+    has_config_from_commandline: bool,
+    files: std::slice::Iter<'a, PathBuf>,
+    opt: &'a Opt,
+}
+
+impl<'a> FileConfigPairIter<'a>
+{
+    fn new(opt: &'a Opt, has_config_from_commandline: bool) -> Self {
+        FileConfigPairIter {
+            has_config_from_commandline,
+            files: opt.files.iter(),
+            opt,
+        }
+    }
+}
+
+impl<'a> Iterator for FileConfigPairIter<'a>
+{
+    type Item = FileConfigPair<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let file = self.files.next()?;
+        let config = if self.has_config_from_commandline {
+            FileConfig::Default
+        } else {
+            let (local_config, config_path) =
+                load_config(Some(file.parent()?), Some(self.opt)).ok()?;
+            FileConfig::Local(local_config, config_path)
+        };
+
+        Some(FileConfigPair {file, config})
+    }
+}
+
 fn format(
-    files: Vec<PathBuf>,
-    minimal_config_path: Option<String>,
-    options: &GetOptsOptions,
+    opt: Opt,
 ) -> Result<i32> {
-    options.verify_file_lines(&files);
-    let (config, config_path) = load_config(None, Some(options.clone()))?;
+    if opt.files.is_empty() {
+        let mut buf = String::new();
+        stdin().read_to_string(&mut buf)?;
+        return format_string(buf, opt);
+    }
+
+    let (config, config_path) = load_config(None, Some(&opt))?;
 
     if config.verbose() == Verbosity::Verbose {
         if let Some(path) = config_path.as_ref() {
@@ -301,7 +485,9 @@ fn format(
     let out = &mut stdout();
     let mut session = Session::new(config, Some(out));
 
-    for file in files {
+    for pair in FileConfigPairIter::new(&opt, config_path.is_some()) {
+        let file = pair.file;
+
         if !file.exists() {
             eprintln!("Error: file `{}` does not exist", file.display());
             session.add_operational_error();
@@ -309,12 +495,9 @@ fn format(
             eprintln!("Error: `{}` is a directory", file.display());
             session.add_operational_error();
         } else {
-            // Check the file directory if the config-path could not be read or not provided
-            if config_path.is_none() {
-                let (local_config, config_path) =
-                    load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
-                if local_config.verbose() == Verbosity::Verbose {
-                    if let Some(path) = config_path {
+            if let FileConfig::Local(local_config, config_path) = pair.config {
+                if let Some(path) = config_path {
+                    if local_config.verbose() == Verbosity::Verbose {
                         println!(
                             "Using rustfmt config file {} for {}",
                             path.display(),
@@ -324,25 +507,17 @@ fn format(
                 }
 
                 session.override_config(local_config, |sess| {
-                    format_and_emit_report(sess, Input::File(file))
+                    format_and_emit_report(sess, Input::File(file.to_path_buf()))
                 });
             } else {
-                format_and_emit_report(&mut session, Input::File(file));
+                format_and_emit_report(&mut session, Input::File(file.to_path_buf()));
             }
         }
     }
 
-    // If we were given a path via dump-minimal-config, output any options
-    // that were used during formatting as TOML.
-    if let Some(path) = minimal_config_path {
-        let mut file = std::fs::File::create(path)?;
-        let toml = session.config.used_options().to_toml()?;
-        file.write_all(toml.as_bytes())?;
-    }
-
     let exit_code = if session.has_operational_errors()
         || session.has_parsing_errors()
-        || ((session.has_diff() || session.has_check_errors()) && options.check)
+        || ((session.has_diff() || session.has_check_errors()) && opt.check)
     {
         1
     } else {
@@ -382,345 +557,6 @@ fn should_print_with_colors<T: Write>(session: &mut Session<'_, T>) -> bool {
         _ => false,
     }
 }
-
-fn print_usage_to_stdout(opts: &Options, reason: &str) {
-    let sep = if reason.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n\n", reason)
-    };
-    let msg = format!(
-        "{}Format Rust code\n\nusage: {} [options] <file>...",
-        sep,
-        env::args_os().next().unwrap().to_string_lossy()
-    );
-    println!("{}", opts.usage(&msg));
-}
-
-fn print_help_file_lines() {
-    println!(
-        "If you want to restrict reformatting to specific sets of lines, you can
-use the `--file-lines` option. Its argument is a JSON array of objects
-with `file` and `range` properties, where `file` is a file name, and
-`range` is an array representing a range of lines like `[7,13]`. Ranges
-are 1-based and inclusive of both end points. Specifying an empty array
-will result in no files being formatted. For example,
-
-```
-rustfmt --file-lines '[
-    {{\"file\":\"src/lib.rs\",\"range\":[7,13]}},
-    {{\"file\":\"src/lib.rs\",\"range\":[21,29]}},
-    {{\"file\":\"src/foo.rs\",\"range\":[10,11]}},
-    {{\"file\":\"src/foo.rs\",\"range\":[15,15]}}]'
-```
-
-would format lines `7-13` and `21-29` of `src/lib.rs`, and lines `10-11`,
-and `15` of `src/foo.rs`. No other files would be formatted, even if they
-are included as out of line modules from `src/lib.rs`."
-    );
-}
-
-fn print_version() {
-    let version_info = format!(
-        "{}-{}",
-        option_env!("CARGO_PKG_VERSION").unwrap_or("unknown"),
-        include_str!(concat!(env!("OUT_DIR"), "/commit-info.txt"))
-    );
-
-    println!("rustfmt {}", version_info);
-}
-
-fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
-    if matches.opt_present("h") {
-        let topic = matches.opt_str("h");
-        if topic == None {
-            return Ok(Operation::Help(HelpOp::None));
-        } else if topic == Some("config".to_owned()) {
-            return Ok(Operation::Help(HelpOp::Config));
-        } else if topic == Some("file-lines".to_owned()) {
-            return Ok(Operation::Help(HelpOp::FileLines));
-        } else {
-            return Err(OperationError::UnknownHelpTopic(topic.unwrap()));
-        }
-    }
-    let mut free_matches = matches.free.iter();
-
-    let mut minimal_config_path = None;
-    if let Some(kind) = matches.opt_str("print-config") {
-        let path = free_matches.next().cloned();
-        match kind.as_str() {
-            "default" => return Ok(Operation::ConfigOutputDefault { path }),
-            "current" => return Ok(Operation::ConfigOutputCurrent { path }),
-            "minimal" => {
-                minimal_config_path = path;
-                if minimal_config_path.is_none() {
-                    eprintln!("WARNING: PATH required for `--print-config minimal`.");
-                }
-            }
-            _ => {
-                return Err(OperationError::UnknownPrintConfigTopic(kind));
-            }
-        }
-    }
-
-    if matches.opt_present("version") {
-        return Ok(Operation::Version);
-    }
-
-    let files: Vec<_> = free_matches
-        .map(|s| {
-            let p = PathBuf::from(s);
-            // we will do comparison later, so here tries to canonicalize first
-            // to get the expected behavior.
-            p.canonicalize().unwrap_or(p)
-        })
-        .collect();
-
-    // if no file argument is supplied, read from stdin
-    if files.is_empty() {
-        if minimal_config_path.is_some() {
-            return Err(OperationError::MinimalPathWithStdin);
-        }
-        let mut buffer = String::new();
-        io::stdin().read_to_string(&mut buffer)?;
-
-        return Ok(Operation::Stdin { input: buffer });
-    }
-
-    Ok(Operation::Format {
-        files,
-        minimal_config_path,
-    })
-}
-
-const STABLE_EMIT_MODES: [EmitMode; 3] = [EmitMode::Files, EmitMode::Stdout, EmitMode::Diff];
-
-/// Parsed command line options.
-#[derive(Clone, Debug, Default)]
-struct GetOptsOptions {
-    skip_children: Option<bool>,
-    recursive: Option<bool>,
-    quiet: bool,
-    verbose: bool,
-    config_path: Option<PathBuf>,
-    inline_config: HashMap<String, String>,
-    emit_mode: Option<EmitMode>,
-    check: bool,
-    edition: Option<Edition>,
-    color: Option<Color>,
-    file_lines: FileLines, // Default is all lines in all files.
-    unstable_features: bool,
-    error_on_unformatted: Option<bool>,
-    print_misformatted_file_names: bool,
-}
-
-fn deprecate_skip_children() {
-    let msg = "Option --skip-children is deprecated since it is now the default to not format \
-               submodules of given files (#3587)";
-    eprintln!("{}: {}", Red.bold().paint("Deprecation"), msg);
-}
-
-impl GetOptsOptions {
-    pub fn from_matches(matches: &Matches) -> Result<GetOptsOptions> {
-        let mut options = GetOptsOptions::default();
-        options.verbose = matches.opt_present("verbose");
-        options.quiet = matches.opt_present("quiet");
-        if options.verbose && options.quiet {
-            return Err(format_err!("Can't use both `--verbose` and `--quiet`"));
-        }
-
-        let rust_nightly = is_nightly();
-
-        if rust_nightly {
-            options.unstable_features = matches.opt_present("unstable-features");
-
-            if options.unstable_features {
-                if matches.opt_present("skip-children") {
-                    deprecate_skip_children();
-                    options.skip_children = Some(true);
-                }
-                if matches.opt_present("error-on-unformatted") {
-                    options.error_on_unformatted = Some(true);
-                }
-                if let Some(ref file_lines) = matches.opt_str("file-lines") {
-                    options.file_lines = file_lines.parse()?;
-                }
-            } else {
-                let mut unstable_options = vec![];
-                if matches.opt_present("skip-children") {
-                    deprecate_skip_children();
-                    unstable_options.push("`--skip-children`");
-                }
-                if matches.opt_present("error-on-unformatted") {
-                    unstable_options.push("`--error-on-unformatted`");
-                }
-                if matches.opt_present("file-lines") {
-                    unstable_options.push("`--file-lines`");
-                }
-                if !unstable_options.is_empty() {
-                    let s = if unstable_options.len() == 1 { "" } else { "s" };
-                    return Err(format_err!(
-                        "Unstable option{} ({}) used without `--unstable-features`",
-                        s,
-                        unstable_options.join(", "),
-                    ));
-                }
-            }
-        }
-
-        if matches.opt_present("recursive") {
-            if let Some(true) = options.skip_children {
-                return Err(format_err!(
-                    "Conflicting options `skip_children` and `recursive` were specified. \
-                    `skip_children` has been deprecated and should no longer be used. ",
-                ));
-            }
-            options.recursive = Some(true);
-        }
-
-        options.config_path = matches.opt_str("config-path").map(PathBuf::from);
-
-        options.inline_config = matches
-            .opt_strs("config")
-            .iter()
-            .flat_map(|config| config.split(','))
-            .map(
-                |key_val| match key_val.char_indices().find(|(_, ch)| *ch == '=') {
-                    Some((middle, _)) => {
-                        let (key, val) = (&key_val[..middle], &key_val[middle + 1..]);
-                        if !Config::is_valid_key_val(key, val) {
-                            Err(format_err!("invalid key=val pair: `{}`", key_val))
-                        } else {
-                            Ok((key.to_string(), val.to_string()))
-                        }
-                    }
-
-                    None => Err(format_err!(
-                        "--config expects comma-separated list of key=val pairs, found `{}`",
-                        key_val
-                    )),
-                },
-            )
-            .collect::<Result<HashMap<_, _>, _>>()?;
-
-        options.check = matches.opt_present("check");
-        if let Some(ref emit_str) = matches.opt_str("emit") {
-            if options.check {
-                return Err(format_err!("Invalid to use `--emit` and `--check`"));
-            }
-
-            options.emit_mode = Some(emit_mode_from_emit_str(emit_str)?);
-        }
-
-        if let Some(ref edition_str) = matches.opt_str("edition") {
-            options.edition = Some(edition_from_edition_str(edition_str)?);
-        }
-
-        if matches.opt_present("files-with-diff") {
-            options.print_misformatted_file_names = true;
-        }
-
-        if !rust_nightly {
-            if let Some(ref emit_mode) = options.emit_mode {
-                if !STABLE_EMIT_MODES.contains(emit_mode) {
-                    return Err(format_err!(
-                        "Invalid value for `--emit` - using an unstable \
-                         value without `--unstable-features`",
-                    ));
-                }
-            }
-        }
-
-        if let Some(ref color) = matches.opt_str("color") {
-            match Color::from_str(color) {
-                Ok(color) => options.color = Some(color),
-                _ => return Err(format_err!("Invalid color: {}", color)),
-            }
-        }
-
-        Ok(options)
-    }
-
-    fn verify_file_lines(&self, files: &[PathBuf]) {
-        for f in self.file_lines.files() {
-            match *f {
-                FileName::Real(ref f) if files.contains(f) => {}
-                FileName::Real(_) => {
-                    eprintln!("Warning: Extra file listed in file_lines option '{}'", f)
-                }
-                FileName::Stdin => eprintln!("Warning: Not a file '{}'", f),
-            }
-        }
-    }
-}
-
-impl CliOptions for GetOptsOptions {
-    fn apply_to(self, config: &mut Config) {
-        if self.verbose {
-            config.set().verbose(Verbosity::Verbose);
-        } else if self.quiet {
-            config.set().verbose(Verbosity::Quiet);
-        } else {
-            config.set().verbose(Verbosity::Normal);
-        }
-        config.set().file_lines(self.file_lines);
-        config.set().unstable_features(self.unstable_features);
-        if let Some(skip_children) = self.skip_children {
-            config.set().skip_children(skip_children);
-        }
-        if let Some(recursive) = self.recursive {
-            config.set().recursive(recursive);
-        }
-        if let Some(error_on_unformatted) = self.error_on_unformatted {
-            config.set().error_on_unformatted(error_on_unformatted);
-        }
-        if let Some(edition) = self.edition {
-            config.set().edition(edition);
-        }
-        if self.check {
-            config.set().emit_mode(EmitMode::Diff);
-        } else if let Some(emit_mode) = self.emit_mode {
-            config.set().emit_mode(emit_mode);
-        }
-        if let Some(color) = self.color {
-            config.set().color(color);
-        }
-        if self.print_misformatted_file_names {
-            config.set().print_misformatted_file_names(true);
-        }
-
-        for (key, val) in self.inline_config {
-            config.override_value(&key, &val);
-        }
-    }
-
-    fn config_path(&self) -> Option<&Path> {
-        self.config_path.as_ref().map(|p| &**p)
-    }
-}
-
-fn edition_from_edition_str(edition_str: &str) -> Result<Edition> {
-    match edition_str {
-        "2015" => Ok(Edition::Edition2015),
-        "2018" => Ok(Edition::Edition2018),
-        _ => Err(format_err!("Invalid value for `--edition`")),
-    }
-}
-
-fn emit_mode_from_emit_str(emit_str: &str) -> Result<EmitMode> {
-    match emit_str {
-        "files" => Ok(EmitMode::Files),
-        "stdout" => Ok(EmitMode::Stdout),
-        "coverage" => Ok(EmitMode::Coverage),
-        "checkstyle" => Ok(EmitMode::Checkstyle),
-        "json" => Ok(EmitMode::Json),
-        _ => Err(format_err!("Invalid value for `--emit`")),
-    }
-}
-
-#[cfg(test)]
-#[macro_use]
-extern crate lazy_static;
 
 #[cfg(test)]
 mod test {
