@@ -152,7 +152,9 @@ fn baz() {
         // Regular unsafe block
     }
 
-    unsafe { foo() }
+    unsafe {
+        foo()
+    }
 
     unsafe {
         foo();
