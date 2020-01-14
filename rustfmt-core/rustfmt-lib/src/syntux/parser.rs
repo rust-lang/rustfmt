@@ -2,13 +2,12 @@ use std::borrow::Cow;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
+use rustc_span::{DUMMY_SP, Span, symbol::kw};
 use syntax::ast;
 use syntax::errors::Diagnostic;
 use syntax::parse::parser::Parser as RawParser;
 use syntax::parse::token::{DelimToken, TokenKind};
 use syntax::parse::{new_sub_parser_from_file, PResult};
-use syntax::source_map::{Span, DUMMY_SP};
-use syntax::symbol::kw;
 
 use crate::syntux::session::ParseSess;
 use crate::{Config, Input};
@@ -108,7 +107,7 @@ impl<'a> ParserBuilder<'a> {
             }),
             Input::Text(text) => syntax::parse::maybe_new_parser_from_source_str(
                 sess,
-                syntax::source_map::FileName::Custom("stdin".to_owned()),
+                rustc_span::FileName::Custom("stdin".to_owned()),
                 text,
             )
             .map(|mut parser| {

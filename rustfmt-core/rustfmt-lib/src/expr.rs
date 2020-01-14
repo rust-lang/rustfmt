@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::cmp::min;
 
 use itertools::Itertools;
+use rustc_span::{BytePos, Span};
 use syntax::parse::token::{DelimToken, LitKind};
-use syntax::source_map::{BytePos, Span};
 use syntax::{ast, ptr};
 
 use crate::chains::rewrite_chain;

@@ -12,16 +12,14 @@
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+use rustc_span::{BytePos, DUMMY_SP, Span, Symbol, symbol::kw};
 use syntax::parse::new_parser_from_tts;
 use syntax::parse::parser::Parser;
 use syntax::parse::token::{BinOpToken, DelimToken, Token, TokenKind};
 use syntax::print::pprust;
-use syntax::source_map::{BytePos, Span};
-use syntax::symbol::kw;
 use syntax::tokenstream::{Cursor, TokenStream, TokenTree};
 use syntax::ThinVec;
 use syntax::{ast, parse, ptr};
-use syntax_pos::{Symbol, DUMMY_SP};
 
 use crate::comment::{
     contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses,

@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
+use rustc_span::Span;
 use syntax::ast;
-use syntax::source_map::Span;
 
 use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};

@@ -1,9 +1,8 @@
 use std::iter::ExactSizeIterator;
 use std::ops::Deref;
 
+use rustc_span::{BytePos, DUMMY_SP, Span, symbol::kw};
 use syntax::ast::{self, FunctionRetTy, Mutability};
-use syntax::source_map::{BytePos, Span, DUMMY_SP};
-use syntax::symbol::kw;
 
 use crate::config::lists::*;
 use crate::config::{IndentStyle, TypeDensity};

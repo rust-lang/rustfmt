@@ -4,10 +4,10 @@ use std::borrow::Cow;
 use std::cmp::{max, min, Ordering};
 
 use regex::Regex;
+use rustc_span::{BytePos, DUMMY_SP, source_map, Span, symbol};
 use rustc_target::spec::abi;
-use syntax::source_map::{self, BytePos, Span};
 use syntax::visit;
-use syntax::{ast, ptr, symbol};
+use syntax::{ast, ptr};
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
@@ -35,7 +35,7 @@ use crate::visitor::FmtVisitor;
 
 const DEFAULT_VISIBILITY: ast::Visibility = source_map::Spanned {
     node: ast::VisibilityKind::Inherited,
-    span: source_map::DUMMY_SP,
+    span: DUMMY_SP,
 };
 
 fn type_annotation_separator(config: &Config) -> &str {

@@ -1,9 +1,7 @@
 use std::cmp::max;
 
-use syntax::{
-    ast, ptr,
-    source_map::{self, Span},
-};
+use rustc_span::{source_map, Span};
+use syntax::{ast, ptr};
 
 use crate::macros::MacroArg;
 use crate::utils::{mk_sp, outer_attributes};

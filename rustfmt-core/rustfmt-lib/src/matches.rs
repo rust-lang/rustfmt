@@ -2,7 +2,7 @@
 
 use std::iter::repeat;
 
-use syntax::source_map::{BytePos, Span};
+use rustc_span::{BytePos, Span};
 use syntax::{ast, ptr};
 
 use crate::comment::{combine_strs_with_missing_comments, rewrite_comment};

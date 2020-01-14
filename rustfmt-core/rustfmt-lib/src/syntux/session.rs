@@ -3,12 +3,11 @@ use std::path::Path;
 use std::rc::Rc;
 
 use rustc_data_structures::sync::Send;
+use rustc_span::{BytePos, source_map::{FilePathMapping, SourceMap}, Span};
 use syntax::ast;
 use syntax::errors::emitter::{ColorConfig, Emitter, EmitterWriter};
 use syntax::errors::{Diagnostic, Handler, Level as DiagnosticLevel};
 use syntax::parse::ParseSess as RawParseSess;
-use syntax::source_map::{FilePathMapping, SourceMap};
-use syntax_pos::{BytePos, Span};
 
 use crate::config::file_lines::LineRange;
 use crate::ignore_path::IgnorePathSet;
@@ -59,7 +58,7 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
         }
         if let Some(primary_span) = &db.span.primary_span() {
             let file_name = self.source_map.span_to_filename(*primary_span);
-            if let syntax_pos::FileName::Real(ref path) = file_name {
+            if let rustc_span::FileName::Real(ref path) = file_name {
                 if self
                     .ignore_path_set
                     .is_match(&FileName::Real(path.to_path_buf()))
@@ -154,7 +153,7 @@ impl ParseSess {
     pub(crate) fn is_file_parsed(&self, path: &Path) -> bool {
         self.parse_sess
             .source_map()
-            .get_source_file(&syntax_pos::FileName::Real(path.to_path_buf()))
+            .get_source_file(&rustc_span::FileName::Real(path.to_path_buf()))
             .is_some()
     }
 
@@ -270,8 +269,7 @@ mod tests {
         use crate::is_nightly_channel;
         use crate::utils::mk_sp;
         use std::path::PathBuf;
-        use syntax::source_map::FileName as SourceMapFileName;
-        use syntax_pos::MultiSpan;
+        use rustc_span::{MultiSpan, FileName as SourceMapFileName};
 
         struct TestEmitter {
             num_emitted_errors: Rc<RefCell<u32>>,

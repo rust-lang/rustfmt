@@ -1,6 +1,6 @@
+use rustc_span::Symbol;
 use syntax::ast;
 use syntax::visit::Visitor;
-use syntax_pos::Symbol;
 
 use crate::attr::MetaVisitor;
 use crate::syntux::parser::{Directory, Parser};

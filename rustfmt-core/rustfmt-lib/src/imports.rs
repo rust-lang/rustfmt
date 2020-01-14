@@ -2,9 +2,8 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 
+use rustc_span::{BytePos, DUMMY_SP, source_map, Span, symbol::sym};
 use syntax::ast::{self, UseTreeKind};
-use syntax::source_map::{self, BytePos, Span, DUMMY_SP};
-use syntax::symbol::sym;
 
 use crate::comment::combine_strs_with_missing_comments;
 use crate::config::lists::*;
@@ -854,7 +853,7 @@ impl Rewrite for UseTree {
 #[cfg(test)]
 mod test {
     use super::*;
-    use syntax::source_map::DUMMY_SP;
+    use rustc_span::DUMMY_SP;
 
     // Parse the path part of an import. This parser is not robust and is only
     // suitable for use in a test harness.

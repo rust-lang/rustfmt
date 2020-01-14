@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use syntax::source_map::{BytePos, Pos, Span};
+use rustc_span::{BytePos, Pos, Span};
 use syntax::{ast, visit};
 
 use crate::attr::*;

@@ -1,7 +1,7 @@
 //! Module that contains skip related stuffs.
 
+use rustc_span::symbol::{sym, Symbol};
 use syntax::ast::{Attribute, PathSegment};
-use syntax::symbol::{sym, Symbol};
 
 macro_rules! sym {
     ($tt:tt) => {

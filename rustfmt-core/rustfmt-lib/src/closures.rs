@@ -1,4 +1,4 @@
-use syntax::source_map::Span;
+use rustc_span::Span;
 use syntax::{ast, ptr};
 
 use crate::attr::get_attrs_from_stmt;

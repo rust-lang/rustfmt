@@ -10,7 +10,7 @@ use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json as json;
 use thiserror::Error;
 
-use syntax_pos::{self, SourceFile};
+use rustc_span::{self, SourceFile};
 
 /// A range of lines in a file, inclusive of both ends.
 pub struct LineRange {
@@ -26,21 +26,21 @@ pub enum FileName {
     Stdin,
 }
 
-impl From<syntax_pos::FileName> for FileName {
-    fn from(name: syntax_pos::FileName) -> FileName {
+impl From<rustc_span::FileName> for FileName {
+    fn from(name: rustc_span::FileName) -> FileName {
         match name {
-            syntax_pos::FileName::Real(p) => FileName::Real(p),
-            syntax_pos::FileName::Custom(ref f) if f == "stdin" => FileName::Stdin,
+            rustc_span::FileName::Real(p) => FileName::Real(p),
+            rustc_span::FileName::Custom(ref f) if f == "stdin" => FileName::Stdin,
             _ => unreachable!(),
         }
     }
 }
 
-impl From<&FileName> for syntax_pos::FileName {
-    fn from(filename: &FileName) -> syntax_pos::FileName {
+impl From<&FileName> for rustc_span::FileName {
+    fn from(filename: &FileName) -> rustc_span::FileName {
         match filename {
-            FileName::Real(path) => syntax_pos::FileName::Real(path.to_owned()),
-            FileName::Stdin => syntax_pos::FileName::Custom("stdin".to_owned()),
+            FileName::Real(path) => rustc_span::FileName::Real(path.to_owned()),
+            FileName::Stdin => rustc_span::FileName::Custom("stdin".to_owned()),
         }
     }
 }

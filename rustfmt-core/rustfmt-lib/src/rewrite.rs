@@ -3,8 +3,8 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+use rustc_span::Span;
 use syntax::ptr;
-use syntax::source_map::Span;
 
 use crate::config::{Config, IndentStyle};
 use crate::shape::Shape;
