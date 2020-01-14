@@ -115,8 +115,6 @@ pub enum EmitMode {
     Files,
     /// Writes the output to stdout.
     Stdout,
-    /// Displays how much of the input file was processed
-    Coverage,
     /// Unfancy stdout
     Checkstyle,
     /// Writes the resulting diffs in a JSON format. Returns an empty array

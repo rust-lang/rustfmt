@@ -3,7 +3,6 @@ use rustc_span::{BytePos, Pos, Span};
 use crate::comment::{is_last_comment_block, rewrite_comment, CodeCharKind, CommentCodeSlices};
 use crate::config::file_lines::FileLines;
 use crate::config::FileName;
-use crate::coverage::transform_missing_snippet;
 use crate::shape::{Indent, Shape};
 use crate::source_map::LineRangeUtils;
 use crate::utils::{
@@ -155,7 +154,7 @@ impl<'a> FmtVisitor<'a> {
     fn write_snippet_inner<F>(
         &mut self,
         big_snippet: &str,
-        old_snippet: &str,
+        snippet: &str,
         big_diff: usize,
         span: Span,
         process_last_snippet: F,
@@ -168,8 +167,6 @@ impl<'a> FmtVisitor<'a> {
         let line = self.parse_sess.line_of_byte_pos(span.lo());
         let file_name = &self.parse_sess.span_to_filename(span);
         let mut status = SnippetStatus::new(line);
-
-        let snippet = &*transform_missing_snippet(self.config, old_snippet);
 
         let slice_within_file_lines_range =
             |file_lines: FileLines, cur_line, s| -> (usize, usize, bool) {

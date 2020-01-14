@@ -7,7 +7,6 @@ use rustc_span::{BytePos, Pos, Span};
 use crate::attr::*;
 use crate::comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};
 use crate::config::{BraceStyle, Config};
-use crate::coverage::transform_missing_snippet;
 use crate::items::{
     format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
     rewrite_associated_impl_type, rewrite_associated_type, rewrite_extern_crate,
@@ -268,7 +267,6 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         )
         .peekable();
         while let Some((kind, offset, sub_slice)) = iter.next() {
-            let sub_slice = transform_missing_snippet(config, sub_slice);
             debug!("close_block: {:?} {:?} {:?}", kind, offset, sub_slice);
 
             match kind {
