@@ -119,7 +119,7 @@ struct Opt {
 
     /// Error if unable to get comments or string literals within max_width,
     /// or they are left with trailing whitespaces (unstable).
-    #[cfg_attr(nightly, structopt(long = "error_on_unformatted"))]
+    #[cfg_attr(nightly, structopt(long = "error-on-unformatted"))]
     #[cfg_attr(not(nightly), structopt(skip))]
     error_on_unformatted: bool,
 
@@ -735,5 +735,31 @@ mod test {
             .expect("Failed to wait on rustfmt child");
         assert!(output.status.success());
         assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "stdin\n");
+    }
+
+    #[cfg(nightly)]
+    #[test]
+    fn verify_error_on_unformatted() {
+        init_log();
+
+        let mut child = Command::new(rustfmt())
+            .arg("--error-on-unformatted")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("run with check option failed");
+
+        {
+            let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+            stdin
+                .write_all(b"fn main()\n{}\n")
+                .expect("Failed to write to rustfmt --check");
+        }
+
+        let output = child
+            .wait_with_output()
+            .expect("Failed to wait on rustfmt child");
+        assert!(output.status.success());
     }
 }
