@@ -524,16 +524,29 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     );
                     self.push_rewrite(item.span, rewrite);
                 }
-                ast::ItemKind::OpaqueTy(ref generic_bounds, ref generics) => {
-                    let rewrite = rewrite_opaque_type(
-                        &self.get_context(),
-                        self.block_indent,
-                        item.ident,
-                        generic_bounds,
-                        generics,
-                        &item.vis,
-                    );
-                    self.push_rewrite(item.span, rewrite);
+                ast::ItemKind::TyAlias(ref ty, ref generics) => match ty.kind.opaque_top_hack() {
+                    None => {
+                        let rewrite = rewrite_type_alias(
+                            &self.get_context(),
+                            self.block_indent,
+                            item.ident,
+                            ty,
+                            generics,
+                            &item.vis,
+                        );
+                        self.push_rewrite(item.span, rewrite);
+                    },
+                    Some(generic_bounds) => {
+                        let rewrite = rewrite_opaque_type(
+                            &self.get_context(),
+                            self.block_indent,
+                            item.ident,
+                            generic_bounds,
+                            generics,
+                            &item.vis,
+                        );
+                        self.push_rewrite(item.span, rewrite);
+                    }
                 }
                 ast::ItemKind::GlobalAsm(..) => {
                     let snippet = Some(self.snippet(item.span).to_owned());

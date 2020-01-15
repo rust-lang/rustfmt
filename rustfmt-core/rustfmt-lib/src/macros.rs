@@ -1476,7 +1476,7 @@ fn format_lazy_static(
 
     while parser.token.kind != TokenKind::Eof {
         // Parse a `lazy_static!` item.
-        let vis = crate::utils::format_visibility(context, &parse_or!(parse_visibility, false));
+        let vis = crate::utils::format_visibility(context, &parse_or!(parse_visibility, rustc_parse::parser::FollowedByType::No));
         parser.eat_keyword(kw::Static);
         parser.eat_keyword(kw::Ref);
         let id = parse_or!(parse_ident);

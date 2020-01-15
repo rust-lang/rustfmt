@@ -252,7 +252,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
 
         let relative = match self.directory.ownership {
             DirectoryOwnership::Owned { relative } => relative,
-            DirectoryOwnership::UnownedViaBlock | DirectoryOwnership::UnownedViaMod(_) => None,
+            DirectoryOwnership::UnownedViaBlock | DirectoryOwnership::UnownedViaMod => None,
         };
         match self
             .parse_sess

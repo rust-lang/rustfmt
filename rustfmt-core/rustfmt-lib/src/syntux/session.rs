@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
-use rustc_data_structures::sync::Send;
+use rustc_data_structures::sync::{Lrc, Send};
 use rustc_errors::emitter::{Emitter, EmitterWriter};
 use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
 use rustc_span::{BytePos, source_map::{FilePathMapping, SourceMap}, Span};
@@ -27,6 +27,7 @@ pub(crate) struct ParseSess {
 struct SilentEmitter;
 
 impl Emitter for SilentEmitter {
+    fn source_map(&self) -> Option<&Lrc<SourceMap>> { None }
     fn emit_diagnostic(&mut self, _db: &Diagnostic) {}
 }
 
@@ -52,6 +53,7 @@ impl SilentOnIgnoredFilesEmitter {
 }
 
 impl Emitter for SilentOnIgnoredFilesEmitter {
+    fn source_map(&self) -> Option<&Lrc<SourceMap>> { None }
     fn emit_diagnostic(&mut self, db: &Diagnostic) {
         if db.level == DiagnosticLevel::Fatal {
             return self.handle_non_ignoreable_error(db);
