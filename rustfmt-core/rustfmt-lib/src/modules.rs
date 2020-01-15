@@ -154,7 +154,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         } else {
             // An internal module (`mod foo { /* ... */ }`);
             if let Some(path) = find_path_value(&item.attrs) {
-                let path = Path::new(&path.as_str()).to_path_buf();
+                let path = Path::new(&*path.as_str()).to_path_buf();
                 Ok(Some(SubModKind::InternalWithPath(path)))
             } else {
                 Ok(Some(SubModKind::Internal(item)))
@@ -288,7 +288,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
 
     fn push_inline_mod_directory(&mut self, id: ast::Ident, attrs: &[ast::Attribute]) {
         if let Some(path) = find_path_value(attrs) {
-            self.directory.path.push(&path.as_str());
+            self.directory.path.push(&*path.as_str());
             self.directory.ownership = DirectoryOwnership::Owned { relative: None };
         } else {
             // We have to push on the current module name in the case of relative
@@ -300,10 +300,10 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             if let DirectoryOwnership::Owned { relative } = &mut self.directory.ownership {
                 if let Some(ident) = relative.take() {
                     // remove the relative offset
-                    self.directory.path.push(ident.as_str());
+                    self.directory.path.push(&*ident.as_str());
                 }
             }
-            self.directory.path.push(&id.as_str());
+            self.directory.path.push(&*id.as_str());
         }
     }
 
