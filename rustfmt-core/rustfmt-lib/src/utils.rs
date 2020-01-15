@@ -127,8 +127,8 @@ pub(crate) fn format_auto(is_auto: ast::IsAuto) -> &'static str {
 #[inline]
 pub(crate) fn format_mutability(mutability: ast::Mutability) -> &'static str {
     match mutability {
-        ast::Mutability::Mutable => "mut ",
-        ast::Mutability::Immutable => "",
+        ast::Mutability::Mut => "mut ",
+        ast::Mutability::Not => "",
     }
 }
 

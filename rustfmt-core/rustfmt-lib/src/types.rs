@@ -633,8 +633,8 @@ impl Rewrite for ast::Ty {
             }
             ast::TyKind::Ptr(ref mt) => {
                 let prefix = match mt.mutbl {
-                    Mutability::Mutable => "*mut ",
-                    Mutability::Immutable => "*const ",
+                    Mutability::Mut => "*mut ",
+                    Mutability::Not => "*const ",
                 };
 
                 rewrite_unary_prefix(context, prefix, &*mt.ty, shape)

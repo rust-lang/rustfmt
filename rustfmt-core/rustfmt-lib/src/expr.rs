@@ -2040,8 +2040,8 @@ fn rewrite_expr_addrof(
     shape: Shape,
 ) -> Option<String> {
     let operator_str = match mutability {
-        ast::Mutability::Immutable => "&",
-        ast::Mutability::Mutable => "&mut ",
+        ast::Mutability::Not => "&",
+        ast::Mutability::Mut => "&mut ",
     };
     rewrite_unary_prefix(context, operator_str, expr, shape)
 }

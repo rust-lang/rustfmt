@@ -1709,7 +1709,7 @@ impl<'a> StaticParts<'a> {
         let (prefix, ty, mutability, expr) = match item.kind {
             ast::ItemKind::Static(ref ty, mutability, ref expr) => ("static", ty, mutability, expr),
             ast::ItemKind::Const(ref ty, ref expr) => {
-                ("const", ty, ast::Mutability::Immutable, expr)
+                ("const", ty, ast::Mutability::Not, expr)
             }
             _ => unreachable!(),
         };
@@ -1735,7 +1735,7 @@ impl<'a> StaticParts<'a> {
             vis: &DEFAULT_VISIBILITY,
             ident: ti.ident,
             ty,
-            mutability: ast::Mutability::Immutable,
+            mutability: ast::Mutability::Not,
             expr_opt: expr_opt.as_ref(),
             defaultness: None,
             span: ti.span,
@@ -1752,7 +1752,7 @@ impl<'a> StaticParts<'a> {
             vis: &ii.vis,
             ident: ii.ident,
             ty,
-            mutability: ast::Mutability::Immutable,
+            mutability: ast::Mutability::Not,
             expr_opt: Some(expr),
             defaultness: Some(ii.defaultness),
             span: ii.span,
