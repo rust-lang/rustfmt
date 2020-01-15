@@ -3,10 +3,10 @@ use std::path::Path;
 use std::rc::Rc;
 
 use rustc_data_structures::sync::Send;
+use rustc_errors::emitter::{Emitter, EmitterWriter};
+use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
 use rustc_span::{BytePos, source_map::{FilePathMapping, SourceMap}, Span};
 use syntax::ast;
-use syntax::errors::emitter::{ColorConfig, Emitter, EmitterWriter};
-use syntax::errors::{Diagnostic, Handler, Level as DiagnosticLevel};
 use syntax::sess::ParseSess as RawParseSess;
 
 use crate::config::file_lines::LineRange;
