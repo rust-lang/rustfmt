@@ -18,7 +18,7 @@ use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
-    colon_spaces, extra_offset, first_line_width, format_abi, format_mutability,
+    colon_spaces, extra_offset, first_line_width, format_extern, format_mutability,
     last_line_extendable, last_line_width, mk_sp, rewrite_ident,
 };
 
@@ -772,8 +772,8 @@ fn rewrite_bare_fn(
 
     result.push_str(crate::utils::format_unsafety(bare_fn.unsafety));
 
-    result.push_str(&format_abi(
-        bare_fn.abi,
+    result.push_str(&format_extern(
+        bare_fn.ext,
         context.config.force_explicit_abi(),
         false,
     ));

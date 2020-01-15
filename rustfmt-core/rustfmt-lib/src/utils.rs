@@ -133,6 +133,16 @@ pub(crate) fn format_mutability(mutability: ast::Mutability) -> &'static str {
 }
 
 #[inline]
+pub(crate) fn format_extern(ext: ast::Extern, explicit_abi: bool, is_mod: bool) -> Cow<'static, str> {
+    match (ext, explicit_abi, is_mod) {
+        (ast::Extern::None, _, false) => Cow::from(""),
+        (ast::Extern::Implicit, false, _) => Cow::from("extern "),
+        (ast::Extern::Explicit(abi), _, _) => Cow::from(format!("extern {} ", abi.symbol_unescaped.as_str())),
+        (_, _, _) => unreachable!(),
+    }
+}
+
+#[inline]
 pub(crate) fn format_abi(abi: abi::Abi, explicit_abi: bool, is_mod: bool) -> Cow<'static, str> {
     if abi == abi::Abi::Rust && !is_mod {
         Cow::from("")

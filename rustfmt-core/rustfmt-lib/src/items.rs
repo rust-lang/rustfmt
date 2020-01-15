@@ -195,7 +195,7 @@ impl<'a> Item<'a> {
     fn from_foreign_mod(fm: &'a ast::ForeignMod, span: Span, config: &Config) -> Item<'a> {
         Item {
             keyword: "",
-            abi: format_abi(fm.abi, config.force_explicit_abi(), true),
+            abi: format_extern(ast::Extern::from_abi(fm.abi), config.force_explicit_abi(), true),
             vis: None,
             body: fm
                 .items
@@ -219,7 +219,8 @@ enum BodyElement<'a> {
 pub(crate) struct FnSig<'a> {
     decl: &'a ast::FnDecl,
     generics: &'a ast::Generics,
-    abi: abi::Abi,
+    ext: ast::Extern,
+    // abi: abi::Abi,
     is_async: Cow<'a, ast::IsAsync>,
     constness: ast::Constness,
     defaultness: ast::Defaultness,
@@ -236,7 +237,7 @@ impl<'a> FnSig<'a> {
         FnSig {
             decl,
             generics,
-            abi: abi::Abi::Rust,
+            ext: ast::Extern::None,
             is_async: Cow::Owned(ast::IsAsync::NotAsync),
             constness: ast::Constness::NotConst,
             defaultness: ast::Defaultness::Final,
@@ -246,15 +247,20 @@ impl<'a> FnSig<'a> {
     }
 
     pub(crate) fn from_method_sig(
-        method_sig: &'a ast::MethodSig,
+        method_sig: &'a ast::FnSig,
         generics: &'a ast::Generics,
     ) -> FnSig<'a> {
+        // let abi = match method_sig.header.ext {
+        //     ast::Extern::None => abi::Abi::Rust,
+        //     ast::Extern::Implicit => abi::Abi::C,
+        //     ast::Extern::Explicit(abi) => self.lower_abi(abi),
+        // };
         FnSig {
             unsafety: method_sig.header.unsafety,
             is_async: Cow::Borrowed(&method_sig.header.asyncness.node),
             constness: method_sig.header.constness.node,
             defaultness: ast::Defaultness::Final,
-            abi: method_sig.header.abi,
+            ext: method_sig.header.ext,
             decl: &*method_sig.decl,
             generics,
             visibility: DEFAULT_VISIBILITY,
@@ -271,7 +277,7 @@ impl<'a> FnSig<'a> {
             visit::FnKind::ItemFn(_, fn_header, visibility, _) => FnSig {
                 decl,
                 generics,
-                abi: fn_header.abi,
+                ext: fn_header.ext,
                 constness: fn_header.constness.node,
                 is_async: Cow::Borrowed(&fn_header.asyncness.node),
                 defaultness,
@@ -296,8 +302,8 @@ impl<'a> FnSig<'a> {
         result.push_str(format_constness(self.constness));
         result.push_str(format_async(&self.is_async));
         result.push_str(format_unsafety(self.unsafety));
-        result.push_str(&format_abi(
-            self.abi,
+        result.push_str(&format_extern(
+            self.ext,
             context.config.force_explicit_abi(),
             false,
         ));
@@ -383,7 +389,7 @@ impl<'a> FmtVisitor<'a> {
         &mut self,
         indent: Indent,
         ident: ast::Ident,
-        sig: &ast::MethodSig,
+        sig: &ast::FnSig,
         generics: &ast::Generics,
         span: Span,
     ) -> Option<String> {
