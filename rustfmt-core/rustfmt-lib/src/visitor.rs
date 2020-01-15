@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use rustc_span::{BytePos, Pos, Span};
-use syntax::{ast, visit};
+use syntax::{ast, visit, token::DelimToken};
 
 use crate::attr::*;
 use crate::comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};
@@ -14,7 +14,7 @@ use crate::items::{
     rewrite_opaque_impl_type, rewrite_opaque_type, rewrite_type_alias, FnBraceStyle, FnSig,
     StaticParts, StructParts,
 };
-use crate::macros::{rewrite_macro, rewrite_macro_def, MacroPosition};
+use crate::macros::{rewrite_macro, rewrite_macro_def, MacroPosition, macro_style};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::skip::{is_skip_attr, SkipContext};
@@ -513,17 +513,6 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         Some(&inner_attrs),
                     )
                 }
-                ast::ItemKind::TyAlias(ref ty, ref generics) => {
-                    let rewrite = rewrite_type_alias(
-                        &self.get_context(),
-                        self.block_indent,
-                        item.ident,
-                        ty,
-                        generics,
-                        &item.vis,
-                    );
-                    self.push_rewrite(item.span, rewrite);
-                }
                 ast::ItemKind::TyAlias(ref ty, ref generics) => match ty.kind.opaque_top_hack() {
                     None => {
                         let rewrite = rewrite_type_alias(
@@ -535,7 +524,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             &item.vis,
                         );
                         self.push_rewrite(item.span, rewrite);
-                    },
+                    }
                     Some(generic_bounds) => {
                         let rewrite = rewrite_opaque_type(
                             &self.get_context(),
@@ -547,7 +536,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         );
                         self.push_rewrite(item.span, rewrite);
                     }
-                }
+                },
                 ast::ItemKind::GlobalAsm(..) => {
                     let snippet = Some(self.snippet(item.span).to_owned());
                     self.push_rewrite(item.span, snippet);
@@ -634,8 +623,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     Some(&inner_attrs),
                 );
             }
+            ast::AssocItemKind::Fn(ref sig, None) => {
+                let indent = self.block_indent;
+                let rewrite =
+                    self.rewrite_required_fn(indent, ii.ident, sig, &ii.generics, ii.span);
+                self.push_rewrite(ii.span, rewrite);
+            }
             ast::AssocItemKind::Const(..) => self.visit_static(&StaticParts::from_impl_item(ii)),
-            ast::AssocItemKind::TyAlias(ref generic_bounds, ref ty) => {
+            ast::AssocItemKind::TyAlias(_, ref ty) => {
                 let rewrite_associated = || {
                     rewrite_associated_impl_type(
                         ii.ident,
@@ -649,16 +644,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 let rewrite = match ty {
                     None => rewrite_associated(),
                     Some(ty) => match ty.kind.opaque_top_hack() {
-                        Some(_) => {
-                            rewrite_opaque_impl_type(
-                                &self.get_context(),
-                                ii.ident,
-                                &ii.generics,
-                                generic_bounds,
-                                self.block_indent,
-                            )
-                        },
-                        None => rewrite_associated()
+                        Some(generic_bounds) => rewrite_opaque_impl_type(
+                            &self.get_context(),
+                            ii.ident,
+                            &ii.generics,
+                            generic_bounds,
+                            self.block_indent,
+                        ),
+                        None => rewrite_associated(),
                     }
                 };
                 self.push_rewrite(ii.span, rewrite);
@@ -675,7 +668,28 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // 1 = ;
         let shape = self.shape().saturating_sub_width(1);
         let rewrite = self.with_context(|ctx| rewrite_macro(mac, ident, ctx, shape, pos));
-        self.push_rewrite(mac.span(), rewrite);
+        // As of v638 of the rustc-ap-* crates, the associated span no longer includes
+        // the trailing semicolon. This determines the correct span to ensure scenarios
+        // with whitespace between the delimiters and trailing semi (i.e. `foo!(abc)     ;`)
+        // are formatted correctly.
+        let (span, rewrite) = match macro_style(mac, &self.get_context()) {
+            DelimToken::Bracket | DelimToken::Paren if MacroPosition::Item == pos => {
+                let search_span = mk_sp(mac.span().hi(), self.snippet_provider.end_pos());
+                let hi = self.snippet_provider.span_before(search_span, ";");
+                let target_span = mk_sp(mac.span().lo(), hi + BytePos(1));
+                let rewrite = rewrite.map(|rw| {
+                    if !rw.ends_with(";") {
+                        format!("{};", rw)
+                    } else {
+                        rw
+                    }
+                });
+                (target_span, rewrite)
+            }
+            _ => (mac.span(), rewrite),
+        };
+
+        self.push_rewrite(span, rewrite);
     }
 
     pub(crate) fn push_str(&mut self, s: &str) {
@@ -782,16 +796,23 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         ErrorKind::DeprecatedAttr,
                     )],
                 );
-            } else if self.is_unknown_rustfmt_attr(&attr.get_normal_item().path.segments) {
-                let file_name = self.parse_sess.span_to_filename(attr.span);
-                self.report.append(
-                    file_name,
-                    vec![FormattingError::from_span(
-                        attr.span,
-                        self.parse_sess,
-                        ErrorKind::BadAttr,
-                    )],
-                );
+            } else {
+                match &attr.kind {
+                    ast::AttrKind::Normal(ref attribute_item)
+                        if self.is_unknown_rustfmt_attr(&attribute_item.path.segments) =>
+                    {
+                        let file_name = self.parse_sess.span_to_filename(attr.span);
+                        self.report.append(
+                            file_name,
+                            vec![FormattingError::from_span(
+                                attr.span,
+                                self.parse_sess,
+                                ErrorKind::BadAttr,
+                            )],
+                        );
+                    }
+                    _ => (),
+                }
             }
         }
         if contains_skip(attrs) {

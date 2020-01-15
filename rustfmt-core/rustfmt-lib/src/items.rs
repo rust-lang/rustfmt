@@ -5,7 +5,6 @@ use std::cmp::{max, min, Ordering};
 
 use regex::Regex;
 use rustc_span::{BytePos, DUMMY_SP, source_map, Span, symbol};
-use rustc_target::spec::abi;
 use syntax::visit;
 use syntax::{ast, ptr};
 
@@ -195,7 +194,11 @@ impl<'a> Item<'a> {
     fn from_foreign_mod(fm: &'a ast::ForeignMod, span: Span, config: &Config) -> Item<'a> {
         Item {
             keyword: "",
-            abi: format_extern(ast::Extern::from_abi(fm.abi), config.force_explicit_abi(), true),
+            abi: format_extern(
+                ast::Extern::from_abi(fm.abi),
+                config.force_explicit_abi(),
+                true,
+            ),
             vis: None,
             body: fm
                 .items
@@ -220,7 +223,6 @@ pub(crate) struct FnSig<'a> {
     decl: &'a ast::FnDecl,
     generics: &'a ast::Generics,
     ext: ast::Extern,
-    // abi: abi::Abi,
     is_async: Cow<'a, ast::IsAsync>,
     constness: ast::Constness,
     defaultness: ast::Defaultness,
@@ -250,11 +252,6 @@ impl<'a> FnSig<'a> {
         method_sig: &'a ast::FnSig,
         generics: &'a ast::Generics,
     ) -> FnSig<'a> {
-        // let abi = match method_sig.header.ext {
-        //     ast::Extern::None => abi::Abi::Rust,
-        //     ast::Extern::Implicit => abi::Abi::C,
-        //     ast::Extern::Explicit(abi) => self.lower_abi(abi),
-        // };
         FnSig {
             unsafety: method_sig.header.unsafety,
             is_async: Cow::Borrowed(&method_sig.header.asyncness.node),
@@ -646,21 +643,70 @@ impl<'a> FmtVisitor<'a> {
                 buffer.push((self.buffer.clone(), item.clone()));
                 self.buffer.clear();
             }
+
+            fn is_type(ty: &Option<syntax::ptr::P<ast::Ty>>) -> bool {
+                match ty {
+                    None => true,
+                    Some(lty) => match lty.kind.opaque_top_hack() {
+                        None => true,
+                        Some(_) => false,
+                    },
+                }
+            }
+
+            fn is_opaque(ty: &Option<syntax::ptr::P<ast::Ty>>) -> bool {
+                match ty {
+                    None => false,
+                    Some(lty) => match lty.kind.opaque_top_hack() {
+                        None => false,
+                        Some(_) => true,
+                    },
+                }
+            }
+
+            fn both_type(
+                a: &Option<syntax::ptr::P<ast::Ty>>,
+                b: &Option<syntax::ptr::P<ast::Ty>>,
+            ) -> bool {
+                is_type(a) && is_type(b)
+            }
+
+            fn both_opaque(
+                a: &Option<syntax::ptr::P<ast::Ty>>,
+                b: &Option<syntax::ptr::P<ast::Ty>>,
+            ) -> bool {
+                is_opaque(a) && is_opaque(b)
+            }
+
+            // In rustc-ap-v638 the `OpaqueTy` AssocItemKind was removed but
+            // we still need to differentiate to maintain sorting order.
+
             // type -> opaque -> const -> macro -> method
             use crate::ast::AssocItemKind::*;
             fn need_empty_line(a: &ast::AssocItemKind, b: &ast::AssocItemKind) -> bool {
                 match (a, b) {
-                    (TyAlias(..), TyAlias(..))
-                    | (Const(..), Const(..)) => false,
+                    (TyAlias(_, ref lty), TyAlias(_, ref rty))
+                        if both_type(lty, rty) || both_opaque(lty, rty) =>
+                    {
+                        false
+                    }
+                    (Const(..), Const(..)) => false,
                     _ => true,
                 }
             }
 
             buffer.sort_by(|(_, a), (_, b)| match (&a.kind, &b.kind) {
-                (TyAlias(..), TyAlias(..))
-                | (Const(..), Const(..))
-                | (Macro(..), Macro(..)) => a.ident.as_str().cmp(&b.ident.as_str()),
+                (TyAlias(_, ref lty), TyAlias(_, ref rty))
+                    if both_type(lty, rty) || both_opaque(lty, rty) =>
+                {
+                    a.ident.as_str().cmp(&b.ident.as_str())
+                }
+                (Const(..), Const(..)) | (Macro(..), Macro(..)) => {
+                    a.ident.as_str().cmp(&b.ident.as_str())
+                }
                 (Fn(..), Fn(..)) => a.span.lo().cmp(&b.span.lo()),
+                (TyAlias(_, ref ty), _) if is_type(ty) => Ordering::Less,
+                (_, TyAlias(_, ref ty)) if is_type(ty) => Ordering::Greater,
                 (TyAlias(..), _) => Ordering::Less,
                 (_, TyAlias(..)) => Ordering::Greater,
                 (Const(..), _) => Ordering::Less,

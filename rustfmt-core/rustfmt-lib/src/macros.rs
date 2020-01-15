@@ -81,7 +81,7 @@ impl Rewrite for MacroArg {
             MacroArg::Ty(ref ty) => ty.rewrite(context, shape),
             MacroArg::Pat(ref pat) => pat.rewrite(context, shape),
             MacroArg::Item(ref item) => item.rewrite(context, shape),
-            MacroArg::Keyword(ident, _) => Some(ident.to_string()),
+            MacroArg::Keyword(ident, _) => Some(ident.name.to_string()),
         }
     }
 }
@@ -261,12 +261,7 @@ fn rewrite_macro_inner(
     } else {
         original_style
     };
-
-    let ts: TokenStream = match *mac.args {
-        ast::MacArgs::Empty => TokenStream::default(),
-        ast::MacArgs::Delimited(_, _, token_stream) => token_stream,
-        ast::MacArgs::Eq(_, token_stream) => token_stream,
-    };
+    let ts = mac.args.inner_tokens();
 
     let has_comment = contains_comment(context.snippet(mac.span()));
     if ts.is_empty() && !has_comment {
@@ -491,11 +486,7 @@ pub(crate) fn rewrite_macro_def(
     if snippet.as_ref().map_or(true, |s| s.ends_with(';')) {
         return snippet;
     }
-    let ts: TokenStream = match *def.body {
-        ast::MacArgs::Empty => TokenStream::default(),
-        ast::MacArgs::Delimited(_, _, token_stream) => token_stream,
-        ast::MacArgs::Eq(_, token_stream) => token_stream,
-    };
+    let ts = def.body.inner_tokens();
     let mut parser = MacroParser::new(ts.into_trees());
     let parsed_def = match parser.parse() {
         Some(def) => def,
@@ -1201,11 +1192,7 @@ pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> O
     // https://github.com/rust-lang/rust/pull/62672
     let path = &pprust::path_to_string(&mac.path);
     if path == "try" || path == "r#try" {
-        let ts: TokenStream = match *mac.args {
-            ast::MacArgs::Empty => TokenStream::default(),
-            ast::MacArgs::Delimited(_, _, token_stream) => token_stream,
-            ast::MacArgs::Eq(_, token_stream) => token_stream,
-        };
+        let ts = mac.args.inner_tokens();
         let mut parser = new_parser_from_tts(context.parse_sess.inner(), ts.trees().collect());
 
         let mut kind = parser.parse_expr().ok()?;
@@ -1223,7 +1210,7 @@ pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> O
     }
 }
 
-fn macro_style(mac: &ast::Mac, context: &RewriteContext<'_>) -> DelimToken {
+pub(crate) fn macro_style(mac: &ast::Mac, context: &RewriteContext<'_>) -> DelimToken {
     let snippet = context.snippet(mac.span());
     let paren_pos = snippet.find_uncommented("(").unwrap_or(usize::max_value());
     let bracket_pos = snippet.find_uncommented("[").unwrap_or(usize::max_value());
@@ -1476,7 +1463,10 @@ fn format_lazy_static(
 
     while parser.token.kind != TokenKind::Eof {
         // Parse a `lazy_static!` item.
-        let vis = crate::utils::format_visibility(context, &parse_or!(parse_visibility, rustc_parse::parser::FollowedByType::No));
+        let vis = crate::utils::format_visibility(
+            context,
+            &parse_or!(parse_visibility, rustc_parse::parser::FollowedByType::No),
+        );
         parser.eat_keyword(kw::Static);
         parser.eat_keyword(kw::Ref);
         let id = parse_or!(parse_ident);

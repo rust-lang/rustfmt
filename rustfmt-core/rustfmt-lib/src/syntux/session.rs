@@ -27,7 +27,9 @@ pub(crate) struct ParseSess {
 struct SilentEmitter;
 
 impl Emitter for SilentEmitter {
-    fn source_map(&self) -> Option<&Lrc<SourceMap>> { None }
+    fn source_map(&self) -> Option<&Lrc<SourceMap>> {
+        None
+    }
     fn emit_diagnostic(&mut self, _db: &Diagnostic) {}
 }
 
@@ -53,7 +55,9 @@ impl SilentOnIgnoredFilesEmitter {
 }
 
 impl Emitter for SilentOnIgnoredFilesEmitter {
-    fn source_map(&self) -> Option<&Lrc<SourceMap>> { None }
+    fn source_map(&self) -> Option<&Lrc<SourceMap>> {
+        None
+    }
     fn emit_diagnostic(&mut self, db: &Diagnostic) {
         if db.level == DiagnosticLevel::Fatal {
             return self.handle_non_ignoreable_error(db);
@@ -271,13 +275,16 @@ mod tests {
         use crate::is_nightly_channel;
         use crate::utils::mk_sp;
         use std::path::PathBuf;
-        use rustc_span::{MultiSpan, FileName as SourceMapFileName};
+        use rustc_span::{DUMMY_SP, MultiSpan, FileName as SourceMapFileName};
 
         struct TestEmitter {
             num_emitted_errors: Rc<RefCell<u32>>,
         }
 
         impl Emitter for TestEmitter {
+            fn source_map(&self) -> Option<&Lrc<SourceMap>> {
+                None
+            }
             fn emit_diagnostic(&mut self, _db: &Diagnostic) {
                 *self.num_emitted_errors.borrow_mut() += 1;
             }
@@ -291,6 +298,7 @@ mod tests {
                 children: vec![],
                 suggestions: vec![],
                 span: span.unwrap_or_else(MultiSpan::new),
+                sort_span: DUMMY_SP,
             }
         }
 

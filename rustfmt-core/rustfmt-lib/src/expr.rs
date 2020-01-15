@@ -252,8 +252,7 @@ pub(crate) fn format_expr(
             fn needs_space_before_range(context: &RewriteContext<'_>, lhs: &ast::Expr) -> bool {
                 match lhs.kind {
                     ast::ExprKind::Lit(ref lit) => match lit.kind {
-                        ast::LitKind::Float(_, ref float_type) if ast::LitFloatType::Unsuffixed == *float_type =>
-                        {
+                        ast::LitKind::Float(_, ast::LitFloatType::Unsuffixed) => {
                             context.snippet(lit.span).ends_with('.')
                         }
                         _ => false,
@@ -1336,8 +1335,12 @@ pub(crate) fn can_be_overflowed_expr(
                 || (context.use_block_indent() && args_len == 1)
         }
         ast::ExprKind::Mac(ref mac) => {
-            match (syntax::ast::MacDelimiter::from_token(mac.args.delim()), context.config.overflow_delimited_expr()) {
-                (Some(ast::MacDelimiter::Bracket), true) | (Some(ast::MacDelimiter::Brace), true) => true,
+            match (
+                syntax::ast::MacDelimiter::from_token(mac.args.delim()),
+                context.config.overflow_delimited_expr(),
+            ) {
+                (Some(ast::MacDelimiter::Bracket), true)
+                | (Some(ast::MacDelimiter::Brace), true) => true,
                 _ => context.use_block_indent() && args_len == 1,
             }
         }

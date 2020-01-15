@@ -133,17 +133,19 @@ pub(crate) fn format_mutability(mutability: ast::Mutability) -> &'static str {
 }
 
 #[inline]
-pub(crate) fn format_extern(ext: ast::Extern, explicit_abi: bool, is_mod: bool) -> Cow<'static, str> {
-    match (ext, explicit_abi, is_mod) {
-        (ast::Extern::None, _, false) => Cow::from(""),
-        (ast::Extern::Implicit, false, _) => Cow::from("extern "),
-        (ast::Extern::Explicit(abi), _, _) => Cow::from(format!("extern {} ", abi.symbol_unescaped.as_str())),
-        (_, _, _) => unreachable!(),
-    }
-}
+pub(crate) fn format_extern(
+    ext: ast::Extern,
+    explicit_abi: bool,
+    is_mod: bool,
+) -> Cow<'static, str> {
+    let abi = match ext {
+        ast::Extern::None => abi::Abi::Rust,
+        ast::Extern::Implicit => abi::Abi::C,
+        ast::Extern::Explicit(abi) => {
+            abi::lookup(&abi.symbol_unescaped.as_str()).unwrap_or(abi::Abi::Rust)
+        }
+    };
 
-#[inline]
-pub(crate) fn format_abi(abi: abi::Abi, explicit_abi: bool, is_mod: bool) -> Cow<'static, str> {
     if abi == abi::Abi::Rust && !is_mod {
         Cow::from("")
     } else if abi == abi::Abi::C && !explicit_abi {
@@ -428,7 +430,7 @@ pub(crate) fn left_most_sub_expr(e: &ast::Expr) -> &ast::Expr {
         | ast::ExprKind::Binary(_, ref e, _)
         | ast::ExprKind::Cast(ref e, _)
         | ast::ExprKind::Type(ref e, _)
-        | ast::ExprKind::Assign(ref e,_,  _)
+        | ast::ExprKind::Assign(ref e, _, _)
         | ast::ExprKind::AssignOp(_, ref e, _)
         | ast::ExprKind::Field(ref e, _)
         | ast::ExprKind::Index(ref e, _)

@@ -1044,7 +1044,6 @@ dependencies = [
  "log",
  "regex",
  "rustc-ap-rustc_data_structures",
- "rustc-ap-rustc_error_codes",
  "rustc-ap-rustc_errors",
  "rustc-ap-rustc_parse",
  "rustc-ap-rustc_span",

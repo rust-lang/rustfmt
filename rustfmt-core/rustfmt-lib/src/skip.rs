@@ -29,10 +29,15 @@ impl SkipContext {
             }
         }
         for attr in attrs {
-            if is_skip_attr_with(&attr.get_normal_item().path.segments, |s| s == sym!(macros)) {
-                get_skip_names(&mut self.macros, attr)
-            } else if is_skip_attr_with(&attr.get_normal_item().path.segments, |s| s == sym::attributes) {
-                get_skip_names(&mut self.attributes, attr)
+            match &attr.kind {
+                syntax::ast::AttrKind::Normal(ref attr_item) => {
+                    if is_skip_attr_with(&attr_item.path.segments, |s| s == sym!(macros)) {
+                        get_skip_names(&mut self.macros, attr)
+                    } else if is_skip_attr_with(&attr_item.path.segments, |s| s == sym::attributes) {
+                        get_skip_names(&mut self.attributes, attr)
+                    }
+                }
+                _ => (),
             }
         }
     }

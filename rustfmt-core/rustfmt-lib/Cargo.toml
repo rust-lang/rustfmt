@@ -38,10 +38,6 @@ version = "638.0.0"
 package = "rustc-ap-rustc_errors"
 version = "638.0.0"
 
-[dependencies.rustc_error_codes]
-package = "rustc-ap-rustc_error_codes"
-version = "638.0.0"
-
 [dependencies.rustc_parse]
 package = "rustc-ap-rustc_parse"
 version = "638.0.0"

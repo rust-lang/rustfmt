@@ -283,11 +283,7 @@ impl<'a> Parser<'a> {
         mac: &'a ast::Mac,
         base_dir: &Directory,
     ) -> Result<Vec<ast::Item>, &'static str> {
-        let token_stream: syntax::tokenstream::TokenStream = match *mac.args {
-            ast::MacArgs::Empty => syntax::tokenstream::TokenStream::default(),
-            ast::MacArgs::Delimited(_, _, token_stream) => token_stream,
-            ast::MacArgs::Eq(_, token_stream) => token_stream,
-        };
+        let token_stream = mac.args.inner_tokens();
         let mut parser = rustc_parse::stream_to_parser_with_base_dir(
             sess.inner(),
             token_stream.clone(),
