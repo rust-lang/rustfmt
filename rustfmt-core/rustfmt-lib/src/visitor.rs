@@ -781,7 +781,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         ErrorKind::DeprecatedAttr,
                     )],
                 );
-            } else if self.is_unknown_rustfmt_attr(&attr.path.segments) {
+            } else if self.is_unknown_rustfmt_attr(&attr.get_normal_item().path.segments) {
                 let file_name = self.parse_sess.span_to_filename(attr.span);
                 self.report.append(
                     file_name,

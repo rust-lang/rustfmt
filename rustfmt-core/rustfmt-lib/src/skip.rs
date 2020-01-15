@@ -29,9 +29,9 @@ impl SkipContext {
             }
         }
         for attr in attrs {
-            if is_skip_attr_with(&attr.item.path.segments, |s| s == sym!(macros)) {
+            if is_skip_attr_with(&attr.get_normal_item().path.segments, |s| s == sym!(macros)) {
                 get_skip_names(&mut self.macros, attr)
-            } else if is_skip_attr_with(&attr.item.path.segments, |s| s == sym::attributes) {
+            } else if is_skip_attr_with(&attr.get_normal_item().path.segments, |s| s == sym::attributes) {
                 get_skip_names(&mut self.attributes, attr)
             }
         }
