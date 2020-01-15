@@ -4,7 +4,7 @@ use std::cmp::min;
 
 use itertools::Itertools;
 use rustc_span::Span;
-use syntax::parse::token::DelimToken;
+use syntax::token::DelimToken;
 use syntax::{ast, ptr};
 
 use crate::closures;

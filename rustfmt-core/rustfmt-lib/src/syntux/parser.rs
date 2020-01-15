@@ -6,7 +6,7 @@ use rustc_parse::{new_sub_parser_from_file, parser::Parser as RawParser};
 use rustc_span::{DUMMY_SP, Span, symbol::kw};
 use syntax::ast;
 use syntax::errors::Diagnostic;
-use syntax::parse::token::{DelimToken, TokenKind};
+use syntax::token::{DelimToken, TokenKind};
 use syntax::parse::PResult;
 
 use crate::syntux::session::ParseSess;

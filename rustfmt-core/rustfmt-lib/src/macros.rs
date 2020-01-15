@@ -14,8 +14,8 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_parse::{new_parser_from_tts, parser::Parser};
 use rustc_span::{BytePos, DUMMY_SP, Span, Symbol, symbol::kw};
-use syntax::parse::token::{BinOpToken, DelimToken, Token, TokenKind};
 use syntax::print::pprust;
+use syntax::token::{BinOpToken, DelimToken, Token, TokenKind};
 use syntax::tokenstream::{Cursor, TokenStream, TokenTree};
 use syntax::ThinVec;
 use syntax::{ast, ptr};
