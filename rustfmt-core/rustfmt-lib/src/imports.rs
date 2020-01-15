@@ -248,7 +248,7 @@ impl UseTree {
 
                 let allow_extend = if attrs.len() == 1 {
                     let line_len = attr_str.len() + 1 + use_str.len();
-                    !attrs.first().unwrap().is_sugared_doc
+                    !attrs.first().unwrap().is_doc_comment()
                         && context.config.inline_attribute_width() >= line_len
                 } else {
                     false

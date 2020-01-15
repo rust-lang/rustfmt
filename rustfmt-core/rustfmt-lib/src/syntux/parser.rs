@@ -151,7 +151,11 @@ impl<'a> Parser<'a> {
                 }
                 TokenKind::DocComment(s) => {
                     // we need to get the position of this token before we bump.
-                    let attr = syntax::attr::mk_sugared_doc_attr(s, parser.token.span);
+                    let attr = syntax::attr::mk_doc_comment(
+                        syntax::util::comments::doc_comment_style(&s.as_str()),
+                        s,
+                        parser.token.span,
+                    );
                     if attr.style == ast::AttrStyle::Inner {
                         attrs.push(attr);
                         parser.bump();
