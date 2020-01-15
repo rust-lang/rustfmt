@@ -418,7 +418,7 @@ pub(crate) fn left_most_sub_expr(e: &ast::Expr) -> &ast::Expr {
         | ast::ExprKind::Binary(_, ref e, _)
         | ast::ExprKind::Cast(ref e, _)
         | ast::ExprKind::Type(ref e, _)
-        | ast::ExprKind::Assign(ref e, _)
+        | ast::ExprKind::Assign(ref e,_,  _)
         | ast::ExprKind::AssignOp(_, ref e, _)
         | ast::ExprKind::Field(ref e, _)
         | ast::ExprKind::Index(ref e, _)
