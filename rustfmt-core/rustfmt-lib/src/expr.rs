@@ -252,7 +252,8 @@ pub(crate) fn format_expr(
             fn needs_space_before_range(context: &RewriteContext<'_>, lhs: &ast::Expr) -> bool {
                 match lhs.kind {
                     ast::ExprKind::Lit(ref lit) => match lit.kind {
-                        ast::LitKind::FloatUnsuffixed(..) => {
+                        ast::LitKind::Float(_, ref float_type) if ast::LitFloatType::Unsuffixed == *float_type =>
+                        {
                             context.snippet(lit.span).ends_with('.')
                         }
                         _ => false,
