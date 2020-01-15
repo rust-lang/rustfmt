@@ -34,7 +34,7 @@ pub(crate) fn get_span_without_attrs(stmt: &ast::Stmt) -> Span {
         ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => expr.span,
         ast::StmtKind::Mac(ref mac) => {
             let (ref mac, _, _) = **mac;
-            mac.span
+            mac.span()
         }
     }
 }

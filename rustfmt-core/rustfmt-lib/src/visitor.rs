@@ -656,12 +656,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     }
 
     fn visit_mac(&mut self, mac: &ast::Mac, ident: Option<ast::Ident>, pos: MacroPosition) {
-        skip_out_of_file_lines_range_visitor!(self, mac.span);
+        skip_out_of_file_lines_range_visitor!(self, mac.span());
 
         // 1 = ;
         let shape = self.shape().saturating_sub_width(1);
         let rewrite = self.with_context(|ctx| rewrite_macro(mac, ident, ctx, shape, pos));
-        self.push_rewrite(mac.span, rewrite);
+        self.push_rewrite(mac.span(), rewrite);
     }
 
     pub(crate) fn push_str(&mut self, s: &str) {
