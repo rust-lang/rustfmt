@@ -17,7 +17,6 @@ use rustc_span::{BytePos, DUMMY_SP, Span, Symbol, symbol::kw};
 use syntax::print::pprust;
 use syntax::token::{BinOpToken, DelimToken, Token, TokenKind};
 use syntax::tokenstream::{Cursor, TokenStream, TokenTree};
-use syntax::ThinVec;
 use syntax::{ast, ptr};
 
 use crate::comment::{
@@ -1203,7 +1202,7 @@ pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> O
             id: ast::NodeId::root(), // dummy value
             kind: ast::ExprKind::Try(kind),
             span: mac.span, // incorrect span, but shouldn't matter too much
-            attrs: ThinVec::new(),
+            attrs: ast::AttrVec::new(),
         })
     } else {
         None
