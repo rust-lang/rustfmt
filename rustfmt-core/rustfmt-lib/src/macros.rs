@@ -143,7 +143,7 @@ fn rewrite_macro_name(
         // Avoid using pretty-printer in the common case.
         format!("{}!", rewrite_ident(context, path.segments[0].ident))
     } else {
-        format!("{}!", path)
+        format!("{}!", pprust::path_to_string(path))
     };
     match extra_ident {
         Some(ident) if ident.name != kw::Invalid => format!("{} {}", name, ident),
@@ -1190,7 +1190,8 @@ pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> O
     // `r#try!` must be used in the 2018 Edition.
     // https://doc.rust-lang.org/std/macro.try.html
     // https://github.com/rust-lang/rust/pull/62672
-    if &mac.path.to_string() == "try" || &mac.path.to_string() == "r#try" {
+    let path = &pprust::path_to_string(&mac.path);
+    if path == "try" || path == "r#try" {
         let ts: TokenStream = mac.tts.clone();
         let mut parser = new_parser_from_tts(context.parse_sess.inner(), ts.trees().collect());
 

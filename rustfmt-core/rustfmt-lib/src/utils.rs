@@ -6,7 +6,7 @@ use syntax::ast::{
     self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
     VisibilityKind,
 };
-use syntax::ptr;
+use syntax::{ptr, print::pprust};
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
@@ -42,7 +42,7 @@ pub(crate) fn is_same_visibility(a: &Visibility, b: &Visibility) -> bool {
         (
             VisibilityKind::Restricted { path: p, .. },
             VisibilityKind::Restricted { path: q, .. },
-        ) => p.to_string() == q.to_string(),
+        ) => pprust::path_to_string(p) == pprust::path_to_string(q),
         (VisibilityKind::Public, VisibilityKind::Public)
         | (VisibilityKind::Inherited, VisibilityKind::Inherited)
         | (
@@ -241,7 +241,7 @@ pub(crate) fn last_line_extendable(s: &str) -> bool {
 fn is_skip(meta_item: &MetaItem) -> bool {
     match meta_item.kind {
         MetaItemKind::Word => {
-            let path_str = meta_item.path.to_string();
+            let path_str = pprust::path_to_string(&meta_item.path);
             path_str == skip_annotation().as_str() || path_str == depr_skip_annotation().as_str()
         }
         MetaItemKind::List(ref l) => {

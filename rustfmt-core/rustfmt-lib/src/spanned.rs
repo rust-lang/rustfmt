@@ -29,12 +29,7 @@ macro_rules! span_with_attrs_lo_hi {
         if attrs.is_empty() {
             mk_sp($lo, $hi)
         } else {
-            // this path is already gone at latest rust-ap-* 627.0.0
-            if attrs[0].item.path.to_string() == "warn_directory_ownership" {
-                mk_sp($lo, $hi)
-            } else {
-                mk_sp(attrs[0].span.lo(), $hi)
-            }
+            mk_sp(attrs[0].span.lo(), $hi)
         }
     }};
 }
