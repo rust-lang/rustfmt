@@ -281,9 +281,7 @@ impl<'a> FnSig<'a> {
             visit::FnKind::Method(_, method_sig, vis, _) => {
                 let mut fn_sig = FnSig::from_method_sig(method_sig, generics);
                 fn_sig.defaultness = defaultness;
-                if let Some(vis) = vis {
-                    fn_sig.visibility = vis.clone();
-                }
+                fn_sig.visibility = vis.clone();
                 fn_sig
             }
             _ => unreachable!(),
@@ -1753,7 +1751,7 @@ impl<'a> StaticParts<'a> {
             ident: ii.ident,
             ty,
             mutability: ast::Mutability::Not,
-            expr_opt: Some(expr),
+            expr_opt: expr.as_ref(),
             defaultness: Some(ii.defaultness),
             span: ii.span,
         }

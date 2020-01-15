@@ -191,8 +191,8 @@ impl Rewrite for Pat {
                     infix.to_owned()
                 };
                 rewrite_pair(
-                    &**lhs,
-                    &**rhs,
+                    &lhs.unwrap(),
+                    &rhs.unwrap(),
                     PairParts::infix(&infix),
                     context,
                     shape,

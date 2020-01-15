@@ -1,7 +1,7 @@
 use std::iter::ExactSizeIterator;
 use std::ops::Deref;
 
-use rustc_span::{BytePos, DUMMY_SP, Span, symbol::kw};
+use rustc_span::{BytePos, Span, symbol::kw};
 use syntax::ast::{self, FunctionRetTy, Mutability};
 
 use crate::config::lists::*;
@@ -274,13 +274,9 @@ fn rewrite_segment(
                 result.push_str(&generics_str)
             }
             ast::GenericArgs::Parenthesized(ref data) => {
-                let output = match data.output {
-                    Some(ref ty) => FunctionRetTy::Ty(ty.clone()),
-                    None => FunctionRetTy::Default(DUMMY_SP),
-                };
                 result.push_str(&format_function_type(
                     data.inputs.iter().map(|x| &**x),
-                    &output,
+                    &data.output,
                     false,
                     data.span,
                     context,
