@@ -7,7 +7,7 @@ use rustc_span::{BytePos, source_map::{FilePathMapping, SourceMap}, Span};
 use syntax::ast;
 use syntax::errors::emitter::{ColorConfig, Emitter, EmitterWriter};
 use syntax::errors::{Diagnostic, Handler, Level as DiagnosticLevel};
-use syntax::parse::ParseSess as RawParseSess;
+use syntax::sess::ParseSess as RawParseSess;
 
 use crate::config::file_lines::LineRange;
 use crate::ignore_path::IgnorePathSet;
@@ -141,8 +141,8 @@ impl ParseSess {
         id: ast::Ident,
         relative: Option<ast::Ident>,
         dir_path: &Path,
-    ) -> syntax::parse::parser::ModulePath {
-        syntax::parse::parser::Parser::default_submod_path(
+    ) -> rustc_parse::parser::ModulePath {
+        rustc_parse::parser::Parser::default_submod_path(
             id,
             relative,
             dir_path,

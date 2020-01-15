@@ -12,14 +12,13 @@
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+use rustc_parse::{new_parser_from_tts, parser::Parser};
 use rustc_span::{BytePos, DUMMY_SP, Span, Symbol, symbol::kw};
-use syntax::parse::new_parser_from_tts;
-use syntax::parse::parser::Parser;
 use syntax::parse::token::{BinOpToken, DelimToken, Token, TokenKind};
 use syntax::print::pprust;
 use syntax::tokenstream::{Cursor, TokenStream, TokenTree};
 use syntax::ThinVec;
-use syntax::{ast, parse, ptr};
+use syntax::{ast, ptr};
 
 use crate::comment::{
     contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses,
@@ -112,23 +111,23 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
 
     parse_macro_arg!(
         Expr,
-        |parser: &mut parse::parser::Parser<'b>| parser.parse_expr(),
+        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_expr(),
         |x: ptr::P<ast::Expr>| Some(x)
     );
     parse_macro_arg!(
         Ty,
-        |parser: &mut parse::parser::Parser<'b>| parser.parse_ty(),
+        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_ty(),
         |x: ptr::P<ast::Ty>| Some(x)
     );
     parse_macro_arg!(
         Pat,
-        |parser: &mut parse::parser::Parser<'b>| parser.parse_pat(None),
+        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_pat(None),
         |x: ptr::P<ast::Pat>| Some(x)
     );
     // `parse_item` returns `Option<ptr::P<ast::Item>>`.
     parse_macro_arg!(
         Item,
-        |parser: &mut parse::parser::Parser<'b>| parser.parse_item(),
+        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_item(),
         |x: Option<ptr::P<ast::Item>>| x
     );
 

@@ -2,18 +2,18 @@ use std::borrow::Cow;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
+use rustc_parse::{new_sub_parser_from_file, parser::Parser as RawParser};
 use rustc_span::{DUMMY_SP, Span, symbol::kw};
 use syntax::ast;
 use syntax::errors::Diagnostic;
-use syntax::parse::parser::Parser as RawParser;
 use syntax::parse::token::{DelimToken, TokenKind};
-use syntax::parse::{new_sub_parser_from_file, PResult};
+use syntax::parse::PResult;
 
 use crate::syntux::session::ParseSess;
 use crate::{Config, Input};
 
-pub(crate) type DirectoryOwnership = syntax::parse::DirectoryOwnership;
-pub(crate) type ModulePathSuccess = syntax::parse::parser::ModulePathSuccess;
+pub(crate) type DirectoryOwnership = rustc_parse::DirectoryOwnership;
+pub(crate) type ModulePathSuccess = rustc_parse::parser::ModulePathSuccess;
 
 #[derive(Clone)]
 pub(crate) struct Directory {
@@ -22,8 +22,8 @@ pub(crate) struct Directory {
 }
 
 impl<'a> Directory {
-    fn to_syntax_directory(&'a self) -> syntax::parse::Directory<'a> {
-        syntax::parse::Directory {
+    fn to_syntax_directory(&'a self) -> rustc_parse::Directory<'a> {
+        rustc_parse::Directory {
             path: Cow::Borrowed(&self.path),
             ownership: self.ownership,
         }
@@ -89,13 +89,13 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn parser(
-        sess: &'a syntax::parse::ParseSess,
+        sess: &'a syntax::sess::ParseSess,
         input: Input,
         directory_ownership: Option<DirectoryOwnership>,
-    ) -> Result<syntax::parse::parser::Parser<'a>, Vec<Diagnostic>> {
+    ) -> Result<rustc_parse::parser::Parser<'a>, Vec<Diagnostic>> {
         match input {
             Input::File(ref file) => Ok(if let Some(directory_ownership) = directory_ownership {
-                syntax::parse::new_sub_parser_from_file(
+                rustc_parse::new_sub_parser_from_file(
                     sess,
                     file,
                     directory_ownership,
@@ -103,9 +103,9 @@ impl<'a> ParserBuilder<'a> {
                     DUMMY_SP,
                 )
             } else {
-                syntax::parse::new_parser_from_file(sess, file)
+                rustc_parse::new_parser_from_file(sess, file)
             }),
-            Input::Text(text) => syntax::parse::maybe_new_parser_from_source_str(
+            Input::Text(text) => rustc_parse::maybe_new_parser_from_source_str(
                 sess,
                 rustc_span::FileName::Custom("stdin".to_owned()),
                 text,
@@ -130,7 +130,7 @@ pub(crate) enum ParserError {
 
 impl<'a> Parser<'a> {
     pub(crate) fn submod_path_from_attr(attrs: &[ast::Attribute], path: &Path) -> Option<PathBuf> {
-        syntax::parse::parser::Parser::submod_path_from_attr(attrs, path)
+        rustc_parse::parser::Parser::submod_path_from_attr(attrs, path)
     }
 
     // FIXME(topecongiro) Use the method from libsyntax[1] once it become public.
@@ -280,7 +280,7 @@ impl<'a> Parser<'a> {
         mac: &'a ast::Mac,
         base_dir: &Directory,
     ) -> Result<Vec<ast::Item>, &'static str> {
-        let mut parser = syntax::parse::stream_to_parser_with_base_dir(
+        let mut parser = rustc_parse::stream_to_parser_with_base_dir(
             sess.inner(),
             mac.tts.clone(),
             base_dir.to_syntax_directory(),
