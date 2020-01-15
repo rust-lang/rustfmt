@@ -633,7 +633,7 @@ impl<'a> FmtVisitor<'a> {
         combine_strs_with_missing_comments(&context, &attrs_str, &variant_body, span, shape, false)
     }
 
-    fn visit_impl_items(&mut self, items: &[ast::ImplItem]) {
+    fn visit_impl_items(&mut self, items: &[ast::AssocItem]) {
         if self.get_context().config.reorder_impl_items() {
             // Create visitor for each items, then reorder them.
             let mut buffer = vec![];
@@ -643,12 +643,11 @@ impl<'a> FmtVisitor<'a> {
                 self.buffer.clear();
             }
             // type -> opaque -> const -> macro -> method
-            use crate::ast::ImplItemKind::*;
-            fn need_empty_line(a: &ast::ImplItemKind, b: &ast::ImplItemKind) -> bool {
+            use crate::ast::AssocItemKind::*;
+            fn need_empty_line(a: &ast::AssocItemKind, b: &ast::AssocItemKind) -> bool {
                 match (a, b) {
                     (TyAlias(..), TyAlias(..))
-                    | (Const(..), Const(..))
-                    | (OpaqueTy(..), OpaqueTy(..)) => false,
+                    | (Const(..), Const(..)) => false,
                     _ => true,
                 }
             }
@@ -656,13 +655,10 @@ impl<'a> FmtVisitor<'a> {
             buffer.sort_by(|(_, a), (_, b)| match (&a.kind, &b.kind) {
                 (TyAlias(..), TyAlias(..))
                 | (Const(..), Const(..))
-                | (Macro(..), Macro(..))
-                | (OpaqueTy(..), OpaqueTy(..)) => a.ident.as_str().cmp(&b.ident.as_str()),
-                (Method(..), Method(..)) => a.span.lo().cmp(&b.span.lo()),
+                | (Macro(..), Macro(..)) => a.ident.as_str().cmp(&b.ident.as_str()),
+                (Fn(..), Fn(..)) => a.span.lo().cmp(&b.span.lo()),
                 (TyAlias(..), _) => Ordering::Less,
                 (_, TyAlias(..)) => Ordering::Greater,
-                (OpaqueTy(..), _) => Ordering::Less,
-                (_, OpaqueTy(..)) => Ordering::Greater,
                 (Const(..), _) => Ordering::Less,
                 (_, Const(..)) => Ordering::Greater,
                 (Macro(..), _) => Ordering::Less,
@@ -822,7 +818,7 @@ pub(crate) fn format_impl(
 
 fn is_impl_single_line(
     context: &RewriteContext<'_>,
-    items: &[ast::ImplItem],
+    items: &[ast::AssocItem],
     result: &str,
     where_clause_str: &str,
     item: &ast::Item,
@@ -1729,9 +1725,9 @@ impl<'a> StaticParts<'a> {
         }
     }
 
-    pub(crate) fn from_trait_item(ti: &'a ast::TraitItem) -> Self {
+    pub(crate) fn from_trait_item(ti: &'a ast::AssocItem) -> Self {
         let (ty, expr_opt) = match ti.kind {
-            ast::TraitItemKind::Const(ref ty, ref expr_opt) => (ty, expr_opt),
+            ast::AssocItemKind::Const(ref ty, ref expr_opt) => (ty, expr_opt),
             _ => unreachable!(),
         };
         StaticParts {
@@ -1746,9 +1742,9 @@ impl<'a> StaticParts<'a> {
         }
     }
 
-    pub(crate) fn from_impl_item(ii: &'a ast::ImplItem) -> Self {
+    pub(crate) fn from_impl_item(ii: &'a ast::AssocItem) -> Self {
         let (ty, expr) = match ii.kind {
-            ast::ImplItemKind::Const(ref ty, ref expr) => (ty, expr),
+            ast::AssocItemKind::Const(ref ty, ref expr) => (ty, expr),
             _ => unreachable!(),
         };
         StaticParts {
