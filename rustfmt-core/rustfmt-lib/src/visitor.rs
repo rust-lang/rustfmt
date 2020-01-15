@@ -502,12 +502,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 ast::ItemKind::Static(..) | ast::ItemKind::Const(..) => {
                     self.visit_static(&StaticParts::from_item(item));
                 }
-                ast::ItemKind::Fn(ref decl, ref fn_header, ref generics, ref body) => {
+                ast::ItemKind::Fn(ref fn_signature, ref generics, ref body) => {
                     let inner_attrs = inner_attributes(&item.attrs);
                     self.visit_fn(
-                        visit::FnKind::ItemFn(item.ident, fn_header, &item.vis, body),
+                        visit::FnKind::ItemFn(item.ident, &fn_signature.header, &item.vis, body),
                         generics,
-                        decl,
+                        &fn_signature.decl,
                         item.span,
                         ast::Defaultness::Final,
                         Some(&inner_attrs),
@@ -587,8 +587,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             }
             ast::AssocItemKind::Fn(ref sig, Some(ref body)) => {
                 let inner_attrs = inner_attributes(&ti.attrs);
+                let vis = rustc_span::source_map::dummy_spanned(ast::VisibilityKind::Inherited);
                 self.visit_fn(
-                    visit::FnKind::Method(ti.ident, sig, None, body),
+                    visit::FnKind::Method(ti.ident, sig, &vis, body),
                     &ti.generics,
                     &sig.decl,
                     ti.span,
@@ -625,7 +626,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ast::AssocItemKind::Fn(ref sig, Some(ref body)) => {
                 let inner_attrs = inner_attributes(&ii.attrs);
                 self.visit_fn(
-                    visit::FnKind::Fn(ii.ident, sig, Some(&ii.vis), body),
+                    visit::FnKind::Method(ii.ident, sig, &ii.vis, body),
                     &ii.generics,
                     &sig.decl,
                     ii.span,
