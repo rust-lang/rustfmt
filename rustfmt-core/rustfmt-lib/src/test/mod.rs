@@ -7,9 +7,7 @@ use std::path::{Path, PathBuf};
 use std::str::Chars;
 use std::thread;
 
-use rustfmt_emitter::rustfmt_diff::{
-    make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter,
-};
+use rustfmt_emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter};
 
 use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle, ReportTactic};
 use crate::formatting::{ReportedErrors, SourceFile};
@@ -809,4 +807,3 @@ fn string_eq_ignore_newline_repr_test() {
     assert!(string_eq_ignore_newline_repr("a\r\n\r\n\r\nb", "a\n\n\nb"));
     assert!(!string_eq_ignore_newline_repr("a\r\nbcd", "a\nbcdefghijk"));
 }
-

@@ -107,7 +107,5 @@ fn format_stmt(
         }
         ast::StmtKind::Mac(..) | ast::StmtKind::Item(..) => None,
     };
-    result.and_then(|res| {
-        recover_comment_removed(res, stmt.span(), context)
-    })
+    result.and_then(|res| recover_comment_removed(res, stmt.span(), context))
 }
