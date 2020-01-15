@@ -48,6 +48,12 @@ impl<'a> FmtVisitor<'a> {
             self.last_pos = end;
             return;
         }
+
+        let last_line_str = self.buffer.lines().last().unwrap_or("");
+        if !missing_snippet.starts_with("\n") && last_line_str.find("//").is_some() {
+            self.push_str("\n");
+        }
+
         self.format_missing_inner(end, |this, last_snippet, _| this.push_str(last_snippet))
     }
 
