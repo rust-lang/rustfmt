@@ -7,9 +7,7 @@ use std::path::{Path, PathBuf};
 use std::str::Chars;
 use std::thread;
 
-use rustfmt_emitter::rustfmt_diff::{
-    make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter,
-};
+use rustfmt_emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter};
 
 use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle, ReportTactic};
 use crate::formatting::{ReportedErrors, SourceFile};
@@ -87,8 +85,8 @@ where
         .any(|c| c.zip(subpath.as_ref().components()).all(|(a, b)| a == b))
 }
 
-fn is_file_skip(path: &Path) -> bool {
-    SKIP_FILE_WHITE_LIST
+fn is_file_skip(skip_file_white_list: &[&str], path: &Path) -> bool {
+    skip_file_white_list
         .iter()
         .any(|file_path| is_subpath(path, file_path))
 }
@@ -96,7 +94,7 @@ fn is_file_skip(path: &Path) -> bool {
 // Returns a `Vec` containing `PathBuf`s of files with an  `rs` extension in the
 // given path. The `recursive` argument controls if files from subdirectories
 // are also returned.
-fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
+fn get_test_files(path: &Path, recursive: bool, skip_file_white_list: &[&str]) -> Vec<PathBuf> {
     let mut files = vec![];
     if path.is_dir() {
         for entry in fs::read_dir(path)
@@ -105,8 +103,10 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
             let entry = entry.expect("couldn't get `DirEntry`");
             let path = entry.path();
             if path.is_dir() && recursive {
-                files.append(&mut get_test_files(&path, recursive));
-            } else if path.extension().map_or(false, |f| f == "rs") && !is_file_skip(&path) {
+                files.append(&mut get_test_files(&path, recursive, skip_file_white_list));
+            } else if path.extension().map_or(false, |f| f == "rs")
+                && !is_file_skip(skip_file_white_list, &path)
+            {
                 files.push(path);
             }
         }
@@ -179,7 +179,7 @@ fn system_tests() {
     init_log();
     run_test_with(&TestSetting::default(), || {
         // Get all files in the tests/source directory.
-        let files = get_test_files(Path::new("tests/source"), true);
+        let files = get_test_files(Path::new("tests/source"), true, SKIP_FILE_WHITE_LIST);
         let (_reports, count, fails) = check_files(files, &None);
 
         // Display results.
@@ -198,7 +198,11 @@ fn system_tests() {
 #[test]
 fn coverage_tests() {
     init_log();
-    let files = get_test_files(Path::new("tests/coverage/source"), true);
+    let files = get_test_files(
+        Path::new("tests/coverage/source"),
+        true,
+        SKIP_FILE_WHITE_LIST,
+    );
     let (_reports, count, fails) = check_files(files, &None);
 
     println!("Ran {} tests in coverage mode.", count);
@@ -362,7 +366,7 @@ fn idempotence_tests() {
             return;
         }
         // Get all files in the tests/target directory.
-        let files = get_test_files(Path::new("tests/target"), true);
+        let files = get_test_files(Path::new("tests/target"), true, SKIP_FILE_WHITE_LIST);
         let (_reports, count, fails) = check_files(files, &None);
 
         // Display results.
@@ -385,7 +389,8 @@ fn self_tests() {
     if !is_nightly_channel!() {
         return;
     }
-    let mut files = get_test_files(Path::new("tests"), false);
+    let skip_file_white_list = ["target", "tests"];
+    let mut files = get_test_files(Path::new("../../rustfmt-core"), true, &skip_file_white_list);
     files.push(PathBuf::from("src/lib.rs"));
 
     let (reports, count, fails) = check_files(files, &Some(PathBuf::from("../../rustfmt.toml")));
@@ -809,4 +814,3 @@ fn string_eq_ignore_newline_repr_test() {
     assert!(string_eq_ignore_newline_repr("a\r\n\r\n\r\nb", "a\n\n\nb"));
     assert!(!string_eq_ignore_newline_repr("a\r\nbcd", "a\nbcdefghijk"));
 }
-
