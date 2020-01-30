@@ -251,7 +251,10 @@ impl FileLines {
             Some(ref map) => map,
         };
 
-        match canonicalize_path_string(file_name).ok().and_then(|file| map.get(&file)) {
+        match canonicalize_path_string(file_name)
+            .ok()
+            .and_then(|file| map.get(&file))
+        {
             Some(ranges) => ranges.iter().any(f),
             None => false,
         }
