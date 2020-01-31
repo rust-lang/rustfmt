@@ -390,8 +390,7 @@ fn self_tests() {
         return;
     }
     let skip_file_white_list = ["target", "tests"];
-    let mut files = get_test_files(Path::new("../../rustfmt-core"), true, &skip_file_white_list);
-    files.push(PathBuf::from("src/lib.rs"));
+    let files = get_test_files(Path::new("../../rustfmt-core"), true, &skip_file_white_list);
 
     let (reports, count, fails) = check_files(files, &Some(PathBuf::from("../../rustfmt.toml")));
     let mut warnings = 0;
