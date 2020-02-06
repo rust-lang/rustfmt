@@ -2001,6 +2001,28 @@ fn main() {
 }
 ```
 
+## `space_around_attr_eq`
+
+Determines if '=' are wrapped in spaces in attributes.
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `true` (default):
+
+```rust
+#[cfg(not(target_os = "pi"))]
+println!("os is not pi!");
+```
+
+#### `false`
+
+```rust
+#[cfg(not(target_os="pi"))]
+println!("os is not pi!");
+```
+
 ## `struct_field_align_threshold`
 
 The maximum diff of width between struct fields to be aligned with each other.
