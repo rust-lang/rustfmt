@@ -355,7 +355,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let indent = self.block_indent;
         let block;
         let rewrite = match fk {
-            visit::FnKind::ItemFn(ident, _, _, b) | visit::FnKind::Method(ident, _, _, b) => {
+            visit::FnKind::Fn(_, ident, _, _, Some(ref b)) => {
                 block = b;
                 self.rewrite_fn_before_block(
                     indent,
@@ -364,7 +364,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     mk_sp(s.lo(), b.span.lo()),
                 )
             }
-            visit::FnKind::Closure(_) => unreachable!(),
+            _ => unreachable!(),
         };
 
         if let Some((fn_str, fn_brace_style)) = rewrite {
@@ -504,8 +504,18 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 }
                 ast::ItemKind::Fn(ref fn_signature, ref generics, ref body) => {
                     let inner_attrs = inner_attributes(&item.attrs);
+                    let fn_ctxt = match fn_signature.header.ext {
+                        ast::Extern::None => visit::FnCtxt::Free,
+                        _ => visit::FnCtxt::Foreign,
+                    };
                     self.visit_fn(
-                        visit::FnKind::ItemFn(item.ident, &fn_signature.header, &item.vis, body),
+                        visit::FnKind::Fn(
+                            fn_ctxt,
+                            item.ident,
+                            &fn_signature,
+                            &item.vis,
+                            body.as_deref(),
+                        ),
                         generics,
                         &fn_signature.decl,
                         item.span,
@@ -577,8 +587,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ast::AssocItemKind::Fn(ref sig, Some(ref body)) => {
                 let inner_attrs = inner_attributes(&ti.attrs);
                 let vis = rustc_span::source_map::dummy_spanned(ast::VisibilityKind::Inherited);
+                let fn_ctxt = visit::FnCtxt::Assoc(visit::AssocCtxt::Trait);
                 self.visit_fn(
-                    visit::FnKind::Method(ti.ident, sig, &vis, body),
+                    visit::FnKind::Fn(fn_ctxt, ti.ident, sig, &vis, Some(body)),
                     &ti.generics,
                     &sig.decl,
                     ti.span,
@@ -614,8 +625,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         match ii.kind {
             ast::AssocItemKind::Fn(ref sig, Some(ref body)) => {
                 let inner_attrs = inner_attributes(&ii.attrs);
+                let fn_ctxt = visit::FnCtxt::Assoc(visit::AssocCtxt::Impl);
                 self.visit_fn(
-                    visit::FnKind::Method(ii.ident, sig, &ii.vis, body),
+                    visit::FnKind::Fn(fn_ctxt, ii.ident, sig, &ii.vis, Some(body)),
                     &ii.generics,
                     &sig.decl,
                     ii.span,

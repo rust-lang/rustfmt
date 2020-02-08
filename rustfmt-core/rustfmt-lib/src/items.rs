@@ -271,21 +271,23 @@ impl<'a> FnSig<'a> {
         defaultness: ast::Defaultness,
     ) -> FnSig<'a> {
         match *fn_kind {
-            visit::FnKind::ItemFn(_, fn_header, visibility, _) => FnSig {
-                decl,
-                generics,
-                ext: fn_header.ext,
-                constness: fn_header.constness.node,
-                is_async: Cow::Borrowed(&fn_header.asyncness.node),
-                defaultness,
-                unsafety: fn_header.unsafety,
-                visibility: visibility.clone(),
-            },
-            visit::FnKind::Method(_, method_sig, vis, _) => {
-                let mut fn_sig = FnSig::from_method_sig(method_sig, generics);
-                fn_sig.defaultness = defaultness;
-                fn_sig.visibility = vis.clone();
-                fn_sig
+            visit::FnKind::Fn(fn_ctxt, _, fn_sig, vis, _) => match fn_ctxt {
+                visit::FnCtxt::Assoc(..) => {
+                    let mut fn_sig = FnSig::from_method_sig(fn_sig, generics);
+                    fn_sig.defaultness = defaultness;
+                    fn_sig.visibility = vis.clone();
+                    fn_sig
+                }
+                _ => FnSig {
+                    decl,
+                    generics,
+                    ext: fn_sig.header.ext,
+                    constness: fn_sig.header.constness.node,
+                    is_async: Cow::Borrowed(&fn_sig.header.asyncness.node),
+                    defaultness,
+                    unsafety: fn_sig.header.unsafety,
+                    visibility: vis.clone(),
+                }
             }
             _ => unreachable!(),
         }
@@ -3119,11 +3121,11 @@ impl Rewrite for ast::ForeignItem {
         let span = mk_sp(self.span.lo(), self.span.hi() - BytePos(1));
 
         let item_str = match self.kind {
-            ast::ForeignItemKind::Fn(ref fn_decl, ref generics) => rewrite_fn_base(
+            ast::ForeignItemKind::Fn(ref fn_sig, ref generics, _) => rewrite_fn_base(
                 context,
                 shape.indent,
                 self.ident,
-                &FnSig::new(fn_decl, generics, self.vis.clone()),
+                &FnSig::new(&fn_sig.decl, generics, self.vis.clone()),
                 span,
                 FnBraceStyle::None,
             )
