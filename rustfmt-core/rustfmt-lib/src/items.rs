@@ -634,7 +634,7 @@ impl<'a> FmtVisitor<'a> {
         combine_strs_with_missing_comments(&context, &attrs_str, &variant_body, span, shape, false)
     }
 
-    fn visit_impl_items(&mut self, items: &[ast::AssocItem]) {
+    fn visit_impl_items(&mut self, items: &[ptr::P<ast::AssocItem>]) {
         if self.get_context().config.reorder_impl_items() {
             // Create visitor for each items, then reorder them.
             let mut buffer = vec![];
@@ -742,7 +742,7 @@ pub(crate) fn format_impl(
     item: &ast::Item,
     offset: Indent,
 ) -> Option<String> {
-    if let ast::ItemKind::Impl(_, _, _, ref generics, _, ref self_ty, ref items) = item.kind {
+    if let ast::ItemKind::Impl { ref generics, ref self_ty, ref items, ..} = item.kind {
         let mut result = String::with_capacity(128);
         let ref_and_type = format_impl_ref_and_type(context, item, offset)?;
         let sep = offset.to_string_with_newline(context.config);
@@ -799,7 +799,7 @@ pub(crate) fn format_impl(
             }
         }
 
-        if is_impl_single_line(context, items, &result, &where_clause_str, item)? {
+        if is_impl_single_line(context, items.as_slice(), &result, &where_clause_str, item)? {
             result.push_str(&where_clause_str);
             if where_clause_str.contains('\n') || last_line_contains_single_line_comment(&result) {
                 // if the where_clause contains extra comments AND
@@ -868,7 +868,7 @@ pub(crate) fn format_impl(
 
 fn is_impl_single_line(
     context: &RewriteContext<'_>,
-    items: &[ast::AssocItem],
+    items: &[ptr::P<ast::AssocItem>],
     result: &str,
     where_clause_str: &str,
     item: &ast::Item,
@@ -890,15 +890,15 @@ fn format_impl_ref_and_type(
     item: &ast::Item,
     offset: Indent,
 ) -> Option<String> {
-    if let ast::ItemKind::Impl(
+    if let ast::ItemKind::Impl {
         unsafety,
         polarity,
         defaultness,
         ref generics,
-        ref trait_ref,
+        of_trait: ref trait_ref,
         ref self_ty,
-        _,
-    ) = item.kind
+        ..
+    } = item.kind
     {
         let mut result = String::with_capacity(128);
 

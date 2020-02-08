@@ -523,6 +523,7 @@ impl Rewrite for ast::GenericBound {
                     ast::TraitBoundModifier::Maybe => poly_trait_ref
                         .rewrite(context, shape.offset_left(1)?)
                         .map(|s| format!("?{}", s)),
+                    _ => unimplemented!(),
                 };
                 rewrite.map(|s| if has_paren { format!("({})", s) } else { s })
             }

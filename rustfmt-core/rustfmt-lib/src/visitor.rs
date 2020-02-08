@@ -448,7 +448,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if should_visit_node_again {
             match item.kind {
                 ast::ItemKind::Use(ref tree) => self.format_import(item, tree),
-                ast::ItemKind::Impl(..) => {
+                ast::ItemKind::Impl {..} => {
                     let block_indent = self.block_indent;
                     let rw = self.with_context(|ctx| format_impl(&ctx, item, block_indent));
                     self.push_rewrite(item.span, rw);

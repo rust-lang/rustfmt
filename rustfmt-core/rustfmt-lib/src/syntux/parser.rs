@@ -88,7 +88,7 @@ impl<'a> ParserBuilder<'a> {
     }
 
     fn parser(
-        sess: &'a syntax::sess::ParseSess,
+        sess: &'a rustc_session::parse::ParseSess,
         input: Input,
         directory_ownership: Option<DirectoryOwnership>,
     ) -> Result<rustc_parse::parser::Parser<'a>, Vec<Diagnostic>> {

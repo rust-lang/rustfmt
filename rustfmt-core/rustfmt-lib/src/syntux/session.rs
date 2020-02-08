@@ -5,9 +5,9 @@ use std::rc::Rc;
 use rustc_data_structures::sync::{Lrc, Send};
 use rustc_errors::emitter::{Emitter, EmitterWriter};
 use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
+use rustc_session::parse::ParseSess as RawParseSess;
 use rustc_span::{BytePos, source_map::{FilePathMapping, SourceMap}, Span};
 use syntax::ast;
-use syntax::sess::ParseSess as RawParseSess;
 
 use crate::config::file_lines::LineRange;
 use crate::ignore_path::IgnorePathSet;
