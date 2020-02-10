@@ -1,4 +1,4 @@
-use syntax::source_map::Span;
+use rustc_span::Span;
 use syntax::{ast, ptr};
 
 use crate::attr::get_attrs_from_stmt;
@@ -184,7 +184,7 @@ fn rewrite_closure_expr(
             | ast::ExprKind::Loop(..)
             | ast::ExprKind::Struct(..) => true,
 
-            ast::ExprKind::AddrOf(_, ref expr)
+            ast::ExprKind::AddrOf(_, _, ref expr)
             | ast::ExprKind::Box(ref expr)
             | ast::ExprKind::Try(ref expr)
             | ast::ExprKind::Unary(_, ref expr)
@@ -431,7 +431,7 @@ fn is_block_closure_forced_inner(expr: &ast::Expr) -> bool {
         | ast::ExprKind::While(..)
         | ast::ExprKind::ForLoop(..)
         | ast::ExprKind::Loop(..) => true,
-        ast::ExprKind::AddrOf(_, ref expr)
+        ast::ExprKind::AddrOf(_, _, ref expr)
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Try(ref expr)
         | ast::ExprKind::Unary(_, ref expr)

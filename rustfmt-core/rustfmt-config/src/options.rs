@@ -374,7 +374,7 @@ impl Default for Edition {
     }
 }
 
-impl From<Edition> for syntax_pos::edition::Edition {
+impl From<Edition> for rustc_span::edition::Edition {
     fn from(edition: Edition) -> Self {
         match edition {
             Edition::Edition2015 => Self::Edition2015,

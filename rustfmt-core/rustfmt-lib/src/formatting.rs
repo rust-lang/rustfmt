@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
+use rustc_span::Span;
 use syntax::ast;
-use syntax::source_map::Span;
 
 use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};
@@ -93,7 +93,7 @@ fn format_project<T: FormatHandler>(
     let mut context = FormatContext::new(&krate, report, parse_session, config, handler);
     let files = modules::ModResolver::new(
         &context.parse_session,
-        directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod(true)),
+        directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod),
         !input_is_stdin && config.recursive(),
     )
     .visit_crate(&krate)

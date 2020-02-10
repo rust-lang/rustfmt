@@ -2,13 +2,12 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
-use rustc_data_structures::sync::Send;
+use rustc_data_structures::sync::{Lrc, Send};
+use rustc_errors::emitter::{Emitter, EmitterWriter};
+use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
+use rustc_session::parse::ParseSess as RawParseSess;
+use rustc_span::{BytePos, source_map::{FilePathMapping, SourceMap}, Span};
 use syntax::ast;
-use syntax::errors::emitter::{ColorConfig, Emitter, EmitterWriter};
-use syntax::errors::{Diagnostic, Handler, Level as DiagnosticLevel};
-use syntax::parse::ParseSess as RawParseSess;
-use syntax::source_map::{FilePathMapping, SourceMap};
-use syntax_pos::{BytePos, Span};
 
 use crate::config::file_lines::LineRange;
 use crate::ignore_path::IgnorePathSet;
@@ -28,6 +27,9 @@ pub(crate) struct ParseSess {
 struct SilentEmitter;
 
 impl Emitter for SilentEmitter {
+    fn source_map(&self) -> Option<&Lrc<SourceMap>> {
+        None
+    }
     fn emit_diagnostic(&mut self, _db: &Diagnostic) {}
 }
 
@@ -53,13 +55,16 @@ impl SilentOnIgnoredFilesEmitter {
 }
 
 impl Emitter for SilentOnIgnoredFilesEmitter {
+    fn source_map(&self) -> Option<&Lrc<SourceMap>> {
+        None
+    }
     fn emit_diagnostic(&mut self, db: &Diagnostic) {
         if db.level == DiagnosticLevel::Fatal {
             return self.handle_non_ignoreable_error(db);
         }
         if let Some(primary_span) = &db.span.primary_span() {
             let file_name = self.source_map.span_to_filename(*primary_span);
-            if let syntax_pos::FileName::Real(ref path) = file_name {
+            if let rustc_span::FileName::Real(ref path) = file_name {
                 if self
                     .ignore_path_set
                     .is_match(&FileName::Real(path.to_path_buf()))
@@ -142,8 +147,8 @@ impl ParseSess {
         id: ast::Ident,
         relative: Option<ast::Ident>,
         dir_path: &Path,
-    ) -> syntax::parse::parser::ModulePath {
-        syntax::parse::parser::Parser::default_submod_path(
+    ) -> rustc_parse::parser::ModulePath {
+        rustc_parse::parser::Parser::default_submod_path(
             id,
             relative,
             dir_path,
@@ -154,7 +159,7 @@ impl ParseSess {
     pub(crate) fn is_file_parsed(&self, path: &Path) -> bool {
         self.parse_sess
             .source_map()
-            .get_source_file(&syntax_pos::FileName::Real(path.to_path_buf()))
+            .get_source_file(&rustc_span::FileName::Real(path.to_path_buf()))
             .is_some()
     }
 
@@ -270,14 +275,16 @@ mod tests {
         use crate::is_nightly_channel;
         use crate::utils::mk_sp;
         use std::path::PathBuf;
-        use syntax::source_map::FileName as SourceMapFileName;
-        use syntax_pos::MultiSpan;
+        use rustc_span::{DUMMY_SP, MultiSpan, FileName as SourceMapFileName};
 
         struct TestEmitter {
             num_emitted_errors: Rc<RefCell<u32>>,
         }
 
         impl Emitter for TestEmitter {
+            fn source_map(&self) -> Option<&Lrc<SourceMap>> {
+                None
+            }
             fn emit_diagnostic(&mut self, _db: &Diagnostic) {
                 *self.num_emitted_errors.borrow_mut() += 1;
             }
@@ -291,6 +298,7 @@ mod tests {
                 children: vec![],
                 suggestions: vec![],
                 span: span.unwrap_or_else(MultiSpan::new),
+                sort_span: DUMMY_SP,
             }
         }
 

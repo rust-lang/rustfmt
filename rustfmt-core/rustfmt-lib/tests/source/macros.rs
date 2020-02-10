@@ -199,7 +199,7 @@ fn issue_3174() {
 gfx_pipeline!(pipe {
     vbuf: gfx::VertexBuffer<Vertex> = (),
     out: gfx::RenderTarget<ColorFormat> = "Target0",
-});
+})     ;
 
 // #1919
 #[test]

@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::cmp::min;
 
 use itertools::Itertools;
-use syntax::parse::token::{DelimToken, LitKind};
-use syntax::source_map::{BytePos, Span};
+use rustc_span::{BytePos, Span};
+use syntax::token::{DelimToken, LitKind};
 use syntax::{ast, ptr};
 
 use crate::chains::rewrite_chain;
@@ -159,7 +159,7 @@ pub(crate) fn format_expr(
         ast::ExprKind::Path(ref qself, ref path) => {
             rewrite_path(context, PathContext::Expr, qself.as_ref(), path, shape)
         }
-        ast::ExprKind::Assign(ref lhs, ref rhs) => {
+        ast::ExprKind::Assign(ref lhs, ref rhs, _) => {
             rewrite_assignment(context, lhs, rhs, None, shape)
         }
         ast::ExprKind::AssignOp(ref op, ref lhs, ref rhs) => {
@@ -213,8 +213,8 @@ pub(crate) fn format_expr(
             rewrite_unary_prefix(context, "return ", &**expr, shape)
         }
         ast::ExprKind::Box(ref expr) => rewrite_unary_prefix(context, "box ", &**expr, shape),
-        ast::ExprKind::AddrOf(mutability, ref expr) => {
-            rewrite_expr_addrof(context, mutability, expr, shape)
+        ast::ExprKind::AddrOf(borrow_kind, mutability, ref expr) => {
+            rewrite_expr_addrof(context, borrow_kind, mutability, expr, shape)
         }
         ast::ExprKind::Cast(ref expr, ref ty) => rewrite_pair(
             &**expr,
@@ -252,7 +252,7 @@ pub(crate) fn format_expr(
             fn needs_space_before_range(context: &RewriteContext<'_>, lhs: &ast::Expr) -> bool {
                 match lhs.kind {
                     ast::ExprKind::Lit(ref lit) => match lit.kind {
-                        ast::LitKind::FloatUnsuffixed(..) => {
+                        ast::LitKind::Float(_, ast::LitFloatType::Unsuffixed) => {
                             context.snippet(lit.span).ends_with('.')
                         }
                         _ => false,
@@ -1289,7 +1289,7 @@ pub(crate) fn is_simple_expr(expr: &ast::Expr) -> bool {
     match expr.kind {
         ast::ExprKind::Lit(..) => true,
         ast::ExprKind::Path(ref qself, ref path) => qself.is_none() && path.segments.len() <= 1,
-        ast::ExprKind::AddrOf(_, ref expr)
+        ast::ExprKind::AddrOf(_, _, ref expr)
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Cast(ref expr, _)
         | ast::ExprKind::Field(ref expr, _)
@@ -1335,8 +1335,12 @@ pub(crate) fn can_be_overflowed_expr(
                 || (context.use_block_indent() && args_len == 1)
         }
         ast::ExprKind::Mac(ref mac) => {
-            match (mac.delim, context.config.overflow_delimited_expr()) {
-                (ast::MacDelimiter::Bracket, true) | (ast::MacDelimiter::Brace, true) => true,
+            match (
+                syntax::ast::MacDelimiter::from_token(mac.args.delim()),
+                context.config.overflow_delimited_expr(),
+            ) {
+                (Some(ast::MacDelimiter::Bracket), true)
+                | (Some(ast::MacDelimiter::Brace), true) => true,
                 _ => context.use_block_indent() && args_len == 1,
             }
         }
@@ -1347,7 +1351,7 @@ pub(crate) fn can_be_overflowed_expr(
         }
 
         // Handle unary-like expressions
-        ast::ExprKind::AddrOf(_, ref expr)
+        ast::ExprKind::AddrOf(_, _, ref expr)
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Try(ref expr)
         | ast::ExprKind::Unary(_, ref expr)
@@ -1359,7 +1363,7 @@ pub(crate) fn can_be_overflowed_expr(
 pub(crate) fn is_nested_call(expr: &ast::Expr) -> bool {
     match expr.kind {
         ast::ExprKind::Call(..) | ast::ExprKind::Mac(..) => true,
-        ast::ExprKind::AddrOf(_, ref expr)
+        ast::ExprKind::AddrOf(_, _, ref expr)
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Try(ref expr)
         | ast::ExprKind::Unary(_, ref expr)
@@ -2035,13 +2039,14 @@ pub(crate) fn prefer_next_line(
 
 fn rewrite_expr_addrof(
     context: &RewriteContext<'_>,
+    _borrow_kind: ast::BorrowKind,
     mutability: ast::Mutability,
     expr: &ast::Expr,
     shape: Shape,
 ) -> Option<String> {
     let operator_str = match mutability {
-        ast::Mutability::Immutable => "&",
-        ast::Mutability::Mutable => "&mut ",
+        ast::Mutability::Not => "&",
+        ast::Mutability::Mut => "&mut ",
     };
     rewrite_unary_prefix(context, operator_str, expr, shape)
 }
@@ -2049,7 +2054,7 @@ fn rewrite_expr_addrof(
 pub(crate) fn is_method_call(expr: &ast::Expr) -> bool {
     match expr.kind {
         ast::ExprKind::MethodCall(..) => true,
-        ast::ExprKind::AddrOf(_, ref expr)
+        ast::ExprKind::AddrOf(_, _, ref expr)
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Cast(ref expr, _)
         | ast::ExprKind::Try(ref expr)
