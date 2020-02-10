@@ -22,6 +22,7 @@
 .idea/
 .vscode/
 *~
+rustfmt-core/rustfmt-bin/tests/**/target
 
 # This directories and files are created by test
 tests/nested-test-files/**/target/
