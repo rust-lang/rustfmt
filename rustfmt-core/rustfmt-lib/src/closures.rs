@@ -200,6 +200,18 @@ fn rewrite_closure_expr(
         || context.config.force_multiline_blocks();
     expr.rewrite(context, shape)
         .and_then(|rw| {
+            // the case closure result is used for MethodCall
+            // the example is below
+            //  || {
+            //    println!();
+            //    || 0
+            //  }().to_string()
+            if let ast::ExprKind::MethodCall(..) = expr.kind {
+                if rw.trim().starts_with("{") {
+                    return Some(rw)
+                }
+            }
+
             if veto_multiline && rw.contains('\n') {
                 None
             } else {
