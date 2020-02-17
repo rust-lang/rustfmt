@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use rustc_span::{BytePos, Pos, Span};
-use syntax::{ast, visit, token::DelimToken};
+use syntax::{ast, token::DelimToken, visit};
 
 use crate::attr::*;
 use crate::comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};
@@ -14,7 +14,7 @@ use crate::items::{
     rewrite_opaque_impl_type, rewrite_opaque_type, rewrite_type_alias, FnBraceStyle, FnSig,
     StaticParts, StructParts,
 };
-use crate::macros::{rewrite_macro, rewrite_macro_def, MacroPosition, macro_style};
+use crate::macros::{macro_style, rewrite_macro, rewrite_macro_def, MacroPosition};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::skip::{is_skip_attr, SkipContext};
@@ -448,7 +448,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if should_visit_node_again {
             match item.kind {
                 ast::ItemKind::Use(ref tree) => self.format_import(item, tree),
-                ast::ItemKind::Impl {..} => {
+                ast::ItemKind::Impl { .. } => {
                     let block_indent = self.block_indent;
                     let rw = self.with_context(|ctx| format_impl(&ctx, item, block_indent));
                     self.push_rewrite(item.span, rw);
@@ -664,7 +664,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             self.block_indent,
                         ),
                         None => rewrite_associated(),
-                    }
+                    },
                 };
                 self.push_rewrite(ii.span, rewrite);
             }

@@ -1,6 +1,6 @@
 //! Format attributes and meta items.
 
-use rustc_span::{BytePos, DUMMY_SP, Span, symbol::sym};
+use rustc_span::{symbol::sym, BytePos, Span, DUMMY_SP};
 use syntax::ast;
 
 use self::doc_comment::DocCommentFormatter;

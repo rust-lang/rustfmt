@@ -199,9 +199,9 @@ impl Rewrite for Pat {
                         shape,
                         SeparatorPlace::Front,
                     )
-                },
+                }
                 (_, _) => unimplemented!(),
-            }
+            },
             PatKind::Ref(ref pat, mutability) => {
                 let prefix = format!("&{}", format_mutability(mutability));
                 rewrite_unary_prefix(context, &prefix, &**pat, shape)

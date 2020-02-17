@@ -8,7 +8,7 @@
 
 use std::cmp::{Ord, Ordering};
 
-use rustc_span::{Span, symbol::sym};
+use rustc_span::{symbol::sym, Span};
 use syntax::{ast, attr};
 
 use crate::config::Config;
@@ -31,10 +31,8 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
         (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
-            let a_orig_name =
-                a_name.map_or_else(|| a.ident.as_str(), rustc_span::Symbol::as_str);
-            let b_orig_name =
-                b_name.map_or_else(|| b.ident.as_str(), rustc_span::Symbol::as_str);
+            let a_orig_name = a_name.map_or_else(|| a.ident.as_str(), rustc_span::Symbol::as_str);
+            let b_orig_name = b_name.map_or_else(|| b.ident.as_str(), rustc_span::Symbol::as_str);
             let result = a_orig_name.cmp(&b_orig_name);
             if result != Ordering::Equal {
                 return result;

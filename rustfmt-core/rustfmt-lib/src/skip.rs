@@ -33,7 +33,8 @@ impl SkipContext {
                 syntax::ast::AttrKind::Normal(ref attr_item) => {
                     if is_skip_attr_with(&attr_item.path.segments, |s| s == sym!(macros)) {
                         get_skip_names(&mut self.macros, attr)
-                    } else if is_skip_attr_with(&attr_item.path.segments, |s| s == sym::attributes) {
+                    } else if is_skip_attr_with(&attr_item.path.segments, |s| s == sym::attributes)
+                    {
                         get_skip_names(&mut self.attributes, attr)
                     }
                 }

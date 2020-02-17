@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use rustc_ast_pretty::pprust;
-use rustc_span::{BytePos, ExpnId, Span, sym, Symbol, SyntaxContext};
+use rustc_span::{sym, BytePos, ExpnId, Span, Symbol, SyntaxContext};
 use rustc_target::spec::abi;
 use syntax::ast::{
     self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
@@ -255,7 +255,8 @@ fn is_skip(meta_item: &MetaItem) -> bool {
     match meta_item.kind {
         MetaItemKind::Word => {
             let path_str = pprust::path_to_string(&meta_item.path);
-            path_str == &*skip_annotation().as_str() || path_str == &*depr_skip_annotation().as_str()
+            path_str == &*skip_annotation().as_str()
+                || path_str == &*depr_skip_annotation().as_str()
         }
         MetaItemKind::List(ref l) => {
             meta_item.check_name(sym::cfg_attr) && l.len() == 2 && is_skip_nested(&l[1])

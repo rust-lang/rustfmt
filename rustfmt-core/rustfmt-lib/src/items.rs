@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::cmp::{max, min, Ordering};
 
 use regex::Regex;
-use rustc_span::{BytePos, DUMMY_SP, source_map, Span, symbol};
+use rustc_span::{source_map, symbol, BytePos, Span, DUMMY_SP};
 use syntax::visit;
 use syntax::{ast, ptr};
 
@@ -287,8 +287,8 @@ impl<'a> FnSig<'a> {
                     defaultness,
                     unsafety: fn_sig.header.unsafety,
                     visibility: vis.clone(),
-                }
-            }
+                },
+            },
             _ => unreachable!(),
         }
     }
@@ -744,7 +744,13 @@ pub(crate) fn format_impl(
     item: &ast::Item,
     offset: Indent,
 ) -> Option<String> {
-    if let ast::ItemKind::Impl { ref generics, ref self_ty, ref items, ..} = item.kind {
+    if let ast::ItemKind::Impl {
+        ref generics,
+        ref self_ty,
+        ref items,
+        ..
+    } = item.kind
+    {
         let mut result = String::with_capacity(128);
         let ref_and_type = format_impl_ref_and_type(context, item, offset)?;
         let sep = offset.to_string_with_newline(context.config);
@@ -1760,9 +1766,7 @@ impl<'a> StaticParts<'a> {
     pub(crate) fn from_item(item: &'a ast::Item) -> Self {
         let (prefix, ty, mutability, expr) = match item.kind {
             ast::ItemKind::Static(ref ty, mutability, ref expr) => ("static", ty, mutability, expr),
-            ast::ItemKind::Const(ref ty, ref expr) => {
-                ("const", ty, ast::Mutability::Not, expr)
-            }
+            ast::ItemKind::Const(ref ty, ref expr) => ("const", ty, ast::Mutability::Not, expr),
             _ => unreachable!(),
         };
         StaticParts {
