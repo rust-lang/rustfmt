@@ -424,5 +424,4 @@ mod test {
         let diff = make_diff("a\nb\nc\nd", "a\nb\nc\nd", 3);
         assert_eq!(diff, vec![]);
     }
-
 }

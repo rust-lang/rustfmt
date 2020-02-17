@@ -5,7 +5,7 @@ extern crate lazy_static;
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
-use std::io::{self, stdout, Error as IoError, Read, Write, stdin};
+use std::io::{self, stdin, stdout, Error as IoError, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -41,7 +41,7 @@ fn main() {
 
 /// Format Rust code
 #[derive(Debug, StructOpt, Clone)]
-#[structopt(name = "rustfmt", version = include_str!(concat!(env!("OUT_DIR"), "/version-info.txt")))]
+#[structopt(name = "rustfmt", version = include_str!(concat!(env!("OUT_DIR"),"/version-info.txt")))]
 struct Opt {
     /// Run in 'check' mode.
     ///
@@ -50,8 +50,8 @@ struct Opt {
     #[structopt(short, long)]
     check: bool,
     /// Specify the format of rustfmt's output.
-    #[cfg_attr(nightly, structopt(long, name= "files|stdout|checkstyle|json"))]
-    #[cfg_attr(not(nightly), structopt(long, name= "files|stdout"))]
+    #[cfg_attr(nightly, structopt(long, name = "files|stdout|checkstyle|json"))]
+    #[cfg_attr(not(nightly), structopt(long, name = "files|stdout"))]
     emit: Option<Emit>,
     /// A path to the configuration file.
     #[structopt(long = "config-path", parse(from_os_str))]
@@ -92,7 +92,6 @@ struct Opt {
     verbose: bool,
 
     // Nightly-only options.
-
     /// Limit formatting to specified ranges.
     ///
     /// If you want to restrict reformatting to specific sets of lines, you can
@@ -124,7 +123,6 @@ struct Opt {
     error_on_unformatted: bool,
 
     // Positional arguments.
-
     #[structopt(parse(from_os_str))]
     files: Vec<PathBuf>,
 }
@@ -148,22 +146,23 @@ impl FromStr for InlineConfig {
 
         s.split(',')
             .map(
-            |key_val| match key_val.char_indices().find(|(_, ch)| *ch == '=') {
-                Some((middle, _)) => {
-                    let (key, val) = (&key_val[..middle], &key_val[middle + 1..]);
-                    if !Config::is_valid_key_val(key, val) {
-                        Err(format_err!("invalid key=val pair: `{}`", key_val))
-                    } else {
-                        Ok((key.to_string(), val.to_string()))
+                |key_val| match key_val.char_indices().find(|(_, ch)| *ch == '=') {
+                    Some((middle, _)) => {
+                        let (key, val) = (&key_val[..middle], &key_val[middle + 1..]);
+                        if !Config::is_valid_key_val(key, val) {
+                            Err(format_err!("invalid key=val pair: `{}`", key_val))
+                        } else {
+                            Ok((key.to_string(), val.to_string()))
+                        }
                     }
-                }
 
-                None => Err(format_err!(
+                    None => Err(format_err!(
                         "--config expects comma-separated list of key=val pairs, found `{}`",
                         key_val
                     )),
-            },
-        ).collect::<Result<HashMap<_, _>, _>>()
+                },
+            )
+            .collect::<Result<HashMap<_, _>, _>>()
             .map(|map| InlineConfig(map, false))
     }
 }
@@ -183,7 +182,10 @@ impl FromStr for PrintConfig {
             "default" => Ok(PrintConfig::Default),
             "minimal" => Ok(PrintConfig::Minimal),
             "current" => Ok(PrintConfig::Current),
-            _ => Err(format!("expected one of [current,default,minimal], found `{}`", s)),
+            _ => Err(format!(
+                "expected one of [current,default,minimal], found `{}`",
+                s
+            )),
         }
     }
 }
@@ -280,7 +282,6 @@ impl Opt {
     }
 }
 
-
 /// Rustfmt operations errors.
 #[derive(Error, Debug)]
 pub enum OperationError {
@@ -347,7 +348,9 @@ impl CliOptions for Opt {
 fn execute(mut opt: Opt) -> Result<i32> {
     opt.verify()?;
 
-    if opt.inline_config.as_ref().map_or(false, |inline_configs| inline_configs.iter().any(InlineConfig::is_help)) {
+    if opt.inline_config.as_ref().map_or(false, |inline_configs| {
+        inline_configs.iter().any(InlineConfig::is_help)
+    }) {
         Config::print_docs(&mut stdout(), cfg!(nightly));
         return Ok(0);
     }
@@ -369,10 +372,12 @@ fn print_default_config() -> Result<i32> {
 }
 
 fn print_config(opt: &Opt, print_config: PrintConfig) -> Result<i32> {
-    let (config, config_path) =
-        load_config(env::current_dir().ok().as_ref().map(PathBuf::as_path), Some(opt))?;
-    let actual_config = FileConfigPairIter::new(&opt, config_path.is_some())
-        .find_map(|pair| match pair.config {
+    let (config, config_path) = load_config(
+        env::current_dir().ok().as_ref().map(PathBuf::as_path),
+        Some(opt),
+    )?;
+    let actual_config =
+        FileConfigPairIter::new(&opt, config_path.is_some()).find_map(|pair| match pair.config {
             FileConfig::Local(config, Some(_)) => Some(config),
             _ => None,
         });
@@ -436,8 +441,7 @@ struct FileConfigPairIter<'a> {
     opt: &'a Opt,
 }
 
-impl<'a> FileConfigPairIter<'a>
-{
+impl<'a> FileConfigPairIter<'a> {
     fn new(opt: &'a Opt, has_config_from_commandline: bool) -> Self {
         FileConfigPairIter {
             has_config_from_commandline,
@@ -447,8 +451,7 @@ impl<'a> FileConfigPairIter<'a>
     }
 }
 
-impl<'a> Iterator for FileConfigPairIter<'a>
-{
+impl<'a> Iterator for FileConfigPairIter<'a> {
     type Item = FileConfigPair<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -461,13 +464,11 @@ impl<'a> Iterator for FileConfigPairIter<'a>
             FileConfig::Local(local_config, config_path)
         };
 
-        Some(FileConfigPair {file, config})
+        Some(FileConfigPair { file, config })
     }
 }
 
-fn format(
-    opt: Opt,
-) -> Result<i32> {
+fn format(opt: Opt) -> Result<i32> {
     if opt.files.is_empty() {
         let mut buf = String::new();
         stdin().read_to_string(&mut buf)?;

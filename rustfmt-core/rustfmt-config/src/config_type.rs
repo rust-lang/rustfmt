@@ -340,4 +340,3 @@ macro_rules! is_nightly_channel {
         option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev")
     };
 }
-

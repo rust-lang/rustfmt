@@ -428,10 +428,7 @@ mod test {
 
         let used_options = config.used_options();
         let toml = used_options.to_toml().unwrap();
-        assert_eq!(
-            toml,
-            "merge_derives = false\n"
-        );
+        assert_eq!(toml, "merge_derives = false\n");
     }
 
     #[test]
