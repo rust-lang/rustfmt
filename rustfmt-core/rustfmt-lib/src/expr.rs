@@ -833,11 +833,8 @@ impl<'a> ControlFlow<'a> {
                 .span_after(self.span, self.connector.trim());
             let comments_span = mk_sp(comments_lo, expr.span.lo());
 
-            let missing_comments = match rewrite_missing_comment(
-                comments_span,
-                cond_shape,
-                context,
-            ) {
+            let missing_comments = match rewrite_missing_comment(comments_span, cond_shape, context)
+            {
                 None => "".to_owned(),
                 Some(comment) if self.connector.is_empty() || comment.is_empty() => comment,
                 // Handle same-line block comments:
