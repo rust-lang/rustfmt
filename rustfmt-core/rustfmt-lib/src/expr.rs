@@ -831,33 +831,53 @@ impl<'a> ControlFlow<'a> {
             let comments_lo = context
                 .snippet_provider
                 .span_after(self.span, self.connector.trim());
-            let missing_comments = if let Some(comment) =
-                rewrite_missing_comment(mk_sp(comments_lo, expr.span.lo()), cond_shape, context)
-            {
-                if !self.connector.is_empty() && !comment.is_empty() {
-                    if comment_style(&comment, false).is_line_comment() || comment.contains('\n') {
-                        let newline = &pat_shape
-                            .indent
-                            .block_indent(context.config)
-                            .to_string_with_newline(context.config);
-                        // An extra space is added when the lhs and rhs are joined
-                        // so we need to remove one space from the end to ensure
-                        // the comment and rhs are aligned.
-                        let mut suffix = newline.as_ref().to_string();
-                        if !suffix.is_empty() {
-                            suffix.truncate(suffix.len() - 1);
-                        }
-                        format!("{}{}{}", newline, comment, suffix)
-                    } else {
-                        format!(" {}", comment)
-                    }
-                } else {
-                    comment
-                }
-            } else {
-                "".to_owned()
-            };
+            let comments_span = mk_sp(comments_lo, expr.span.lo());
 
+            let missing_comments = match rewrite_missing_comment(
+                comments_span,
+                cond_shape,
+                context,
+            ) {
+                None => "".to_owned(),
+                Some(comment) if self.connector.is_empty() || comment.is_empty() => comment,
+                // Handle same-line block comments:
+                //     if let Some(foo) = /*bar*/ baz { ... }
+                //     if let Some(ref /*def*/ mut /*abc*/ state)...
+                Some(comment)
+                    if !comment_style(&comment, false).is_line_comment()
+                        && !comment.contains('\n') =>
+                {
+                    format!(" {}", comment)
+                }
+                // Handle sequence of multiple inline comments:
+                //     if let Some(n) =
+                //         // this is a test comment
+                //         // with another
+                //         foo { .... }
+                Some(_) => {
+                    let newline = &cond_shape
+                        .indent
+                        .block_indent(context.config)
+                        .to_string_with_newline(context.config);
+                    let shape = pat_shape.block_indent(context.config.tab_spaces());
+                    let comment = format!(
+                        "{}{}",
+                        newline,
+                        rewrite_missing_comment(comments_span, shape, context)?,
+                    );
+                    let lhs = format!("{}{}{}{}", matcher, pat_string, self.connector, comment);
+                    let orig_rhs = Some(format!("{}{}", newline, expr.rewrite(context, shape)?));
+                    let rhs = choose_rhs(
+                        context,
+                        expr,
+                        cond_shape,
+                        orig_rhs,
+                        RhsTactics::Default,
+                        true,
+                    )?;
+                    return Some(format!("{}{}", lhs, rhs));
+                }
+            };
             let result = format!(
                 "{}{}{}{}",
                 matcher, pat_string, self.connector, missing_comments
