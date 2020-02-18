@@ -1441,7 +1441,9 @@ fn format_empty_struct_or_tuple(
         result.push_str(&offset.to_string_with_newline(context.config))
     }
     result.push_str(opener);
-    match rewrite_missing_comment(span, Shape::indented(offset, context.config), context) {
+    let comment_shape =
+        Shape::indented(offset, context.config).block_indent(context.config.tab_spaces());
+    match rewrite_missing_comment(span, comment_shape, context) {
         Some(ref s) if s.is_empty() => (),
         Some(ref s) => {
             if !is_single_line(s) || first_line_contains_single_line_comment(s) {
