@@ -1,7 +1,7 @@
 use std::iter::ExactSizeIterator;
 use std::ops::Deref;
 
-use rustc_span::{BytePos, Span, symbol::kw};
+use rustc_span::{symbol::kw, BytePos, Span};
 use syntax::ast::{self, FunctionRetTy, Mutability};
 
 use crate::config::lists::*;

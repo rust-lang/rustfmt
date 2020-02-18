@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 
-use rustc_span::{BytePos, DUMMY_SP, source_map, Span, symbol::sym};
+use rustc_span::{source_map, symbol::sym, BytePos, Span, DUMMY_SP};
 use syntax::ast::{self, UseTreeKind};
 
 use crate::comment::combine_strs_with_missing_comments;

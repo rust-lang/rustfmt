@@ -475,6 +475,16 @@ fn format(opt: Opt) -> Result<i32> {
         return format_string(buf, opt);
     }
 
+    if let Some(file) = opt.files.iter().find(|f| !f.exists()) {
+        return Err(format_err!(
+            "Error: file `{}` does not exist",
+            file.display()
+        ));
+    }
+    if let Some(dir) = opt.files.iter().find(|f| f.is_dir()) {
+        return Err(format_err!("Error: `{}` is a directory", dir.display()));
+    }
+
     let (config, config_path) = load_config(None, Some(&opt))?;
 
     if config.verbose() == Verbosity::Verbose {
@@ -489,30 +499,22 @@ fn format(opt: Opt) -> Result<i32> {
     for pair in FileConfigPairIter::new(&opt, config_path.is_some()) {
         let file = pair.file;
 
-        if !file.exists() {
-            eprintln!("Error: file `{}` does not exist", file.display());
-            session.add_operational_error();
-        } else if file.is_dir() {
-            eprintln!("Error: `{}` is a directory", file.display());
-            session.add_operational_error();
-        } else {
-            if let FileConfig::Local(local_config, config_path) = pair.config {
-                if let Some(path) = config_path {
-                    if local_config.verbose() == Verbosity::Verbose {
-                        println!(
-                            "Using rustfmt config file {} for {}",
-                            path.display(),
-                            file.display()
-                        );
-                    }
+        if let FileConfig::Local(local_config, config_path) = pair.config {
+            if let Some(path) = config_path {
+                if local_config.verbose() == Verbosity::Verbose {
+                    println!(
+                        "Using rustfmt config file {} for {}",
+                        path.display(),
+                        file.display()
+                    );
                 }
-
-                session.override_config(local_config, |sess| {
-                    format_and_emit_report(sess, Input::File(file.to_path_buf()))
-                });
-            } else {
-                format_and_emit_report(&mut session, Input::File(file.to_path_buf()));
             }
+
+            session.override_config(local_config, |sess| {
+                format_and_emit_report(sess, Input::File(file.to_path_buf()))
+            });
+        } else {
+            format_and_emit_report(&mut session, Input::File(file.to_path_buf()));
         }
     }
 

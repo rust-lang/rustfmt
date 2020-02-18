@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use rustc_errors::{Diagnostic, PResult};
 use rustc_parse::{new_sub_parser_from_file, parser::Parser as RawParser};
-use rustc_span::{DUMMY_SP, Span, symbol::kw};
+use rustc_span::{symbol::kw, Span, DUMMY_SP};
 use syntax::ast;
 use syntax::token::{DelimToken, TokenKind};
 

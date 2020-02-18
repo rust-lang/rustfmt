@@ -6,7 +6,10 @@ use rustc_data_structures::sync::{Lrc, Send};
 use rustc_errors::emitter::{Emitter, EmitterWriter};
 use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
 use rustc_session::parse::ParseSess as RawParseSess;
-use rustc_span::{BytePos, source_map::{FilePathMapping, SourceMap}, Span};
+use rustc_span::{
+    source_map::{FilePathMapping, SourceMap},
+    BytePos, Span,
+};
 use syntax::ast;
 
 use crate::config::file_lines::LineRange;
@@ -274,8 +277,8 @@ mod tests {
         use crate::config::IgnoreList;
         use crate::is_nightly_channel;
         use crate::utils::mk_sp;
+        use rustc_span::{FileName as SourceMapFileName, MultiSpan, DUMMY_SP};
         use std::path::PathBuf;
-        use rustc_span::{DUMMY_SP, MultiSpan, FileName as SourceMapFileName};
 
         struct TestEmitter {
             num_emitted_errors: Rc<RefCell<u32>>,
