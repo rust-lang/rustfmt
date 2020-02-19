@@ -127,9 +127,7 @@ pub(crate) fn format_expr(
         ast::ExprKind::Block(ref block, opt_label) => {
             match expr_type {
                 ExprType::Statement => {
-                    if is_unsafe_block(block) {
-                        rewrite_block(block, Some(&expr.attrs), opt_label, context, shape)
-                    } else if let rw @ Some(_) =
+                    if let rw @ Some(_) =
                         rewrite_empty_block(context, block, Some(&expr.attrs), opt_label, "", shape)
                     {
                         // Rewrite block without trying to put it in a single line.

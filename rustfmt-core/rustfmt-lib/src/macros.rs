@@ -31,8 +31,8 @@ use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
-    format_visibility, indent_next_line, is_empty_line, mk_sp, remove_trailing_white_spaces,
-    rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
+    count_newlines, format_visibility, indent_next_line, is_empty_line, mk_sp,
+    remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
 };
 use crate::visitor::FmtVisitor;
 
@@ -1473,7 +1473,7 @@ fn format_lazy_static(
         parser.eat(&TokenKind::Colon);
         let ty = parse_or!(parse_ty);
         parser.eat(&TokenKind::Eq);
-        let expr = parse_or!(parse_expr);
+        let expr = parse_or!(parse_stmt)?;
         parser.eat(&TokenKind::Semi);
 
         // Rewrite as a static item.
@@ -1487,11 +1487,15 @@ fn format_lazy_static(
         result.push_str(&crate::expr::rewrite_assign_rhs(
             context,
             stmt,
-            &*expr,
+            &expr,
             nested_shape.sub_width(1)?,
         )?);
         result.push(';');
         if parser.token.kind != TokenKind::Eof {
+            let snippet = context.snippet(mk_sp(parser.prev_span.hi(), parser.token.span.lo()));
+            if count_newlines(snippet) >= 2 {
+                result.push('\n');
+            }
             result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
         }
     }

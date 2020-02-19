@@ -6,7 +6,9 @@ fn main() {
 
     let x = try /* Invisible comment */ { foo()? };
 
-    let x = try { unsafe { foo()? } };
+    let x = try {
+        unsafe { foo()? }
+    };
 
     let y = match (try { foo()? }) {
         _ => (),
