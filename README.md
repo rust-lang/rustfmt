@@ -148,7 +148,7 @@ for more info.
 
 `cargo build` to build.
 
-`cargo test && cargo test --manifest-path rustfmt-core/Cargo.toml` to run all tests.
+`cargo test --manifest-path rustfmt-core/Cargo.toml` to run all tests.
 
 To run rustfmt after this, use `cargo run --bin rustfmt -- filename`. See the
 notes above on running rustfmt.
@@ -214,13 +214,13 @@ needs to be specified in `rustfmt.toml`, e.g., with `edition = "2018"`.
 
   Options:
 
-  | Flag |Description| Nightly Only |
-  |:---:|:---:|:---:|
-  | files | overwrites output to files | No |
-  | stdout | writes output to stdout | No |
-  | coverage | displays how much of the input file was processed | Yes |
-  | checkstyle | emits in a checkstyle format | Yes |
-  | json | emits diffs in a json format | Yes |
+  |    Flag    |                    Description                    | Nightly Only |
+  | :--------: | :-----------------------------------------------: | :----------: |
+  |   files    |            overwrites output to files             |      No      |
+  |   stdout   |              writes output to stdout              |      No      |
+  |  coverage  | displays how much of the input file was processed |     Yes      |
+  | checkstyle |           emits in a checkstyle format            |     Yes      |
+  |    json    |           emits diffs in a json format            |     Yes      |
 
 ## License
 
