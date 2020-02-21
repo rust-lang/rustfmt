@@ -54,9 +54,18 @@ fn print_config() {
     );
     assert_that!(&["--print-config", "default"], contains("max_width = 100"));
     assert_that!(&["--print-config", "current"], contains("max_width = 100"));
-    assert_that!(&["--config", "max_width=120", "--print-config", "current"], contains("max_width = 120"));
-    assert_that!(&["--config", "max_width=120", "--print-config", "minimal"], contains("max_width = 120"));
-    assert_that!(&["--config", "max_width=100", "--print-config", "minimal"], eq(""));
+    assert_that!(
+        &["--config", "max_width=120", "--print-config", "current"],
+        contains("max_width = 120")
+    );
+    assert_that!(
+        &["--config", "max_width=120", "--print-config", "minimal"],
+        contains("max_width = 120")
+    );
+    assert_that!(
+        &["--config", "max_width=100", "--print-config", "minimal"],
+        eq("")
+    );
 }
 
 #[ignore]

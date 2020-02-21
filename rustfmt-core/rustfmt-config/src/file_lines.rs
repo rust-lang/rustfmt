@@ -173,7 +173,7 @@ impl fmt::Display for FileLines {
             Some(map) => {
                 for (file_name, ranges) in map.iter() {
                     write!(f, "{}: ", file_name)?;
-                    write!(f, "{}\n", ranges.iter().format(", "))?;
+                    writeln!(f, "{}", ranges.iter().format(", "))?;
                 }
             }
         };
