@@ -238,7 +238,7 @@ impl Rewrite for Pat {
                         if let Some(rw) = p.rewrite(context, shape) {
                             rw
                         } else {
-                            format!("{}", context.snippet(p.span))
+                            context.snippet(p.span).to_string()
                         }
                     })
                     .collect();

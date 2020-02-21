@@ -69,5 +69,8 @@ fn print_config() {
 fn rustfmt_help() {
     assert_that!(&["--", "--help"], contains("Format Rust code"));
     assert_that!(&["--", "-h"], contains("Format Rust code"));
-    assert_that!(&["--", "--config", "help"], contains("Configuration Options:"));
+    assert_that!(
+        &["--", "--config", "help"],
+        contains("Configuration Options:")
+    );
 }

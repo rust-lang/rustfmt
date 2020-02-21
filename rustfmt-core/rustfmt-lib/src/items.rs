@@ -299,7 +299,7 @@ impl<'a> FnSig<'a> {
         result.push_str(&*format_visibility(context, &self.visibility));
         result.push_str(format_defaultness(self.defaultness));
         result.push_str(format_constness(self.constness));
-        result.push_str(format_async(&self.is_async));
+        result.push_str(format_async(*self.is_async));
         result.push_str(format_unsafety(self.unsafety));
         result.push_str(&format_extern(
             self.ext,
@@ -649,20 +649,14 @@ impl<'a> FmtVisitor<'a> {
             fn is_type(ty: &Option<syntax::ptr::P<ast::Ty>>) -> bool {
                 match ty {
                     None => true,
-                    Some(lty) => match lty.kind.opaque_top_hack() {
-                        None => true,
-                        Some(_) => false,
-                    },
+                    Some(lty) => lty.kind.opaque_top_hack().is_none(),
                 }
             }
 
             fn is_opaque(ty: &Option<syntax::ptr::P<ast::Ty>>) -> bool {
                 match ty {
                     None => false,
-                    Some(lty) => match lty.kind.opaque_top_hack() {
-                        None => false,
-                        Some(_) => true,
-                    },
+                    Some(lty) => lty.kind.opaque_top_hack().is_some(),
                 }
             }
 

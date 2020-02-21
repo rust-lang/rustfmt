@@ -240,8 +240,7 @@ impl<'a> FmtVisitor<'a> {
         let last_char = big_snippet
             .chars()
             .rev()
-            .skip_while(|rev_c| [' ', '\t'].contains(rev_c))
-            .next();
+            .find(|rev_c| ![' ', '\t'].contains(rev_c));
 
         let fix_indent = last_char.map_or(true, |rev_c| ['{', '\n'].contains(&rev_c));
 
@@ -276,8 +275,7 @@ impl<'a> FmtVisitor<'a> {
             match snippet[status.line_start..]
                 .chars()
                 // skip trailing whitespaces
-                .skip_while(|c| *c == ' ' || *c == '\t')
-                .next()
+                .find(|c| !(*c == ' ' || *c == '\t'))
             {
                 Some('\n') | Some('\r') => {
                     if !is_last_comment_block(subslice) {

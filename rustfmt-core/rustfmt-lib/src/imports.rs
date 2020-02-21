@@ -442,11 +442,8 @@ impl UseTree {
 
         // Normalise foo::self as bar -> foo as bar.
         if let UseSegment::Slf(_) = last {
-            match self.path.last() {
-                Some(UseSegment::Ident(_, None)) => {
-                    aliased_self = true;
-                }
-                _ => {}
+            if let Some(UseSegment::Ident(_, None)) = self.path.last() {
+                aliased_self = true;
             }
         }
 
@@ -540,9 +537,8 @@ impl UseTree {
         match self.path.clone().last() {
             Some(UseSegment::List(list)) => {
                 if list.len() == 1 && list[0].path.len() == 1 {
-                    match list[0].path[0] {
-                        UseSegment::Slf(..) => return vec![self],
-                        _ => (),
+                    if let UseSegment::Slf(..) = list[0].path[0] {
+                        return vec![self];
                     };
                 }
                 let prefix = &self.path[..self.path.len() - 1];

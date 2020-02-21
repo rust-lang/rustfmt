@@ -416,7 +416,7 @@ fn is_block_closure_forced(
     } else {
         if let ast::ExprKind::Match(..) = expr.kind {
             let is_move_closure_without_brace = capture == ast::CaptureBy::Value
-                && !context.snippet(expr.span).trim().starts_with("{");
+                && !context.snippet(expr.span).trim().starts_with('{');
 
             is_block_closure_forced_inner(expr) || is_move_closure_without_brace
         } else {

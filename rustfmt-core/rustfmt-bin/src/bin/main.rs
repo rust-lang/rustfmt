@@ -340,7 +340,7 @@ impl CliOptions for Opt {
     }
 
     fn config_path(&self) -> Option<&Path> {
-        self.config_path.as_ref().map(PathBuf::as_path)
+        self.config_path.as_deref()
     }
 }
 
@@ -372,10 +372,7 @@ fn print_default_config() -> Result<i32> {
 }
 
 fn print_config(opt: &Opt, print_config: PrintConfig) -> Result<i32> {
-    let (config, config_path) = load_config(
-        env::current_dir().ok().as_ref().map(PathBuf::as_path),
-        Some(opt),
-    )?;
+    let (config, config_path) = load_config(env::current_dir().ok().as_deref(), Some(opt))?;
     let actual_config =
         FileConfigPairIter::new(&opt, config_path.is_some()).find_map(|pair| match pair.config {
             FileConfig::Local(config, Some(_)) => Some(config),

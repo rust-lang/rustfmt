@@ -286,7 +286,7 @@ impl<'a> Parser<'a> {
         let token_stream = mac.args.inner_tokens();
         let mut parser = rustc_parse::stream_to_parser_with_base_dir(
             sess.inner(),
-            token_stream.clone(),
+            token_stream,
             base_dir.to_syntax_directory(),
         );
 

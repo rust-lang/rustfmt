@@ -177,7 +177,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             let missing_span = self.next_span(hi);
             let snippet = self.snippet(missing_span);
             let len = CommentCodeSlices::new(snippet)
-                .nth(0)
+                .next()
                 .and_then(|(kind, _, s)| {
                     if kind == CodeCharKind::Normal {
                         s.rfind('\n')
@@ -690,7 +690,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 let hi = self.snippet_provider.span_before(search_span, ";");
                 let target_span = mk_sp(mac.span().lo(), hi + BytePos(1));
                 let rewrite = rewrite.map(|rw| {
-                    if !rw.ends_with(";") {
+                    if !rw.ends_with(';') {
                         format!("{};", rw)
                     } else {
                         rw
