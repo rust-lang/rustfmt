@@ -96,7 +96,15 @@ macro_rules! create_config {
                     (self.0).$i.1 = true;
                     (self.0).$i.2 = value;
                     match stringify!($i) {
-                        "max_width" | "use_small_heuristics" => self.0.set_heuristics(),
+                        "max_width"
+                        | "width_heuristics"
+                        | "fn_call_width"
+                        | "single_line_if_else_max_width"
+                        | "attr_fn_like_width"
+                        | "struct_lit_width"
+                        | "struct_variant_width"
+                        | "array_width"
+                        | "chain_width" => self.0.set_heuristics(),
                         "license_template_path" => self.0.set_license_template(),
                         &_ => (),
                     }
@@ -228,7 +236,15 @@ macro_rules! create_config {
                 }
 
                 match key {
-                    "max_width" | "use_small_heuristics" => self.set_heuristics(),
+                    "max_width"
+                    | "width_heuristics"
+                    | "fn_call_width"
+                    | "single_line_if_else_max_width"
+                    | "attr_fn_like_width"
+                    | "struct_lit_width"
+                    | "struct_variant_width"
+                    | "array_width"
+                    | "chain_width" => self.set_heuristics(),
                     "license_template_path" => self.set_license_template(),
                     &_ => (),
                 }
@@ -236,8 +252,8 @@ macro_rules! create_config {
 
             #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
-                const HIDE_OPTIONS: [&str; 6] = [
-                    "verbose", "verbose_diff", "file_lines", "width_heuristics",
+                const HIDE_OPTIONS: [&str; 5] = [
+                    "verbose", "verbose_diff", "file_lines",
                     "recursive", "print_misformatted_file_names",
                 ];
                 HIDE_OPTIONS.contains(&name)
@@ -280,16 +296,88 @@ macro_rules! create_config {
                 )+
             }
 
+            fn set_width_heuristics(&mut self, heuristics: WidthHeuristics) {
+                let max_width = self.max_width.2;
+                let get_width_value = |
+                    was_set: bool,
+                    override_value: usize,
+                    heuristic_value: usize,
+                    config_key: &str,
+                | -> usize {
+                    if !was_set {
+                        return heuristic_value;
+                    }
+                    if override_value > max_width {
+                        panic!("`{}` cannot have a value that exceeds `max_width`", config_key);
+                    }
+                    override_value
+                };
+
+                let fn_call_width = get_width_value(
+                    self.was_set().fn_call_width(),
+                    self.fn_call_width.2,
+                    heuristics.fn_call_width,
+                    "fn_call_width",
+                );
+                self.fn_call_width.2 = fn_call_width;
+
+                let attr_fn_like_width = get_width_value(
+                    self.was_set().attr_fn_like_width(),
+                    self.attr_fn_like_width.2,
+                    heuristics.attr_fn_like_width,
+                    "attr_fn_like_width",
+                );
+                self.attr_fn_like_width.2 = attr_fn_like_width;
+
+                let struct_lit_width = get_width_value(
+                    self.was_set().struct_lit_width(),
+                    self.struct_lit_width.2,
+                    heuristics.struct_lit_width,
+                    "struct_lit_width",
+                );
+                self.struct_lit_width.2 = struct_lit_width;
+
+                let struct_variant_width = get_width_value(
+                    self.was_set().struct_variant_width(),
+                    self.struct_variant_width.2,
+                    heuristics.struct_variant_width,
+                    "struct_variant_width",
+                );
+                self.struct_variant_width.2 = struct_variant_width;
+
+                let array_width = get_width_value(
+                    self.was_set().array_width(),
+                    self.array_width.2,
+                    heuristics.array_width,
+                    "array_width",
+                );
+                self.array_width.2 = array_width;
+
+                let chain_width = get_width_value(
+                    self.was_set().chain_width(),
+                    self.chain_width.2,
+                    heuristics.chain_width,
+                    "chain_width",
+                );
+                self.chain_width.2 = chain_width;
+
+                let single_line_if_else_max_width = get_width_value(
+                    self.was_set().single_line_if_else_max_width(),
+                    self.single_line_if_else_max_width.2,
+                    heuristics.single_line_if_else_max_width,
+                    "single_line_if_else_max_width",
+                );
+                self.single_line_if_else_max_width.2 = single_line_if_else_max_width;
+            }
+
             fn set_heuristics(&mut self) {
-                if self.use_small_heuristics.2 == Heuristics::Default {
-                    let max_width = self.max_width.2;
-                    self.set().width_heuristics(WidthHeuristics::scaled(max_width));
-                } else if self.use_small_heuristics.2 == Heuristics::Max {
-                    let max_width = self.max_width.2;
-                    self.set().width_heuristics(WidthHeuristics::set(max_width));
-                } else {
-                    self.set().width_heuristics(WidthHeuristics::null());
-                }
+                let max_width = self.max_width.2;
+                match self.width_heuristics.2 {
+                    Heuristics::Scaled =>
+                        self.set_width_heuristics(WidthHeuristics::scaled(max_width)),
+                    Heuristics::Max => self.set_width_heuristics(WidthHeuristics::set(max_width)),
+                    Heuristics::Off => self.set_width_heuristics(WidthHeuristics::null()),
+                };
             }
 
             fn set_license_template(&mut self) {

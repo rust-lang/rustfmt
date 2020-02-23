@@ -32,9 +32,24 @@ create_config! {
     hard_tabs: bool, false, true, "Use tab characters for indentation, spaces for alignment";
     tab_spaces: usize, 4, true, "Number of spaces per tab";
     newline_style: NewlineStyle, NewlineStyle::Auto, true, "Unix or Windows line endings";
-    use_small_heuristics: Heuristics, Heuristics::Default, true, "Whether to use different \
-        formatting for items and expressions if they satisfy a heuristic notion of 'small'";
     indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items";
+    width_heuristics: Heuristics, Heuristics::Scaled, true, "Controls width heuristics \
+        by setting the values for the individual width heuristic options";
+
+    // Width Heuristics
+    fn_call_width: usize, 60, true, "Maximum width of the args of a function call before \
+        falling back to vertical formatting.";
+    attr_fn_like_width: usize, 70, true, "Maximum width of the args of a function-like \
+        attributes before falling back to vertical formatting.";
+    struct_lit_width: usize, 18, true, "Maximum width in the body of a struct lit before \
+        falling back to vertical formatting.";
+    struct_variant_width: usize, 35, true, "Maximum width in the body of a struct variant before \
+        falling back to vertical formatting.";
+    array_width: usize, 60, true,  "Maximum width of an array literal before falling \
+        back to vertical formatting.";
+    chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
+    single_line_if_else_max_width: usize, 50, true, "Maximum line length for single line if-else \
+        expressions. A value of zero means always break if-else expressions.";
 
     // Comments. macros, and strings
     wrap_comments: bool, false, false, "Break comments to fit on the line";
@@ -146,8 +161,6 @@ create_config! {
     file_lines: FileLines, FileLines::all(), false,
         "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
          via the --file-lines option";
-    width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
-        "'small' heuristic values";
     emit_mode: EmitMode, EmitMode::Files, false,
         "What emit Mode to use when none is supplied";
     print_misformatted_file_names: bool, false, true,
@@ -167,7 +180,6 @@ impl PartialConfig {
         let mut cloned = self.clone();
         cloned.file_lines = None;
         cloned.verbose = None;
-        cloned.width_heuristics = None;
         cloned.print_misformatted_file_names = None;
         cloned.recursive = None;
         cloned.emit_mode = None;
@@ -389,9 +401,6 @@ mod test {
         create_config! {
             // Options that are used by the generated functions
             max_width: usize, 100, true, "Maximum width of each line";
-            use_small_heuristics: Heuristics, Heuristics::Default, true,
-                "Whether to use different formatting for items and \
-                 expressions if they satisfy a heuristic notion of 'small'.";
             license_template_path: String, String::default(), false,
                 "Beginning of file must match license template";
             required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
@@ -403,8 +412,22 @@ mod test {
             file_lines: FileLines, FileLines::all(), false,
                 "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
                     via the --file-lines option";
-            width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
-                "'small' heuristic values";
+            width_heuristics: Heuristics, Heuristics::Scaled, true, "Controls width heuristics \
+                    by setting the values for the individual width heuristic options";
+            // Width Heuristics
+            fn_call_width: usize, 60, true, "Maximum width of the args of a function call before \
+                falling back to vertical formatting.";
+            attr_fn_like_width: usize, 70, true, "Maximum width of the args of a function-like \
+                attributes before falling back to vertical formatting.";
+            struct_lit_width: usize, 18, true, "Maximum width in the body of a struct lit before \
+                falling back to vertical formatting.";
+            struct_variant_width: usize, 35, true, "Maximum width in the body of a struct \
+                variant before falling back to vertical formatting.";
+            array_width: usize, 60, true,  "Maximum width of an array literal before falling \
+                back to vertical formatting.";
+            chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
+            single_line_if_else_max_width: usize, 50, true, "Maximum line length for single \
+                line if-else expressions. A value of zero means always break if-else expressions.";
 
             // Options that are used by the tests
             stable_option: bool, false, true, "A stable option";
@@ -492,8 +515,15 @@ mod test {
 hard_tabs = false
 tab_spaces = 4
 newline_style = "Auto"
-use_small_heuristics = "Default"
 indent_style = "Block"
+width_heuristics = "Scaled"
+fn_call_width = 60
+attr_fn_like_width = 70
+struct_lit_width = 18
+struct_variant_width = 35
+array_width = 60
+chain_width = 60
+single_line_if_else_max_width = 50
 wrap_comments = false
 format_code_in_doc_comments = false
 comment_width = 80
