@@ -556,36 +556,96 @@ ignore = []
         assert_eq!(&toml, &default_config);
     }
 
-    // FIXME(#2183): these tests cannot be run in parallel because they use env vars.
-    // #[test]
-    // fn test_as_not_nightly_channel() {
-    //     let mut config = Config::default();
-    //     assert_eq!(config.was_set().unstable_features(), false);
-    //     config.set().unstable_features(true);
-    //     assert_eq!(config.was_set().unstable_features(), false);
-    // }
+    mod unstable_features {
+        use super::super::*;
 
-    // #[test]
-    // fn test_as_nightly_channel() {
-    //     let v = ::std::env::var("CFG_RELEASE_CHANNEL").unwrap_or(String::from(""));
-    //     ::std::env::set_var("CFG_RELEASE_CHANNEL", "nightly");
-    //     let mut config = Config::default();
-    //     config.set().unstable_features(true);
-    //     assert_eq!(config.was_set().unstable_features(), false);
-    //     config.set().unstable_features(true);
-    //     assert_eq!(config.unstable_features(), true);
-    //     ::std::env::set_var("CFG_RELEASE_CHANNEL", v);
-    // }
+        #[test]
+        fn test_default_not_nightly_channel() {
+            if is_nightly_channel!() {
+                // This test requires non-nightly
+                return;
+            }
+            let config = Config::default();
+            assert_eq!(config.unstable_features(), false);
+            assert_eq!(config.was_set().unstable_features(), false);
+        }
 
-    // #[test]
-    // fn test_unstable_from_toml() {
-    //     let mut config = Config::from_toml("unstable_features = true").unwrap();
-    //     assert_eq!(config.was_set().unstable_features(), false);
-    //     let v = ::std::env::var("CFG_RELEASE_CHANNEL").unwrap_or(String::from(""));
-    //     ::std::env::set_var("CFG_RELEASE_CHANNEL", "nightly");
-    //     config = Config::from_toml("unstable_features = true").unwrap();
-    //     assert_eq!(config.was_set().unstable_features(), true);
-    //     assert_eq!(config.unstable_features(), true);
-    //     ::std::env::set_var("CFG_RELEASE_CHANNEL", v);
-    // }
+        #[test]
+        fn test_default_nightly_channel() {
+            if !is_nightly_channel!() {
+                // This test requires nightly
+                return;
+            }
+            let config = Config::default();
+            assert_eq!(config.unstable_features(), false);
+        }
+
+        #[test]
+        fn test_from_toml_not_nightly() {
+            if is_nightly_channel!() {
+                // This test requires non-nightly
+                return;
+            }
+            let config = Config::from_toml("unstable_features = true", Path::new("")).unwrap();
+            assert_eq!(config.was_set().unstable_features(), false);
+        }
+
+        #[test]
+        fn test_from_toml_nightly() {
+            if !is_nightly_channel!() {
+                // This test requires non-nightly
+                return;
+            }
+            let config = Config::from_toml("unstable_features = true", Path::new("")).unwrap();
+            assert_eq!(config.was_set().unstable_features(), true);
+        }
+
+        #[test]
+        fn test_set_not_nightly_channel() {
+            if is_nightly_channel!() {
+                // This test requires non-nightly
+                return;
+            }
+            let mut config = Config::default();
+            assert_eq!(config.unstable_features(), false);
+            config.set().unstable_features(true);
+            assert_eq!(config.unstable_features(), true);
+        }
+
+        #[test]
+        fn test_set_nightly_channel() {
+            if !is_nightly_channel!() {
+                // This test requires nightly
+                return;
+            }
+            let mut config = Config::default();
+            assert_eq!(config.unstable_features(), false);
+            config.set().unstable_features(true);
+            assert_eq!(config.unstable_features(), true);
+        }
+
+        #[test]
+        fn test_override_not_nightly_channel() {
+            if is_nightly_channel!() {
+                // This test requires non-nightly
+                return;
+            }
+            let mut config = Config::default();
+            assert_eq!(config.unstable_features(), false);
+            config.override_value("unstable_features", "true");
+            assert_eq!(config.unstable_features(), true);
+        }
+
+        #[test]
+        fn test_override_nightly_channel() {
+            if !is_nightly_channel!() {
+                // This test requires nightly
+                return;
+            }
+            let mut config = Config::default();
+            assert_eq!(config.unstable_features(), false);
+            config.override_value("unstable_features", "true");
+            assert_eq!(config.unstable_features(), true);
+        }
+    }
 }
