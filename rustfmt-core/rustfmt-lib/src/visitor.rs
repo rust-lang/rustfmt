@@ -364,7 +364,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     mk_sp(s.lo(), b.span.lo()),
                 )
             }
-            _ => unreachable!(),
+            _ => return,
         };
 
         if let Some((fn_str, fn_brace_style)) = rewrite {
