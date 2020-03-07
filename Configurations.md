@@ -996,7 +996,7 @@ fn lorem() -> usize {
 
 ```rust
 fn lorem() -> usize {
-    42 // tabs before 42
+	42 // tabs before 42
 }
 ```
 
