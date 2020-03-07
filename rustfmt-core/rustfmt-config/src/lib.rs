@@ -79,7 +79,7 @@ create_config! {
 
     // Misc.
     wrap_long_multiline_chains: bool, false, true,
-        "Wrap the right hand side of a let binding When it is a multiline chain";
+        "Wrap the right hand side of a let binding when it is a multiline chain";
     remove_nested_parens: bool, true, true, "Remove nested parens";
     combine_control_expr: bool, true, false, "Combine control expressions with function calls";
     overflow_delimited_expr: bool, false, false,
