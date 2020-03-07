@@ -996,7 +996,7 @@ fn lorem() -> usize {
 
 ```rust
 fn lorem() -> usize {
-	42 // tabs before 42
+    42 // tabs before 42
 }
 ```
 
@@ -2426,6 +2426,68 @@ Break comments to fit on the line
 // magna aliqua. Ut enim ad minim veniam, quis nostrud
 // exercitation ullamco laboris nisi ut aliquip ex ea
 // commodo consequat.
+```
+
+## `wrap_long_multiline_chains`
+
+Wrap the right hand side of a let binding when it is a long multiline chain.
+Leave other right hand expressions alone.
+
+- **Default value**: false
+- **Possible values**: true, false
+- **Stable**: Yes
+
+### Example
+
+#### `false` (default):
+```rust
+fn main() {
+    let chain = my_struct
+        .map(|e| e + 1)
+        .and_then(|e| e + 1)
+        .and_then(|e| e + 1)
+        .and_then(|e| e + 1)
+        .and_then(|e| e + 1)
+        .collect();
+
+    let struct_let = Struct {
+        item_one,
+        item_two,
+        item_three,
+        item_four,
+        item_five,
+        item_six,
+        item_seven,
+        item_eight,
+    };
+}
+```
+
+#### `true`:
+```rust
+fn main() {
+    let chain =
+        my_struct
+        .map(|e| e + 1)
+        .and_then(|e| e + 1)
+        .and_then(|e| e + 1)
+        .and_then(|e| e + 1)
+        .and_then(|e| e + 1)
+        .collect();
+
+    let short_chain = my_struct.map(|e| e + 1);
+
+    let struct_let = Struct {
+        item_one,
+        item_two,
+        item_three,
+        item_four,
+        item_five,
+        item_six,
+        item_seven,
+        item_eight,
+    };
+}
 ```
 
 # Internal Options

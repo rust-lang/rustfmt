@@ -78,6 +78,8 @@ create_config! {
         "Where to put a binary operator when a binary expression goes multiline";
 
     // Misc.
+    wrap_long_multiline_chains: bool, false, true,
+        "Wrap the right hand side of a let binding When it is a multiline chain";
     remove_nested_parens: bool, true, true, "Remove nested parens";
     combine_control_expr: bool, true, false, "Combine control expressions with function calls";
     overflow_delimited_expr: bool, false, false,
@@ -516,6 +518,7 @@ space_before_colon = false
 space_after_colon = true
 spaces_around_ranges = false
 binop_separator = "Front"
+wrap_long_multiline_chains = false
 remove_nested_parens = true
 combine_control_expr = true
 overflow_delimited_expr = false

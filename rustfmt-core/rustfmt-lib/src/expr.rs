@@ -1990,6 +1990,18 @@ fn choose_rhs<R: Rewrite>(
             let before_space_str = if has_rhs_comment { "" } else { " " };
 
             match (orig_rhs, new_rhs) {
+                (Some(ref orig_rhs), Some(_))
+                    if context.config.wrap_long_multiline_chains()
+                        && orig_rhs.matches('.').collect::<Vec<_>>().len() > 1 =>
+                {
+                    let new_shape = shape_from_rhs_tactic(
+                        context,
+                        shape,
+                        RhsTactics::ForceNextLineWithoutIndent,
+                    )?;
+                    let new_rhs = expr.rewrite(context, new_shape)?;
+                    Some(format!("{}{}", new_indent_str, new_rhs))
+                }
                 (Some(ref orig_rhs), Some(ref new_rhs))
                     if wrap_str(new_rhs.clone(), context.config.max_width(), new_shape)
                         .is_none() =>
