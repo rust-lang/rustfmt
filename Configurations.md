@@ -103,7 +103,7 @@ fn bar() {
 Maximum number of blank lines which can be put between items. If more than this number of consecutive empty
 lines are found, they are trimmed down to match this integer.
 
-- **Default value**: `1`
+- **Default value**: `5`
 - **Possible values**: any non-negative integer
 - **Stable**: No (tracking issue: #3381)
 
@@ -127,7 +127,7 @@ fn bar() {
 }
 ```
 
-#### `1` (default):
+#### `1`:
 ```rust
 fn foo() {
     println!("a");

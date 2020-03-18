@@ -101,7 +101,7 @@ create_config! {
         "How to handle trailing commas for lists";
     match_block_trailing_comma: bool, false, false,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
-    blank_lines_upper_bound: usize, 1, false,
+    blank_lines_upper_bound: usize, 5, false,
         "Maximum number of blank lines which can be put between items";
     blank_lines_lower_bound: usize, 0, false,
         "Minimum number of blank lines which must be put between items";
@@ -529,7 +529,7 @@ control_brace_style = "AlwaysSameLine"
 trailing_semicolon = true
 trailing_comma = "Vertical"
 match_block_trailing_comma = false
-blank_lines_upper_bound = 1
+blank_lines_upper_bound = 5
 blank_lines_lower_bound = 0
 edition = "2018"
 version = "One"

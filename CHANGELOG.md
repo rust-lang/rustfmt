@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Change the default value for `blank_lines_upper_bound` from 1 to 5.
+
 ## [1.4.9] 2019-10-07
 
 ### Changed
@@ -13,7 +16,7 @@
 - Fix aligning comments of different group
 - Fix flattening imports with a single `self`.
 - Fix removing attributes on function parameters.
-- Fix removing `impl` keyword from opaque type. 
+- Fix removing `impl` keyword from opaque type.
 
 ## [1.4.8] 2019-09-08
 
@@ -45,7 +48,7 @@
 
 - Add `--message-format` command line option to `cargo-fmt`.
 - Add `-l,--files-with-diff` command line option to `rustfmt`.
-- Add `json` emit mode. 
+- Add `json` emit mode.
 
 ### Fixed
 
@@ -96,7 +99,7 @@
 
 ### Added
 
-- Add new attribute `rustfmt::skip::attributes` to prevent rustfmt 
+- Add new attribute `rustfmt::skip::attributes` to prevent rustfmt
 from formatting an attribute #3665
 
 ### Changed
