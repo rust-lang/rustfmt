@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use rustc_ast_pretty::pprust;
 use rustc_span::{sym, BytePos, ExpnId, Span, Symbol, SyntaxContext};
-use rustc_target::spec::abi;
 use syntax::ast::{
     self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
     VisibilityKind,

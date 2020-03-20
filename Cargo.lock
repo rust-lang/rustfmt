@@ -1062,7 +1062,6 @@ dependencies = [
  "rustc-ap-rustc_parse",
  "rustc-ap-rustc_session",
  "rustc-ap-rustc_span",
- "rustc-ap-rustc_target",
  "rustc-ap-syntax",
  "rustfmt_configuration",
  "rustfmt_emitter",
