@@ -140,19 +140,17 @@ pub(crate) fn format_extern(
     is_mod: bool,
 ) -> Cow<'static, str> {
     let abi = match ext {
-        ast::Extern::None => abi::Abi::Rust,
-        ast::Extern::Implicit => abi::Abi::C,
-        ast::Extern::Explicit(abi) => {
-            abi::lookup(&abi.symbol_unescaped.as_str()).unwrap_or(abi::Abi::Rust)
-        }
+        ast::Extern::None => "Rust".to_owned(),
+        ast::Extern::Implicit => "C".to_owned(),
+        ast::Extern::Explicit(abi) => abi.symbol_unescaped.to_string(),
     };
 
-    if abi == abi::Abi::Rust && !is_mod {
+    if abi == "Rust" && !is_mod {
         Cow::from("")
-    } else if abi == abi::Abi::C && !explicit_abi {
+    } else if abi == "C" && !explicit_abi {
         Cow::from("extern ")
     } else {
-        Cow::from(format!("extern {} ", abi))
+        Cow::from(format!(r#"extern "{}" "#, abi))
     }
 }
 
