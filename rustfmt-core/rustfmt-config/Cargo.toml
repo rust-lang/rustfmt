@@ -18,6 +18,6 @@ thiserror = "1.0"
 toml = "0.5"
 
 [dependencies.rustc_span]
-package = "rustc-ap-rustc_span"
-version = "642.0.0"
+package = "rustc-ap-rustc_ast"
+version = "649.0.0"
 
