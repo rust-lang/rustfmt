@@ -1,9 +1,6 @@
 use std::iter::ExactSizeIterator;
 use std::ops::Deref;
 
-use rustc_ast::ast::{self, FnRetTy, Mutability};
-use rustc_span::{symbol::kw, BytePos, Span};
-
 use crate::config::lists::*;
 use crate::config::{IndentStyle, TypeDensity};
 use crate::expr::{format_expr, rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix, ExprType};
@@ -21,6 +18,9 @@ use crate::utils::{
     colon_spaces, extra_offset, first_line_width, format_extern, format_mutability,
     last_line_extendable, last_line_width, mk_sp, rewrite_ident,
 };
+use rustc_ast::ast::{self, FnRetTy, Mutability};
+use rustc_hir;
+use rustc_span::{symbol::kw, BytePos, Span};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PathContext {

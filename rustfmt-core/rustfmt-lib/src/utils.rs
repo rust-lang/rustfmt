@@ -6,6 +6,7 @@ use rustc_ast::ast::{
 };
 use rustc_ast::ptr;
 use rustc_ast_pretty::pprust;
+use rustc_hir;
 use rustc_span::{sym, BytePos, ExpnId, Span, Symbol, SyntaxContext};
 use rustc_target::spec::abi;
 use unicode_width::UnicodeWidthStr;
