@@ -87,6 +87,19 @@ impl<'a> ParserBuilder<'a> {
         Ok(Parser { parser, sess })
     }
 
+    // imported from rustc
+
+    /// Given a session, a path, and a span,
+    /// add the file at the given path to the `source_map`, and returns a parser.
+    /// On an error, uses the given span as the source of the problem.
+    pub fn new_sub_parser_from_file<'b>(
+        sess: &'b rustc_session::parse::ParseSess,
+        path: &Path,
+        sp: Span,
+    ) -> Parser<'b> {
+        source_file_to_parser(sess, file_to_source_file(sess, path, Some(sp)))
+    }
+
     fn parser(
         sess: &'a rustc_session::parse::ParseSess,
         input: Input,
@@ -94,13 +107,7 @@ impl<'a> ParserBuilder<'a> {
     ) -> Result<rustc_parse::parser::Parser<'a>, Vec<Diagnostic>> {
         match input {
             Input::File(ref file) => Ok(if let Some(directory_ownership) = directory_ownership {
-                rustc_parse::new_sub_parser_from_file(
-                    sess,
-                    file,
-                    directory_ownership,
-                    None,
-                    DUMMY_SP,
-                )
+                new_sub_parser_from_file(sess, file, directory_ownership, None, DUMMY_SP)
             } else {
                 rustc_parse::new_parser_from_file(sess, file)
             }),
@@ -286,7 +293,7 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_cfg_if(
         sess: &'a ParseSess,
-        mac: &'a ast::Mac, 
+        mac: &'a ast::Mac,
         base_dir: &Directory,
     ) -> Result<Vec<ast::Item>, &'static str> {
         match catch_unwind(AssertUnwindSafe(|| {
