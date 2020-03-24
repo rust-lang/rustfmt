@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use rustc_span::symbol::{sym, Symbol};
 use rustc_ast::ast;
 use rustc_ast::visit::Visitor;
+use rustc_span::symbol::{sym, Symbol};
 
 use crate::attr::MetaVisitor;
 use crate::config::FileName;
@@ -374,7 +374,7 @@ fn find_path_value(attrs: &[ast::Attribute]) -> Option<Symbol> {
 
 fn is_cfg_if(item: &ast::Item) -> bool {
     match item.kind {
-        ast::ItemKind::Mac(ref mac) => {
+        ast::ItemKind::MacCall(ref mac) => {
             if let Some(first_segment) = mac.path.segments.first() {
                 if first_segment.ident.name == *CFG_IF {
                     return true;

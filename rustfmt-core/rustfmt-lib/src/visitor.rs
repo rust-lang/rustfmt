@@ -492,7 +492,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.format_missing_with_indent(source!(self, item.span).lo());
                     self.format_mod(module, &item.vis, item.span, item.ident, attrs, is_inline);
                 }
-                ast::ItemKind::Mac(ref mac) => {
+                ast::ItemKind::MacCall(ref mac) => {
                     self.visit_mac(mac, Some(item.ident), MacroPosition::Item);
                 }
                 ast::ItemKind::ForeignMod(ref foreign_mod) => {
