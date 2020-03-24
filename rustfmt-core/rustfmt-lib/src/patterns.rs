@@ -1,6 +1,6 @@
 use rustc_span::{BytePos, Span};
-use syntax::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax};
-use syntax::ptr;
+use rustc_ast::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax};
+use rustc_ast::ptr;
 
 use crate::comment::{combine_strs_with_missing_comments, FindUncommented};
 use crate::config::lists::*;

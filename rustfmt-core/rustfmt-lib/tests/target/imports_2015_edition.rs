@@ -10,7 +10,7 @@ use exceedingly::loooooooooooooooooooooooooooooooooooooooooooooooooooooooong::im
 use exceedingly::looooooooooooooooooooooooooooooooooooooooooooooooooooooooooong::import::path::{
     ItemA, ItemB,
 };
-use syntax::ast::{ItemDefaultImpl, ItemForeignMod, ItemImpl, ItemMac, ItemMod, ItemStatic};
+use rustc_ast::ast::{ItemDefaultImpl, ItemForeignMod, ItemImpl, ItemMac, ItemMod, ItemStatic};
 
 use list::{
     // Another item
@@ -23,8 +23,8 @@ use list::{
 
 use test::{/* A */ self /* B */, Other /* C */};
 
-pub use syntax::ast::{Expr, ExprAssign, ExprCall, ExprMethodCall, ExprPath, Expr_};
-use syntax::{self};
+pub use rustc_ast::ast::{Expr, ExprAssign, ExprCall, ExprMethodCall, ExprPath, Expr_};
+use rustc_ast::{self};
 use Foo::{Bar, Baz};
 use {Bar /* comment */, /* Pre-comment! */ Foo};
 
@@ -32,12 +32,12 @@ use std::io;
 use std::io::{self};
 
 mod Foo {
-    pub use syntax::ast::{
+    pub use rustc_ast::ast::{
         ItemDefaultImpl, ItemForeignMod, ItemImpl, ItemMac, ItemMod, ItemStatic,
     };
 
     mod Foo2 {
-        pub use syntax::ast::{
+        pub use rustc_ast::ast::{
             self, ItemDefaultImpl, ItemForeignMod, ItemImpl, ItemMac, ItemMod, ItemStatic,
         };
     }

@@ -29,7 +29,7 @@ impl SkipContext {
             }
         }
         for attr in attrs {
-            if let syntax::ast::AttrKind::Normal(ref attr_item) = &attr.kind {
+            if let rustc_ast::ast::AttrKind::Normal(ref attr_item) = &attr.kind {
                 if is_skip_attr_with(&attr_item.path.segments, |s| s == sym!(macros)) {
                     get_skip_names(&mut self.macros, attr)
                 } else if is_skip_attr_with(&attr_item.path.segments, |s| s == sym::attributes) {

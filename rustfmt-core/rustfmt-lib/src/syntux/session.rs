@@ -10,7 +10,7 @@ use rustc_span::{
     source_map::{FilePathMapping, SourceMap},
     BytePos, Span,
 };
-use syntax::ast;
+use rustc_ast::ast;
 
 use crate::config::file_lines::LineRange;
 use crate::ignore_path::IgnorePathSet;

@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use rustfmt_configuration as config;
-use syntax::ast;
+use rustc_ast::ast;
 use thiserror::Error;
 
 use crate::comment::LineClasses;

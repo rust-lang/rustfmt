@@ -8,8 +8,8 @@ use rustc_parse::parser::module::{
 };
 use rustc_parse::{new_sub_parser_from_file, parser::Parser as RawParser};
 use rustc_span::{symbol::kw, Span, DUMMY_SP};
-use syntax::ast;
-use syntax::token::{DelimToken, TokenKind};
+use rustc_ast::ast;
+use rustc_ast::token::{DelimToken, TokenKind};
 
 use crate::syntux::session::ParseSess;
 use crate::{Config, Input};
@@ -161,8 +161,8 @@ impl<'a> Parser<'a> {
                 }
                 TokenKind::DocComment(s) => {
                     // we need to get the position of this token before we bump.
-                    let attr = syntax::attr::mk_doc_comment(
-                        syntax::util::comments::doc_comment_style(&s.as_str()),
+                    let attr = rustc_ast::attr::mk_doc_comment(
+                        rustc_ast::util::comments::doc_comment_style(&s.as_str()),
                         s,
                         parser.token.span,
                     );

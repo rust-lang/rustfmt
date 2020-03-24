@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use rustc_span::{BytePos, Pos, Span};
-use syntax::{ast, token::DelimToken, visit};
+use rustc_ast::{ast, token::DelimToken, visit};
 
 use crate::attr::*;
 use crate::comment::{rewrite_comment, CodeCharKind, CommentCodeSlices};

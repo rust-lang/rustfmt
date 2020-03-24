@@ -1,5 +1,5 @@
 use rustc_span::Span;
-use syntax::ast;
+use rustc_ast::ast;
 
 use crate::comment::recover_comment_removed;
 use crate::expr::{format_expr, ExprType};
