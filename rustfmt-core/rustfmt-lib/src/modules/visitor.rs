@@ -1,6 +1,6 @@
-use rustc_span::Symbol;
 use rustc_ast::ast;
 use rustc_ast::visit::Visitor;
+use rustc_span::Symbol;
 
 use crate::attr::MetaVisitor;
 use crate::syntux::parser::{Directory, Parser};
@@ -32,7 +32,7 @@ impl<'a> CfgIfVisitor<'a> {
 }
 
 impl<'a, 'ast: 'a> Visitor<'ast> for CfgIfVisitor<'a> {
-    fn visit_mac(&mut self, mac: &'ast ast::Mac) {
+    fn visit_mac(&mut self, mac: &'ast ast::MacCall) {
         match self.visit_mac_inner(mac) {
             Ok(()) => (),
             Err(e) => debug!("{}", e),
@@ -41,7 +41,7 @@ impl<'a, 'ast: 'a> Visitor<'ast> for CfgIfVisitor<'a> {
 }
 
 impl<'a, 'ast: 'a> CfgIfVisitor<'a> {
-    fn visit_mac_inner(&mut self, mac: &'ast ast::Mac) -> Result<(), &'static str> {
+    fn visit_mac_inner(&mut self, mac: &'ast ast::MacCall) -> Result<(), &'static str> {
         // Support both:
         // ```
         // extern crate cfg_if;

@@ -2,14 +2,14 @@ use std::borrow::Cow;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
+use rustc_ast::ast;
+use rustc_ast::token::{DelimToken, TokenKind};
 use rustc_errors::{Diagnostic, PResult};
 use rustc_parse::parser::module::{
     parse_external_mod, push_directory, Directory, DirectoryOwnership,
 };
 use rustc_parse::{new_sub_parser_from_file, parser::Parser as RawParser};
 use rustc_span::{symbol::kw, Span, DUMMY_SP};
-use rustc_ast::ast;
-use rustc_ast::token::{DelimToken, TokenKind};
 
 use crate::syntux::session::ParseSess;
 use crate::{Config, Input};
@@ -296,7 +296,7 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_cfg_if(
         sess: &'a ParseSess,
-        mac: &'a ast::Mac,
+        mac: &'a ast::MacCall,
         base_dir: &Directory,
     ) -> Result<Vec<ast::Item>, &'static str> {
         match catch_unwind(AssertUnwindSafe(|| {
@@ -310,7 +310,7 @@ impl<'a> Parser<'a> {
 
     fn parse_cfg_if_inner(
         sess: &'a ParseSess,
-        mac: &'a ast::Mac,
+        mac: &'a ast::MacCall,
         base_dir: &Directory,
     ) -> Result<Vec<ast::Item>, &'static str> {
         let token_stream = mac.args.inner_tokens();

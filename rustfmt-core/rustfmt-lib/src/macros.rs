@@ -12,12 +12,12 @@
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-use rustc_ast_pretty::pprust;
-use rustc_parse::{new_parser_from_tts, parser::Parser};
-use rustc_span::{symbol::kw, BytePos, Span, Symbol, DUMMY_SP};
 use rustc_ast::token::{BinOpToken, DelimToken, Token, TokenKind};
 use rustc_ast::tokenstream::{Cursor, TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
+use rustc_ast_pretty::pprust;
+use rustc_parse::{new_parser_from_tts, parser::Parser};
+use rustc_span::{symbol::kw, BytePos, Span, Symbol, DUMMY_SP};
 
 use crate::comment::{
     contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses,
@@ -187,7 +187,7 @@ fn return_macro_parse_failure_fallback(
 }
 
 pub(crate) fn rewrite_macro(
-    mac: &ast::Mac,
+    mac: &ast::MacCall,
     extra_ident: Option<ast::Ident>,
     context: &RewriteContext<'_>,
     shape: Shape,
@@ -238,7 +238,7 @@ fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
 }
 
 fn rewrite_macro_inner(
-    mac: &ast::Mac,
+    mac: &ast::MacCall,
     extra_ident: Option<ast::Ident>,
     context: &RewriteContext<'_>,
     shape: Shape,
@@ -1184,7 +1184,10 @@ fn next_space(tok: &TokenKind) -> SpaceState {
 /// Tries to convert a macro use into a short hand try expression. Returns `None`
 /// when the macro is not an instance of `try!` (or parsing the inner expression
 /// failed).
-pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> Option<ast::Expr> {
+pub(crate) fn convert_try_mac(
+    mac: &ast::MacCall,
+    context: &RewriteContext<'_>,
+) -> Option<ast::Expr> {
     // The `try!` macro was deprecated in Rust 1.39.0 and `try` is a
     // reserved keyword in the 2018 Edition so the raw identifier
     // `r#try!` must be used in the 2018 Edition.
@@ -1210,7 +1213,7 @@ pub(crate) fn convert_try_mac(mac: &ast::Mac, context: &RewriteContext<'_>) -> O
     }
 }
 
-pub(crate) fn macro_style(mac: &ast::Mac, context: &RewriteContext<'_>) -> DelimToken {
+pub(crate) fn macro_style(mac: &ast::MacCall, context: &RewriteContext<'_>) -> DelimToken {
     let snippet = context.snippet(mac.span());
     let paren_pos = snippet.find_uncommented("(").unwrap_or(usize::max_value());
     let bracket_pos = snippet.find_uncommented("[").unwrap_or(usize::max_value());
