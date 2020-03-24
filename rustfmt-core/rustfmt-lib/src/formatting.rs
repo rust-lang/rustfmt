@@ -11,11 +11,14 @@ use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};
 use crate::config::{Config, FileName, Verbosity};
 use crate::issues::BadIssueSeeker;
-use crate::syntux::parser::{DirectoryOwnership, Parser, ParserError};
+use crate::syntux::parser::{Parser, ParserError};
 use crate::syntux::session::ParseSess;
 use crate::utils::count_newlines;
 use crate::visitor::FmtVisitor;
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
+use rustc_parse::parser::module::{
+    parse_external_mod, push_directory, Directory, DirectoryOwnership,
+};
 
 mod newline_style;
 

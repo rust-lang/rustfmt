@@ -3,6 +3,9 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
 use rustc_errors::{Diagnostic, PResult};
+use rustc_parse::parser::module::{
+    parse_external_mod, push_directory, Directory, DirectoryOwnership,
+};
 use rustc_parse::{new_sub_parser_from_file, parser::Parser as RawParser};
 use rustc_span::{symbol::kw, Span, DUMMY_SP};
 use syntax::ast;
@@ -21,8 +24,8 @@ pub(crate) struct Directory {
 }
 
 impl<'a> Directory {
-    fn to_syntax_directory(&'a self) -> rustc_parse::Directory<'a> {
-        rustc_parse::Directory {
+    fn to_syntax_directory(&'a self) -> rustc_parse::parser::module::Directory<'a> {
+        rustc_parse::parser::module::Directory {
             path: Cow::Borrowed(&self.path),
             ownership: self.ownership,
         }
@@ -284,7 +287,7 @@ impl<'a> Parser<'a> {
     /// The main usage of this function is outside of rustc, for those who uses
     /// librustc_ast as a library. Please do not remove this function while refactoring
     /// just because it is not used in rustc codebase!
-    pub(crate) fn stream_to_parser_with_base_dir(
+    fn stream_to_parser_with_base_dir(
         sess: &ParseSess,
         stream: rustc_ast::tokenstream::TokenStream,
     ) -> Parser<'_> {
