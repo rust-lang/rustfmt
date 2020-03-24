@@ -5,9 +5,7 @@ use std::path::{Path, PathBuf};
 use rustc_ast::ast;
 use rustc_ast::token::{DelimToken, TokenKind};
 use rustc_errors::{Diagnostic, PResult};
-use rustc_parse::parser::module::{
-    parse_external_mod, push_directory, Directory, DirectoryOwnership,
-};
+use rustc_expand::module::{parse_external_mod, push_directory, Directory, DirectoryOwnership};
 use rustc_parse::{new_sub_parser_from_file, parser::Parser as RawParser};
 use rustc_span::{symbol::kw, Span, DUMMY_SP};
 

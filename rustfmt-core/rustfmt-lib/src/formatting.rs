@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
-use rustc_span::Span;
 use rustc_ast::ast;
+use rustc_span::Span;
 
 use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};
@@ -16,9 +16,7 @@ use crate::syntux::session::ParseSess;
 use crate::utils::count_newlines;
 use crate::visitor::FmtVisitor;
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
-use rustc_parse::parser::module::{
-    parse_external_mod, push_directory, Directory, DirectoryOwnership,
-};
+use rustc_expand::module::{parse_external_mod, push_directory, Directory, DirectoryOwnership};
 
 mod newline_style;
 

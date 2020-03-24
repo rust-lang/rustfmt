@@ -15,16 +15,16 @@ use std::panic;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use rustfmt_configuration as config;
 use rustc_ast::ast;
+use rustfmt_configuration as config;
 use thiserror::Error;
 
 use crate::comment::LineClasses;
 use crate::formatting::{FormatErrorMap, FormattingError, ReportedErrors, SourceFile};
 use crate::issues::Issue;
 use crate::shape::Indent;
-use rustc_parse::parser::module::DirectoryOwnership;
-//use crate::syntux::parser::DirectoryOwnership;
+//use rustc_expand::module::DirectoryOwnership;
+use crate::syntux::parser::DirectoryOwnership;
 use crate::utils::indent_next_line;
 
 pub use crate::config::{
