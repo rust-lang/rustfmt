@@ -1025,6 +1025,7 @@ dependencies = [
  "itertools",
  "regex",
  "rustc-ap-rustc_ast",
+ "rustc-ap-rustc_span",
  "rustfmt-config_proc_macro",
  "serde",
  "serde_json",

@@ -17,7 +17,11 @@ serde_json = "1.0"
 thiserror = "1.0"
 toml = "0.5"
 
-[dependencies.rustc_span]
+[dependencies.rustc_ast]
 package = "rustc-ap-rustc_ast"
 version = "649.0.0"
 
+
+[dependencies.rustc_span]
+package = "rustc-ap-rustc_span"
+version = "649.0.0"

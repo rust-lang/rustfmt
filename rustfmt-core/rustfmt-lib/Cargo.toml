@@ -58,7 +58,7 @@ version = "649.0.0"
 package = "rustc-ap-rustc_target"
 version = "649.0.0"
 
-[dependencies.syntax]
+[dependencies.rustc_ast]
 package = "rustc-ap-rustc_ast"
 version = "649.0.0"
 
