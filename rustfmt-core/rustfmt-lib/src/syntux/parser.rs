@@ -14,8 +14,8 @@ use syntax::token::{DelimToken, TokenKind};
 use crate::syntux::session::ParseSess;
 use crate::{Config, Input};
 
-pub(crate) type DirectoryOwnership = rustc_parse::DirectoryOwnership;
-pub(crate) type ModulePathSuccess = rustc_parse::parser::ModulePathSuccess;
+pub(crate) type DirectoryOwnership = rustc_parse::parser::module::DirectoryOwnership;
+pub(crate) type ModulePathSuccess = rustc_expand::ModulePathSuccess;
 
 #[derive(Clone)]
 pub(crate) struct Directory {

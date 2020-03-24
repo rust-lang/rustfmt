@@ -23,7 +23,8 @@ use crate::comment::LineClasses;
 use crate::formatting::{FormatErrorMap, FormattingError, ReportedErrors, SourceFile};
 use crate::issues::Issue;
 use crate::shape::Indent;
-use crate::syntux::parser::DirectoryOwnership;
+use rustc_parse::parser::module::DirectoryOwnership;
+//use crate::syntux::parser::DirectoryOwnership;
 use crate::utils::indent_next_line;
 
 pub use crate::config::{
