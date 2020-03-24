@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
-use rustc_ast_pretty::pprust;
-use rustc_span::{sym, BytePos, ExpnId, Span, Symbol, SyntaxContext};
-use rustc_target::spec::abi;
 use rustc_ast::ast::{
     self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
     VisibilityKind,
 };
 use rustc_ast::ptr;
+use rustc_ast_pretty::pprust;
+use rustc_span::{sym, BytePos, ExpnId, Span, Symbol, SyntaxContext};
+use rustc_target::spec::abi;
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
