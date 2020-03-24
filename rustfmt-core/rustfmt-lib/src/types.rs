@@ -292,7 +292,7 @@ fn rewrite_segment(
 
 fn format_function_type<'a, I>(
     inputs: I,
-    output: &FnRetTy,
+    output: &hir::FnRetTy,
     variadic: bool,
     span: Span,
     context: &RewriteContext<'_>,
