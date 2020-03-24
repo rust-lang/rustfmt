@@ -264,9 +264,29 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // this function was removed from rustc:
+
+    /// Given a stream, the `ParseSess` and the base directory, produces a parser.
+    ///
+    /// Use this function when you are creating a parser from the token stream
+    /// and also care about the current working directory of the parser (e.g.,
+    /// you are trying to resolve modules defined inside a macro invocation).
+    ///
+    /// # Note
+    ///
+    /// The main usage of this function is outside of rustc, for those who uses
+    /// librustc_ast as a library. Please do not remove this function while refactoring
+    /// just because it is not used in rustc codebase!
+    pub(crate) fn stream_to_parser_with_base_dir(
+        sess: &ParseSess,
+        stream: rustc_ast::tokenstream::TokenStream,
+    ) -> Parser<'_> {
+        Parser::new(sess, stream, false, None)
+    }
+
     pub(crate) fn parse_cfg_if(
         sess: &'a ParseSess,
-        mac: &'a ast::Mac,
+        mac: &'a ast::Mac, 
         base_dir: &Directory,
     ) -> Result<Vec<ast::Item>, &'static str> {
         match catch_unwind(AssertUnwindSafe(|| {
@@ -284,7 +304,7 @@ impl<'a> Parser<'a> {
         base_dir: &Directory,
     ) -> Result<Vec<ast::Item>, &'static str> {
         let token_stream = mac.args.inner_tokens();
-        let mut parser = rustc_parse::stream_to_parser_with_base_dir(
+        let mut parser = stream_to_parser_with_base_dir(
             sess.inner(),
             token_stream,
             base_dir.to_syntax_directory(),
