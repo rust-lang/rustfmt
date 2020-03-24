@@ -50,7 +50,7 @@ pub(crate) fn rewrite_closure(
         }
 
         let result = match fn_decl.output {
-            ast::FunctionRetTy::Default(_) if !context.inside_macro() => {
+            ast::FnRetTy::Default(_) if !context.inside_macro() => {
                 try_rewrite_without_block(body, &prefix, capture, context, shape, body_shape)
             }
             _ => None,

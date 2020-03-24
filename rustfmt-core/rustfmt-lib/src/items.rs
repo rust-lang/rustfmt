@@ -1975,11 +1975,11 @@ pub(crate) fn rewrite_associated_impl_type(
     }
 }
 
-impl Rewrite for ast::FunctionRetTy {
+impl Rewrite for ast::FnRetTy {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match *self {
-            ast::FunctionRetTy::Default(_) => Some(String::new()),
-            ast::FunctionRetTy::Ty(ref ty) => {
+            ast::FnRetTy::Default(_) => Some(String::new()),
+            ast::FnRetTy::Ty(ref ty) => {
                 if context.config.indent_style() == IndentStyle::Visual {
                     let inner_width = shape.width.checked_sub(3)?;
                     return ty
@@ -2348,7 +2348,7 @@ fn rewrite_fn_base(
     }
 
     // Return type.
-    if let ast::FunctionRetTy::Ty(..) = fd.output {
+    if let ast::FnRetTy::Ty(..) = fd.output {
         let ret_should_indent = match context.config.indent_style() {
             // If our params are block layout then we surely must have space.
             IndentStyle::Block if put_params_in_block || fd.inputs.is_empty() => false,
@@ -2448,8 +2448,8 @@ fn rewrite_fn_base(
     }
 
     let pos_before_where = match fd.output {
-        ast::FunctionRetTy::Default(..) => params_span.hi(),
-        ast::FunctionRetTy::Ty(ref ty) => ty.span.hi(),
+        ast::FnRetTy::Default(..) => params_span.hi(),
+        ast::FnRetTy::Ty(ref ty) => ty.span.hi(),
     };
 
     let is_params_multi_lined = param_str.contains('\n');
@@ -2477,7 +2477,7 @@ fn rewrite_fn_base(
     // If there are neither where-clause nor return type, we may be missing comments between
     // params and `{`.
     if where_clause_str.is_empty() {
-        if let ast::FunctionRetTy::Default(ret_span) = fd.output {
+        if let ast::FnRetTy::Default(ret_span) = fd.output {
             match recover_missing_comment_in_span(
                 mk_sp(params_span.hi(), ret_span.hi()),
                 shape,
