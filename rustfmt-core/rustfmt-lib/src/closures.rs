@@ -25,7 +25,7 @@ use crate::utils::{last_line_width, left_most_sub_expr, stmt_expr, NodeIdExt};
 
 pub(crate) fn rewrite_closure(
     capture: ast::CaptureBy,
-    is_async: &ast::IsAsync,
+    is_async: &hir::IsAsync,
     movability: ast::Movability,
     fn_decl: &ast::FnDecl,
     body: &ast::Expr,
@@ -222,7 +222,7 @@ fn rewrite_closure_block(
 // Return type is (prefix, extra_offset)
 fn rewrite_closure_fn_decl(
     capture: ast::CaptureBy,
-    asyncness: &ast::IsAsync,
+    asyncness: &hir::IsAsync,
     movability: ast::Movability,
     fn_decl: &ast::FnDecl,
     body: &ast::Expr,
