@@ -110,10 +110,10 @@ pub(crate) fn format_defaultness(defaultness: ast::Defaultness) -> &'static str 
 }
 
 #[inline]
-pub(crate) fn format_unsafety(unsafety: ast::Unsafety) -> &'static str {
+pub(crate) fn format_unsafety(unsafety: ast::Unsafe) -> &'static str {
     match unsafety {
-        ast::Unsafety::Unsafe => "unsafe ",
-        ast::Unsafety::Normal => "",
+        ast::Unsafe::Unsafe => "unsafe ",
+        ast::Unsafe::Normal => "",
     }
 }
 

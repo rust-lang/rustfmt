@@ -226,7 +226,7 @@ pub(crate) struct FnSig<'a> {
     is_async: Cow<'a, ast::IsAsync>,
     constness: ast::Const,
     defaultness: ast::Defaultness,
-    unsafety: ast::Unsafety,
+    unsafety: ast::Unsafe,
     visibility: ast::Visibility,
 }
 
@@ -243,7 +243,7 @@ impl<'a> FnSig<'a> {
             is_async: Cow::Owned(ast::IsAsync::NotAsync),
             constness: ast::Const::NotConst,
             defaultness: ast::Defaultness::Final,
-            unsafety: ast::Unsafety::Normal,
+            unsafety: ast::Unsafe::Normal,
             visibility: vis,
         }
     }
