@@ -254,8 +254,8 @@ impl<'a> FnSig<'a> {
     ) -> FnSig<'a> {
         FnSig {
             unsafety: method_sig.header.unsafety,
-            is_async: Cow::Borrowed(&method_sig.header.asyncness.node),
-            constness: method_sig.header.constness.node,
+            is_async: Cow::Borrowed(&method_sig.header.asyncness),
+            constness: method_sig.header.constness,
             defaultness: ast::Defaultness::Final,
             ext: method_sig.header.ext,
             decl: &*method_sig.decl,
@@ -282,8 +282,8 @@ impl<'a> FnSig<'a> {
                     decl,
                     generics,
                     ext: fn_sig.header.ext,
-                    constness: fn_sig.header.constness.node,
-                    is_async: Cow::Borrowed(&fn_sig.header.asyncness.node),
+                    constness: fn_sig.header.constness,
+                    is_async: Cow::Borrowed(&fn_sig.header.asyncness),
                     defaultness,
                     unsafety: fn_sig.header.unsafety,
                     visibility: vis.clone(),
