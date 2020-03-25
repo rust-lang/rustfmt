@@ -54,7 +54,6 @@ macro_rules! implement_spanned {
 implement_spanned!(ast::AssocItem);
 implement_spanned!(ast::Expr);
 implement_spanned!(ast::Field);
-implement_spanned!(ast::ForeignItem);
 implement_spanned!(ast::Item);
 implement_spanned!(ast::Local);
 
