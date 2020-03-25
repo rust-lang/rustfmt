@@ -96,8 +96,8 @@ pub(crate) fn format_async(is_async: ast::Async) -> &'static str {
 #[inline]
 pub(crate) fn format_constness(constness: ast::Const) -> &'static str {
     match constness {
-        ast::Const::Const => "const ",
-        ast::Const::NotConst => "",
+        ast::Const::Yes(..) => "const ",
+        ast::Const::No => "",
     }
 }
 

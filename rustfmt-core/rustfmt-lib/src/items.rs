@@ -241,7 +241,7 @@ impl<'a> FnSig<'a> {
             generics,
             ext: ast::Extern::None,
             is_async: Cow::Owned(ast::Async::No),
-            constness: ast::Const::NotConst,
+            constness: ast::Const::No,
             defaultness: ast::Defaultness::Final,
             unsafety: ast::Unsafe::Normal,
             visibility: vis,
