@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
@@ -20,10 +19,10 @@ pub(crate) struct Directory {
     pub(crate) ownership: DirectoryOwnership,
 }
 
-impl<'a> Directory {
-    fn to_syntax_directory(&'a self) -> rustc_parse::Directory<'a> {
+impl Directory {
+    fn to_syntax_directory(&self) -> rustc_parse::Directory {
         rustc_parse::Directory {
-            path: Cow::Borrowed(&self.path),
+            path: self.path.clone(),
             ownership: self.ownership,
         }
     }
