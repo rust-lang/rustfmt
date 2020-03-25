@@ -243,7 +243,7 @@ impl<'a> FnSig<'a> {
             is_async: Cow::Owned(ast::Async::No),
             constness: ast::Const::No,
             defaultness: ast::Defaultness::Final,
-            unsafety: ast::Unsafe::Normal,
+            unsafety: ast::Unsafe::No,
             visibility: vis,
         }
     }
