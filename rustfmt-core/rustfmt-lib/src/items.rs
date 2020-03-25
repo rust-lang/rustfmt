@@ -240,7 +240,7 @@ impl<'a> FnSig<'a> {
             decl,
             generics,
             ext: ast::Extern::None,
-            is_async: Cow::Owned(ast::Async::NotAsync),
+            is_async: Cow::Owned(ast::Async::No),
             constness: ast::Const::NotConst,
             defaultness: ast::Defaultness::Final,
             unsafety: ast::Unsafe::Normal,
