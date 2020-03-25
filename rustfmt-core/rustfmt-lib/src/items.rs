@@ -1970,7 +1970,7 @@ pub(crate) fn rewrite_associated_impl_type(
     let result = rewrite_associated_type(ident, ty_opt, generics, None, context, indent)?;
 
     match defaultness {
-        ast::Defaultness::Default => Some(format!("default {}", result)),
+        ast::Defaultness::Default(..) => Some(format!("default {}", result)),
         _ => Some(result),
     }
 }
