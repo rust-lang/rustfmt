@@ -86,10 +86,10 @@ pub(crate) fn format_visibility(
 }
 
 #[inline]
-pub(crate) fn format_async(is_async: ast::IsAsync) -> &'static str {
+pub(crate) fn format_async(is_async: ast::Async) -> &'static str {
     match is_async {
-        ast::IsAsync::Async { .. } => "async ",
-        ast::IsAsync::NotAsync => "",
+        ast::Async::Async { .. } => "async ",
+        ast::Async::NotAsync => "",
     }
 }
 
