@@ -403,4 +403,13 @@ mod tests {
             strings = tail;
         }
     }
+    #[test]
+    fn test_compare_opt_ident_as_versions() {
+        use super::compare_opt_ident_as_versions;
+        use std::cmp::Ordering;
+        let items: &[Option<&'static str>] = &[None, Some("a"), Some("r#a"), Some("a")];
+        for (p, n) in items[..items.len() - 1].iter().zip(items[1..].iter()) {
+            assert!(compare_opt_ident_as_versions(p, n) != Ordering::Greater);
+        }
+    }
 }
