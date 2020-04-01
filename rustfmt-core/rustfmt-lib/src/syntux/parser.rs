@@ -21,9 +21,9 @@ pub(crate) struct Directory {
 }
 
 impl<'a> Directory {
-    fn to_syntax_directory(&'a self) -> rustc_parse::Directory<'a> {
+    fn to_syntax_directory(&'a self) -> rustc_parse::Directory {
         rustc_parse::Directory {
-            path: Cow::Borrowed(&self.path),
+            path: self.path.clone(),
             ownership: self.ownership,
         }
     }
