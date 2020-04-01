@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::cmp::min;
 
 use itertools::Itertools;
+use rustc_ast::token::{DelimToken, LitKind};
+use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, Span};
-use syntax::token::{DelimToken, LitKind};
-use syntax::{ast, ptr};
 
 use crate::chains::rewrite_chain;
 use crate::closures;
@@ -1191,19 +1191,17 @@ pub(crate) fn is_simple_block_stmt(
 }
 
 fn block_has_statements(block: &ast::Block) -> bool {
-    block.stmts.iter().any(|stmt| {
-        match stmt.kind {
-            ast::StmtKind::Semi(ref expr) => {
-                if let ast::ExprKind::Tup(ref tup_exprs) = expr.kind {
-                    if tup_exprs.is_empty() {
-                        return false;
-                    }
+    block.stmts.iter().any(|stmt| match stmt.kind {
+        ast::StmtKind::Semi(ref expr) => {
+            if let ast::ExprKind::Tup(ref tup_exprs) = expr.kind {
+                if tup_exprs.is_empty() {
+                    return false;
                 }
-                true
             }
-            ast::StmtKind::Empty => false,
-            _ => true,
+            true
         }
+        ast::StmtKind::Empty => false,
+        _ => true,
     })
 }
 
@@ -1355,7 +1353,7 @@ pub(crate) fn can_be_overflowed_expr(
         }
         ast::ExprKind::Mac(ref mac) => {
             match (
-                syntax::ast::MacDelimiter::from_token(mac.args.delim()),
+                rustc_ast::ast::MacDelimiter::from_token(mac.args.delim()),
                 context.config.overflow_delimited_expr(),
             ) {
                 (Some(ast::MacDelimiter::Bracket), true)

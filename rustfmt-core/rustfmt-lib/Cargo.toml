@@ -30,6 +30,10 @@ unicode-width = "0.1.5"
 [dev-dependencies]
 env_logger = "0.7"
 
+[dependencies.rustc_ast]
+package = "rustc-ap-rustc_ast"
+version = "647.0.0"
+
 [dependencies.rustc_ast_pretty]
 package = "rustc-ap-rustc_ast_pretty"
 version = "647.0.0"
@@ -53,8 +57,3 @@ version = "647.0.0"
 [dependencies.rustc_span]
 package = "rustc-ap-rustc_span"
 version = "647.0.0"
-
-[dependencies.syntax]
-package = "rustc-ap-rustc_ast"
-version = "647.0.0"
-
