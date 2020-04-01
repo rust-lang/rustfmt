@@ -19,5 +19,5 @@ toml = "0.5"
 
 [dependencies.rustc_span]
 package = "rustc-ap-rustc_span"
-version = "650.0.0"
+version = "651.0.0"
 
