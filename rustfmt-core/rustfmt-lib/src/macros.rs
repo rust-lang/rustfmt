@@ -230,7 +230,7 @@ fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
             parser.bump();
             return Some(MacroArg::Keyword(
                 ast::Ident::with_dummy_span(keyword),
-                parser.prev_span,
+                parser.prev_token.span,
             ));
         }
     }
@@ -1492,7 +1492,8 @@ fn format_lazy_static(
         )?);
         result.push(';');
         if parser.token.kind != TokenKind::Eof {
-            let snippet = context.snippet(mk_sp(parser.prev_span.hi(), parser.token.span.lo()));
+            let snippet =
+                context.snippet(mk_sp(parser.prev_token.span.hi(), parser.token.span.lo()));
             if count_newlines(snippet) >= 2 {
                 result.push('\n');
             }

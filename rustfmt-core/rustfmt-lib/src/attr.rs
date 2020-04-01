@@ -2,6 +2,7 @@
 
 use rustc_span::{symbol::sym, BytePos, Span, DUMMY_SP};
 use syntax::ast;
+use syntax::attr::HasAttrs;
 
 use self::doc_comment::DocCommentFormatter;
 use crate::comment::{contains_comment, rewrite_doc_comment, CommentStyle};
@@ -19,12 +20,7 @@ mod doc_comment;
 
 /// Returns attributes on the given statement.
 pub(crate) fn get_attrs_from_stmt(stmt: &ast::Stmt) -> &[ast::Attribute] {
-    match stmt.kind {
-        ast::StmtKind::Local(ref local) => &local.attrs,
-        ast::StmtKind::Item(ref item) => &item.attrs,
-        ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => &expr.attrs,
-        ast::StmtKind::Mac(ref mac) => &mac.2,
-    }
+    stmt.attrs()
 }
 
 pub(crate) fn get_span_without_attrs(stmt: &ast::Stmt) -> Span {
@@ -36,6 +32,7 @@ pub(crate) fn get_span_without_attrs(stmt: &ast::Stmt) -> Span {
             let (ref mac, _, _) = **mac;
             mac.span()
         }
+        ast::StmtKind::Empty => stmt.span,
     }
 }
 

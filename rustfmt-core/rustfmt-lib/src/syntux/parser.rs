@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
@@ -178,7 +177,7 @@ impl<'a> Parser<'a> {
         let hi = if parser.token.span.is_dummy() {
             span
         } else {
-            parser.prev_span
+            parser.prev_token.span
         };
 
         Ok(ast::Mod {
