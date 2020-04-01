@@ -147,7 +147,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.push_rewrite(stmt.span(), rewrite)
                 }
             }
-            ast::StmtKind::Mac(ref mac) => {
+            ast::StmtKind::MacCall(ref mac) => {
                 let (ref mac, _macro_style, ref attrs) = **mac;
                 if self.visit_attrs(attrs, ast::AttrStyle::Outer) {
                     self.push_skipped_with_span(
@@ -495,7 +495,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.format_missing_with_indent(source!(self, item.span).lo());
                     self.format_mod(module, &item.vis, item.span, item.ident, attrs, is_inline);
                 }
-                ast::ItemKind::Mac(ref mac) => {
+                ast::ItemKind::MacCall(ref mac) => {
                     self.visit_mac(mac, Some(item.ident), MacroPosition::Item);
                 }
                 ast::ItemKind::ForeignMod(ref foreign_mod) => {
@@ -621,7 +621,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 );
                 self.push_rewrite(ti.span, rewrite);
             }
-            ast::AssocItemKind::Macro(ref mac) => {
+            ast::AssocItemKind::MacCall(ref mac) => {
                 self.visit_mac(mac, Some(ti.ident), MacroPosition::Item);
             }
         }
@@ -680,13 +680,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 };
                 self.push_rewrite(ii.span, rewrite);
             }
-            ast::AssocItemKind::Macro(ref mac) => {
+            ast::AssocItemKind::MacCall(ref mac) => {
                 self.visit_mac(mac, Some(ii.ident), MacroPosition::Item);
             }
         }
     }
 
-    fn visit_mac(&mut self, mac: &ast::Mac, ident: Option<ast::Ident>, pos: MacroPosition) {
+    fn visit_mac(&mut self, mac: &ast::MacCall, ident: Option<ast::Ident>, pos: MacroPosition) {
         skip_out_of_file_lines_range_visitor!(self, mac.span());
 
         // 1 = ;

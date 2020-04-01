@@ -28,7 +28,7 @@ pub(crate) fn get_span_without_attrs(stmt: &ast::Stmt) -> Span {
         ast::StmtKind::Local(ref local) => local.span,
         ast::StmtKind::Item(ref item) => item.span,
         ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => expr.span,
-        ast::StmtKind::Mac(ref mac) => {
+        ast::StmtKind::MacCall(ref mac) => {
             let (ref mac, _, _) = **mac;
             mac.span()
         }

@@ -703,7 +703,7 @@ impl<'a> FmtVisitor<'a> {
                 {
                     a.ident.as_str().cmp(&b.ident.as_str())
                 }
-                (Const(..), Const(..)) | (Macro(..), Macro(..)) => {
+                (Const(..), Const(..)) | (MacCall(..), MacCall(..)) => {
                     a.ident.as_str().cmp(&b.ident.as_str())
                 }
                 (Fn(..), Fn(..)) => a.span.lo().cmp(&b.span.lo()),
@@ -713,8 +713,8 @@ impl<'a> FmtVisitor<'a> {
                 (_, TyAlias(..)) => Ordering::Greater,
                 (Const(..), _) => Ordering::Less,
                 (_, Const(..)) => Ordering::Greater,
-                (Macro(..), _) => Ordering::Less,
-                (_, Macro(..)) => Ordering::Greater,
+                (MacCall(..), _) => Ordering::Less,
+                (_, MacCall(..)) => Ordering::Greater,
             });
             let mut prev_kind = None;
             for (buf, item) in buffer {
@@ -918,10 +918,9 @@ fn format_impl_ref_and_type(
         let generics_str = rewrite_generics(context, "impl", generics, shape)?;
         result.push_str(&generics_str);
 
-        let polarity_str = if polarity == ast::ImplPolarity::Negative {
-            "!"
-        } else {
-            ""
+        let polarity_str = match polarity {
+            ast::ImplPolarity::Negative(_) => "!",
+            ast::ImplPolarity::Positive => "",
         };
 
         if let Some(ref trait_ref) = *trait_ref {
@@ -3164,7 +3163,7 @@ impl Rewrite for ast::ForeignItem {
                     rewrite_ident(context, self.ident)
                 ))
             }
-            ast::ForeignItemKind::Macro(ref mac) => {
+            ast::ForeignItemKind::MacCall(ref mac) => {
                 rewrite_macro(mac, None, context, shape, MacroPosition::Item)
             }
         }?;
