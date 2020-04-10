@@ -2,8 +2,8 @@
 
 use std::iter::repeat;
 
+use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, Span};
-use syntax::{ast, ptr};
 
 use crate::comment::{combine_strs_with_missing_comments, rewrite_comment};
 use crate::config::lists::*;
@@ -572,7 +572,7 @@ fn can_flatten_block_around_this(body: &ast::Expr) -> bool {
         | ast::ExprKind::Array(..)
         | ast::ExprKind::Call(..)
         | ast::ExprKind::MethodCall(..)
-        | ast::ExprKind::Mac(..)
+        | ast::ExprKind::MacCall(..)
         | ast::ExprKind::Struct(..)
         | ast::ExprKind::Tup(..) => true,
         ast::ExprKind::AddrOf(_, _, ref expr)

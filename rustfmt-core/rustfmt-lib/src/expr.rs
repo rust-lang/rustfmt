@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::cmp::min;
 
 use itertools::Itertools;
+use rustc_ast::token::{DelimToken, LitKind};
+use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, Span};
-use syntax::token::{DelimToken, LitKind};
-use syntax::{ast, ptr};
 
 use crate::chains::rewrite_chain;
 use crate::closures;
@@ -197,7 +197,7 @@ pub(crate) fn format_expr(
         ast::ExprKind::Try(..) | ast::ExprKind::Field(..) | ast::ExprKind::MethodCall(..) => {
             rewrite_chain(expr, context, shape)
         }
-        ast::ExprKind::Mac(ref mac) => {
+        ast::ExprKind::MacCall(ref mac) => {
             rewrite_macro(mac, None, context, shape, MacroPosition::Expression).or_else(|| {
                 wrap_str(
                     context.snippet(expr.span).to_owned(),
@@ -320,7 +320,7 @@ pub(crate) fn format_expr(
         }
         // We do not format these expressions yet, but they should still
         // satisfy our width restrictions.
-        ast::ExprKind::InlineAsm(..) => Some(context.snippet(expr.span).to_owned()),
+        ast::ExprKind::LlvmInlineAsm(..) => Some(context.snippet(expr.span).to_owned()),
         ast::ExprKind::TryBlock(ref block) => {
             if let rw @ Some(_) =
                 rewrite_single_line_block(context, "try ", block, Some(&expr.attrs), None, shape)
@@ -1191,15 +1191,17 @@ pub(crate) fn is_simple_block_stmt(
 }
 
 fn block_has_statements(block: &ast::Block) -> bool {
-    block.stmts.iter().any(|stmt| {
-        if let ast::StmtKind::Semi(ref expr) = stmt.kind {
+    block.stmts.iter().any(|stmt| match stmt.kind {
+        ast::StmtKind::Semi(ref expr) => {
             if let ast::ExprKind::Tup(ref tup_exprs) = expr.kind {
                 if tup_exprs.is_empty() {
                     return false;
                 }
             }
+            true
         }
-        true
+        ast::StmtKind::Empty => false,
+        _ => true,
     })
 }
 
@@ -1349,9 +1351,9 @@ pub(crate) fn can_be_overflowed_expr(
             context.config.overflow_delimited_expr()
                 || (context.use_block_indent() && args_len == 1)
         }
-        ast::ExprKind::Mac(ref mac) => {
+        ast::ExprKind::MacCall(ref mac) => {
             match (
-                syntax::ast::MacDelimiter::from_token(mac.args.delim()),
+                rustc_ast::ast::MacDelimiter::from_token(mac.args.delim()),
                 context.config.overflow_delimited_expr(),
             ) {
                 (Some(ast::MacDelimiter::Bracket), true)
@@ -1377,7 +1379,7 @@ pub(crate) fn can_be_overflowed_expr(
 
 pub(crate) fn is_nested_call(expr: &ast::Expr) -> bool {
     match expr.kind {
-        ast::ExprKind::Call(..) | ast::ExprKind::Mac(..) => true,
+        ast::ExprKind::Call(..) | ast::ExprKind::MacCall(..) => true,
         ast::ExprKind::AddrOf(_, _, ref expr)
         | ast::ExprKind::Box(ref expr)
         | ast::ExprKind::Try(ref expr)

@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use rustc_ast_pretty::pprust;
-use rustc_span::{sym, BytePos, ExpnId, Span, Symbol, SyntaxContext};
-use syntax::ast::{
+use rustc_ast::ast::{
     self, Attribute, CrateSugar, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
     VisibilityKind,
 };
-use syntax::ptr;
+use rustc_ast::ptr;
+use rustc_ast_pretty::pprust;
+use rustc_span::{sym, BytePos, ExpnId, Span, Symbol, SyntaxContext};
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
@@ -85,34 +85,34 @@ pub(crate) fn format_visibility(
 }
 
 #[inline]
-pub(crate) fn format_async(is_async: ast::IsAsync) -> &'static str {
+pub(crate) fn format_async(is_async: ast::Async) -> &'static str {
     match is_async {
-        ast::IsAsync::Async { .. } => "async ",
-        ast::IsAsync::NotAsync => "",
+        ast::Async::Yes { .. } => "async ",
+        ast::Async::No => "",
     }
 }
 
 #[inline]
-pub(crate) fn format_constness(constness: ast::Constness) -> &'static str {
+pub(crate) fn format_constness(constness: ast::Const) -> &'static str {
     match constness {
-        ast::Constness::Const => "const ",
-        ast::Constness::NotConst => "",
+        ast::Const::Yes(..) => "const ",
+        ast::Const::No => "",
     }
 }
 
 #[inline]
 pub(crate) fn format_defaultness(defaultness: ast::Defaultness) -> &'static str {
     match defaultness {
-        ast::Defaultness::Default => "default ",
+        ast::Defaultness::Default(..) => "default ",
         ast::Defaultness::Final => "",
     }
 }
 
 #[inline]
-pub(crate) fn format_unsafety(unsafety: ast::Unsafety) -> &'static str {
+pub(crate) fn format_unsafety(unsafety: ast::Unsafe) -> &'static str {
     match unsafety {
-        ast::Unsafety::Unsafe => "unsafe ",
-        ast::Unsafety::Normal => "",
+        ast::Unsafe::Yes(..) => "unsafe ",
+        ast::Unsafe::No => "",
     }
 }
 
@@ -154,7 +154,7 @@ pub(crate) fn format_extern(
 }
 
 #[inline]
-// Transform `Vec<syntax::ptr::P<T>>` into `Vec<&T>`
+// Transform `Vec<rustc_ast::ptr::P<T>>` into `Vec<&T>`
 pub(crate) fn ptr_vec_to_ref_vec<T>(vec: &[ptr::P<T>]) -> Vec<&T> {
     vec.iter().map(|x| &**x).collect::<Vec<_>>()
 }
@@ -452,7 +452,7 @@ pub(crate) fn first_line_ends_with(s: &str, c: char) -> bool {
 // parens, braces, and brackets in its idiomatic formatting.
 pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr: &str) -> bool {
     match expr.kind {
-        ast::ExprKind::Mac(..)
+        ast::ExprKind::MacCall(..)
         | ast::ExprKind::Call(..)
         | ast::ExprKind::MethodCall(..)
         | ast::ExprKind::Array(..)
@@ -486,7 +486,7 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Continue(..)
         | ast::ExprKind::Err
         | ast::ExprKind::Field(..)
-        | ast::ExprKind::InlineAsm(..)
+        | ast::ExprKind::LlvmInlineAsm(..)
         | ast::ExprKind::Let(..)
         | ast::ExprKind::Path(..)
         | ast::ExprKind::Range(..)

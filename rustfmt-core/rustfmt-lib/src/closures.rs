@@ -1,5 +1,5 @@
+use rustc_ast::{ast, ptr};
 use rustc_span::Span;
-use syntax::{ast, ptr};
 
 use crate::attr::get_attrs_from_stmt;
 use crate::config::lists::*;
@@ -25,7 +25,7 @@ use crate::utils::{last_line_width, left_most_sub_expr, stmt_expr, NodeIdExt};
 
 pub(crate) fn rewrite_closure(
     capture: ast::CaptureBy,
-    is_async: &ast::IsAsync,
+    is_async: &ast::Async,
     movability: ast::Movability,
     fn_decl: &ast::FnDecl,
     body: &ast::Expr,
@@ -50,7 +50,7 @@ pub(crate) fn rewrite_closure(
         }
 
         let result = match fn_decl.output {
-            ast::FunctionRetTy::Default(_) if !context.inside_macro() => {
+            ast::FnRetTy::Default(_) if !context.inside_macro() => {
                 try_rewrite_without_block(body, &prefix, capture, context, shape, body_shape)
             }
             _ => None,
@@ -222,7 +222,7 @@ fn rewrite_closure_block(
 // Return type is (prefix, extra_offset)
 fn rewrite_closure_fn_decl(
     capture: ast::CaptureBy,
-    asyncness: &ast::IsAsync,
+    asyncness: &ast::Async,
     movability: ast::Movability,
     fn_decl: &ast::FnDecl,
     body: &ast::Expr,

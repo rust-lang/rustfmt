@@ -1,7 +1,7 @@
 //! Module that contains skip related stuffs.
 
+use rustc_ast::ast::{Attribute, PathSegment};
 use rustc_span::symbol::{sym, Symbol};
-use syntax::ast::{Attribute, PathSegment};
 
 macro_rules! sym {
     ($tt:tt) => {
@@ -29,7 +29,7 @@ impl SkipContext {
             }
         }
         for attr in attrs {
-            if let syntax::ast::AttrKind::Normal(ref attr_item) = &attr.kind {
+            if let rustc_ast::ast::AttrKind::Normal(ref attr_item) = &attr.kind {
                 if is_skip_attr_with(&attr_item.path.segments, |s| s == sym!(macros)) {
                     get_skip_names(&mut self.macros, attr)
                 } else if is_skip_attr_with(&attr_item.path.segments, |s| s == sym::attributes) {
