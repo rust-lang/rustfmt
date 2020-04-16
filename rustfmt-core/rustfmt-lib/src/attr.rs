@@ -248,7 +248,11 @@ impl Rewrite for ast::MetaItem {
                 // See #2479 for example.
                 let value = rewrite_literal(context, literal, lit_shape)
                     .unwrap_or_else(|| context.snippet(literal.span).to_owned());
-                format!("{} = {}", path, value)
+                if context.config.space_around_attr_eq() {
+                    format!("{} = {}", path, value)
+                } else {
+                    format!("{}={}", path, value)
+                }
             }
         })
     }
