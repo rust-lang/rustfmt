@@ -32,9 +32,24 @@ create_config! {
     hard_tabs: bool, false, true, "Use tab characters for indentation, spaces for alignment";
     tab_spaces: usize, 4, true, "Number of spaces per tab";
     newline_style: NewlineStyle, NewlineStyle::Auto, true, "Unix or Windows line endings";
-    use_small_heuristics: Heuristics, Heuristics::Default, true, "Whether to use different \
-        formatting for items and expressions if they satisfy a heuristic notion of 'small'";
     indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items";
+    width_heuristics: Heuristics, Heuristics::Scaled, true, "Controls width heuristics \
+        by setting the values for the individual width heuristic options";
+
+    // Width Heuristics
+    fn_call_width: usize, 60, true, "Maximum width of the args of a function call before \
+        falling back to vertical formatting.";
+    attr_fn_like_width: usize, 70, true, "Maximum width of the args of a function-like \
+        attributes before falling back to vertical formatting.";
+    struct_lit_width: usize, 18, true, "Maximum width in the body of a struct lit before \
+        falling back to vertical formatting.";
+    struct_variant_width: usize, 35, true, "Maximum width in the body of a struct variant before \
+        falling back to vertical formatting.";
+    array_width: usize, 60, true,  "Maximum width of an array literal before falling \
+        back to vertical formatting.";
+    chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
+    single_line_if_else_max_width: usize, 50, true, "Maximum line length for single line if-else \
+        expressions. A value of zero means always break if-else expressions.";
 
     // Comments. macros, and strings
     wrap_comments: bool, false, false, "Break comments to fit on the line";
@@ -146,8 +161,6 @@ create_config! {
     file_lines: FileLines, FileLines::all(), false,
         "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
          via the --file-lines option";
-    width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
-        "'small' heuristic values";
     emit_mode: EmitMode, EmitMode::Files, false,
         "What emit Mode to use when none is supplied";
     print_misformatted_file_names: bool, false, true,
@@ -167,7 +180,6 @@ impl PartialConfig {
         let mut cloned = self.clone();
         cloned.file_lines = None;
         cloned.verbose = None;
-        cloned.width_heuristics = None;
         cloned.print_misformatted_file_names = None;
         cloned.recursive = None;
         cloned.emit_mode = None;
@@ -389,9 +401,6 @@ mod test {
         create_config! {
             // Options that are used by the generated functions
             max_width: usize, 100, true, "Maximum width of each line";
-            use_small_heuristics: Heuristics, Heuristics::Default, true,
-                "Whether to use different formatting for items and \
-                 expressions if they satisfy a heuristic notion of 'small'.";
             license_template_path: String, String::default(), false,
                 "Beginning of file must match license template";
             required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
@@ -403,8 +412,22 @@ mod test {
             file_lines: FileLines, FileLines::all(), false,
                 "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
                     via the --file-lines option";
-            width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
-                "'small' heuristic values";
+            width_heuristics: Heuristics, Heuristics::Scaled, true, "Controls width heuristics \
+                    by setting the values for the individual width heuristic options";
+            // Width Heuristics
+            fn_call_width: usize, 60, true, "Maximum width of the args of a function call before \
+                falling back to vertical formatting.";
+            attr_fn_like_width: usize, 70, true, "Maximum width of the args of a function-like \
+                attributes before falling back to vertical formatting.";
+            struct_lit_width: usize, 18, true, "Maximum width in the body of a struct lit before \
+                falling back to vertical formatting.";
+            struct_variant_width: usize, 35, true, "Maximum width in the body of a struct \
+                variant before falling back to vertical formatting.";
+            array_width: usize, 60, true,  "Maximum width of an array literal before falling \
+                back to vertical formatting.";
+            chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
+            single_line_if_else_max_width: usize, 50, true, "Maximum line length for single \
+                line if-else expressions. A value of zero means always break if-else expressions.";
 
             // Options that are used by the tests
             stable_option: bool, false, true, "A stable option";
@@ -492,8 +515,15 @@ mod test {
 hard_tabs = false
 tab_spaces = 4
 newline_style = "Auto"
-use_small_heuristics = "Default"
 indent_style = "Block"
+width_heuristics = "Scaled"
+fn_call_width = 60
+attr_fn_like_width = 70
+struct_lit_width = 18
+struct_variant_width = 35
+array_width = 60
+chain_width = 60
+single_line_if_else_max_width = 50
 wrap_comments = false
 format_code_in_doc_comments = false
 comment_width = 80
@@ -649,6 +679,244 @@ ignore = []
             assert_eq!(config.unstable_features(), false);
             config.override_value("unstable_features", "true");
             assert_eq!(config.unstable_features(), true);
+        }
+    }
+
+    #[cfg(test)]
+    mod width_heuristics {
+        use super::*;
+
+        #[test]
+        fn test_scaled_sets_correct_widths() {
+            let toml = r#"
+                width_heuristics = "Scaled"
+                max_width = 200
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.array_width(), 120);
+            assert_eq!(config.attr_fn_like_width(), 140);
+            assert_eq!(config.chain_width(), 120);
+            assert_eq!(config.fn_call_width(), 120);
+            assert_eq!(config.single_line_if_else_max_width(), 100);
+            assert_eq!(config.struct_lit_width(), 36);
+            assert_eq!(config.struct_variant_width(), 70);
+        }
+
+        #[test]
+        fn test_max_sets_correct_widths() {
+            let toml = r#"
+                width_heuristics = "Max"
+                max_width = 120
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.array_width(), 120);
+            assert_eq!(config.attr_fn_like_width(), 120);
+            assert_eq!(config.chain_width(), 120);
+            assert_eq!(config.fn_call_width(), 120);
+            assert_eq!(config.single_line_if_else_max_width(), 120);
+            assert_eq!(config.struct_lit_width(), 120);
+            assert_eq!(config.struct_variant_width(), 120);
+        }
+
+        #[test]
+        fn test_off_sets_correct_widths() {
+            let toml = r#"
+                width_heuristics = "Off"
+                max_width = 100
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.array_width(), usize::max_value());
+            assert_eq!(config.attr_fn_like_width(), usize::max_value());
+            assert_eq!(config.chain_width(), usize::max_value());
+            assert_eq!(config.fn_call_width(), usize::max_value());
+            assert_eq!(config.single_line_if_else_max_width(), 0);
+            assert_eq!(config.struct_lit_width(), 0);
+            assert_eq!(config.struct_variant_width(), 0);
+        }
+
+        #[test]
+        fn test_override_works_with_scaled() {
+            let toml = r#"
+                width_heuristics = "Scaled"
+                array_width = 20
+                attr_fn_like_width = 40
+                chain_width = 20
+                fn_call_width = 90
+                single_line_if_else_max_width = 40
+                struct_lit_width = 30
+                struct_variant_width = 34
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.array_width(), 20);
+            assert_eq!(config.attr_fn_like_width(), 40);
+            assert_eq!(config.chain_width(), 20);
+            assert_eq!(config.fn_call_width(), 90);
+            assert_eq!(config.single_line_if_else_max_width(), 40);
+            assert_eq!(config.struct_lit_width(), 30);
+            assert_eq!(config.struct_variant_width(), 34);
+        }
+
+        #[test]
+        fn test_override_with_max() {
+            let toml = r#"
+                width_heuristics = "Max"
+                array_width = 20
+                attr_fn_like_width = 40
+                chain_width = 20
+                fn_call_width = 90
+                single_line_if_else_max_width = 40
+                struct_lit_width = 30
+                struct_variant_width = 34
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.array_width(), 20);
+            assert_eq!(config.attr_fn_like_width(), 40);
+            assert_eq!(config.chain_width(), 20);
+            assert_eq!(config.fn_call_width(), 90);
+            assert_eq!(config.single_line_if_else_max_width(), 40);
+            assert_eq!(config.struct_lit_width(), 30);
+            assert_eq!(config.struct_variant_width(), 34);
+        }
+
+        #[test]
+        fn test_override_with_off() {
+            let toml = r#"
+                width_heuristics = "Off"
+                array_width = 20
+                attr_fn_like_width = 40
+                chain_width = 20
+                fn_call_width = 90
+                single_line_if_else_max_width = 40
+                struct_lit_width = 30
+                struct_variant_width = 34
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.array_width(), 20);
+            assert_eq!(config.attr_fn_like_width(), 40);
+            assert_eq!(config.chain_width(), 20);
+            assert_eq!(config.fn_call_width(), 90);
+            assert_eq!(config.single_line_if_else_max_width(), 40);
+            assert_eq!(config.struct_lit_width(), 30);
+            assert_eq!(config.struct_variant_width(), 34);
+        }
+
+        #[test]
+        fn test_fn_call_width_config_exceeds_max_width() {
+            let toml = r#"
+                max_width = 90
+                fn_call_width = 95
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.fn_call_width(), 90);
+        }
+
+        #[test]
+        fn test_attr_fn_like_width_config_exceeds_max_width() {
+            let toml = r#"
+                max_width = 80
+                attr_fn_like_width = 90
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.attr_fn_like_width(), 80);
+        }
+
+        #[test]
+        fn test_struct_lit_config_exceeds_max_width() {
+            let toml = r#"
+                max_width = 78
+                struct_lit_width = 90
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.struct_lit_width(), 78);
+        }
+
+        #[test]
+        fn test_struct_variant_width_config_exceeds_max_width() {
+            let toml = r#"
+                max_width = 80
+                struct_variant_width = 90
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.struct_variant_width(), 80);
+        }
+
+        #[test]
+        fn test_array_width_config_exceeds_max_width() {
+            let toml = r#"
+                max_width = 60
+                array_width = 80
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.array_width(), 60);
+        }
+
+        #[test]
+        fn test_chain_width_config_exceeds_max_width() {
+            let toml = r#"
+                max_width = 80
+                chain_width = 90
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.chain_width(), 80);
+        }
+
+        #[test]
+        fn test_single_line_if_else_max_width_config_exceeds_max_width() {
+            let toml = r#"
+                max_width = 70
+                single_line_if_else_max_width = 90
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.single_line_if_else_max_width(), 70);
+        }
+
+        #[test]
+        fn test_override_fn_call_width_exceeds_max_width() {
+            let mut config = Config::default();
+            config.override_value("fn_call_width", "101");
+            assert_eq!(config.fn_call_width(), 100);
+        }
+
+        #[test]
+        fn test_override_attr_fn_like_width_exceeds_max_width() {
+            let mut config = Config::default();
+            config.override_value("attr_fn_like_width", "101");
+            assert_eq!(config.attr_fn_like_width(), 100);
+        }
+
+        #[test]
+        fn test_override_struct_lit_exceeds_max_width() {
+            let mut config = Config::default();
+            config.override_value("struct_lit_width", "101");
+            assert_eq!(config.struct_lit_width(), 100);
+        }
+
+        #[test]
+        fn test_override_struct_variant_width_exceeds_max_width() {
+            let mut config = Config::default();
+            config.override_value("struct_variant_width", "101");
+            assert_eq!(config.struct_variant_width(), 100);
+        }
+
+        #[test]
+        fn test_override_array_width_exceeds_max_width() {
+            let mut config = Config::default();
+            config.override_value("array_width", "101");
+            assert_eq!(config.array_width(), 100);
+        }
+
+        #[test]
+        fn test_override_chain_width_exceeds_max_width() {
+            let mut config = Config::default();
+            config.override_value("chain_width", "101");
+            assert_eq!(config.chain_width(), 100);
+        }
+
+        #[test]
+        fn test_override_single_line_if_else_max_width_exceeds_max_width() {
+            let mut config = Config::default();
+            config.override_value("single_line_if_else_max_width", "101");
+            assert_eq!(config.single_line_if_else_max_width(), 100);
         }
     }
 }

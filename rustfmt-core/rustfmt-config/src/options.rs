@@ -77,14 +77,16 @@ pub enum TypeDensity {
 }
 
 #[config_type]
-/// To what extent does rustfmt pursue its heuristics?
+/// Heuristic settings that can be used to simply
+/// the configuration of the granular width configurations
+/// like `struct_lit_width`, `array_width`, etc.
 pub enum Heuristics {
     /// Turn off any heuristics
     Off,
     /// Turn on max heuristics
     Max,
-    /// Use Rustfmt's defaults
-    Default,
+    /// Use scaled values based on the value of `max_width`
+    Scaled,
 }
 
 impl Density {
@@ -245,14 +247,6 @@ impl WidthHeuristics {
             chain_width: (60.0 * max_width_ratio).round() as usize,
             single_line_if_else_max_width: (50.0 * max_width_ratio).round() as usize,
         }
-    }
-}
-
-impl std::str::FromStr for WidthHeuristics {
-    type Err = &'static str;
-
-    fn from_str(_: &str) -> Result<Self, Self::Err> {
-        Err("WidthHeuristics is not parsable")
     }
 }
 

@@ -1,5 +1,5 @@
 // rustfmt-max_width: 110
-// rustfmt-use_small_heuristics: Max
+// rustfmt-width_heuristics: Max
 // rustfmt-hard_tabs: true
 // rustfmt-use_field_init_shorthand: true
 // rustfmt-overflow_delimited_expr: true
