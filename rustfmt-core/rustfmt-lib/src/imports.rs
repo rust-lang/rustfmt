@@ -11,6 +11,7 @@ use crate::config::{Edition, IndentStyle};
 use crate::lists::{
     definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
 };
+use crate::reorder::{compare_as_versions, compare_opt_ident_as_versions};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
@@ -654,12 +655,7 @@ impl Ord for UseSegment {
         match (self, other) {
             (&Slf(ref a), &Slf(ref b))
             | (&Super(ref a), &Super(ref b))
-            | (&Crate(ref a), &Crate(ref b)) => match (a, b) {
-                (Some(sa), Some(sb)) => {
-                    sa.trim_start_matches("r#").cmp(sb.trim_start_matches("r#"))
-                }
-                (_, _) => a.cmp(b),
-            },
+            | (&Crate(ref a), &Crate(ref b)) => compare_opt_ident_as_versions(&a, &b),
             (&Glob, &Glob) => Ordering::Equal,
             (&Ident(ref pia, ref aa), &Ident(ref pib, ref ab)) => {
                 let ia = pia.trim_start_matches("r#");
@@ -677,18 +673,8 @@ impl Ord for UseSegment {
                 if !is_upper_snake_case(ia) && is_upper_snake_case(ib) {
                     return Ordering::Less;
                 }
-                let ident_ord = ia.cmp(ib);
-                if ident_ord != Ordering::Equal {
-                    return ident_ord;
-                }
-                match (aa, ab) {
-                    (None, Some(_)) => Ordering::Less,
-                    (Some(_), None) => Ordering::Greater,
-                    (Some(aas), Some(abs)) => aas
-                        .trim_start_matches("r#")
-                        .cmp(abs.trim_start_matches("r#")),
-                    (None, None) => Ordering::Equal,
-                }
+
+                compare_as_versions(&ia, &ib).then_with(|| compare_opt_ident_as_versions(&aa, &ab))
             }
             (&List(ref a), &List(ref b)) => {
                 for (a, b) in a.iter().zip(b.iter()) {
@@ -716,17 +702,17 @@ impl Ord for UseSegment {
 impl Ord for UseTree {
     fn cmp(&self, other: &UseTree) -> Ordering {
         for (a, b) in self.path.iter().zip(other.path.iter()) {
-            let ord = a.cmp(b);
             // The comparison without aliases is a hack to avoid situations like
             // comparing `a::b` to `a as c` - where the latter should be ordered
             // first since it is shorter.
-            if ord != Ordering::Equal && a.remove_alias().cmp(&b.remove_alias()) != Ordering::Equal
-            {
+            let ord = a.remove_alias().cmp(&b.remove_alias());
+            if ord != Ordering::Equal {
                 return ord;
             }
         }
 
-        self.path.len().cmp(&other.path.len())
+        Ord::cmp(&self.path.len(), &other.path.len())
+            .then(Ord::cmp(&self.path.last(), &other.path.last()))
     }
 }
 

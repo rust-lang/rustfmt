@@ -23,6 +23,7 @@ use crate::expr::{
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::overflow;
+use crate::reorder::compare_as_versions;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
@@ -701,10 +702,10 @@ impl<'a> FmtVisitor<'a> {
                 (TyAlias(_, _, _, ref lty), TyAlias(_, _, _, ref rty))
                     if both_type(lty, rty) || both_opaque(lty, rty) =>
                 {
-                    a.ident.as_str().cmp(&b.ident.as_str())
+                    compare_as_versions(&a.ident.as_str(), &b.ident.as_str())
                 }
                 (Const(..), Const(..)) | (MacCall(..), MacCall(..)) => {
-                    a.ident.as_str().cmp(&b.ident.as_str())
+                    compare_as_versions(&a.ident.as_str(), &b.ident.as_str())
                 }
                 (Fn(..), Fn(..)) => a.span.lo().cmp(&b.span.lo()),
                 (TyAlias(_, _, _, ref ty), _) if is_type(ty) => Ordering::Less,

@@ -22,18 +22,133 @@ use crate::spanned::Spanned;
 use crate::utils::{contains_skip, mk_sp};
 use crate::visitor::FmtVisitor;
 
+/// Compare strings according to version sort (roughly equivalent to `strverscmp`)
+pub(crate) fn compare_as_versions(left: &str, right: &str) -> Ordering {
+    let mut left = left.chars().peekable();
+    let mut right = right.chars().peekable();
+
+    loop {
+        // The strings are equal so far and not inside a number in both sides
+        let (l, r) = match (left.next(), right.next()) {
+            // Is this the end of both strings?
+            (None, None) => return Ordering::Equal,
+            // If for one, the shorter one is considered smaller
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(l), Some(r)) => (l, r),
+        };
+        let next_ordering = match (l.to_digit(10), r.to_digit(10)) {
+            // If neither is a digit, just compare them
+            (None, None) => Ord::cmp(&l, &r),
+            // The one with shorter non-digit run is smaller
+            // For `strverscmp` it's smaller iff next char in longer is greater than digits
+            (None, Some(_)) => Ordering::Greater,
+            (Some(_), None) => Ordering::Less,
+            // If both start numbers, we have to compare the numbers
+            (Some(l), Some(r)) => {
+                if l == 0 || r == 0 {
+                    // Fraction mode: compare as if there was leading `0.`
+                    let ordering = Ord::cmp(&l, &r);
+                    if ordering != Ordering::Equal {
+                        return ordering;
+                    }
+                    loop {
+                        // Get next pair
+                        let (l, r) = match (left.peek(), right.peek()) {
+                            // Is this the end of both strings?
+                            (None, None) => return Ordering::Equal,
+                            // If for one, the shorter one is considered smaller
+                            (None, Some(_)) => return Ordering::Less,
+                            (Some(_), None) => return Ordering::Greater,
+                            (Some(l), Some(r)) => (l, r),
+                        };
+                        // Are they digits?
+                        match (l.to_digit(10), r.to_digit(10)) {
+                            // If out of digits, use the stored ordering due to equal length
+                            (None, None) => break Ordering::Equal,
+                            // If one is shorter, it's smaller
+                            (None, Some(_)) => return Ordering::Less,
+                            (Some(_), None) => return Ordering::Greater,
+                            // If both are digits, consume them and take into account
+                            (Some(l), Some(r)) => {
+                                left.next();
+                                right.next();
+                                let ordering = Ord::cmp(&l, &r);
+                                if ordering != Ordering::Equal {
+                                    return ordering;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Integer mode
+                    let mut same_length_ordering = Ord::cmp(&l, &r);
+                    loop {
+                        // Get next pair
+                        let (l, r) = match (left.peek(), right.peek()) {
+                            // Is this the end of both strings?
+                            (None, None) => return same_length_ordering,
+                            // If for one, the shorter one is considered smaller
+                            (None, Some(_)) => return Ordering::Less,
+                            (Some(_), None) => return Ordering::Greater,
+                            (Some(l), Some(r)) => (l, r),
+                        };
+                        // Are they digits?
+                        match (l.to_digit(10), r.to_digit(10)) {
+                            // If out of digits, use the stored ordering due to equal length
+                            (None, None) => break same_length_ordering,
+                            // If one is shorter, it's smaller
+                            (None, Some(_)) => return Ordering::Less,
+                            (Some(_), None) => return Ordering::Greater,
+                            // If both are digits, consume them and take into account
+                            (Some(l), Some(r)) => {
+                                left.next();
+                                right.next();
+                                same_length_ordering = same_length_ordering.then(Ord::cmp(&l, &r));
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        if next_ordering != Ordering::Equal {
+            return next_ordering;
+        }
+    }
+}
+
+/// Compare identifiers, trimming `r#` if present, according to version sort
+pub(crate) fn compare_ident_as_versions(left: &str, right: &str) -> Ordering {
+    compare_as_versions(
+        left.trim_start_matches("r#"),
+        right.trim_start_matches("r#"),
+    )
+}
+
+pub(crate) fn compare_opt_ident_as_versions<S>(left: &Option<S>, right: &Option<S>) -> Ordering
+where
+    S: AsRef<str>,
+{
+    match (left, right) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(left), Some(right)) => compare_ident_as_versions(left.as_ref(), right.as_ref()),
+    }
+}
+
 /// Choose the ordering between the given two items.
 fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
     match (&a.kind, &b.kind) {
         (&ast::ItemKind::Mod(..), &ast::ItemKind::Mod(..)) => {
-            a.ident.as_str().cmp(&b.ident.as_str())
+            compare_as_versions(&a.ident.as_str(), &b.ident.as_str())
         }
         (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
             let a_orig_name = a_name.map_or_else(|| a.ident.as_str(), rustc_span::Symbol::as_str);
             let b_orig_name = b_name.map_or_else(|| b.ident.as_str(), rustc_span::Symbol::as_str);
-            let result = a_orig_name.cmp(&b_orig_name);
+            let result = compare_as_versions(&a_orig_name, &b_orig_name);
             if result != Ordering::Equal {
                 return result;
             }
@@ -44,7 +159,7 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
                 (Some(..), None) => Ordering::Greater,
                 (None, Some(..)) => Ordering::Less,
                 (None, None) => Ordering::Equal,
-                (Some(..), Some(..)) => a.ident.as_str().cmp(&b.ident.as_str()),
+                (Some(..), Some(..)) => compare_as_versions(&a.ident.as_str(), &b.ident.as_str()),
             }
         }
         _ => unreachable!(),
@@ -261,6 +376,40 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.visit_item(item);
                 items = rest;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_compare_as_versions() {
+        use super::compare_as_versions;
+        use std::cmp::Ordering;
+        let mut strings: &[&'static str] = &[
+            "9", "i8", "ia32", "u009", "u08", "u08", "u080", "u8", "u8", "u16", "u32", "u128",
+        ];
+        while !strings.is_empty() {
+            let (first, tail) = strings.split_first().unwrap();
+            for second in tail {
+                if first == second {
+                    assert_eq!(compare_as_versions(first, second), Ordering::Equal);
+                    assert_eq!(compare_as_versions(second, first), Ordering::Equal);
+                } else {
+                    assert_eq!(compare_as_versions(first, second), Ordering::Less);
+                    assert_eq!(compare_as_versions(second, first), Ordering::Greater);
+                }
+            }
+            strings = tail;
+        }
+    }
+    #[test]
+    fn test_compare_opt_ident_as_versions() {
+        use super::compare_opt_ident_as_versions;
+        use std::cmp::Ordering;
+        let items: &[Option<&'static str>] = &[None, Some("a"), Some("r#a"), Some("a")];
+        for (p, n) in items[..items.len() - 1].iter().zip(items[1..].iter()) {
+            assert!(compare_opt_ident_as_versions(p, n) != Ordering::Greater);
         }
     }
 }

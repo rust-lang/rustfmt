@@ -3,3 +3,9 @@
 use path::{self /* self */, /* A */ A, B /* B */, C};
 
 use {aa, ab, ac, b, Z};
+
+// The sort order shall follow versionsort
+use {u8, u16, u32, u64, u128};
+use {v0002, v0030, v0200, v02000, v02001, v1};
+// Order by alias should use versionsort too
+use {crate as crate1, crate as crate2, crate as crate10};

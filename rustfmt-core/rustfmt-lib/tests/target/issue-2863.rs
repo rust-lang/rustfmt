@@ -13,6 +13,8 @@ impl<T> IntoIterator for SafeVec<T> {
     type F = impl Trait;
 
     const AnotherConst: i32 = 100;
+    const AnyConst2: i32 = 100;
+    const AnyConst10: i32 = 100;
     const SomeConst: i32 = 100;
 
     // comment on foo()
