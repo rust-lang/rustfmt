@@ -1,5 +1,7 @@
-pub trait ConfigType: Sized {
-    fn doc_hint() -> String;
+mod config {
+    pub trait ConfigType: Sized {
+        fn doc_hint() -> String;
+    }
 }
 
 #[allow(dead_code)]

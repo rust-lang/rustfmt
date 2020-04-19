@@ -8,7 +8,7 @@ pub use self::stdout::*;
 use std::io::{self, Write};
 use std::path::Path;
 
-use rustfmt_configuration::FileName;
+use crate::config::FileName;
 
 pub mod checkstyle;
 pub mod diff;

@@ -16,7 +16,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use rustc_ast::ast;
-use rustfmt_configuration as config;
 use thiserror::Error;
 
 use crate::comment::LineClasses;
@@ -33,11 +32,16 @@ pub use crate::config::{
 
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
 
-pub use rustfmt_emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
-use rustfmt_emitter::{self as emitter, Emitter};
+pub use crate::emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
+use crate::emitter::Emitter;
 
 #[macro_use]
 mod utils;
+
+#[cfg(feature = "config")]
+pub mod config;
+#[cfg(feature = "emitter")]
+pub mod emitter;
 
 mod attr;
 mod chains;

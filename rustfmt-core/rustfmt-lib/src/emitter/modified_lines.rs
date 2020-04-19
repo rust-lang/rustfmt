@@ -1,6 +1,5 @@
-use crate::rustfmt_diff::{make_diff, ModifiedLines};
-
 use super::*;
+use rustfmt_diff::{make_diff, ModifiedLines};
 
 #[derive(Debug, Default)]
 pub struct ModifiedLinesEmitter;

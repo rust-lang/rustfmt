@@ -1,5 +1,5 @@
-use crate::file_lines::FileLines;
-use crate::options::{IgnoreList, WidthHeuristics};
+use crate::config::file_lines::FileLines;
+use crate::config::options::{IgnoreList, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
 pub(crate) trait ConfigType: Sized {
@@ -52,7 +52,6 @@ impl ConfigType for IgnoreList {
 
 macro_rules! create_config {
     ($($i:ident: $Ty:ty, $def:expr, $is_stable:literal, $dstring:literal;)+) => (
-        use std::collections::HashSet;
         use std::io::Write;
 
         use serde::{Deserialize, Serialize};
@@ -170,14 +169,15 @@ macro_rules! create_config {
             }
 
             /// Returns a hash set initialized with every user-facing config option name.
-            pub fn hash_set() -> HashSet<&'static str> {
+            #[cfg(test)]
+            pub(crate) fn hash_set() -> std::collections::HashSet<&'static str> {
                 [$(
                     stringify!($i),
                 )+]
                 .iter().copied().collect()
             }
 
-            pub fn is_valid_name(name: &str) -> bool {
+            pub(crate) fn is_valid_name(name: &str) -> bool {
                 match name {
                     $(
                         stringify!($i) => true,

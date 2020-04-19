@@ -2,7 +2,7 @@
 
 use rustfmt_config_proc_macro::config_type;
 
-use crate::IndentStyle;
+use crate::config::IndentStyle;
 
 /// The definitive formatting tactic for lists.
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]

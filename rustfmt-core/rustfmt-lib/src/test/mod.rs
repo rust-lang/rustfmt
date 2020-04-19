@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::str::Chars;
 use std::thread;
 
-use rustfmt_emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter};
+use crate::emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter};
 
 use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle, ReportTactic};
 use crate::formatting::{ReportedErrors, SourceFile};

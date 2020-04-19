@@ -1,7 +1,7 @@
-use rustfmt_configuration::Config;
+use crate::config::Config;
 
 use super::*;
-use crate::rustfmt_diff::{make_diff, print_diff};
+use rustfmt_diff::{make_diff, print_diff};
 
 pub struct DiffEmitter {
     config: Config,

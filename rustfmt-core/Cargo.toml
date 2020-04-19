@@ -1,7 +1,5 @@
 [workspace]
 members = [
   "rustfmt-bin",
-  "rustfmt-config",
-  "rustfmt-emitter",
   "rustfmt-lib",
 ]

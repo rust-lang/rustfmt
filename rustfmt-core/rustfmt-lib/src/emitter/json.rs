@@ -1,8 +1,9 @@
+use std::io::{self, Write};
+
 use super::*;
-use crate::rustfmt_diff::{make_diff, DiffLine, Mismatch};
+use rustfmt_diff::{make_diff, DiffLine, Mismatch};
 use serde::Serialize;
 use serde_json::to_string as to_json_string;
-use std::io::{self, Write};
 
 #[derive(Debug, Default)]
 pub struct JsonEmitter {

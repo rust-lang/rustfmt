@@ -8,10 +8,10 @@ use std::{env, fs};
 use regex::Regex;
 use thiserror::Error;
 
-use crate::config_type::ConfigType;
-pub use crate::file_lines::{FileLines, FileName, Range};
-pub use crate::lists::*;
-pub use crate::options::*;
+use crate::config::config_type::ConfigType;
+pub use crate::config::file_lines::{FileLines, FileName, Range};
+pub use crate::config::lists::*;
+pub use crate::config::options::*;
 
 #[macro_use]
 pub mod config_type;
