@@ -9,7 +9,7 @@ use std::thread;
 
 use crate::emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter};
 
-use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle, ReportTactic};
+use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle};
 use crate::formatting::{ReportedErrors, SourceFile};
 use crate::is_nightly_channel;
 use crate::source_file;
@@ -604,9 +604,6 @@ fn read_config(filename: &Path) -> Config {
             }
         }
     }
-
-    // Don't generate warnings for to-do items.
-    config.set().report_todo(ReportTactic::Never);
 
     config
 }
