@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::iter::Enumerate;
 use std::path::{Path, PathBuf};
 
-use rustfmt_emitter::rustfmt_diff::{make_diff, Mismatch};
+use crate::emitter::rustfmt_diff::{make_diff, Mismatch};
 
 use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
 use crate::config::{Config, EmitMode, Verbosity};

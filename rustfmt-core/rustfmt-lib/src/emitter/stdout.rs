@@ -1,8 +1,7 @@
 use std::io::Write;
 
-use rustfmt_configuration::Verbosity;
-
 use super::*;
+use crate::config::Verbosity;
 
 #[derive(Debug)]
 pub struct StdoutEmitter {

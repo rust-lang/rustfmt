@@ -14,7 +14,7 @@ use crate::create_emitter;
 #[cfg(test)]
 use crate::formatting::FileRecord;
 
-use rustfmt_emitter::{self as emitter, Emitter};
+use crate::emitter::{self, Emitter};
 
 // Append a newline to the end of each file.
 pub(crate) fn append_newline(s: &mut String) {

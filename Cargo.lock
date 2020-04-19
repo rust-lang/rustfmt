@@ -1163,38 +1163,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustfmt_configuration"
-version = "2.0.0-rc.1"
-dependencies = [
- "dirs",
- "itertools",
- "regex",
- "rustc-ap-rustc_span",
- "rustfmt-config_proc_macro",
- "serde",
- "serde_json",
- "thiserror",
- "toml",
-]
-
-[[package]]
-name = "rustfmt_emitter"
-version = "2.0.0-rc.1"
-dependencies = [
- "diff",
- "rustfmt_configuration",
- "serde",
- "serde_json",
- "term",
-]
-
-[[package]]
 name = "rustfmt_lib"
 version = "2.0.0-rc.1"
 dependencies = [
  "annotate-snippets",
  "anyhow",
  "bytecount",
+ "diff",
+ "dirs",
  "ignore",
  "itertools",
  "lazy_static",
@@ -1208,10 +1184,12 @@ dependencies = [
  "rustc-ap-rustc_parse",
  "rustc-ap-rustc_session",
  "rustc-ap-rustc_span",
- "rustfmt_configuration",
- "rustfmt_emitter",
+ "rustfmt-config_proc_macro",
+ "serde",
+ "serde_json",
  "term",
  "thiserror",
+ "toml",
  "unicode-segmentation",
  "unicode-width",
  "unicode_categories",
@@ -1476,9 +1454,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01d1404644c8b12b16bfcffa4322403a91a451584daaaa7c28d3152e6cbc98cf"
+checksum = "ffc92d160b1eef40665be3a05630d003936a3bc7da7421277846c2613e92c71a"
 dependencies = [
  "serde",
 ]
