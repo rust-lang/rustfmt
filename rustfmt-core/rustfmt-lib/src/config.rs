@@ -8,10 +8,12 @@ use std::{env, fs};
 use regex::Regex;
 use thiserror::Error;
 
-use crate::config::config_type::ConfigType;
 pub use crate::config::file_lines::{FileLines, FileName, Range};
 pub use crate::config::lists::*;
 pub use crate::config::options::*;
+
+use crate::config::config_type::ConfigType;
+use crate::utils::absolute_path;
 
 #[macro_use]
 pub mod config_type;
@@ -236,7 +238,7 @@ impl Config {
                 dir.to_path_buf()
             };
 
-            current = fs::canonicalize(current)?;
+            current = absolute_path(current)?;
 
             loop {
                 match get_toml_path(&current) {

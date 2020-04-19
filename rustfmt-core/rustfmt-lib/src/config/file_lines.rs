@@ -12,6 +12,8 @@ use thiserror::Error;
 
 use rustc_span::{self, SourceFile};
 
+use crate::utils::absolute_path;
+
 /// A range of lines in a file, inclusive of both ends.
 pub struct LineRange {
     pub file: Rc<SourceFile>,
@@ -295,7 +297,7 @@ impl<'a> iter::Iterator for Files<'a> {
 
 fn canonicalize_path_string(file: &FileName) -> std::io::Result<FileName> {
     match *file {
-        FileName::Real(ref path) => path.canonicalize().map(FileName::Real),
+        FileName::Real(ref path) => absolute_path(path).map(FileName::Real),
         _ => Ok(file.clone()),
     }
 }

@@ -18,21 +18,20 @@ use std::rc::Rc;
 use rustc_ast::ast;
 use thiserror::Error;
 
-use crate::comment::LineClasses;
-use crate::formatting::{FormatErrorMap, FormattingError, ReportedErrors, SourceFile};
-use crate::shape::Indent;
-use crate::syntux::parser::DirectoryOwnership;
-use crate::utils::indent_next_line;
-
 pub use crate::config::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName, NewlineStyle,
     Range, Verbosity,
 };
-
-pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
-
 pub use crate::emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
+pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
+pub use crate::utils::absolute_path;
+
+use crate::comment::LineClasses;
 use crate::emitter::Emitter;
+use crate::formatting::{FormatErrorMap, FormattingError, ReportedErrors, SourceFile};
+use crate::shape::Indent;
+use crate::syntux::parser::DirectoryOwnership;
+use crate::utils::indent_next_line;
 
 #[macro_use]
 mod utils;
