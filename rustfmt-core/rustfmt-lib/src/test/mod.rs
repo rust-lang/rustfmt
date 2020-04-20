@@ -40,6 +40,7 @@ const SKIP_FILE_WHITE_LIST: &[&str] = &[
     // these files directly
     "configs/recursive/disabled/foo.rs",
     "configs/recursive/enabled/foo.rs",
+    "mods-relative-path/mod_b.rs",
 ];
 
 fn init_log() {
