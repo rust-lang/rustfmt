@@ -6,12 +6,6 @@ test-all = "test --manifest-path rustfmt-core/Cargo.toml"
 test-bin = "test --manifest-path rustfmt-core/rustfmt-bin/Cargo.toml"
 tb = "test-bin"
 
-test-config = "test --manifest-path rustfmt-core/rustfmt-config/Cargo.toml"
-tc = "test-config"
-
-test-emitter = "test --manifest-path rustfmt-core/rustfmt-emitter/Cargo.toml"
-te = "test-emitter"
-
 test-lib = "test --manifest-path rustfmt-core/rustfmt-lib/Cargo.toml"
 tl = "test-lib"
 
