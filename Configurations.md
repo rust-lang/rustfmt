@@ -1504,6 +1504,88 @@ fn main() {
 
 See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 
+## `match_arm_leading_pipes`
+
+Controls whether to include a leading pipe on match arms
+
+- **Default value**: `Never`
+- **Possible values**: `Always`, `Never`, `KeepExisting`
+- **Stable**: Yes
+
+#### `Never` (default):
+```rust
+// Leading pipes are from this:
+// fn foo() {
+//     match foo {
+//         | "foo" | "bar" => {}
+//         | "baz"
+//         | "something relatively long"
+//         | "something really really really realllllllllllllly long" => println!("x"),
+//         | "qux" => println!("y"),
+//         _ => {}
+//     }
+// }
+
+// Are removed:
+fn foo() {
+    match foo {
+        "foo" | "bar" => {}
+        "baz"
+        | "something relatively long"
+        | "something really really really realllllllllllllly long" => println!("x"),
+        "qux" => println!("y"),
+        _ => {}
+    }
+}
+```
+
+#### `Always`:
+```rust
+// Leading pipes are emitted on all arms of this:
+// fn foo() {
+//     match foo {
+//         "foo" | "bar" => {}
+//         "baz"
+//         | "something relatively long"
+//         | "something really really really realllllllllllllly long" => println!("x"),
+//         "qux" => println!("y"),
+//         _ => {}
+//     }
+// }
+
+// Becomes:
+fn foo() {
+    match foo {
+        | "foo" | "bar" => {}
+        | "baz"
+        | "something relatively long"
+        | "something really really really realllllllllllllly long" => println!("x"),
+        | "qux" => println!("y"),
+        | _ => {}
+    }
+}
+```
+
+#### `KeepExisting`:
+```rust
+fn foo() {
+    match foo {
+        | "foo" | "bar" => {}
+        | "baz"
+        | "something relatively long"
+        | "something really really really realllllllllllllly long" => println!("x"),
+        | "qux" => println!("y"),
+        _ => {}
+    }
+
+    match baz {
+        "qux" => {}
+        "foo" | "bar" => {}
+        _ => {}
+    }
+}
+```
+
 ## `match_block_trailing_comma`
 
 Put a trailing comma after a block based match arm (non-block arms are not affected)
