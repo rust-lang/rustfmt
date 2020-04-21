@@ -1090,6 +1090,7 @@ dependencies = [
  "unicode-segmentation",
  "unicode-width",
  "unicode_categories",
+ "winapi",
 ]
 
 [[package]]

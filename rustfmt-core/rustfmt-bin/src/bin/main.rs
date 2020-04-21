@@ -14,7 +14,7 @@ use structopt::StructOpt;
 use thiserror::Error;
 
 use rustfmt_lib::{
-    load_config, CliOptions, Config, Edition, EmitMode, FileLines, FileName,
+    absolute_path, load_config, CliOptions, Config, Edition, EmitMode, FileLines, FileName,
     FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
 
@@ -252,7 +252,7 @@ enum OptError {
 impl Opt {
     fn canonicalize(&mut self) {
         for f in &mut self.files {
-            if let Ok(canonical_path) = f.canonicalize() {
+            if let Ok(canonical_path) = absolute_path(&f) {
                 *f = canonical_path;
             }
         }
