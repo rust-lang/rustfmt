@@ -46,7 +46,6 @@ mod attr;
 mod chains;
 mod closures;
 mod comment;
-mod coverage;
 mod expr;
 mod format_report_formatter;
 pub(crate) mod formatting;
@@ -473,9 +472,7 @@ pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
         EmitMode::Files => Box::new(emitter::FilesEmitter::new(
             config.print_misformatted_file_names(),
         )),
-        EmitMode::Stdout | EmitMode::Coverage => {
-            Box::new(emitter::StdoutEmitter::new(config.verbose()))
-        }
+        EmitMode::Stdout => Box::new(emitter::StdoutEmitter::new(config.verbose())),
         EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
         EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
         EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),

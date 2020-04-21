@@ -193,22 +193,6 @@ fn system_tests() {
     });
 }
 
-// Do the same for tests/coverage-source directory.
-// The only difference is the coverage mode.
-#[test]
-fn coverage_tests() {
-    init_log();
-    let files = get_test_files(
-        Path::new("tests/coverage/source"),
-        true,
-        SKIP_FILE_WHITE_LIST,
-    );
-    let (_reports, count, fails) = check_files(files, &None);
-
-    println!("Ran {} tests in coverage mode.", count);
-    assert_eq!(fails, 0, "{} tests failed", fails);
-}
-
 #[test]
 fn checkstyle_test() {
     init_log();
