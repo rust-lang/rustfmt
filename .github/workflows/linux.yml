@@ -1,0 +1,45 @@
+name: linux
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: (${{ matrix.target }}, ${{ matrix.channel }}, ${{ matrix.cfg-release-channel }})
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [
+          x86_64-unknown-linux-gnu,
+        ]
+        channel: [ nightly ]
+        cfg-release-channel: [
+          beta,
+          nightly,
+        ]
+
+    env:
+      CFG_RELEASE_CHANNEL: ${{ matrix.cfg-release-channel }}
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v2
+
+      # Run build
+    - name: setup
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.channel }}-${{ matrix.target }}
+        target: ${{ matrix.target }}
+        override: true
+        profile: minimal
+        default: true
+    - name: build
+      run: |
+        rustc -Vv
+        cargo -V
+        cargo build --manifest-path rustfmt-core/Cargo.toml --workspace
+
+    - name: test
+      run: cargo test-all
+    - name: test ignored
+      run: cargo test-all -- --ignored
