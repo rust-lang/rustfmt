@@ -39,6 +39,7 @@ generic-simd = ["rustfmt_lib/generic-simd"]
 
 [dependencies]
 anyhow = "1.0"
+dunce = "1.0"
 env_logger = "0.7"
 log = "0.4"
 structopt = "0.3"

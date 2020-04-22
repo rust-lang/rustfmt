@@ -31,6 +31,7 @@ emitter = [
 annotate-snippets = { version = "0.6", features = ["ansi_term"] }
 anyhow = "1.0"
 bytecount = "0.6"
+dunce = "1.0"
 ignore = "0.4.11"
 itertools = "0.8"
 lazy_static = "1.0.0"

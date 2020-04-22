@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
-use rustfmt_lib::absolute_path;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -289,7 +288,7 @@ impl Target {
         nested_int_test_files: Option<Vec<PathBuf>>,
     ) -> Self {
         let path = PathBuf::from(&target.src_path);
-        let canonicalized = absolute_path(&path).unwrap_or(path);
+        let canonicalized = dunce::canonicalize(&path).unwrap_or(path);
         let test_files = nested_int_test_files.unwrap_or_else(Vec::new);
 
         Self {
@@ -389,14 +388,14 @@ fn get_targets_root_only(
     include_nested_test_files: bool,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path, false)?;
-    let workspace_root_path = absolute_path(PathBuf::from(&metadata.workspace_root))?;
+    let workspace_root_path = dunce::canonicalize(PathBuf::from(&metadata.workspace_root))?;
     let (in_workspace_root, current_dir_manifest) = if let Some(target_manifest) = manifest_path {
         (
-            workspace_root_path == target_manifest,
-            absolute_path(target_manifest)?,
+            workspace_root_path.as_path() == target_manifest,
+            dunce::canonicalize(target_manifest)?,
         )
     } else {
-        let current_dir = absolute_path(env::current_dir()?)?;
+        let current_dir = dunce::canonicalize(env::current_dir()?)?;
         (
             workspace_root_path == current_dir,
             current_dir.join("Cargo.toml"),
@@ -414,7 +413,7 @@ fn get_targets_root_only(
                 .into_iter()
                 .filter(|p| {
                     in_workspace_root
-                        || absolute_path(PathBuf::from(&p.manifest_path)).unwrap_or_default()
+                        || dunce::canonicalize(PathBuf::from(&p.manifest_path)).unwrap_or_default()
                             == current_dir_manifest
                 })
                 .map(|p| p.targets)
@@ -1051,7 +1050,7 @@ mod cargo_fmt_tests {
             edition: &str,
         ) -> Target {
             let path = PathBuf::from(src_path);
-            let canonicalized = absolute_path(&path).unwrap_or(path);
+            let canonicalized = dunce::canonicalize(&path).unwrap_or(path);
             Target {
                 path: canonicalized,
                 kind: String::from(kind),
