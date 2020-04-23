@@ -1063,7 +1063,7 @@ The pattern format is the same as [.gitignore](https://git-scm.com/docs/gitignor
 
 - **Default value**: format every file
 - **Possible values**: See an example below
-- **Stable**: No (tracking issue: [#3395](https://github.com/rust-lang/rustfmt/issues/3395))
+- **Stable**: Yes
 
 ### Example
 
