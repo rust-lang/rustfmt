@@ -13,7 +13,6 @@ pub use crate::config::lists::*;
 pub use crate::config::options::*;
 
 use crate::config::config_type::ConfigType;
-use crate::utils::absolute_path;
 
 #[macro_use]
 pub mod config_type;
@@ -238,7 +237,7 @@ impl Config {
                 dir.to_path_buf()
             };
 
-            current = absolute_path(current)?;
+            current = dunce::canonicalize(current)?;
 
             loop {
                 match get_toml_path(&current) {

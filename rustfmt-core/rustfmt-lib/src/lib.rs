@@ -24,7 +24,6 @@ pub use crate::config::{
 };
 pub use crate::emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
-pub use crate::utils::absolute_path;
 
 use crate::comment::LineClasses;
 use crate::emitter::Emitter;
