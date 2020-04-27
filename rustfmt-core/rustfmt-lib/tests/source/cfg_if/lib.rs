@@ -10,6 +10,7 @@
 //! * `mips64`: [`is_mips64_feature_detected`]
 //! * `powerpc`: [`is_powerpc_feature_detected`]
 //! * `powerpc64`: [`is_powerpc64_feature_detected`]
+// rustfmt-recursive: true
 
 #![unstable(feature = "stdsimd", issue = "27731")]
 #![feature(const_fn, staged_api, stdsimd, doc_cfg, allow_internal_unstable)]

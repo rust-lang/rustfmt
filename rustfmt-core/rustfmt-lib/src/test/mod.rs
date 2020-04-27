@@ -21,21 +21,10 @@ const DIFF_CONTEXT_SIZE: usize = 3;
 
 // A list of files on which we want to skip testing.
 const SKIP_FILE_WHITE_LIST: &[&str] = &[
+    "issue-3253/paths",
     "issue-3434/no_entry.rs",
     "issue-3665/sub_mod.rs",
-    // Testing for issue-3779
     "issue-3779/ice.rs",
-    // These files and directory are a part of modules defined inside `cfg_if!`.
-    "cfg_if/mod.rs",
-    "cfg_if/detect",
-    "issue-3253/foo.rs",
-    "issue-3253/bar.rs",
-    "issue-3253/paths",
-    // These files and directory are a part of modules defined inside `cfg_attr(..)`.
-    "cfg_mod/dir",
-    "cfg_mod/bar.rs",
-    "cfg_mod/foo.rs",
-    "cfg_mod/wasm32.rs",
     // We want to ensure `recursive` is working correctly, so do not test
     // these files directly
     "configs/recursive/disabled/foo.rs",
