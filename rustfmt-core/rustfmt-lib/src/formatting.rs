@@ -29,16 +29,6 @@ impl<'b, T: Write + 'b> Session<'b, T> {
         }
 
         rustc_ast::with_globals(self.config.edition().into(), || {
-            if self.config.disable_all_formatting() {
-                // When the input is from stdin, echo back the input.
-                if let Input::Text(ref buf) = input {
-                    if let Err(e) = io::stdout().write_all(buf.as_bytes()) {
-                        return Err(From::from(e));
-                    }
-                }
-                return Ok(FormatReport::new());
-            }
-
             let config = &self.config.clone();
             let format_result = format_project(input, config, self);
 
