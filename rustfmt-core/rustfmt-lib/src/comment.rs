@@ -13,7 +13,6 @@ use crate::utils::{
     count_newlines, first_line_width, last_line_width, tab_to_spaces, trim_left_preserve_layout,
     unicode_str_width,
 };
-use crate::{ErrorKind, FormattingError};
 
 fn is_custom_comment(comment: &str) -> bool {
     if !comment.starts_with("//") {
@@ -1580,17 +1579,6 @@ pub(crate) fn recover_comment_removed(
     let snippet = context.snippet(span);
     let includes_comment = contains_comment(snippet);
     if snippet != new && includes_comment && changed_comment_content(snippet, &new) {
-        // We missed some comments. Warn and keep the original text.
-        if context.config.error_on_unformatted() {
-            context.report.append(
-                context.parse_sess.span_to_filename(span),
-                vec![FormattingError::from_span(
-                    span,
-                    &context.parse_sess,
-                    ErrorKind::LostComment,
-                )],
-            );
-        }
         Some(snippet.to_owned())
     } else {
         Some(new)

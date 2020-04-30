@@ -25,7 +25,7 @@ use crate::utils::{
     last_line_contains_single_line_comment, last_line_width, mk_sp, ptr_vec_to_ref_vec,
     rewrite_ident, stmt_expr,
 };
-use crate::{ErrorKind, FormatReport, FormattingError};
+use crate::{ErrorKind, FormatError, FormatReport, NonFormattedRange};
 
 /// Creates a string slice corresponding to the specified span.
 pub(crate) struct SnippetProvider {
@@ -82,7 +82,7 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) line_number: usize,
     /// List of 1-based line ranges which were annotated with skip
     /// Both bounds are inclusifs.
-    pub(crate) skipped_range: Rc<RefCell<Vec<(usize, usize)>>>,
+    pub(crate) skipped_range: Rc<RefCell<Vec<NonFormattedRange>>>,
     pub(crate) macro_rewrite_failure: bool,
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
@@ -757,7 +757,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let lo = std::cmp::min(attrs_end + 1, first_line);
         self.push_rewrite_inner(item_span, None);
         let hi = self.line_number + 1;
-        self.skipped_range.borrow_mut().push((lo, hi));
+        self.skipped_range
+            .borrow_mut()
+            .push(NonFormattedRange::new(lo, hi));
     }
 
     pub(crate) fn from_context(ctx: &'a RewriteContext<'_>) -> FmtVisitor<'a> {
@@ -812,13 +814,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         for attr in attrs {
             if attr.check_name(depr_skip_annotation()) {
                 let file_name = self.parse_sess.span_to_filename(attr.span);
-                self.report.append(
+                self.report.add_format_error(
                     file_name,
-                    vec![FormattingError::from_span(
-                        attr.span,
-                        self.parse_sess,
-                        ErrorKind::DeprecatedAttr,
-                    )],
+                    FormatError::from_span(ErrorKind::DeprecatedAttr, self.parse_sess, attr.span),
                 );
             } else {
                 match &attr.kind {
@@ -826,13 +824,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         if self.is_unknown_rustfmt_attr(&attribute_item.path.segments) =>
                     {
                         let file_name = self.parse_sess.span_to_filename(attr.span);
-                        self.report.append(
+                        self.report.add_format_error(
                             file_name,
-                            vec![FormattingError::from_span(
-                                attr.span,
-                                self.parse_sess,
-                                ErrorKind::BadAttr,
-                            )],
+                            FormatError::from_span(ErrorKind::BadAttr, self.parse_sess, attr.span),
                         );
                     }
                     _ => (),

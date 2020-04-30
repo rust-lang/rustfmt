@@ -3,7 +3,7 @@ use std::fmt;
 use std::io;
 use std::io::Write;
 
-use crate::config::{Color, Config, Verbosity};
+use crate::{Color, Verbosity};
 
 #[derive(Debug, PartialEq)]
 pub enum DiffLine {
@@ -248,12 +248,11 @@ pub fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Misma
     results
 }
 
-pub fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config)
+pub fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, color: Color, verbosity: Verbosity)
 where
     F: Fn(u32) -> String,
 {
-    let color = config.color();
-    let line_terminator = if config.verbose() == Verbosity::Verbose {
+    let line_terminator = if verbosity == Verbosity::Verbose {
         "⏎"
     } else {
         ""

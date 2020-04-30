@@ -28,7 +28,6 @@ use crate::comment::{
 use crate::config::lists::*;
 use crate::expr::rewrite_array;
 use crate::lists::{itemize_list, write_list, ListFormatting};
-use crate::overflow;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
@@ -38,6 +37,7 @@ use crate::utils::{
     remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
 };
 use crate::visitor::FmtVisitor;
+use crate::{overflow, NonFormattedRange};
 
 const FORCED_BRACKET_MACROS: &[&str] = &["vec!"];
 
@@ -180,10 +180,13 @@ fn return_macro_parse_failure_fallback(
         return trim_left_preserve_layout(context.snippet(span), indent, &context.config);
     }
 
-    context.skipped_range.borrow_mut().push((
-        context.parse_sess.line_of_byte_pos(span.lo()),
-        context.parse_sess.line_of_byte_pos(span.hi()),
-    ));
+    context
+        .skipped_range
+        .borrow_mut()
+        .push(NonFormattedRange::new(
+            context.parse_sess.line_of_byte_pos(span.lo()),
+            context.parse_sess.line_of_byte_pos(span.hi()),
+        ));
 
     // Return the snippet unmodified if the macro is not block-like
     Some(context.snippet(span).to_owned())
