@@ -92,7 +92,7 @@ create_config! {
     space_around_attr_eq: bool, true, false,
         "Determines if '=' are wrapped in spaces in attributes.";
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
-    binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
+    binop_separator: SeparatorPlace, SeparatorPlace::Front, true,
         "Where to put a binary operator when a binary expression goes multiline";
 
     // Misc.
