@@ -1514,7 +1514,7 @@ Put a trailing comma after a block based match arm (non-block arms are not affec
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3380](https://github.com/rust-lang/rustfmt/issues/3380))
+- **Stable**: Yes
 
 #### `false` (default):
 
