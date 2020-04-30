@@ -1,4 +1,5 @@
 use super::*;
+use crate::EmitterConfig;
 use std::fs;
 
 #[derive(Debug, Default)]
@@ -7,9 +8,9 @@ pub struct FilesEmitter {
 }
 
 impl FilesEmitter {
-    pub fn new(print_misformatted_file_names: bool) -> Self {
+    pub fn new(config: EmitterConfig) -> Self {
         Self {
-            print_misformatted_file_names,
+            print_misformatted_file_names: config.print_filename,
         }
     }
 }

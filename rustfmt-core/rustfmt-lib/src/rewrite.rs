@@ -11,7 +11,7 @@ use crate::shape::Shape;
 use crate::skip::SkipContext;
 use crate::syntux::session::ParseSess;
 use crate::visitor::SnippetProvider;
-use crate::FormatReport;
+use crate::{FormatReport, NonFormattedRange};
 
 pub(crate) trait Rewrite {
     /// Rewrite self into shape.
@@ -41,7 +41,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) macro_rewrite_failure: Cell<bool>,
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
-    pub(crate) skipped_range: Rc<RefCell<Vec<(usize, usize)>>>,
+    pub(crate) skipped_range: Rc<RefCell<Vec<NonFormattedRange>>>,
 }
 
 pub(crate) struct InsideMacroGuard {

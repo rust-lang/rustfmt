@@ -1,37 +1,38 @@
 #![deny(rust_2018_idioms)]
 #![warn(unreachable_pub)]
+#![feature(cell_leak)]
 
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{Ref, RefCell};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt;
-use std::io::{self, Write};
-use std::mem;
+use std::io;
 use std::panic;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use rustc_ast::ast;
-use rustc_span::symbol;
+use rustc_span::{symbol, Span};
 use thiserror::Error;
 
 pub use crate::config::{
-    load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName, NewlineStyle,
-    Range, Verbosity,
+    load_config, CliOptions, Config, Edition, FileLines, FileName, NewlineStyle, Range,
 };
 pub use crate::emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
+pub use crate::source_file::write_all_files;
 
 use crate::comment::LineClasses;
 use crate::emitter::Emitter;
-use crate::formatting::{FormatErrorMap, FormattingError, ReportedErrors, SourceFile};
 use crate::shape::Indent;
 use crate::syntux::parser::DirectoryOwnership;
+use crate::syntux::session::ParseSess;
 use crate::utils::indent_next_line;
+use std::str::FromStr;
 
 #[macro_use]
 mod utils;
@@ -76,9 +77,8 @@ mod types;
 mod vertical;
 pub(crate) mod visitor;
 
-/// The various errors that can occur during formatting. Note that not all of
-/// these can currently be propagated to clients.
-#[derive(Error, Debug)]
+/// The various errors that can occur during formatting.
+#[derive(Error, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum ErrorKind {
     /// Line has exceeded character limit (found, maximum).
     #[error(
@@ -98,173 +98,315 @@ pub enum ErrorKind {
     /// Used a rustfmt:: attribute other than skip or skip::macros.
     #[error("invalid attribute")]
     BadAttr,
-    /// An io error during reading or writing.
-    #[error("io error: {0}")]
-    IoError(io::Error),
-    /// Parse error occurred when parsing the input.
-    #[error("parse error")]
-    ParseError,
-    /// The user mandated a version and the current version of Rustfmt does not
-    /// satisfy that requirement.
-    #[error("version mismatch")]
-    VersionMismatch,
-    /// If we had formatted the given node, then we would have lost a comment.
-    #[error("not formatted because a comment would be lost")]
-    LostComment,
-    /// Invalid glob pattern in `ignore` configuration option.
-    #[error("Invalid glob pattern found in ignore list: {0}")]
-    InvalidGlobPattern(ignore::Error),
+    /// Failed to format macro calls.
+    #[error("failed to format macro calls")]
+    MacroFormatError,
 }
 
-impl ErrorKind {
-    fn is_comment(&self) -> bool {
-        match self {
-            ErrorKind::LostComment => true,
-            _ => false,
-        }
+#[derive(Error, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct FormatError {
+    #[error(transparent)]
+    kind: ErrorKind,
+    line_num: Option<usize>,
+    line_str: Option<String>,
+}
+
+impl fmt::Display for FormatError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
     }
 }
 
-impl From<io::Error> for ErrorKind {
-    fn from(e: io::Error) -> ErrorKind {
-        ErrorKind::IoError(e)
+impl FormatError {
+    pub(crate) fn new(kind: ErrorKind, line_num: usize, line_str: String) -> Self {
+        FormatError {
+            kind,
+            line_num: Some(line_num),
+            line_str: Some(line_str),
+        }
+    }
+
+    pub(crate) fn err_without_line_info(kind: ErrorKind) -> Self {
+        FormatError {
+            kind,
+            line_num: None,
+            line_str: None,
+        }
+    }
+
+    pub(crate) fn from_span(kind: ErrorKind, parse_sess: &ParseSess, span: Span) -> Self {
+        FormatError {
+            kind,
+            line_num: Some(parse_sess.line_of_byte_pos(span.lo())),
+            line_str: Some(parse_sess.span_to_first_line_string(span)),
+        }
+    }
+
+    // (space, target)
+    pub(crate) fn format_len(&self) -> Option<(usize, usize)> {
+        match self.kind {
+            ErrorKind::LineOverflow(found, max) => Some((max, found - max)),
+            ErrorKind::TrailingWhitespace
+            | ErrorKind::DeprecatedAttr
+            | ErrorKind::BadAttr
+            | ErrorKind::LicenseCheck => {
+                let len = self.line_str.as_ref().map_or(0, |s| s.len());
+                let trailing_ws_start = self
+                    .line_str
+                    .as_ref()
+                    .and_then(|s| s.rfind(|c: char| !c.is_whitespace()))
+                    .map(|pos| pos + 1)
+                    .unwrap_or(0);
+                Some((trailing_ws_start, len - trailing_ws_start))
+            }
+            _ => None,
+        }
     }
 }
 
 /// Result of formatting a snippet of code along with ranges of lines that didn't get formatted,
 /// i.e., that got returned as they were originally.
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 struct FormattedSnippet {
     snippet: String,
-    non_formatted_ranges: Vec<(usize, usize)>,
+    non_formatted_ranges: Vec<NonFormattedRange>,
 }
 
 impl FormattedSnippet {
     /// In case the snippet needed to be wrapped in a function, this shifts down the ranges of
     /// non-formatted code.
     fn unwrap_code_block(&mut self) {
-        self.non_formatted_ranges
-            .iter_mut()
-            .for_each(|(low, high)| {
-                *low -= 1;
-                *high -= 1;
-            });
+        self.non_formatted_ranges.iter_mut().for_each(|range| {
+            *range = range.shift_up();
+        });
     }
 
     /// Returns `true` if the line n did not get formatted.
     fn is_line_non_formatted(&self, n: usize) -> bool {
         self.non_formatted_ranges
             .iter()
-            .any(|(low, high)| *low <= n && n <= *high)
+            .any(|range| range.contains(n))
+    }
+}
+
+/// The result of formatting, including the formatted text and various
+/// errors and warning arose while formatting.
+#[derive(Debug, Clone, Default)]
+pub struct FormatResult {
+    original_snippet: Option<String>,
+    formatted_snippet: FormattedSnippet,
+    format_errors: HashSet<FormatError>,
+    newline_style: NewlineStyle,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NonFormattedRange {
+    lo: usize,
+    hi: usize,
+}
+
+impl NonFormattedRange {
+    pub(crate) fn new(lo: usize, hi: usize) -> NonFormattedRange {
+        NonFormattedRange { lo, hi }
+    }
+
+    fn shift_up(self) -> NonFormattedRange {
+        NonFormattedRange {
+            lo: self.lo - 1,
+            hi: self.hi - 1,
+        }
+    }
+
+    fn contains(&self, line: usize) -> bool {
+        self.lo <= line && line <= self.hi
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum OperationError {
+    /// The user mandated a version and the current version of rustfmt does not
+    /// satisfy that requirement.
+    #[error("version mismatch")]
+    VersionMismatch,
+    /// An io error during reading or writing.
+    #[error("io error: {0}")]
+    IoError(io::Error),
+    /// Invalid glob pattern in `ignore` configuration option.
+    #[error("invalid glob pattern found in ignore list: {0}")]
+    InvalidGlobPattern(ignore::Error),
+    /// Parse error occurred while parsing the input.
+    #[error("failed to parse {input:?}")]
+    ParseError { input: FileName, is_panic: bool },
+}
+
+impl OperationError {
+    #[cfg(test)]
+    pub fn is_parse_error(&self) -> bool {
+        match self {
+            OperationError::ParseError { .. } => true,
+            _ => false,
+        }
+    }
+}
+
+impl FormatResult {
+    pub(crate) fn success(
+        snippet: String,
+        non_formatted_ranges: Vec<NonFormattedRange>,
+        original_snippet: Option<String>,
+        newline_style: NewlineStyle,
+    ) -> Self {
+        let formatted_snippet = FormattedSnippet {
+            snippet,
+            non_formatted_ranges,
+        };
+        FormatResult {
+            original_snippet,
+            formatted_snippet,
+            format_errors: HashSet::new(),
+            newline_style,
+        }
+    }
+
+    pub(crate) fn errors(&self) -> impl Iterator<Item = &FormatError> {
+        self.format_errors
+            .iter()
+            .filter(|e| e.kind != ErrorKind::MacroFormatError)
     }
 }
 
 /// Reports on any issues that occurred during a run of Rustfmt.
 ///
 /// Can be reported to the user using the `Display` impl on [`FormatReportFormatter`].
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FormatReport {
-    // Maps stringified file paths to their associated formatting errors.
-    internal: Rc<RefCell<(FormatErrorMap, ReportedErrors)>>,
-    non_formatted_ranges: Vec<(usize, usize)>,
+    format_result: Rc<RefCell<BTreeMap<FileName, FormatResult>>>,
+    ignored_files: Rc<RefCell<BTreeSet<FileName>>>,
 }
 
 impl FormatReport {
-    fn new() -> FormatReport {
+    pub fn new() -> FormatReport {
         FormatReport {
-            internal: Rc::new(RefCell::new((HashMap::new(), ReportedErrors::default()))),
-            non_formatted_ranges: Vec::new(),
+            format_result: Rc::new(RefCell::new(BTreeMap::new())),
+            ignored_files: Rc::new(RefCell::new(BTreeSet::new())),
         }
     }
 
-    fn add_non_formatted_ranges(&mut self, mut ranges: Vec<(usize, usize)>) {
-        self.non_formatted_ranges.append(&mut ranges);
+    pub fn format_result(&self) -> impl Iterator<Item = (&FileName, &FormatResult)> {
+        Ref::leak(RefCell::borrow(&self.format_result)).iter()
     }
 
-    fn append(&self, f: FileName, mut v: Vec<FormattingError>) {
-        self.track_errors(&v);
-        self.internal
+    /// FIXME(topecongiro): reduce visibility.
+    pub fn merge(&mut self, other: Self) {
+        self.format_result
             .borrow_mut()
-            .0
-            .entry(f)
-            .and_modify(|fe| fe.append(&mut v))
-            .or_insert(v);
+            .append(&mut other.format_result.borrow_mut());
+        self.ignored_files
+            .borrow_mut()
+            .append(&mut other.ignored_files.borrow_mut());
     }
 
-    fn track_errors(&self, new_errors: &[FormattingError]) {
-        let errs = &mut self.internal.borrow_mut().1;
-        if !new_errors.is_empty() {
-            errs.has_formatting_errors = true;
-        }
-        if errs.has_operational_errors && errs.has_check_errors {
-            return;
-        }
-        for err in new_errors {
-            match err.kind {
-                ErrorKind::LineOverflow(..) | ErrorKind::TrailingWhitespace => {
-                    errs.has_operational_errors = true;
-                }
-                ErrorKind::LicenseCheck
-                | ErrorKind::DeprecatedAttr
-                | ErrorKind::BadAttr
-                | ErrorKind::VersionMismatch => {
-                    errs.has_check_errors = true;
-                }
-                _ => {}
-            }
+    pub(crate) fn add_ignored_file(&self, file_name: FileName) {
+        self.ignored_files.borrow_mut().insert(file_name);
+    }
+
+    fn add_format_result(&self, file_name: FileName, format_result: FormatResult) {
+        let mut format_results = self.format_result.borrow_mut();
+        let mut original_format_result = format_results.entry(file_name).or_default();
+        original_format_result.formatted_snippet = format_result.formatted_snippet;
+        original_format_result
+            .format_errors
+            .extend(format_result.format_errors);
+        if original_format_result.original_snippet.is_none() {
+            original_format_result.original_snippet = format_result.original_snippet;
         }
     }
 
-    fn add_diff(&mut self) {
-        self.internal.borrow_mut().1.has_diff = true;
+    fn append_errors(&self, f: FileName, errors: impl Iterator<Item = FormatError>) {
+        let mut format_result = self.format_result.borrow_mut();
+        let format_errors = &mut format_result.entry(f).or_default().format_errors;
+        for err in errors {
+            format_errors.insert(err);
+        }
     }
 
-    fn add_macro_format_failure(&mut self) {
-        self.internal.borrow_mut().1.has_macro_format_failure = true;
+    pub(crate) fn add_macro_format_failure(&self, file_name: FileName) {
+        self.add_format_error(
+            file_name,
+            FormatError::err_without_line_info(ErrorKind::MacroFormatError),
+        );
     }
 
-    fn add_parsing_error(&mut self) {
-        self.internal.borrow_mut().1.has_parsing_errors = true;
+    pub(crate) fn add_license_failure(&self, file_name: FileName) {
+        self.add_format_error(
+            file_name,
+            FormatError::err_without_line_info(ErrorKind::LicenseCheck),
+        );
+    }
+
+    pub(crate) fn add_format_error(&self, file_name: FileName, format_error: FormatError) {
+        self.format_result
+            .borrow_mut()
+            .entry(file_name)
+            .or_default()
+            .format_errors
+            .insert(format_error);
+    }
+
+    pub fn has_errors(&self) -> bool {
+        RefCell::borrow(&self.format_result)
+            .iter()
+            .any(|(_, format_result)| format_result.errors().count() > 0)
     }
 
     fn warning_count(&self) -> usize {
-        self.internal
-            .borrow()
-            .0
+        RefCell::borrow(&self.format_result)
             .iter()
-            .map(|(_, errors)| errors.len())
+            .map(|(_, format_result)| format_result.errors().count())
             .sum()
     }
 
     /// Whether any warnings or errors are present in the report.
     pub fn has_warnings(&self) -> bool {
-        self.internal.borrow().1.has_formatting_errors
-    }
-
-    /// Print the report to a terminal using colours and potentially other
-    /// fancy output.
-    #[deprecated(note = "Use FormatReportFormatter with colors enabled instead")]
-    pub fn fancy_print(
-        &self,
-        mut t: Box<dyn term::Terminal<Output = io::Stderr>>,
-    ) -> Result<(), term::Error> {
-        writeln!(
-            t,
-            "{}",
-            FormatReportFormatterBuilder::new(&self)
-                .enable_colors(true)
-                .build()
-        )?;
-        Ok(())
+        self.has_errors()
     }
 }
 
-#[deprecated(note = "Use FormatReportFormatter instead")]
-impl fmt::Display for FormatReport {
-    // Prints all the formatting errors.
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", FormatReportFormatterBuilder::new(&self).build())?;
-        Ok(())
+/// How chatty should Rustfmt be?
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Verbosity {
+    /// Default.
+    Normal,
+    /// Emit more.
+    Verbose,
+    /// Emit as little as possible.
+    Quiet,
+}
+
+impl Default for Verbosity {
+    fn default() -> Self {
+        Verbosity::Normal
+    }
+}
+
+/// Client-preference for coloured output.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Color {
+    /// Always use color, whether it is a piped or terminal output
+    Always,
+    /// Never use color
+    Never,
+    /// Automatically use color, if supported by terminal
+    Auto,
+}
+
+impl Color {
+    /// Whether we should use a coloured terminal.
+    pub fn use_colored_tty(self) -> bool {
+        match self {
+            Color::Always | Color::Auto => true,
+            Color::Never => false,
+        }
     }
 }
 
@@ -272,30 +414,38 @@ impl fmt::Display for FormatReport {
 /// When we cannot parse the given snippet, this function returns `None`.
 fn format_snippet(snippet: &str, config: &Config) -> Option<FormattedSnippet> {
     let mut config = config.clone();
-    panic::catch_unwind(|| {
-        let mut out: Vec<u8> = Vec::with_capacity(snippet.len() * 2);
-        config.set().emit_mode(config::EmitMode::Stdout);
-        config.set().verbose(Verbosity::Quiet);
+    panic::catch_unwind(move || {
         config.set().hide_parse_errors(true);
 
-        let (formatting_error, result) = {
+        let result = {
             let input = Input::Text(snippet.into());
-            let mut session = Session::new(config, Some(&mut out));
-            let result = session.format(input);
-            (
-                session.errors.has_macro_format_failure
-                    || session.out.as_ref().unwrap().is_empty() && !snippet.is_empty()
-                    || result.is_err(),
-                result,
-            )
+            let mut session = RustFormatterBuilder::default()
+                .verbosity(Verbosity::Quiet)
+                .build();
+            session.format(input, &config)
         };
-        if formatting_error {
-            None
-        } else {
-            String::from_utf8(out).ok().map(|snippet| FormattedSnippet {
-                snippet,
-                non_formatted_ranges: result.unwrap().non_formatted_ranges,
-            })
+        match result {
+            Ok(report) if !report.has_errors() => {
+                match (*report.format_result)
+                    .clone()
+                    .into_inner()
+                    .into_iter()
+                    .next()
+                {
+                    Some((
+                        _,
+                        FormatResult {
+                            formatted_snippet,
+                            format_errors,
+                            ..
+                        },
+                    )) if format_errors.is_empty() && !formatted_snippet.snippet.is_empty() => {
+                        Some(formatted_snippet)
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
         }
     })
     // Discard panics encountered while formatting the snippet
@@ -391,99 +541,116 @@ fn format_code_block(code_snippet: &str, config: &Config) -> Option<FormattedSni
 }
 
 /// A session is a run of rustfmt across a single or multiple inputs.
-pub struct Session<'b, T: Write> {
-    pub config: Config,
-    pub out: Option<&'b mut T>,
-    pub(crate) errors: ReportedErrors,
-    source_file: SourceFile,
-    emitter: Box<dyn Emitter + 'b>,
+#[derive(Default)]
+pub struct Session {
+    /// If set to `true`, format sub-modules which are defined in the given input.
+    /// Defaults to `false`.
+    recursive: bool,
+    verbosity: Verbosity,
 }
 
-impl<'b, T: Write + 'b> Session<'b, T> {
-    pub fn new(config: Config, mut out: Option<&'b mut T>) -> Session<'b, T> {
-        let emitter = create_emitter(&config);
+#[derive(Clone, Copy, Default)]
+pub struct RustFormatterBuilder {
+    /// If set to `true`, format sub-modules which are defined in the given input.
+    recursive: bool,
+    verbosity: Verbosity,
+}
 
-        if let Some(ref mut out) = out {
-            let _ = emitter.emit_header(out);
-        }
-
+impl RustFormatterBuilder {
+    /// Build a new `Session` from the current configuration.
+    pub fn build(self) -> Session {
         Session {
-            config,
-            out,
-            emitter,
-            errors: ReportedErrors::default(),
-            source_file: SourceFile::new(),
+            recursive: self.recursive,
+            verbosity: self.verbosity,
         }
     }
 
+    pub fn recursive(&mut self, recursive: bool) -> &mut Self {
+        self.recursive = recursive;
+        self
+    }
+
+    pub fn verbosity(&mut self, verbosity: Verbosity) -> &mut Self {
+        self.verbosity = verbosity;
+        self
+    }
+}
+
+impl Session {
     /// The main entry point for Rustfmt. Formats the given input according to the
     /// given config. `out` is only necessary if required by the configuration.
-    pub fn format(&mut self, input: Input) -> Result<FormatReport, ErrorKind> {
-        self.format_input_inner(input)
-    }
-
-    pub fn override_config<F, U>(&mut self, mut config: Config, f: F) -> U
-    where
-        F: FnOnce(&mut Session<'b, T>) -> U,
-    {
-        mem::swap(&mut config, &mut self.config);
-        let result = f(self);
-        mem::swap(&mut config, &mut self.config);
-        result
-    }
-
-    pub fn add_operational_error(&mut self) {
-        self.errors.has_operational_errors = true;
-    }
-
-    pub fn has_operational_errors(&self) -> bool {
-        self.errors.has_operational_errors
-    }
-
-    pub fn has_parsing_errors(&self) -> bool {
-        self.errors.has_parsing_errors
-    }
-
-    pub fn has_formatting_errors(&self) -> bool {
-        self.errors.has_formatting_errors
-    }
-
-    pub fn has_check_errors(&self) -> bool {
-        self.errors.has_check_errors
-    }
-
-    pub fn has_diff(&self) -> bool {
-        self.errors.has_diff
-    }
-
-    pub fn has_no_errors(&self) -> bool {
-        !(self.has_operational_errors()
-            || self.has_parsing_errors()
-            || self.has_formatting_errors()
-            || self.has_check_errors()
-            || self.has_diff())
-            || self.errors.has_macro_format_failure
+    pub fn format(
+        &mut self,
+        input: Input,
+        config: &Config,
+    ) -> Result<FormatReport, OperationError> {
+        self.format_input_inner(input, config)
     }
 }
 
-pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
-    match config.emit_mode() {
-        EmitMode::Files => Box::new(emitter::FilesEmitter::new(
-            config.print_misformatted_file_names(),
-        )),
-        EmitMode::Stdout => Box::new(emitter::StdoutEmitter::new(config.verbose())),
+/// What Rustfmt should emit. Mostly corresponds to the `--emit` command line
+/// option.
+#[derive(Clone, Copy, Debug)]
+pub enum EmitMode {
+    /// Emits to files.
+    Files,
+    /// Writes the output to stdout.
+    Stdout,
+    /// Unfancy stdout
+    Checkstyle,
+    /// Writes the resulting diffs in a JSON format. Returns an empty array
+    /// `[]` if there were no diffs.
+    Json,
+    /// Output the changed lines (for internal value only)
+    ModifiedLines,
+    /// Checks if a diff can be generated. If so, rustfmt outputs a diff and
+    /// quits with exit code 1.
+    /// This option is designed to be run in CI where a non-zero exit signifies
+    /// non-standard code formatting. Used for `--check`.
+    Diff,
+}
+
+impl FromStr for EmitMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "files" => Ok(EmitMode::Files),
+            "stdout" => Ok(EmitMode::Stdout),
+            "checkstyle" => Ok(EmitMode::Checkstyle),
+            "json" => Ok(EmitMode::Json),
+            _ => Err(format!("unknown emit mode `{}`", s)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct EmitterConfig {
+    pub emit_mode: EmitMode,
+    pub color: Color,
+    pub verbosity: Verbosity,
+    pub print_filename: bool,
+}
+
+impl Default for EmitterConfig {
+    fn default() -> Self {
+        EmitterConfig {
+            emit_mode: EmitMode::Files,
+            color: Color::Auto,
+            verbosity: Verbosity::Normal,
+            print_filename: false,
+        }
+    }
+}
+
+pub(crate) fn create_emitter(emitter_config: EmitterConfig) -> Box<dyn Emitter> {
+    match emitter_config.emit_mode {
+        EmitMode::Files => Box::new(emitter::FilesEmitter::new(emitter_config)),
+        EmitMode::Stdout => Box::new(emitter::StdoutEmitter::new(emitter_config)),
         EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
         EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
         EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
-        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
-    }
-}
-
-impl<'b, T: Write + 'b> Drop for Session<'b, T> {
-    fn drop(&mut self) {
-        if let Some(ref mut out) = self.out {
-            let _ = self.emitter.emit_footer(out);
-        }
+        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(emitter_config)),
     }
 }
 

@@ -16,7 +16,7 @@ use crate::ignore_path::IgnorePathSet;
 use crate::source_map::LineRangeUtils;
 use crate::utils::starts_with_newline;
 use crate::visitor::SnippetProvider;
-use crate::{Config, ErrorKind, FileName};
+use crate::{Config, FileName, OperationError};
 
 /// ParseSess holds structs necessary for constructing a parser.
 pub(crate) struct ParseSess {
@@ -121,10 +121,10 @@ fn default_handler(
 }
 
 impl ParseSess {
-    pub(crate) fn new(config: &Config) -> Result<ParseSess, ErrorKind> {
+    pub(crate) fn new(config: &Config) -> Result<ParseSess, OperationError> {
         let ignore_path_set = match IgnorePathSet::from_ignore_list(&config.ignore()) {
             Ok(ignore_path_set) => Rc::new(ignore_path_set),
-            Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
+            Err(e) => return Err(OperationError::InvalidGlobPattern(e)),
         };
         let source_map = Rc::new(SourceMap::new(FilePathMapping::empty()));
         let can_reset_errors = Rc::new(RefCell::new(false));

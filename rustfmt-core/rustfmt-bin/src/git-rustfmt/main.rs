@@ -7,7 +7,10 @@ use std::process::Command;
 
 use structopt::StructOpt;
 
-use rustfmt_lib::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
+use rustfmt_lib::{
+    load_config, write_all_files, CliOptions, EmitterConfig, FormatReportFormatterBuilder, Input,
+    Session,
+};
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
     let prefixes: Vec<_> = files
@@ -57,19 +60,19 @@ fn fmt_files(files: &[&str]) -> i32 {
     let (config, _) =
         load_config::<NullOptions>(Some(Path::new(".")), None).expect("couldn't load config");
 
-    let mut exit_code = 0;
     let mut out = stdout();
-    let mut session = Session::new(config, Some(&mut out));
+    let mut session = Session::default();
     for file in files {
-        let report = session.format(Input::File(PathBuf::from(file))).unwrap();
+        let report = session
+            .format(Input::File(PathBuf::from(file)), &config)
+            .unwrap();
         if report.has_warnings() {
             eprintln!("{}", FormatReportFormatterBuilder::new(&report).build());
         }
-        if !session.has_no_errors() {
-            exit_code = 1;
-        }
+        write_all_files(report, &mut out, EmitterConfig::default()).unwrap();
     }
-    exit_code
+
+    todo!("Fix error handling")
 }
 
 struct NullOptions;

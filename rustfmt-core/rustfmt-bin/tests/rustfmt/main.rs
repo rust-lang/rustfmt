@@ -77,9 +77,9 @@ fn inline_config() {
             "--print-config",
             "current",
             ".",
-            "--config=color=Never,edition=2018"
+            "--config=max_width=50,edition=2018"
         ],
-        contains("color = \"Never\"") && contains("edition = \"2018\"")
+        contains("max_width = 50") && contains("edition = \"2018\"")
     );
 
     // multiple overriding invocations
@@ -89,11 +89,11 @@ fn inline_config() {
             "current",
             ".",
             "--config",
-            "color=never,edition=2018",
+            "max_width=80,edition=2018",
             "--config",
             "color=always,format_strings=true"
         ],
-        contains("color = \"Always\"")
+        contains("max_width = 80")
             && contains("edition = \"2018\"")
             && contains("format_strings = true")
     );
