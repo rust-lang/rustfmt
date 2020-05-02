@@ -15,7 +15,11 @@ To enable unstable options, set `unstable_features = true` in `rustfmt.toml` or 
 
 # Configuration Options
 
-Below you find a detailed visual guide on all the supported configuration options of rustfmt:
+Below you can find a detailed visual guide on all the supported configuration options of rustfmt.
+
+**_Note that the below list reflects the configuration options available on the latest version of rustfmt in source control. Some newer options may not be available yet in a released version of rustfmt_**
+
+
 
 ## `array_width` 
 
