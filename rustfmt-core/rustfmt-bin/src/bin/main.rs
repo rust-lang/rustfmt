@@ -14,9 +14,9 @@ use structopt::StructOpt;
 use thiserror::Error;
 
 use rustfmt_lib::{
-    load_config, write_all_files, CliOptions, Config, Edition, EmitMode, EmitterConfig, FileLines,
-    FileName, FormatReport, FormatReportFormatterBuilder, Input, RustFormatterBuilder, Session,
-    Verbosity,
+    emitter::{emit_format_report, EmitMode, EmitterConfig, Verbosity},
+    load_config, CliOptions, Config, Edition, FileLines, FileName, FormatReport,
+    FormatReportFormatterBuilder, Input, RustFormatterBuilder, Session,
 };
 
 fn main() {
@@ -426,7 +426,7 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
         &config,
         &mut format_report,
     );
-    let has_diff = write_all_files(format_report, out, opt.emitter_config(EmitMode::Stdout))?;
+    let has_diff = emit_format_report(format_report, out, opt.emitter_config(EmitMode::Stdout))?;
     Ok(if opt.check && has_diff { 1 } else { 0 })
 }
 
@@ -544,7 +544,7 @@ fn format(opt: Opt) -> Result<i32> {
     }
 
     let out = &mut stdout();
-    let has_diff = write_all_files(format_report, out, opt.emitter_config(EmitMode::Files))?;
+    let has_diff = emit_format_report(format_report, out, opt.emitter_config(EmitMode::Files))?;
 
     Ok(if opt.check && has_diff { 1 } else { 0 })
 }

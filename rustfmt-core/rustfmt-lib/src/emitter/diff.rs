@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Color, EmitterConfig, Verbosity};
+use crate::emitter::{Color, EmitterConfig, Verbosity};
 use rustfmt_diff::{make_diff, print_diff};
 
 pub struct DiffEmitter {
@@ -34,7 +34,7 @@ impl Emitter for DiffEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
-    ) -> Result<EmitterResult, io::Error> {
+    ) -> Result<EmitterResult, EmitterError> {
         const CONTEXT_SIZE: usize = 3;
         let mismatch = make_diff(&original_text, formatted_text, CONTEXT_SIZE);
         let has_diff = !mismatch.is_empty();
