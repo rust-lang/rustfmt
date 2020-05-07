@@ -523,14 +523,6 @@ fn main() {
 }
 ```
 
-## `disable_all_formatting`
-
-Don't reformat anything
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3388](https://github.com/rust-lang/rustfmt/issues/3388))
-
 ## `edition`
 
 Specifies which edition is used by the parser.
