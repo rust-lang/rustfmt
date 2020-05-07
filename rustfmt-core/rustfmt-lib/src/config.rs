@@ -144,7 +144,6 @@ create_config! {
         "Require a specific version of rustfmt";
     unstable_features: bool, false, false,
             "Enables unstable features. Only available on nightly channel";
-    disable_all_formatting: bool, false, false, "Don't reformat anything";
     hide_parse_errors: bool, false, false, "Hide errors from the parser";
     error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
     error_on_unformatted: bool, false, false,
@@ -572,7 +571,6 @@ condense_wildcard_suffixes = false
 color = "Auto"
 required_version = "{}"
 unstable_features = false
-disable_all_formatting = false
 hide_parse_errors = false
 error_on_line_overflow = false
 error_on_unformatted = false
