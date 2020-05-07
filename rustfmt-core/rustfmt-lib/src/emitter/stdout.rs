@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use super::*;
-use crate::{EmitterConfig, Verbosity};
+use crate::emitter::{EmitterConfig, Verbosity};
 
 #[derive(Debug)]
 pub struct StdoutEmitter {
@@ -25,7 +25,7 @@ impl Emitter for StdoutEmitter {
             formatted_text,
             ..
         }: FormattedFile<'_>,
-    ) -> Result<EmitterResult, io::Error> {
+    ) -> Result<EmitterResult, EmitterError> {
         if self.verbosity != Verbosity::Quiet {
             writeln!(output, "{}:\n", filename)?;
         }

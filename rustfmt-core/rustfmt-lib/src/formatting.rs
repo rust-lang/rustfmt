@@ -13,8 +13,8 @@ use crate::syntux::session::ParseSess;
 use crate::utils::count_newlines;
 use crate::visitor::FmtVisitor;
 use crate::{
-    modules, source_file, ErrorKind, FormatError, FormatReport, FormatResult, Input,
-    NonFormattedRange, OperationError, Session, Verbosity,
+    modules, ErrorKind, FormatError, FormatReport, FormatResult, Input, NonFormattedRange,
+    OperationError, Session, Verbosity,
 };
 
 mod newline_style;
@@ -157,7 +157,7 @@ impl Session {
 
         // For some reason, the source_map does not include terminating
         // newlines so we must add one on for each file. This is sad.
-        source_file::append_newline(&mut visitor.buffer);
+        visitor.buffer.push('\n');
 
         format_lines(
             &mut visitor.buffer,

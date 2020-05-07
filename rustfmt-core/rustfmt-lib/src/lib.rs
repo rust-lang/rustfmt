@@ -9,7 +9,6 @@ extern crate log;
 
 use std::cell::{Ref, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fmt;
 use std::io;
 use std::panic;
 use std::path::PathBuf;
@@ -24,15 +23,15 @@ pub use crate::config::{
 };
 pub use crate::emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
-pub use crate::source_file::write_all_files;
 
-use crate::comment::LineClasses;
-use crate::emitter::Emitter;
-use crate::shape::Indent;
-use crate::syntux::parser::DirectoryOwnership;
-use crate::syntux::session::ParseSess;
-use crate::utils::indent_next_line;
-use std::str::FromStr;
+use crate::{
+    comment::LineClasses,
+    emitter::{Color, Verbosity},
+    shape::Indent,
+    syntux::parser::DirectoryOwnership,
+    syntux::session::ParseSess,
+    utils::indent_next_line,
+};
 
 #[macro_use]
 mod utils;
@@ -65,7 +64,6 @@ mod reorder;
 mod rewrite;
 mod shape;
 mod skip;
-pub(crate) mod source_file;
 pub(crate) mod source_map;
 mod spanned;
 mod stmt;
@@ -104,17 +102,11 @@ pub enum ErrorKind {
 }
 
 #[derive(Error, Clone, Debug, Hash, Eq, PartialEq)]
+#[error("{kind}")]
 pub struct FormatError {
-    #[error(transparent)]
     kind: ErrorKind,
     line_num: Option<usize>,
     line_str: Option<String>,
-}
-
-impl fmt::Display for FormatError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.kind.fmt(f)
-    }
 }
 
 impl FormatError {
@@ -372,44 +364,6 @@ impl FormatReport {
     }
 }
 
-/// How chatty should Rustfmt be?
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Verbosity {
-    /// Default.
-    Normal,
-    /// Emit more.
-    Verbose,
-    /// Emit as little as possible.
-    Quiet,
-}
-
-impl Default for Verbosity {
-    fn default() -> Self {
-        Verbosity::Normal
-    }
-}
-
-/// Client-preference for coloured output.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Color {
-    /// Always use color, whether it is a piped or terminal output
-    Always,
-    /// Never use color
-    Never,
-    /// Automatically use color, if supported by terminal
-    Auto,
-}
-
-impl Color {
-    /// Whether we should use a coloured terminal.
-    pub fn use_colored_tty(self) -> bool {
-        match self {
-            Color::Always | Color::Auto => true,
-            Color::Never => false,
-        }
-    }
-}
-
 /// Format the given snippet. The snippet is expected to be *complete* code.
 /// When we cannot parse the given snippet, this function returns `None`.
 fn format_snippet(snippet: &str, config: &Config) -> Option<FormattedSnippet> {
@@ -585,72 +539,6 @@ impl Session {
         config: &Config,
     ) -> Result<FormatReport, OperationError> {
         self.format_input_inner(input, config)
-    }
-}
-
-/// What Rustfmt should emit. Mostly corresponds to the `--emit` command line
-/// option.
-#[derive(Clone, Copy, Debug)]
-pub enum EmitMode {
-    /// Emits to files.
-    Files,
-    /// Writes the output to stdout.
-    Stdout,
-    /// Unfancy stdout
-    Checkstyle,
-    /// Writes the resulting diffs in a JSON format. Returns an empty array
-    /// `[]` if there were no diffs.
-    Json,
-    /// Output the changed lines (for internal value only)
-    ModifiedLines,
-    /// Checks if a diff can be generated. If so, rustfmt outputs a diff and
-    /// quits with exit code 1.
-    /// This option is designed to be run in CI where a non-zero exit signifies
-    /// non-standard code formatting. Used for `--check`.
-    Diff,
-}
-
-impl FromStr for EmitMode {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "files" => Ok(EmitMode::Files),
-            "stdout" => Ok(EmitMode::Stdout),
-            "checkstyle" => Ok(EmitMode::Checkstyle),
-            "json" => Ok(EmitMode::Json),
-            _ => Err(format!("unknown emit mode `{}`", s)),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct EmitterConfig {
-    pub emit_mode: EmitMode,
-    pub color: Color,
-    pub verbosity: Verbosity,
-    pub print_filename: bool,
-}
-
-impl Default for EmitterConfig {
-    fn default() -> Self {
-        EmitterConfig {
-            emit_mode: EmitMode::Files,
-            color: Color::Auto,
-            verbosity: Verbosity::Normal,
-            print_filename: false,
-        }
-    }
-}
-
-pub(crate) fn create_emitter(emitter_config: EmitterConfig) -> Box<dyn Emitter> {
-    match emitter_config.emit_mode {
-        EmitMode::Files => Box::new(emitter::FilesEmitter::new(emitter_config)),
-        EmitMode::Stdout => Box::new(emitter::StdoutEmitter::new(emitter_config)),
-        EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
-        EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
-        EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
-        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(emitter_config)),
     }
 }
 

@@ -1,7 +1,7 @@
 use self::xml::XmlEscaped;
 use super::*;
 use rustfmt_diff::{make_diff, DiffLine, Mismatch};
-use std::io::{self, Write};
+use std::io::Write;
 
 mod xml;
 
@@ -9,14 +9,15 @@ mod xml;
 pub struct CheckstyleEmitter;
 
 impl Emitter for CheckstyleEmitter {
-    fn emit_header(&self, output: &mut dyn Write) -> Result<(), io::Error> {
+    fn emit_header(&self, output: &mut dyn Write) -> Result<(), EmitterError> {
         writeln!(output, r#"<?xml version="1.0" encoding="utf-8"?>"#)?;
         write!(output, r#"<checkstyle version="4.3">"#)?;
         Ok(())
     }
 
-    fn emit_footer(&self, output: &mut dyn Write) -> Result<(), io::Error> {
-        writeln!(output, "</checkstyle>")
+    fn emit_footer(&self, output: &mut dyn Write) -> Result<(), EmitterError> {
+        writeln!(output, "</checkstyle>")?;
+        Ok(())
     }
 
     fn emit_formatted_file(
@@ -27,7 +28,7 @@ impl Emitter for CheckstyleEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
-    ) -> Result<EmitterResult, io::Error> {
+    ) -> Result<EmitterResult, EmitterError> {
         const CONTEXT_SIZE: usize = 0;
         let diff = make_diff(original_text, formatted_text, CONTEXT_SIZE);
         output_checkstyle_file(output, filename, diff)?;
@@ -39,7 +40,7 @@ pub fn output_checkstyle_file<T>(
     mut writer: T,
     filename: &FileName,
     diff: Vec<Mismatch>,
-) -> Result<(), io::Error>
+) -> Result<(), EmitterError>
 where
     T: Write,
 {

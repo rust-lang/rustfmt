@@ -9,9 +9,11 @@ use std::thread;
 use crate::emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChunk, OutputWriter};
 
 use crate::config::{Config, FileName, NewlineStyle};
-use crate::{is_nightly_channel, write_all_files, EmitterConfig, OperationError};
-use crate::{source_file, RustFormatterBuilder};
-use crate::{Color, EmitMode, FormatReport, FormatReportFormatterBuilder, Input, Session};
+use crate::{
+    emitter::{emit_format_report, EmitMode, EmitterConfig},
+    is_nightly_channel, Color, FormatReport, FormatReportFormatterBuilder, Input, OperationError,
+    RustFormatterBuilder, Session,
+};
 
 mod configuration_snippet;
 
@@ -222,7 +224,7 @@ fn modified_test() {
         .format(Input::File(filename.into()), &config)
         .unwrap();
     let mut data = vec![];
-    write_all_files(
+    emit_format_report(
         report,
         &mut data,
         EmitterConfig {
@@ -280,7 +282,7 @@ fn assert_output(source: &Path, expected_filename: &Path) {
 
     // Populate output by writing to a vec.
     let mut out = vec![];
-    let _ = source_file::write_all_files(report, &mut out, emitter_config);
+    let _ = emit_format_report(report, &mut out, emitter_config);
     let output = String::from_utf8(out).unwrap();
 
     let mut expected_file = fs::File::open(&expected_filename).expect("couldn't open target");
@@ -321,7 +323,7 @@ fn assert_stdin_output(
     {
         let mut session = Session::default();
         let report = session.format(input, &config).unwrap();
-        let format_has_diff = write_all_files(
+        let format_has_diff = emit_format_report(
             report,
             &mut buf,
             EmitterConfig {
@@ -415,7 +417,7 @@ fn stdin_formatting_smoke_test() {
     let report = session.format(input, &Config::default()).unwrap();
     assert!(!report.has_errors());
     let mut buf: Vec<u8> = vec![];
-    write_all_files(
+    emit_format_report(
         report,
         &mut buf,
         EmitterConfig {
@@ -458,7 +460,7 @@ fn stdin_works_with_modified_lines() {
     {
         let mut session = Session::default();
         let report = session.format(input, &config).unwrap();
-        let format_has_diff = write_all_files(
+        let format_has_diff = emit_format_report(
             report,
             &mut buf,
             EmitterConfig {

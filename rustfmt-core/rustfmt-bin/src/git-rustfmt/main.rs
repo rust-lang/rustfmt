@@ -8,8 +8,8 @@ use std::process::Command;
 use structopt::StructOpt;
 
 use rustfmt_lib::{
-    load_config, write_all_files, CliOptions, EmitterConfig, FormatReportFormatterBuilder, Input,
-    Session,
+    emitter::{emit_format_report, EmitterConfig},
+    load_config, CliOptions, FormatReportFormatterBuilder, Input, Session,
 };
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
@@ -69,7 +69,7 @@ fn fmt_files(files: &[&str]) -> i32 {
         if report.has_warnings() {
             eprintln!("{}", FormatReportFormatterBuilder::new(&report).build());
         }
-        write_all_files(report, &mut out, EmitterConfig::default()).unwrap();
+        emit_format_report(report, &mut out, EmitterConfig::default()).unwrap();
     }
 
     todo!("Fix error handling")
