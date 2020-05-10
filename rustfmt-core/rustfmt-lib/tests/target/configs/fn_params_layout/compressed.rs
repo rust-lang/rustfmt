@@ -1,5 +1,5 @@
-// rustfmt-fn_args_layout: Compressed
-// Function arguments density
+// rustfmt-fn_params_layout: Compressed
+// Function parameter density
 
 trait Lorem {
     fn lorem(ipsum: Ipsum, dolor: Dolor, sit: Sit, amet: Amet);

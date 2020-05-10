@@ -1,10 +1,20 @@
-// rustfmt-fn_args_layout: Tall
-// Function arguments density
+// rustfmt-fn_params_layout: Vertical
+// Function parameter density
 
 trait Lorem {
-    fn lorem(ipsum: Ipsum, dolor: Dolor, sit: Sit, amet: Amet);
+    fn lorem(
+        ipsum: Ipsum,
+        dolor: Dolor,
+        sit: Sit,
+        amet: Amet,
+    );
 
-    fn lorem(ipsum: Ipsum, dolor: Dolor, sit: Sit, amet: Amet) {
+    fn lorem(
+        ipsum: Ipsum,
+        dolor: Dolor,
+        sit: Sit,
+        amet: Amet,
+    ) {
         // body
     }
 

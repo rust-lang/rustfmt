@@ -108,8 +108,8 @@ create_config! {
         the same line with the pattern of arms";
     force_multiline_blocks: bool, false, false,
         "Force multiline closure bodies and match arms to be wrapped in a block";
-    fn_args_layout: Density, Density::Tall, true,
-        "Control the layout of arguments in a function";
+    fn_params_layout: Density, Density::Tall, true,
+        "Control the layout of parameters in a function signature";
     brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
     control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,
         "Brace style for control flow constructs";
@@ -552,7 +552,7 @@ struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
 force_multiline_blocks = false
-fn_args_layout = "Tall"
+fn_params_layout = "Tall"
 brace_style = "SameLineWhere"
 control_brace_style = "AlwaysSameLine"
 trailing_semicolon = true
