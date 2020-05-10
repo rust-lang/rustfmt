@@ -24,6 +24,7 @@ pub use crate::config::{
 pub use crate::emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
 
+use crate::formatting::format_input_inner;
 use crate::{
     comment::LineClasses,
     emitter::{Color, Verbosity},
@@ -373,10 +374,14 @@ fn format_snippet(snippet: &str, config: &Config) -> Option<FormattedSnippet> {
 
         let result = {
             let input = Input::Text(snippet.into());
-            let mut session = RustFormatterBuilder::default()
-                .verbosity(Verbosity::Quiet)
-                .build();
-            session.format(input, &config)
+            format(
+                input,
+                &config,
+                OperationSetting {
+                    verbosity: Verbosity::Quiet,
+                    ..OperationSetting::default()
+                },
+            )
         };
         match result {
             Ok(report) if !report.has_errors() => {
@@ -494,52 +499,21 @@ fn format_code_block(code_snippet: &str, config: &Config) -> Option<FormattedSni
     })
 }
 
-/// A session is a run of rustfmt across a single or multiple inputs.
-#[derive(Default)]
-pub struct Session {
-    /// If set to `true`, format sub-modules which are defined in the given input.
-    /// Defaults to `false`.
-    recursive: bool,
-    verbosity: Verbosity,
-}
-
 #[derive(Clone, Copy, Default)]
-pub struct RustFormatterBuilder {
+pub struct OperationSetting {
     /// If set to `true`, format sub-modules which are defined in the given input.
-    recursive: bool,
-    verbosity: Verbosity,
+    pub recursive: bool,
+    pub verbosity: Verbosity,
 }
 
-impl RustFormatterBuilder {
-    /// Build a new `Session` from the current configuration.
-    pub fn build(self) -> Session {
-        Session {
-            recursive: self.recursive,
-            verbosity: self.verbosity,
-        }
-    }
-
-    pub fn recursive(&mut self, recursive: bool) -> &mut Self {
-        self.recursive = recursive;
-        self
-    }
-
-    pub fn verbosity(&mut self, verbosity: Verbosity) -> &mut Self {
-        self.verbosity = verbosity;
-        self
-    }
-}
-
-impl Session {
-    /// The main entry point for Rustfmt. Formats the given input according to the
-    /// given config. `out` is only necessary if required by the configuration.
-    pub fn format(
-        &mut self,
-        input: Input,
-        config: &Config,
-    ) -> Result<FormatReport, OperationError> {
-        self.format_input_inner(input, config)
-    }
+/// The main entry point for Rustfmt. Formats the given input according to the
+/// given config. `out` is only necessary if required by the configuration.
+pub fn format(
+    input: Input,
+    config: &Config,
+    operation_setting: OperationSetting,
+) -> Result<FormatReport, OperationError> {
+    format_input_inner(input, config, operation_setting)
 }
 
 #[derive(Debug)]

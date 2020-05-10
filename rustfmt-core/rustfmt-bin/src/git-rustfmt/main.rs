@@ -9,7 +9,7 @@ use structopt::StructOpt;
 
 use rustfmt_lib::{
     emitter::{emit_format_report, EmitterConfig},
-    load_config, CliOptions, FormatReportFormatterBuilder, Input, Session,
+    format, load_config, CliOptions, FormatReportFormatterBuilder, Input, OperationSetting,
 };
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
@@ -59,13 +59,11 @@ fn get_files(input: &str) -> Vec<&str> {
 fn fmt_files(files: &[&str]) -> i32 {
     let (config, _) =
         load_config::<NullOptions>(Some(Path::new(".")), None).expect("couldn't load config");
+    let setting = OperationSetting::default();
 
     let mut out = stdout();
-    let mut session = Session::default();
     for file in files {
-        let report = session
-            .format(Input::File(PathBuf::from(file)), &config)
-            .unwrap();
+        let report = format(Input::File(PathBuf::from(file)), &config, setting).unwrap();
         if report.has_warnings() {
             eprintln!("{}", FormatReportFormatterBuilder::new(&report).build());
         }

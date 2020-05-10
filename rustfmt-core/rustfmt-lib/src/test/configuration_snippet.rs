@@ -8,7 +8,7 @@ use crate::emitter::rustfmt_diff::{make_diff, Mismatch};
 
 use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
 use crate::config::Config;
-use crate::{Input, RustFormatterBuilder, Verbosity};
+use crate::{Input, OperationSetting, Verbosity};
 
 const CONFIGURATIONS_FILE_NAME: &str = "../../Configurations.md";
 
@@ -172,10 +172,11 @@ impl ConfigCodeBlock {
         let input = Input::Text(self.code_block.as_ref().unwrap().to_owned());
         let config = self.get_block_config();
 
-        let mut session = RustFormatterBuilder::default()
-            .verbosity(Verbosity::Quiet)
-            .build();
-        let report = session.format(input, &config);
+        let operation_setting = OperationSetting {
+            verbosity: Verbosity::Quiet,
+            ..OperationSetting::default()
+        };
+        let report = crate::format(input, &config, operation_setting);
         if report.is_err() {
             write_message(&format!(
                 "\u{261d}\u{1f3fd} Cannot format {}:{}",
