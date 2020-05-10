@@ -63,14 +63,23 @@ fn fmt_files(files: &[&str]) -> i32 {
 
     let mut out = stdout();
     for file in files {
-        let report = format(Input::File(PathBuf::from(file)), &config, setting).unwrap();
-        if report.has_warnings() {
+        let report = match format(Input::File(PathBuf::from(file)), &config, setting) {
+            Ok(report) => report,
+            Err(e) => {
+                eprintln!("{}", e);
+                return 1;
+            }
+        };
+        if report.has_errors() {
             eprintln!("{}", FormatReportFormatterBuilder::new(&report).build());
         }
-        emit_format_report(report, &mut out, EmitterConfig::default()).unwrap();
+        if let Err(e) = emit_format_report(report, &mut out, EmitterConfig::default()) {
+            eprintln!("{}", e);
+            return 1;
+        }
     }
 
-    todo!("Fix error handling")
+    0
 }
 
 struct NullOptions;
