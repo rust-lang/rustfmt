@@ -290,8 +290,9 @@ fn identify_comment(
     ) -> (bool, usize) {
         let mut first_group_ending = 0;
         let mut hbl = false;
+        let mut seen_cb_delimiters = 0;
 
-        for line in orig.lines() {
+        for (i, line) in orig.lines().enumerate() {
             let trimmed_line = line.trim_start();
             if trimmed_line.is_empty() {
                 hbl = true;
@@ -299,6 +300,14 @@ fn identify_comment(
             } else if trimmed_line.starts_with(line_start)
                 || comment_style(trimmed_line, false) == style
             {
+                if line.starts_with(&format!("{}```", line_start)) {
+                    seen_cb_delimiters += 1;
+                    if seen_cb_delimiters % 2 != 0 && i != 0 {
+                        // Next line is the start of a new code block. Stop here to avoid wrapping
+                        // the delimiter up when we format the comment group.
+                        break;
+                    }
+                }
                 first_group_ending += compute_len(&orig[first_group_ending..], line);
             } else {
                 break;
