@@ -7,6 +7,10 @@
 // this is code that won't
 // even if it also is very very very very very very very very very very very very long
 // ```
+// This is a second long line that will be wrapped on the next line.
+// ```
+// this is code that won't
+// ```
 
 /// This is a long line that will be wrapped on the next line.
 /// ```
