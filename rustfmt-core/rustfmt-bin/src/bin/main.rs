@@ -520,7 +520,11 @@ fn format(opt: Opt) -> Result<i32> {
         );
     }
 
-    let has_diff = emit_format_report(format_report, &mut stdout(), opt.emitter_config(EmitMode::Files))?;
+    let has_diff = emit_format_report(
+        format_report,
+        &mut stdout(),
+        opt.emitter_config(EmitMode::Files),
+    )?;
 
     Ok(if opt.check && has_diff { 1 } else { 0 })
 }

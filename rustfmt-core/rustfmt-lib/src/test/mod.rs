@@ -540,7 +540,7 @@ fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<Format
         debug!("Testing '{}'...", file_name.display());
 
         match idempotent_check(&file_name, &opt_config) {
-            Ok(ref report) if report.has_warnings() => {
+            Ok(ref report) if report.has_errors() => {
                 print!("{}", FormatReportFormatterBuilder::new(&report).build());
                 fails += 1;
             }
