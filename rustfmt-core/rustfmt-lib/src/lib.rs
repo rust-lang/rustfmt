@@ -33,6 +33,7 @@ mod format_report_formatter;
 mod formatting;
 mod release_channel;
 pub mod result;
+
 #[cfg(test)]
 mod test;
 
@@ -52,6 +53,18 @@ pub fn format(
     operation_setting: OperationSetting,
 ) -> Result<FormatReport, OperationError> {
     format_input_inner(input, config, operation_setting)
+}
+
+pub fn format_inputs<'a>(
+    inputs: impl Iterator<Item = (Input, &'a Config)>,
+    operation_setting: OperationSetting,
+) -> Result<FormatReport, OperationError> {
+    let mut format_report = FormatReport::new();
+    for (input, config) in inputs {
+        let report = format(input, config, operation_setting)?;
+        format_report.merge(report);
+    }
+    Ok(format_report)
 }
 
 /// The input to rustfmt.

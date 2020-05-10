@@ -100,8 +100,7 @@ impl FormatReport {
         Rc::clone(&self.format_result)
     }
 
-    /// FIXME(topecongiro): reduce visibility.
-    pub fn merge(&mut self, other: Self) {
+    pub(crate) fn merge(&mut self, other: Self) {
         self.format_result
             .borrow_mut()
             .append(&mut other.format_result.borrow_mut());

@@ -15,7 +15,7 @@ use thiserror::Error;
 
 use rustfmt_lib::{
     emitter::{emit_format_report, EmitMode, EmitterConfig, Verbosity},
-    load_config, CliOptions, Config, Edition, FileLines, FileName, FormatReport,
+    format_inputs, load_config, CliOptions, Config, Edition, FileLines, FileName,
     FormatReportFormatterBuilder, Input, OperationSetting,
 };
 
@@ -418,10 +418,8 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
         recursive: opt.recursive,
         verbosity: Verbosity::Quiet,
     };
-    let mut format_report = FormatReport::new();
-    // FIXME: Add error handling.
-    format_and_emit_report(Input::Text(input), &config, setting, &mut format_report);
-    let has_diff = emit_format_report(format_report, out, opt.emitter_config(EmitMode::Stdout))?;
+    let report = rustfmt_lib::format(Input::Text(input), &config, setting)?;
+    let has_diff = emit_format_report(report, out, opt.emitter_config(EmitMode::Stdout))?;
     Ok(if opt.check && has_diff { 1 } else { 0 })
 }
 
@@ -485,7 +483,7 @@ fn format(opt: Opt) -> Result<i32> {
         return Err(format_err!("Error: `{}` is a directory", dir.display()));
     }
 
-    let (config, config_path) = load_config(None, Some(&opt))?;
+    let (default_config, config_path) = load_config(None, Some(&opt))?;
 
     if opt.verbose {
         if let Some(path) = config_path.as_ref() {
@@ -497,37 +495,21 @@ fn format(opt: Opt) -> Result<i32> {
         recursive: opt.recursive,
         verbosity: opt.verbosity(),
     };
-    let mut format_report = FormatReport::new();
 
-    for pair in FileConfigPairIter::new(&opt, config_path.is_some()) {
-        let file = pair.file;
-
-        if let FileConfig::Local(local_config, config_path) = pair.config {
-            if let Some(path) = config_path {
-                if opt.verbose {
-                    println!(
-                        "Using rustfmt config file {} for {}",
-                        path.display(),
-                        file.display()
-                    );
-                }
-            }
-
-            format_and_emit_report(
-                Input::File(file.to_path_buf()),
-                &local_config,
-                setting,
-                &mut format_report,
-            );
-        } else {
-            format_and_emit_report(
-                Input::File(file.to_path_buf()),
-                &config,
-                setting,
-                &mut format_report,
-            );
-        }
-    }
+    let inputs = FileConfigPairIter::new(&opt, config_path.is_some()).collect::<Vec<_>>();
+    let format_report = format_inputs(
+        inputs.iter().map(|p| {
+            (
+                Input::File(p.file.to_path_buf()),
+                if let FileConfig::Local(ref config, _) = p.config {
+                    config
+                } else {
+                    &default_config
+                },
+            )
+        }),
+        setting,
+    )?;
 
     if format_report.has_errors() {
         eprintln!(
@@ -538,26 +520,9 @@ fn format(opt: Opt) -> Result<i32> {
         );
     }
 
-    let out = &mut stdout();
-    let has_diff = emit_format_report(format_report, out, opt.emitter_config(EmitMode::Files))?;
+    let has_diff = emit_format_report(format_report, &mut stdout(), opt.emitter_config(EmitMode::Files))?;
 
     Ok(if opt.check && has_diff { 1 } else { 0 })
-}
-
-fn format_and_emit_report(
-    input: Input,
-    config: &Config,
-    operation_setting: OperationSetting,
-    format_report: &mut FormatReport,
-) {
-    match rustfmt_lib::format(input, config, operation_setting) {
-        Ok(report) => {
-            format_report.merge(report);
-        }
-        Err(err) => {
-            eprintln!("{}", err);
-        }
-    }
 }
 
 #[cfg(test)]
