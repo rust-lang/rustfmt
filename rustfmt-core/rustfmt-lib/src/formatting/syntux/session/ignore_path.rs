@@ -34,8 +34,8 @@ impl IgnorePathSet {
 mod test {
     use std::path::{Path, PathBuf};
 
+    use super::IgnorePathSet;
     use crate::config::{Config, FileName};
-    use crate::ignore_path::IgnorePathSet;
 
     #[test]
     fn test_ignore_path_set() {

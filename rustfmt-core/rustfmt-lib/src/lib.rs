@@ -30,8 +30,7 @@ pub mod config;
 pub mod emitter;
 
 mod format_report_formatter;
-pub(crate) mod formatting;
-mod ignore_path;
+mod formatting;
 mod release_channel;
 pub mod result;
 #[cfg(test)]
