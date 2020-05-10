@@ -15,8 +15,10 @@ use crate::config::{file_lines::LineRange, Config, FileName};
 use crate::formatting::{
     source_map::LineRangeUtils, utils::starts_with_newline, visitor::SnippetProvider,
 };
-use crate::ignore_path::IgnorePathSet;
 use crate::result::OperationError;
+use ignore_path::IgnorePathSet;
+
+mod ignore_path;
 
 /// ParseSess holds structs necessary for constructing a parser.
 pub(crate) struct ParseSess {
