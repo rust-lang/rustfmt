@@ -14,176 +14,169 @@ use crate::utils::count_newlines;
 use crate::visitor::FmtVisitor;
 use crate::{
     modules, ErrorKind, FormatError, FormatReport, FormatResult, Input, NonFormattedRange,
-    OperationError, Session, Verbosity,
+    OperationError, OperationSetting, Verbosity,
 };
 
 mod newline_style;
 
-impl Session {
-    pub(crate) fn format_input_inner(
-        &mut self,
-        input: Input,
-        config: &Config,
-    ) -> Result<FormatReport, OperationError> {
-        if !config.version_meets_requirement() {
-            return Err(OperationError::VersionMismatch);
-        }
-
-        rustc_ast::with_globals(config.edition().into(), || {
-            self.format_project(input, config)
-        })
+pub(crate) fn format_input_inner(
+    input: Input,
+    config: &Config,
+    operation_setting: OperationSetting,
+) -> Result<FormatReport, OperationError> {
+    if !config.version_meets_requirement() {
+        return Err(OperationError::VersionMismatch);
     }
 
-    fn format_project(
-        &mut self,
-        input: Input,
-        config: &Config,
-    ) -> Result<FormatReport, OperationError> {
-        let mut timer = Timer::start();
+    rustc_ast::with_globals(config.edition().into(), || {
+        format_project(input, config, operation_setting)
+    })
+}
+fn format_project(
+    input: Input,
+    config: &Config,
+    operation_setting: OperationSetting,
+) -> Result<FormatReport, OperationError> {
+    let mut timer = Timer::start();
 
-        let format_report = FormatReport::new();
+    let format_report = FormatReport::new();
 
-        let main_file = input.file_name();
-        let input_is_stdin = main_file == FileName::Stdin;
+    let main_file = input.file_name();
+    let input_is_stdin = main_file == FileName::Stdin;
 
-        let mut parse_session = ParseSess::new(config)?;
-        if !self.recursive && parse_session.ignore_file(&main_file) {
-            format_report.add_ignored_file(main_file);
-            return Ok(format_report);
-        }
+    let mut parse_session = ParseSess::new(config)?;
+    if !operation_setting.recursive && parse_session.ignore_file(&main_file) {
+        format_report.add_ignored_file(main_file);
+        return Ok(format_report);
+    }
 
-        // Parse the crate.
-        let directory_ownership = input.to_directory_ownership();
-        let original_snippet = if let Input::Text(ref str) = input {
-            Some(str.to_owned())
-        } else {
-            None
-        };
+    // Parse the crate.
+    let directory_ownership = input.to_directory_ownership();
+    let original_snippet = if let Input::Text(ref str) = input {
+        Some(str.to_owned())
+    } else {
+        None
+    };
 
-        let krate = match Parser::parse_crate(config, input, directory_ownership, &parse_session) {
-            Ok(krate) => krate,
-            Err(e) => {
-                return Err(OperationError::ParseError {
-                    input: main_file,
-                    is_panic: e == ParserError::ParsePanicError,
-                });
-            }
-        };
-        timer = timer.done_parsing();
-
-        // Suppress error output if we have to do any further parsing.
-        parse_session.set_silent_emitter();
-
-        let files = modules::ModResolver::new(
-            &parse_session,
-            directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod),
-            !input_is_stdin && self.recursive,
-        )
-        .visit_crate(&krate)
-        .map_err(|e| OperationError::IoError(io::Error::new(io::ErrorKind::Other, e)))?;
-
-        for (path, module) in files {
-            let should_ignore = !input_is_stdin && parse_session.ignore_file(&path);
-            if (!self.recursive && path != main_file) || should_ignore {
-                continue;
-            }
-            should_emit_verbose(input_is_stdin, self.verbosity, || {
-                println!("Formatting {}", path)
+    let krate = match Parser::parse_crate(config, input, directory_ownership, &parse_session) {
+        Ok(krate) => krate,
+        Err(e) => {
+            return Err(OperationError::ParseError {
+                input: main_file,
+                is_panic: e == ParserError::ParsePanicError,
             });
-            let is_root = path == main_file;
-            self.format_file(
-                &parse_session,
-                config,
-                &krate,
-                path,
-                &module,
-                is_root,
-                &format_report,
-                original_snippet.clone(),
-            );
         }
-        timer = timer.done_formatting();
+    };
+    timer = timer.done_parsing();
 
-        should_emit_verbose(input_is_stdin, self.verbosity, || {
-            println!(
-                "Spent {0:.3} secs in the parsing phase, and {1:.3} secs in the formatting phase",
-                timer.get_parse_time(),
-                timer.get_format_time(),
-            )
+    // Suppress error output if we have to do any further parsing.
+    parse_session.set_silent_emitter();
+
+    let files = modules::ModResolver::new(
+        &parse_session,
+        directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod),
+        !input_is_stdin && operation_setting.recursive,
+    )
+    .visit_crate(&krate)
+    .map_err(|e| OperationError::IoError(io::Error::new(io::ErrorKind::Other, e)))?;
+
+    for (path, module) in files {
+        let should_ignore = !input_is_stdin && parse_session.ignore_file(&path);
+        if (!operation_setting.recursive && path != main_file) || should_ignore {
+            continue;
+        }
+        should_emit_verbose(input_is_stdin, operation_setting.verbosity, || {
+            println!("Formatting {}", path)
         });
-
-        Ok(format_report)
+        let is_root = path == main_file;
+        format_file(
+            &parse_session,
+            config,
+            &krate,
+            path,
+            &module,
+            is_root,
+            &format_report,
+            original_snippet.clone(),
+        );
     }
+    timer = timer.done_formatting();
+
+    should_emit_verbose(input_is_stdin, operation_setting.verbosity, || {
+        println!(
+            "Spent {0:.3} secs in the parsing phase, and {1:.3} secs in the formatting phase",
+            timer.get_parse_time(),
+            timer.get_format_time(),
+        )
+    });
+
+    Ok(format_report)
 }
 
-impl Session {
-    // Formats a single file/module.
-    fn format_file(
-        &mut self,
-        parse_session: &ParseSess,
-        config: &Config,
-        krate: &ast::Crate,
-        path: FileName,
-        module: &ast::Mod,
-        is_root: bool,
-        report: &FormatReport,
-        original_snippet: Option<String>,
-    ) {
-        let snippet_provider = parse_session.snippet_provider(module.inner);
-        let mut visitor =
-            FmtVisitor::from_parse_sess(&parse_session, config, &snippet_provider, report.clone());
-        visitor.skip_context.update_with_attrs(&krate.attrs);
+fn format_file(
+    parse_session: &ParseSess,
+    config: &Config,
+    krate: &ast::Crate,
+    path: FileName,
+    module: &ast::Mod,
+    is_root: bool,
+    report: &FormatReport,
+    original_snippet: Option<String>,
+) {
+    let snippet_provider = parse_session.snippet_provider(module.inner);
+    let mut visitor =
+        FmtVisitor::from_parse_sess(&parse_session, config, &snippet_provider, report.clone());
+    visitor.skip_context.update_with_attrs(&krate.attrs);
 
-        // Format inner attributes if available.
-        if !krate.attrs.is_empty() && is_root {
-            visitor.skip_empty_lines(snippet_provider.end_pos());
-            if visitor.visit_attrs(&krate.attrs, ast::AttrStyle::Inner) {
-                visitor.push_rewrite(module.inner, None);
-            } else {
-                visitor.format_separate_mod(module, snippet_provider.end_pos());
-            }
+    // Format inner attributes if available.
+    if !krate.attrs.is_empty() && is_root {
+        visitor.skip_empty_lines(snippet_provider.end_pos());
+        if visitor.visit_attrs(&krate.attrs, ast::AttrStyle::Inner) {
+            visitor.push_rewrite(module.inner, None);
         } else {
-            visitor.last_pos = snippet_provider.start_pos();
-            visitor.skip_empty_lines(snippet_provider.end_pos());
             visitor.format_separate_mod(module, snippet_provider.end_pos());
-        };
-
-        debug_assert_eq!(
-            visitor.line_number,
-            count_newlines(&visitor.buffer),
-            "failed in format_file visitor.buffer:\n {:?}",
-            &visitor.buffer
-        );
-
-        // For some reason, the source_map does not include terminating
-        // newlines so we must add one on for each file. This is sad.
-        visitor.buffer.push('\n');
-
-        format_lines(
-            &mut visitor.buffer,
-            &path,
-            &visitor.skipped_range.borrow(),
-            config,
-            report.clone(),
-        );
-
-        apply_newline_style(
-            config.newline_style(),
-            &mut visitor.buffer,
-            snippet_provider.entire_snippet(),
-        );
-
-        if visitor.macro_rewrite_failure {
-            report.add_macro_format_failure(path.clone());
         }
-        let format_result = FormatResult::success(
-            visitor.buffer.to_owned(),
-            visitor.skipped_range.borrow().clone(),
-            original_snippet,
-            config.newline_style(),
-        );
-        report.add_format_result(path, format_result);
+    } else {
+        visitor.last_pos = snippet_provider.start_pos();
+        visitor.skip_empty_lines(snippet_provider.end_pos());
+        visitor.format_separate_mod(module, snippet_provider.end_pos());
+    };
+
+    debug_assert_eq!(
+        visitor.line_number,
+        count_newlines(&visitor.buffer),
+        "failed in format_file visitor.buffer:\n {:?}",
+        &visitor.buffer
+    );
+
+    // For some reason, the source_map does not include terminating
+    // newlines so we must add one on for each file. This is sad.
+    visitor.buffer.push('\n');
+
+    format_lines(
+        &mut visitor.buffer,
+        &path,
+        &visitor.skipped_range.borrow(),
+        config,
+        report.clone(),
+    );
+
+    apply_newline_style(
+        config.newline_style(),
+        &mut visitor.buffer,
+        snippet_provider.entire_snippet(),
+    );
+
+    if visitor.macro_rewrite_failure {
+        report.add_macro_format_failure(path.clone());
     }
+    let format_result = FormatResult::success(
+        visitor.buffer.to_owned(),
+        visitor.skipped_range.borrow().clone(),
+        original_snippet,
+        config.newline_style(),
+    );
+    report.add_format_result(path, format_result);
 }
 
 #[derive(Clone, Copy, Debug)]

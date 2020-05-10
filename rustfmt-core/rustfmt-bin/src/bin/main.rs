@@ -16,7 +16,7 @@ use thiserror::Error;
 use rustfmt_lib::{
     emitter::{emit_format_report, EmitMode, EmitterConfig, Verbosity},
     load_config, CliOptions, Config, Edition, FileLines, FileName, FormatReport,
-    FormatReportFormatterBuilder, Input, RustFormatterBuilder, Session,
+    FormatReportFormatterBuilder, Input, OperationSetting,
 };
 
 fn main() {
@@ -414,18 +414,13 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
     }
 
     let out = &mut stdout();
-    let mut session = RustFormatterBuilder::default()
-        .recursive(opt.recursive)
-        .verbosity(Verbosity::Quiet)
-        .build();
+    let setting = OperationSetting {
+        recursive: opt.recursive,
+        verbosity: Verbosity::Quiet,
+    };
     let mut format_report = FormatReport::new();
     // FIXME: Add error handling.
-    format_and_emit_report(
-        &mut session,
-        Input::Text(input),
-        &config,
-        &mut format_report,
-    );
+    format_and_emit_report(Input::Text(input), &config, setting, &mut format_report);
     let has_diff = emit_format_report(format_report, out, opt.emitter_config(EmitMode::Stdout))?;
     Ok(if opt.check && has_diff { 1 } else { 0 })
 }
@@ -498,10 +493,10 @@ fn format(opt: Opt) -> Result<i32> {
         }
     }
 
-    let mut session = RustFormatterBuilder::default()
-        .recursive(opt.recursive)
-        .verbosity(opt.verbosity())
-        .build();
+    let setting = OperationSetting {
+        recursive: opt.recursive,
+        verbosity: opt.verbosity(),
+    };
     let mut format_report = FormatReport::new();
 
     for pair in FileConfigPairIter::new(&opt, config_path.is_some()) {
@@ -519,16 +514,16 @@ fn format(opt: Opt) -> Result<i32> {
             }
 
             format_and_emit_report(
-                &mut session,
                 Input::File(file.to_path_buf()),
                 &local_config,
+                setting,
                 &mut format_report,
             );
         } else {
             format_and_emit_report(
-                &mut session,
                 Input::File(file.to_path_buf()),
                 &config,
+                setting,
                 &mut format_report,
             );
         }
@@ -550,12 +545,12 @@ fn format(opt: Opt) -> Result<i32> {
 }
 
 fn format_and_emit_report(
-    session: &mut Session,
     input: Input,
     config: &Config,
+    operation_setting: OperationSetting,
     format_report: &mut FormatReport,
 ) {
-    match session.format(input, config) {
+    match rustfmt_lib::format(input, config, operation_setting) {
         Ok(report) => {
             format_report.merge(report);
         }

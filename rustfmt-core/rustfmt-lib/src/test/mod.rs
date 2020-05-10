@@ -11,8 +11,8 @@ use crate::emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChun
 use crate::config::{Config, FileName, NewlineStyle};
 use crate::{
     emitter::{emit_format_report, EmitMode, EmitterConfig},
-    is_nightly_channel, Color, FormatReport, FormatReportFormatterBuilder, Input, OperationError,
-    RustFormatterBuilder, Session,
+    format, is_nightly_channel, Color, FormatReport, FormatReportFormatterBuilder, Input,
+    OperationError, OperationSetting,
 };
 
 mod configuration_snippet;
@@ -218,11 +218,9 @@ fn modified_test() {
     // Test "modified" output
     let filename = "tests/writemode/source/modified.rs";
     let config = Config::default();
+    let setting = OperationSetting::default();
 
-    let mut session = Session::default();
-    let report = session
-        .format(Input::File(filename.into()), &config)
-        .unwrap();
+    let report = format(Input::File(filename.into()), &config, setting).unwrap();
     let mut data = vec![];
     emit_format_report(
         report,
@@ -321,8 +319,7 @@ fn assert_stdin_output(
     // Populate output by writing to a vec.
     let mut buf: Vec<u8> = vec![];
     {
-        let mut session = Session::default();
-        let report = session.format(input, &config).unwrap();
+        let report = format(input, &config, OperationSetting::default()).unwrap();
         let format_has_diff = emit_format_report(
             report,
             &mut buf,
@@ -413,8 +410,7 @@ fn self_tests() {
 fn stdin_formatting_smoke_test() {
     init_log();
     let input = Input::Text("fn main () {}".to_owned());
-    let mut session = RustFormatterBuilder::default().build();
-    let report = session.format(input, &Config::default()).unwrap();
+    let report = format(input, &Config::default(), OperationSetting::default()).unwrap();
     assert!(!report.has_errors());
     let mut buf: Vec<u8> = vec![];
     emit_format_report(
@@ -438,8 +434,11 @@ fn stdin_parser_panic_caught() {
     init_log();
     // See issue #3239.
     for text in ["{", "}"].iter().cloned().map(String::from) {
-        let mut session = Session::default();
-        let format_result = session.format(Input::Text(text), &Config::default());
+        let format_result = format(
+            Input::Text(text),
+            &Config::default(),
+            OperationSetting::default(),
+        );
 
         assert!(format_result.err().unwrap().is_parse_error());
     }
@@ -458,8 +457,7 @@ fn stdin_works_with_modified_lines() {
     config.set().newline_style(NewlineStyle::Unix);
     let mut buf: Vec<u8> = vec![];
     {
-        let mut session = Session::default();
-        let report = session.format(input, &config).unwrap();
+        let report = format(input, &config, OperationSetting::default()).unwrap();
         let format_has_diff = emit_format_report(
             report,
             &mut buf,
@@ -505,8 +503,7 @@ fn format_lines_errors_are_reported() {
     let input = Input::Text(format!("fn {}() {{}}", long_identifier));
     let mut config = Config::default();
     config.set().error_on_line_overflow(true);
-    let mut session = Session::default();
-    let report = session.format(input, &config).unwrap();
+    let report = format(input, &config, OperationSetting::default()).unwrap();
     assert!(report.has_errors());
 }
 
@@ -518,8 +515,7 @@ fn format_lines_errors_are_reported_with_tabs() {
     let mut config = Config::default();
     config.set().error_on_line_overflow(true);
     config.set().hard_tabs(true);
-    let mut session = Session::default();
-    let report = session.format(input, &config).unwrap();
+    let report = format(input, &config, OperationSetting::default()).unwrap();
     assert!(report.has_errors());
 }
 
@@ -598,7 +594,7 @@ fn print_mismatches<T: Fn(u32) -> String>(
     }
 }
 
-fn read_config(filename: &Path) -> (Config, RustFormatterBuilder, EmitterConfig) {
+fn read_config(filename: &Path) -> (Config, OperationSetting, EmitterConfig) {
     let sig_comments = read_significant_comments(filename);
     // Look for a config file. If there is a 'config' property in the significant comments, use
     // that. Otherwise, if there are no significant comments at all, look for a config file with
@@ -609,11 +605,11 @@ fn read_config(filename: &Path) -> (Config, RustFormatterBuilder, EmitterConfig)
         get_config(filename.with_extension("toml").file_name().map(Path::new))
     };
 
-    let mut rustfmt_builder = RustFormatterBuilder::default();
+    let mut operation_setting = OperationSetting::default();
     let mut emitter_config = EmitterConfig::default();
     for (key, val) in &sig_comments {
         if key == "recursive" {
-            rustfmt_builder.recursive(val.parse::<bool>().unwrap());
+            operation_setting.recursive = val.parse::<bool>().unwrap();
         } else if key == "emit_mode" {
             emitter_config.emit_mode = val.parse::<EmitMode>().unwrap()
         } else if key != "target" && key != "config" && key != "unstable" {
@@ -624,18 +620,17 @@ fn read_config(filename: &Path) -> (Config, RustFormatterBuilder, EmitterConfig)
         }
     }
 
-    (config, rustfmt_builder, emitter_config)
+    (config, operation_setting, emitter_config)
 }
 
 fn format_file<P: Into<PathBuf>>(
     filepath: P,
-    rustfmt_builder: RustFormatterBuilder,
+    operation_setting: OperationSetting,
     config: Config,
 ) -> Result<FormatReport, OperationError> {
     let filepath = filepath.into();
     let input = Input::File(filepath);
-    let mut session = rustfmt_builder.build();
-    session.format(input, &config)
+    format(input, &config, operation_setting)
 }
 
 enum IdempotentCheckError {
@@ -650,7 +645,7 @@ fn idempotent_check(
     let sig_comments = read_significant_comments(filename);
     let (config, builder, _) = if let Some(ref config_file_path) = opt_config {
         let config = Config::from_toml_path(config_file_path).expect("`rustfmt.toml` not found");
-        let builder = RustFormatterBuilder::default();
+        let builder = OperationSetting::default();
         let emitter_config = EmitterConfig::default();
         (config, builder, emitter_config)
     } else {
