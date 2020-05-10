@@ -1,16 +1,14 @@
 use rustc_span::{BytePos, Pos, Span};
 
-use crate::config::{
-    file_lines::FileLines,
-    FileName,
-};
+use crate::config::{file_lines::FileLines, FileName};
 
 use crate::formatting::{
     comment::{is_last_comment_block, rewrite_comment, CodeCharKind, CommentCodeSlices},
     shape::{Indent, Shape},
     source_map::LineRangeUtils,
     utils::{
-        count_lf_crlf, count_newlines, last_line_contains_single_line_comment, last_line_width, mk_sp,
+        count_lf_crlf, count_newlines, last_line_contains_single_line_comment, last_line_width,
+        mk_sp,
     },
     visitor::FmtVisitor,
 };

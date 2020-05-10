@@ -4,16 +4,10 @@ use std::ops::Deref;
 use rustc_ast::ast::{self, FnRetTy, Mutability};
 use rustc_span::{symbol::kw, BytePos, Span};
 
-use crate::config::{
-    lists::*,
-    IndentStyle,
-    TypeDensity,
-};
+use crate::config::{lists::*, IndentStyle, TypeDensity};
 use crate::formatting::{
     expr::{format_expr, rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix, ExprType},
-    lists::{
-        definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
-    },
+    lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator},
     macros::{rewrite_macro, MacroPosition},
     overflow,
     pairs::{rewrite_pair, PairParts},
@@ -23,8 +17,7 @@ use crate::formatting::{
     spanned::Spanned,
     utils::{
         colon_spaces, extra_offset, first_line_width, format_extern, format_mutability,
-        last_line_extendable, last_line_width, mk_sp, rewrite_ident,
-        format_unsafety,
+        format_unsafety, last_line_extendable, last_line_width, mk_sp, rewrite_ident,
     },
 };
 

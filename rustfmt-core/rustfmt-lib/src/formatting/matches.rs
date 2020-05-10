@@ -5,11 +5,15 @@ use std::iter::repeat;
 use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, Span};
 
+use crate::config::{
+    lists::*,
+    Config, ControlBraceStyle, IndentStyle, MatchArmLeadingPipe,
+};
 use crate::formatting::{
     comment::{combine_strs_with_missing_comments, rewrite_comment},
     expr::{
-        format_expr, is_empty_block, is_simple_block, is_unsafe_block, prefer_next_line, rewrite_cond,
-        ExprType, RhsTactics,
+        format_expr, is_empty_block, is_simple_block, is_unsafe_block, prefer_next_line,
+        rewrite_cond, ExprType, RhsTactics,
     },
     lists::{itemize_list, write_list, ListFormatting},
     rewrite::{Rewrite, RewriteContext},
@@ -17,13 +21,9 @@ use crate::formatting::{
     source_map::SpanUtils,
     spanned::Spanned,
     utils::{
-        contains_skip, extra_offset, first_line_width, inner_attributes, last_line_extendable, mk_sp,
-        semicolon_for_expr, trimmed_last_line_width, unicode_str_width,
+        contains_skip, extra_offset, first_line_width, inner_attributes, last_line_extendable,
+        mk_sp, semicolon_for_expr, trimmed_last_line_width, unicode_str_width,
     },
-};
-use crate::config::{
-    lists::*,
-    Config, ControlBraceStyle, IndentStyle, MatchArmLeadingPipe,
 };
 
 /// A simple wrapper type against `ast::Arm`. Used inside `write_list()`.

@@ -5,9 +5,7 @@ use crate::config::IndentStyle;
 use crate::formatting::{
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
-    utils::{
-        first_line_width, is_single_line, last_line_width, trimmed_last_line_width, wrap_str,
-    },
+    utils::{first_line_width, is_single_line, last_line_width, trimmed_last_line_width, wrap_str},
 };
 
 /// Sigils that decorate a binop pair.

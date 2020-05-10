@@ -11,8 +11,8 @@ use crate::formatting::{
     shape::{Indent, Shape},
     string::{rewrite_string, StringFormat},
     utils::{
-        count_newlines, first_line_width, last_line_width, tab_to_spaces, trim_left_preserve_layout,
-        unicode_str_width,
+        count_newlines, first_line_width, last_line_width, tab_to_spaces,
+        trim_left_preserve_layout, unicode_str_width,
     },
 };
 

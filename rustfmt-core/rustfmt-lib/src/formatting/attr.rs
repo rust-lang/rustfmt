@@ -4,14 +4,13 @@ use rustc_ast::ast;
 use rustc_ast::attr::HasAttrs;
 use rustc_span::{symbol::sym, Span};
 
+use crate::config::{lists::*, IndentStyle};
 use doc_comment::DocCommentFormatter;
-use crate::config::{
-    lists::*,
-    IndentStyle,
-};
 
 use crate::formatting::{
-    comment::{contains_comment, rewrite_doc_comment, CommentStyle, recover_missing_comment_in_span},
+    comment::{
+        contains_comment, recover_missing_comment_in_span, rewrite_doc_comment, CommentStyle,
+    },
     expr::{rewrite_literal, span_ends_with_comma},
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator},
     overflow,

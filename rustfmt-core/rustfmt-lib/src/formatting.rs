@@ -8,6 +8,7 @@ use rustc_ast::ast;
 pub(crate) use syntux::session::ParseSess;
 
 use self::newline_style::apply_newline_style;
+use crate::config::{Config, FileName};
 use crate::formatting::{
     comment::{CharClasses, FullCodeCharKind},
     report::NonFormattedRange,
@@ -15,7 +16,6 @@ use crate::formatting::{
     utils::count_newlines,
     visitor::FmtVisitor,
 };
-use crate::config::{Config, FileName};
 use crate::result::OperationError;
 use crate::{
     ErrorKind, FormatError, FormatReport, FormatResult, Input, OperationSetting, Verbosity,

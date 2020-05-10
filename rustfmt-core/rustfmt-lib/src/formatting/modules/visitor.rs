@@ -2,11 +2,7 @@ use rustc_ast::ast;
 use rustc_ast::visit::Visitor;
 use rustc_span::Symbol;
 
-use crate::formatting::{
-    attr::MetaVisitor,
-    syntux::parser::Parser,
-    syntux::session::ParseSess,
-};
+use crate::formatting::{attr::MetaVisitor, syntux::parser::Parser, syntux::session::ParseSess};
 
 pub(crate) struct ModItem {
     pub(crate) item: ast::Item,

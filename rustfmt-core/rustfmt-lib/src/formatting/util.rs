@@ -1,10 +1,7 @@
-use crate::{config::Config, emitter::Verbosity, Input, NewlineStyle, OperationSetting};
 use crate::formatting::{
-    comment::LineClasses,
-    FormattedSnippet,
-    shape::Indent,
-    utils::indent_next_line,
+    comment::LineClasses, shape::Indent, utils::indent_next_line, FormattedSnippet,
 };
+use crate::{config::Config, emitter::Verbosity, Input, NewlineStyle, OperationSetting};
 
 /// Format the given snippet. The snippet is expected to be *complete* code.
 /// When we cannot parse the given snippet, this function returns `None`.

@@ -11,18 +11,12 @@ use rustc_span::{
     symbol, BytePos, Span,
 };
 
-use crate::config::{
-    Config,
-    FileName,
-    file_lines::LineRange,
+use crate::config::{file_lines::LineRange, Config, FileName};
+use crate::formatting::{
+    source_map::LineRangeUtils, utils::starts_with_newline, visitor::SnippetProvider,
 };
 use crate::ignore_path::IgnorePathSet;
 use crate::result::OperationError;
-use crate::formatting::{
-    source_map::LineRangeUtils,
-    utils::starts_with_newline,
-    visitor::SnippetProvider,
-};
 
 /// ParseSess holds structs necessary for constructing a parser.
 pub(crate) struct ParseSess {
@@ -275,8 +269,8 @@ mod tests {
     mod emitter {
         use super::*;
         use crate::config::IgnoreList;
-        use crate::is_nightly_channel;
         use crate::formatting::utils::mk_sp;
+        use crate::is_nightly_channel;
         use rustc_span::{FileName as SourceMapFileName, MultiSpan, DUMMY_SP};
         use std::path::PathBuf;
 

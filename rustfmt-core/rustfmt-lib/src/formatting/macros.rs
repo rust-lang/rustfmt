@@ -22,26 +22,25 @@ use rustc_span::{
     BytePos, Span, Symbol, DUMMY_SP,
 };
 
+use crate::config::lists::*;
 use crate::formatting::{
-    comment::{
-        contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses,
-    },
+    comment::{contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses},
     expr::{rewrite_array, rewrite_assign_rhs},
-    report::NonFormattedRange,
     lists::{itemize_list, write_list, ListFormatting},
     overflow,
+    report::NonFormattedRange,
     rewrite::{Rewrite, RewriteContext},
     shape::{Indent, Shape},
     source_map::SpanUtils,
     spanned::Spanned,
-    util::{format_snippet, format_code_block},
+    util::{format_code_block, format_snippet},
     utils::{
         count_newlines, format_visibility, indent_next_line, is_empty_line, mk_sp,
-        remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
+        remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout, wrap_str,
+        NodeIdExt,
     },
     visitor::FmtVisitor,
 };
-use crate::config::lists::*;
 
 const FORCED_BRACKET_MACROS: &[&str] = &["vec!"];
 
