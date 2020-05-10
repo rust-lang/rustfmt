@@ -4,6 +4,7 @@ use std::cmp;
 use std::iter::Peekable;
 
 use rustc_span::BytePos;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::comment::{find_comment_end, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
@@ -464,8 +465,10 @@ where
 
             if !starts_with_newline(comment) {
                 if formatting.align_comments {
-                    let mut comment_alignment =
-                        post_comment_alignment(item_max_width, inner_item.len());
+                    let mut comment_alignment = post_comment_alignment(
+                        item_max_width,
+                        UnicodeSegmentation::graphemes(inner_item.as_str(), true).count(),
+                    );
                     if first_line_width(&formatted_comment)
                         + last_line_width(&result)
                         + comment_alignment
@@ -474,8 +477,10 @@ where
                     {
                         item_max_width = None;
                         formatted_comment = rewrite_post_comment(&mut item_max_width)?;
-                        comment_alignment =
-                            post_comment_alignment(item_max_width, inner_item.len());
+                        comment_alignment = post_comment_alignment(
+                            item_max_width,
+                            UnicodeSegmentation::graphemes(inner_item.as_str(), true).count(),
+                        );
                     }
                     for _ in 0..=comment_alignment {
                         result.push(' ');
@@ -533,7 +538,7 @@ where
     let mut first = true;
     for item in items.clone().into_iter().skip(i) {
         let item = item.as_ref();
-        let inner_item_width = item.inner_as_ref().len();
+        let inner_item_width = UnicodeSegmentation::graphemes(item.inner_as_ref(), true).count();
         if !first
             && (item.is_different_group()
                 || item.post_comment.is_none()
