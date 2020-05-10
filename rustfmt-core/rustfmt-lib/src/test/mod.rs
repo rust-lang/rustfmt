@@ -659,7 +659,7 @@ fn idempotent_check(
     let mut write_result = HashMap::new();
     for (filename, text) in format_report.format_result() {
         if let FileName::Real(ref filename) = filename {
-            write_result.insert(filename.to_owned(), text.formatted_snippet.snippet.clone());
+            write_result.insert(filename.to_owned(), text.formatted_text().to_owned());
         }
     }
 

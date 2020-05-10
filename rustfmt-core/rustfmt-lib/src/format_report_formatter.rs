@@ -49,8 +49,8 @@ impl<'a> Display for FormatReportFormatter<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let formatter = DisplayListFormatter::new(self.enable_colors, false);
 
-        for (file, errors) in self.report.format_result.borrow().iter() {
-            for error in errors.errors() {
+        for (file, errors) in self.report.format_result_as_rc().borrow().iter() {
+            for error in errors.errors_excluding_macro() {
                 let snippet = formatting_error_to_snippet(file, error);
                 writeln!(f, "{}\n", formatter.format(&DisplayList::from(snippet)))?;
             }
@@ -92,11 +92,11 @@ fn formatting_error_to_snippet(file: &FileName, error: &FormatError) -> Snippet 
 }
 
 fn snippet_title(error: &FormatError) -> Annotation {
-    let annotation_type = error_kind_to_snippet_annotation_type(&error.kind);
+    let annotation_type = error_kind_to_snippet_annotation_type(&error.kind());
 
     Annotation {
         id: None,
-        label: Some(error.kind.to_string()),
+        label: Some(error.kind().to_string()),
         annotation_type,
     }
 }
@@ -104,14 +104,14 @@ fn snippet_title(error: &FormatError) -> Annotation {
 fn snippet_code_slice(file: &FileName, error: &FormatError) -> Slice {
     let annotations = slice_annotation(error).into_iter().collect();
     let origin = error
-        .line_num
+        .line_num()
         .as_ref()
         .map(|line_num| format!("{}:{}", file, line_num));
-    let source = error.line_str.clone().unwrap_or_else(|| String::new());
+    let source = error.line_str().unwrap_or("").to_owned();
 
     Slice {
         source,
-        line_start: error.line_num.unwrap_or(0),
+        line_start: error.line_num().unwrap_or(0),
         origin,
         fold: false,
         annotations,
