@@ -168,11 +168,6 @@ impl FormatReport {
             .map(|(_, format_result)| format_result.errors_excluding_macro().count())
             .sum()
     }
-
-    /// Whether any warnings or errors are present in the report.
-    pub fn has_warnings(&self) -> bool {
-        self.has_errors()
-    }
 }
 
 impl NonFormattedRange {
