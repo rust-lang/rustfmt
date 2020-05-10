@@ -5,19 +5,56 @@ use std::time::{Duration, Instant};
 
 use rustc_ast::ast;
 
+pub(crate) use syntux::session::ParseSess;
+
 use self::newline_style::apply_newline_style;
-use crate::comment::{CharClasses, FullCodeCharKind};
+use crate::formatting::{
+    comment::{CharClasses, FullCodeCharKind},
+    report::NonFormattedRange,
+    syntux::parser::{DirectoryOwnership, Parser, ParserError},
+    utils::count_newlines,
+    visitor::FmtVisitor,
+};
 use crate::config::{Config, FileName};
-use crate::syntux::parser::{DirectoryOwnership, Parser, ParserError};
-use crate::syntux::session::ParseSess;
-use crate::utils::count_newlines;
-use crate::visitor::FmtVisitor;
+use crate::result::OperationError;
 use crate::{
-    modules, ErrorKind, FormatError, FormatReport, FormatResult, Input, NonFormattedRange,
-    OperationError, OperationSetting, Verbosity,
+    ErrorKind, FormatError, FormatReport, FormatResult, Input, OperationSetting, Verbosity,
 };
 
+#[macro_use]
+mod utils;
+
+mod attr;
+mod chains;
+mod closures;
+mod comment;
+mod expr;
+mod imports;
+mod items;
+mod lists;
+mod macros;
+mod matches;
+mod missed_spans;
+pub(crate) mod modules;
 mod newline_style;
+mod overflow;
+mod pairs;
+mod patterns;
+mod reorder;
+mod rewrite;
+mod shape;
+mod skip;
+pub(crate) mod source_map;
+mod spanned;
+mod stmt;
+mod string;
+mod syntux;
+mod types;
+mod vertical;
+pub(crate) mod visitor;
+
+pub(crate) mod report;
+pub(crate) mod util;
 
 pub(crate) fn format_input_inner(
     input: Input,
@@ -32,6 +69,7 @@ pub(crate) fn format_input_inner(
         format_project(input, config, operation_setting)
     })
 }
+
 fn format_project(
     input: Input,
     config: &Config,
@@ -410,5 +448,63 @@ where
 {
     if verbosity == Verbosity::Verbose && !forbid_verbose_output {
         f();
+    }
+}
+
+/// Result of formatting a snippet of code along with ranges of lines that didn't get formatted,
+/// i.e., that got returned as they were originally.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct FormattedSnippet {
+    snippet: String,
+    non_formatted_ranges: Vec<NonFormattedRange>,
+}
+
+impl FormattedSnippet {
+    /// In case the snippet needed to be wrapped in a function, this shifts down the ranges of
+    /// non-formatted code.
+    fn unwrap_code_block(&mut self) {
+        self.non_formatted_ranges.iter_mut().for_each(|range| {
+            *range = range.shift_up();
+        });
+    }
+
+    /// Returns `true` if the line n did not get formatted.
+    pub(crate) fn is_line_non_formatted(&self, n: usize) -> bool {
+        self.non_formatted_ranges
+            .iter()
+            .any(|range| range.contains(n))
+    }
+}
+
+impl AsRef<str> for FormattedSnippet {
+    fn as_ref(&self) -> &str {
+        self.snippet.as_str()
+    }
+}
+
+impl Input {
+    fn file_name(&self) -> FileName {
+        match *self {
+            Input::File(ref file) => FileName::Real(file.clone()),
+            Input::Text(..) => FileName::Stdin,
+        }
+    }
+
+    fn to_directory_ownership(&self) -> Option<DirectoryOwnership> {
+        match self {
+            Input::File(ref file) => {
+                // If there exists a directory with the same name as an input,
+                // then the input should be parsed as a sub module.
+                let file_stem = file.file_stem()?;
+                if file.parent()?.to_path_buf().join(file_stem).is_dir() {
+                    Some(DirectoryOwnership::Owned {
+                        relative: file_stem.to_str().map(ast::Ident::from_str),
+                    })
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 }

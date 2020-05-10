@@ -188,7 +188,7 @@ impl ConfigCodeBlock {
 
         let report = report.unwrap();
         let result = report.format_result().next().unwrap();
-        let text = &result.1.formatted_snippet.snippet;
+        let text = result.1.formatted_text();
         !self.formatted_has_diff(text)
     }
 

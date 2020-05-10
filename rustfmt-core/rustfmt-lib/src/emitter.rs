@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 use thiserror::Error;
 
-use crate::syntux::session::ParseSess;
+use crate::formatting::ParseSess;
 use crate::{config::FileName, FormatReport, FormatResult, NewlineStyle};
 
 pub mod checkstyle;
@@ -165,7 +165,7 @@ where
     let mut has_diff = false;
 
     emitter.emit_header(out)?;
-    for (filename, format_result) in format_report.format_result.borrow().iter() {
+    for (filename, format_result) in format_report.format_result_as_rc().borrow().iter() {
         has_diff |= write_file(None, filename, &format_result, out, &mut *emitter)?.has_diff;
     }
     emitter.emit_footer(out)?;
@@ -200,10 +200,10 @@ where
     // source map instead of hitting the file system. This also supports getting
     // original text for `FileName::Stdin`.
     let original_text =
-        if formatted_result.newline_style != NewlineStyle::Auto && *filename != FileName::Stdin {
+        if formatted_result.newline_style() != NewlineStyle::Auto && *filename != FileName::Stdin {
             Rc::new(fs::read_to_string(ensure_real_path(filename))?)
         } else {
-            match &formatted_result.original_snippet {
+            match formatted_result.original_text() {
                 Some(original_snippet) => Rc::new(original_snippet.to_owned()),
                 None => match parse_sess.and_then(|sess| sess.get_original_snippet(filename)) {
                     Some(ori) => ori,
@@ -215,7 +215,7 @@ where
     let formatted_file = FormattedFile {
         filename,
         original_text: original_text.as_str(),
-        formatted_text: &formatted_result.formatted_snippet.snippet,
+        formatted_text: formatted_result.formatted_text(),
     };
 
     emitter.emit_formatted_file(out, formatted_file)
