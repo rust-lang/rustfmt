@@ -4,10 +4,7 @@
 use rustc_span::{BytePos, Span};
 
 use crate::config::file_lines::LineRange;
-use crate::formatting::{
-    comment::FindUncommented,
-    visitor::SnippetProvider,
-};
+use crate::formatting::{comment::FindUncommented, visitor::SnippetProvider};
 
 pub(crate) trait SpanUtils {
     fn span_after(&self, original: Span, needle: &str) -> BytePos;

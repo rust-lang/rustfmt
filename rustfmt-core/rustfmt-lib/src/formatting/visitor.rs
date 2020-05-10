@@ -8,13 +8,13 @@ use crate::config::{BraceStyle, Config};
 use crate::formatting::{
     attr::*,
     comment::{rewrite_comment, CodeCharKind, CommentCodeSlices},
-    report::{FormatReport, NonFormattedRange},
     items::{
         format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
         rewrite_associated_impl_type, rewrite_extern_crate, rewrite_opaque_impl_type,
         rewrite_opaque_type, rewrite_type_alias, FnBraceStyle, FnSig, StaticParts, StructParts,
     },
     macros::{macro_style, rewrite_macro, rewrite_macro_def, MacroPosition},
+    report::{FormatReport, NonFormattedRange},
     rewrite::{Rewrite, RewriteContext},
     shape::{Indent, Shape},
     skip::{is_skip_attr, SkipContext},

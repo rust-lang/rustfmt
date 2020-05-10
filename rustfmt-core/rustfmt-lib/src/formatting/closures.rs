@@ -1,15 +1,13 @@
 use rustc_ast::{ast, ptr};
 use rustc_span::Span;
 
-use crate::config::{
-    lists::*,
-    IndentStyle,
-    SeparatorTactic,
-};
+use crate::config::{lists::*, IndentStyle, SeparatorTactic};
 use crate::formatting::{
     attr::get_attrs_from_stmt,
-    expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond,
-           rewrite_block_with_visitor},
+    expr::{
+        block_contains_comment, is_simple_block, is_unsafe_block, rewrite_block_with_visitor,
+        rewrite_cond,
+    },
     items::{span_hi_for_param, span_lo_for_param},
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator},
     overflow::OverflowableItem,
@@ -162,15 +160,8 @@ fn rewrite_closure_with_block(
         rules: ast::BlockCheckMode::Default,
         span: body.span,
     };
-    let block = rewrite_block_with_visitor(
-        context,
-        "",
-        &block,
-        Some(&body.attrs),
-        None,
-        shape,
-        false,
-    )?;
+    let block =
+        rewrite_block_with_visitor(context, "", &block, Some(&body.attrs), None, shape, false)?;
     Some(format!("{} {}", prefix, block))
 }
 

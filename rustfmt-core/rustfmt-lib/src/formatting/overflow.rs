@@ -7,15 +7,16 @@ use rustc_ast::token::DelimToken;
 use rustc_ast::{ast, ptr};
 use rustc_span::Span;
 
+use crate::config::lists::*;
 use crate::formatting::{
     closures,
     expr::{
-        can_be_overflowed_expr, is_every_expr_simple, is_method_call, is_nested_call, is_simple_expr,
-        rewrite_cond,
+        can_be_overflowed_expr, is_every_expr_simple, is_method_call, is_nested_call,
+        is_simple_expr, rewrite_cond,
     },
     lists::{
-        definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
-        total_item_width,
+        definitive_tactic, itemize_list, total_item_width, write_list, ListFormatting, ListItem,
+        Separator,
     },
     macros::MacroArg,
     patterns::{can_be_overflowed_pat, TuplePatField},
@@ -26,7 +27,6 @@ use crate::formatting::{
     types::{can_be_overflowed_type, SegmentParam},
     utils::{count_newlines, extra_offset, first_line_width, last_line_width, mk_sp},
 };
-use crate::config::lists::*;
 
 const SHORT_ITEM_THRESHOLD: usize = 10;
 

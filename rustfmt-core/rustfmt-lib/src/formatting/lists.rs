@@ -6,11 +6,7 @@ use std::iter::Peekable;
 use rustc_span::BytePos;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::config::{
-    lists::*,
-    Config,
-    IndentStyle,
-};
+use crate::config::{lists::*, Config, IndentStyle};
 use crate::formatting::{
     comment::{find_comment_end, rewrite_comment, FindUncommented},
     rewrite::RewriteContext,

@@ -6,13 +6,12 @@ use itertools::Itertools;
 use rustc_ast::ast;
 use rustc_span::{BytePos, Span};
 
+use crate::config::lists::*;
 use crate::formatting::{
     comment::combine_strs_with_missing_comments,
     expr::rewrite_field,
     items::{rewrite_struct_field, rewrite_struct_field_prefix},
-    lists::{
-        definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
-    },
+    lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator},
     rewrite::{Rewrite, RewriteContext},
     shape::{Indent, Shape},
     source_map::SpanUtils,
@@ -21,7 +20,6 @@ use crate::formatting::{
         contains_skip, is_attributes_extendable, mk_sp, rewrite_ident, trimmed_last_line_width,
     },
 };
-use crate::config::lists::*;
 
 pub(crate) trait AlignedItem {
     fn skip(&self) -> bool;

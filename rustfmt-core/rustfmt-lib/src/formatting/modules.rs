@@ -6,6 +6,7 @@ use rustc_ast::ast;
 use rustc_ast::visit::Visitor;
 use rustc_span::symbol::{self, sym, Symbol};
 
+use crate::config::FileName;
 use crate::formatting::{
     attr::MetaVisitor,
     items::is_mod_decl,
@@ -13,7 +14,6 @@ use crate::formatting::{
     syntux::session::ParseSess,
     utils::contains_skip,
 };
-use crate::config::FileName;
 
 mod visitor;
 

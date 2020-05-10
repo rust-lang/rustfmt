@@ -6,16 +6,14 @@ use rustc_ast::token::{DelimToken, LitKind};
 use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, Span};
 
-use crate::config::{
-    lists::*,
-    Config, ControlBraceStyle, IndentStyle,
-};
+use crate::config::{lists::*, Config, ControlBraceStyle, IndentStyle};
 use crate::formatting::{
     chains::rewrite_chain,
     closures,
     comment::{
-        combine_strs_with_missing_comments, comment_style, contains_comment, recover_comment_removed,
-        rewrite_comment, rewrite_missing_comment, CharClasses, FindUncommented,
+        combine_strs_with_missing_comments, comment_style, contains_comment,
+        recover_comment_removed, rewrite_comment, rewrite_missing_comment, CharClasses,
+        FindUncommented,
     },
     lists::{
         definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,

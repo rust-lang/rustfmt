@@ -13,15 +13,13 @@ use crate::config::lists::*;
 use crate::config::{Edition, IndentStyle};
 use crate::formatting::{
     comment::combine_strs_with_missing_comments,
-    lists::{
-        definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
-    },
+    lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator},
     reorder::{compare_as_versions, compare_opt_ident_as_versions},
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
     source_map::SpanUtils,
     spanned::Spanned,
-    utils::{is_same_visibility, mk_sp, rewrite_ident, format_visibility},
+    utils::{format_visibility, is_same_visibility, mk_sp, rewrite_ident},
     visitor::FmtVisitor,
 };
 
@@ -234,9 +232,10 @@ impl UseTree {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<String> {
-        let vis = self.visibility.as_ref().map_or(Cow::from(""), |vis| {
-            format_visibility(context, &vis)
-        });
+        let vis = self
+            .visibility
+            .as_ref()
+            .map_or(Cow::from(""), |vis| format_visibility(context, &vis));
         let use_str = self
             .rewrite(context, shape.offset_left(vis.len())?)
             .map(|s| {
