@@ -637,9 +637,9 @@ trailing whitespaces.
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#3392](https://github.com/rust-lang/rustfmt/issues/3392))
 
-## `fn_args_layout`
+## `fn_params_layout`
 
-Control the layout of arguments in a function
+Control the layout of parameters in a function signature
 
 - **Default value**: `"Tall"`
 - **Possible values**: `"Compressed"`, `"Tall"`, `"Vertical"`
