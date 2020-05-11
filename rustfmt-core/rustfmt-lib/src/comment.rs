@@ -704,6 +704,9 @@ impl<'a> CommentRewrite<'a> {
         } else if self.fmt.config.wrap_comments() && ItemizedBlock::is_itemized_line(&line) {
             let ib = ItemizedBlock::new(&line);
             self.item_block = Some(ib);
+            if self.result.ends_with(' ') {
+                self.result.pop();
+            }
             return false;
         }
 
