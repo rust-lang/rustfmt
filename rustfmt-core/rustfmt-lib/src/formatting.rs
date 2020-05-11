@@ -18,7 +18,8 @@ use crate::formatting::{
 };
 use crate::result::OperationError;
 use crate::{
-    ErrorKind, FormatError, FormatReport, FormatResult, Input, OperationSetting, Verbosity,
+    result::{ErrorKind, FormatError},
+    FormatReport, FormatResult, Input, OperationSetting, Verbosity,
 };
 
 #[macro_use]

@@ -3,7 +3,7 @@ use std::fmt;
 use std::io;
 use std::io::Write;
 
-use crate::{Color, Verbosity};
+use crate::{emitter::Color, Verbosity};
 
 #[derive(Debug, PartialEq)]
 pub enum DiffLine {

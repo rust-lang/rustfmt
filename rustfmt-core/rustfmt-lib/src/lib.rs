@@ -9,8 +9,6 @@ extern crate log;
 
 use std::path::PathBuf;
 
-use rustc_ast::ast;
-
 pub use crate::config::{
     load_config, CliOptions, Config, Edition, FileLines, FileName, NewlineStyle, Range,
 };
@@ -19,10 +17,7 @@ pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportForm
 pub use crate::formatting::report::{FormatReport, FormatResult};
 
 use crate::formatting::format_input_inner;
-use crate::{
-    emitter::{Color, Verbosity},
-    result::{ErrorKind, FormatError, OperationError},
-};
+use crate::{emitter::Verbosity, result::OperationError};
 
 #[cfg(feature = "config")]
 pub mod config;

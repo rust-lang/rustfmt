@@ -1,5 +1,8 @@
 use crate::config::FileName;
-use crate::{ErrorKind, FormatError, FormatReport};
+use crate::{
+    formatting::report::FormatReport,
+    result::{ErrorKind, FormatError},
+};
 use annotate_snippets::display_list::DisplayList;
 use annotate_snippets::formatter::DisplayListFormatter;
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
