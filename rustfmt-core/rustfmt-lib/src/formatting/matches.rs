@@ -5,10 +5,7 @@ use std::iter::repeat;
 use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, Span};
 
-use crate::config::{
-    lists::*,
-    Config, ControlBraceStyle, IndentStyle, MatchArmLeadingPipe,
-};
+use crate::config::{lists::*, Config, ControlBraceStyle, IndentStyle, MatchArmLeadingPipe};
 use crate::formatting::{
     comment::{combine_strs_with_missing_comments, rewrite_comment},
     expr::{
