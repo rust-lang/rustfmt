@@ -91,11 +91,10 @@ fn inline_config() {
             "--config",
             "max_width=80,edition=2018",
             "--config",
-            "tab_spaces=8,format_strings=true"
+            "max_width=60,format_strings=true"
         ],
-        contains("max_width = 80")
+        contains("max_width = 60")
             && contains("edition = \"2018\"")
             && contains("format_strings = true")
-            && contains("tab_spaces = 8")
     );
 }
