@@ -10,9 +10,9 @@ use crate::emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChun
 
 use crate::config::{Config, FileName, NewlineStyle};
 use crate::{
-    emitter::{emit_format_report, EmitMode, EmitterConfig},
-    format, is_nightly_channel, Color, FormatReport, FormatReportFormatterBuilder, Input,
-    OperationError, OperationSetting,
+    emitter::{emit_format_report, Color, EmitMode, EmitterConfig},
+    format, is_nightly_channel, FormatReport, FormatReportFormatterBuilder, Input, OperationError,
+    OperationSetting,
 };
 
 mod configuration_snippet;

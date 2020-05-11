@@ -687,7 +687,7 @@ impl<'a> FmtVisitor<'a> {
             // we still need to differentiate to maintain sorting order.
 
             // type -> opaque -> const -> macro -> method
-            use crate::ast::AssocItemKind::*;
+            use ast::AssocItemKind::*;
             fn need_empty_line(a: &ast::AssocItemKind, b: &ast::AssocItemKind) -> bool {
                 match (a, b) {
                     (TyAlias(_, _, _, ref lty), TyAlias(_, _, _, ref rty))
