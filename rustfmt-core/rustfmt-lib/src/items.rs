@@ -1556,21 +1556,23 @@ fn format_tuple_struct(
     Some(result)
 }
 
-fn rewrite_type_prefix(
+fn rewrite_type<R: Rewrite>(
     context: &RewriteContext<'_>,
     indent: Indent,
-    prefix: &str,
     ident: ast::Ident,
+    vis: &ast::Visibility,
     generics: &ast::Generics,
+    generic_bounds_opt: Option<&ast::GenericBounds>,
+    rhs: Option<&R>,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
-    result.push_str(prefix);
+    result.push_str(&format!("{}type ", format_visibility(context, vis)));
     let ident_str = rewrite_ident(context, ident);
 
-    // 2 = `= `
     if generics.params.is_empty() {
         result.push_str(ident_str)
     } else {
+        // 2 = `= `
         let g_shape = Shape::indented(indent, context.config)
             .offset_left(result.len())?
             .sub_width(2)?;
@@ -1578,8 +1580,20 @@ fn rewrite_type_prefix(
         result.push_str(&generics_str);
     }
 
+    if let Some(bounds) = generic_bounds_opt {
+        if !bounds.is_empty() {
+            // 2 = `: `
+            let shape = Shape::indented(indent, context.config).offset_left(result.len() + 2)?;
+            let type_bounds = bounds.rewrite(context, shape).map(|s| format!(": {}", s))?;
+            result.push_str(&type_bounds);
+        }
+    }
+
     let where_budget = context.budget(last_line_width(&result));
-    let option = WhereClauseOption::snuggled(&result);
+    let mut option = WhereClauseOption::snuggled(&result);
+    if rhs.is_none() {
+        option.suppress_comma();
+    }
     let where_clause_str = rewrite_where_clause(
         context,
         &generics.where_clause,
@@ -1593,49 +1607,22 @@ fn rewrite_type_prefix(
     )?;
     result.push_str(&where_clause_str);
 
-    Some(result)
-}
+    if let Some(ty) = rhs {
+        // If there's a where clause, add a newline before the assignment. Otherwise just add a
+        // space.
+        if !generics.where_clause.predicates.is_empty() {
+            result.push_str(&indent.to_string_with_newline(context.config));
+        } else {
+            result.push(' ');
+        }
+        let lhs = format!("{}=", result);
 
-fn rewrite_type_item<R: Rewrite>(
-    context: &RewriteContext<'_>,
-    indent: Indent,
-    prefix: &str,
-    suffix: &str,
-    ident: ast::Ident,
-    rhs: &R,
-    generics: &ast::Generics,
-    vis: &ast::Visibility,
-) -> Option<String> {
-    let mut result = String::with_capacity(128);
-    result.push_str(&rewrite_type_prefix(
-        context,
-        indent,
-        &format!("{}{} ", format_visibility(context, vis), prefix),
-        ident,
-        generics,
-    )?);
-
-    if generics.where_clause.predicates.is_empty() {
-        result.push_str(suffix);
+        // 1 = `;`
+        let shape = Shape::indented(indent, context.config).sub_width(1)?;
+        rewrite_assign_rhs(context, lhs, &*ty, shape).map(|s| s + ";")
     } else {
-        result.push_str(&indent.to_string_with_newline(context.config));
-        result.push_str(suffix.trim_start());
+        Some(format!("{};", result))
     }
-
-    // 1 = ";"
-    let rhs_shape = Shape::indented(indent, context.config).sub_width(1)?;
-    rewrite_assign_rhs(context, result, rhs, rhs_shape).map(|s| s + ";")
-}
-
-pub(crate) fn rewrite_type_alias(
-    context: &RewriteContext<'_>,
-    indent: Indent,
-    ident: ast::Ident,
-    ty: &ast::Ty,
-    generics: &ast::Generics,
-    vis: &ast::Visibility,
-) -> Option<String> {
-    rewrite_type_item(context, indent, "type", " =", ident, ty, generics, vis)
 }
 
 pub(crate) fn rewrite_opaque_type(
@@ -1647,15 +1634,14 @@ pub(crate) fn rewrite_opaque_type(
     vis: &ast::Visibility,
 ) -> Option<String> {
     let opaque_type_bounds = OpaqueTypeBounds { generic_bounds };
-    rewrite_type_item(
+    rewrite_type(
         context,
         indent,
-        "type",
-        " =",
         ident,
-        &opaque_type_bounds,
-        generics,
         vis,
+        generics,
+        Some(generic_bounds),
+        Some(&opaque_type_bounds),
     )
 }
 
@@ -1897,40 +1883,24 @@ fn rewrite_static(
     }
 }
 
-pub(crate) fn rewrite_associated_type(
+pub(crate) fn rewrite_type_alias(
     ident: ast::Ident,
     ty_opt: Option<&ptr::P<ast::Ty>>,
     generics: &ast::Generics,
     generic_bounds_opt: Option<&ast::GenericBounds>,
     context: &RewriteContext<'_>,
     indent: Indent,
+    vis: &ast::Visibility,
 ) -> Option<String> {
-    let ident_str = rewrite_ident(context, ident);
-    // 5 = "type "
-    let generics_shape = Shape::indented(indent, context.config).offset_left(5)?;
-    let generics_str = rewrite_generics(context, ident_str, generics, generics_shape)?;
-    let prefix = format!("type {}", generics_str);
-
-    let type_bounds_str = if let Some(bounds) = generic_bounds_opt {
-        if bounds.is_empty() {
-            String::new()
-        } else {
-            // 2 = ": ".len()
-            let shape = Shape::indented(indent, context.config).offset_left(prefix.len() + 2)?;
-            bounds.rewrite(context, shape).map(|s| format!(": {}", s))?
-        }
-    } else {
-        String::new()
-    };
-
-    if let Some(ty) = ty_opt {
-        // 1 = `;`
-        let shape = Shape::indented(indent, context.config).sub_width(1)?;
-        let lhs = format!("{}{} =", prefix, type_bounds_str);
-        rewrite_assign_rhs(context, lhs, &**ty, shape).map(|s| s + ";")
-    } else {
-        Some(format!("{}{};", prefix, type_bounds_str))
-    }
+    rewrite_type(
+        context,
+        indent,
+        ident,
+        vis,
+        generics,
+        generic_bounds_opt,
+        ty_opt,
+    )
 }
 
 struct OpaqueType<'a> {
@@ -1973,13 +1943,14 @@ pub(crate) fn rewrite_opaque_impl_type(
 
 pub(crate) fn rewrite_associated_impl_type(
     ident: ast::Ident,
+    vis: &ast::Visibility,
     defaultness: ast::Defaultness,
     ty_opt: Option<&ptr::P<ast::Ty>>,
     generics: &ast::Generics,
     context: &RewriteContext<'_>,
     indent: Indent,
 ) -> Option<String> {
-    let result = rewrite_associated_type(ident, ty_opt, generics, None, context, indent)?;
+    let result = rewrite_type_alias(ident, ty_opt, generics, None, context, indent, vis)?;
 
     match defaultness {
         ast::Defaultness::Default(..) => Some(format!("default {}", result)),
@@ -3156,14 +3127,20 @@ impl Rewrite for ast::ForeignItem {
                 // 1 = ;
                 rewrite_assign_rhs(context, prefix, &**ty, shape.sub_width(1)?).map(|s| s + ";")
             }
-            ast::ForeignItemKind::TyAlias(..) => {
-                let vis = format_visibility(context, &self.vis);
-                Some(format!(
-                    "{}type {};",
-                    vis,
-                    rewrite_ident(context, self.ident)
-                ))
-            }
+            ast::ForeignItemKind::TyAlias(
+                _,
+                ref generics,
+                ref generic_bounds,
+                ref type_default,
+            ) => rewrite_type_alias(
+                self.ident,
+                type_default.as_ref(),
+                generics,
+                Some(generic_bounds),
+                &context,
+                shape.indent,
+                &self.vis,
+            ),
             ast::ForeignItemKind::MacCall(ref mac) => {
                 rewrite_macro(mac, None, context, shape, MacroPosition::Item)
             }
