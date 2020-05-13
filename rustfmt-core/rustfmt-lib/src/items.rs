@@ -2432,9 +2432,11 @@ fn rewrite_fn_base(
             result.push_str(&ret_str);
         }
 
-        // Comment between return type and the end of the decl.
-        let snippet_lo = fd.output.span().hi();
         if where_clause.predicates.is_empty() {
+            // Comment between return type and the end of the decl.
+            // Even if there are no predicates in the where clause, the "where" kw may be present,
+            // so start the snippet after it.
+            let snippet_lo = where_clause.span.hi();
             let snippet_hi = span.hi();
             let snippet = context.snippet(mk_sp(snippet_lo, snippet_hi));
             // Try to preserve the layout of the original snippet.

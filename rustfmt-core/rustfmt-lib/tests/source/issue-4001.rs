@@ -1,0 +1,3 @@
+fn unit() -> () where     /* comment */ {
+    ()
+}
