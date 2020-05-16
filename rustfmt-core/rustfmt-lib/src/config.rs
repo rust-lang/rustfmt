@@ -170,6 +170,43 @@ impl PartialConfig {
 
         ::toml::to_string(&cloned).map_err(ToTomlError)
     }
+
+    pub fn from_toml_path(file_path: &Path) -> Result<PartialConfig, Error> {
+        let mut file = File::open(&file_path)?;
+        let mut toml = String::new();
+        file.read_to_string(&mut toml)?;
+        PartialConfig::from_toml(&toml).map_err(|err| Error::new(ErrorKind::InvalidData, err))
+    }
+
+    fn from_toml(toml: &str) -> Result<PartialConfig, String> {
+        let parsed: ::toml::Value = toml
+            .parse()
+            .map_err(|e| format!("Could not parse TOML: {}", e))?;
+        let mut err = String::new();
+        let table = parsed
+            .as_table()
+            .ok_or_else(|| String::from("Parsed config was not table"))?;
+        for key in table.keys() {
+            if !Config::is_valid_name(key) {
+                let msg = &format!("Warning: Unknown configuration option `{}`\n", key);
+                err.push_str(msg)
+            }
+        }
+        match parsed.try_into() {
+            Ok(parsed_config) => {
+                if !err.is_empty() {
+                    eprint!("{}", err);
+                }
+                Ok(parsed_config)
+            }
+            Err(e) => {
+                err.push_str("Error: Decoding config file failed:\n");
+                err.push_str(format!("{}\n", e).as_str());
+                err.push_str("Please check your config file.");
+                Err(err)
+            }
+        }
+    }
 }
 
 impl Config {
@@ -197,11 +234,8 @@ impl Config {
     /// Returns a `Config` if the config could be read and parsed from
     /// the file, otherwise errors.
     pub fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
-        let mut file = File::open(&file_path)?;
-        let mut toml = String::new();
-        file.read_to_string(&mut toml)?;
-        Config::from_toml(&toml, file_path.parent().unwrap())
-            .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+        let partial_config = PartialConfig::from_toml_path(file_path)?;
+        Ok(Config::default().fill_from_parsed_config(partial_config, file_path.parent().unwrap()))
     }
 
     /// Resolves the config for input in `dir`.
@@ -213,11 +247,11 @@ impl Config {
     ///
     /// Returns the `Config` to use, and the path of the project file if there was
     /// one.
-    pub fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<PathBuf>), Error> {
+    pub fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<Vec<PathBuf>>), Error> {
         /// Try to find a project file in the given directory and its parents.
         /// Returns the path of a the nearest project file if one exists,
         /// or `None` if no project file was found.
-        fn resolve_project_file(dir: &Path) -> Result<Option<PathBuf>, Error> {
+        fn resolve_project_files(dir: &Path) -> Result<Option<Vec<PathBuf>>, Error> {
             let mut current = if dir.is_relative() {
                 env::current_dir()?.join(dir)
             } else {
@@ -225,13 +259,11 @@ impl Config {
             };
 
             current = dunce::canonicalize(current)?;
+            let mut paths = Vec::new();
 
             loop {
-                match get_toml_path(&current) {
-                    Ok(Some(path)) => return Ok(Some(path)),
-                    Err(e) => return Err(e),
-                    _ => (),
-                }
+                let current_toml_path = get_toml_path(&current)?;
+                paths.push(current_toml_path);
 
                 // If the current directory has no parent, we're done searching.
                 if !current.pop() {
@@ -239,10 +271,14 @@ impl Config {
                 }
             }
 
+            if !paths.is_empty() {
+                return Ok(paths.into_iter().filter(|p| p.is_some()).collect());
+            }
+
             // If nothing was found, check in the home directory.
             if let Some(home_dir) = dirs::home_dir() {
                 if let Some(path) = get_toml_path(&home_dir)? {
-                    return Ok(Some(path));
+                    return Ok(Some(vec![path]));
                 }
             }
 
@@ -250,48 +286,35 @@ impl Config {
             if let Some(mut config_dir) = dirs::config_dir() {
                 config_dir.push("rustfmt");
                 if let Some(path) = get_toml_path(&config_dir)? {
-                    return Ok(Some(path));
+                    return Ok(Some(vec![path]));
                 }
             }
 
             Ok(None)
         }
 
-        match resolve_project_file(dir)? {
+        let files = resolve_project_files(dir);
+
+        match files? {
             None => Ok((Config::default(), None)),
-            Some(path) => Config::from_toml_path(&path).map(|config| (config, Some(path))),
+            Some(paths) => {
+                let mut config = Config::default();
+                let mut used_paths = Vec::with_capacity(paths.len());
+                for path in paths.into_iter().rev() {
+                    let partial_config = PartialConfig::from_toml_path(&path)?;
+                    config = config.fill_from_parsed_config(partial_config, &path);
+                    used_paths.push(path);
+                }
+
+                Ok((config, Some(used_paths)))
+            }
         }
     }
 
     pub fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
-        let parsed: ::toml::Value = toml
-            .parse()
-            .map_err(|e| format!("Could not parse TOML: {}", e))?;
-        let mut err = String::new();
-        let table = parsed
-            .as_table()
-            .ok_or_else(|| String::from("Parsed config was not table"))?;
-        for key in table.keys() {
-            if !Config::is_valid_name(key) {
-                let msg = &format!("Warning: Unknown configuration option `{}`\n", key);
-                err.push_str(msg)
-            }
-        }
-        match parsed.try_into() {
-            Ok(parsed_config) => {
-                if !err.is_empty() {
-                    eprint!("{}", err);
-                }
-                let config = Config::default().fill_from_parsed_config(parsed_config, dir);
-                Ok(config)
-            }
-            Err(e) => {
-                err.push_str("Error: Decoding config file failed:\n");
-                err.push_str(format!("{}\n", e).as_str());
-                err.push_str("Please check your config file.");
-                Err(err)
-            }
-        }
+        let partial_config = PartialConfig::from_toml(toml)?;
+        let config = Config::default().fill_from_parsed_config(partial_config, dir);
+        Ok(config)
     }
 }
 
@@ -300,14 +323,14 @@ impl Config {
 pub fn load_config<O: CliOptions>(
     file_path: Option<&Path>,
     options: Option<&O>,
-) -> Result<(Config, Option<PathBuf>), Error> {
+) -> Result<(Config, Option<Vec<PathBuf>>), Error> {
     let over_ride = match options {
         Some(opts) => config_path(opts)?,
         None => None,
     };
 
     let result = if let Some(over_ride) = over_ride {
-        Config::from_toml_path(over_ride.as_ref()).map(|p| (p, Some(over_ride.to_owned())))
+        Config::from_toml_path(over_ride.as_ref()).map(|p| (p, Some(vec![over_ride.to_owned()])))
     } else if let Some(file_path) = file_path {
         Config::from_resolved_toml_path(file_path)
     } else {
@@ -414,6 +437,42 @@ mod test {
             // Options that are used by the tests
             stable_option: bool, false, true, "A stable option";
             unstable_option: bool, false, false, "An unstable option";
+        }
+    }
+
+    struct TempFile {
+        path: PathBuf,
+    }
+
+    fn make_temp_file(file_name: &'static str, content: &'static str) -> TempFile {
+        use std::env::var;
+
+        // Used in the Rust build system.
+        let target_dir = var("RUSTFMT_TEST_DIR").map_or_else(|_| env::temp_dir(), PathBuf::from);
+        let path = target_dir.join(file_name);
+
+        fs::create_dir_all(path.parent().unwrap()).expect("couldn't create temp file");
+        let mut file = File::create(&path).expect("couldn't create temp file");
+        file.write_all(content.as_bytes())
+            .expect("couldn't write temp file");
+        TempFile { path }
+    }
+
+    impl Drop for TempFile {
+        fn drop(&mut self) {
+            use std::fs::remove_file;
+            remove_file(&self.path).expect("couldn't delete temp file");
+        }
+    }
+
+    struct NullOptions;
+
+    impl CliOptions for NullOptions {
+        fn apply_to(&self, _: &mut Config) {
+            unreachable!();
+        }
+        fn config_path(&self) -> Option<&Path> {
+            unreachable!();
         }
     }
 
@@ -566,6 +625,37 @@ ignore = []
         );
         let toml = Config::default().all_options().to_toml().unwrap();
         assert_eq!(&toml, &default_config);
+    }
+
+    #[test]
+    fn test_merged_config() {
+        let _outer_config = make_temp_file(
+            "a/rustfmt.toml",
+            r#"
+tab_spaces = 2
+fn_call_width = 50
+ignore = ["b/main.rs", "util.rs"]
+"#,
+        );
+
+        let inner_config = make_temp_file(
+            "a/b/rustfmt.toml",
+            r#"
+tab_spaces = 3
+ignore = []
+"#,
+        );
+
+        let inner_dir = inner_config.path.parent().unwrap();
+        let (config, paths) = load_config::<NullOptions>(Some(inner_dir), None).unwrap();
+
+        assert_eq!(config.tab_spaces(), 3);
+        assert_eq!(config.fn_call_width(), 50);
+        assert_eq!(config.ignore().to_string(), r#"["main.rs"]"#);
+
+        let paths = paths.unwrap();
+        assert!(paths[0].ends_with("a/rustfmt.toml"));
+        assert!(paths[1].ends_with("a/b/rustfmt.toml"));
     }
 
     mod unstable_features {

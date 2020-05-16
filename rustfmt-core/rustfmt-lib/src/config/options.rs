@@ -276,6 +276,30 @@ impl IgnoreList {
     pub fn rustfmt_toml_path(&self) -> &Path {
         &self.rustfmt_toml_path
     }
+
+    pub fn merge_into(self, other: Self) -> Self {
+        let old_rustfmt_toml_path = self.rustfmt_toml_path;
+        let new_rustfmt_toml_path = other.rustfmt_toml_path.clone();
+        let relocalized_old_paths: HashSet<PathBuf> = self
+            .path_set
+            .into_iter()
+            .map(|p| old_rustfmt_toml_path.parent().unwrap().join(p))
+            .map(|p| {
+                p.strip_prefix(new_rustfmt_toml_path.parent().unwrap())
+                    .map(PathBuf::from)
+            })
+            .filter(|p| p.is_ok())
+            .map(|p| p.unwrap())
+            .collect();
+
+        let mut path_set = other.path_set;
+        path_set.extend(relocalized_old_paths);
+
+        Self {
+            path_set,
+            rustfmt_toml_path: new_rustfmt_toml_path,
+        }
+    }
 }
 
 impl std::str::FromStr for IgnoreList {
@@ -330,4 +354,44 @@ pub enum MatchArmLeadingPipe {
     Never,
     /// Maintain any existing leading pipes
     KeepExisting,
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+
+    use crate::config::IgnoreList;
+
+    #[test]
+    fn test_ignore_list_merge_into() {
+        let ignore_list_outer = IgnoreList {
+            path_set: vec!["b/c/d.rs", "b/c/d/e.rs", "b/other.rs"]
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            rustfmt_toml_path: PathBuf::from("a/rustfmt.toml"),
+        };
+
+        let ignore_list_inner = IgnoreList {
+            path_set: vec!["f.rs", "g/h.rs"]
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            rustfmt_toml_path: PathBuf::from("a/b/c/rustfmt.toml"),
+        };
+
+        let ignore_list_merged = ignore_list_outer.merge_into(ignore_list_inner);
+
+        assert_eq!(
+            ignore_list_merged.rustfmt_toml_path,
+            PathBuf::from("a/b/c/rustfmt.toml")
+        );
+        assert_eq!(
+            ignore_list_merged.path_set,
+            vec!["d.rs", "d/e.rs", "f.rs", "g/h.rs"]
+                .into_iter()
+                .map(PathBuf::from)
+                .collect()
+        );
+    }
 }

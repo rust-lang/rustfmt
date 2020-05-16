@@ -425,7 +425,7 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
 
 enum FileConfig {
     Default,
-    Local(Config, Option<PathBuf>),
+    Local(Config, Option<Vec<PathBuf>>),
 }
 
 struct FileConfigPair<'a> {
@@ -457,9 +457,9 @@ impl<'a> Iterator for FileConfigPairIter<'a> {
         let config = if self.has_config_from_commandline {
             FileConfig::Default
         } else {
-            let (local_config, config_path) =
+            let (local_config, config_paths) =
                 load_config(Some(file.parent()?), Some(self.opt)).ok()?;
-            FileConfig::Local(local_config, config_path)
+            FileConfig::Local(local_config, config_paths)
         };
 
         Some(FileConfigPair { file, config })
@@ -483,11 +483,19 @@ fn format(opt: Opt) -> Result<i32> {
         return Err(format_err!("Error: `{}` is a directory", dir.display()));
     }
 
-    let (default_config, config_path) = load_config(None, Some(&opt))?;
+    let (default_config, config_paths) = load_config(None, Some(&opt))?;
 
     if opt.verbose {
-        if let Some(path) = config_path.as_ref() {
-            println!("Using rustfmt config file {}", path.display());
+        if let Some(paths) = config_paths.as_ref() {
+            println!(
+                "Using rustfmt config files {} for {}",
+                paths
+                    .into_iter()
+                    .map(|p| p.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
+                file.display()
+            );
         }
     }
 
@@ -496,7 +504,7 @@ fn format(opt: Opt) -> Result<i32> {
         verbosity: opt.verbosity(),
     };
 
-    let inputs = FileConfigPairIter::new(&opt, config_path.is_some()).collect::<Vec<_>>();
+    let inputs = FileConfigPairIter::new(&opt, config_paths.is_some()).collect::<Vec<_>>();
     let format_report = format_inputs(
         inputs.iter().map(|p| {
             (
