@@ -25,7 +25,7 @@ use crate::formatting::{
     utils::{
         self, contains_skip, count_newlines, depr_skip_annotation, inner_attributes,
         last_line_contains_single_line_comment, last_line_width, mk_sp, ptr_vec_to_ref_vec,
-        rewrite_ident, stmt_expr,
+        rewrite_ident, starts_with_newline, stmt_expr,
     },
 };
 use crate::result::{ErrorKind, FormatError};
@@ -124,6 +124,21 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let is_all_semicolons =
             |snippet: &str| snippet.chars().all(|c| c.is_whitespace() || c == ';');
         if is_all_semicolons(&self.snippet(stmt.span())) {
+            // If the statement is all semicolons, just skip over it. Before that, make sure any
+            // comment snippet preceding the semicolon is picked up.
+            let snippet = self.snippet(mk_sp(self.last_pos, stmt.span().lo()));
+            let original_starts_with_newline = snippet
+                .find(|c| c != ' ')
+                .map_or(false, |i| starts_with_newline(&snippet[i..]));
+            let snippet = snippet.trim();
+            if !snippet.is_empty() {
+                if original_starts_with_newline {
+                    self.push_str("\n");
+                }
+                self.push_str(&self.block_indent.to_string(self.config));
+                self.push_str(snippet);
+            }
+
             self.last_pos = stmt.span().hi();
             return;
         }
