@@ -293,9 +293,7 @@ impl Config {
             Ok(None)
         }
 
-        let files = resolve_project_files(dir);
-
-        match files? {
+        match resolve_project_files(dir)? {
             None => Ok((Config::default(), None)),
             Some(paths) => {
                 let mut config = Config::default();

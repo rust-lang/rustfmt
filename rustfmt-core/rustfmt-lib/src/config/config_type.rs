@@ -50,19 +50,19 @@ impl ConfigType for IgnoreList {
     }
 }
 
-macro_rules! update {
-    ($self:ident, ignore = $val:ident, $dir:ident) => {
-        $self.ignore.1 = true;
+macro_rules! update_config {
+    ($config:ident, ignore = $val:ident, $dir:ident) => {
+        $config.ignore.1 = true;
 
         let mut new_ignored = $val;
         new_ignored.add_prefix($dir);
-        let old_ignored = $self.ignore.2;
-        $self.ignore.2 = old_ignored.merge_into(new_ignored);
+        let old_ignored = $config.ignore.2;
+        $config.ignore.2 = old_ignored.merge_into(new_ignored);
     };
 
-    ($self:ident, $i:ident = $val:ident, $dir:ident) => {
-        $self.$i.1 = true;
-        $self.$i.2 = $val;
+    ($config:ident, $i:ident = $val:ident, $dir:ident) => {
+        $config.$i.1 = true;
+        $config.$i.2 = $val;
     };
 }
 
@@ -165,10 +165,10 @@ macro_rules! create_config {
             $(
                 if let Some(val) = parsed.$i {
                     if self.$i.3 {
-                        update!(self, $i = val, dir);
+                        update_config!(self, $i = val, dir);
                     } else {
                         if is_nightly_channel!() {
-                            update!(self, $i = val, dir);
+                            update_config!(self, $i = val, dir);
                         } else {
                             eprintln!("Warning: can't set `{} = {:?}`, unstable features are only \
                                        available in nightly channel.", stringify!($i), val);

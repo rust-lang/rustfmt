@@ -277,14 +277,18 @@ impl IgnoreList {
         &self.rustfmt_toml_path
     }
 
+    /// Merges `self` into `other`, returning a new `IgnoreList`. The resulting `IgnoreList` uses
+    /// the `rustfmt_toml_path` of `other`, and only contains paths that are in `other`'s
+    /// `rustfmt_toml_path`.
     pub fn merge_into(self, other: Self) -> Self {
         let old_rustfmt_toml_path = self.rustfmt_toml_path;
-        let new_rustfmt_toml_path = other.rustfmt_toml_path.clone();
+        let new_rustfmt_toml_path = other.rustfmt_toml_path;
         let relocalized_old_paths: HashSet<PathBuf> = self
             .path_set
             .into_iter()
             .map(|p| old_rustfmt_toml_path.parent().unwrap().join(p))
             .map(|p| {
+                // Only keep old paths that are also in the new config path
                 p.strip_prefix(new_rustfmt_toml_path.parent().unwrap())
                     .map(PathBuf::from)
             })
