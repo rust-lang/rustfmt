@@ -120,12 +120,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             self.parse_sess.span_to_debug_info(stmt.span())
         );
 
-        // https://github.com/rust-lang/rust/issues/63679.
-        let is_all_semicolons =
-            |snippet: &str| snippet.chars().all(|c| c.is_whitespace() || c == ';');
-        if is_all_semicolons(&self.snippet(stmt.span())) {
-            // If the statement is all semicolons, just skip over it. Before that, make sure any
-            // comment snippet preceding the semicolon is picked up.
+        if stmt.is_empty() {
+            // If the statement is empty, just skip over it. Before that, make sure any comment
+            // snippet preceding the semicolon is picked up.
             let snippet = self.snippet(mk_sp(self.last_pos, stmt.span().lo()));
             let original_starts_with_newline = snippet
                 .find(|c| c != ' ')
