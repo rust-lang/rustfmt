@@ -17,7 +17,10 @@ use rustc_ast::tokenstream::{Cursor, TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_parse::{new_parser_from_tts, parser::Parser};
-use rustc_span::{symbol::{self, kw}, BytePos, Span, Symbol, DUMMY_SP};
+use rustc_span::{
+    symbol::{self, kw},
+    BytePos, Span, Symbol, DUMMY_SP,
+};
 
 use crate::comment::{
     contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses,

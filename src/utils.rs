@@ -6,7 +6,7 @@ use rustc_ast::ast::{
 };
 use rustc_ast::ptr;
 use rustc_ast_pretty::pprust;
-use rustc_span::{sym, BytePos, ExpnId, Span, Symbol, SyntaxContext, symbol};
+use rustc_span::{sym, symbol, BytePos, ExpnId, Span, Symbol, SyntaxContext};
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
