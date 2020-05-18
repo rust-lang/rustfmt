@@ -2,7 +2,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt;
 use std::io::{self, stdin, stdout, Error as IoError, Read, Write};
@@ -496,12 +496,21 @@ fn format(opt: Opt) -> Result<i32> {
         verbosity: opt.verbosity(),
     };
 
+    let mut config_warnings: HashMap<&Option<PathBuf>, HashSet<String>> = HashMap::new();
     let inputs = FileConfigPairIter::new(&opt, config_path.is_some()).collect::<Vec<_>>();
     let format_report = format_inputs(
         inputs.iter().map(|p| {
             (
                 Input::File(p.file.to_path_buf()),
-                if let FileConfig::Local(ref config, _) = p.config {
+                if let FileConfig::Local(ref config, ref path) = p.config {
+                    let seen_warnings = config_warnings.entry(path).or_insert(HashSet::new());
+                    for warning in config.warnings.iter() {
+                        if seen_warnings.contains(warning) {
+                            continue;
+                        }
+                        eprintln!("{}", warning);
+                        seen_warnings.insert(warning.to_string());
+                    }
                     config
                 } else {
                     &default_config
@@ -542,17 +551,18 @@ mod test {
         path: PathBuf,
     }
 
-    fn make_temp_file(file_name: &'static str) -> TempFile {
+    fn make_temp_file(file_name: &'static str, content: &'static str) -> TempFile {
         use std::env::var;
         use std::fs::File;
 
         // Used in the Rust build system.
-        let target_dir = var("RUSTFMT_TEST_DIR").unwrap_or_else(|_| ".".to_owned());
+        let target_dir = var("RUSTFMT_TEST_DIR").map_or_else(|_| env::temp_dir(), PathBuf::from);
         let path = Path::new(&target_dir).join(file_name);
 
+        std::fs::create_dir_all(path.parent().unwrap()).expect("couldn't create temp file");
         let mut file = File::create(&path).expect("couldn't create temp file");
-        let content = b"fn main() {}\n";
-        file.write_all(content).expect("couldn't write temp file");
+        file.write_all(content.as_bytes())
+            .expect("couldn't write temp file");
         TempFile { path }
     }
 
@@ -596,7 +606,7 @@ mod test {
     #[test]
     fn verify_check_works() {
         init_log();
-        let temp_file = make_temp_file("temp_check.rs");
+        let temp_file = make_temp_file("temp_check.rs", "fn main() {}\n");
 
         Command::new(rustfmt())
             .arg("--check")
@@ -678,5 +688,27 @@ mod test {
             .wait_with_output()
             .expect("Failed to wait on rustfmt child");
         assert!(output.status.success());
+    }
+
+    #[test]
+    fn deduplicate_warning_messages() {
+        init_log();
+
+        let temp_file_1 = make_temp_file("temp_check_1.rs", "fn main() {}\n");
+        let temp_file_2 = make_temp_file("temp_check_2.rs", "fn main() {}\n");
+        let _temp_config = make_temp_file("rustfmt.toml", "max_width = 60\nfn_call_width = 100\n");
+
+        let child = Command::new(rustfmt())
+            .arg(&temp_file_1.path)
+            .arg(&temp_file_2.path)
+            .output()
+            .expect("rustfmt failed");
+
+        let stderr = String::from_utf8_lossy(&child.stderr);
+        assert_eq!(
+            stderr,
+            "`fn_call_width` cannot have a value that exceeds `max_width`. \
+        `fn_call_width` will be set to the same value as `max_width`\n"
+        );
     }
 }

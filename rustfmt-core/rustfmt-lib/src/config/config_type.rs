@@ -52,6 +52,7 @@ impl ConfigType for IgnoreList {
 
 macro_rules! create_config {
     ($($i:ident: $Ty:ty, $def:expr, $is_stable:literal, $dstring:literal;)+) => (
+        use std::collections::HashSet;
         use std::io::Write;
 
         use serde::{Deserialize, Serialize};
@@ -62,6 +63,7 @@ macro_rules! create_config {
             // if a license_template_path has been specified, successfully read, parsed and compiled
             // into a regex, it will be stored here
             pub license_template: Option<Regex>,
+            pub warnings: HashSet<String>,
             // For each config item, we store a bool indicating whether it has
             // been accessed and the value, and a bool whether the option was
             // manually initialized, or taken from the default,
@@ -156,8 +158,9 @@ macro_rules! create_config {
                             self.$i.1 = true;
                             self.$i.2 = val;
                         } else {
-                            eprintln!("Warning: can't set `{} = {:?}`, unstable features are only \
-                                       available in nightly channel.", stringify!($i), val);
+                            self.warnings.insert(
+                                format!("Warning: can't set `{} = {:?}`, unstable features are \
+                                         only available in nightly channel.", stringify!($i), val));
                         }
                     }
                 }
@@ -302,16 +305,17 @@ macro_rules! create_config {
                     override_value: usize,
                     heuristic_value: usize,
                     config_key: &str,
+                    warnings: &mut HashSet<String>,
                 | -> usize {
                     if !was_set {
                         return heuristic_value;
                     }
                     if override_value > max_width {
-                        eprintln!(
+                        warnings.insert(format!(
                             "`{0}` cannot have a value that exceeds `max_width`. \
                             `{0}` will be set to the same value as `max_width`",
                             config_key,
-                        );
+                        ));
                         return max_width;
                     }
                     override_value
@@ -322,6 +326,7 @@ macro_rules! create_config {
                     self.fn_call_width.2,
                     heuristics.fn_call_width,
                     "fn_call_width",
+                    &mut self.warnings,
                 );
                 self.fn_call_width.2 = fn_call_width;
 
@@ -330,6 +335,7 @@ macro_rules! create_config {
                     self.attr_fn_like_width.2,
                     heuristics.attr_fn_like_width,
                     "attr_fn_like_width",
+                    &mut self.warnings,
                 );
                 self.attr_fn_like_width.2 = attr_fn_like_width;
 
@@ -338,6 +344,7 @@ macro_rules! create_config {
                     self.struct_lit_width.2,
                     heuristics.struct_lit_width,
                     "struct_lit_width",
+                    &mut self.warnings,
                 );
                 self.struct_lit_width.2 = struct_lit_width;
 
@@ -346,6 +353,7 @@ macro_rules! create_config {
                     self.struct_variant_width.2,
                     heuristics.struct_variant_width,
                     "struct_variant_width",
+                    &mut self.warnings,
                 );
                 self.struct_variant_width.2 = struct_variant_width;
 
@@ -354,6 +362,7 @@ macro_rules! create_config {
                     self.array_width.2,
                     heuristics.array_width,
                     "array_width",
+                    &mut self.warnings,
                 );
                 self.array_width.2 = array_width;
 
@@ -362,6 +371,7 @@ macro_rules! create_config {
                     self.chain_width.2,
                     heuristics.chain_width,
                     "chain_width",
+                    &mut self.warnings,
                 );
                 self.chain_width.2 = chain_width;
 
@@ -370,6 +380,7 @@ macro_rules! create_config {
                     self.single_line_if_else_max_width.2,
                     heuristics.single_line_if_else_max_width,
                     "single_line_if_else_max_width",
+                    &mut self.warnings,
                 );
                 self.single_line_if_else_max_width.2 = single_line_if_else_max_width;
             }
@@ -390,8 +401,11 @@ macro_rules! create_config {
                     if lt_path.len() > 0 {
                         match license::load_and_compile_template(&lt_path) {
                             Ok(re) => self.license_template = Some(re),
-                            Err(msg) => eprintln!("Warning for license template file {:?}: {}",
-                                                lt_path, msg),
+                            Err(msg) => {
+                                self.warnings.insert(
+                                    format!("Warning for license template file {:?}: {}",
+                                            lt_path, msg));
+                            }
                         }
                     }
                 }
@@ -418,6 +432,7 @@ macro_rules! create_config {
             fn default() -> Self {
                 Self {
                     license_template: None,
+                    warnings: HashSet::new(),
                     $(
                         $i: (Cell::new(false), false, $def, $is_stable),
                     )+
