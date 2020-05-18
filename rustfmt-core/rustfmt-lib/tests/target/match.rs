@@ -124,8 +124,8 @@ fn issue339() {
         // collapsing here is safe
         ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff => {}
         // collapsing here exceeds line length
-        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffg => {
-        }
+        ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffg =>
+            {}
         h => { // comment above block
         }
         i => {} // comment below block

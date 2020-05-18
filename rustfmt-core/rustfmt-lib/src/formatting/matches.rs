@@ -249,8 +249,17 @@ fn rewrite_match_arm(
     };
 
     // Patterns
-    // 5 = ` => {`
-    let pat_shape = shape.sub_width(5)?.offset_left(pipe_offset)?;
+    let is_empty_block = if let ast::ExprKind::Block(ref block, _) = arm.body.kind {
+        is_empty_block(context, block, Some(&arm.body.attrs))
+    } else {
+        false
+    };
+    let sub_width = if is_empty_block {
+        " => {}".len()
+    } else {
+        " => {".len()
+    };
+    let pat_shape = shape.sub_width(sub_width)?.offset_left(pipe_offset)?;
 
     let pats_str = arm.pat.rewrite(context, pat_shape)?;
 
@@ -480,7 +489,7 @@ fn rewrite_match_body(
 
         match rewrite {
             Some(ref body_str)
-                if is_block
+                if (is_block && (!is_empty_block || !body_str.contains('\n')))
                     || (!body_str.contains('\n')
                         && unicode_str_width(body_str) <= body_shape.width) =>
             {
