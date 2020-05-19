@@ -59,7 +59,7 @@ use std::borrow::Cow;
 use std::cmp::min;
 
 use rustc_ast::{ast, ptr};
-use rustc_span::{BytePos, Span, symbol};
+use rustc_span::{symbol, BytePos, Span};
 
 use crate::comment::{rewrite_comment, CharClasses, FullCodeCharKind, RichChar};
 use crate::config::IndentStyle;

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use rustc_ast::ast;
 use rustc_ast::visit::Visitor;
-use rustc_span::symbol::{sym, Symbol, self};
+use rustc_span::symbol::{self, sym, Symbol};
 
 use crate::attr::MetaVisitor;
 use crate::config::FileName;

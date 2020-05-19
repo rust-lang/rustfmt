@@ -3,7 +3,11 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use rustc_ast::ast::{self, UseTreeKind};
-use rustc_span::{source_map, symbol::{self, sym}, BytePos, Span, DUMMY_SP};
+use rustc_span::{
+    source_map,
+    symbol::{self, sym},
+    BytePos, Span, DUMMY_SP,
+};
 
 use crate::comment::combine_strs_with_missing_comments;
 use crate::config::lists::*;

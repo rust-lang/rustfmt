@@ -8,7 +8,7 @@ use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
 use rustc_session::parse::ParseSess as RawParseSess;
 use rustc_span::{
     source_map::{FilePathMapping, SourceMap},
-    BytePos, Span, symbol,
+    symbol, BytePos, Span,
 };
 
 use crate::config::file_lines::LineRange;
