@@ -15,6 +15,10 @@ set -ex
 # it again.
 #
 #which cargo-fmt || cargo install --force
+
+export CFG_RELEASE_CHANNEL=nightly
+export CFG_RELEASE=nightly
+
 cargo install --path . --force --locked
 
 echo "Integration tests for: ${INTEGRATION}"
