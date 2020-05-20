@@ -25,6 +25,10 @@ jobs:
             target: i686-pc-windows-gnu
             mingw-7z-path: mingw
 
+    env:
+      CFG_RELEASE_CHANNEL: nightly
+      CFG_RELEASE: nightly
+
     steps:
     # The Windows runners have autocrlf enabled by default
     # which causes failures for some of rustfmt's line-ending sensitive tests
