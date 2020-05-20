@@ -45,6 +45,8 @@ matrix:
 
 script:
   - |
+   export CFG_RELEASE_CHANNEL=nightly
+   export CFG_RELEASE=nightly
     if [ -z ${INTEGRATION} ]; then
       cargo build && cargo test && cargo test -- --ignored && cargo test --manifest-path rustfmt-core/Cargo.toml && cargo test --manifest-path rustfmt-core/Cargo.toml -- --ignored
     else
@@ -56,8 +58,6 @@ after_success:
 
 before_deploy:
   # TODO: cross build
- - export CFG_RELEASE_CHANNEL=nightly
- - export CFG_RELEASE=nightly
  - cargo build --release --target=x86_64-unknown-linux-gnu
  - tar czf rustfmt-x86_64-unknown-linux-gnu.tar.gz Contributing.md Design.md README.md -C target/x86_64-unknown-linux-gnu/release/rustfmt rustfmt
 
