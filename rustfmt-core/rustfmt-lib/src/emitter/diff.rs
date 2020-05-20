@@ -1,15 +1,27 @@
-use crate::config::Config;
-
 use super::*;
+use crate::emitter::{Color, EmitterConfig, Verbosity};
 use rustfmt_diff::{make_diff, print_diff};
 
 pub struct DiffEmitter {
-    config: Config,
+    color: Color,
+    verbosity: Verbosity,
+    print_filename: bool,
 }
 
 impl DiffEmitter {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+    pub fn new(
+        EmitterConfig {
+            color,
+            verbosity,
+            print_filename,
+            ..
+        }: EmitterConfig,
+    ) -> Self {
+        Self {
+            color,
+            verbosity,
+            print_filename,
+        }
     }
 }
 
@@ -22,19 +34,20 @@ impl Emitter for DiffEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
-    ) -> Result<EmitterResult, io::Error> {
+    ) -> Result<EmitterResult, EmitterError> {
         const CONTEXT_SIZE: usize = 3;
         let mismatch = make_diff(&original_text, formatted_text, CONTEXT_SIZE);
         let has_diff = !mismatch.is_empty();
 
         if has_diff {
-            if self.config.print_misformatted_file_names() {
+            if self.print_filename {
                 writeln!(output, "{}", filename)?;
             } else {
                 print_diff(
                     mismatch,
                     |line_num| format!("Diff in {}:{}:", filename, line_num),
-                    &self.config,
+                    self.color,
+                    self.verbosity,
                 );
             }
         } else if original_text != formatted_text {
@@ -58,8 +71,7 @@ mod tests {
     #[test]
     fn does_not_print_when_no_files_reformatted() {
         let mut writer = Vec::new();
-        let config = Config::default();
-        let mut emitter = DiffEmitter::new(config);
+        let mut emitter = DiffEmitter::new(EmitterConfig::default());
         let result = emitter
             .emit_formatted_file(
                 &mut writer,
@@ -84,9 +96,10 @@ mod tests {
         let lib_formatted = "fn greet() {\n    println!(\"Greetings!\");\n}";
 
         let mut writer = Vec::new();
-        let mut config = Config::default();
-        config.set().print_misformatted_file_names(true);
-        let mut emitter = DiffEmitter::new(config);
+        let mut emitter = DiffEmitter::new(EmitterConfig {
+            print_filename: true,
+            ..EmitterConfig::default()
+        });
         let _ = emitter
             .emit_formatted_file(
                 &mut writer,
@@ -117,8 +130,7 @@ mod tests {
     #[test]
     fn prints_newline_message_with_only_newline_style_diff() {
         let mut writer = Vec::new();
-        let config = Config::default();
-        let mut emitter = DiffEmitter::new(config);
+        let mut emitter = DiffEmitter::new(EmitterConfig::default());
         let _ = emitter
             .emit_formatted_file(
                 &mut writer,

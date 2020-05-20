@@ -14,12 +14,14 @@ use structopt::StructOpt;
 use thiserror::Error;
 
 use rustfmt_lib::{
-    load_config, CliOptions, Config, Edition, EmitMode, FileLines, FileName,
-    FormatReportFormatterBuilder, Input, Session, Verbosity,
+    emitter::{emit_format_report, EmitMode, EmitterConfig, Verbosity},
+    format_inputs, load_config, CliOptions, Config, Edition, FileLines, FileName,
+    FormatReportFormatterBuilder, Input, OperationSetting,
 };
 
 fn main() {
     env_logger::init();
+
     let opt: Opt = Opt::from_args();
 
     let exit_code = match execute(opt) {
@@ -125,6 +127,32 @@ struct Opt {
     // Positional arguments.
     #[structopt(parse(from_os_str))]
     files: Vec<PathBuf>,
+}
+
+impl Opt {
+    fn verbosity(&self) -> Verbosity {
+        if self.verbose {
+            Verbosity::Verbose
+        } else if self.quiet {
+            Verbosity::Quiet
+        } else {
+            Verbosity::Normal
+        }
+    }
+
+    fn emitter_config(&self, default_emit_mode: EmitMode) -> EmitterConfig {
+        let emit_mode = if self.check {
+            EmitMode::Diff
+        } else {
+            self.emit.map_or(default_emit_mode, Emit::to_emit_mode)
+        };
+        EmitterConfig {
+            emit_mode,
+            verbosity: self.verbosity(),
+            print_filename: self.files_with_diff,
+            ..EmitterConfig::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -307,28 +335,12 @@ impl From<IoError> for OperationError {
 
 impl CliOptions for Opt {
     fn apply_to(&self, config: &mut Config) {
-        if self.verbose {
-            config.set().verbose(Verbosity::Verbose);
-        } else if self.quiet {
-            config.set().verbose(Verbosity::Quiet);
-        }
         config.set().file_lines(self.file_lines.clone());
-        if self.recursive {
-            config.set().recursive(true);
-        }
         if self.error_on_unformatted {
             config.set().error_on_unformatted(true);
         }
         if let Some(ref edition) = self.edition {
             config.set().edition((*edition).clone());
-        }
-        if self.check {
-            config.set().emit_mode(EmitMode::Diff);
-        } else if let Some(emit) = self.emit {
-            config.set().emit_mode(emit.to_emit_mode());
-        }
-        if self.files_with_diff {
-            config.set().print_misformatted_file_names(true);
         }
         if let Some(ref inline_configs) = self.inline_config {
             for inline_config in inline_configs {
@@ -392,17 +404,8 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
     // try to read config from local directory
     let (mut config, _) = load_config(Some(Path::new(".")), Some(&opt))?;
 
-    if opt.check {
-        config.set().emit_mode(EmitMode::Diff);
-    } else {
-        config
-            .set()
-            .emit_mode(opt.emit.map_or(EmitMode::Stdout, Emit::to_emit_mode));
-    }
-    config.set().verbose(Verbosity::Quiet);
-
     // parse file_lines
-    config.set().file_lines(opt.file_lines);
+    config.set().file_lines(opt.file_lines.clone());
     for f in config.file_lines().files() {
         match *f {
             FileName::Stdin => {}
@@ -411,15 +414,13 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
     }
 
     let out = &mut stdout();
-    let mut session = Session::new(config, Some(out));
-    format_and_emit_report(&mut session, Input::Text(input));
-
-    let exit_code = if session.has_operational_errors() || session.has_parsing_errors() {
-        1
-    } else {
-        0
+    let setting = OperationSetting {
+        recursive: opt.recursive,
+        verbosity: Verbosity::Quiet,
     };
-    Ok(exit_code)
+    let report = rustfmt_lib::format(Input::Text(input), &config, setting)?;
+    let has_diff = emit_format_report(report, out, opt.emitter_config(EmitMode::Stdout))?;
+    Ok(if opt.check && has_diff { 1 } else { 0 })
 }
 
 enum FileConfig {
@@ -482,80 +483,50 @@ fn format(opt: Opt) -> Result<i32> {
         return Err(format_err!("Error: `{}` is a directory", dir.display()));
     }
 
-    let (config, config_path) = load_config(None, Some(&opt))?;
+    let (default_config, config_path) = load_config(None, Some(&opt))?;
 
-    if config.verbose() == Verbosity::Verbose {
+    if opt.verbose {
         if let Some(path) = config_path.as_ref() {
             println!("Using rustfmt config file {}", path.display());
         }
     }
 
-    let out = &mut stdout();
-    let mut session = Session::new(config, Some(out));
-
-    for pair in FileConfigPairIter::new(&opt, config_path.is_some()) {
-        let file = pair.file;
-
-        if let FileConfig::Local(local_config, config_path) = pair.config {
-            if let Some(path) = config_path {
-                if local_config.verbose() == Verbosity::Verbose {
-                    println!(
-                        "Using rustfmt config file {} for {}",
-                        path.display(),
-                        file.display()
-                    );
-                }
-            }
-
-            session.override_config(local_config, |sess| {
-                format_and_emit_report(sess, Input::File(file.to_path_buf()))
-            });
-        } else {
-            format_and_emit_report(&mut session, Input::File(file.to_path_buf()));
-        }
-    }
-
-    let exit_code = if session.has_operational_errors()
-        || session.has_parsing_errors()
-        || ((session.has_diff() || session.has_check_errors()) && opt.check)
-    {
-        1
-    } else {
-        0
+    let setting = OperationSetting {
+        recursive: opt.recursive,
+        verbosity: opt.verbosity(),
     };
-    Ok(exit_code)
-}
 
-fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) {
-    match session.format(input) {
-        Ok(report) => {
-            if report.has_warnings() {
-                eprintln!(
-                    "{}",
-                    FormatReportFormatterBuilder::new(&report)
-                        .enable_colors(should_print_with_colors(session))
-                        .build()
-                );
-            }
-        }
-        Err(msg) => {
-            eprintln!("Error writing files: {}", msg);
-            session.add_operational_error();
-        }
-    }
-}
+    let inputs = FileConfigPairIter::new(&opt, config_path.is_some()).collect::<Vec<_>>();
+    let format_report = format_inputs(
+        inputs.iter().map(|p| {
+            (
+                Input::File(p.file.to_path_buf()),
+                if let FileConfig::Local(ref config, _) = p.config {
+                    config
+                } else {
+                    &default_config
+                },
+            )
+        }),
+        setting,
+    )?;
 
-fn should_print_with_colors<T: Write>(session: &mut Session<'_, T>) -> bool {
-    match term::stderr() {
-        Some(ref t)
-            if session.config.color().use_colored_tty()
-                && t.supports_color()
-                && t.supports_attr(term::Attr::Bold) =>
-        {
-            true
-        }
-        _ => false,
+    if format_report.has_errors() {
+        eprintln!(
+            "{}",
+            FormatReportFormatterBuilder::new(&format_report)
+                .enable_colors(true)
+                .build()
+        );
     }
+
+    let has_diff = emit_format_report(
+        format_report,
+        &mut stdout(),
+        opt.emitter_config(EmitMode::Files),
+    )?;
+
+    Ok(if opt.check && has_diff { 1 } else { 0 })
 }
 
 #[cfg(test)]
@@ -565,31 +536,6 @@ mod test {
 
     fn init_log() {
         let _ = env_logger::builder().is_test(true).try_init();
-    }
-
-    #[test]
-    fn format_lines_errors_are_reported() {
-        init_log();
-        let long_identifier = String::from_utf8(vec![b'a'; 239]).unwrap();
-        let input = Input::Text(format!("fn {}() {{}}", long_identifier));
-        let mut config = Config::default();
-        config.set().error_on_line_overflow(true);
-        let mut session = Session::<io::Stdout>::new(config, None);
-        session.format(input).unwrap();
-        assert!(session.has_formatting_errors());
-    }
-
-    #[test]
-    fn format_lines_errors_are_reported_with_tabs() {
-        init_log();
-        let long_identifier = String::from_utf8(vec![b'a'; 97]).unwrap();
-        let input = Input::Text(format!("fn a() {{\n\t{}\n}}", long_identifier));
-        let mut config = Config::default();
-        config.set().error_on_line_overflow(true);
-        config.set().hard_tabs(true);
-        let mut session = Session::<io::Stdout>::new(config, None);
-        session.format(input).unwrap();
-        assert!(session.has_formatting_errors());
     }
 
     struct TempFile {
@@ -704,7 +650,7 @@ mod test {
         let output = child
             .wait_with_output()
             .expect("Failed to wait on rustfmt child");
-        assert!(output.status.success());
+        assert!(!output.status.success());
         assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "stdin\n");
     }
 

@@ -7,7 +7,10 @@ use std::process::Command;
 
 use structopt::StructOpt;
 
-use rustfmt_lib::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
+use rustfmt_lib::{
+    emitter::{emit_format_report, EmitterConfig},
+    format, load_config, CliOptions, FormatReportFormatterBuilder, Input, OperationSetting,
+};
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
     let prefixes: Vec<_> = files
@@ -56,20 +59,27 @@ fn get_files(input: &str) -> Vec<&str> {
 fn fmt_files(files: &[&str]) -> i32 {
     let (config, _) =
         load_config::<NullOptions>(Some(Path::new(".")), None).expect("couldn't load config");
+    let setting = OperationSetting::default();
 
-    let mut exit_code = 0;
     let mut out = stdout();
-    let mut session = Session::new(config, Some(&mut out));
     for file in files {
-        let report = session.format(Input::File(PathBuf::from(file))).unwrap();
-        if report.has_warnings() {
+        let report = match format(Input::File(PathBuf::from(file)), &config, setting) {
+            Ok(report) => report,
+            Err(e) => {
+                eprintln!("{}", e);
+                return 1;
+            }
+        };
+        if report.has_errors() {
             eprintln!("{}", FormatReportFormatterBuilder::new(&report).build());
         }
-        if !session.has_no_errors() {
-            exit_code = 1;
+        if let Err(e) = emit_format_report(report, &mut out, EmitterConfig::default()) {
+            eprintln!("{}", e);
+            return 1;
         }
     }
-    exit_code
+
+    0
 }
 
 struct NullOptions;

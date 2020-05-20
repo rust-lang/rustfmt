@@ -22,6 +22,12 @@ pub enum NewlineStyle {
     Native,
 }
 
+impl Default for NewlineStyle {
+    fn default() -> Self {
+        NewlineStyle::Auto
+    }
+}
+
 #[config_type]
 /// Where to put the opening brace of items (`fn`, `impl`, etc.).
 pub enum BraceStyle {
@@ -107,39 +113,6 @@ pub enum ReportTactic {
     Never,
 }
 
-/// What Rustfmt should emit. Mostly corresponds to the `--emit` command line
-/// option.
-#[config_type]
-pub enum EmitMode {
-    /// Emits to files.
-    Files,
-    /// Writes the output to stdout.
-    Stdout,
-    /// Unfancy stdout
-    Checkstyle,
-    /// Writes the resulting diffs in a JSON format. Returns an empty array
-    /// `[]` if there were no diffs.
-    Json,
-    /// Output the changed lines (for internal value only)
-    ModifiedLines,
-    /// Checks if a diff can be generated. If so, rustfmt outputs a diff and
-    /// quits with exit code 1.
-    /// This option is designed to be run in CI where a non-zero exit signifies
-    /// non-standard code formatting. Used for `--check`.
-    Diff,
-}
-
-/// Client-preference for coloured output.
-#[config_type]
-pub enum Color {
-    /// Always use color, whether it is a piped or terminal output
-    Always,
-    /// Never use color
-    Never,
-    /// Automatically use color, if supported by terminal
-    Auto,
-}
-
 #[config_type]
 /// rustfmt format style version.
 pub enum Version {
@@ -147,27 +120,6 @@ pub enum Version {
     One,
     /// 2.x.y. When specified, rustfmt will format in the the latest style.
     Two,
-}
-
-impl Color {
-    /// Whether we should use a coloured terminal.
-    pub fn use_colored_tty(self) -> bool {
-        match self {
-            Color::Always | Color::Auto => true,
-            Color::Never => false,
-        }
-    }
-}
-
-/// How chatty should Rustfmt be?
-#[config_type]
-pub enum Verbosity {
-    /// Emit more.
-    Verbose,
-    /// Default.
-    Normal,
-    /// Emit as little as possible.
-    Quiet,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -245,12 +197,6 @@ impl WidthHeuristics {
             chain_width: (60.0 * max_width_ratio).round() as usize,
             single_line_if_else_max_width: (50.0 * max_width_ratio).round() as usize,
         }
-    }
-}
-
-impl Default for EmitMode {
-    fn default() -> EmitMode {
-        EmitMode::Files
     }
 }
 
