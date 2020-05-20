@@ -5,10 +5,8 @@ macro_rules! foo {
 		$bar(|x| {
 			if x {
 				None;
-				None
 			} else {
 				None;
-				None
 			}
 		})
 	};
