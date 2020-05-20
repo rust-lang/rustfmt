@@ -4,6 +4,7 @@ use std::io;
 use std::time::{Duration, Instant};
 
 use rustc_ast::ast;
+use rustc_span::symbol;
 
 pub(crate) use syntux::session::ParseSess;
 
@@ -499,7 +500,7 @@ impl Input {
                 let file_stem = file.file_stem()?;
                 if file.parent()?.to_path_buf().join(file_stem).is_dir() {
                     Some(DirectoryOwnership::Owned {
-                        relative: file_stem.to_str().map(ast::Ident::from_str),
+                        relative: file_stem.to_str().map(symbol::Ident::from_str),
                     })
                 } else {
                     None
