@@ -370,7 +370,7 @@ impl<'a> FmtVisitor<'a> {
     pub(crate) fn rewrite_fn_before_block(
         &mut self,
         indent: Indent,
-        ident: ast::Ident,
+        ident: symbol::Ident,
         fn_sig: &FnSig<'_>,
         span: Span,
     ) -> Option<(String, FnBraceStyle)> {
@@ -394,7 +394,7 @@ impl<'a> FmtVisitor<'a> {
     pub(crate) fn rewrite_required_fn(
         &mut self,
         indent: Indent,
-        ident: ast::Ident,
+        ident: symbol::Ident,
         sig: &ast::FnSig,
         generics: &ast::Generics,
         span: Span,
@@ -470,7 +470,7 @@ impl<'a> FmtVisitor<'a> {
 
     pub(crate) fn visit_enum(
         &mut self,
-        ident: ast::Ident,
+        ident: symbol::Ident,
         vis: &ast::Visibility,
         enum_def: &ast::EnumDef,
         generics: &ast::Generics,
@@ -1012,7 +1012,7 @@ fn rewrite_trait_ref(
 
 pub(crate) struct StructParts<'a> {
     prefix: &'a str,
-    ident: ast::Ident,
+    ident: symbol::Ident,
     vis: &'a ast::Visibility,
     def: &'a ast::VariantData,
     generics: Option<&'a ast::Generics>,
@@ -1279,7 +1279,7 @@ impl<'a> Rewrite for TraitAliasBounds<'a> {
 
 pub(crate) fn format_trait_alias(
     context: &RewriteContext<'_>,
-    ident: ast::Ident,
+    ident: symbol::Ident,
     vis: &ast::Visibility,
     generics: &ast::Generics,
     generic_bounds: &ast::GenericBounds,
@@ -1559,7 +1559,7 @@ fn format_tuple_struct(
 fn rewrite_type<R: Rewrite>(
     context: &RewriteContext<'_>,
     indent: Indent,
-    ident: ast::Ident,
+    ident: symbol::Ident,
     vis: &ast::Visibility,
     generics: &ast::Generics,
     generic_bounds_opt: Option<&ast::GenericBounds>,
@@ -1628,7 +1628,7 @@ fn rewrite_type<R: Rewrite>(
 pub(crate) fn rewrite_opaque_type(
     context: &RewriteContext<'_>,
     indent: Indent,
-    ident: ast::Ident,
+    ident: symbol::Ident,
     generic_bounds: &ast::GenericBounds,
     generics: &ast::Generics,
     vis: &ast::Visibility,
@@ -1742,7 +1742,7 @@ pub(crate) fn rewrite_struct_field(
 pub(crate) struct StaticParts<'a> {
     prefix: &'a str,
     vis: &'a ast::Visibility,
-    ident: ast::Ident,
+    ident: symbol::Ident,
     ty: &'a ast::Ty,
     mutability: ast::Mutability,
     expr_opt: Option<&'a ptr::P<ast::Expr>>,
@@ -1884,7 +1884,7 @@ fn rewrite_static(
 }
 
 pub(crate) fn rewrite_type_alias(
-    ident: ast::Ident,
+    ident: symbol::Ident,
     ty_opt: Option<&ptr::P<ast::Ty>>,
     generics: &ast::Generics,
     generic_bounds_opt: Option<&ast::GenericBounds>,
@@ -1918,7 +1918,7 @@ impl<'a> Rewrite for OpaqueType<'a> {
 
 pub(crate) fn rewrite_opaque_impl_type(
     context: &RewriteContext<'_>,
-    ident: ast::Ident,
+    ident: symbol::Ident,
     generics: &ast::Generics,
     generic_bounds: &ast::GenericBounds,
     indent: Indent,
@@ -1942,7 +1942,7 @@ pub(crate) fn rewrite_opaque_impl_type(
 }
 
 pub(crate) fn rewrite_associated_impl_type(
-    ident: ast::Ident,
+    ident: symbol::Ident,
     vis: &ast::Visibility,
     defaultness: ast::Defaultness,
     ty_opt: Option<&ptr::P<ast::Ty>>,
@@ -2178,7 +2178,7 @@ pub(crate) enum FnBraceStyle {
 fn rewrite_fn_base(
     context: &RewriteContext<'_>,
     indent: Indent,
-    ident: ast::Ident,
+    ident: symbol::Ident,
     fn_sig: &FnSig<'_>,
     span: Span,
     fn_brace_style: FnBraceStyle,
@@ -2981,7 +2981,7 @@ fn rewrite_comments_before_after_where(
 fn format_header(
     context: &RewriteContext<'_>,
     item_name: &str,
-    ident: ast::Ident,
+    ident: symbol::Ident,
     vis: &ast::Visibility,
 ) -> String {
     format!(
