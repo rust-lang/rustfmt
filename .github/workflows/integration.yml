@@ -70,8 +70,6 @@ jobs:
         profile: minimal
         default: true
     - uses: davidB/rust-cargo-make@v1
-      with:
-        version: 'latest'
     - name: run integration tests
       env:
         INTEGRATION: ${{ matrix.integration }}
