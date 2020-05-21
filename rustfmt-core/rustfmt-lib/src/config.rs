@@ -271,8 +271,17 @@ impl Config {
                 }
             }
 
-            if !paths.is_empty() {
-                return Ok(paths.into_iter().filter(|p| p.is_some()).collect());
+            // List of closest -> most distant rustfmt config from the current directory.
+            let config_paths: Option<Vec<_>> = paths.into_iter().filter(|p| p.is_some()).collect();
+            let has_paths = config_paths.as_ref().and_then(|paths| {
+                if paths.is_empty() {
+                    None
+                } else {
+                    Some(paths.len())
+                }
+            });
+            if has_paths.is_some() {
+                return Ok(config_paths);
             }
 
             // If nothing was found, check in the home directory.
@@ -296,6 +305,17 @@ impl Config {
         match resolve_project_files(dir)? {
             None => Ok((Config::default(), None)),
             Some(paths) => {
+                // If this branch is hit, there must be at least one config file available.
+                let most_local_path = &paths[0];
+                if let Ok(partial_config) = PartialConfig::from_toml_path(most_local_path) {
+                    let config =
+                        Config::default().fill_from_parsed_config(partial_config, most_local_path);
+                    if config.version() == Version::One {
+                        // In v1, don't merge transient config files. Just use the most local one.
+                        return Ok((config, Some(vec![most_local_path.clone()])));
+                    }
+                }
+
                 let mut config = Config::default();
                 let mut used_paths = Vec::with_capacity(paths.len());
                 for path in paths.into_iter().rev() {
@@ -627,33 +647,40 @@ ignore = []
 
     #[test]
     fn test_merged_config() {
-        let _outer_config = make_temp_file(
-            "a/rustfmt.toml",
-            r#"
+        match option_env!("CFG_RELEASE_CHANNEL") {
+            // this test requires nightly
+            None | Some("nightly") => {
+                let _outer_config = make_temp_file(
+                    "a/rustfmt.toml",
+                    r#"
 tab_spaces = 2
 fn_call_width = 50
 ignore = ["b/main.rs", "util.rs"]
 "#,
-        );
+                );
 
-        let inner_config = make_temp_file(
-            "a/b/rustfmt.toml",
-            r#"
+                let inner_config = make_temp_file(
+                    "a/b/rustfmt.toml",
+                    r#"
+version = "two"
 tab_spaces = 3
 ignore = []
 "#,
-        );
+                );
 
-        let inner_dir = inner_config.path.parent().unwrap();
-        let (config, paths) = load_config::<NullOptions>(Some(inner_dir), None).unwrap();
+                let inner_dir = inner_config.path.parent().unwrap();
+                let (config, paths) = load_config::<NullOptions>(Some(inner_dir), None).unwrap();
 
-        assert_eq!(config.tab_spaces(), 3);
-        assert_eq!(config.fn_call_width(), 50);
-        assert_eq!(config.ignore().to_string(), r#"["main.rs"]"#);
+                assert_eq!(config.tab_spaces(), 3);
+                assert_eq!(config.fn_call_width(), 50);
+                assert_eq!(config.ignore().to_string(), r#"["main.rs"]"#);
 
-        let paths = paths.unwrap();
-        assert!(paths[0].ends_with("a/rustfmt.toml"));
-        assert!(paths[1].ends_with("a/b/rustfmt.toml"));
+                let paths = paths.unwrap();
+                assert!(paths[0].ends_with("a/rustfmt.toml"));
+                assert!(paths[1].ends_with("a/b/rustfmt.toml"));
+            }
+            _ => (),
+        };
     }
 
     mod unstable_features {
