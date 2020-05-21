@@ -12,3 +12,6 @@ alias = "check"
 
 [tasks.t]
 alias = "test"
+
+[taks.default.windows]
+script_runner = "bash"
