@@ -11,7 +11,7 @@ const DATA_U32: [u32; 8] = [
     10123090_6_4__u32,
 ];
 
-const DATA_USIZE: [isize; 8] = [
+const DATA_ISIZE: [isize; 8] = [
     -0b1000100101000011,
     0xABCD123,
     -0o12___274256144,
