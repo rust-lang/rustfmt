@@ -1,4 +1,5 @@
 use super::*;
+use crate::emitter::EmitterConfig;
 use std::fs;
 
 #[derive(Debug, Default)]
@@ -7,9 +8,9 @@ pub struct FilesEmitter {
 }
 
 impl FilesEmitter {
-    pub fn new(print_misformatted_file_names: bool) -> Self {
+    pub fn new(config: EmitterConfig) -> Self {
         Self {
-            print_misformatted_file_names,
+            print_misformatted_file_names: config.print_filename,
         }
     }
 }
@@ -23,9 +24,12 @@ impl Emitter for FilesEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
-    ) -> Result<EmitterResult, io::Error> {
+    ) -> Result<EmitterResult, EmitterError> {
         // Write text directly over original file if there is a diff.
-        let filename = ensure_real_path(filename);
+        let filename = match filename {
+            FileName::Stdin => return Err(EmitterError::InvalidInputForFiles),
+            FileName::Real(path_buf) => path_buf,
+        };
         if original_text != formatted_text {
             fs::write(filename, formatted_text)?;
             if self.print_misformatted_file_names {

@@ -1,14 +1,14 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader};
 use std::iter::Enumerate;
 use std::path::{Path, PathBuf};
 
 use crate::emitter::rustfmt_diff::{make_diff, Mismatch};
 
 use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
-use crate::config::{Config, EmitMode, Verbosity};
-use crate::{Input, Session};
+use crate::config::Config;
+use crate::{Input, OperationSetting, Verbosity};
 
 const CONFIGURATIONS_FILE_NAME: &str = "../../Configurations.md";
 
@@ -96,7 +96,6 @@ impl ConfigCodeBlock {
 
     fn get_block_config(&self) -> Config {
         let mut config = Config::default();
-        config.set().verbose(Verbosity::Quiet);
         if self.config_name.is_some() && self.config_value.is_some() {
             config.override_value(
                 self.config_name.as_ref().unwrap(),
@@ -139,19 +138,6 @@ impl ConfigCodeBlock {
         true
     }
 
-    fn has_parsing_errors<T: Write>(&self, session: &Session<'_, T>) -> bool {
-        if session.has_parsing_errors() {
-            write_message(&format!(
-                "\u{261d}\u{1f3fd} Cannot format {}:{}",
-                CONFIGURATIONS_FILE_NAME,
-                self.code_block_start.unwrap()
-            ));
-            return true;
-        }
-
-        false
-    }
-
     fn print_diff(&self, compare: Vec<Mismatch>) {
         let mut mismatches = HashMap::new();
         mismatches.insert(PathBuf::from(CONFIGURATIONS_FILE_NAME), compare);
@@ -184,19 +170,26 @@ impl ConfigCodeBlock {
         }
 
         let input = Input::Text(self.code_block.as_ref().unwrap().to_owned());
-        let mut config = self.get_block_config();
-        config.set().emit_mode(EmitMode::Stdout);
-        let mut buf: Vec<u8> = vec![];
+        let config = self.get_block_config();
 
-        {
-            let mut session = Session::new(config, Some(&mut buf));
-            session.format(input).unwrap();
-            if self.has_parsing_errors(&session) {
-                return false;
-            }
+        let operation_setting = OperationSetting {
+            verbosity: Verbosity::Quiet,
+            ..OperationSetting::default()
+        };
+        let report = crate::format(input, &config, operation_setting);
+        if report.is_err() {
+            write_message(&format!(
+                "\u{261d}\u{1f3fd} Cannot format {}:{}",
+                CONFIGURATIONS_FILE_NAME,
+                self.code_block_start.unwrap()
+            ));
+            return false;
         }
 
-        !self.formatted_has_diff(&String::from_utf8(buf).unwrap())
+        let report = report.unwrap();
+        let result = report.format_result().next().unwrap();
+        let text = result.1.formatted_text();
+        !self.formatted_has_diff(text)
     }
 
     // Extract a code block from the iterator. Behavior:

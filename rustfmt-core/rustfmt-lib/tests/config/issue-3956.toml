@@ -2,4 +2,3 @@ ignore = [
   "tests/**/issue-3956/graphics.rs",
   "tests/**/issue-3956/graphics_emu.rs"
 ]
-recursive = true

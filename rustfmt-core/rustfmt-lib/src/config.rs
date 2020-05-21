@@ -142,8 +142,6 @@ create_config! {
                                                      in tuple patterns";
 
     // Control options (changes the operation of rustfmt, rather than the formatting)
-    color: Color, Color::Auto, false,
-        "What Color option to use when none is supplied: Always, Never, Auto";
     required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
         "Require a specific version of rustfmt";
     unstable_features: bool, false, false,
@@ -157,17 +155,9 @@ create_config! {
         "Skip formatting the specified files and directories";
 
     // Not user-facing
-    verbose: Verbosity, Verbosity::Normal, false, "How much to information to emit to the user";
     file_lines: FileLines, FileLines::all(), false,
         "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
          via the --file-lines option";
-    emit_mode: EmitMode, EmitMode::Files, false,
-        "What emit Mode to use when none is supplied";
-    print_misformatted_file_names: bool, false, true,
-        "Prints the names of mismatched files that were formatted. Prints the names of \
-         files that would be formated when used with `--check` mode. ";
-    recursive: bool, false, true,
-        "Format all encountered modules recursively, including those defined in external files.";
 }
 
 #[derive(Error, Debug)]
@@ -179,10 +169,6 @@ impl PartialConfig {
         // Non-user-facing options can't be specified in TOML
         let mut cloned = self.clone();
         cloned.file_lines = None;
-        cloned.verbose = None;
-        cloned.print_misformatted_file_names = None;
-        cloned.recursive = None;
-        cloned.emit_mode = None;
 
         ::toml::to_string(&cloned).map_err(ToTomlError)
     }
@@ -407,8 +393,6 @@ mod test {
                 "Require a specific version of rustfmt.";
             ignore: IgnoreList, IgnoreList::default(), false,
                 "Skip formatting the specified files and directories.";
-            verbose: Verbosity, Verbosity::Normal, false,
-                "How much to information to emit to the user";
             file_lines: FileLines, FileLines::all(), false,
                 "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
                     via the --file-lines option";
@@ -438,10 +422,10 @@ mod test {
     #[test]
     fn test_config_set() {
         let mut config = Config::default();
-        config.set().verbose(Verbosity::Quiet);
-        assert_eq!(config.verbose(), Verbosity::Quiet);
-        config.set().verbose(Verbosity::Normal);
-        assert_eq!(config.verbose(), Verbosity::Normal);
+        config.set().max_width(60);
+        assert_eq!(config.max_width(), 60);
+        config.set().max_width(80);
+        assert_eq!(config.max_width(), 80);
     }
 
     #[test]
@@ -461,7 +445,7 @@ mod test {
         let config = Config::from_toml("hard_tabs = true", Path::new("")).unwrap();
 
         assert_eq!(config.was_set().hard_tabs(), true);
-        assert_eq!(config.was_set().verbose(), false);
+        assert_eq!(config.was_set().max_width(), false);
     }
 
     #[test]
@@ -574,7 +558,6 @@ use_try_shorthand = false
 use_field_init_shorthand = false
 force_explicit_abi = true
 condense_wildcard_suffixes = false
-color = "Auto"
 required_version = "{}"
 unstable_features = false
 hide_parse_errors = false

@@ -24,6 +24,7 @@ jobs:
 
     env:
       CFG_RELEASE_CHANNEL: ${{ matrix.cfg-release-channel }}
+      CFG_RELEASE: ${{ matrix.cfg-release-channel }}
 
     steps:
     - name: checkout

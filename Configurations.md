@@ -311,14 +311,6 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
-## `color`
-
-Whether to use colored output or not.
-
-- **Default value**: `"Auto"`
-- **Possible values**: "Auto", "Always", "Never"
-- **Stable**: No (tracking issue: [#3385](https://github.com/rust-lang/rustfmt/issues/3385))
-
 ## `combine_control_expr`
 
 Combine control expressions with function calls.
@@ -2649,16 +2641,3 @@ Break comments to fit on the line
 // exercitation ullamco laboris nisi ut aliquip ex ea
 // commodo consequat.
 ```
-
-# Internal Options
-
-## `emit_mode`
-
-Internal option
-
-## `print_misformatted_file_names`
-
-Internal option, use `-l` or `--files-with-diff`
-
-## `recursive`
-Internal option, use `-r` or `--recursive`
