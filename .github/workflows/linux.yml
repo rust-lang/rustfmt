@@ -41,6 +41,8 @@ jobs:
         default: true
 
     - uses: davidB/rust-cargo-make@v1
+      with:
+        version: 'latest'
 
     - name: build
       run: |
