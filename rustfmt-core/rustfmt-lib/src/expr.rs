@@ -1228,12 +1228,67 @@ pub(crate) fn rewrite_literal(
 ) -> Option<String> {
     match l.kind {
         ast::LitKind::Str(_, ast::StrStyle::Cooked) => rewrite_string_lit(context, l.span, shape),
+        ast::LitKind::Int(_, _) => rewrite_int_lit(context, l.span, shape),
         _ => wrap_str(
             context.snippet(l.span).to_owned(),
             context.config.max_width(),
             shape,
         ),
     }
+}
+
+fn rewrite_int_lit(context: &RewriteContext<'_>, span: Span, shape: Shape) -> Option<String> {
+    let int_lit = context.snippet(span);
+    if !context.config.format_long_ints() {
+        return wrap_str(int_lit.to_owned(), context.config.max_width(), shape);
+    }
+
+    // Determine whether there's a prefix
+    let is_decimal =
+        !(int_lit.starts_with("0b") || int_lit.starts_with("0o") || int_lit.starts_with("0x"));
+    let digits_between_underscores = if is_decimal { 3 } else { 4 };
+    let prefix_len = if is_decimal { 0 } else { 2 };
+
+    // First pass: determine the number of digits and the suffix length
+    let mut digits = 0;
+    let mut suffix_len = 0;
+    for (i, c) in int_lit[prefix_len..].chars().enumerate() {
+        match c {
+            '_' => continue,
+            'i' | 'u' => {
+                suffix_len = int_lit.len() - prefix_len - i;
+                break;
+            }
+            _ => digits += 1,
+        }
+    }
+
+    let mut result = String::with_capacity(
+        digits + (digits - 1) / digits_between_underscores + prefix_len + suffix_len,
+    );
+
+    // Push prefix
+    result.push_str(&int_lit[0..prefix_len]);
+
+    // Push digits
+    for c in int_lit[prefix_len..int_lit.len() - suffix_len].chars() {
+        if c == '_' {
+            continue;
+        }
+        result.push(c);
+        digits -= 1;
+        if (digits % digits_between_underscores) == 0 && digits > 0 {
+            result.push('_');
+        }
+    }
+
+    // Push suffix
+    if suffix_len > 0 {
+        result.push('_');
+        result.push_str(&int_lit[int_lit.len() - suffix_len..]);
+    }
+
+    wrap_str(result, context.config.max_width(), shape)
 }
 
 fn rewrite_string_lit(context: &RewriteContext<'_>, span: Span, shape: Shape) -> Option<String> {

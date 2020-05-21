@@ -1043,6 +1043,25 @@ fn lorem() -> usize {
 
 See also: [`tab_spaces`](#tab_spaces).
 
+## `format_long_ints`
+
+Adds underscore seperators into long integers.
+
+- Default value: `false`
+- Possible values: `true`, `false`
+- Stable: No (tracking issue: [#3949](https://github.com/rust-lang/rustfmt/issues/3949))
+
+#### `false` (default):
+
+```rust
+const LONG_NUM: u32 = 0b1000100101000011u32;
+```
+
+#### `true`:
+
+```rust
+const LONG_NUM: u32 = 0b1000_1001_0100_0011_u32;
+```
 
 ## `hide_parse_errors`
 
