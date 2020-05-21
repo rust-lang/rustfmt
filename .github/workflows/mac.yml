@@ -33,7 +33,8 @@ jobs:
         profile: minimal
         default: true
 
-    - uses: davidB/rust-cargo-make@v1
+    - name: cargo-make
+      run: cargo install --force cargo-make
 
     - name: build
       run: |

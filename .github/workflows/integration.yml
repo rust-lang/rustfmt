@@ -69,7 +69,6 @@ jobs:
         override: true
         profile: minimal
         default: true
-    - uses: davidB/rust-cargo-make@v1
     - name: run integration tests
       env:
         INTEGRATION: ${{ matrix.integration }}
