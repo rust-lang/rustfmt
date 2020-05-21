@@ -12,6 +12,3 @@ alias = "check"
 
 [tasks.t]
 alias = "test"
-
-[tasks.default.windows]
-script_runner = "bash"

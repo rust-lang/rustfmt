@@ -34,6 +34,7 @@ run_task = "test-subproject"
 
 [tasks.test-subproject]
 condition = { env_set = ["RUSTFMT_MAKE_MANIFEST_PATH"] }
+script_runner = "bash"
 script = [
   "cargo test --manifest-path ${RUSTFMT_MAKE_MANIFEST_PATH}",
   "cargo test --manifest-path ${RUSTFMT_MAKE_MANIFEST_PATH} -- --ignored",
