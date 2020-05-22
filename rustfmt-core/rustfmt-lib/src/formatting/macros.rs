@@ -497,7 +497,7 @@ pub(crate) fn rewrite_macro_def(
     }
     let ts = def.body.inner_tokens();
     let mut parser = MacroParser::new(ts.into_trees());
-    let parsed_def = match parser.parse() {
+    let parsed_def = match parser.parse(def.macro_rules) {
         Some(def) => def,
         None => return snippet,
     };
@@ -544,8 +544,12 @@ pub(crate) fn rewrite_macro_def(
     .collect::<Vec<_>>();
 
     let fmt = ListFormatting::new(arm_shape, context.config)
-        .separator(if def.macro_rules { ";" } else { "" })
-        .trailing_separator(SeparatorTactic::Always)
+        .separator(if def.macro_rules { ";" } else { "," })
+        .trailing_separator(if def.macro_rules || multi_branch_style {
+            SeparatorTactic::Always
+        } else {
+            SeparatorTactic::Never
+        })
         .preserve_newline(true);
 
     if multi_branch_style {
@@ -1250,17 +1254,17 @@ impl MacroParser {
     }
 
     // (`(` ... `)` `=>` `{` ... `}`)*
-    fn parse(&mut self) -> Option<Macro> {
+    fn parse(&mut self, is_macro_rules: bool) -> Option<Macro> {
         let mut branches = vec![];
         while self.toks.look_ahead(1).is_some() {
-            branches.push(self.parse_branch()?);
+            branches.push(self.parse_branch(is_macro_rules)?);
         }
 
         Some(Macro { branches })
     }
 
     // `(` ... `)` `=>` `{` ... `}`
-    fn parse_branch(&mut self) -> Option<MacroBranch> {
+    fn parse_branch(&mut self, is_macro_rules: bool) -> Option<MacroBranch> {
         let tok = self.toks.next()?;
         let (lo, args_paren_kind) = match tok {
             TokenTree::Token(..) => return None,
@@ -1285,13 +1289,13 @@ impl MacroParser {
                 )
             }
         };
-        if let Some(TokenTree::Token(Token {
-            kind: TokenKind::Semi,
-            span,
-        })) = self.toks.look_ahead(0)
-        {
-            self.toks.next();
-            hi = span.hi();
+        if let Some(TokenTree::Token(Token { kind, span })) = self.toks.look_ahead(0) {
+            if (is_macro_rules && kind == TokenKind::Semi)
+                || (!is_macro_rules && kind == TokenKind::Comma)
+            {
+                self.toks.next();
+                hi = span.hi();
+            }
         }
         Some(MacroBranch {
             span: mk_sp(lo, hi),
