@@ -292,8 +292,7 @@ impl IgnoreList {
                 p.strip_prefix(new_rustfmt_toml_path.parent().unwrap())
                     .map(PathBuf::from)
             })
-            .filter(|p| p.is_ok())
-            .map(|p| p.unwrap())
+            .flatten()
             .collect();
 
         let mut path_set = other.path_set;

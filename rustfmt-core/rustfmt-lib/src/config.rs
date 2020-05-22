@@ -273,14 +273,10 @@ impl Config {
 
             // List of closest -> most distant rustfmt config from the current directory.
             let config_paths: Option<Vec<_>> = paths.into_iter().filter(|p| p.is_some()).collect();
-            let has_paths = config_paths.as_ref().and_then(|paths| {
-                if paths.is_empty() {
-                    None
-                } else {
-                    Some(paths.len())
-                }
-            });
-            if has_paths.is_some() {
+            let has_paths = config_paths
+                .as_ref()
+                .map_or(false, |paths| !paths.is_empty());
+            if has_paths {
                 return Ok(config_paths);
             }
 

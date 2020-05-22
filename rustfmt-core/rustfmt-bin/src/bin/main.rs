@@ -488,7 +488,7 @@ fn format(opt: Opt) -> Result<i32> {
     if opt.verbose {
         if let Some(paths) = config_paths.as_ref() {
             println!(
-                "Using rustfmt config files {}",
+                "Using rustfmt config file(s) {}",
                 paths
                     .into_iter()
                     .map(|p| p.display().to_string())
