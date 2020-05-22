@@ -4,22 +4,8 @@ set -ex
 
 : ${INTEGRATION?"The INTEGRATION environment variable must be set."}
 
-# FIXME: this means we can get a stale cargo-fmt from a previous run.
-#
-# `which rustfmt` fails if rustfmt is not found. Since we don't install
-# `rustfmt` via `rustup`, this is the case unless we manually install it. Once
-# that happens, `cargo install --force` will be called, which installs
-# `rustfmt`, `cargo-fmt`, etc to `~/.cargo/bin`. This directory is cached by
-# travis (see `.travis.yml`'s "cache" key), such that build-bots that arrive
-# here after the first installation will find `rustfmt` and won't need to build
-# it again.
-#
-#which cargo-fmt || cargo install --force
-
-export CFG_RELEASE_CHANNEL=nightly
-export CFG_RELEASE=nightly
-
-cargo install --path . --force --locked
+which cargo-make || cargo install --force cargo-make
+cargo make install
 
 echo "Integration tests for: ${INTEGRATION}"
 cargo fmt -- --version
