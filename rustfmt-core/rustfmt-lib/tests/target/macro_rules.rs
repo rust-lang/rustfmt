@@ -102,21 +102,21 @@ macro m2 {
     ($expr:expr, $($func:ident)*) => {{
         let x = $expr;
         $func(x)
-    }}
+    }},
 
     /* b */
     () => {
         /* c */
-    }
+    },
 
-    (@tag) => {}
+    (@tag) => {},
 
     // d
     ($item:ident) => {
         mod macro_item {
             struct $item;
         }
-    }
+    },
 }
 
 // #2438, #2476
