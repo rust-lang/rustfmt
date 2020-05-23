@@ -9,6 +9,22 @@ on issues, or file new issues specifically to get help.
 All contributors are expected to follow our [Code of
 Conduct](CODE_OF_CONDUCT.md).
 
+# Building and Testing
+
+Rustfmt requires a nightly compiler. Replace all invocations of `cargo` by
+`cargo +nightly` if necessary.
+
+At all times the environment variables `CFG_RELEASE_CHANNEL` and `CFG_RELEASE` must
+be set to either `nightly` or `beta`. Both should be set to the same value. The
+project supports [cargo-make](https://github.com/sagiegurari/cargo-make) which
+automatically sets these variables for you:
+
+```
+cargo +nightly make test
+```
+
+The available tasks are listed in `Makefile.toml`.
+
 ## Test and file issues
 
 It would be really useful to have people use rustfmt on their projects and file
@@ -20,18 +36,19 @@ issues where it does something you don't expect.
 Having a strong test suite for a tool like this is essential. It is very easy
 to create regressions. Any tests you can add are very much appreciated.
 
-The tests can be run with `cargo test`. This does a number of things:
+The tests can be run with `cargo make test`. This does a number of things:
 * runs the unit tests for a number of internal functions;
-* makes sure that rustfmt run on every file in `./tests/source/` is equal to its
-  associated file in `./tests/target/`;
-* runs idempotence tests on the files in `./tests/target/`. These files should
-  not be changed by rustfmt;
+* makes sure that rustfmt run on every file in `rustfmt-core/rustfmt-lib/tests/source/`
+  is equal to its associated file in `rustfmt-core/rustfmt-lib/tests/target/`;
+* runs idempotence tests on the files in `rustfmt-core/rustfmt-lib/tests/target/`.
+  These files should not be changed by rustfmt;
 * checks that rustfmt's code is not changed by running on itself. This ensures
   that the project bootstraps.
 
-Creating a test is as easy as creating a new file in `./tests/source/` and an
-equally named one in `./tests/target/`. If it is only required that rustfmt
-leaves a piece of code unformatted, it may suffice to only create a target file.
+Creating a test is as easy as creating a new file in
+`rustfmt-core/rustfmt-lib/tests/source/` and an equally named one in
+`rustfmt-core/rustfmt-lib/tests/target/`. If it is only required that rustfmt leaves a
+piece of code unformatted, it may suffice to only create a target file.
 
 Whenever there's a discrepancy between the expected output when running tests, a
 colourised diff will be printed so that the offending line(s) can quickly be
