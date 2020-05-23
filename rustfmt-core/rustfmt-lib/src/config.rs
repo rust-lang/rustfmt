@@ -301,17 +301,6 @@ impl Config {
         match resolve_project_files(dir)? {
             None => Ok((Config::default(), None)),
             Some(paths) => {
-                // If this branch is hit, there must be at least one config file available.
-                let most_local_path = &paths[0];
-                if let Ok(partial_config) = PartialConfig::from_toml_path(most_local_path) {
-                    let config =
-                        Config::default().fill_from_parsed_config(partial_config, most_local_path);
-                    if config.version() == Version::One {
-                        // In v1, don't merge transient config files. Just use the most local one.
-                        return Ok((config, Some(vec![most_local_path.clone()])));
-                    }
-                }
-
                 let mut config = Config::default();
                 let mut used_paths = Vec::with_capacity(paths.len());
                 for path in paths.into_iter().rev() {
