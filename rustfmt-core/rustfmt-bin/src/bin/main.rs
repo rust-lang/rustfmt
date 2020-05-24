@@ -323,14 +323,8 @@ pub enum OperationError {
     #[error("The `--print-config=minimal` option doesn't work with standard input.")]
     MinimalPathWithStdin,
     /// An io error during reading or writing.
-    #[error("io error: {0}")]
+    #[error("{0}")]
     IoError(IoError),
-}
-
-impl From<IoError> for OperationError {
-    fn from(e: IoError) -> OperationError {
-        OperationError::IoError(e)
-    }
 }
 
 impl CliOptions for Opt {
