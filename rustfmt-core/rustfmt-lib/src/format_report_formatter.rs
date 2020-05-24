@@ -1,10 +1,8 @@
-use crate::config::FileName;
 use crate::{
     formatting::report::FormatReport,
     result::{ErrorKind, FormatError},
 };
-use annotate_snippets::display_list::DisplayList;
-use annotate_snippets::formatter::DisplayListFormatter;
+use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use std::fmt::{self, Display};
 
@@ -50,85 +48,71 @@ pub struct FormatReportFormatter<'a> {
 
 impl<'a> Display for FormatReportFormatter<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let formatter = DisplayListFormatter::new(self.enable_colors, false);
-
+        let opt = FormatOptions {
+            color: self.enable_colors,
+            ..Default::default()
+        };
         for (file, errors) in self.report.format_result_as_rc().borrow().iter() {
             for error in errors.errors_excluding_macro() {
-                let snippet = formatting_error_to_snippet(file, error);
-                writeln!(f, "{}\n", formatter.format(&DisplayList::from(snippet)))?;
+                let annotation_type = error_kind_to_snippet_annotation_type(&error.kind());
+                let label = error.kind().to_string();
+                let title = Annotation {
+                    id: None,
+                    label: Some(&label),
+                    annotation_type,
+                };
+                let origin = error
+                    .line_num()
+                    .as_ref()
+                    .map(|line_num| format!("{}:{}", file, line_num));
+                let slice = Slice {
+                    source: error.line_str().unwrap_or(""),
+                    line_start: error.line_num().unwrap_or(0),
+                    origin: origin.as_ref().map(|s| s.as_str()),
+                    fold: false,
+                    annotations: slice_annotation(error).into_iter().collect(),
+                };
+
+                let snippet = Snippet {
+                    title: Some(title),
+                    slices: vec![slice],
+                    footer: vec![],
+                    opt,
+                };
+                writeln!(f, "{}\n", DisplayList::from(snippet))?;
             }
         }
 
         if self.report.has_errors() {
-            let snippet = formatting_failure_snippet(self.report.warning_count());
-            writeln!(f, "{}", formatter.format(&DisplayList::from(snippet)))?;
+            let label = format!(
+                "rustfmt has failed to format. See previous {} errors.",
+                self.report.warning_count()
+            );
+            let snippet = Snippet {
+                title: Some(Annotation {
+                    id: None,
+                    label: Some(&label),
+                    annotation_type: AnnotationType::Warning,
+                }),
+                slices: Vec::new(),
+                footer: vec![],
+                opt,
+            };
+            writeln!(f, "{}", DisplayList::from(snippet))?;
         }
 
         Ok(())
     }
 }
 
-fn formatting_failure_snippet(warning_count: usize) -> Snippet {
-    Snippet {
-        title: Some(Annotation {
-            id: None,
-            label: Some(format!(
-                "rustfmt has failed to format. See previous {} errors.",
-                warning_count
-            )),
-            annotation_type: AnnotationType::Warning,
-        }),
-        slices: Vec::new(),
-        footer: vec![],
-    }
-}
-
-fn formatting_error_to_snippet(file: &FileName, error: &FormatError) -> Snippet {
-    let slices = vec![snippet_code_slice(file, error)];
-    let title = Some(snippet_title(error));
-
-    Snippet {
-        title,
-        slices,
-        footer: vec![],
-    }
-}
-
-fn snippet_title(error: &FormatError) -> Annotation {
-    let annotation_type = error_kind_to_snippet_annotation_type(&error.kind());
-
-    Annotation {
-        id: None,
-        label: Some(error.kind().to_string()),
-        annotation_type,
-    }
-}
-
-fn snippet_code_slice(file: &FileName, error: &FormatError) -> Slice {
-    let annotations = slice_annotation(error).into_iter().collect();
-    let origin = error
-        .line_num()
-        .as_ref()
-        .map(|line_num| format!("{}:{}", file, line_num));
-    let source = error.line_str().unwrap_or("").to_owned();
-
-    Slice {
-        source,
-        line_start: error.line_num().unwrap_or(0),
-        origin,
-        fold: false,
-        annotations,
-    }
-}
-
-fn slice_annotation(error: &FormatError) -> Option<SourceAnnotation> {
+fn slice_annotation(error: &FormatError) -> Option<SourceAnnotation<'static>> {
     match error.format_len() {
         Some((range_start, range_length)) if range_length > 0 => {
             let range_end = range_start + range_length;
             Some(SourceAnnotation {
                 annotation_type: AnnotationType::Error,
                 range: (range_start, range_end),
-                label: String::new(),
+                label: "",
             })
         }
         _ => None,
