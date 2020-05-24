@@ -3,8 +3,8 @@
 use rustc_span::Span;
 use thiserror::Error;
 
-use crate::{formatting::ParseSess, FileName};
 use crate::formatting::modules::ModuleResolutionError;
+use crate::{formatting::ParseSess, FileName};
 
 /// Represents the specific error kind of [`FormatError`].
 #[derive(Error, Clone, Copy, Debug, Hash, Eq, PartialEq)]

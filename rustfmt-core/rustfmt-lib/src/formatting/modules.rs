@@ -44,17 +44,10 @@ pub struct ModuleResolutionError {
 pub(crate) enum ModuleResolutionErrorKind {
     /// Find a file that cannot be parsed.
     #[error("cannot parse {file}")]
-    ParseError {
-        file: PathBuf,
-    },
+    ParseError { file: PathBuf },
     /// File cannot be found.
     #[error("{file} does not exist")]
-    NotFound {
-        file: PathBuf,
-    },
-    /// IO error.
-    #[error("{0}")]
-    IOError(#[from] std::io::Error),
+    NotFound { file: PathBuf },
 }
 
 #[derive(Clone)]
@@ -272,15 +265,11 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 ))),
                 Err(ParserError::ParseError) => Err(ModuleResolutionError {
                     module: mod_name.to_string(),
-                    kind: ModuleResolutionErrorKind::ParseError {
-                        file: path,
-                    },
+                    kind: ModuleResolutionErrorKind::ParseError { file: path },
                 }),
                 Err(..) => Err(ModuleResolutionError {
                     module: mod_name.to_string(),
-                    kind: ModuleResolutionErrorKind::NotFound {
-                        file: path,
-                    }
+                    kind: ModuleResolutionErrorKind::NotFound { file: path },
                 }),
             };
         }
@@ -323,15 +312,11 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     }
                     Err(ParserError::ParseError) => Err(ModuleResolutionError {
                         module: mod_name.to_string(),
-                        kind: ModuleResolutionErrorKind::ParseError{
-                        file: path,
-                    }
-                    } ),
+                        kind: ModuleResolutionErrorKind::ParseError { file: path },
+                    }),
                     Err(..) if outside_mods_empty => Err(ModuleResolutionError {
                         module: mod_name.to_string(),
-                        kind: ModuleResolutionErrorKind::NotFound {
-                            file: path,
-                        },
+                        kind: ModuleResolutionErrorKind::NotFound { file: path },
                     }),
                     Err(..) => {
                         if should_insert {
@@ -348,8 +333,10 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             Err(mut e) => {
                 e.cancel();
                 Err(ModuleResolutionError {
-                    module:  mod_name.to_string(),
-                    kind: ModuleResolutionErrorKind::NotFound {file: self.directory.path.clone()},
+                    module: mod_name.to_string(),
+                    kind: ModuleResolutionErrorKind::NotFound {
+                        file: self.directory.path.clone(),
+                    },
                 })
             }
         }
