@@ -149,7 +149,7 @@ create_config! {
     error_on_unformatted: bool, false, false,
         "Error if unable to get comments or string literals within max_width, \
          or they are left with trailing whitespaces";
-    ignore: IgnoreList, IgnoreList::default(), false,
+    ignore: IgnoreList, IgnoreList::default(), true,
         "Skip formatting the specified files and directories";
 
     // Not user-facing
