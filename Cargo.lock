@@ -14,8 +14,14 @@ name = "annotate-snippets"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7021ce4924a3f25f802b2cccd1af585e39ea1a363a1aa2e72afe54b67a3a7a7"
+
+[[package]]
+name = "annotate-snippets"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d78ea013094e5ea606b1c05fe35f1dd7ea1eb1ea259908d040b25bd5ec677ee5"
 dependencies = [
- "ansi_term",
+ "yansi-term",
 ]
 
 [[package]]
@@ -830,7 +836,7 @@ version = "659.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c374e89b3c9714869ef86076942155383804ba6778c26be2169d324563c31f9"
 dependencies = [
- "annotate-snippets",
+ "annotate-snippets 0.6.1",
  "atty",
  "log",
  "rustc-ap-rustc_data_structures",
@@ -1073,7 +1079,7 @@ dependencies = [
 name = "rustfmt_lib"
 version = "2.0.0-rc.1"
 dependencies = [
- "annotate-snippets",
+ "annotate-snippets 0.8.0",
  "anyhow",
  "bytecount",
  "diff",
@@ -1462,3 +1468,12 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "yansi-term"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a30d0d48515e745863faad2da9c1e1bac640f9f0f83f1eecb79fc0bf4018e5d2"
+dependencies = [
+ "winapi",
+]
