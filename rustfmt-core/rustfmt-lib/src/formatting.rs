@@ -1,6 +1,5 @@
 // High level formatting functions.
 
-use std::io;
 use std::time::{Duration, Instant};
 
 use rustc_ast::ast;
@@ -117,8 +116,7 @@ fn format_project(
         directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod),
         !input_is_stdin && operation_setting.recursive,
     )
-    .visit_crate(&krate)
-    .map_err(|e| OperationError::IoError(io::Error::new(io::ErrorKind::Other, e)))?;
+    .visit_crate(&krate)?;
 
     for (path, module) in files {
         let should_ignore = !input_is_stdin && parse_session.ignore_file(&path);

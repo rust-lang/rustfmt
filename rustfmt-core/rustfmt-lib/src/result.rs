@@ -3,6 +3,7 @@
 use rustc_span::Span;
 use thiserror::Error;
 
+use crate::formatting::modules::ModuleResolutionError;
 use crate::{formatting::ParseSess, FileName};
 
 /// Represents the specific error kind of [`FormatError`].
@@ -110,9 +111,9 @@ pub enum OperationError {
     /// satisfy that requirement.
     #[error("version mismatch")]
     VersionMismatch,
-    /// An io error during reading or writing.
-    #[error("io error: {0}")]
-    IoError(std::io::Error),
+    /// Error during module resolution.
+    #[error("{0}")]
+    ModuleResolutionError(#[from] ModuleResolutionError),
     /// Invalid glob pattern in `ignore` configuration option.
     #[error("invalid glob pattern found in ignore list: {0}")]
     InvalidGlobPattern(ignore::Error),
