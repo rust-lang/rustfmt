@@ -71,25 +71,27 @@ function show_head {
     echo "Head commit of ${INTEGRATION}: $head"
 }
 
+tempdir=$(mktemp -d)
+
 case ${INTEGRATION} in
     cargo)
-        git clone --depth=1 https://github.com/rust-lang/${INTEGRATION}.git
-        cd ${INTEGRATION}
+        git clone --depth=1 https://github.com/rust-lang/${INTEGRATION}.git ${tempdir}
+        cd ${tempdir}
         show_head
         export CFG_DISABLE_CROSS_TESTS=1
         check_fmt_with_all_tests
         cd -
         ;;
     crater)
-        git clone --depth=1 https://github.com/rust-lang-nursery/${INTEGRATION}.git
-        cd ${INTEGRATION}
+        git clone --depth=1 https://github.com/rust-lang-nursery/${INTEGRATION}.git ${tempdir}
+        cd ${tempdir}
         show_head
         check_fmt_with_lib_tests
         cd -
         ;;
     *)
-        git clone --depth=1 https://github.com/rust-lang-nursery/${INTEGRATION}.git
-        cd ${INTEGRATION}
+        git clone --depth=1 https://github.com/rust-lang-nursery/${INTEGRATION}.git ${tempdir}
+        cd ${tempdir}
         show_head
         check_fmt_with_all_tests
         cd -
