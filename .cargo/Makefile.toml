@@ -4,8 +4,21 @@
 CFG_RELEASE = { value = "${CARGO_MAKE_RUST_VERSION}", condition = { env_not_set = ["CFG_RELEASE"] } }
 CFG_RELEASE_CHANNEL = { value = "${CARGO_MAKE_RUST_CHANNEL}", condition = { env_not_set = ["CFG_RELEASE_CHANNEL"] } }
 
+[tasks.build-bin]
+workspace = false
+command = "cargo"
+args = [
+  "build",
+  "--bin",
+  "rustfmt",
+  "--all-features",
+]
+
 [tasks.b]
 alias = "build"
+
+[tasks.bb]
+alias = "build-bin"
 
 [tasks.c]
 alias = "check"
