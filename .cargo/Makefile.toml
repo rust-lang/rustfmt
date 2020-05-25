@@ -1,8 +1,8 @@
 # This Makefile.toml defines common tasks and settings used in the rustfmt project.
 
 [env]
-CFG_RELEASE = { value = "nightly", condition = { env_not_set = ["CFG_RELEASE"] } }
-CFG_RELEASE_CHANNEL = { value = "nightly", condition = { env_not_set = ["CFG_RELEASE_CHANNEL"] } }
+CFG_RELEASE = { value = "${CARGO_MAKE_RUST_VERSION}", condition = { env_not_set = ["CFG_RELEASE"] } }
+CFG_RELEASE_CHANNEL = { value = "${CARGO_MAKE_RUST_CHANNEL}", condition = { env_not_set = ["CFG_RELEASE_CHANNEL"] } }
 
 [tasks.b]
 alias = "build"
