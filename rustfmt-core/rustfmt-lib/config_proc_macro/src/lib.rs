@@ -18,8 +18,7 @@ pub fn config_type(_args: TokenStream, input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::Item);
     let output = config_type::define_config_type(&input);
 
-    #[cfg(feature = "debug-with-rustfmt")]
-    {
+    if std::env::var("RUSTFMT_DEV_DEBUG_PROC_MACRO").is_ok() {
         utils::debug_with_rustfmt(&output);
     }
 

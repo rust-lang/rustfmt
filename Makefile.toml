@@ -1,15 +1,5 @@
 extend = ".cargo/Makefile.toml"
 
-[tasks.build]
-clear = true
-command = "cargo"
-args = [
-  "build",
-  "--manifest-path",
-  "rustfmt-core/Cargo.toml",
-  "--workspace",
-]
-
 [tasks.install]
 command = "cargo"
 args = [
