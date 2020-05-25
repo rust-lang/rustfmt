@@ -161,7 +161,7 @@ pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
     let init_span = mk_sp(span.lo(), init_last_pos);
     let one_line_width = if rest.is_empty() { one_line_width } else { 0 };
     let result =
-        rewrite_aligned_items_inner(context, init, init_span, shape.indent, one_line_width)?;
+        rewrite_aligned_items_inner(context, init, rest, init_span, shape.indent, one_line_width)?;
     if rest.is_empty() {
         Some(result + spaces)
     } else {
@@ -198,6 +198,7 @@ fn struct_field_prefix_max_min_width<T: AlignedItem>(
 fn rewrite_aligned_items_inner<T: AlignedItem>(
     context: &RewriteContext<'_>,
     fields: &[T],
+    remaining_fields: &[T],
     span: Span,
     offset: Indent,
     one_line_width: usize,
@@ -248,7 +249,12 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
 
     let fmt = ListFormatting::new(item_shape, context.config)
         .tactic(tactic)
-        .trailing_separator(context.config.trailing_comma())
+        .trailing_separator(if remaining_fields.is_empty() {
+            // trailing commas should only be removed on the last field
+            context.config.trailing_comma()
+        } else {
+            SeparatorTactic::Always
+        })
         .preserve_newline(true);
     write_list(&items, &fmt)
 }
