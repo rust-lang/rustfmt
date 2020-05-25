@@ -2,7 +2,7 @@
 
 # The metadata of this crate is intentionally removed to avoid publishing this crate by accident.
 name = "rustfmt-bin"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 edition = "2018"
 
 [[bin]]
@@ -42,7 +42,7 @@ structopt = "0.3"
 term = "0.6"
 thiserror = "1.0"
 
-rustfmt_lib = { path = "../rustfmt-lib", version = "2.0.0-rc.1" }
+rustfmt_lib = { path = "../rustfmt-lib", version = "2.0.0-rc.2" }
 
 [dev-dependencies]
 lazy_static = "1.0"

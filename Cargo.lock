@@ -1057,7 +1057,7 @@ dependencies = [
 
 [[package]]
 name = "rustfmt-nightly"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1077,7 +1077,7 @@ dependencies = [
 
 [[package]]
 name = "rustfmt_lib"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 dependencies = [
  "annotate-snippets 0.8.0",
  "anyhow",
