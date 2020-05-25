@@ -19,9 +19,8 @@ pub fn is_unit(v: &syn::Variant) -> bool {
     }
 }
 
-#[cfg(feature = "debug-with-rustfmt")]
 /// Pretty-print the output of proc macro using rustfmt.
-pub fn debug_with_rustfmt(input: &TokenStream) {
+pub(crate) fn debug_with_rustfmt(input: &TokenStream) {
     use std::io::Write;
     use std::process::{Command, Stdio};
 
