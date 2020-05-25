@@ -106,10 +106,6 @@ fn format_project(
             });
         }
     };
-    timer = timer.done_parsing();
-
-    // Suppress error output if we have to do any further parsing.
-    parse_session.set_silent_emitter();
 
     let files = modules::ModResolver::new(
         &parse_session,
@@ -117,6 +113,11 @@ fn format_project(
         !input_is_stdin && operation_setting.recursive,
     )
     .visit_crate(&krate)?;
+
+    timer = timer.done_parsing();
+
+    // Suppress error output if we have to do any further parsing.
+    parse_session.set_silent_emitter();
 
     for (path, module) in files {
         let should_ignore = !input_is_stdin && parse_session.ignore_file(&path);

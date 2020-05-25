@@ -11,7 +11,9 @@ use crate::emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChun
 use crate::config::{Config, FileName, NewlineStyle};
 use crate::{
     emitter::{emit_format_report, Color, EmitMode, EmitterConfig},
-    format, is_nightly_channel, FormatReport, FormatReportFormatterBuilder, Input, OperationError,
+    format,
+    formatting::modules::{ModuleResolutionError, ModuleResolutionErrorKind},
+    is_nightly_channel, FormatReport, FormatReportFormatterBuilder, Input, OperationError,
     OperationSetting,
 };
 
@@ -517,6 +519,28 @@ fn format_lines_errors_are_reported_with_tabs() {
     config.set().hard_tabs(true);
     let report = format(input, &config, OperationSetting::default()).unwrap();
     assert!(report.has_errors());
+}
+
+#[test]
+fn parser_errors_in_submods_are_surfaced() {
+    // See also https://github.com/rust-lang/rustfmt/issues/4126
+    let filename = "tests/parser/issue-4126/lib.rs";
+    let file = PathBuf::from(filename);
+    let exp_mod_name = "invalid";
+    let (config, operation, _) = read_config(&file);
+    if let Err(OperationError::ModuleResolutionError { 0: inner }) =
+        format_file(&file, operation, config)
+    {
+        let ModuleResolutionError { module, kind } = inner;
+        assert_eq!(&module, exp_mod_name);
+        if let ModuleResolutionErrorKind::ParseError { file } = kind {
+            assert_eq!(file, PathBuf::from("tests/parser/issue-4126/invalid.rs"));
+        } else {
+            panic!("Expected parser error");
+        }
+    } else {
+        panic!("Expected ModuleResolution operation error");
+    }
 }
 
 // For each file, run rustfmt and collect the output.
