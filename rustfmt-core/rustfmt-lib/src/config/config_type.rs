@@ -50,6 +50,22 @@ impl ConfigType for IgnoreList {
     }
 }
 
+macro_rules! update_config {
+    ($config:ident, ignore = $val:ident, $dir:ident) => {
+        $config.ignore.1 = true;
+
+        let mut new_ignored = $val;
+        new_ignored.add_prefix($dir);
+        let old_ignored = $config.ignore.2;
+        $config.ignore.2 = old_ignored.merge_into(new_ignored);
+    };
+
+    ($config:ident, $i:ident = $val:ident, $dir:ident) => {
+        $config.$i.1 = true;
+        $config.$i.2 = $val;
+    };
+}
+
 macro_rules! create_config {
     ($($i:ident: $Ty:ty, $def:expr, $is_stable:literal, $dstring:literal;)+) => (
         use std::io::Write;
@@ -149,12 +165,10 @@ macro_rules! create_config {
             $(
                 if let Some(val) = parsed.$i {
                     if self.$i.3 {
-                        self.$i.1 = true;
-                        self.$i.2 = val;
+                        update_config!(self, $i = val, dir);
                     } else {
                         if is_nightly_channel!() {
-                            self.$i.1 = true;
-                            self.$i.2 = val;
+                            update_config!(self, $i = val, dir);
                         } else {
                             eprintln!("Warning: can't set `{} = {:?}`, unstable features are only \
                                        available in nightly channel.", stringify!($i), val);
@@ -164,7 +178,6 @@ macro_rules! create_config {
             )+
                 self.set_heuristics();
                 self.set_license_template();
-                self.set_ignore(dir);
                 self
             }
 
@@ -252,9 +265,8 @@ macro_rules! create_config {
 
             #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
-                const HIDE_OPTIONS: [&str; 5] = [
-                    "verbose", "verbose_diff", "file_lines",
-                    "recursive", "print_misformatted_file_names",
+                const HIDE_OPTIONS: [&str; 1] = [
+                    "file_lines",
                 ];
                 HIDE_OPTIONS.contains(&name)
             }
@@ -396,10 +408,6 @@ macro_rules! create_config {
                         }
                     }
                 }
-            }
-
-            fn set_ignore(&mut self, dir: &Path) {
-                self.ignore.2.add_prefix(dir);
             }
 
             #[allow(unreachable_pub)]

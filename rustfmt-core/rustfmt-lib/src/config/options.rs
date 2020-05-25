@@ -22,6 +22,12 @@ pub enum NewlineStyle {
     Native,
 }
 
+impl Default for NewlineStyle {
+    fn default() -> Self {
+        NewlineStyle::Auto
+    }
+}
+
 #[config_type]
 /// Where to put the opening brace of items (`fn`, `impl`, etc.).
 pub enum BraceStyle {
@@ -107,39 +113,6 @@ pub enum ReportTactic {
     Never,
 }
 
-/// What Rustfmt should emit. Mostly corresponds to the `--emit` command line
-/// option.
-#[config_type]
-pub enum EmitMode {
-    /// Emits to files.
-    Files,
-    /// Writes the output to stdout.
-    Stdout,
-    /// Unfancy stdout
-    Checkstyle,
-    /// Writes the resulting diffs in a JSON format. Returns an empty array
-    /// `[]` if there were no diffs.
-    Json,
-    /// Output the changed lines (for internal value only)
-    ModifiedLines,
-    /// Checks if a diff can be generated. If so, rustfmt outputs a diff and
-    /// quits with exit code 1.
-    /// This option is designed to be run in CI where a non-zero exit signifies
-    /// non-standard code formatting. Used for `--check`.
-    Diff,
-}
-
-/// Client-preference for coloured output.
-#[config_type]
-pub enum Color {
-    /// Always use color, whether it is a piped or terminal output
-    Always,
-    /// Never use color
-    Never,
-    /// Automatically use color, if supported by terminal
-    Auto,
-}
-
 #[config_type]
 /// rustfmt format style version.
 pub enum Version {
@@ -147,27 +120,6 @@ pub enum Version {
     One,
     /// 2.x.y. When specified, rustfmt will format in the the latest style.
     Two,
-}
-
-impl Color {
-    /// Whether we should use a coloured terminal.
-    pub fn use_colored_tty(self) -> bool {
-        match self {
-            Color::Always | Color::Auto => true,
-            Color::Never => false,
-        }
-    }
-}
-
-/// How chatty should Rustfmt be?
-#[config_type]
-pub enum Verbosity {
-    /// Emit more.
-    Verbose,
-    /// Default.
-    Normal,
-    /// Emit as little as possible.
-    Quiet,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -248,12 +200,6 @@ impl WidthHeuristics {
     }
 }
 
-impl Default for EmitMode {
-    fn default() -> EmitMode {
-        EmitMode::Files
-    }
-}
-
 /// A set of directories, files and modules that rustfmt should ignore.
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct IgnoreList {
@@ -330,6 +276,33 @@ impl IgnoreList {
     pub fn rustfmt_toml_path(&self) -> &Path {
         &self.rustfmt_toml_path
     }
+
+    /// Merges `self` into `other`, returning a new `IgnoreList`. The resulting `IgnoreList` uses
+    /// the `rustfmt_toml_path` of `other`, and only contains paths that are in `other`'s
+    /// `rustfmt_toml_path`.
+    pub fn merge_into(self, other: Self) -> Self {
+        let old_rustfmt_toml_path = self.rustfmt_toml_path;
+        let new_rustfmt_toml_path = other.rustfmt_toml_path;
+        let relocalized_old_paths: HashSet<PathBuf> = self
+            .path_set
+            .into_iter()
+            .map(|p| old_rustfmt_toml_path.parent().unwrap().join(p))
+            .map(|p| {
+                // Only keep old paths that are also in the new config path
+                p.strip_prefix(new_rustfmt_toml_path.parent().unwrap())
+                    .map(PathBuf::from)
+            })
+            .flatten()
+            .collect();
+
+        let mut path_set = other.path_set;
+        path_set.extend(relocalized_old_paths);
+
+        Self {
+            path_set,
+            rustfmt_toml_path: new_rustfmt_toml_path,
+        }
+    }
 }
 
 impl std::str::FromStr for IgnoreList {
@@ -372,5 +345,56 @@ impl From<Edition> for rustc_span::edition::Edition {
             Edition::Edition2015 => Self::Edition2015,
             Edition::Edition2018 => Self::Edition2018,
         }
+    }
+}
+
+/// Controls how rustfmt should handle leading pipes on match arms.
+#[config_type]
+pub enum MatchArmLeadingPipe {
+    /// Place leading pipes on all match arms
+    Always,
+    /// Never emit leading pipes on match arms
+    Never,
+    /// Maintain any existing leading pipes
+    KeepExisting,
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+
+    use crate::config::IgnoreList;
+
+    #[test]
+    fn test_ignore_list_merge_into() {
+        let ignore_list_outer = IgnoreList {
+            path_set: vec!["b/c/d.rs", "b/c/d/e.rs", "b/other.rs"]
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            rustfmt_toml_path: PathBuf::from("a/rustfmt.toml"),
+        };
+
+        let ignore_list_inner = IgnoreList {
+            path_set: vec!["f.rs", "g/h.rs"]
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+            rustfmt_toml_path: PathBuf::from("a/b/c/rustfmt.toml"),
+        };
+
+        let ignore_list_merged = ignore_list_outer.merge_into(ignore_list_inner);
+
+        assert_eq!(
+            ignore_list_merged.rustfmt_toml_path,
+            PathBuf::from("a/b/c/rustfmt.toml")
+        );
+        assert_eq!(
+            ignore_list_merged.path_set,
+            vec!["d.rs", "d/e.rs", "f.rs", "g/h.rs"]
+                .into_iter()
+                .map(PathBuf::from)
+                .collect()
+        );
     }
 }

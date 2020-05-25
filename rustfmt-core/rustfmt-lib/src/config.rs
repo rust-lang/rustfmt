@@ -92,7 +92,7 @@ create_config! {
     space_around_attr_eq: bool, true, false,
         "Determines if '=' are wrapped in spaces in attributes.";
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
-    binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
+    binop_separator: SeparatorPlace, SeparatorPlace::Front, true,
         "Where to put a binary operator when a binary expression goes multiline";
 
     // Misc.
@@ -106,10 +106,12 @@ create_config! {
         "Align enum variants discrims, if their diffs fit within threshold";
     match_arm_blocks: bool, true, false, "Wrap the body of arms in blocks when it does not fit on \
         the same line with the pattern of arms";
+    match_arm_leading_pipes: MatchArmLeadingPipe, MatchArmLeadingPipe::Never, true,
+        "Determines whether leading pipes are emitted on match arms";
     force_multiline_blocks: bool, false, false,
         "Force multiline closure bodies and match arms to be wrapped in a block";
-    fn_args_layout: Density, Density::Tall, true,
-        "Control the layout of arguments in a function";
+    fn_params_layout: Density, Density::Tall, true,
+        "Control the layout of parameters in a function signature";
     brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
     control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,
         "Brace style for control flow constructs";
@@ -117,7 +119,7 @@ create_config! {
         "Add trailing semicolon after break, continue and return";
     trailing_comma: SeparatorTactic, SeparatorTactic::Vertical, false,
         "How to handle trailing commas for lists";
-    match_block_trailing_comma: bool, false, false,
+    match_block_trailing_comma: bool, false, true,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
     blank_lines_upper_bound: usize, 1, false,
         "Maximum number of blank lines which can be put between items";
@@ -138,33 +140,22 @@ create_config! {
                                                      in tuple patterns";
 
     // Control options (changes the operation of rustfmt, rather than the formatting)
-    color: Color, Color::Auto, false,
-        "What Color option to use when none is supplied: Always, Never, Auto";
     required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
         "Require a specific version of rustfmt";
     unstable_features: bool, false, false,
             "Enables unstable features. Only available on nightly channel";
-    disable_all_formatting: bool, false, false, "Don't reformat anything";
     hide_parse_errors: bool, false, false, "Hide errors from the parser";
     error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
     error_on_unformatted: bool, false, false,
         "Error if unable to get comments or string literals within max_width, \
          or they are left with trailing whitespaces";
-    ignore: IgnoreList, IgnoreList::default(), false,
+    ignore: IgnoreList, IgnoreList::default(), true,
         "Skip formatting the specified files and directories";
 
     // Not user-facing
-    verbose: Verbosity, Verbosity::Normal, false, "How much to information to emit to the user";
     file_lines: FileLines, FileLines::all(), false,
         "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
          via the --file-lines option";
-    emit_mode: EmitMode, EmitMode::Files, false,
-        "What emit Mode to use when none is supplied";
-    print_misformatted_file_names: bool, false, true,
-        "Prints the names of mismatched files that were formatted. Prints the names of \
-         files that would be formated when used with `--check` mode. ";
-    recursive: bool, false, true,
-        "Format all encountered modules recursively, including those defined in external files.";
 }
 
 #[derive(Error, Debug)]
@@ -176,12 +167,45 @@ impl PartialConfig {
         // Non-user-facing options can't be specified in TOML
         let mut cloned = self.clone();
         cloned.file_lines = None;
-        cloned.verbose = None;
-        cloned.print_misformatted_file_names = None;
-        cloned.recursive = None;
-        cloned.emit_mode = None;
 
         ::toml::to_string(&cloned).map_err(ToTomlError)
+    }
+
+    pub fn from_toml_path(file_path: &Path) -> Result<PartialConfig, Error> {
+        let mut file = File::open(&file_path)?;
+        let mut toml = String::new();
+        file.read_to_string(&mut toml)?;
+        PartialConfig::from_toml(&toml).map_err(|err| Error::new(ErrorKind::InvalidData, err))
+    }
+
+    fn from_toml(toml: &str) -> Result<PartialConfig, String> {
+        let parsed: ::toml::Value = toml
+            .parse()
+            .map_err(|e| format!("Could not parse TOML: {}", e))?;
+        let mut err = String::new();
+        let table = parsed
+            .as_table()
+            .ok_or_else(|| String::from("Parsed config was not table"))?;
+        for key in table.keys() {
+            if !Config::is_valid_name(key) {
+                let msg = &format!("Warning: Unknown configuration option `{}`\n", key);
+                err.push_str(msg)
+            }
+        }
+        match parsed.try_into() {
+            Ok(parsed_config) => {
+                if !err.is_empty() {
+                    eprint!("{}", err);
+                }
+                Ok(parsed_config)
+            }
+            Err(e) => {
+                err.push_str("Error: Decoding config file failed:\n");
+                err.push_str(format!("{}\n", e).as_str());
+                err.push_str("Please check your config file.");
+                Err(err)
+            }
+        }
     }
 }
 
@@ -210,11 +234,8 @@ impl Config {
     /// Returns a `Config` if the config could be read and parsed from
     /// the file, otherwise errors.
     pub fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
-        let mut file = File::open(&file_path)?;
-        let mut toml = String::new();
-        file.read_to_string(&mut toml)?;
-        Config::from_toml(&toml, file_path.parent().unwrap())
-            .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+        let partial_config = PartialConfig::from_toml_path(file_path)?;
+        Ok(Config::default().fill_from_parsed_config(partial_config, file_path.parent().unwrap()))
     }
 
     /// Resolves the config for input in `dir`.
@@ -226,11 +247,11 @@ impl Config {
     ///
     /// Returns the `Config` to use, and the path of the project file if there was
     /// one.
-    pub fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<PathBuf>), Error> {
+    pub fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<Vec<PathBuf>>), Error> {
         /// Try to find a project file in the given directory and its parents.
         /// Returns the path of a the nearest project file if one exists,
         /// or `None` if no project file was found.
-        fn resolve_project_file(dir: &Path) -> Result<Option<PathBuf>, Error> {
+        fn resolve_project_files(dir: &Path) -> Result<Option<Vec<PathBuf>>, Error> {
             let mut current = if dir.is_relative() {
                 env::current_dir()?.join(dir)
             } else {
@@ -238,13 +259,11 @@ impl Config {
             };
 
             current = dunce::canonicalize(current)?;
+            let mut paths = Vec::new();
 
             loop {
-                match get_toml_path(&current) {
-                    Ok(Some(path)) => return Ok(Some(path)),
-                    Err(e) => return Err(e),
-                    _ => (),
-                }
+                let current_toml_path = get_toml_path(&current)?;
+                paths.push(current_toml_path);
 
                 // If the current directory has no parent, we're done searching.
                 if !current.pop() {
@@ -252,10 +271,19 @@ impl Config {
                 }
             }
 
+            // List of closest -> most distant rustfmt config from the current directory.
+            let config_paths: Option<Vec<_>> = paths.into_iter().filter(|p| p.is_some()).collect();
+            let has_paths = config_paths
+                .as_ref()
+                .map_or(false, |paths| !paths.is_empty());
+            if has_paths {
+                return Ok(config_paths);
+            }
+
             // If nothing was found, check in the home directory.
             if let Some(home_dir) = dirs::home_dir() {
                 if let Some(path) = get_toml_path(&home_dir)? {
-                    return Ok(Some(path));
+                    return Ok(Some(vec![path]));
                 }
             }
 
@@ -263,48 +291,33 @@ impl Config {
             if let Some(mut config_dir) = dirs::config_dir() {
                 config_dir.push("rustfmt");
                 if let Some(path) = get_toml_path(&config_dir)? {
-                    return Ok(Some(path));
+                    return Ok(Some(vec![path]));
                 }
             }
 
             Ok(None)
         }
 
-        match resolve_project_file(dir)? {
+        match resolve_project_files(dir)? {
             None => Ok((Config::default(), None)),
-            Some(path) => Config::from_toml_path(&path).map(|config| (config, Some(path))),
+            Some(paths) => {
+                let mut config = Config::default();
+                let mut used_paths = Vec::with_capacity(paths.len());
+                for path in paths.into_iter().rev() {
+                    let partial_config = PartialConfig::from_toml_path(&path)?;
+                    config = config.fill_from_parsed_config(partial_config, &path);
+                    used_paths.push(path);
+                }
+
+                Ok((config, Some(used_paths)))
+            }
         }
     }
 
     pub fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
-        let parsed: ::toml::Value = toml
-            .parse()
-            .map_err(|e| format!("Could not parse TOML: {}", e))?;
-        let mut err = String::new();
-        let table = parsed
-            .as_table()
-            .ok_or_else(|| String::from("Parsed config was not table"))?;
-        for key in table.keys() {
-            if !Config::is_valid_name(key) {
-                let msg = &format!("Warning: Unknown configuration option `{}`\n", key);
-                err.push_str(msg)
-            }
-        }
-        match parsed.try_into() {
-            Ok(parsed_config) => {
-                if !err.is_empty() {
-                    eprint!("{}", err);
-                }
-                let config = Config::default().fill_from_parsed_config(parsed_config, dir);
-                Ok(config)
-            }
-            Err(e) => {
-                err.push_str("Error: Decoding config file failed:\n");
-                err.push_str(format!("{}\n", e).as_str());
-                err.push_str("Please check your config file.");
-                Err(err)
-            }
-        }
+        let partial_config = PartialConfig::from_toml(toml)?;
+        let config = Config::default().fill_from_parsed_config(partial_config, dir);
+        Ok(config)
     }
 }
 
@@ -313,14 +326,14 @@ impl Config {
 pub fn load_config<O: CliOptions>(
     file_path: Option<&Path>,
     options: Option<&O>,
-) -> Result<(Config, Option<PathBuf>), Error> {
+) -> Result<(Config, Option<Vec<PathBuf>>), Error> {
     let over_ride = match options {
         Some(opts) => config_path(opts)?,
         None => None,
     };
 
     let result = if let Some(over_ride) = over_ride {
-        Config::from_toml_path(over_ride.as_ref()).map(|p| (p, Some(over_ride.to_owned())))
+        Config::from_toml_path(over_ride.as_ref()).map(|p| (p, Some(vec![over_ride.to_owned()])))
     } else if let Some(file_path) = file_path {
         Config::from_resolved_toml_path(file_path)
     } else {
@@ -404,8 +417,6 @@ mod test {
                 "Require a specific version of rustfmt.";
             ignore: IgnoreList, IgnoreList::default(), false,
                 "Skip formatting the specified files and directories.";
-            verbose: Verbosity, Verbosity::Normal, false,
-                "How much to information to emit to the user";
             file_lines: FileLines, FileLines::all(), false,
                 "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
                     via the --file-lines option";
@@ -432,13 +443,49 @@ mod test {
         }
     }
 
+    struct TempFile {
+        path: PathBuf,
+    }
+
+    fn make_temp_file(file_name: &'static str, content: &'static str) -> TempFile {
+        use std::env::var;
+
+        // Used in the Rust build system.
+        let target_dir = var("RUSTFMT_TEST_DIR").map_or_else(|_| env::temp_dir(), PathBuf::from);
+        let path = target_dir.join(file_name);
+
+        fs::create_dir_all(path.parent().unwrap()).expect("couldn't create temp file");
+        let mut file = File::create(&path).expect("couldn't create temp file");
+        file.write_all(content.as_bytes())
+            .expect("couldn't write temp file");
+        TempFile { path }
+    }
+
+    impl Drop for TempFile {
+        fn drop(&mut self) {
+            use std::fs::remove_file;
+            remove_file(&self.path).expect("couldn't delete temp file");
+        }
+    }
+
+    struct NullOptions;
+
+    impl CliOptions for NullOptions {
+        fn apply_to(&self, _: &mut Config) {
+            unreachable!();
+        }
+        fn config_path(&self) -> Option<&Path> {
+            unreachable!();
+        }
+    }
+
     #[test]
     fn test_config_set() {
         let mut config = Config::default();
-        config.set().verbose(Verbosity::Quiet);
-        assert_eq!(config.verbose(), Verbosity::Quiet);
-        config.set().verbose(Verbosity::Normal);
-        assert_eq!(config.verbose(), Verbosity::Normal);
+        config.set().max_width(60);
+        assert_eq!(config.max_width(), 60);
+        config.set().max_width(80);
+        assert_eq!(config.max_width(), 80);
     }
 
     #[test]
@@ -458,7 +505,7 @@ mod test {
         let config = Config::from_toml("hard_tabs = true", Path::new("")).unwrap();
 
         assert_eq!(config.was_set().hard_tabs(), true);
-        assert_eq!(config.was_set().verbose(), false);
+        assert_eq!(config.was_set().max_width(), false);
     }
 
     #[test]
@@ -552,8 +599,9 @@ overflow_delimited_expr = false
 struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
+match_arm_leading_pipes = "Never"
 force_multiline_blocks = false
-fn_args_layout = "Tall"
+fn_params_layout = "Tall"
 brace_style = "SameLineWhere"
 control_brace_style = "AlwaysSameLine"
 trailing_semicolon = true
@@ -569,10 +617,8 @@ use_try_shorthand = false
 use_field_init_shorthand = false
 force_explicit_abi = true
 condense_wildcard_suffixes = false
-color = "Auto"
 required_version = "{}"
 unstable_features = false
-disable_all_formatting = false
 hide_parse_errors = false
 error_on_line_overflow = false
 error_on_unformatted = false
@@ -582,6 +628,44 @@ ignore = []
         );
         let toml = Config::default().all_options().to_toml().unwrap();
         assert_eq!(&toml, &default_config);
+    }
+
+    #[test]
+    fn test_merged_config() {
+        match option_env!("CFG_RELEASE_CHANNEL") {
+            // this test requires nightly
+            None | Some("nightly") => {
+                let _outer_config = make_temp_file(
+                    "a/rustfmt.toml",
+                    r#"
+tab_spaces = 2
+fn_call_width = 50
+ignore = ["b/main.rs", "util.rs"]
+"#,
+                );
+
+                let inner_config = make_temp_file(
+                    "a/b/rustfmt.toml",
+                    r#"
+version = "two"
+tab_spaces = 3
+ignore = []
+"#,
+                );
+
+                let inner_dir = inner_config.path.parent().unwrap();
+                let (config, paths) = load_config::<NullOptions>(Some(inner_dir), None).unwrap();
+
+                assert_eq!(config.tab_spaces(), 3);
+                assert_eq!(config.fn_call_width(), 50);
+                assert_eq!(config.ignore().to_string(), r#"["main.rs"]"#);
+
+                let paths = paths.unwrap();
+                assert!(paths[0].ends_with("a/rustfmt.toml"));
+                assert!(paths[1].ends_with("a/b/rustfmt.toml"));
+            }
+            _ => (),
+        };
     }
 
     mod unstable_features {

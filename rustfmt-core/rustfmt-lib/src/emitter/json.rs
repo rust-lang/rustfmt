@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::Write;
 
 use super::*;
 use rustfmt_diff::{make_diff, DiffLine, Mismatch};
@@ -27,8 +27,9 @@ struct MismatchedFile {
 }
 
 impl Emitter for JsonEmitter {
-    fn emit_footer(&self, output: &mut dyn Write) -> Result<(), io::Error> {
-        writeln!(output, "{}", &to_json_string(&self.mismatched_files)?)
+    fn emit_footer(&self, output: &mut dyn Write) -> Result<(), EmitterError> {
+        writeln!(output, "{}", &to_json_string(&self.mismatched_files)?)?;
+        Ok(())
     }
 
     fn emit_formatted_file(
@@ -39,7 +40,7 @@ impl Emitter for JsonEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
-    ) -> Result<EmitterResult, io::Error> {
+    ) -> Result<EmitterResult, EmitterError> {
         const CONTEXT_SIZE: usize = 0;
         let diff = make_diff(original_text, formatted_text, CONTEXT_SIZE);
         let has_diff = !diff.is_empty();
@@ -57,7 +58,7 @@ impl JsonEmitter {
         &mut self,
         filename: &FileName,
         diff: Vec<Mismatch>,
-    ) -> Result<(), io::Error> {
+    ) -> Result<(), EmitterError> {
         let mut mismatches = vec![];
         for mismatch in diff {
             let original_begin_line = mismatch.line_number_orig;

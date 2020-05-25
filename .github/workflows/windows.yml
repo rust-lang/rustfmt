@@ -25,6 +25,10 @@ jobs:
             target: i686-pc-windows-gnu
             mingw-7z-path: mingw
 
+    env:
+      CFG_RELEASE_CHANNEL: nightly
+      CFG_RELEASE: nightly
+
     steps:
     # The Windows runners have autocrlf enabled by default
     # which causes failures for some of rustfmt's line-ending sensitive tests
@@ -78,16 +82,17 @@ jobs:
         override: true
         profile: minimal
         default: true
+
+    - name: cargo-make
+      run: cargo install --force cargo-make
+
     - name: build
       run: |
         rustc -Vv
         cargo -V
-        cargo build --manifest-path rustfmt-core/Cargo.toml --workspace
+        cargo make build
       shell: cmd
 
     - name: test
-      run: cargo test-all
-      shell: cmd
-    - name: test ignored
-      run: cargo test-all -- --ignored
+      run: cargo make test
       shell: cmd

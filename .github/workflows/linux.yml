@@ -24,6 +24,7 @@ jobs:
 
     env:
       CFG_RELEASE_CHANNEL: ${{ matrix.cfg-release-channel }}
+      CFG_RELEASE: ${{ matrix.cfg-release-channel }}
 
     steps:
     - name: checkout
@@ -38,13 +39,15 @@ jobs:
         override: true
         profile: minimal
         default: true
+
+    - name: cargo-make
+      run: cargo install --force cargo-make
+
     - name: build
       run: |
         rustc -Vv
         cargo -V
-        cargo build --manifest-path rustfmt-core/Cargo.toml --workspace
+        cargo make build
 
     - name: test
-      run: cargo test-all
-    - name: test ignored
-      run: cargo test-all -- --ignored
+      run: cargo make test

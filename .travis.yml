@@ -45,6 +45,8 @@ matrix:
 
 script:
   - |
+    export CFG_RELEASE_CHANNEL=nightly
+    export CFG_RELEASE=nightly
     if [ -z ${INTEGRATION} ]; then
       cargo build && cargo test && cargo test -- --ignored && cargo test --manifest-path rustfmt-core/Cargo.toml && cargo test --manifest-path rustfmt-core/Cargo.toml -- --ignored
     else

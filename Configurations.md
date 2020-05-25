@@ -15,7 +15,11 @@ To enable unstable options, set `unstable_features = true` in `rustfmt.toml` or 
 
 # Configuration Options
 
-Below you find a detailed visual guide on all the supported configuration options of rustfmt:
+Below you can find a detailed visual guide on all the supported configuration options of rustfmt.
+
+**_Note that the below list reflects the configuration options available on the latest version of rustfmt in source control. Some newer options may not be available yet in a released version of rustfmt_**
+
+
 
 ## `array_width` 
 
@@ -47,7 +51,7 @@ Where to put a binary operator when a binary expression goes multiline.
 
 - **Default value**: `"Front"`
 - **Possible values**: `"Front"`, `"Back"`
-- **Stable**: No (tracking issue: [#3368](https://github.com/rust-lang/rustfmt/issues/3368))
+- **Stable**: Yes
 
 #### `"Front"` (default):
 
@@ -307,14 +311,6 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
-## `color`
-
-Whether to use colored output or not.
-
-- **Default value**: `"Auto"`
-- **Possible values**: "Auto", "Always", "Never"
-- **Stable**: No (tracking issue: [#3385](https://github.com/rust-lang/rustfmt/issues/3385))
-
 ## `combine_control_expr`
 
 Combine control expressions with function calls.
@@ -519,20 +515,12 @@ fn main() {
 }
 ```
 
-## `disable_all_formatting`
-
-Don't reformat anything
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3388](https://github.com/rust-lang/rustfmt/issues/3388))
-
 ## `edition`
 
 Specifies which edition is used by the parser.
 
-- **Default value**: `2015`
-- **Possible values**: `2015`, `2018`
+- **Default value**: `"2015"`
+- **Possible values**: `"2015"`, `"2018"`
 - **Stable**: Yes
 
 Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
@@ -641,9 +629,9 @@ trailing whitespaces.
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#3392](https://github.com/rust-lang/rustfmt/issues/3392))
 
-## `fn_args_layout`
+## `fn_params_layout`
 
-Control the layout of arguments in a function
+Control the layout of parameters in a function signature
 
 - **Default value**: `"Tall"`
 - **Possible values**: `"Compressed"`, `"Tall"`, `"Vertical"`
@@ -1063,7 +1051,7 @@ The pattern format is the same as [.gitignore](https://git-scm.com/docs/gitignor
 
 - **Default value**: format every file
 - **Possible values**: See an example below
-- **Stable**: No (tracking issue: [#3395](https://github.com/rust-lang/rustfmt/issues/3395))
+- **Stable**: Yes
 
 ### Example
 
@@ -1508,13 +1496,95 @@ fn main() {
 
 See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 
+## `match_arm_leading_pipes`
+
+Controls whether to include a leading pipe on match arms
+
+- **Default value**: `Never`
+- **Possible values**: `Always`, `Never`, `KeepExisting`
+- **Stable**: Yes
+
+#### `Never` (default):
+```rust
+// Leading pipes are from this:
+// fn foo() {
+//     match foo {
+//         | "foo" | "bar" => {}
+//         | "baz"
+//         | "something relatively long"
+//         | "something really really really realllllllllllllly long" => println!("x"),
+//         | "qux" => println!("y"),
+//         _ => {}
+//     }
+// }
+
+// Are removed:
+fn foo() {
+    match foo {
+        "foo" | "bar" => {}
+        "baz"
+        | "something relatively long"
+        | "something really really really realllllllllllllly long" => println!("x"),
+        "qux" => println!("y"),
+        _ => {}
+    }
+}
+```
+
+#### `Always`:
+```rust
+// Leading pipes are emitted on all arms of this:
+// fn foo() {
+//     match foo {
+//         "foo" | "bar" => {}
+//         "baz"
+//         | "something relatively long"
+//         | "something really really really realllllllllllllly long" => println!("x"),
+//         "qux" => println!("y"),
+//         _ => {}
+//     }
+// }
+
+// Becomes:
+fn foo() {
+    match foo {
+        | "foo" | "bar" => {}
+        | "baz"
+        | "something relatively long"
+        | "something really really really realllllllllllllly long" => println!("x"),
+        | "qux" => println!("y"),
+        | _ => {}
+    }
+}
+```
+
+#### `KeepExisting`:
+```rust
+fn foo() {
+    match foo {
+        | "foo" | "bar" => {}
+        | "baz"
+        | "something relatively long"
+        | "something really really really realllllllllllllly long" => println!("x"),
+        | "qux" => println!("y"),
+        _ => {}
+    }
+
+    match baz {
+        "qux" => {}
+        "foo" | "bar" => {}
+        _ => {}
+    }
+}
+```
+
 ## `match_block_trailing_comma`
 
 Put a trailing comma after a block based match arm (non-block arms are not affected)
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3380](https://github.com/rust-lang/rustfmt/issues/3380))
+- **Stable**: Yes
 
 #### `false` (default):
 
@@ -2552,16 +2622,3 @@ Break comments to fit on the line
 // exercitation ullamco laboris nisi ut aliquip ex ea
 // commodo consequat.
 ```
-
-# Internal Options
-
-## `emit_mode`
-
-Internal option
-
-## `print_misformatted_file_names`
-
-Internal option, use `-l` or `--files-with-diff`
-
-## `recursive`
-Internal option, use `-r` or `--recursive`
