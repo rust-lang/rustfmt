@@ -1,6 +1,6 @@
 [package]
 name = "rustfmt_lib"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 authors = ["topecongiro <seuchida@gmail.com>"]
 edition = "2018"
 description = "Rustfmt as a library"
