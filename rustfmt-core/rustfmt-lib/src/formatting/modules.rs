@@ -261,7 +261,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 Ok(m) => Ok(Some(SubModKind::External(
                     path,
                     DirectoryOwnership::Owned { relative: None },
-                    Cow::Owned(m),
+                    Cow::Owned(m.0),
                 ))),
                 Err(ParserError::ParseError) => Err(ModuleResolutionError {
                     module: mod_name.to_string(),
@@ -301,10 +301,10 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 }
                 match Parser::parse_file_as_module(self.parse_sess, &path, sub_mod.inner) {
                     Ok(m) if outside_mods_empty => {
-                        Ok(Some(SubModKind::External(path, ownership, Cow::Owned(m))))
+                        Ok(Some(SubModKind::External(path, ownership, Cow::Owned(m.0))))
                     }
                     Ok(m) => {
-                        mods_outside_ast.push((path.clone(), ownership, Cow::Owned(m)));
+                        mods_outside_ast.push((path.clone(), ownership, Cow::Owned(m.0)));
                         if should_insert {
                             mods_outside_ast.push((path, ownership, sub_mod.clone()));
                         }
@@ -403,7 +403,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             result.push((
                 actual_path,
                 DirectoryOwnership::Owned { relative: None },
-                Cow::Owned(m),
+                Cow::Owned(m.0),
             ))
         }
         result
