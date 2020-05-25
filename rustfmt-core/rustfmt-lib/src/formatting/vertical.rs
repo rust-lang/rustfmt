@@ -109,11 +109,6 @@ impl AlignedItem for ast::Field {
     }
 }
 
-// This is the code that reformats struct declarations
-// It looks to me that the problem is that struct declarations are formatted by 'groups'
-// i.e, the code formats a single group of fields each time, each group separated by empty lines
-// This means that it thinks the end of a single group is also the end of the struct declaration
-// So it won't insert commas when there aren't supposed to be any trailing commas
 pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
     fields: &[T],
     context: &RewriteContext<'_>,
