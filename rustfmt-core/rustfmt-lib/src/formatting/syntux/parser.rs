@@ -177,7 +177,9 @@ impl<'a> Parser<'a> {
                 Ok(_attrs) => (),
                 Err(mut e) => {
                     e.cancel();
-                    sess.reset_errors();
+                    if sess.can_reset_errors() {
+                        sess.reset_errors();
+                    }
                     return None;
                 }
             }
@@ -186,13 +188,25 @@ impl<'a> Parser<'a> {
                 Ok(m) => Some(m),
                 Err(mut db) => {
                     db.cancel();
-                    sess.reset_errors();
+                    if sess.can_reset_errors() {
+                        sess.reset_errors();
+                    }
                     None
                 }
             }
         }));
         match result {
-            Ok(Some(m)) => Ok(m),
+            Ok(Some(m)) => {
+                if !sess.has_errors() {
+                    return Ok(m);
+                }
+
+                if sess.can_reset_errors() {
+                    sess.reset_errors();
+                    return Ok(m);
+                }
+                Err(ParserError::ParseError)
+            }
             Ok(None) => Err(ParserError::ParseError),
             Err(..) if path.exists() => Err(ParserError::ParseError),
             Err(_) => Err(ParserError::ParsePanicError),
