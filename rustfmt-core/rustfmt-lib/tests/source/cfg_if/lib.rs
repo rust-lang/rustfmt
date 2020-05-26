@@ -1,3 +1,5 @@
+// rustfmt-recursive: true
+
 //! Run-time feature detection for the Rust standard library.
 //!
 //! To detect whether a feature is enabled in the system running the binary
