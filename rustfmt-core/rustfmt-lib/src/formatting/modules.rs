@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use rustc_ast::ast;
+use rustc_ast::attr::HasAttrs;
 use rustc_ast::visit::Visitor;
 use rustc_span::symbol::{self, sym, Symbol};
 use thiserror::Error;
@@ -29,6 +30,29 @@ lazy_static! {
 pub(crate) struct Module<'a> {
     ast_mod: Cow<'a, ast::Mod>,
     inner_attr: Vec<ast::Attribute>,
+}
+
+impl<'a> Module<'a> {
+    pub(crate) fn new(ast_mod: Cow<'a, ast::Mod>, attrs: &[ast::Attribute]) -> Self {
+        let inner_attr = attrs
+            .iter()
+            .filter(|attr| attr.style == ast::AttrStyle::Inner)
+            .cloned()
+            .collect();
+        Module {
+            ast_mod,
+            inner_attr,
+        }
+    }
+}
+
+impl<'a> HasAttrs for Module<'a> {
+    fn attrs(&self) -> &[ast::Attribute] {
+        &self.inner_attr
+    }
+    fn visit_attrs(&mut self, f: impl FnOnce(&mut Vec<ast::Attribute>)) {
+        f(&mut self.inner_attr)
+    }
 }
 
 impl<'a> AsRef<ast::Mod> for Module<'a> {
@@ -109,10 +133,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
 
         self.file_map.insert(
             root_filename,
-            Module {
-                ast_mod: Cow::Borrowed(&krate.module),
-                inner_attr: krate.attrs.clone(),
-            },
+            Module::new(Cow::Borrowed(&krate.module), &krate.attrs),
         );
         Ok(self.file_map)
     }
@@ -125,10 +146,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             if let ast::ItemKind::Mod(ref sub_mod) = module_item.item.kind {
                 self.visit_sub_mod(
                     &module_item.item,
-                    Module {
-                        ast_mod: Cow::Owned(sub_mod.clone()),
-                        inner_attr: module_item.item.attrs.clone(),
-                    },
+                    Module::new(Cow::Owned(sub_mod.clone()), &module_item.item.attrs),
                 )?;
             }
         }
@@ -144,13 +162,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             }
 
             if let ast::ItemKind::Mod(ref sub_mod) = item.kind {
-                self.visit_sub_mod(
-                    &item,
-                    Module {
-                        ast_mod: Cow::Owned(sub_mod.clone()),
-                        inner_attr: item.attrs.clone(),
-                    },
-                )?;
+                self.visit_sub_mod(&item, Module::new(Cow::Owned(sub_mod.clone()), &item.attrs))?;
             }
         }
         Ok(())
@@ -164,13 +176,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             }
 
             if let ast::ItemKind::Mod(ref sub_mod) = item.kind {
-                self.visit_sub_mod(
-                    item,
-                    Module {
-                        ast_mod: Cow::Borrowed(sub_mod),
-                        inner_attr: item.attrs.clone(),
-                    },
-                )?;
+                self.visit_sub_mod(item, Module::new(Cow::Borrowed(sub_mod), &item.attrs))?;
             }
         }
         Ok(())
@@ -297,10 +303,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 Ok(m) => Ok(Some(SubModKind::External(
                     path,
                     DirectoryOwnership::Owned { relative: None },
-                    Module {
-                        ast_mod: Cow::Owned(m.0),
-                        inner_attr: m.1,
-                    },
+                    Module::new(Cow::Owned(m.0), &m.1),
                 ))),
                 Err(ParserError::ParseError) => Err(ModuleResolutionError {
                     module: mod_name.to_string(),
@@ -342,19 +345,13 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     Ok(m) if outside_mods_empty => Ok(Some(SubModKind::External(
                         path,
                         ownership,
-                        Module {
-                            ast_mod: Cow::Owned(m.0),
-                            inner_attr: m.1,
-                        },
+                        Module::new(Cow::Owned(m.0), &m.1),
                     ))),
                     Ok(m) => {
                         mods_outside_ast.push((
                             path.clone(),
                             ownership,
-                            Module {
-                                ast_mod: Cow::Owned(m.0),
-                                inner_attr: m.1,
-                            },
+                            Module::new(Cow::Owned(m.0), &m.1),
                         ));
                         if should_insert {
                             mods_outside_ast.push((path, ownership, sub_mod.clone()));
@@ -457,10 +454,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             result.push((
                 actual_path,
                 DirectoryOwnership::Owned { relative: None },
-                Module {
-                    ast_mod: Cow::Owned(m.0),
-                    inner_attr: m.1,
-                },
+                Module::new(Cow::Owned(m.0), &m.1),
             ))
         }
         result
