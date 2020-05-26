@@ -9,6 +9,7 @@ pub(crate) use syntux::session::ParseSess;
 
 use self::newline_style::apply_newline_style;
 use crate::config::{Config, FileName};
+use crate::formatting::modules::Module;
 use crate::formatting::{
     comment::{CharClasses, FullCodeCharKind},
     report::NonFormattedRange,
@@ -127,14 +128,12 @@ fn format_project(
         should_emit_verbose(input_is_stdin, operation_setting.verbosity, || {
             println!("Formatting {}", path)
         });
-        let is_root = path == main_file;
         format_file(
             &parse_session,
             config,
             &krate,
             path,
             &module,
-            is_root,
             &format_report,
             original_snippet.clone(),
         );
@@ -157,29 +156,17 @@ fn format_file(
     config: &Config,
     krate: &ast::Crate,
     path: FileName,
-    module: &ast::Mod,
-    is_root: bool,
+    module: &Module<'_>,
     report: &FormatReport,
     original_snippet: Option<String>,
 ) {
-    let snippet_provider = parse_session.snippet_provider(module.inner);
+    let snippet_provider = parse_session.snippet_provider(module.as_ref().inner);
     let mut visitor =
         FmtVisitor::from_parse_sess(&parse_session, config, &snippet_provider, report.clone());
     visitor.skip_context.update_with_attrs(&krate.attrs);
-
-    // Format inner attributes if available.
-    if !krate.attrs.is_empty() && is_root {
-        visitor.skip_empty_lines(snippet_provider.end_pos());
-        if visitor.visit_attrs(&krate.attrs, ast::AttrStyle::Inner) {
-            visitor.push_rewrite(module.inner, None);
-        } else {
-            visitor.format_separate_mod(module, snippet_provider.end_pos());
-        }
-    } else {
-        visitor.last_pos = snippet_provider.start_pos();
-        visitor.skip_empty_lines(snippet_provider.end_pos());
-        visitor.format_separate_mod(module, snippet_provider.end_pos());
-    };
+    visitor.last_pos = snippet_provider.start_pos();
+    visitor.skip_empty_lines(snippet_provider.end_pos());
+    visitor.format_separate_mod(module, snippet_provider.end_pos());
 
     debug_assert_eq!(
         visitor.line_number,
