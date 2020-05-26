@@ -9,6 +9,7 @@ pub(crate) use syntux::session::ParseSess;
 
 use self::newline_style::apply_newline_style;
 use crate::config::{Config, FileName};
+use crate::formatting::modules::Module;
 use crate::formatting::{
     comment::{CharClasses, FullCodeCharKind},
     report::NonFormattedRange,
@@ -157,12 +158,12 @@ fn format_file(
     config: &Config,
     krate: &ast::Crate,
     path: FileName,
-    module: &ast::Mod,
+    module: &Module<'_>,
     is_root: bool,
     report: &FormatReport,
     original_snippet: Option<String>,
 ) {
-    let snippet_provider = parse_session.snippet_provider(module.inner);
+    let snippet_provider = parse_session.snippet_provider(module.as_ref().inner);
     let mut visitor =
         FmtVisitor::from_parse_sess(&parse_session, config, &snippet_provider, report.clone());
     visitor.skip_context.update_with_attrs(&krate.attrs);
@@ -171,14 +172,14 @@ fn format_file(
     if !krate.attrs.is_empty() && is_root {
         visitor.skip_empty_lines(snippet_provider.end_pos());
         if visitor.visit_attrs(&krate.attrs, ast::AttrStyle::Inner) {
-            visitor.push_rewrite(module.inner, None);
+            visitor.push_rewrite(module.as_ref().inner, None);
         } else {
-            visitor.format_separate_mod(module, snippet_provider.end_pos());
+            visitor.format_separate_mod(module.as_ref(), snippet_provider.end_pos());
         }
     } else {
         visitor.last_pos = snippet_provider.start_pos();
         visitor.skip_empty_lines(snippet_provider.end_pos());
-        visitor.format_separate_mod(module, snippet_provider.end_pos());
+        visitor.format_separate_mod(module.as_ref(), snippet_provider.end_pos());
     };
 
     debug_assert_eq!(
