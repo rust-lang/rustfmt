@@ -603,6 +603,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             self.push_skipped_with_span(ti.attrs.as_slice(), ti.span, ti.span);
             return;
         }
+        let skip_context_outer = self.skip_context.clone();
+        self.skip_context.update_with_attrs(&ti.attrs);
 
         match ti.kind {
             ast::AssocItemKind::Const(..) => self.visit_static(&StaticParts::from_trait_item(ti)),
@@ -640,6 +642,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.visit_mac(mac, Some(ti.ident), MacroPosition::Item);
             }
         }
+        self.skip_context = skip_context_outer;
     }
 
     pub(crate) fn visit_impl_item(&mut self, ii: &ast::AssocItem) {
@@ -649,6 +652,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             self.push_skipped_with_span(ii.attrs.as_slice(), ii.span, ii.span);
             return;
         }
+        let skip_context_outer = self.skip_context.clone();
+        self.skip_context.update_with_attrs(&ii.attrs);
 
         match ii.kind {
             ast::AssocItemKind::Fn(defaultness, ref sig, ref generics, Some(ref body)) => {
@@ -700,6 +705,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.visit_mac(mac, Some(ii.ident), MacroPosition::Item);
             }
         }
+        self.skip_context = skip_context_outer;
     }
 
     fn visit_mac(&mut self, mac: &ast::MacCall, ident: Option<symbol::Ident>, pos: MacroPosition) {
