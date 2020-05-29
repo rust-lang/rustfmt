@@ -132,9 +132,6 @@ name = "bytecount"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0017894339f586ccb943b01b9555de56770c11cda818e7e3d8bd93f4ed7f46e"
-dependencies = [
- "packed_simd",
-]
 
 [[package]]
 name = "byteorder"
@@ -554,15 +551,6 @@ name = "opaque-debug"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
-
-[[package]]
-name = "packed_simd"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a85ea9fc0d4ac0deb6fe7911d38786b32fc11119afd9e9d38b84ff691ce64220"
-dependencies = [
- "cfg-if",
-]
 
 [[package]]
 name = "parking_lot"
@@ -1059,32 +1047,14 @@ dependencies = [
 name = "rustfmt-nightly"
 version = "2.0.0-rc.2"
 dependencies = [
- "anyhow",
- "cargo_metadata",
- "dunce",
- "env_logger",
- "lazy_static",
- "log",
- "regex",
- "rustc-workspace-hack",
- "rustfmt_lib",
- "serde",
- "serde_json",
- "structopt",
- "term",
- "thiserror",
-]
-
-[[package]]
-name = "rustfmt_lib"
-version = "2.0.0-rc.2"
-dependencies = [
  "annotate-snippets 0.8.0",
  "anyhow",
  "bytecount",
+ "cargo_metadata",
  "diff",
  "dirs",
  "dunce",
+ "env_logger",
  "ignore",
  "itertools",
  "lazy_static",
@@ -1098,16 +1068,17 @@ dependencies = [
  "rustc-ap-rustc_parse",
  "rustc-ap-rustc_session",
  "rustc-ap-rustc_span",
+ "rustc-workspace-hack",
  "rustfmt-config_proc_macro",
  "serde",
  "serde_json",
+ "structopt",
  "term",
  "thiserror",
  "toml",
  "unicode-segmentation",
  "unicode-width",
  "unicode_categories",
- "winapi",
 ]
 
 [[package]]

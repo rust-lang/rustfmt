@@ -13,7 +13,7 @@ use anyhow::{format_err, Result};
 use structopt::StructOpt;
 use thiserror::Error;
 
-use rustfmt_lib::{
+use rustfmt_nightly::{
     emitter::{emit_format_report, EmitMode, EmitterConfig, Verbosity},
     format_inputs, load_config, CliOptions, Config, Edition, FileLines, FileName,
     FormatReportFormatterBuilder, Input, OperationSetting,
@@ -412,7 +412,7 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
         recursive: opt.recursive,
         verbosity: Verbosity::Quiet,
     };
-    let report = rustfmt_lib::format(Input::Text(input), &config, setting)?;
+    let report = rustfmt_nightly::format(Input::Text(input), &config, setting)?;
     let has_diff = emit_format_report(report, out, opt.emitter_config(EmitMode::Stdout))?;
     Ok(if opt.check && has_diff { 1 } else { 0 })
 }
