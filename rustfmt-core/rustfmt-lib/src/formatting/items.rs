@@ -1126,7 +1126,7 @@ pub(crate) fn format_trait(
 
             let where_budget = context.budget(last_line_width(&result));
             let pos_before_where = if generic_bounds.is_empty() {
-                generics.where_clause.span.lo()
+                generics.span.hi()
             } else {
                 generic_bounds[generic_bounds.len() - 1].span().hi()
             };
