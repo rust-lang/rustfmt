@@ -38,13 +38,6 @@ cargo-fmt = [
    "structopt",
 ]
 
-rustfmt-format-diff = [
-  "env_logger",
-  "serde",
-  "serde_json",
-  "structopt",
-]
-
 config = [
   "dirs",
   "rustfmt-config_proc_macro",
@@ -61,7 +54,20 @@ emitter = [
   "term",
 ]
 
+git-rustfmt = [
+  "env_logger",
+  "structopt",
+]
+
 rustfmt = [
+  "env_logger",
+  "structopt",
+]
+
+rustfmt-format-diff = [
+  "env_logger",
+  "serde",
+  "serde_json",
   "structopt",
 ]
 
