@@ -5,7 +5,7 @@ where
 {
 }
 
-trait SomeTrait<>
+trait SomeTrait
 // comment
 where
     T: Copy,
