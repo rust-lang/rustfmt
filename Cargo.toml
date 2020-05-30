@@ -14,22 +14,30 @@ edition = "2018"
 [[bin]]
 name = "rustfmt"
 path = "src/rustfmt/main.rs"
+required-features = ["rustfmt"]
 
 [[bin]]
 name = "cargo-fmt"
 path = "src/cargo-fmt/main.rs"
+required-features = ["cargo-fmt"]
 
 [[bin]]
 name = "rustfmt-format-diff"
 path = "src/format-diff/main.rs"
+required-features = ["rustfmt-format-diff"]
 
 [[bin]]
 name = "git-rustfmt"
 path = "src/git-rustfmt/main.rs"
+required-features = ["git-rustfmt"]
 
 [features]
-default = ["cargo-fmt", "config", "emitter", "rustfmt-format-diff"]
-cargo-fmt = ["cargo_metadata", "structopt"]
+default = ["config", "emitter"]
+cargo-fmt = [
+  "cargo_metadata",
+   "structopt",
+]
+
 rustfmt-format-diff = [
   "env_logger",
   "serde",
