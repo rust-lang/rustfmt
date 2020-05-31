@@ -1342,7 +1342,7 @@ pub(crate) fn format_struct_struct(
     result.push_str(&header_str);
 
     let header_hi = struct_parts.ident.span.hi();
-    let body_lo = context.snippet_provider.span_after(span, "{");
+    let body_lo = context.snippet_provider.span_after_last(span, "{");
 
     let generics_str = match struct_parts.generics {
         Some(g) => format_generics(
