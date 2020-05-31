@@ -905,6 +905,7 @@ fn format_impl_ref_and_type(
         unsafety,
         polarity,
         defaultness,
+        constness,
         ref generics,
         of_trait: ref trait_ref,
         ref self_ty,
@@ -920,6 +921,7 @@ fn format_impl_ref_and_type(
         let shape = Shape::indented(offset + last_line_width(&result), context.config);
         let generics_str = rewrite_generics(context, "impl", generics, shape)?;
         result.push_str(&generics_str);
+        result.push_str(format_constness_right(constness));
 
         let polarity_str = match polarity {
             ast::ImplPolarity::Negative(_) => "!",
