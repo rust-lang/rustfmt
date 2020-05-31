@@ -50,4 +50,4 @@ build: false
 test_script:
   - cargo install cargo-make
   - cargo make build-bins
-  - cargo test-all
+  - cargo make test-all
