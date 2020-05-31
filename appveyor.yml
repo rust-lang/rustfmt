@@ -48,10 +48,6 @@ install:
 build: false
 
 test_script:
-  - set CFG_RELEASE_CHANNEL=nightly
-  - set CFG_RELEASE=nightly
-  - cargo build --verbose
-  - cargo test
-  - cargo test -- --ignored
-  - cargo test --manifest-path rustfmt-core/Cargo.toml
-  - cargo test --manifest-path rustfmt-core/Cargo.toml -- --ignored
+  - cargo install cargo-make
+  - cargo make build-bins
+  - cargo test-all
