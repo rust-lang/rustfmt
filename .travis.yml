@@ -47,7 +47,7 @@ script:
   - |
     export CFG_RELEASE_CHANNEL=nightly
     export CFG_RELEASE=nightly
-    which cargo-make || cargo intall cargo-make
+    which cargo-make || cargo install cargo-make
     if [ -z ${INTEGRATION} ]; then
       cargo make build-bins
       cargo make test-all
