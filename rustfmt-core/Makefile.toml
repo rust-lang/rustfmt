@@ -1,4 +1,0 @@
-extend = { path = "../.cargo/Makefile.toml" }
-
-[env]
-CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = "true"

@@ -47,8 +47,10 @@ script:
   - |
     export CFG_RELEASE_CHANNEL=nightly
     export CFG_RELEASE=nightly
+    which cargo-make || cargo install cargo-make
     if [ -z ${INTEGRATION} ]; then
-      cargo build && cargo test && cargo test -- --ignored && cargo test --manifest-path rustfmt-core/Cargo.toml && cargo test --manifest-path rustfmt-core/Cargo.toml -- --ignored
+      cargo make build-bins
+      cargo make test-all
     else
       ./ci/integration.sh
     fi

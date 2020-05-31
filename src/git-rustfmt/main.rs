@@ -1,13 +1,11 @@
-#[macro_use]
-extern crate log;
-
 use std::io::stdout;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use log::debug;
 use structopt::StructOpt;
 
-use rustfmt_lib::{
+use rustfmt_nightly::{
     emitter::{emit_format_report, EmitterConfig},
     format, load_config, CliOptions, FormatReportFormatterBuilder, Input, OperationSetting,
 };
@@ -85,7 +83,7 @@ fn fmt_files(files: &[&str]) -> i32 {
 struct NullOptions;
 
 impl CliOptions for NullOptions {
-    fn apply_to(&self, _: &mut rustfmt_lib::Config) {
+    fn apply_to(&self, _: &mut rustfmt_nightly::Config) {
         unreachable!();
     }
     fn config_path(&self) -> Option<&Path> {

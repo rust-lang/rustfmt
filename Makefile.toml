@@ -1,4 +1,25 @@
-extend = ".cargo/Makefile.toml"
+[env]
+CFG_RELEASE = { value = "${CARGO_MAKE_RUST_VERSION}", condition = { env_not_set = ["CFG_RELEASE"] } }
+CFG_RELEASE_CHANNEL = { value = "${CARGO_MAKE_RUST_CHANNEL}", condition = { env_not_set = ["CFG_RELEASE_CHANNEL"] } }
+
+[tasks.build-bin]
+command = "cargo"
+args = [
+  "build",
+  "--bin",
+  "rustfmt",
+  "--bin",
+  "cargo-fmt",
+  "--features=rustfmt,cargo-fmt",
+]
+
+[tasks.build-bins]
+command = "cargo"
+args = [
+  "build",
+  "--all-features",
+  "--bins",
+]
 
 [tasks.install]
 command = "cargo"
@@ -7,25 +28,34 @@ args = [
   "--path",
   ".",
   "--force",
-  "--locked",
+  "--locked", # Respect Cargo.lock
+  "--features=rustfmt,cargo-fmt" # Install only rustfmt and cargo-fmt
 ]
 
-[tasks.test]
-clear = true
-run_task = { name = ["test-bin", "test-lib"] }
+[tasks.test-all]
+run_task = { name = ["test", "test-ignored"] }
 
-[tasks.test-bin]
-env = { "RUSTFMT_MAKE_MANIFEST_PATH" = "rustfmt-core/rustfmt-bin/Cargo.toml" }
-run_task = "test-subproject"
-
-[tasks.test-lib]
-env = { "RUSTFMT_MAKE_MANIFEST_PATH" = "rustfmt-core/rustfmt-lib/Cargo.toml" }
-run_task = "test-subproject"
-
-[tasks.test-subproject]
-condition = { env_set = ["RUSTFMT_MAKE_MANIFEST_PATH"] }
-script_runner = "@shell"
-script = [
-  "cargo test --manifest-path ${RUSTFMT_MAKE_MANIFEST_PATH}",
-  "cargo test --manifest-path ${RUSTFMT_MAKE_MANIFEST_PATH} -- --ignored",
+[tasks.test-ignored]
+command = "cargo"
+args = [
+  "test",
+	"--all-features",
+	"--",
+	"--ignored",
 ]
+
+[tasks.b]
+alias = "build"
+
+[tasks.bb]
+alias = "build-bin"
+
+[tasks.bins]
+alias = "build-bins"
+
+[tasks.c]
+alias = "check"
+
+[tasks.t]
+alias = "test"
+

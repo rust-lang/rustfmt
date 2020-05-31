@@ -10,7 +10,7 @@ use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
 use crate::config::Config;
 use crate::{Input, OperationSetting, Verbosity};
 
-const CONFIGURATIONS_FILE_NAME: &str = "../../Configurations.md";
+const CONFIGURATIONS_FILE_NAME: &str = "Configurations.md";
 
 // This enum is used to represent one of three text features in Configurations.md: a block of code
 // with its starting line number, the name of a rustfmt configuration option, or the value of a
