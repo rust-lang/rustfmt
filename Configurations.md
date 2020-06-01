@@ -1,6 +1,6 @@
 # Configuring Rustfmt
 
-Rustfmt is designed to be very configurable. You can create a TOML file called `rustfmt.toml` or `.rustfmt.toml`, place it in the project or any other parent directory and it will apply the options in that file. If none of these directories contain such a file, both your home directory and a directory called `rustfmt` in your [global config directory](https://docs.rs/dirs/1.0.4/dirs/fn.config_dir.html) (e.g. `.config/rustfmt/`) are checked as well.
+Rustfmt is designed to be very configurable. You can create a TOML file called `rustfmt.toml` or `.rustfmt.toml`, place it in the project or any other parent directory and it will apply the options in that file.
 
 A possible content of `rustfmt.toml` or `.rustfmt.toml` might look like this:
 
@@ -12,6 +12,58 @@ reorder_imports = false
 Each configuration option is either stable or unstable.
 Stable options can be used directly, while unstable options are opt-in.
 To enable unstable options, set `unstable_features = true` in `rustfmt.toml` or pass `--unstable-features` to rustfmt.
+
+## Configuration file resolution
+
+As mentioned above, rusftmt searches for a `rustfmt.toml` or `.rustfmt.toml` in the directory it is
+run and all parent directories.
+
+If none of these directories contain such a file, both your home directory and a directory called `rustfmt` in your [global config directory](https://docs.rs/dirs/1.0.4/dirs/fn.config_dir.html) (e.g. `.config/rustfmt/`) are checked as well.
+
+If any of these directories contain such a file, rustfmt is configured with the union of
+configuration options in all such files. The configuration options are applied in order of reverse
+proximity to the directory rustfmt is run in. For example, consider a directory structure
+
+```text
+outer
+|-- rustfmt.toml
+|-- outer.rs
+|-- inner
+    |-- rustfmt.toml
+    |-- inner.rs
+    |-- lib_inner.rs
+```
+
+Where `outer/rusftmt.toml` is
+
+```toml
+max_width = 80
+array_width = 50
+ignore = ['inner/inner.rs']
+```
+
+and `outer/inner/rusftmt.toml` is
+
+```toml
+max_width = 70
+ignore = ['./lib_inner.rs']
+```
+
+If run in the `inner` directory, rusftmt's internal configuration will include
+
+```toml
+max_width = 70
+array_width = 50
+ignore = ['./lib_inner.rs', './inner.rs']
+```
+
+If run in the root `outer` directory, rustfmt's internal configuration will include
+
+```toml
+max_width = 80
+array_width = 50
+ignore = ['inner/inner.rs']
+```
 
 # Configuration Options
 
