@@ -131,10 +131,10 @@ struct Opt {
 
 impl Opt {
     fn verbosity(&self) -> Verbosity {
-        if self.verbose {
-            Verbosity::Verbose
-        } else if self.quiet {
+        if self.quiet || self.files.is_empty() {
             Verbosity::Quiet
+        } else if self.verbose {
+            Verbosity::Verbose
         } else {
             Verbosity::Normal
         }
