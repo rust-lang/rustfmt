@@ -66,8 +66,8 @@ fn generic<T>(arg: T) -> &SomeType
     
     x().y(|| {
         match cond() {
-            true => (),
-            false => (),
+            true => {},
+            false => {},
         }
     });
 }
