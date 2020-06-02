@@ -6,10 +6,10 @@ fn main() {
                     Some(ip) => {
                         sock.send_to(&buf, (ip, 8765)).expect("foobar");
                     }
-                    _ => ()
+                    _ => {},
                 }
             }
-            _ => ()
+            _ => {},
         };
     }
 }

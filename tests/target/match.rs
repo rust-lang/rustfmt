@@ -246,7 +246,7 @@ fn issue507() {
         1 => unsafe {
             std::intrinsics::abort()
         },
-        _ => (),
+        _ => {}
     }
 }
 
@@ -466,7 +466,7 @@ impl<'tcx> Const<'tcx> {
 fn issue_2151() {
     match either {
         x => {}
-        y => (),
+        y => {}
     }
 }
 

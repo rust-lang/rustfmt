@@ -241,7 +241,7 @@ fn issue383() {
 fn issue507() {
     match 1 {
         1 => unsafe { std::intrinsics::abort() },
-        _ => (),
+        _ => {},
     }
 }
 
@@ -440,7 +440,7 @@ fn issue_2151() {
     match either {
         x => {
 
-        }y => ()
+        }y => {},
     }
 }
 

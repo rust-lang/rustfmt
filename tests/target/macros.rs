@@ -896,14 +896,14 @@ impl Foo {
 // #819
 fn macro_in_pattern_position() {
     let x = match y {
-        foo!() => (),
-        bar!(a, b, c) => (),
-        bar!(a, b, c,) => (),
-        baz!(1 + 2 + 3, quux.kaas()) => (),
+        foo!() => {}
+        bar!(a, b, c) => {}
+        bar!(a, b, c,) => {}
+        baz!(1 + 2 + 3, quux.kaas()) => {}
         quux!(
             AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,
             BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-        ) => (),
+        ) => {}
     };
 }
 
@@ -956,7 +956,7 @@ fn foo() {
 // #2591
 fn foo() {
     match 0u32 {
-        0 => (),
+        0 => {}
         _ => unreachable!(/* obviously */),
     }
 }

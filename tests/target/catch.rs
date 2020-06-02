@@ -11,7 +11,7 @@ fn main() {
     };
 
     let y = match (try { foo()? }) {
-        _ => (),
+        _ => {}
     };
 
     try {

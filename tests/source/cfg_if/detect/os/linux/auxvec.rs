@@ -159,7 +159,7 @@ fn auxv_from_buf(buf: &[usize; 64]) -> Result<AuxVec, ()> {
         for el in buf.chunks(2) {
             match el[0] {
                 AT_HWCAP => return Ok(AuxVec { hwcap: el[1] }),
-                _ => (),
+                _ => {}
             }
         }
     }
@@ -172,7 +172,7 @@ fn auxv_from_buf(buf: &[usize; 64]) -> Result<AuxVec, ()> {
             match el[0] {
                 AT_HWCAP => hwcap = Some(el[1]),
                 AT_HWCAP2 => hwcap2 = Some(el[1]),
-                _ => (),
+                _ => {}
             }
         }
 

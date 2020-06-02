@@ -16,7 +16,7 @@ fn main() {
     // Test case where first chain element isn't a path, but is shorter than
     // the size of a tab.
     x()
-        .y(|| match cond() { true => (), false => () });
+        .y(|| match cond() { true => {} false => {} });
 
     loong_func()
         .quux(move || if true {
