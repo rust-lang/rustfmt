@@ -2395,11 +2395,18 @@ fn lorem<Ipsum: Dolor+Sit=Amet>() {
 
 ## `unstable_features`
 
-Enable unstable features on the unstable channel.
+Enable unstable features on stable and beta channels (unstable features are available by default on nightly).
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3387](https://github.com/rust-lang/rustfmt/issues/3387))
+- **Stable**: Yes
+
+**Note** - if you are setting unstable configuration options via the CLI instead of the configuration file, then you should include a `unstable_features=true` item before any of the unstable items.
+
+For example:
+```bash
+rustfmt src/lib.rs --config unstable_features=true merge_imports=true
+```
 
 ## `use_field_init_shorthand`
 
