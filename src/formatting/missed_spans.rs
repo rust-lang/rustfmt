@@ -1,4 +1,4 @@
-use rustc_span::{BytePos, Pos, Span};
+use rustc_span::{BytePos, Span};
 
 use crate::config::{file_lines::FileLines, FileName};
 
@@ -140,28 +140,15 @@ impl<'a> FmtVisitor<'a> {
     where
         F: Fn(&mut FmtVisitor<'_>, &str, &str),
     {
-        // Get a snippet from the file start to the span's hi without allocating.
-        // We need it to determine what precedes the current comment. If the comment
-        // follows code on the same line, we won't touch it.
-        let big_span_lo = self.snippet_provider.start_pos();
-        let big_snippet = self.snippet_provider.entire_snippet();
-        let big_diff = (span.lo() - big_span_lo).to_usize();
-
         let snippet = self.snippet(span);
 
         debug!("write_snippet `{}`", snippet);
 
-        self.write_snippet_inner(big_snippet, snippet, big_diff, span, process_last_snippet);
+        self.write_snippet_inner(snippet, span, process_last_snippet);
     }
 
-    fn write_snippet_inner<F>(
-        &mut self,
-        big_snippet: &str,
-        snippet: &str,
-        big_diff: usize,
-        span: Span,
-        process_last_snippet: F,
-    ) where
+    fn write_snippet_inner<F>(&mut self, snippet: &str, span: Span, process_last_snippet: F)
+    where
         F: Fn(&mut FmtVisitor<'_>, &str, &str),
     {
         // Trim whitespace from the right hand side of each line.
@@ -200,13 +187,7 @@ impl<'a> FmtVisitor<'a> {
             let newline_count = lf_count + crlf_count;
             if CodeCharKind::Comment == kind && within_file_lines_range {
                 // 1: comment.
-                self.process_comment(
-                    &mut status,
-                    snippet,
-                    &big_snippet[..(offset + big_diff)],
-                    offset,
-                    subslice,
-                );
+                self.process_comment(&mut status, snippet, offset, subslice);
             } else if subslice.trim().is_empty() && newline_count > 0 && within_file_lines_range {
                 // 2: blank lines.
                 self.push_vertical_spaces(newline_count);
@@ -233,11 +214,11 @@ impl<'a> FmtVisitor<'a> {
         &mut self,
         status: &mut SnippetStatus,
         snippet: &str,
-        big_snippet: &str,
         offset: usize,
         subslice: &str,
     ) {
-        let last_char = big_snippet
+        let last_char = self
+            .buffer
             .chars()
             .rev()
             .find(|rev_c| ![' ', '\t'].contains(rev_c));
