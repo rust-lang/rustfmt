@@ -142,8 +142,9 @@ create_config! {
     // Control options (changes the operation of rustfmt, rather than the formatting)
     required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
         "Require a specific version of rustfmt";
-    unstable_features: bool, false, false,
-            "Enables unstable features. Only available on nightly channel";
+    unstable_features: bool, false, true,
+            "Enables unstable features on stable and beta channels (unstable features are enabled \
+             by default on nightly channel)";
     hide_parse_errors: bool, false, false, "Hide errors from the parser";
     error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
     error_on_unformatted: bool, false, false,
@@ -436,6 +437,10 @@ mod test {
             chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
             single_line_if_else_max_width: usize, 50, true, "Maximum line length for single \
                 line if-else expressions. A value of zero means always break if-else expressions.";
+
+            unstable_features: bool, false, true,
+                "Enables unstable features on stable and beta channels (unstable features are enabled \
+                 by default on nightly channel)";
 
             // Options that are used by the tests
             stable_option: bool, false, true, "A stable option";

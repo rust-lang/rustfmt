@@ -167,11 +167,14 @@ macro_rules! create_config {
                     if self.$i.3 {
                         update_config!(self, $i = val, dir);
                     } else {
-                        if is_nightly_channel!() {
+                        if parsed.unstable_features == Some(true) || is_nightly_channel!() {
                             update_config!(self, $i = val, dir);
                         } else {
-                            eprintln!("Warning: can't set `{} = {:?}`, unstable features are only \
-                                       available in nightly channel.", stringify!($i), val);
+                            eprintln!(
+                                "Warning: can't set `{} = {:?}`, unstable features can only \
+                                be used on stable or beta when `unstable_features` is also enabled.",
+                                stringify!($i), val
+                            );
                         }
                     }
                 }
@@ -237,12 +240,20 @@ macro_rules! create_config {
                 match key {
                     $(
                         stringify!($i) => {
-                            self.$i.1 = true;
-                            self.$i.2 = val.parse::<$Ty>()
+                            if self.$i.3 || self.unstable_features() || is_nightly_channel!() {
+                                self.$i.1 = true;
+                                self.$i.2 = val.parse::<$Ty>()
                                 .expect(&format!("Failed to parse override for {} (\"{}\") as a {}",
                                                  stringify!($i),
                                                  val,
                                                  stringify!($Ty)));
+                            } else {
+                                return eprintln!(
+                                    "Warning: can't set `{} = {:?}`, unstable features can only \
+                                    be used on stable or beta when `unstable_features` is also enabled.",
+                                    stringify!($i), val
+                                );
+                            }
                         }
                     )+
                     _ => panic!("Unknown config key in override: {}", key)
