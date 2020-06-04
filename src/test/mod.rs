@@ -629,6 +629,10 @@ fn read_config(filename: &Path) -> (Config, OperationSetting, EmitterConfig) {
         get_config(filename.with_extension("toml").file_name().map(Path::new))
     };
 
+    if !config.was_set().unstable_features() && !is_nightly_channel!() {
+        config.override_value("unstable_features", "true");
+    }
+
     let mut operation_setting = OperationSetting::default();
     let mut emitter_config = EmitterConfig::default();
     for (key, val) in &sig_comments {

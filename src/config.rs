@@ -698,13 +698,31 @@ ignore = []
         }
 
         #[test]
-        fn test_from_toml_not_nightly() {
+        fn test_from_toml_not_nightly_unstable_set() {
             if is_nightly_channel!() {
                 // This test requires non-nightly
                 return;
             }
-            let config = Config::from_toml("unstable_features = true", Path::new("")).unwrap();
-            assert_eq!(config.was_set().unstable_features(), false);
+            let toml = r#"
+                unstable_features = true
+                merge_imports = true
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.was_set().unstable_features(), true);
+            assert_eq!(config.was_set().merge_imports(), true);
+            assert_eq!(config.unstable_features(), true);
+            assert_eq!(config.merge_imports(), true);
+        }
+
+        #[test]
+        fn test_from_toml_not_nightly_unstable_not_set() {
+            if is_nightly_channel!() {
+                // This test requires non-nightly
+                return;
+            }
+            let config = Config::from_toml("merge_imports = true", Path::new("")).unwrap();
+            assert_eq!(config.was_set().merge_imports(), false);
+            assert_eq!(config.merge_imports(), false);
         }
 
         #[test]
@@ -749,8 +767,12 @@ ignore = []
             }
             let mut config = Config::default();
             assert_eq!(config.unstable_features(), false);
+            config.override_value("merge_imports", "true");
+            assert_eq!(config.merge_imports(), false);
             config.override_value("unstable_features", "true");
             assert_eq!(config.unstable_features(), true);
+            config.override_value("merge_imports", "true");
+            assert_eq!(config.merge_imports(), true);
         }
 
         #[test]
