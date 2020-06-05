@@ -1,3 +1,4 @@
+unstable_features = true
 max_width = 100
 comment_width = 80
 tab_spaces = 2

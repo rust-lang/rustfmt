@@ -96,6 +96,9 @@ impl ConfigCodeBlock {
 
     fn get_block_config(&self) -> Config {
         let mut config = Config::default();
+        if !crate::is_nightly_channel!() {
+            config.override_value("unstable_features", "true");
+        }
         if self.config_name.is_some() && self.config_value.is_some() {
             config.override_value(
                 self.config_name.as_ref().unwrap(),

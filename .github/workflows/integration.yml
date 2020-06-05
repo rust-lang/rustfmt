@@ -15,10 +15,7 @@ jobs:
       matrix:
         integration: [
           bitflags,
-          chalk,
-          crater,
           error-chain,
-          glob,
           log,
           mdbook,
           packed_simd,
@@ -37,6 +34,15 @@ jobs:
           # Instead, leverage `continue-on-error`
           # https://help.github.com/en/actions/automating-your-workflow-with-github-actions/workflow-syntax-for-github-actions#jobsjob_idstepscontinue-on-error
           #
+          # Failing due to breaking changes in rustfmt 2.0 where empty
+          # match blocks have trailing commas removed
+          # https://github.com/rust-lang/rustfmt/pull/4226
+          - integration: chalk
+            allow-failure: true
+          - integration: crater
+            allow-failure: true
+          - integration: glob
+            allow-failure: true
           # Using old rustfmt configuration option
           - integration: rand
             allow-failure: true
