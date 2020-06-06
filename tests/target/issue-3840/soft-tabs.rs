@@ -1,5 +1,3 @@
-// rustfmt-version: Two
-
 impl<
     Target: FromEvent<A> + FromEvent<B>,
     A: Widget2<Ctx = C>,

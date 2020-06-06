@@ -1,5 +1,3 @@
-// rustfmt-version: Two
-
 fn foo() {
     match 0 {
         0 => {

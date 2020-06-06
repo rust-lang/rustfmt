@@ -1,4 +1,3 @@
-// rustfmt-version: Two
 // Tests that a function which is almost short enough, but not quite, gets
 // formatted correctly.
 

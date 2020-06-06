@@ -1,5 +1,3 @@
-// rustfmt-version: Two
-
 fn main() {
     thread::spawn(|| {
         while true {

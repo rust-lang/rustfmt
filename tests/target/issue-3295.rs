@@ -1,4 +1,3 @@
-// rustfmt-version: Two
 pub enum TestEnum {
     a,
     b,

@@ -1,5 +1,4 @@
 // rustfmt-wrap_comments: true
-// rustfmt-version: Two
 
 // check that a line below max_width does not get over the limit when wrapping
 // it in a block comment
