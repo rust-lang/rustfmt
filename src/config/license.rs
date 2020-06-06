@@ -3,7 +3,10 @@ use std::fs::File;
 use std::io;
 use std::io::Read;
 
+use itertools::Itertools;
 use regex::Regex;
+
+use self::ParsingState::*;
 
 #[derive(Debug)]
 pub(crate) enum LicenseError {
@@ -43,8 +46,6 @@ enum ParsingState {
     ReEsc(u32),
     Abort(String),
 }
-
-use self::ParsingState::*;
 
 pub(crate) struct TemplateParser {
     parsed: String,
@@ -111,7 +112,7 @@ impl TemplateParser {
     /// ```
     pub(crate) fn parse(template: &str) -> Result<String, LicenseError> {
         let mut parser = Self::new();
-        for chr in template.chars() {
+        for chr in template.lines().join("\n").chars() {
             if chr == '\n' {
                 parser.linum += 1;
             }

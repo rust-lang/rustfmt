@@ -2610,22 +2610,6 @@ fn main() {
 }
 ```
 
-## `version`
-
-Which version of the formatting rules to use. `Version::One` is backwards-compatible
-with Rustfmt 1.0. Other versions are only backwards compatible within a major
-version number.
-
-- **Default value**: `One`
-- **Possible values**: `One`, `Two`
-- **Stable**: No (tracking issue: [#3383](https://github.com/rust-lang/rustfmt/issues/3383))
-
-### Example
-
-```toml
-version = "Two"
-```
-
 ## `where_single_line`
 
 Forces the `where` clause to be laid out on a single line.
