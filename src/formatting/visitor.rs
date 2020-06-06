@@ -144,8 +144,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         match stmt.as_ast_node().kind {
             ast::StmtKind::Item(ref item) => {
                 self.visit_item(item);
-                // Handle potential `;` after the item.
-                self.format_missing(stmt.span().hi());
+                // If the item requires a trailing ";" (like `struct Foo;`), we should have already
+                // handled it. Otherwise there still may be a trailing ";", but it is unnecessary.
+                // Drop it by fast-forwarding the visitor to the end of the item.
+                self.last_pos = stmt.span().hi();
             }
             ast::StmtKind::Local(..) | ast::StmtKind::Expr(..) | ast::StmtKind::Semi(..) => {
                 let attrs = get_attrs_from_stmt(stmt.as_ast_node());

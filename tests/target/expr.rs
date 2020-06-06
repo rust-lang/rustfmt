@@ -94,7 +94,7 @@ fn foo() -> bool {
             const fn get(&self) -> usize {
                 5
             }
-        };
+        }
         Foo.get()
     }];
 }
