@@ -62,9 +62,6 @@ impl SnippetProvider {
         }
     }
 
-    pub(crate) fn entire_snippet(&self) -> &str {
-        self.big_snippet.as_str()
-    }
     pub(crate) fn start_pos(&self) -> BytePos {
         BytePos::from_usize(self.start_pos)
     }

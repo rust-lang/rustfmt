@@ -7,19 +7,18 @@ use rustc_span::symbol;
 
 pub(crate) use syntux::session::ParseSess;
 
-use self::newline_style::apply_newline_style;
 use crate::config::{Config, FileName};
-use crate::formatting::modules::Module;
 use crate::formatting::{
     comment::{CharClasses, FullCodeCharKind},
+    modules::Module,
+    newline_style::apply_newline_style,
     report::NonFormattedRange,
     syntux::parser::{DirectoryOwnership, Parser, ParserError},
     utils::count_newlines,
     visitor::FmtVisitor,
 };
-use crate::result::OperationError;
 use crate::{
-    result::{ErrorKind, FormatError},
+    result::{ErrorKind, FormatError, OperationError},
     FormatReport, FormatResult, Input, OperationSetting, Verbosity,
 };
 
@@ -136,7 +135,7 @@ fn format_project(
             &module,
             &format_report,
             original_snippet.clone(),
-        );
+        )?;
     }
     timer = timer.done_formatting();
 
@@ -159,7 +158,7 @@ fn format_file(
     module: &Module<'_>,
     report: &FormatReport,
     original_snippet: Option<String>,
-) {
+) -> Result<(), OperationError> {
     let snippet_provider = parse_session.snippet_provider(module.as_ref().inner);
     let mut visitor =
         FmtVisitor::from_parse_sess(&parse_session, config, &snippet_provider, report.clone());
@@ -187,11 +186,20 @@ fn format_file(
         report.clone(),
     );
 
-    apply_newline_style(
-        config.newline_style(),
-        &mut visitor.buffer,
-        snippet_provider.entire_snippet(),
-    );
+    // SourceFile's in the SourceMap will always have Unix-style line endings
+    // See: https://github.com/rust-lang/rustfmt/issues/3850
+    // So we must check the file system to get the original file value in order
+    // to detect newline_style conflicts.
+    // Otherwise, parse session is around (cfg(not(test))) and newline_style has been
+    // left as the default value, then try getting source from the parse session
+    // source map instead of hitting the file system.
+    let original_text = match original_snippet {
+        Some(snippet) => snippet,
+        None => std::fs::read_to_string(path.as_path().ok_or(OperationError::IoError(
+            std::io::Error::from(std::io::ErrorKind::InvalidInput),
+        ))?)?,
+    };
+    apply_newline_style(config.newline_style(), &mut visitor.buffer, &original_text);
 
     if visitor.macro_rewrite_failure {
         report.add_macro_format_failure(path.clone());
@@ -199,10 +207,12 @@ fn format_file(
     let format_result = FormatResult::success(
         visitor.buffer.to_owned(),
         visitor.skipped_range.borrow().clone(),
-        original_snippet,
+        original_text,
         config.newline_style(),
     );
     report.add_format_result(path, format_result);
+
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug)]
