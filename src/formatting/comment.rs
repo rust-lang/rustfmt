@@ -12,7 +12,7 @@ use crate::formatting::{
     string::{rewrite_string, StringFormat},
     utils::{
         count_newlines, first_line_width, last_line_width, tab_to_spaces,
-        trim_left_preserve_layout, unicode_str_width,
+        trim_end_unless_two_whitespaces, trim_left_preserve_layout, unicode_str_width,
     },
 };
 
@@ -68,9 +68,13 @@ impl<'a> CommentStyle<'a> {
     }
 
     /// Returns `true` if the commenting style is for documentation.
+    /// https://doc.rust-lang.org/reference/comments.html
     pub(crate) fn is_doc_comment(&self) -> bool {
         match *self {
-            CommentStyle::TripleSlash | CommentStyle::Doc => true,
+            CommentStyle::TripleSlash
+            | CommentStyle::Doc
+            | CommentStyle::DoubleBullet
+            | CommentStyle::Exclamation => true,
             _ => false,
         }
     }
@@ -244,6 +248,7 @@ pub(crate) fn combine_strs_with_missing_comments(
 }
 
 pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> Option<String> {
+    debug!("rewrite_doc_comment: {:?}", orig);
     identify_comment(orig, false, shape, config, true)
 }
 
@@ -253,6 +258,7 @@ pub(crate) fn rewrite_comment(
     shape: Shape,
     config: &Config,
 ) -> Option<String> {
+    debug!("rewrite_comment: {:?}", orig);
     identify_comment(orig, block_style, shape, config, false)
 }
 
@@ -362,8 +368,10 @@ fn identify_comment(
 
     let (first_group, rest) = orig.split_at(first_group_ending);
     let rewritten_first_group =
-        if !config.normalize_comments() && has_bare_lines && style.is_block_comment() {
-            trim_left_preserve_layout(first_group, shape.indent, config)?
+        if !config.normalize_comments() && has_bare_lines && style.is_block_comment()
+        // && !is_doc_comment
+        {
+            trim_left_preserve_layout(first_group, shape.indent, config, is_doc_comment)?
         } else if !config.normalize_comments()
             && !config.wrap_comments()
             && !config.format_code_in_doc_comments()
@@ -923,15 +931,6 @@ pub(crate) fn recover_missing_comment_in_span(
             Cow::from(" ")
         };
         Some(format!("{}{}", sep, missing_comment))
-    }
-}
-
-/// Trim trailing whitespaces unless they consist of two or more whitespaces.
-fn trim_end_unless_two_whitespaces(s: &str, is_doc_comment: bool) -> &str {
-    if is_doc_comment && s.ends_with("  ") {
-        s
-    } else {
-        s.trim_end()
     }
 }
 
