@@ -33,6 +33,7 @@ args = [
 ]
 
 [tasks.test-all]
+dependencies = ["build-bin"]
 run_task = { name = ["test", "test-ignored"] }
 
 [tasks.test-ignored]
