@@ -2998,16 +2998,20 @@ fn format_header(
 
     // Check for a missing comment between the visibility and the item name.
     let after_vis = vis.span.hi();
-    let before_item_name = context
+    if let Some(before_item_name) = context
         .snippet_provider
-        .span_before(mk_sp(vis.span().lo(), ident.span.hi()), item_name.trim());
-    if let Some(cmt) = rewrite_missing_comment(mk_sp(after_vis, before_item_name), shape, context) {
-        result.push_str(&cmt);
-        let need_newline = last_line_contains_single_line_comment(&result);
-        if need_newline {
-            result.push_str(&offset.to_string_with_newline(context.config));
-        } else if cmt.len() > 0 {
-            result.push(' ');
+        .opt_span_before(mk_sp(vis.span().lo(), ident.span.hi()), item_name.trim())
+    {
+        if let Some(cmt) =
+            rewrite_missing_comment(mk_sp(after_vis, before_item_name), shape, context)
+        {
+            result.push_str(&cmt);
+            let need_newline = last_line_contains_single_line_comment(&result);
+            if need_newline {
+                result.push_str(&offset.to_string_with_newline(context.config));
+            } else if cmt.len() > 0 {
+                result.push(' ');
+            }
         }
     }
 
