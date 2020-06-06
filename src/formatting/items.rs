@@ -805,7 +805,7 @@ pub(crate) fn format_impl(
                     Some(ref missing_comment) if !missing_comment.is_empty() => {
                         result.push_str(missing_comment);
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         }
@@ -1171,7 +1171,7 @@ pub(crate) fn format_trait(
                         Some(ref missing_comment) if !missing_comment.is_empty() => {
                             result.push_str(missing_comment);
                         }
-                        _ => (),
+                        _ => {}
                     }
                 }
             }
@@ -1449,7 +1449,7 @@ fn format_empty_struct_or_tuple(
     let comment_shape =
         Shape::indented(offset, context.config).block_indent(context.config.tab_spaces());
     match rewrite_missing_comment(span, comment_shape, context) {
-        Some(ref s) if s.is_empty() => (),
+        Some(ref s) if s.is_empty() => {}
         Some(ref s) => {
             if !is_single_line(s) || first_line_contains_single_line_comment(s) {
                 let nested_indent_str = offset
@@ -2478,7 +2478,7 @@ fn rewrite_fn_base(
                     result.push_str(missing_comment);
                     force_new_line_for_brace = true;
                 }
-                _ => (),
+                _ => {}
             }
         }
     }
@@ -2643,7 +2643,7 @@ fn compute_budgets_for_params(
         match fn_brace_style {
             FnBraceStyle::None => used_space += 1,     // 1 = `;`
             FnBraceStyle::SameLine => used_space += 2, // 2 = `{}`
-            FnBraceStyle::NextLine => (),
+            FnBraceStyle::NextLine => {}
         }
         let one_line_budget = context.budget(used_space);
 

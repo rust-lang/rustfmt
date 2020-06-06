@@ -439,8 +439,8 @@ mod test {
                 line if-else expressions. A value of zero means always break if-else expressions.";
 
             unstable_features: bool, false, true,
-                "Enables unstable features on stable and beta channels (unstable features are enabled \
-                 by default on nightly channel)";
+                "Enables unstable features on stable and beta channels \
+                (unstable features are enabled by default on nightly channel)";
 
             // Options that are used by the tests
             stable_option: bool, false, true, "A stable option";
@@ -669,7 +669,7 @@ ignore = []
                 assert!(paths[0].ends_with("a/rustfmt.toml"));
                 assert!(paths[1].ends_with("a/b/rustfmt.toml"));
             }
-            _ => (),
+            _ => {}
         };
     }
 

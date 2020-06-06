@@ -331,13 +331,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             self.push_str(" ");
                             continue;
                         }
-                        0 => (),
+                        0 => {}
                         1 if prev_is_comment
                             && last_line_contains_single_line_comment(&self.buffer) =>
                         {
                             self.push_str("\n")
                         }
-                        1 => (),
+                        1 => {}
                         _ => self.push_str("\n"),
                     }
                     newline_inserted = true;
@@ -853,7 +853,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             FormatError::from_span(ErrorKind::BadAttr, self.parse_sess, attr.span),
                         );
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         }

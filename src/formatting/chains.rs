@@ -353,7 +353,7 @@ impl Chain {
                         CommentPosition::Top,
                     ));
                 }
-                _ => (),
+                _ => {}
             }
 
             prev_span_end = chain_item.span.hi();

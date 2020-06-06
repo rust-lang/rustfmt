@@ -1303,7 +1303,7 @@ where
                             self.status = CharClassesStatus::LitChar;
                             return Some((char_kind, item));
                         }
-                        _ => (),
+                        _ => {}
                     }
 
                     match self.base.peek() {
@@ -1608,7 +1608,7 @@ pub(crate) fn filter_normal_code(code: &str) -> String {
             buffer.push_str(&line);
             buffer.push('\n');
         }
-        _ => (),
+        _ => {}
     });
     if !code.ends_with('\n') && buffer.ends_with('\n') {
         buffer.pop();

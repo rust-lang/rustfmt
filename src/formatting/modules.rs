@@ -234,7 +234,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         .or_insert(sub_mod);
                 }
             }
-            _ => (),
+            _ => {}
         }
         Ok(())
     }

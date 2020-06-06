@@ -665,7 +665,7 @@ pub(crate) fn get_comment_end(
         match post_snippet.find('/') {
             Some(j) if j < i => block_open_index = None,
             _ if post_snippet[..i].ends_with('/') => block_open_index = None,
-            _ => (),
+            _ => {}
         }
     }
     let newline_index = post_snippet.find('\n');

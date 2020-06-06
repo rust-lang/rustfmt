@@ -171,8 +171,9 @@ macro_rules! create_config {
                             update_config!(self, $i = val, dir);
                         } else {
                             eprintln!(
-                                "Warning: can't set `{} = {:?}`, unstable features can only \
-                                be used on stable or beta when `unstable_features` is also enabled.",
+                                "Warning: can't set `{} = {:?}`, unstable features can \
+                                only be used on stable or beta when `unstable_features` \
+                                is also enabled.",
                                 stringify!($i), val
                             );
                         }
@@ -249,8 +250,9 @@ macro_rules! create_config {
                                                  stringify!($Ty)));
                             } else {
                                 return eprintln!(
-                                    "Warning: can't set `{} = {:?}`, unstable features can only \
-                                    be used on stable or beta when `unstable_features` is also enabled.",
+                                    "Warning: can't set `{} = {:?}`, unstable features \
+                                     can only be used on stable or beta when `unstable_features` \
+                                     is also enabled.",
                                     stringify!($i), val
                                 );
                             }

@@ -1507,7 +1507,7 @@ fn rewrite_index(
         Some(ref index_str) if !index_str.contains('\n') => {
             return Some(format!("{}[{}]", expr_str, index_str));
         }
-        _ => (),
+        _ => {}
     }
 
     // Try putting index on the next line and see if it fits in a single line.

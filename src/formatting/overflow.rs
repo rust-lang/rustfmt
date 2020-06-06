@@ -479,7 +479,7 @@ impl<'a> Context<'a> {
                 {
                     self.context.force_one_line_chain.replace(true);
                 }
-                _ => (),
+                _ => {}
             }
             let result = last_item_shape(
                 &self.items,
@@ -582,7 +582,7 @@ impl<'a> Context<'a> {
                     }
                 }
             }
-            _ => (),
+            _ => {}
         }
 
         tactic
