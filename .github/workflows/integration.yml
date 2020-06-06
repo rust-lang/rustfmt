@@ -20,7 +20,6 @@ jobs:
           mdbook,
           packed_simd,
           rust-semverver,
-          stdsimd,
           tempdir,
           futures-rs,
           rust-clippy,
@@ -42,6 +41,8 @@ jobs:
           - integration: crater
             allow-failure: true
           - integration: glob
+            allow-failure: true
+          - integration: stdsimd
             allow-failure: true
           # Using old rustfmt configuration option
           - integration: rand
@@ -78,5 +79,6 @@ jobs:
     - name: run integration tests
       env:
         INTEGRATION: ${{ matrix.integration }}
+        TARGET: x86_64-unknown-linux-gnu
       run: ./ci/integration.sh
       continue-on-error: ${{ matrix.allow-failure == true }}
