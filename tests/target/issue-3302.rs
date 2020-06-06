@@ -1,5 +1,3 @@
-// rustfmt-version: Two
-
 macro_rules! moo1 {
     () => {
         bar! {
