@@ -569,9 +569,12 @@ pub(crate) fn trim_left_preserve_layout(
     orig: &str,
     indent: Indent,
     config: &Config,
+    inside_doc_comment: bool,
 ) -> Option<String> {
     let mut lines = LineClasses::new(orig);
-    let first_line = lines.next().map(|(_, s)| s.trim_end().to_owned())?;
+    let first_line = lines
+        .next()
+        .map(|(_, s)| trim_end_unless_two_whitespaces(&s, inside_doc_comment).to_owned())?;
     let mut trimmed_lines = Vec::with_capacity(16);
 
     let mut veto_trim = false;
@@ -593,7 +596,7 @@ pub(crate) fn trim_left_preserve_layout(
                 trimmed = false;
                 line
             } else {
-                line.trim().to_owned()
+                trim_end_unless_two_whitespaces(line.trim_start(), inside_doc_comment).to_owned()
             };
             trimmed_lines.push((trimmed, line, prefix_space_width));
 
@@ -627,6 +630,16 @@ pub(crate) fn trim_left_preserve_layout(
                 .collect::<Vec<_>>()
                 .join("\n"),
     )
+}
+
+/// Trim trailing whitespace unless it consists of two or more whitespaces and is in a doc comment.
+/// This is, needed to preserve Markdown's double-space line break syntax.
+pub(crate) fn trim_end_unless_two_whitespaces(s: &str, is_doc_comment: bool) -> &str {
+    if is_doc_comment && s.ends_with("  ") {
+        s
+    } else {
+        s.trim_end()
+    }
 }
 
 /// Based on the given line, determine if the next line can be indented or not.
@@ -687,8 +700,19 @@ mod test {
         let config = Config::default();
         let indent = Indent::new(4, 0);
         assert_eq!(
-            trim_left_preserve_layout(&s, indent, &config),
+            trim_left_preserve_layout(&s, indent, &config, false),
             Some("aaa\n    bbb\n    ccc".to_string())
+        );
+    }
+
+    #[test]
+    fn test_trim_left_preserve_layout_no_trim_end_in_doc_comment() {
+        let s = "aaa    \n\tbbb    \n    ccc    ";
+        let config = Config::default();
+        let indent = Indent::new(4, 0);
+        assert_eq!(
+            trim_left_preserve_layout(&s, indent, &config, true),
+            Some("aaa    \n    bbb    \n    ccc    ".to_string())
         );
     }
 }

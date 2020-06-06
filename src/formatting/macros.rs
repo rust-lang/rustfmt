@@ -180,7 +180,12 @@ fn return_macro_parse_failure_fallback(
         })
         .unwrap_or(false);
     if is_like_block_indent_style {
-        return trim_left_preserve_layout(context.snippet(span), indent, &context.config);
+        return trim_left_preserve_layout(
+            context.snippet(span),
+            indent,
+            &context.config,
+            /* inside_doc_comment */ false,
+        );
     }
 
     context
@@ -432,7 +437,12 @@ fn rewrite_macro_inner(
             // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
             // anything in between the braces (for now).
             let snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
-            match trim_left_preserve_layout(snippet, shape.indent, &context.config) {
+            match trim_left_preserve_layout(
+                snippet,
+                shape.indent,
+                &context.config,
+                /* inside_doc_comment */ false,
+            ) {
                 Some(macro_body) => Some(format!("{} {}", macro_name, macro_body)),
                 None => Some(format!("{} {}", macro_name, snippet)),
             }
