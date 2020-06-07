@@ -206,13 +206,6 @@ impl ParseSess {
             Rc::clone(source_file.src.as_ref().unwrap()),
         )
     }
-
-    pub(crate) fn get_original_snippet(&self, file_name: &FileName) -> Option<Rc<String>> {
-        self.parse_sess
-            .source_map()
-            .get_source_file(&file_name.into())
-            .and_then(|source_file| source_file.src.clone())
-    }
 }
 
 // Methods that should be restricted within the syntux module.

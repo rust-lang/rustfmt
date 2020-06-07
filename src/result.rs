@@ -120,6 +120,9 @@ pub enum OperationError {
     /// Parse error occurred while parsing the input.
     #[error("failed to parse {input:?}")]
     ParseError { input: FileName, is_panic: bool },
+    /// Io error.
+    #[error("{0}")]
+    IoError(#[from] std::io::Error),
 }
 
 impl OperationError {

@@ -20,7 +20,7 @@ pub struct FormatReport {
 /// errors and warning arose while formatting.
 #[derive(Debug, Clone, Default)]
 pub struct FormatResult {
-    original_snippet: Option<String>,
+    original_snippet: String,
     formatted_snippet: FormattedSnippet,
     format_errors: HashSet<FormatError>,
     newline_style: NewlineStyle,
@@ -37,7 +37,7 @@ impl FormatResult {
     pub(crate) fn success(
         snippet: String,
         non_formatted_ranges: Vec<NonFormattedRange>,
-        original_snippet: Option<String>,
+        original_snippet: String,
         newline_style: NewlineStyle,
     ) -> Self {
         let formatted_snippet = FormattedSnippet {
@@ -67,8 +67,8 @@ impl FormatResult {
         self.newline_style.clone()
     }
 
-    pub fn original_text(&self) -> Option<&str> {
-        self.original_snippet.as_ref().map(|s| s.as_str())
+    pub fn original_text(&self) -> &str {
+        &self.original_snippet
     }
 
     pub fn formatted_text(&self) -> &str {
@@ -120,9 +120,7 @@ impl FormatReport {
         original_format_result
             .format_errors
             .extend(format_result.format_errors);
-        if original_format_result.original_snippet.is_none() {
-            original_format_result.original_snippet = format_result.original_snippet;
-        }
+        original_format_result.original_snippet = format_result.original_snippet;
     }
 
     pub(crate) fn append_errors(&self, f: FileName, errors: impl Iterator<Item = FormatError>) {
