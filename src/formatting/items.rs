@@ -2994,7 +2994,7 @@ fn format_header(
     let mut result = String::with_capacity(128);
     let shape = Shape::indented(offset, context.config);
 
-    result.push_str(&format_visibility(context, vis));
+    result.push_str(&format_visibility(context, vis).trim());
 
     // Check for a missing comment between the visibility and the item name.
     let after_vis = vis.span.hi();
@@ -3002,20 +3002,19 @@ fn format_header(
         .snippet_provider
         .opt_span_before(mk_sp(vis.span().lo(), ident.span.hi()), item_name.trim())
     {
-        if let Some(cmt) =
-            rewrite_missing_comment(mk_sp(after_vis, before_item_name), shape, context)
-        {
-            result.push_str(&cmt);
-            let need_newline = last_line_contains_single_line_comment(&result);
-            if need_newline {
-                result.push_str(&offset.to_string_with_newline(context.config));
-            } else if cmt.len() > 0 {
-                result.push(' ');
-            }
+        let missing_span = mk_sp(after_vis, before_item_name);
+        if let Some(result_with_comment) = combine_strs_with_missing_comments(
+            context,
+            &result,
+            item_name,
+            missing_span,
+            shape,
+            /* allow_extend */ true,
+        ) {
+            result = result_with_comment;
         }
     }
 
-    result.push_str(item_name);
     result.push_str(&rewrite_ident(context, ident));
 
     result
