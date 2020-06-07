@@ -57,7 +57,7 @@ mod test {
                 assert!(ignore_path_set.is_match(&FileName::Real(PathBuf::from("bar_dir/baz.rs"))));
                 assert!(!ignore_path_set.is_match(&FileName::Real(PathBuf::from("src/bar.rs"))));
             }
-            _ => (),
+            _ => {}
         };
     }
 }

@@ -286,7 +286,7 @@ fn rewrite_segment(
                     shape,
                 )?);
             }
-            _ => (),
+            _ => {}
         }
     }
 
@@ -556,7 +556,7 @@ impl Rewrite for ast::GenericParam {
         // FIXME: If there are more than one attributes, this will force multiline.
         match self.attrs.rewrite(context, shape) {
             Some(ref rw) if !rw.is_empty() => result.push_str(&format!("{} ", rw)),
-            _ => (),
+            _ => {}
         }
 
         if let rustc_ast::ast::GenericParamKind::Const { ref ty } = &self.kind {

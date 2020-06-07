@@ -139,7 +139,7 @@ impl TemplateParser {
                     parser.linum
                 )));
             }
-            _ => (),
+            _ => {}
         }
         parser.parsed.push_str(&regex::escape(&parser.buffer));
 

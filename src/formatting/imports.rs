@@ -427,7 +427,7 @@ impl UseTree {
 
         // Remove foo::{} or self without attributes.
         match last {
-            _ if self.attrs.is_some() => (),
+            _ if self.attrs.is_some() => {}
             UseSegment::List(ref list) if list.is_empty() => {
                 self.path = vec![];
                 return self;
@@ -436,7 +436,7 @@ impl UseTree {
                 self.path = vec![];
                 return self;
             }
-            _ => (),
+            _ => {}
         }
 
         // Normalise foo::self -> foo.

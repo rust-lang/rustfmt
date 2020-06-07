@@ -316,7 +316,7 @@ fn rewrite_macro_inner(
 
             match parser.token.kind {
                 TokenKind::Eof => break,
-                TokenKind::Comma => (),
+                TokenKind::Comma => {}
                 TokenKind::Semi => {
                     // Try to parse `vec![expr; expr]`
                     if FORCED_BRACKET_MACROS.contains(&&macro_name[..]) {

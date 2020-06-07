@@ -98,6 +98,8 @@ fn is_file_skip(skip_file_white_list: &[&str], path: &Path) -> bool {
 // given path. The `recursive` argument controls if files from subdirectories
 // are also returned.
 fn get_test_files(path: &Path, recursive: bool, skip_file_white_list: &[&str]) -> Vec<PathBuf> {
+    assert!(path.exists(), "{} does not exist", path.display());
+
     let mut files = vec![];
     if path.is_dir() {
         for entry in fs::read_dir(path)
@@ -384,9 +386,9 @@ fn self_tests() {
         return;
     }
     let skip_file_white_list = ["target", "tests"];
-    let files = get_test_files(Path::new("../../rustfmt-core"), true, &skip_file_white_list);
+    let files = get_test_files(Path::new("src"), true, &skip_file_white_list);
 
-    let (reports, count, fails) = check_files(files, &Some(PathBuf::from("../../rustfmt.toml")));
+    let (reports, count, fails) = check_files(files, &Some(PathBuf::from("rustfmt.toml")));
     let mut warnings = 0;
 
     // Display results.
@@ -672,6 +674,12 @@ fn idempotent_check(
 ) -> Result<FormatReport, IdempotentCheckError> {
     let sig_comments = read_significant_comments(filename);
     let (config, builder, _) = if let Some(ref config_file_path) = opt_config {
+        assert!(
+            config_file_path.exists(),
+            "{} does not exist",
+            config_file_path.display()
+        );
+
         let config = Config::from_toml_path(config_file_path).expect("`rustfmt.toml` not found");
         let builder = OperationSetting::default();
         let emitter_config = EmitterConfig::default();
