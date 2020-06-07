@@ -90,7 +90,7 @@ fn format_project(
     }
 
     // Parse the crate.
-    let directory_ownership = input.to_directory_ownership();
+    let directory_ownership = input.to_directory_ownership(operation_setting.recursive);
     let original_snippet = if let Input::Text(ref str) = input {
         Some(str.to_owned())
     } else {
@@ -488,8 +488,10 @@ impl Input {
         }
     }
 
-    fn to_directory_ownership(&self) -> Option<DirectoryOwnership> {
+    fn to_directory_ownership(&self, recursive: bool) -> Option<DirectoryOwnership> {
         match self {
+            // On recursive mode, we assume that input is the root file.
+            Input::File(..) if recursive => None,
             Input::File(ref file) => {
                 // If there exists a directory with the same name as an input,
                 // then the input should be parsed as a sub module.
@@ -502,7 +504,7 @@ impl Input {
                     None
                 }
             }
-            _ => None,
+            Input::Text(..) => None,
         }
     }
 }
