@@ -1,4 +1,5 @@
-// rustfmt-indent_style=Visual
+// rustfmt-indent_style: Visual
+// rustfmt-max_width: 30
 
 fn main() {
     let grammar: Vec<_> = ast
@@ -9,4 +10,7 @@ fn main() {
             _ => false,
         })
         .collect();
+
+    let a = b.iter()
+             .map(|m| m.hi());
 }
