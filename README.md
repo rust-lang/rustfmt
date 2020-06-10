@@ -1,4 +1,4 @@
-# rustfmt [![Build Status](https://travis-ci.com/rust-lang/rustfmt.svg?branch=master)](https://travis-ci.com/rust-lang/rustfmt) [![Build Status](https://ci.appveyor.com/api/projects/status/github/rust-lang/rustfmt?svg=true)](https://ci.appveyor.com/project/rust-lang-libs/rustfmt) [![crates.io](https://img.shields.io/crates/v/rustfmt-nightly.svg)](https://crates.io/crates/rustfmt-nightly) [![Travis Configuration Status](https://img.shields.io/travis/davidalber/rustfmt-travis.svg?label=travis%20example)](https://travis-ci.org/davidalber/rustfmt-travis)
+# rustfmt [![Linux badge][linux-build-status]][linux-build] [![Mac badge][mac-build-status]][mac-build] [![Windows badge][windows-build-status]][windows-build] [![crates.io badge][cratesio-badge]][cratesio-package] [![Travis config badge][travis-config-badge]][travis-config-job]
 
 A tool for formatting Rust code according to style guidelines.
 
@@ -82,11 +82,22 @@ rustup component add rustfmt
 
 ## Installing from source
 
-To install from source (nightly required), first checkout to the tag or branch you want to install, then issue
+To install from source (nightly required), first checkout to the tag or branch for the version of rustfmt you want. 
+
+The easiest way to install is via [cargo make][cargo-make]
 
 ```sh
-cargo install --path .
+cargo make install
 ```
+
+Alternatively, you can run `cargo install` directly as long as you set the required environment variables and features.
+
+```sh
+export CFG_RELEASE=1.45.0-nightly
+export CFG_RELEASE=nightly
+cargo install --path . --force --locked --features rustfmt,cargo-fmt
+```
+(Windows users can use `set` to specify the environment variable values)
 
 This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add `~/.cargo/bin` directory to
 your PATH variable.
@@ -146,9 +157,42 @@ for more info.
 
 ## How to build and test
 
-`cargo build` to build.
+We recommend using [cargo make][cargo-make] when working with the rustfmt codebase.
 
-`cargo test --manifest-path rustfmt-core/Cargo.toml` to run all tests.
+You can alternatively use `cargo` directly, but you'll have to set the `CFG_RELEASE` and `CFG_RELEASE_CHANNEL` environment variables and also provide the corresponding features.
+
+For example:
+```sh
+export CFG_RELEASE=1.45.0-nightly
+export CFG_RELEASE=nightly
+```
+(Windows users can use `set` to specify the environment variable values)
+
+To build with `cargo make`:
+
+```sh
+cargo make build
+```
+
+Or alternatively with `cargo` directly:
+```sh
+cargo build --all-features
+# or
+CFG_RELEASE_CHANNEL=nightly CFG_RELEASE=1.45.0-nightly cargo build --all-features
+```
+
+To run tests with `cargo make`:
+
+```sh
+cargo make test
+```
+
+Or alternatively with `cargo` directly:
+```sh
+cargo test --all-features
+# or 
+CFG_RELEASE_CHANNEL=nightly CFG_RELEASE=1.45.0-nightly cargo test --all-features
+```
 
 To run rustfmt after this, use `cargo run --bin rustfmt -- filename`. See the
 notes above on running rustfmt.
@@ -231,3 +275,14 @@ See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for details.
 [rust]: https://github.com/rust-lang/rust
 [fmt rfcs]: https://github.com/rust-lang-nursery/fmt-rfcs
 [style guide]: https://github.com/rust-lang-nursery/fmt-rfcs/blob/master/guide/guide.md
+[cargo-make]: https://sagiegurari.github.io/cargo-make/
+[linux-build-status]: https://img.shields.io/github/workflow/status/rust-lang/rustfmt/linux/master?label=linux&style=flat-square
+[linux-build]: https://github.com/rust-lang/rustfmt/actions?query=workflow%3Alinux+branch%3Amaster
+[mac-build-status]: https://img.shields.io/github/workflow/status/rust-lang/rustfmt/mac/master?label=mac&style=flat-square
+[mac-build]: https://github.com/rust-lang/rustfmt/actions?query=workflow%3Amac+branch%3Amaster
+[windows-build-status]: https://img.shields.io/github/workflow/status/rust-lang/rustfmt/windows/master?label=windows&style=flat-square
+[windows-build]: https://github.com/rust-lang/rustfmt/actions?query=workflow%3Awindows+branch%3Amaster
+[cratesio-badge]: https://img.shields.io/crates/v/rustfmt-nightly?style=flat-square
+[cratesio-package]: https://crates.io/crates/rustfmt-nightly
+[travis-config-badge]: https://img.shields.io/travis/davidalber/rustfmt-travis?label=travis%20example&style=flat-square
+[travis-config-job]: https://travis-ci.org/davidalber/rustfmt-travis
