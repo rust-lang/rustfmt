@@ -14,16 +14,38 @@ Conduct](CODE_OF_CONDUCT.md).
 Rustfmt requires a nightly compiler. Replace all invocations of `cargo` by
 `cargo +nightly` if necessary.
 
-At all times the environment variables `CFG_RELEASE_CHANNEL` and `CFG_RELEASE` must
-be set to either `nightly` or `beta`. Both should be set to the same value. The
-project supports [cargo-make](https://github.com/sagiegurari/cargo-make) which
-automatically sets these variables for you:
+At all times the environment variables `CFG_RELEASE_CHANNEL` and `CFG_RELEASE` must be set. The
+project supports and recommends [cargo-make][cargo-make] when working on rustfmt because `cargo-make` automatically sets these variables for you and simplifies the process.
 
+The available tasks for `cargo-make` are listed in `Makefile.toml` and several are detailed in sections below.
+
+You can alternatively use `cargo` directly, but to do so you'll have to manually set the `CFG_RELEASE` and `CFG_RELEASE_CHANNEL` environment variables yourself and also provide the corresponding features.
+
+`CFG_RELEASE_CHANNEL` must be set to either `nightly` or `beta`, and `CFG_RELEASE` should be set to your corresponding Rust version.
+
+For example:
+```sh
+export CFG_RELEASE=1.45.0-nightly
+export CFG_RELEASE=nightly
+cargo +nightly build ...
+# And/or inline if you prefer, or need to override value(s)
+CFG_RELEASE_CHANNEL=nightly CFG_RELEASE=1.45.0-nightly cargo +nightly build ... 
 ```
-cargo +nightly make test
+(Windows users can use `set` to specify the environment variable values)
+
+## Building
+To build with `cargo make`:
+
+```sh
+cargo make build
 ```
 
-The available tasks are listed in `Makefile.toml`.
+Or alternatively with `cargo` directly:
+```sh
+cargo build --all-features
+# And/or with the required environment variables inline if you prefer, or need to override the value(s)
+CFG_RELEASE_CHANNEL=nightly CFG_RELEASE=1.45.0-nightly cargo build --all-features
+```
 
 ## Test and file issues
 
@@ -31,23 +53,38 @@ It would be really useful to have people use rustfmt on their projects and file
 issues where it does something you don't expect.
 
 
-## Create test cases
+## Running tests
 
-Having a strong test suite for a tool like this is essential. It is very easy
-to create regressions. Any tests you can add are very much appreciated.
+The tests can be executed with `cargo make` or directly with `cargo` provided the corresponding environment variables have been set.
 
-The tests can be run with `cargo make test`. This does a number of things:
+To run tests with `cargo make`:
+
+```sh
+cargo make test
+```
+
+Or alternatively with `cargo` directly:
+```sh
+cargo test --all-features
+# And/or with the required environment variables inline if you prefer, or need to override the value(s)
+CFG_RELEASE_CHANNEL=beta CFG_RELEASE=1.45.0-nightly cargo test --all-features
+```
+
+This does a number of things:
 * runs the unit tests for a number of internal functions;
-* makes sure that rustfmt run on every file in `rustfmt-core/rustfmt-lib/tests/source/`
-  is equal to its associated file in `rustfmt-core/rustfmt-lib/tests/target/`;
-* runs idempotence tests on the files in `rustfmt-core/rustfmt-lib/tests/target/`.
+* ensures that rustfmt is executed against every file in `tests/source/` and that each formatted result is equal to its associated file in `tests/target/`;
+* runs idempotence tests on the files in `tests/target/`.
   These files should not be changed by rustfmt;
 * checks that rustfmt's code is not changed by running on itself. This ensures
   that the project bootstraps.
 
+## Creating test cases
+Having a strong test suite for a tool like this is essential. It is very easy
+to create regressions. Any tests you can add are very much appreciated.
+
 Creating a test is as easy as creating a new file in
-`rustfmt-core/rustfmt-lib/tests/source/` and an equally named one in
-`rustfmt-core/rustfmt-lib/tests/target/`. If it is only required that rustfmt leaves a
+`tests/source/` and an equally named one in
+`tests/target/`. If it is only required that rustfmt leaves a
 piece of code unformatted, it may suffice to only create a target file.
 
 Whenever there's a discrepancy between the expected output when running tests, a
@@ -73,6 +110,8 @@ would need a configuration file named `test-indent.toml` in that directory. As a
 example, the `issue-1111.rs` test file is configured by the file
 `./tests/config/issue-1111.toml`.
 
+[cargo-make]: https://sagiegurari.github.io/cargo-make/
+
 ## Debugging
 
 Some `rewrite_*` methods use the `debug!` macro for printing useful information.
@@ -82,7 +121,13 @@ and get a better grasp on the execution flow.
 
 ## Hack!
 
-Here are some [good starting issues](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Agood-first-issue).
+There are a lot of open issues on the backlog for those interested in hacking on rustfmt. If you find an issue that you are interested in working on, add a comment to the issue to let us (and other potential contributors) know!
+
+Here are some good starting issues:
+
+[![GitHub good-first-issue](https://img.shields.io/github/issues/rust-lang/rustfmt/good-first-issue?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Agood%20first%20issue)
+[![GitHub help-wanted](https://img.shields.io/github/issues/rust-lang/rustfmt/help-wanted?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Ahelp-wanted)
+
 
 If you've found areas which need polish and don't have issues, please submit a
 PR, don't feel there needs to be an issue.
@@ -95,7 +140,7 @@ source code. So, basically, the only style guideline is that you must pass the
 tests. That ensures that the Rustfmt source code adheres to our own conventions.
 
 Talking of tests, if you add a new feature or fix a bug, please also add a test.
-It's really easy, see above for details. Please run `cargo test` before
+It's really easy, see above for details. Please [run the tests](#running-tests) locally before
 submitting a PR to ensure your patch passes all tests, it's pretty quick.
 
 Rustfmt is post-1.0 and within major version releases we strive for backwards
