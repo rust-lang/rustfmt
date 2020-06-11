@@ -211,8 +211,11 @@ guide] that has been formalized through the [style RFC
 process][fmt rfcs].
 
 Configuration options are either stable or unstable. Stable options can always
-be used, while unstable ones are only available on a nightly toolchain, and opt-in.
-See [GitHub page](https://rust-lang.github.io/rustfmt/) for details.
+be used on any channel. Unstable options are always available on nightly, but can only be used on stable and beta with an explicit opt-in (starting in Rustfmt v2.0).
+
+Unstable options are not available on stable/beta with Rustfmt v1.x.
+
+See the configuration documentation on the Rustfmt [GitHub page](https://rust-lang.github.io/rustfmt/) for details (look for the `unstable_features` section).
 
 ### Rust's Editions
 
