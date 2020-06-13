@@ -38,7 +38,7 @@ impl FileName {
 impl From<rustc_span::FileName> for FileName {
     fn from(name: rustc_span::FileName) -> FileName {
         match name {
-            rustc_span::FileName::Real(p) => FileName::Real(p),
+            rustc_span::FileName::Real(p) => FileName::Real(p.into_local_path()),
             rustc_span::FileName::Custom(ref f) if f == "stdin" => FileName::Stdin,
             _ => unreachable!(),
         }
@@ -48,7 +48,9 @@ impl From<rustc_span::FileName> for FileName {
 impl From<&FileName> for rustc_span::FileName {
     fn from(filename: &FileName) -> rustc_span::FileName {
         match filename {
-            FileName::Real(path) => rustc_span::FileName::Real(path.to_owned()),
+            FileName::Real(path) => {
+                rustc_span::FileName::Real(rustc_span::RealFileName::Named(path.to_owned()))
+            }
             FileName::Stdin => rustc_span::FileName::Custom("stdin".to_owned()),
         }
     }
