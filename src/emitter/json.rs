@@ -67,20 +67,22 @@ impl JsonEmitter {
             let mut expected_end_line = expected_begin_line;
             let mut original_line_counter = 0;
             let mut expected_line_counter = 0;
-            let mut original_lines = vec![];
-            let mut expected_lines = vec![];
+            let mut original = String::new();
+            let mut expected = String::new();
 
             for line in mismatch.lines {
                 match line {
                     DiffLine::Expected(msg) => {
                         expected_end_line = expected_begin_line + expected_line_counter;
                         expected_line_counter += 1;
-                        expected_lines.push(msg)
+                        expected.push_str(&msg);
+                        expected.push('\n');
                     }
                     DiffLine::Resulting(msg) => {
                         original_end_line = original_begin_line + original_line_counter;
                         original_line_counter += 1;
-                        original_lines.push(msg)
+                        original.push_str(&msg);
+                        original.push('\n');
                     }
                     DiffLine::Context(_) => continue,
                 }
@@ -91,8 +93,8 @@ impl JsonEmitter {
                 original_end_line,
                 expected_begin_line,
                 expected_end_line,
-                original: original_lines.join("\n"),
-                expected: expected_lines.join("\n"),
+                original,
+                expected,
             });
         }
         self.mismatched_files.push(MismatchedFile {
