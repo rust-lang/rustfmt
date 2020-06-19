@@ -26,7 +26,7 @@ You can alternatively use `cargo` directly, but to do so you'll have to manually
 For example:
 ```sh
 export CFG_RELEASE=1.45.0-nightly
-export CFG_RELEASE=nightly
+export CFG_RELEASE_CHANNEL=nightly
 cargo +nightly build ...
 # And/or inline if you prefer, or need to override value(s)
 CFG_RELEASE_CHANNEL=nightly CFG_RELEASE=1.45.0-nightly cargo +nightly build ... 

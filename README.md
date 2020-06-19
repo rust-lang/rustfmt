@@ -94,7 +94,7 @@ Alternatively, you can run `cargo install` directly as long as you set the requi
 
 ```sh
 export CFG_RELEASE=1.45.0-nightly
-export CFG_RELEASE=nightly
+export CFG_RELEASE_CHANNEL=nightly
 cargo install --path . --force --locked --features rustfmt,cargo-fmt
 ```
 (Windows users can use `set` to specify the environment variable values)
@@ -164,7 +164,7 @@ You can alternatively use `cargo` directly, but you'll have to set the `CFG_RELE
 For example:
 ```sh
 export CFG_RELEASE=1.45.0-nightly
-export CFG_RELEASE=nightly
+export CFG_RELEASE_CHANNEL=nightly
 ```
 (Windows users can use `set` to specify the environment variable values)
 
