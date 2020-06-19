@@ -124,8 +124,8 @@ mod tests {
                 original_end_line: 79,
                 expected_begin_line: 79,
                 expected_end_line: 82,
-                original: String::from("fn Foo<T>() where T: Bar {"),
-                expected: String::from("fn Foo<T>()\nwhere\n    T: Bar,\n{"),
+                original: String::from("fn Foo<T>() where T: Bar {\n"),
+                expected: String::from("fn Foo<T>()\nwhere\n    T: Bar,\n{\n"),
             }],
         };
         let mismatch = Mismatch {
@@ -162,10 +162,10 @@ mod tests {
                 expected_begin_line: 5,
                 expected_end_line: 5,
                 original: String::from(
-                    "fn foo(_x: &u64) -> Option<&(dyn::std::error::Error + 'static)> {",
+                    "fn foo(_x: &u64) -> Option<&(dyn::std::error::Error + 'static)> {\n",
                 ),
                 expected: String::from(
-                    "fn foo(_x: &u64) -> Option<&(dyn ::std::error::Error + 'static)> {",
+                    "fn foo(_x: &u64) -> Option<&(dyn ::std::error::Error + 'static)> {\n",
                 ),
             }],
         };
@@ -264,8 +264,8 @@ mod tests {
                     original_end_line: 2,
                     expected_begin_line: 2,
                     expected_end_line: 2,
-                    original: String::from("println!(\"Hello, world!\");"),
-                    expected: String::from("    println!(\"Hello, world!\");"),
+                    original: String::from("println!(\"Hello, world!\");\n"),
+                    expected: String::from("    println!(\"Hello, world!\");\n"),
                 },
                 MismatchedBlock {
                     original_begin_line: 7,
@@ -273,10 +273,10 @@ mod tests {
                     expected_begin_line: 7,
                     expected_end_line: 10,
                     original: String::from(
-                        "#[test]\nfn it_works() {\n    assert_eq!(2 + 2, 4);\n}",
+                        "#[test]\nfn it_works() {\n    assert_eq!(2 + 2, 4);\n}\n",
                     ),
                     expected: String::from(
-                        "    #[test]\n    fn it_works() {\n        assert_eq!(2 + 2, 4);\n    }",
+                        "    #[test]\n    fn it_works() {\n        assert_eq!(2 + 2, 4);\n    }\n",
                     ),
                 },
             ],
@@ -325,8 +325,8 @@ mod tests {
                 original_end_line: 2,
                 expected_begin_line: 2,
                 expected_end_line: 2,
-                original: String::from("println!(\"Hello, world!\");"),
-                expected: String::from("    println!(\"Hello, world!\");"),
+                original: String::from("println!(\"Hello, world!\");\n"),
+                expected: String::from("    println!(\"Hello, world!\");\n"),
             }],
         };
 
@@ -337,8 +337,8 @@ mod tests {
                 original_end_line: 2,
                 expected_begin_line: 2,
                 expected_end_line: 2,
-                original: String::from("println!(\"Greetings!\");"),
-                expected: String::from("    println!(\"Greetings!\");"),
+                original: String::from("println!(\"Greetings!\");\n"),
+                expected: String::from("    println!(\"Greetings!\");\n"),
             }],
         };
 
