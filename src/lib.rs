@@ -5,6 +5,10 @@
 #[macro_use]
 extern crate log;
 
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
+
 use std::path::PathBuf;
 
 pub use crate::config::{
