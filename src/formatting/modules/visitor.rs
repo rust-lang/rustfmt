@@ -49,9 +49,9 @@ impl<'a, 'ast: 'a> CfgIfVisitor<'a> {
         // extern crate cfg_if;
         // cfg_if! {..}
         // ```
-        match mac.path.segments.first() {
-            Some(first_segment) => {
-                if first_segment.ident.name != Symbol::intern("cfg_if") {
+        match mac.path.segments.last() {
+            Some(last_segment) => {
+                if last_segment.ident.name != Symbol::intern("cfg_if") {
                     return Err("Expected cfg_if");
                 }
             }

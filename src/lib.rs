@@ -3,8 +3,6 @@
 #![feature(cell_leak)]
 
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate log;
 
 use std::path::PathBuf;
