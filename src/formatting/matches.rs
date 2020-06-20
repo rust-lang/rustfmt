@@ -377,15 +377,17 @@ fn rewrite_match_body(
     let comma = arm_comma(context.config, body, is_last);
     let alt_block_sep = &shape.indent.to_string_with_newline(context.config);
 
-    let combine_orig_body = |mut body_str: &str| {
+    let combine_orig_body = |body_str: &str| {
         let block_sep = match context.config.control_brace_style() {
             ControlBraceStyle::AlwaysNextLine if is_block => alt_block_sep,
             _ => " ",
         };
-        if body_str == "()" {
-            body_str = "{}";
-        }
-        Some(format!("{} =>{}{}{}", pats_str, block_sep, body_str, comma))
+        let (body, comma) = match body_str {
+            "()" if context.config.match_block_trailing_comma() => ("{}", ","),
+            "()" => ("{}", ""),
+            _ => (body_str, comma),
+        };
+        Some(format!("{} =>{}{}{}", pats_str, block_sep, body, comma))
     };
 
     let next_line_indent = if !is_block || is_empty_block {
