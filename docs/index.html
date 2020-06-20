@@ -82,6 +82,7 @@
             const queryParams = new URLSearchParams(window.location.search);
             const searchParam = queryParams.get('search');
             const searchTerm = null !== searchParam ? searchParam : '';
+            const versionNumber = null !== queryParams.get('version') ? 'v' + queryParams.get('version') : 'master';
             new Vue({
               el: '#app',
               data: {
@@ -90,7 +91,7 @@
                 configurationDescriptions: [],
                 searchCondition: searchTerm,
                 shouldStable: false,
-                version: 'master',
+                version: versionNumber,
                 oldVersion: undefined,
                 versionOptions: ['master']
               },
