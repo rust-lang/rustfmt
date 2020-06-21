@@ -100,16 +100,20 @@
                   if (this.version !== this.oldVersion) {
                     const ConfigurationMdUrl =
                       `https://raw.githubusercontent.com/rust-lang/rustfmt/${this.version}/Configurations.md`;
-                    const res = await axios.get(ConfigurationMdUrl);
-                    const {
-                      about,
-                      configurationAbout,
-                      configurationDescriptions
-                    } = parseMarkdownAst(res.data);
-                    this.aboutHtml = marked.parser(about);
-                    this.configurationAboutHtml = marked.parser(configurationAbout);
-                    this.configurationDescriptions = configurationDescriptions;
-                    this.oldVersion = this.version;
+                    try {
+                      const res = await axios.get(ConfigurationMdUrl);
+                      const {
+                        about,
+                        configurationAbout,
+                        configurationDescriptions
+                      } = parseMarkdownAst(res.data);
+                      this.aboutHtml = marked.parser(about);
+                      this.configurationAboutHtml = marked.parser(configurationAbout);
+                      this.configurationDescriptions = configurationDescriptions;
+                      this.oldVersion = this.version;
+                    } catch(error) {
+                        this.aboutHtml = "<p>Failed to get configuration options for this version, please select the version from the dropdown above.</p>";
+                    }
                   }
 
                   const ast = this.configurationDescriptions
