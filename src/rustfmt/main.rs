@@ -92,6 +92,9 @@ struct Opt {
     /// Print verbose output.
     #[structopt(short, long)]
     verbose: bool,
+    /// Continue with reformatting even if there are errors.
+    #[structopt(short, long)]
+    force: bool,
 
     // Nightly-only options.
     /// Limit formatting to specified ranges.
@@ -413,6 +416,22 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
         verbosity: Verbosity::Quiet,
     };
     let report = rustfmt_nightly::format(Input::Text(input), &config, setting)?;
+
+    if report.has_errors() {
+        eprintln!(
+            "{}",
+            FormatReportFormatterBuilder::new(&report)
+                .enable_colors(true)
+                .build()
+        );
+
+        if !opt.force
+            && report.has_failing_errors(vec![(FileName::Stdin, &config)].into_iter().collect())
+        {
+            return Ok(1);
+        }
+    }
+
     let has_diff = emit_format_report(report, out, opt.emitter_config(EmitMode::Stdout))?;
     Ok(if opt.check && has_diff { 1 } else { 0 })
 }
@@ -512,13 +531,38 @@ fn format(opt: Opt) -> Result<i32> {
         setting,
     )?;
 
-    if format_report.has_errors() {
+    let print_formatting_errors = || {
         eprintln!(
             "{}",
             FormatReportFormatterBuilder::new(&format_report)
                 .enable_colors(true)
                 .build()
         );
+    };
+
+    match (format_report.has_errors(), opt.force) {
+        (false, _) => {}
+        (true, true) => print_formatting_errors(),
+        (true, false) => {
+            print_formatting_errors();
+            let file_config_map = inputs
+                .iter()
+                .map(|p| {
+                    (
+                        FileName::Real(p.file.to_path_buf()),
+                        if let FileConfig::Local(ref config, _) = p.config {
+                            config
+                        } else {
+                            &default_config
+                        },
+                    )
+                })
+                .collect();
+
+            if format_report.has_failing_errors(file_config_map) {
+                return Ok(1);
+            }
+        }
     }
 
     let has_diff = emit_format_report(
@@ -543,7 +587,16 @@ mod test {
         path: PathBuf,
     }
 
-    fn make_temp_file(file_name: &'static str) -> TempFile {
+    fn assert_temp_file_contents(expected_contents: &[u8], actual_file: TempFile) {
+        assert_eq!(
+            expected_contents,
+            std::fs::read_to_string(&actual_file.path)
+                .expect("couldn't read temp file")
+                .as_bytes(),
+        );
+    }
+
+    fn make_temp_file_with_contents(file_name: &'static str, content: &[u8]) -> TempFile {
         use std::env::var;
         use std::fs::File;
 
@@ -552,9 +605,12 @@ mod test {
         let path = Path::new(&target_dir).join(file_name);
 
         let mut file = File::create(&path).expect("couldn't create temp file");
-        let content = b"fn main() {}\n";
         file.write_all(content).expect("couldn't write temp file");
         TempFile { path }
+    }
+
+    fn make_temp_file(file_name: &'static str) -> TempFile {
+        make_temp_file_with_contents(file_name, b"fn main() {}\n")
     }
 
     impl Drop for TempFile {
@@ -679,5 +735,124 @@ mod test {
             .wait_with_output()
             .expect("Failed to wait on rustfmt child");
         assert!(output.status.success());
+    }
+
+    #[cfg(test)]
+    mod force {
+        use super::*;
+
+        const CONTENTS: &[u8] = br#"
+        #![rustfmt::max_width(120)]
+        fn foo() {
+        println!("bar");
+        }
+        "#;
+
+        const FORMATTED_CONTENTS: &[u8] = br#"
+#![rustfmt::max_width(120)]
+fn foo() {
+    println!("bar");
+}
+"#;
+
+        #[test]
+        fn verify_default() {
+            init_log();
+            let temp_file = make_temp_file_with_contents("temp_invalid_attrs.rs", CONTENTS);
+
+            let child = Command::new(rustfmt())
+                .arg(&temp_file.path)
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("run without --force option failed");
+            let output = child
+                .wait_with_output()
+                .expect("Failed to wait on rustfmt child");
+
+            assert!(!output.status.success());
+            assert_temp_file_contents(CONTENTS, temp_file);
+        }
+
+        #[test]
+        fn verify_enabled() {
+            init_log();
+            let temp_file = make_temp_file_with_contents("temp_invalid_attrs_enabled.rs", CONTENTS);
+
+            let child = Command::new(rustfmt())
+                .arg(&temp_file.path)
+                .arg("--force")
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("run with --force option failed");
+            let output = child
+                .wait_with_output()
+                .expect("Failed to wait on rustfmt child");
+            assert!(output.status.success());
+            assert_temp_file_contents(FORMATTED_CONTENTS, temp_file);
+        }
+
+        #[test]
+        fn verify_default_stdin() {
+            if !rustfmt_nightly::is_nightly_channel!() {
+                return;
+            }
+            init_log();
+
+            let mut child = Command::new(rustfmt())
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("run with check option failed");
+
+            {
+                let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+                stdin
+                    .write_all(CONTENTS)
+                    .expect("Failed to write to rustfmt --check");
+            }
+            let output = child
+                .wait_with_output()
+                .expect("Failed to wait on rustfmt child");
+            assert!(!output.status.success());
+            assert!(output.stdout.is_empty());
+            let exp_err = vec![
+                "\u{1b}[1;38;5;9merror\u{1b}[0m: \u{1b}[1minvalid attribute",
+                "\u{1b}[0m\n \u{1b}[1;38;5;12m-->\u{1b}[0m stdin:2\n",
+                "\u{1b}[1;38;5;12m  |\u{1b}[0m\n",
+                "\u{1b}[1;38;5;12m2 |\u{1b}[0m         #![rustfmt::max_width(120)]\n",
+                "\u{1b}[1;38;5;12m  |\u{1b}[0m\n\n",
+                "\u{1b}[1;38;5;11mwarning\u{1b}[0m: \u{1b}[1mrustfmt has failed to format. ",
+                "See previous 1 errors.",
+                "\u{1b}[0m\n\n",
+            ]
+            .join("");
+            assert_eq!(String::from_utf8(output.stderr).unwrap(), exp_err);
+        }
+
+        #[test]
+        fn verify_enabled_stdin() {
+            init_log();
+
+            let mut child = Command::new(rustfmt())
+                .arg("--force")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("run with check option failed");
+
+            {
+                let stdin = child.stdin.as_mut().expect("Failed to open stdin");
+                stdin
+                    .write_all(CONTENTS)
+                    .expect("Failed to write to rustfmt --check");
+            }
+            let output = child
+                .wait_with_output()
+                .expect("Failed to wait on rustfmt child");
+            assert!(output.status.success());
+            assert_eq!(&output.stdout, &FORMATTED_CONTENTS);
+        }
     }
 }

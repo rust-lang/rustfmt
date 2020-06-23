@@ -1,9 +1,10 @@
 use std::cell::{Ref, RefCell};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::formatting::FormattedSnippet;
 use crate::result::{ErrorKind, FormatError};
+use crate::Config;
 use crate::FileName;
 use crate::NewlineStyle;
 
@@ -77,6 +78,17 @@ impl FormatResult {
 
     pub(crate) fn formatted_snippet(&self) -> &FormattedSnippet {
         &self.formatted_snippet
+    }
+
+    pub(crate) fn has_error_kind(&self, kind: ErrorKind) -> bool {
+        self.all_errors().any(|e| e.kind() == kind)
+    }
+
+    pub(crate) fn has_any_matching_errors<F>(&self, error_matcher: F) -> bool
+    where
+        F: FnMut(&FormatError) -> bool,
+    {
+        self.all_errors().any(error_matcher)
     }
 }
 
@@ -154,6 +166,69 @@ impl FormatReport {
             .insert(format_error);
     }
 
+    fn has_any_matching_format_result<F>(&self, format_result_matcher: F) -> bool
+    where
+        F: FnMut((&FileName, &FormatResult)) -> bool,
+    {
+        RefCell::borrow(&self.format_result)
+            .iter()
+            .any(format_result_matcher)
+    }
+
+    fn has_error_kind(&self, kind: ErrorKind) -> bool {
+        self.has_any_matching_format_result(|(_, format_result)| format_result.has_error_kind(kind))
+    }
+
+    pub fn has_deprecated_attribute_errors(&self) -> bool {
+        self.has_error_kind(ErrorKind::DeprecatedAttr)
+    }
+
+    pub fn has_invalid_rustfmt_attribute_errors(&self) -> bool {
+        self.has_error_kind(ErrorKind::BadAttr)
+    }
+
+    pub fn has_attribute_errors(&self) -> bool {
+        self.has_any_matching_format_result(|(_, format_result)| {
+            format_result.has_any_matching_errors(|e| match e.kind() {
+                ErrorKind::BadAttr | ErrorKind::DeprecatedAttr => true,
+                _ => false,
+            })
+        })
+    }
+
+    pub fn has_failing_errors(&self, file_config_map: HashMap<FileName, &Config>) -> bool {
+        self.has_any_matching_format_result(|(file_name, format_result)| {
+            format_result.has_any_matching_errors(|e| match e.kind() {
+                ErrorKind::BadAttr | ErrorKind::DeprecatedAttr => true,
+                ErrorKind::LicenseCheck => {
+                    if let Some(config) = file_config_map.get(file_name) {
+                        if config.was_set().license_template_path() {
+                            return true;
+                        }
+                    }
+                    false
+                }
+                ErrorKind::LineOverflow(..) => {
+                    if let Some(config) = file_config_map.get(file_name) {
+                        if config.error_on_line_overflow() {
+                            return true;
+                        }
+                    }
+                    false
+                }
+                ErrorKind::TrailingWhitespace => {
+                    if let Some(config) = file_config_map.get(file_name) {
+                        if config.error_on_unformatted() {
+                            return true;
+                        }
+                    }
+                    false
+                }
+                _ => false,
+            })
+        })
+    }
+
     pub fn has_errors(&self) -> bool {
         RefCell::borrow(&self.format_result)
             .iter()
@@ -182,5 +257,167 @@ impl NonFormattedRange {
 
     pub(crate) fn contains(&self, line: usize) -> bool {
         self.lo <= line && line <= self.hi
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[cfg(test)]
+    mod has_failing_errors {
+        use super::*;
+        use std::path::PathBuf;
+
+        #[test]
+        fn false_with_only_macro() {
+            let file_name = FileName::Real(PathBuf::from("foo/bar.rs"));
+            let report = FormatReport::new();
+            report.add_format_error(
+                file_name.clone(),
+                FormatError::new(ErrorKind::MacroFormatError, 2, String::new()),
+            );
+            assert!(
+                !report.has_failing_errors(
+                    vec![(file_name, &Config::default())].into_iter().collect()
+                )
+            );
+        }
+
+        #[test]
+        fn true_with_bad_attr() {
+            let file_name = FileName::Real(PathBuf::from("bar/baz.rs"));
+            let report = FormatReport::new();
+            report.add_format_error(
+                file_name.clone(),
+                FormatError::new(ErrorKind::BadAttr, 2, String::new()),
+            );
+            assert!(
+                report.has_failing_errors(
+                    vec![(file_name, &Config::default())].into_iter().collect()
+                )
+            );
+        }
+
+        #[test]
+        fn true_with_deprecated_attr() {
+            let file_name = FileName::Real(PathBuf::from("baz/qux.rs"));
+            let report = FormatReport::new();
+            report.add_format_error(
+                file_name.clone(),
+                FormatError::new(ErrorKind::DeprecatedAttr, 2, String::new()),
+            );
+            assert!(
+                report.has_failing_errors(
+                    vec![(file_name, &Config::default())].into_iter().collect()
+                )
+            );
+        }
+
+        #[test]
+        fn false_with_license_check_and_config_disabled() {
+            let file_name = FileName::Real(PathBuf::from("foo.rs"));
+            let bar_file_name = FileName::Real(PathBuf::from("bar.rs"));
+            let mut license_config = Config::default();
+            license_config
+                .set()
+                .license_template_path(String::from("template.txt"));
+            let report = FormatReport::new();
+            report.add_format_error(
+                bar_file_name.clone(),
+                FormatError::new(ErrorKind::LicenseCheck, 2, String::new()),
+            );
+            assert!(
+                !report.has_failing_errors(
+                    vec![
+                        (file_name, &license_config),
+                        (bar_file_name, &Config::default()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                )
+            );
+        }
+
+        #[test]
+        fn true_with_license_check_and_config_enabled() {
+            let file_name = FileName::Real(PathBuf::from("foo.rs"));
+            let report = FormatReport::new();
+            let mut config = Config::default();
+            config
+                .set()
+                .license_template_path(String::from("license.txt"));
+            report.add_license_failure(file_name.clone());
+            assert!(report.has_failing_errors(vec![(file_name, &config)].into_iter().collect()));
+        }
+
+        #[test]
+        fn false_with_line_overflow_and_config_disabled() {
+            let file_name = FileName::Real(PathBuf::from("short_enough.rs"));
+            let overflow_file_name = FileName::Real(PathBuf::from("too_long.rs"));
+            let mut overflow_config = Config::default();
+            overflow_config.set().error_on_line_overflow(true);
+            let report = FormatReport::new();
+            report.add_license_failure(file_name.clone());
+            assert!(
+                !report.has_failing_errors(
+                    vec![
+                        (file_name, &overflow_config),
+                        (overflow_file_name, &Config::default()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                )
+            );
+        }
+
+        #[test]
+        fn true_with_line_overflow_and_config_enabled() {
+            let file_name = FileName::Real(PathBuf::from("overflowed.rs"));
+            let report = FormatReport::new();
+            let mut config = Config::default();
+            config.set().error_on_line_overflow(true);
+            report.add_format_error(
+                file_name.clone(),
+                FormatError::new(ErrorKind::LineOverflow(100, 103), 2, String::new()),
+            );
+            assert!(report.has_failing_errors(vec![(file_name, &config)].into_iter().collect()));
+        }
+
+        #[test]
+        fn false_with_trailing_whitespace_and_config_disabled() {
+            let file_name = FileName::Real(PathBuf::from("trimmed.rs"));
+            let trailing_file_name = FileName::Real(PathBuf::from("trailing_whitespace.rs"));
+            let mut trailing_config = Config::default();
+            trailing_config.set().error_on_unformatted(true);
+            let report = FormatReport::new();
+            report.add_format_error(
+                trailing_file_name.clone(),
+                FormatError::new(ErrorKind::TrailingWhitespace, 3, String::new()),
+            );
+            assert!(
+                !report.has_failing_errors(
+                    vec![
+                        (file_name, &trailing_config),
+                        (trailing_file_name, &Config::default()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                )
+            );
+        }
+
+        #[test]
+        fn true_with_trailing_whitespace_and_config_enabled() {
+            let file_name = FileName::Real(PathBuf::from("trailing_whitespace.rs"));
+            let report = FormatReport::new();
+            let mut config = Config::default();
+            config.set().error_on_unformatted(true);
+            report.add_format_error(
+                file_name.clone(),
+                FormatError::new(ErrorKind::TrailingWhitespace, 42, String::new()),
+            );
+            assert!(report.has_failing_errors(vec![(file_name, &config)].into_iter().collect()));
+        }
     }
 }
