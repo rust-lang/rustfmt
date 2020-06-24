@@ -657,17 +657,16 @@ impl<'a> FmtVisitor<'a> {
             }
 
             fn is_type(ty: &Option<rustc_ast::ptr::P<ast::Ty>>) -> bool {
-                match ty {
-                    None => true,
-                    Some(lty) => lty.kind.opaque_top_hack().is_none(),
+                if let Some(lty) = ty {
+                    if let ast::TyKind::ImplTrait(..) = lty.kind {
+                        return false;
+                    }
                 }
+                true
             }
 
             fn is_opaque(ty: &Option<rustc_ast::ptr::P<ast::Ty>>) -> bool {
-                match ty {
-                    None => false,
-                    Some(lty) => lty.kind.opaque_top_hack().is_some(),
-                }
+                !is_type(ty)
             }
 
             fn both_type(
