@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a bug report for rustfmt
+about: Report rustfmt errors, failing to format inputs, etc.
 title: ''
 labels: ''
 assignees: ''
