@@ -2,7 +2,7 @@
 name: Bug report
 about: Report rustfmt errors, failing to format inputs, etc.
 title: ''
-labels: ''
+labels: bug
 assignees: ''
 
 ---
@@ -17,7 +17,7 @@ Steps to reproduce the behavior. If possible, please add a link to your project 
 A clear and concise description of what you expected to happen.
 
 **Meta**
-<!-- `rustfmt --version` -->
 
-- rustfmt version: 
-- From where did you install rustfmt?:
+- rustfmt version: <!-- `rustfmt -V` -->
+- From where did you install rustfmt?: <!-- rustup, crates.io, package managers, etc. -->
+- How do you run rustfmt: <!-- `rustfmt`, `cargo-fmt`, via editors, etc. -->

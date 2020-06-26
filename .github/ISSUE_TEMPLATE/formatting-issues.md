@@ -24,5 +24,5 @@ assignees: topecongiro
 
 **Meta**
 
-- rustfmt version: `rustfmt --version`
-- From where did you install rustfmt?: rustup/crates.io/package manager
+- rustfmt version: <!-- `rustfmt -V` -->
+- From where did you install rustfmt?: <!-- rustup, crates.io, package managers, etc. -->
