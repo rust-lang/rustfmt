@@ -32,6 +32,14 @@ args = [
   "--features=rustfmt,cargo-fmt" # Install only rustfmt and cargo-fmt
 ]
 
+[tasks.release]
+command = "cargo"
+args = [
+  "build",
+	"--all-features",
+	"--release",
+]
+
 [tasks.test-all]
 dependencies = ["build-bin"]
 run_task = { name = ["test", "test-ignored"] }
