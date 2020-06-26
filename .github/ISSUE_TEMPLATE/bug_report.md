@@ -17,6 +17,7 @@ Steps to reproduce the behavior. If possible, please add a link to your project 
 A clear and concise description of what you expected to happen.
 
 **Meta**
+<!-- `rustfmt --version` -->
 
 - rustfmt version: 
 - From where did you install rustfmt?:
