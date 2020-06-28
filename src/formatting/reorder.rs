@@ -12,6 +12,7 @@ use rustc_ast::{ast, attr};
 use rustc_span::{symbol::sym, Span};
 
 use crate::config::Config;
+use crate::formatting::modules::{get_mod_inner_attrs, FileModMap};
 use crate::formatting::{
     imports::{merge_use_trees, UseTree},
     items::{is_mod_decl, rewrite_extern_crate, rewrite_mod},
@@ -263,8 +264,8 @@ fn rewrite_reorderable_items(
     }
 }
 
-fn contains_macro_use_attr(item: &ast::Item) -> bool {
-    attr::contains_name(&item.attrs, sym::macro_use)
+fn contains_macro_use_attr(attrs: &[ast::Attribute]) -> bool {
+    attr::contains_name(attrs, sym::macro_use)
 }
 
 /// A simplified version of `ast::ItemKind`.
@@ -279,20 +280,26 @@ enum ReorderableItemKind {
 }
 
 impl ReorderableItemKind {
-    fn from(item: &ast::Item) -> Self {
+    fn from(item: &ast::Item, file_mod_map: &FileModMap<'_>) -> Self {
         match item.kind {
-            _ if contains_macro_use_attr(item) | contains_skip(&item.attrs) => {
+            _ if contains_macro_use_attr(&item.attrs) | contains_skip(&item.attrs) => {
                 ReorderableItemKind::Other
             }
             ast::ItemKind::ExternCrate(..) => ReorderableItemKind::ExternCrate,
-            ast::ItemKind::Mod(..) if is_mod_decl(item) => ReorderableItemKind::Mod,
+            ast::ItemKind::Mod(..)
+                if is_mod_decl(item)
+                    && !get_mod_inner_attrs(item, file_mod_map)
+                        .map_or(false, contains_macro_use_attr) =>
+            {
+                ReorderableItemKind::Mod
+            }
             ast::ItemKind::Use(..) => ReorderableItemKind::Use,
             _ => ReorderableItemKind::Other,
         }
     }
 
-    fn is_same_item_kind(self, item: &ast::Item) -> bool {
-        ReorderableItemKind::from(item) == self
+    fn is_same_item_kind(self, item: &ast::Item, file_mod_map: &FileModMap<'_>) -> bool {
+        ReorderableItemKind::from(item, file_mod_map) == self
     }
 
     fn is_reorderable(self, config: &Config) -> bool {
@@ -328,7 +335,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let item_length = items
             .iter()
             .take_while(|ppi| {
-                item_kind.is_same_item_kind(&***ppi)
+                item_kind.is_same_item_kind(&***ppi, self.file_mod_map)
                     && (!in_group || {
                         let current = self.parse_sess.lookup_line_range(ppi.span());
                         let in_same_group = current.lo < last.hi + 2;
@@ -365,7 +372,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             // If the next item is a `use`, `extern crate` or `mod`, then extract it and any
             // subsequent items that have the same item kind to be reordered within
             // `walk_reorderable_items`. Otherwise, just format the next item for output.
-            let item_kind = ReorderableItemKind::from(items[0]);
+            let item_kind = ReorderableItemKind::from(items[0], self.file_mod_map);
             if item_kind.is_reorderable(self.config) {
                 let visited_items_num =
                     self.walk_reorderable_items(items, item_kind, item_kind.in_group());

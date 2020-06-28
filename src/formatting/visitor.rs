@@ -5,7 +5,6 @@ use rustc_ast::{ast, attr::HasAttrs, token::DelimToken, visit};
 use rustc_span::{symbol, BytePos, Pos, Span};
 
 use crate::config::{BraceStyle, Config};
-use crate::formatting::modules::Module;
 use crate::formatting::{
     attr::*,
     comment::{rewrite_comment, CodeCharKind, CommentCodeSlices},
@@ -15,6 +14,7 @@ use crate::formatting::{
         rewrite_opaque_type, rewrite_type_alias, FnBraceStyle, FnSig, StaticParts, StructParts,
     },
     macros::{macro_style, rewrite_macro, rewrite_macro_def, MacroPosition},
+    modules::{FileModMap, Module},
     report::{FormatReport, NonFormattedRange},
     rewrite::{Rewrite, RewriteContext},
     shape::{Indent, Shape},
@@ -73,6 +73,7 @@ impl SnippetProvider {
 pub(crate) struct FmtVisitor<'a> {
     parent_context: Option<&'a RewriteContext<'a>>,
     pub(crate) parse_sess: &'a ParseSess,
+    pub(crate) file_mod_map: &'a FileModMap<'a>,
     pub(crate) buffer: String,
     pub(crate) last_pos: BytePos,
     // FIXME: use an RAII util or closure for indenting
@@ -788,6 +789,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ctx.parse_sess,
             ctx.config,
             ctx.snippet_provider,
+            ctx.file_mod_map,
             ctx.report.clone(),
         );
         visitor.skip_context.update(ctx.skip_context.clone());
@@ -799,10 +801,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         parse_session: &'a ParseSess,
         config: &'a Config,
         snippet_provider: &'a SnippetProvider,
+        file_mod_map: &'a FileModMap<'_>,
         report: FormatReport,
     ) -> FmtVisitor<'a> {
         FmtVisitor {
             parent_context: None,
+            file_mod_map,
             parse_sess: parse_session,
             buffer: String::with_capacity(snippet_provider.big_snippet.len() * 2),
             last_pos: BytePos(0),
@@ -992,6 +996,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     pub(crate) fn get_context(&self) -> RewriteContext<'_> {
         RewriteContext {
             parse_sess: self.parse_sess,
+            file_mod_map: self.file_mod_map,
             config: self.config,
             inside_macro: Rc::new(Cell::new(false)),
             use_block: Cell::new(false),
