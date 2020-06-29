@@ -10,7 +10,7 @@ pub(crate) use syntux::session::ParseSess;
 use crate::config::{Config, FileName};
 use crate::formatting::{
     comment::{CharClasses, FullCodeCharKind},
-    modules::Module,
+    modules::{FileModMap, Module},
     newline_style::apply_newline_style,
     report::NonFormattedRange,
     syntux::parser::{DirectoryOwnership, Parser, ParserError},
@@ -107,6 +107,11 @@ fn format_project(
         }
     };
 
+    if !operation_setting.recursive {
+        // Suppress error output for sub-modules if we are not in recurisve mode.
+        parse_session.set_silent_emitter();
+    }
+
     let files = modules::ModResolver::new(
         &parse_session,
         directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod),
@@ -119,9 +124,9 @@ fn format_project(
     // Suppress error output if we have to do any further parsing.
     parse_session.set_silent_emitter();
 
-    for (path, module) in files {
+    for (path, module) in &files {
         let should_ignore = !input_is_stdin && parse_session.ignore_file(&path);
-        if (!operation_setting.recursive && path != main_file) || should_ignore {
+        if (!operation_setting.recursive && path != &main_file) || should_ignore {
             continue;
         }
         should_emit_verbose(input_is_stdin, operation_setting.verbosity, || {
@@ -134,6 +139,7 @@ fn format_project(
             path,
             &module,
             &format_report,
+            &files,
             original_snippet.clone(),
         )?;
     }
@@ -154,14 +160,20 @@ fn format_file(
     parse_session: &ParseSess,
     config: &Config,
     krate: &ast::Crate,
-    path: FileName,
+    path: &FileName,
     module: &Module<'_>,
     report: &FormatReport,
+    file_mod_map: &FileModMap<'_>,
     original_snippet: Option<String>,
 ) -> Result<(), OperationError> {
     let snippet_provider = parse_session.snippet_provider(module.as_ref().inner);
-    let mut visitor =
-        FmtVisitor::from_parse_sess(&parse_session, config, &snippet_provider, report.clone());
+    let mut visitor = FmtVisitor::from_parse_sess(
+        &parse_session,
+        config,
+        &snippet_provider,
+        file_mod_map,
+        report.clone(),
+    );
     visitor.skip_context.update_with_attrs(&krate.attrs);
     visitor.last_pos = snippet_provider.start_pos();
     visitor.skip_empty_lines(snippet_provider.end_pos());
@@ -210,7 +222,7 @@ fn format_file(
         original_text,
         config.newline_style(),
     );
-    report.add_format_result(path, format_result);
+    report.add_format_result(path.clone(), format_result);
 
     Ok(())
 }
