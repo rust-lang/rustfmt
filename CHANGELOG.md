@@ -1,6 +1,112 @@
 # Changelog
 
-## [Unreleased]
+## [2.0.0] UNRELEASED
+
+### Added
+
+- Add `-r,--recursive` command line flag to `rustfmt`.
+- Add `-f,--force` command line flag to `rustfmt`.
+- Add `-l,--files-with-diff` command line flag to `rustfmt`.
+- Add `--check` command line flag to `cargo-fmt`.
+- Add `array_width` configuration option.
+- Add `attr_fn_like_width` configuration option.
+- Add `chain_width` configuration option.
+- Add `fn_call_width` configuration option.
+- Add `match_arm_leading_pipes` configuration option.
+- Add `single_line_if_else_max_width` configuration option.
+- Add `space_around_attr_eq` to configuration option.
+- Add `struct_lit_width` configuration option.
+- Add `struct_variant_width` configuration option.
+
+### Changed
+
+- Change the default edition to 2018.
+- Do not format sub-modules by default.
+- Do not overwrite files on critial errors by default.
+- Normalize an empty match arm to `{}`.
+- Rename `use_small_heuristics` to `width_heuristics`
+- Rename `fn_args_layout` to `fn_params_layout`.
+- Rename the default value of `width_heuristics` to `Scaled` from `Default`.
+- Update `rustc-ap-*` crates to 666.0.0.
+
+### Fixed
+
+- Fix `[rustfmt::skip::macros]` not working in certain places.
+- Fix to support new syntax.
+- Fix producing invalid code against certain inputs.
+- Fix changing the semantic of the code against certain inputs.
+- Fix removing comment in various places.
+- Fix various poor formattings.
+
+### Removed
+
+- Remove `--backup` command line flag from `rustfmt`.
+- Remove `disable_all_formatting` configuration option.
+- Remove `skip_children` configuration option.
+- Remove `report_fixme` configuration option.
+- Remove `report_todo` configuration option.
+- Remove `version` configuration option.
+- Remove `coverage` emit mode.
+
+### Stabilized
+
+- Stabilize `bin_op_separator` configuration option.
+- Stabilize `match_block_trailing_comma` configuration option.
+- Stabilize `ignore` configuration option.
+
+## [1.4.17] 2020-06-08
+
+### Fixed
+
+- Fix `#![rustfmt::skip]` and its variants getting ignored.
+
+## [1.4.16] 2020-06-08 [YANKED]
+
+## [1.4.15] 2020-05-19
+
+### Changed
+
+- Update `rustc-ap-*` crates to 659.0.0.
+
+## [1.4.14] 2020-04-14
+
+### Changed
+
+- Update `rustc-ap-*` crates to 654.0.0.
+
+## [1.4.13] 2020-03-31
+
+### Changed
+
+- Update `rustc-ap-*` crates to 650.0.0.
+
+## [1.4.12] 2020-02-10
+
+### Changed
+
+- Update `rustc-ap-*` crates to 642.0.0.
+
+## [1.4.11] 2019-12-03
+
+### Fixed
+
+- Fix adding an extra block to async closure.
+
+## [1.4.10] 2019-10-25
+
+### Changed
+
+- Use the `--offline` mode if possible when invoking cargo metadata.
+- Update `rustc-ap-*` crates to 610.0.0.
+
+### Fixed
+
+- Fix ignoring newline settings when running in the `--check` mode.
+- Fix removing attributes on block.
+- Fix removing comments in various places.
+- Fix generating unparsable code when comments is at the end of function parameters.
+- Fix panicking against a closure with an empty block.
+- Fix various poor formattings.
 
 ## [1.4.9] 2019-10-07
 
