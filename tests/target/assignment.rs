@@ -16,6 +16,7 @@ fn main() {
     single_line_fit = 5;
     single_lit_fit >>= 10;
 
+
     // #2791
     let x = 2;
 }

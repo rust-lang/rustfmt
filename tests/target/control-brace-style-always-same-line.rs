@@ -4,21 +4,25 @@ fn main() {
         let bar = ();
     }
 
+
     'label: loop
     // loop comment
     {
         let foo = ();
     }
 
+
     cond = true;
     while cond {
         let foo = ();
     }
 
+
     'while_label: while cond {
         // while comment
         let foo = ();
     }
+
 
     for obj in iter {
         for sub_obj in obj {
