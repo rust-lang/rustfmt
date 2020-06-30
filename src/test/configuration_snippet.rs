@@ -190,9 +190,19 @@ impl ConfigCodeBlock {
         }
 
         let report = report.unwrap();
-        let result = report.format_result().next().unwrap();
-        let text = result.1.formatted_text();
-        !self.formatted_has_diff(text)
+        let result = report.format_result().next();
+
+        match result {
+            Some(result) => {
+                let text = result.1.formatted_text();
+                !self.formatted_has_diff(text)
+            }
+            None => {
+                // The format report may be empty if the code block contains `#![rustfmt::skip]`.
+                // In that case, we just return true.
+                true
+            }
+        }
     }
 
     // Extract a code block from the iterator. Behavior:
