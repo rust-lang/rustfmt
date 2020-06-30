@@ -513,7 +513,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 }
                 ast::ItemKind::ForeignMod(ref foreign_mod) => {
                     self.format_missing_with_indent(source!(self, item.span).lo());
-                    self.format_foreign_mod(foreign_mod, item.span);
+                    self.format_foreign_mod(foreign_mod, item.span, item.attrs());
                 }
                 ast::ItemKind::Static(..) | ast::ItemKind::Const(..) => {
                     self.visit_static(&StaticParts::from_item(item));

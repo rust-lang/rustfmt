@@ -147,19 +147,28 @@ pub(crate) fn format_extern(
     ext: ast::Extern,
     explicit_abi: bool,
     is_mod: bool,
+    attrs: Option<&[ast::Attribute]>,
 ) -> Cow<'static, str> {
-    let abi = match ext {
-        ast::Extern::None => "Rust".to_owned(),
-        ast::Extern::Implicit => "C".to_owned(),
-        ast::Extern::Explicit(abi) => abi.symbol_unescaped.to_string(),
-    };
+    let format_explicit_abi = |abi: &str| Cow::from(format!(r#"extern "{}" "#, abi));
+    let explicit_conversion_preserves_semantics =
+        || !is_mod || (is_mod && attrs.map_or(true, |a| a.is_empty()));
 
-    if abi == "Rust" && !is_mod {
-        Cow::from("")
-    } else if abi == "C" && !explicit_abi {
-        Cow::from("extern ")
-    } else {
-        Cow::from(format!(r#"extern "{}" "#, abi))
+    match ext {
+        ast::Extern::None if !is_mod => Cow::from(""),
+        ast::Extern::Explicit(ast::StrLit {
+            symbol_unescaped, ..
+        }) if !is_mod && symbol_unescaped == rustc_span::sym::rust => Cow::from(""),
+        ast::Extern::Implicit if !explicit_abi || !explicit_conversion_preserves_semantics() => {
+            Cow::from("extern ")
+        }
+        ast::Extern::Explicit(ast::StrLit {
+            symbol_unescaped, ..
+        }) if !explicit_abi && symbol_unescaped == rustc_span::sym::C => Cow::from("extern "),
+        ast::Extern::None => format_explicit_abi("Rust"),
+        ast::Extern::Implicit => format_explicit_abi("C"),
+        ast::Extern::Explicit(ast::StrLit {
+            symbol_unescaped, ..
+        }) => format_explicit_abi(&symbol_unescaped.to_string()),
     }
 }
 
