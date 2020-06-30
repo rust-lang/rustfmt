@@ -785,6 +785,7 @@ fn rewrite_bare_fn(
         bare_fn.ext,
         context.config.force_explicit_abi(),
         false,
+        None,
     ));
 
     result.push_str("fn");

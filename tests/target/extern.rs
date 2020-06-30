@@ -84,3 +84,20 @@ extern "C" {
 }
 
 extern "C" {}
+
+// #2908 - https://github.com/rust-lang/rustfmt/issues/2908
+#[wasm_bindgen(module = "child_process", version = "*")]
+extern {
+    #[wasm_bindgen(js_name = execSync)]
+    fn exec_sync(cmd: &str) -> Buffer;
+
+    fn foo() -> Bar;
+}
+
+// Users that have an existing explicit ABI would need to convert to implicit
+// manually, as rustfmt will be conservative and not attempt to convert explicit
+// to implicit in the wasm case.
+#[wasm_bindgen]
+extern "C" {
+    fn foo() -> Bar;
+}

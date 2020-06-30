@@ -195,13 +195,19 @@ struct Item<'a> {
 }
 
 impl<'a> Item<'a> {
-    fn from_foreign_mod(fm: &'a ast::ForeignMod, span: Span, config: &Config) -> Item<'a> {
+    fn from_foreign_mod(
+        fm: &'a ast::ForeignMod,
+        span: Span,
+        config: &Config,
+        attrs: &[ast::Attribute],
+    ) -> Item<'a> {
         Item {
             keyword: "",
             abi: format_extern(
                 ast::Extern::from_abi(fm.abi),
                 config.force_explicit_abi(),
                 true,
+                Some(attrs),
             ),
             vis: None,
             body: fm
@@ -293,6 +299,7 @@ impl<'a> FnSig<'a> {
             self.ext,
             context.config.force_explicit_abi(),
             false,
+            None,
         ));
         result
     }
@@ -337,8 +344,13 @@ impl<'a> FmtVisitor<'a> {
         }
     }
 
-    pub(crate) fn format_foreign_mod(&mut self, fm: &ast::ForeignMod, span: Span) {
-        let item = Item::from_foreign_mod(fm, span, self.config);
+    pub(crate) fn format_foreign_mod(
+        &mut self,
+        fm: &ast::ForeignMod,
+        span: Span,
+        attrs: &[ast::Attribute],
+    ) {
+        let item = Item::from_foreign_mod(fm, span, self.config, attrs);
         self.format_item(&item);
     }
 
