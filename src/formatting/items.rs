@@ -1140,24 +1140,28 @@ pub(crate) fn format_trait(
                 result.push_str(&where_indent.to_string_with_newline(context.config));
             }
             result.push_str(&where_clause_str);
+        }
+        let pre_block_span = if !generics.where_clause.predicates.is_empty() {
+            mk_sp(generics.where_clause.span.hi(), item.span.hi())
         } else {
-            let item_snippet = context.snippet(item.span);
-            if let Some(lo) = item_snippet.find('/') {
-                // 1 = `{`
-                let comment_hi = body_lo - BytePos(1);
-                let comment_lo = item.span.lo() + BytePos(lo as u32);
-                if comment_lo < comment_hi {
-                    match recover_missing_comment_in_span(
-                        mk_sp(comment_lo, comment_hi),
-                        Shape::indented(offset, context.config),
-                        context,
-                        last_line_width(&result),
-                    ) {
-                        Some(ref missing_comment) if !missing_comment.is_empty() => {
-                            result.push_str(missing_comment);
-                        }
-                        _ => {}
+            item.span
+        };
+        let pre_block_snippet = context.snippet(pre_block_span);
+        if let Some(lo) = pre_block_snippet.find('/') {
+            // 1 = `{`
+            let comment_hi = body_lo - BytePos(1);
+            let comment_lo = pre_block_span.lo() + BytePos(lo as u32);
+            if comment_lo < comment_hi {
+                match recover_missing_comment_in_span(
+                    mk_sp(comment_lo, comment_hi),
+                    Shape::indented(offset, context.config),
+                    context,
+                    last_line_width(&result),
+                ) {
+                    Some(ref missing_comment) if !missing_comment.is_empty() => {
+                        result.push_str(missing_comment);
                     }
+                    _ => {}
                 }
             }
         }
