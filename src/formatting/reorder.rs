@@ -351,6 +351,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             .any(|item| !out_of_file_lines_range!(self, item.span));
 
         if at_least_one_in_file_lines && !items.is_empty() {
+            self.normalize_vertical_spaces = true;
             let lo = items.first().unwrap().span().lo();
             let hi = items.last().unwrap().span().hi();
             let span = mk_sp(lo, hi);
@@ -382,7 +383,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 // Reaching here means items were not reordered. There must be at least
                 // one item left in `items`, so calling `unwrap()` here is safe.
                 let (item, rest) = items.split_first().unwrap();
-                self.visit_item(item);
+                self.visit_item(item, true);
                 items = rest;
             }
         }
