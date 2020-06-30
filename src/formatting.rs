@@ -10,6 +10,7 @@ pub(crate) use syntux::session::ParseSess;
 use crate::config::{Config, FileName};
 use crate::formatting::{
     comment::{CharClasses, FullCodeCharKind},
+    generated::is_generated_file,
     modules::{FileModMap, Module},
     newline_style::apply_newline_style,
     report::NonFormattedRange,
@@ -30,6 +31,7 @@ mod chains;
 mod closures;
 mod comment;
 mod expr;
+mod generated;
 mod imports;
 mod items;
 mod lists;
@@ -125,7 +127,10 @@ fn format_project(
     parse_session.set_silent_emitter();
 
     for (path, module) in &files {
-        let should_ignore = !input_is_stdin && parse_session.ignore_file(&path);
+        let should_ignore = (!input_is_stdin && parse_session.ignore_file(&path))
+            || (!config.format_generated_files()
+                && is_generated_file(&path, original_snippet.as_ref()));
+
         if (!operation_setting.recursive && path != &main_file) || should_ignore {
             continue;
         }
