@@ -2063,6 +2063,52 @@ fn lorem<T:Eq>(t:T) {
 
 See also: [`space_before_colon`](#space_before_colon).
 
+## `space_after_function_name`
+
+Leave a space after the function name.
+
+- **Default value**: `"Never"`
+- **Possible values**: `"AfterGenerics"`, `"Never"`
+- **Stable**: No (tracking issue: [#3564](https://github.com/rust-lang/rustfmt/issues/3564))
+
+#### `"Never"` (default):
+
+```rust
+fn lorem() {
+    // body
+}
+
+fn lorem(ipsum: usize) {
+    // body
+}
+
+fn lorem<T>(ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+#### `"AfterGenerics"`:
+
+```rust
+fn lorem () {
+    // body
+}
+
+fn lorem (ipsum: usize) {
+    // body
+}
+
+fn lorem<T> (ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
 ## `space_before_colon`
 
 Leave a space before the colon.
