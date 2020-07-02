@@ -244,8 +244,8 @@ fn rewrite_match_arm(
     // 2 = `| `
     let (pipe_offset, pipe_str) = match context.config.match_arm_leading_pipes() {
         MatchArmLeadingPipe::Never => (0, ""),
-        MatchArmLeadingPipe::KeepExisting if !has_leading_pipe => (0, ""),
-        MatchArmLeadingPipe::KeepExisting | MatchArmLeadingPipe::Always => (2, "| "),
+        MatchArmLeadingPipe::Preserve if !has_leading_pipe => (0, ""),
+        MatchArmLeadingPipe::Preserve | MatchArmLeadingPipe::Always => (2, "| "),
     };
 
     // Patterns
