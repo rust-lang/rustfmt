@@ -267,6 +267,7 @@ fn rewrite_segment(
                     param_list.iter(),
                     shape,
                     mk_sp(*span_lo, span_hi),
+                    false,
                 )?;
 
                 // Update position of last bracket.

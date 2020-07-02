@@ -1,4 +1,4 @@
-// rustfmt-space_after_function_name: AfterGenerics
+// rustfmt-fn_generics_space: OnlyAfter
 // Trait space after function name
 
 trait Story {

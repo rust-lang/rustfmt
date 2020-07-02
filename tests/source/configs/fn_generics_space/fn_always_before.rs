@@ -1,5 +1,6 @@
-// rustfmt-space_after_function_name: AfterGenerics
-// Function space after function name
+// rustfmt-fn_generics_space: OnlyBefore
+// rustfmt-fn_no_generics_space: true
+// Spacing around function generics
 
 fn lorem() {
     // body

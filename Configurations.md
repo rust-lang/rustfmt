@@ -803,6 +803,140 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
+## `fn_generics_space`
+
+Leave spaces around function generics.
+
+- **Default value**: `"Never"`
+- **Possible values**: `"OnlyBefore"`, `"OnlyAfter"`, `"BeforeAndAfter"`, `"Never"`
+- **Stable**: No (tracking issue: [#3564](https://github.com/rust-lang/rustfmt/issues/3564))
+
+#### `"Never"` (default):
+
+```rust
+fn lorem() {
+    // body
+}
+
+fn lorem(ipsum: usize) {
+    // body
+}
+
+fn lorem<T>(ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+#### `"OnlyBefore"`:
+
+```rust
+fn lorem() {
+    // body
+}
+
+fn lorem(ipsum: usize) {
+    // body
+}
+
+fn lorem <T>(ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+#### `"OnlyAfter"`:
+
+```rust
+fn lorem() {
+    // body
+}
+
+fn lorem(ipsum: usize) {
+    // body
+}
+
+fn lorem<T> (ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+#### `"BeforeAndAfter"`:
+
+```rust
+fn lorem() {
+    // body
+}
+
+fn lorem(ipsum: usize) {
+    // body
+}
+
+fn lorem <T> (ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+See also [`fn_no_generics_space`](#fn_no_generics_space).
+
+## `fn_no_generics_space`
+
+Leave a space after the function name when it's not generic.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#3564](https://github.com/rust-lang/rustfmt/issues/3564))
+
+#### `false` (default):
+
+```rust
+fn lorem() {
+    // body
+}
+
+fn lorem(ipsum: usize) {
+    // body
+}
+
+fn lorem<T>(ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+#### `true`:
+
+```rust
+fn lorem () {
+    // body
+}
+
+fn lorem (ipsum: usize) {
+    // body
+}
+
+fn lorem<T>(ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+See also [`fn_generics_space`](#fn_generics_space).
+
 ## `fn_single_line`
 
 Put single-expression functions on a single line
@@ -2062,52 +2196,6 @@ fn lorem<T:Eq>(t:T) {
 ```
 
 See also: [`space_before_colon`](#space_before_colon).
-
-## `space_after_function_name`
-
-Leave a space after the function name.
-
-- **Default value**: `"Never"`
-- **Possible values**: `"AfterGenerics"`, `"Never"`
-- **Stable**: No (tracking issue: [#3564](https://github.com/rust-lang/rustfmt/issues/3564))
-
-#### `"Never"` (default):
-
-```rust
-fn lorem() {
-    // body
-}
-
-fn lorem(ipsum: usize) {
-    // body
-}
-
-fn lorem<T>(ipsum: T)
-where
-    T: Add + Sub + Mul + Div,
-{
-    // body
-}
-```
-
-#### `"AfterGenerics"`:
-
-```rust
-fn lorem () {
-    // body
-}
-
-fn lorem (ipsum: usize) {
-    // body
-}
-
-fn lorem<T> (ipsum: T)
-where
-    T: Add + Sub + Mul + Div,
-{
-    // body
-}
-```
 
 ## `space_before_colon`
 

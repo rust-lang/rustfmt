@@ -360,12 +360,16 @@ pub enum MatchArmLeadingPipe {
 }
 
 #[config_type]
-/// Where to add spaces after the function name.
-pub enum SpaceAfterFunctionName {
+/// Spacing around function generics.
+pub enum FnGenericsSpace {
     /// Never add spaces.
     Never,
-    /// Add a space, and put generics before the space.
-    AfterGenerics,
+    /// Add a space before generics.
+    OnlyBefore,
+    /// Add a space after generics.
+    OnlyAfter,
+    /// Add a space before and after generics.
+    BeforeAndAfter,
 }
 
 #[cfg(test)]

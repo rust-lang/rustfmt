@@ -272,6 +272,7 @@ pub(crate) fn rewrite_with_parens<'a, T: 'a + IntoOverflowableItem<'a>>(
         item_max_width,
         force_separator_tactic,
         None,
+        false,
     )
     .rewrite(shape)
 }
@@ -282,6 +283,7 @@ pub(crate) fn rewrite_with_angle_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
     items: impl Iterator<Item = &'a T>,
     shape: Shape,
     span: Span,
+    space_after_ident: bool,
 ) -> Option<String> {
     Context::new(
         context,
@@ -294,6 +296,7 @@ pub(crate) fn rewrite_with_angle_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
         context.config.max_width(),
         None,
         None,
+        space_after_ident,
     )
     .rewrite(shape)
 }
@@ -323,6 +326,7 @@ pub(crate) fn rewrite_with_square_brackets<'a, T: 'a + IntoOverflowableItem<'a>>
         context.config.array_width(),
         force_separator_tactic,
         Some(("[", "]")),
+        false,
     )
     .rewrite(shape)
 }
@@ -340,6 +344,7 @@ struct Context<'a> {
     one_line_width: usize,
     force_separator_tactic: Option<SeparatorTactic>,
     custom_delims: Option<(&'a str, &'a str)>,
+    space_width: usize,
 }
 
 impl<'a> Context<'a> {
@@ -354,14 +359,16 @@ impl<'a> Context<'a> {
         item_max_width: usize,
         force_separator_tactic: Option<SeparatorTactic>,
         custom_delims: Option<(&'a str, &'a str)>,
+        space_after_ident: bool,
     ) -> Context<'a> {
-        let used_width = extra_offset(ident, shape);
+        let space_width = space_after_ident.into();
+        let used_width = extra_offset(ident, shape) + space_width;
         // 1 = `()`
         let one_line_width = shape.width.saturating_sub(used_width + 2);
 
         // 1 = "(" or ")"
         let one_line_shape = shape
-            .offset_left(last_line_width(ident) + 1)
+            .offset_left(last_line_width(ident) + 1 + space_width)
             .and_then(|shape| shape.sub_width(1))
             .unwrap_or(Shape { width: 0, ..shape });
         let nested_shape = shape_from_indent_style(context, shape, used_width + 2, used_width + 1);
@@ -378,6 +385,7 @@ impl<'a> Context<'a> {
             one_line_width,
             force_separator_tactic,
             custom_delims,
+            space_width,
         }
     }
 
@@ -461,7 +469,7 @@ impl<'a> Context<'a> {
         let combine_arg_with_callee = self.items.len() == 1
             && self.items[0].is_expr()
             && !self.items[0].has_attrs()
-            && self.ident.len() < self.context.config.tab_spaces();
+            && self.ident.len() + self.space_width < self.context.config.tab_spaces();
         let overflow_last = combine_arg_with_callee || can_be_overflowed(self.context, &self.items);
 
         // Replace the last item with its first line to see if it fits with
@@ -633,7 +641,9 @@ impl<'a> Context<'a> {
 
     fn wrap_items(&self, items_str: &str, shape: Shape, is_extendable: bool) -> String {
         let shape = Shape {
-            width: shape.width.saturating_sub(last_line_width(self.ident)),
+            width: shape
+                .width
+                .saturating_sub(last_line_width(self.ident) + self.space_width),
             ..shape
         };
 
@@ -656,9 +666,15 @@ impl<'a> Context<'a> {
             .indent
             .to_string_with_newline(self.context.config);
         let mut result = String::with_capacity(
-            self.ident.len() + items_str.len() + 2 + indent_str.len() + nested_indent_str.len(),
+            self.ident.len()
+                + self.space_width
+                + items_str.len()
+                + 2
+                + indent_str.len()
+                + nested_indent_str.len(),
         );
         result.push_str(self.ident);
+        result.push_str(&" ".repeat(self.space_width));
         result.push_str(prefix);
         let force_single_line =
             !self.context.use_block_indent() || (is_extendable && extend_width <= shape.width);

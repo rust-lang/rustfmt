@@ -1,6 +1,6 @@
-// rustfmt-space_after_function_name: AfterGenerics
+// rustfmt-fn_generics_space: OnlyAfter
 // rustfmt-max_width: 118
-// Trait space after function name
+// Spacing around trait function generics
 
 trait Story {
     fn swap_context<T: 'static + Context + Send + Sync>(&mut self, context: T) -> Option<Box<Context + Send + Sync>>;
