@@ -272,7 +272,7 @@ impl<'a> FmtVisitor<'a> {
 
             if !item.body.is_empty() {
                 let first_non_ws = item.body.first().map(|s| s.span().lo());
-                let opening_nls = &self.trim_spaces_after_opening_brace(first_non_ws);
+                let opening_nls = &self.advance_to_first_block_item(first_non_ws);
                 self.push_str(&opening_nls);
 
                 for item in &item.body {
@@ -778,11 +778,11 @@ pub(crate) fn format_impl(
         visitor.block_indent = item_indent;
         visitor.last_pos = lo + BytePos(open_pos as u32);
 
-        let open_nls = &visitor.trim_spaces_after_opening_brace(
+        let open_nls = &visitor.advance_to_first_block_item(
             inner_attributes(&item.attrs)
                 .first()
                 .map(|a| a.span.lo())
-                .or(items.first().map(|i| i.span().lo())),
+                .or_else(|| items.first().map(|i| i.span().lo())),
         );
 
         visitor.visit_attrs(&item.attrs, ast::AttrStyle::Inner);
@@ -1168,7 +1168,7 @@ pub(crate) fn format_trait(
             visitor.last_pos = block_span.lo() + BytePos(open_pos as u32);
 
             let open_nls =
-                &visitor.trim_spaces_after_opening_brace(items.first().map(|i| i.span().lo()));
+                &visitor.advance_to_first_block_item(items.first().map(|i| i.span().lo()));
 
             for item in items {
                 visitor.visit_trait_item(item);
