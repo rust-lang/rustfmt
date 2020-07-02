@@ -182,11 +182,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
     }
 
-    /// Remove spaces between the opening brace and the first statement or the inner attribute
-    /// of the block, fast-forwarding this position of the visitor.
+    /// Advances the position of the visitor to the first statement or the inner attribute of a
+    /// block.
+    ///
     /// If `preserve_block_start_blank_lines` is true, the return value contains the newlines that
     /// should be preserved.
-    pub(crate) fn trim_spaces_after_opening_brace(
+    pub(crate) fn advance_to_first_block_item(
         &mut self,
         first_item_pos: Option<BytePos>,
     ) -> String {
@@ -268,9 +269,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.push_str("{");
 
         let first_non_ws = inner_attrs
-            .and_then(|attrs| inner_attributes(attrs).first().map(|attr| attr.span.lo()))
-            .or(b.stmts.first().map(|s| s.span().lo()));
-        let opening_nls = &self.trim_spaces_after_opening_brace(first_non_ws);
+            .and_then(|attrs| attrs.first().map(|attr| attr.span.lo()))
+            .or_else(|| b.stmts.first().map(|s| s.span().lo()));
+        let opening_nls = &self.advance_to_first_block_item(first_non_ws);
         self.push_str(&opening_nls);
 
         // Format inner attributes if available.
@@ -1001,8 +1002,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 let first_non_ws = inner_attributes(attrs)
                     .first()
                     .map(|attr| attr.span.lo())
-                    .or(m.items.first().map(|s| s.span().lo()));
-                let opening_nls = &self.trim_spaces_after_opening_brace(first_non_ws);
+                    .or_else(|| m.items.first().map(|s| s.span().lo()));
+                let opening_nls = &self.advance_to_first_block_item(first_non_ws);
                 self.push_str(&opening_nls);
 
                 self.visit_attrs(attrs, ast::AttrStyle::Inner);
