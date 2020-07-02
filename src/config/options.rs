@@ -359,6 +359,15 @@ pub enum MatchArmLeadingPipe {
     KeepExisting,
 }
 
+#[config_type]
+/// Where to add spaces after the function name.
+pub enum SpaceAfterFunctionName {
+    /// Never add spaces.
+    Never,
+    /// Add a space, and put generics before the space.
+    AfterGenerics,
+}
+
 #[cfg(test)]
 mod test {
     use std::path::PathBuf;

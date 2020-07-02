@@ -9,7 +9,7 @@ use rustc_ast::{ast, ptr};
 use rustc_span::{source_map, symbol, BytePos, Span, DUMMY_SP};
 
 use crate::config::lists::*;
-use crate::config::{BraceStyle, Config, IndentStyle};
+use crate::config::{BraceStyle, Config, IndentStyle, SpaceAfterFunctionName};
 use crate::formatting::{
     attr::filter_inline_attrs,
     comment::{
@@ -2228,7 +2228,7 @@ fn rewrite_fn_base(
         .last()
         .map_or(false, |l| l.trim_start().len() == 1);
 
-    if context.config.space_before_fn_params() {
+    if let SpaceAfterFunctionName::AfterGenerics = context.config.space_after_function_name() {
         result.push(' ');
     }
 

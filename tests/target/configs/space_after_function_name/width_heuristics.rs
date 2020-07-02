@@ -1,6 +1,6 @@
-// rustfmt-space_before_fn_params: true
+// rustfmt-space_after_function_name: AfterGenerics
 // rustfmt-max_width: 118
-// Trait space before function parameters
+// Trait space after function name
 
 trait Story {
     fn swap_context<T: 'static + Context + Send + Sync> (&mut self, context: T)
