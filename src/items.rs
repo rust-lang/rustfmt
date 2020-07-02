@@ -172,6 +172,14 @@ enum BodyElement<'a> {
     ForeignItem(&'a ast::ForeignItem),
 }
 
+impl BodyElement<'_> {
+    pub(crate) fn span(&self) -> Span {
+        match self {
+            BodyElement::ForeignItem(fi) => fi.span(),
+        }
+    }
+}
+
 /// Represents a fn's signature.
 pub(crate) struct FnSig<'a> {
     decl: &'a ast::FnDecl,
@@ -263,6 +271,10 @@ impl<'a> FmtVisitor<'a> {
             self.block_indent = self.block_indent.block_indent(self.config);
 
             if !item.body.is_empty() {
+                let first_non_ws = item.body.first().map(|s| s.span().lo());
+                let opening_nls = &self.trim_spaces_after_opening_brace(first_non_ws);
+                self.push_str(&opening_nls);
+
                 for item in &item.body {
                     self.format_body_element(item);
                 }
@@ -766,12 +778,25 @@ pub(crate) fn format_impl(
         visitor.block_indent = item_indent;
         visitor.last_pos = lo + BytePos(open_pos as u32);
 
+        let open_nls = &visitor.trim_spaces_after_opening_brace(
+            inner_attributes(&item.attrs)
+                .first()
+                .map(|a| a.span.lo())
+                .or(items.first().map(|i| i.span().lo())),
+        );
+
         visitor.visit_attrs(&item.attrs, ast::AttrStyle::Inner);
         visitor.visit_impl_items(items);
 
         visitor.format_missing(item.span.hi() - BytePos(1));
 
-        let inner_indent_str = visitor.block_indent.to_string_with_newline(context.config);
+        let inner_indent_str = if !open_nls.is_empty() {
+            result.push_str(open_nls);
+            visitor.block_indent.to_string(context.config)
+        } else {
+            visitor.block_indent.to_string_with_newline(context.config)
+        };
+
         let outer_indent_str = offset.block_only().to_string_with_newline(context.config);
 
         result.push_str(&inner_indent_str);
@@ -1142,13 +1167,21 @@ pub(crate) fn format_trait(
             visitor.block_indent = offset.block_only().block_indent(context.config);
             visitor.last_pos = block_span.lo() + BytePos(open_pos as u32);
 
+            let open_nls =
+                &visitor.trim_spaces_after_opening_brace(items.first().map(|i| i.span().lo()));
+
             for item in items {
                 visitor.visit_trait_item(item);
             }
 
             visitor.format_missing(item.span.hi() - BytePos(1));
 
-            let inner_indent_str = visitor.block_indent.to_string_with_newline(context.config);
+            let inner_indent_str = if !open_nls.is_empty() {
+                result.push_str(open_nls);
+                visitor.block_indent.to_string(context.config)
+            } else {
+                visitor.block_indent.to_string_with_newline(context.config)
+            };
 
             result.push_str(&inner_indent_str);
             result.push_str(visitor.buffer.trim());
