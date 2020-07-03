@@ -355,8 +355,8 @@ pub enum MatchArmLeadingPipe {
     Always,
     /// Never emit leading pipes on match arms
     Never,
-    /// Maintain any existing leading pipes
-    KeepExisting,
+    /// Preserve any existing leading pipes
+    Preserve,
 }
 
 #[cfg(test)]

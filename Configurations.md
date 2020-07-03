@@ -1550,7 +1550,7 @@ See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 Controls whether to include a leading pipe on match arms
 
 - **Default value**: `Never`
-- **Possible values**: `Always`, `Never`, `KeepExisting`
+- **Possible values**: `Always`, `Never`, `Preserve`
 - **Stable**: Yes
 
 #### `Never` (default):
@@ -1607,7 +1607,7 @@ fn foo() {
 }
 ```
 
-#### `KeepExisting`:
+#### `Preserve`:
 ```rust
 fn foo() {
     match foo {
