@@ -967,12 +967,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
     pub(crate) fn format_separate_mod(&mut self, m: &Module<'_>, end_pos: BytePos) {
         self.block_indent = Indent::empty();
-        if self.visit_attrs(m.attrs(), ast::AttrStyle::Inner) {
-            self.push_skipped_with_span(m.attrs(), m.as_ref().inner, m.as_ref().inner);
-        } else {
-            self.walk_mod_items(m.as_ref());
-            self.format_missing_with_indent(end_pos);
-        }
+        let skipped = self.visit_attrs(m.attrs(), ast::AttrStyle::Inner);
+        assert!(
+            !skipped,
+            "Skipping module must be handled before reaching this line.",
+        );
+
+        self.walk_mod_items(m.as_ref());
+        self.format_missing_with_indent(end_pos);
     }
 
     pub(crate) fn skip_empty_lines(&mut self, end_pos: BytePos) {

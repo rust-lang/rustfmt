@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use rustc_ast::ast;
+use rustc_ast::{ast, attr::HasAttrs};
 use rustc_span::symbol;
 
 pub(crate) use syntux::session::ParseSess;
@@ -14,7 +14,7 @@ use crate::formatting::{
     newline_style::apply_newline_style,
     report::NonFormattedRange,
     syntux::parser::{DirectoryOwnership, Parser, ParserError},
-    utils::count_newlines,
+    utils::{contains_skip, count_newlines},
     visitor::FmtVisitor,
 };
 use crate::{
@@ -129,6 +129,10 @@ fn format_project(
         if (!operation_setting.recursive && path != &main_file) || should_ignore {
             continue;
         }
+        if contains_skip(module.attrs()) {
+            continue;
+        }
+
         should_emit_verbose(input_is_stdin, operation_setting.verbosity, || {
             println!("Formatting {}", path)
         });
