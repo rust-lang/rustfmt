@@ -74,6 +74,7 @@ extern "C" {
         file: *mut FILE,
     ) -> *mut FILE;
 
+
     async fn foo() -> *mut Bar;
     const fn foo() -> *mut Bar;
     unsafe fn foo() -> *mut Bar;

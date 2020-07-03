@@ -75,7 +75,7 @@ impl Rewrite for ast::Item {
         let mut visitor = FmtVisitor::from_context(context);
         visitor.block_indent = shape.indent;
         visitor.last_pos = self.span().lo();
-        visitor.visit_item(self);
+        visitor.visit_item(self, false);
         Some(visitor.buffer.to_owned())
     }
 }
@@ -1562,7 +1562,7 @@ fn rewrite_macro_with_items(
             MacroArg::Item(item) => item,
             _ => return None,
         };
-        visitor.visit_item(&item);
+        visitor.visit_item(&item, false);
     }
 
     let mut result = String::with_capacity(256);

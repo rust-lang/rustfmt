@@ -164,14 +164,11 @@ fn bar() {
 #### `1`
 ```rust
 fn foo() {
-
     println!("a");
 }
 
 fn bar() {
-
     println!("b");
-
     println!("c");
 }
 ```

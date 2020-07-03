@@ -88,6 +88,8 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) macro_rewrite_failure: bool,
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
+    /// If set to `true`, normalize number of vertical spaces on formatting missing snippets.
+    pub(crate) normalize_vertical_spaces: bool,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -141,7 +143,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
         match stmt.as_ast_node().kind {
             ast::StmtKind::Item(ref item) => {
-                self.visit_item(item);
+                self.visit_item(item, true);
                 // If the item requires a trailing ";" (like `struct Foo;`), we should have already
                 // handled it. Otherwise there still may be a trailing ";", but it is unnecessary.
                 // Drop it by fast-forwarding the visitor to the end of the item.
@@ -408,7 +410,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.visit_block(block, inner_attrs, true)
     }
 
-    pub(crate) fn visit_item(&mut self, item: &ast::Item) {
+    pub(crate) fn visit_item(&mut self, item: &ast::Item, normalize_spaces: bool) {
+        self.normalize_vertical_spaces = normalize_spaces;
+        self.visit_item_inner(item);
+    }
+
+    fn visit_item_inner(&mut self, item: &ast::Item) {
         skip_out_of_file_lines_range_visitor!(self, item.span);
 
         // This is where we bail out if there is a skip attribute. This is only
@@ -819,6 +826,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             macro_rewrite_failure: false,
             report,
             skip_context: Default::default(),
+            normalize_vertical_spaces: false,
         }
     }
 

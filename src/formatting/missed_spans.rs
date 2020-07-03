@@ -50,7 +50,8 @@ impl<'a> FmtVisitor<'a> {
             self.last_pos = end;
             return;
         }
-        self.format_missing_inner(end, |this, last_snippet, _| this.push_str(last_snippet))
+        self.format_missing_inner(end, |this, last_snippet, _| this.push_str(last_snippet));
+        self.normalize_vertical_spaces = false;
     }
 
     pub(crate) fn format_missing_with_indent(&mut self, end: BytePos) {
@@ -63,13 +64,15 @@ impl<'a> FmtVisitor<'a> {
             }
             let indent = this.block_indent.to_string(config);
             this.push_str(&indent);
-        })
+        });
+        self.normalize_vertical_spaces = false;
     }
 
     pub(crate) fn format_missing_no_indent(&mut self, end: BytePos) {
         self.format_missing_inner(end, |this, last_snippet, _| {
             this.push_str(last_snippet.trim_end());
-        })
+        });
+        self.normalize_vertical_spaces = false;
     }
 
     fn format_missing_inner<F: Fn(&mut FmtVisitor<'_>, &str, &str)>(
@@ -113,7 +116,7 @@ impl<'a> FmtVisitor<'a> {
         }
     }
 
-    fn push_vertical_spaces(&mut self, mut newline_count: usize) {
+    fn normalize_newline_count(&self, mut newline_count: usize) -> usize {
         let offset = self.buffer.chars().rev().take_while(|c| *c == '\n').count();
         let newline_upper_bound = self.config.blank_lines_upper_bound() + 1;
         let newline_lower_bound = self.config.blank_lines_lower_bound() + 1;
@@ -130,6 +133,16 @@ impl<'a> FmtVisitor<'a> {
             } else {
                 newline_count = newline_lower_bound - offset;
             }
+        }
+
+        newline_count
+    }
+
+    fn push_vertical_spaces(&mut self, mut newline_count: usize) {
+        if self.normalize_vertical_spaces {
+            newline_count = self.normalize_newline_count(newline_count);
+        } else if newline_count < 1 {
+            newline_count = 1;
         }
 
         let blank_lines = "\n".repeat(newline_count);
