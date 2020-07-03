@@ -576,16 +576,22 @@ impl<'a> CommentRewrite<'a> {
         cr
     }
 
-    fn join_block(s: &str, sep: &str) -> String {
+    fn join_block(s: &str, sep: &str, add_sep_prefix: bool) -> String {
         let mut result = String::with_capacity(s.len() + 128);
         let mut iter = s.lines().peekable();
+        let get_sep = |line: Option<&&str>| -> &str {
+            match line {
+                Some(&"") => sep.trim_end(),
+                Some(..) => sep,
+                None => "",
+            }
+        };
+        if add_sep_prefix {
+            result.push_str(get_sep(iter.peek()));
+        }
         while let Some(line) = iter.next() {
             result.push_str(line);
-            result.push_str(match iter.peek() {
-                Some(next_line) if next_line.is_empty() => sep.trim_end(),
-                Some(..) => &sep,
-                None => "",
-            });
+            result.push_str(get_sep(iter.peek()));
         }
         result
     }
@@ -594,10 +600,10 @@ impl<'a> CommentRewrite<'a> {
         if !self.code_block_buffer.is_empty() {
             // There is a code block that is not properly enclosed by backticks.
             // We will leave them untouched.
-            self.result.push_str(&self.comment_line_separator);
             self.result.push_str(&Self::join_block(
                 &trim_custom_comment_prefix(&self.code_block_buffer),
                 &self.comment_line_separator,
+                true, /* add_sep_prefix */
             ));
         }
 
@@ -615,10 +621,12 @@ impl<'a> CommentRewrite<'a> {
                 Some(s) => self.result.push_str(&Self::join_block(
                     &s,
                     &format!("{}{}", self.comment_line_separator, ib.line_start),
+                    false, /* add_sep_prefix */
                 )),
                 None => self.result.push_str(&Self::join_block(
                     &ib.original_block_as_string(),
                     &self.comment_line_separator,
+                    false, /* add_sep_prefix */
                 )),
             };
         }
@@ -658,10 +666,12 @@ impl<'a> CommentRewrite<'a> {
                 Some(s) => self.result.push_str(&Self::join_block(
                     &s,
                     &format!("{}{}", self.comment_line_separator, ib.line_start),
+                    false, /* add_sep_prefix */
                 )),
                 None => self.result.push_str(&Self::join_block(
                     &ib.original_block_as_string(),
                     &self.comment_line_separator,
+                    false, /* add_sep_prefix */
                 )),
             };
         } else if self.code_block_attr.is_some() {
@@ -689,9 +699,11 @@ impl<'a> CommentRewrite<'a> {
                     }
                 };
                 if !code_block.is_empty() {
-                    self.result.push_str(&self.comment_line_separator);
-                    self.result
-                        .push_str(&Self::join_block(&code_block, &self.comment_line_separator));
+                    self.result.push_str(&Self::join_block(
+                        &code_block,
+                        &self.comment_line_separator,
+                        true, /* add_sep_prefix */
+                    ));
                 }
                 self.code_block_buffer.clear();
                 self.result.push_str(&self.comment_line_separator);
