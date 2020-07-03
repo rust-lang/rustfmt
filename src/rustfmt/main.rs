@@ -708,7 +708,7 @@ mod test {
             .wait_with_output()
             .expect("Failed to wait on rustfmt child");
         assert!(!output.status.success());
-        assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "stdin\n");
+        assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "<stdin>\n");
     }
 
     #[cfg(nightly)]
@@ -818,7 +818,7 @@ fn foo() {
             assert!(output.stdout.is_empty());
             let exp_err = vec![
                 "\u{1b}[1;38;5;9merror\u{1b}[0m: \u{1b}[1minvalid attribute",
-                "\u{1b}[0m\n \u{1b}[1;38;5;12m-->\u{1b}[0m stdin:2\n",
+                "\u{1b}[0m\n \u{1b}[1;38;5;12m-->\u{1b}[0m <stdin>:2\n",
                 "\u{1b}[1;38;5;12m  |\u{1b}[0m\n",
                 "\u{1b}[1;38;5;12m2 |\u{1b}[0m         #![rustfmt::max_width(120)]\n",
                 "\u{1b}[1;38;5;12m  |\u{1b}[0m\n\n",

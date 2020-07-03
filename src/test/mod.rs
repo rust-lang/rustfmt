@@ -428,9 +428,9 @@ fn stdin_formatting_smoke_test() {
     .unwrap();
 
     #[cfg(not(windows))]
-    assert_eq!(buf, b"stdin:\n\nfn main() {}\n");
+    assert_eq!(buf, b"<stdin>:\n\nfn main() {}\n");
     #[cfg(windows)]
-    assert_eq!(buf, b"stdin:\n\nfn main() {}\r\n");
+    assert_eq!(buf, b"<stdin>:\n\nfn main() {}\r\n");
 }
 
 #[test]
