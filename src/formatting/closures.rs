@@ -121,6 +121,8 @@ fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext<'_>) -
         || prefix.contains('\n')
 }
 
+// TODO: The expressions "veto"ed here should align with expressions that are permitted on multiple
+// lines in rewrite_closure_expr#allow_multi_line. Consider refactoring to avoid this disparity.
 fn veto_block(e: &ast::Expr) -> bool {
     match e.kind {
         ast::ExprKind::Call(..)
@@ -179,7 +181,8 @@ fn rewrite_closure_expr(
             | ast::ExprKind::Block(..)
             | ast::ExprKind::TryBlock(..)
             | ast::ExprKind::Loop(..)
-            | ast::ExprKind::Struct(..) => true,
+            | ast::ExprKind::Struct(..)
+            | ast::ExprKind::Range(..) => true,
 
             ast::ExprKind::AddrOf(_, _, ref expr)
             | ast::ExprKind::Box(ref expr)
