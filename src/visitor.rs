@@ -231,6 +231,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 if snippet.find('\n') != snippet.rfind('\n') {
                     let mut lines = snippet.lines().map(&str::trim);
                     lines.next(); // Eat block-opening newline
+                    lines.next_back(); // Eat newline before the first item
                     let mut result = String::new();
                     while let Some("") = lines.next() {
                         result.push('\n');
@@ -982,6 +983,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     .or_else(|| m.items.first().map(|s| s.span().lo()));
                 if let Some(opening_nls) = self.advance_to_first_block_item(first_non_ws) {
                     self.push_str(&opening_nls);
+                    if attrs.is_empty() {
+                        self.push_str("\n");
+                    }
                 }
 
                 self.visit_attrs(attrs, ast::AttrStyle::Inner);

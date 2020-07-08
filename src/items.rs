@@ -783,20 +783,16 @@ pub(crate) fn format_impl(
             .first()
             .map(|a| a.span.lo())
             .or_else(|| items.first().map(|i| i.span().lo()));
-        let opening_nls = visitor.advance_to_first_block_item(first_non_ws);
+        if let Some(opening_nls) = visitor.advance_to_first_block_item(first_non_ws) {
+            result.push_str(&opening_nls);
+        }
 
         visitor.visit_attrs(&item.attrs, ast::AttrStyle::Inner);
         visitor.visit_impl_items(items);
 
         visitor.format_missing(item.span.hi() - BytePos(1));
 
-        let inner_indent_str = if let Some(opening_nls) = opening_nls {
-            result.push_str(&opening_nls);
-            visitor.block_indent.to_string(context.config)
-        } else {
-            visitor.block_indent.to_string_with_newline(context.config)
-        };
-
+        let inner_indent_str = visitor.block_indent.to_string_with_newline(context.config);
         let outer_indent_str = offset.block_only().to_string_with_newline(context.config);
 
         result.push_str(&inner_indent_str);
@@ -1167,8 +1163,11 @@ pub(crate) fn format_trait(
             visitor.block_indent = offset.block_only().block_indent(context.config);
             visitor.last_pos = block_span.lo() + BytePos(open_pos as u32);
 
-            let opening_nls =
-                visitor.advance_to_first_block_item(items.first().map(|i| i.span().lo()));
+            if let Some(opening_nls) =
+                visitor.advance_to_first_block_item(items.first().map(|i| i.span().lo()))
+            {
+                result.push_str(&opening_nls);
+            }
 
             for item in items {
                 visitor.visit_trait_item(item);
@@ -1176,12 +1175,7 @@ pub(crate) fn format_trait(
 
             visitor.format_missing(item.span.hi() - BytePos(1));
 
-            let inner_indent_str = if let Some(opening_nls) = opening_nls {
-                result.push_str(&opening_nls);
-                visitor.block_indent.to_string(context.config)
-            } else {
-                visitor.block_indent.to_string_with_newline(context.config)
-            };
+            let inner_indent_str = visitor.block_indent.to_string_with_newline(context.config);
 
             result.push_str(&inner_indent_str);
             result.push_str(visitor.buffer.trim());
