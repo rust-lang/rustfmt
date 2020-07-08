@@ -190,64 +190,59 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     pub(crate) fn advance_to_first_block_item(
         &mut self,
         first_item_pos: Option<BytePos>,
-    ) -> String {
-        let mut result = String::new();
-        if let Some(first_item_pos) = first_item_pos {
-            let missing_span = self.next_span(first_item_pos);
-            let snippet = self.snippet(missing_span);
+    ) -> Option<String> {
+        let missing_span = first_item_pos.map(|pos| self.next_span(pos))?;
+        let snippet = self.snippet(missing_span);
 
-            if self.config.preserve_block_start_blank_lines() {
-                // First we need to find the span to look for blank lines in. This is either the
-                // - span between the opening brace and first item, or
-                // - span between the opening brace and a comment before the first item
-                // We do this so that we get a span of contiguous whitespace, which makes
-                // processing the blank lines easier.
-                let blank_lines_snippet = if let Some(hi) = self
-                    .snippet_provider
-                    .span_to_snippet(missing_span)
-                    .and_then(|s| s.find('/'))
-                {
-                    self.snippet_provider.span_to_snippet(mk_sp(
-                        missing_span.lo(),
-                        missing_span.lo() + BytePos::from_usize(hi),
-                    ))
+        let len = CommentCodeSlices::new(snippet)
+            .next()
+            .and_then(|(kind, _, s)| {
+                if kind == CodeCharKind::Normal {
+                    s.rfind('\n')
                 } else {
-                    self.snippet_provider.span_to_snippet(missing_span)
-                };
-
-                if let Some(snippet) = blank_lines_snippet {
-                    let has_multiple_blank_lines =
-                        if let (Some(l), Some(r)) = (snippet.find('\n'), snippet.rfind('\n')) {
-                            l != r
-                        } else {
-                            false
-                        };
-                    if has_multiple_blank_lines {
-                        let mut lines = snippet.lines().map(&str::trim);
-                        lines.next(); // Eat block-opening newline
-                        while let Some("") = lines.next() {
-                            result.push('\n');
-                        }
-                    }
-                } else {
-                    debug!("Failed to preserve blank lines for {:?}", missing_span);
+                    None
                 }
-            }
+            });
+        if let Some(len) = len {
+            self.last_pos = self.last_pos + BytePos::from_usize(len);
+        }
 
-            let len = CommentCodeSlices::new(snippet)
-                .next()
-                .and_then(|(kind, _, s)| {
-                    if kind == CodeCharKind::Normal {
-                        s.rfind('\n')
-                    } else {
-                        None
+        if self.config.preserve_block_start_blank_lines() {
+            // First we need to find the span to look for blank lines in. This is either the
+            // - span between the opening brace and first item, or
+            // - span between the opening brace and a comment before the first item
+            // We do this so that we get a span of contiguous whitespace, which makes processing the
+            // blank lines easier.
+            let blank_lines_snippet = if let Some(hi) = self
+                .snippet_provider
+                .span_to_snippet(missing_span)
+                .and_then(|s| s.find('/'))
+            {
+                self.snippet_provider.span_to_snippet(mk_sp(
+                    missing_span.lo(),
+                    missing_span.lo() + BytePos::from_usize(hi),
+                ))
+            } else {
+                self.snippet_provider.span_to_snippet(missing_span)
+            };
+
+            if let Some(snippet) = blank_lines_snippet {
+                if snippet.find('\n') != snippet.rfind('\n') {
+                    let mut lines = snippet.lines().map(&str::trim);
+                    lines.next(); // Eat block-opening newline
+                    let mut result = String::new();
+                    while let Some("") = lines.next() {
+                        result.push('\n');
                     }
-                });
-            if let Some(len) = len {
-                self.last_pos = self.last_pos + BytePos::from_usize(len);
+                    if !result.is_empty() {
+                        return Some(result);
+                    }
+                }
+            } else {
+                debug!("Failed to preserve blank lines for {:?}", missing_span);
             }
         }
-        result
+        None
     }
 
     pub(crate) fn visit_block(
@@ -271,8 +266,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let first_non_ws = inner_attrs
             .and_then(|attrs| attrs.first().map(|attr| attr.span.lo()))
             .or_else(|| b.stmts.first().map(|s| s.span().lo()));
-        let opening_nls = &self.advance_to_first_block_item(first_non_ws);
-        self.push_str(&opening_nls);
+        if let Some(opening_nls) = self.advance_to_first_block_item(first_non_ws) {
+            self.push_str(&opening_nls);
+        }
 
         // Format inner attributes if available.
         if let Some(attrs) = inner_attrs {
@@ -1003,8 +999,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     .first()
                     .map(|attr| attr.span.lo())
                     .or_else(|| m.items.first().map(|s| s.span().lo()));
-                let opening_nls = &self.advance_to_first_block_item(first_non_ws);
-                self.push_str(&opening_nls);
+                if let Some(opening_nls) = self.advance_to_first_block_item(first_non_ws) {
+                    self.push_str(&opening_nls);
+                }
 
                 self.visit_attrs(attrs, ast::AttrStyle::Inner);
                 self.walk_mod_items(m);
