@@ -272,8 +272,9 @@ impl<'a> FmtVisitor<'a> {
 
             if !item.body.is_empty() {
                 let first_non_ws = item.body.first().map(|s| s.span().lo());
-                let opening_nls = &self.advance_to_first_block_item(first_non_ws);
-                self.push_str(&opening_nls);
+                if let Some(opening_nls) = self.advance_to_first_block_item(first_non_ws) {
+                    self.push_str(&opening_nls);
+                }
 
                 for item in &item.body {
                     self.format_body_element(item);
@@ -778,20 +779,19 @@ pub(crate) fn format_impl(
         visitor.block_indent = item_indent;
         visitor.last_pos = lo + BytePos(open_pos as u32);
 
-        let open_nls = &visitor.advance_to_first_block_item(
-            inner_attributes(&item.attrs)
-                .first()
-                .map(|a| a.span.lo())
-                .or_else(|| items.first().map(|i| i.span().lo())),
-        );
+        let first_non_ws = inner_attributes(&item.attrs)
+            .first()
+            .map(|a| a.span.lo())
+            .or_else(|| items.first().map(|i| i.span().lo()));
+        let opening_nls = visitor.advance_to_first_block_item(first_non_ws);
 
         visitor.visit_attrs(&item.attrs, ast::AttrStyle::Inner);
         visitor.visit_impl_items(items);
 
         visitor.format_missing(item.span.hi() - BytePos(1));
 
-        let inner_indent_str = if !open_nls.is_empty() {
-            result.push_str(open_nls);
+        let inner_indent_str = if let Some(opening_nls) = opening_nls {
+            result.push_str(&opening_nls);
             visitor.block_indent.to_string(context.config)
         } else {
             visitor.block_indent.to_string_with_newline(context.config)
@@ -1167,8 +1167,8 @@ pub(crate) fn format_trait(
             visitor.block_indent = offset.block_only().block_indent(context.config);
             visitor.last_pos = block_span.lo() + BytePos(open_pos as u32);
 
-            let open_nls =
-                &visitor.advance_to_first_block_item(items.first().map(|i| i.span().lo()));
+            let opening_nls =
+                visitor.advance_to_first_block_item(items.first().map(|i| i.span().lo()));
 
             for item in items {
                 visitor.visit_trait_item(item);
@@ -1176,8 +1176,8 @@ pub(crate) fn format_trait(
 
             visitor.format_missing(item.span.hi() - BytePos(1));
 
-            let inner_indent_str = if !open_nls.is_empty() {
-                result.push_str(open_nls);
+            let inner_indent_str = if let Some(opening_nls) = opening_nls {
+                result.push_str(&opening_nls);
                 visitor.block_indent.to_string(context.config)
             } else {
                 visitor.block_indent.to_string_with_newline(context.config)
