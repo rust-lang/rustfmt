@@ -105,3 +105,8 @@ impl<'a, 'gcx, 'tcx> ProbeContext<'a, 'gcx, 'tcx> {
         // ...
     }
 }
+
+// #4315
+pub trait AsUnindented {
+    type Output<'ast> where Self: 'ast;
+}
