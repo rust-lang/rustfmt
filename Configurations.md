@@ -961,6 +961,14 @@ fn add_one(x: i32) -> i32 {
 }
 ```
 
+## `format_generated_files`
+
+Format generated files. A file is considered as generated if the file starts with `// @generated`.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
 ## `format_macro_matchers`
 
 Format the metavariable matching patterns in macros.
