@@ -22,7 +22,7 @@ mod configuration_snippet;
 const DIFF_CONTEXT_SIZE: usize = 3;
 
 // A list of files on which we want to skip testing.
-const SKIP_FILE_WHITE_LIST: &[&str] = &[
+const FILE_SKIP_LIST: &[&str] = &[
     "issue-3434/no_entry.rs",
     "issue-3665/sub_mod.rs",
     // Testing for issue-3779
@@ -88,8 +88,8 @@ where
         .any(|c| c.zip(subpath.as_ref().components()).all(|(a, b)| a == b))
 }
 
-fn is_file_skip(skip_file_white_list: &[&str], path: &Path) -> bool {
-    skip_file_white_list
+fn is_file_skip(file_skip_list: &[&str], path: &Path) -> bool {
+    file_skip_list
         .iter()
         .any(|file_path| is_subpath(path, file_path))
 }
@@ -97,7 +97,7 @@ fn is_file_skip(skip_file_white_list: &[&str], path: &Path) -> bool {
 // Returns a `Vec` containing `PathBuf`s of files with an  `rs` extension in the
 // given path. The `recursive` argument controls if files from subdirectories
 // are also returned.
-fn get_test_files(path: &Path, recursive: bool, skip_file_white_list: &[&str]) -> Vec<PathBuf> {
+fn get_test_files(path: &Path, recursive: bool, file_skip_list: &[&str]) -> Vec<PathBuf> {
     assert!(path.exists(), "{} does not exist", path.display());
 
     let mut files = vec![];
@@ -108,9 +108,9 @@ fn get_test_files(path: &Path, recursive: bool, skip_file_white_list: &[&str]) -
             let entry = entry.expect("couldn't get `DirEntry`");
             let path = entry.path();
             if path.is_dir() && recursive {
-                files.append(&mut get_test_files(&path, recursive, skip_file_white_list));
+                files.append(&mut get_test_files(&path, recursive, file_skip_list));
             } else if path.extension().map_or(false, |f| f == "rs")
-                && !is_file_skip(skip_file_white_list, &path)
+                && !is_file_skip(file_skip_list, &path)
             {
                 files.push(path);
             }
@@ -184,7 +184,7 @@ fn system_tests() {
     init_log();
     run_test_with(&TestSetting::default(), || {
         // Get all files in the tests/source directory.
-        let files = get_test_files(Path::new("tests/source"), true, SKIP_FILE_WHITE_LIST);
+        let files = get_test_files(Path::new("tests/source"), true, FILE_SKIP_LIST);
         let (_reports, count, fails) = check_files(files, &None);
 
         // Display results.
@@ -362,7 +362,7 @@ fn idempotence_tests() {
             return;
         }
         // Get all files in the tests/target directory.
-        let files = get_test_files(Path::new("tests/target"), true, SKIP_FILE_WHITE_LIST);
+        let files = get_test_files(Path::new("tests/target"), true, FILE_SKIP_LIST);
         let (_reports, count, fails) = check_files(files, &None);
 
         // Display results.
@@ -385,8 +385,8 @@ fn self_tests() {
     if !is_nightly_channel!() {
         return;
     }
-    let skip_file_white_list = ["target", "tests"];
-    let files = get_test_files(Path::new("src"), true, &skip_file_white_list);
+    let file_skip_list = ["target", "tests"];
+    let files = get_test_files(Path::new("src"), true, &file_skip_list);
 
     let (reports, count, fails) = check_files(files, &Some(PathBuf::from("rustfmt.toml")));
     let mut warnings = 0;
