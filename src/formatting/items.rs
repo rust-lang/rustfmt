@@ -229,6 +229,14 @@ enum BodyElement<'a> {
     ForeignItem(&'a ast::ForeignItem),
 }
 
+impl BodyElement<'_> {
+    pub(crate) fn span(&self) -> Span {
+        match self {
+            BodyElement::ForeignItem(fi) => fi.span(),
+        }
+    }
+}
+
 /// Represents a fn's signature.
 pub(crate) struct FnSig<'a> {
     decl: &'a ast::FnDecl,
@@ -325,6 +333,11 @@ impl<'a> FmtVisitor<'a> {
                 let indent_str = self.block_indent.to_string(self.config);
                 self.push_str(&indent_str);
             } else {
+                let first_non_ws = item.body.first().map(|s| s.span().lo());
+                if let Some(opening_nls) = self.advance_to_first_block_item(first_non_ws) {
+                    self.push_str(&opening_nls);
+                }
+
                 for item in &item.body {
                     self.format_body_element(item);
                 }
@@ -851,6 +864,14 @@ pub(crate) fn format_impl(
             visitor.block_indent = item_indent;
             visitor.last_pos = lo + BytePos(open_pos as u32);
 
+            let first_non_ws = inner_attributes(&item.attrs)
+                .first()
+                .map(|a| a.span.lo())
+                .or_else(|| items.first().map(|i| i.span().lo()));
+            if let Some(opening_nls) = visitor.advance_to_first_block_item(first_non_ws) {
+                result.push_str(&opening_nls);
+            }
+
             visitor.visit_attrs(&item.attrs, ast::AttrStyle::Inner);
             visitor.visit_impl_items(items);
 
@@ -1209,6 +1230,12 @@ pub(crate) fn format_trait(
             let mut visitor = FmtVisitor::from_context(context);
             visitor.block_indent = offset.block_only().block_indent(context.config);
             visitor.last_pos = block_span.lo() + BytePos(open_pos as u32);
+
+            if let Some(opening_nls) =
+                visitor.advance_to_first_block_item(trait_items.first().map(|i| i.span().lo()))
+            {
+                result.push_str(&opening_nls);
+            }
 
             for item in trait_items {
                 visitor.visit_trait_item(item);

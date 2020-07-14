@@ -1809,6 +1809,35 @@ pub enum Foo {}
 pub enum Foo {}
 ```
 
+## `preserve_block_start_blank_lines`
+
+Preserves blanks lines at the start of the block. Note that this will preserve newlines, but strip
+any other whitespace on those lines.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+fn say_hi() {
+    println!("hi");
+}
+```
+
+#### `true`:
+
+```rust
+fn say_hi() {
+
+
+    println!("hi");
+}
+```
+
+###
+
 ## `overflow_delimited_expr`
 
 When structs, slices, arrays, and block/array-like macros are used as the last

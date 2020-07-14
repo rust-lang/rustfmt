@@ -182,32 +182,68 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
     }
 
-    /// Remove spaces between the opening brace and the first statement or the inner attribute
-    /// of the block.
-    fn trim_spaces_after_opening_brace(
+    /// Advances the position of the visitor to the first statement or the inner attribute of a
+    /// block.
+    ///
+    /// If `preserve_block_start_blank_lines` is true, the return value contains the newlines that
+    /// should be preserved.
+    pub(crate) fn advance_to_first_block_item(
         &mut self,
-        b: &ast::Block,
-        inner_attrs: Option<&[ast::Attribute]>,
-    ) {
-        if let Some(first_stmt) = b.stmts.first() {
-            let hi = inner_attrs
-                .and_then(|attrs| inner_attributes(attrs).first().map(|attr| attr.span.lo()))
-                .unwrap_or_else(|| first_stmt.span().lo());
-            let missing_span = self.next_span(hi);
-            let snippet = self.snippet(missing_span);
-            let len = CommentCodeSlices::new(snippet)
-                .next()
-                .and_then(|(kind, _, s)| {
-                    if kind == CodeCharKind::Normal {
-                        s.rfind('\n')
-                    } else {
-                        None
+        first_item_pos: Option<BytePos>,
+    ) -> Option<String> {
+        let missing_span = first_item_pos.map(|pos| self.next_span(pos))?;
+        let snippet = self.snippet(missing_span);
+
+        let len = CommentCodeSlices::new(snippet)
+            .next()
+            .and_then(|(kind, _, s)| {
+                if kind == CodeCharKind::Normal {
+                    s.rfind('\n')
+                } else {
+                    None
+                }
+            });
+        if let Some(len) = len {
+            self.last_pos = self.last_pos + BytePos::from_usize(len);
+        }
+
+        if self.config.preserve_block_start_blank_lines() {
+            // First we need to find the span to look for blank lines in. This is either the
+            // - span between the opening brace and first item, or
+            // - span between the opening brace and a comment before the first item
+            // We do this so that we get a span of contiguous whitespace, which makes processing the
+            // blank lines easier.
+            let blank_lines_snippet = if let Some(hi) = self
+                .snippet_provider
+                .span_to_snippet(missing_span)
+                .and_then(|s| s.find('/'))
+            {
+                self.snippet_provider.span_to_snippet(mk_sp(
+                    missing_span.lo(),
+                    missing_span.lo() + BytePos::from_usize(hi),
+                ))
+            } else {
+                self.snippet_provider.span_to_snippet(missing_span)
+            };
+
+            if let Some(snippet) = blank_lines_snippet {
+                if snippet.find('\n') != snippet.rfind('\n') {
+                    let mut lines = snippet.lines().map(&str::trim);
+                    lines.next(); // Eat block-opening newline
+                    lines.next_back(); // Eat newline before the first item
+                    let mut result = String::new();
+                    while let Some("") = lines.next() {
+                        result.push('\n');
                     }
-                });
-            if let Some(len) = len {
-                self.last_pos = self.last_pos + BytePos::from_usize(len);
+                    if !result.is_empty() {
+                        return Some(result);
+                    }
+                }
+            } else {
+                debug!("Failed to preserve blank lines for {:?}", missing_span);
             }
         }
+        None
     }
 
     pub(crate) fn visit_block(
@@ -227,7 +263,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.last_pos = self.last_pos + brace_compensation;
         self.block_indent = self.block_indent.block_indent(self.config);
         self.push_str("{");
-        self.trim_spaces_after_opening_brace(b, inner_attrs);
+
+        let first_non_ws = inner_attrs
+            .and_then(|attrs| attrs.first().map(|attr| attr.span.lo()))
+            .or_else(|| b.stmts.first().map(|s| s.span().lo()));
+        if let Some(opening_nls) = self.advance_to_first_block_item(first_non_ws) {
+            self.push_str(&opening_nls);
+        }
 
         // Format inner attributes if available.
         if let Some(attrs) = inner_attrs {
@@ -953,6 +995,18 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             } else {
                 self.last_pos = mod_lo;
                 self.block_indent = self.block_indent.block_indent(self.config);
+
+                let first_non_ws = inner_attributes(attrs)
+                    .first()
+                    .map(|attr| attr.span.lo())
+                    .or_else(|| m.items.first().map(|s| s.span().lo()));
+                if let Some(opening_nls) = self.advance_to_first_block_item(first_non_ws) {
+                    self.push_str(&opening_nls);
+                    if attrs.is_empty() {
+                        self.push_str("\n");
+                    }
+                }
+
                 self.visit_attrs(attrs, ast::AttrStyle::Inner);
                 self.walk_mod_items(m);
                 let missing_span = self.next_span(m.inner.hi() - BytePos(1));
