@@ -68,7 +68,7 @@ pub(crate) fn format_input_inner(
         return Err(OperationError::VersionMismatch);
     }
 
-    rustc_ast::with_globals(config.edition().into(), || {
+    rustc_ast::with_session_globals(config.edition().into(), || {
         format_project(input, config, operation_setting)
     })
 }
