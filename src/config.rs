@@ -95,9 +95,9 @@ create_config! {
     binop_separator: SeparatorPlace, SeparatorPlace::Front, true,
         "Where to put a binary operator when a binary expression goes multiline";
     fn_generics_space: FnGenericsSpace, FnGenericsSpace::Never, false,
-        "Leave spaces around function generics.";
+        "Controls spacing around generics within a function signature";
     fn_no_generics_space: bool, false, false,
-        "Leave a space after the function name when it's not generic.";
+        "Whether to put a space between the function name and opening paren in signatures without generics";
 
     // Misc.
     remove_nested_parens: bool, true, true, "Remove nested parens";

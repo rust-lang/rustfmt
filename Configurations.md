@@ -805,11 +805,11 @@ See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
 ## `fn_generics_space`
 
-Leave spaces around function generics.
+Controls spacing around generics within a function signature
 
 - **Default value**: `"Never"`
 - **Possible values**: `"OnlyBefore"`, `"OnlyAfter"`, `"BeforeAndAfter"`, `"Never"`
-- **Stable**: No (tracking issue: [#3564](https://github.com/rust-lang/rustfmt/issues/3564))
+- **Stable**: No
 
 #### `"Never"` (default):
 
@@ -822,6 +822,7 @@ fn lorem(ipsum: usize) {
     // body
 }
 
+// Spacing only affects this function with generics.
 fn lorem<T>(ipsum: T)
 where
     T: Add + Sub + Mul + Div,
@@ -841,6 +842,7 @@ fn lorem(ipsum: usize) {
     // body
 }
 
+// Spacing only affects this function with generics.
 fn lorem <T>(ipsum: T)
 where
     T: Add + Sub + Mul + Div,
@@ -860,6 +862,7 @@ fn lorem(ipsum: usize) {
     // body
 }
 
+// Spacing only affects this function with generics.
 fn lorem<T> (ipsum: T)
 where
     T: Add + Sub + Mul + Div,
@@ -879,6 +882,7 @@ fn lorem(ipsum: usize) {
     // body
 }
 
+// Spacing only affects this function with generics.
 fn lorem <T> (ipsum: T)
 where
     T: Add + Sub + Mul + Div,
@@ -891,11 +895,11 @@ See also [`fn_no_generics_space`](#fn_no_generics_space).
 
 ## `fn_no_generics_space`
 
-Leave a space after the function name when it's not generic.
+Whether to put a space between the function name and opening paren in signatures without generics
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3564](https://github.com/rust-lang/rustfmt/issues/3564))
+- **Stable**: No
 
 #### `false` (default):
 
@@ -908,6 +912,7 @@ fn lorem(ipsum: usize) {
     // body
 }
 
+// Spacing doesn't affect this function with generics.
 fn lorem<T>(ipsum: T)
 where
     T: Add + Sub + Mul + Div,
@@ -927,6 +932,7 @@ fn lorem (ipsum: usize) {
     // body
 }
 
+// Spacing doesn't affect this function with generics.
 fn lorem<T>(ipsum: T)
 where
     T: Add + Sub + Mul + Div,
