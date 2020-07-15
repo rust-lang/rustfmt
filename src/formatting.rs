@@ -57,7 +57,6 @@ mod vertical;
 pub(crate) mod visitor;
 
 pub(crate) mod report;
-pub(crate) mod util;
 
 pub(crate) fn format_input_inner(
     input: Input,
