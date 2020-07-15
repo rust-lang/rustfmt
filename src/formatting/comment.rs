@@ -11,7 +11,7 @@ use crate::formatting::{
     shape::{Indent, Shape},
     string::{rewrite_string, StringFormat},
     utils::{
-        count_newlines, first_line_width, last_line_width, tab_to_spaces,
+        count_newlines, first_line_width, format_code_block, last_line_width, tab_to_spaces,
         trim_end_unless_two_whitespaces, trim_left_preserve_layout, unicode_str_width,
     },
 };
@@ -685,10 +685,7 @@ impl<'a> CommentRewrite<'a> {
                         let mut config = self.fmt.config.clone();
                         config.set().wrap_comments(false);
                         if config.format_code_in_doc_comments() {
-                            if let Some(s) = crate::formatting::util::format_code_block(
-                                &self.code_block_buffer,
-                                &config,
-                            ) {
+                            if let Some(s) = format_code_block(&self.code_block_buffer, &config) {
                                 trim_custom_comment_prefix(s.as_ref())
                             } else {
                                 trim_custom_comment_prefix(&self.code_block_buffer)
