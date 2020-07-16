@@ -89,8 +89,6 @@
             const RusfmtTagsUrl = 'https://api.github.com/repos/rust-lang/rustfmt/tags';
             const UrlHash = window.location.hash.replace(/^#/, '');
             const queryParams = new URLSearchParams(window.location.search);
-            const searchParam = queryParams.get('search');
-            const searchTerm = null !== searchParam ? searchParam : '';
             const versionParam = queryParams.get('version');
             const parseVersionParam = (version) => {
               if (version === 'master') return 'master';
@@ -104,7 +102,7 @@
                 aboutHtml: '',
                 configurationAboutHtml: '',
                 configurationDescriptions: [],
-                searchCondition: searchTerm,
+                searchCondition: '',
                 shouldStable: false,
                 version: versionNumber,
                 oldVersion: undefined,
@@ -147,7 +145,6 @@
                   ast.links = {};
 
                   queryParams.set('version', this.version);
-                  queryParams.set('search', this.searchCondition);
                   const curUrl = window.location.pathname +
                     '?' + queryParams.toString() + window.location.hash;
                   history.pushState(null, '', curUrl);
