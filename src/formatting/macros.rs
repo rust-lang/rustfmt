@@ -33,11 +33,10 @@ use crate::formatting::{
     shape::{Indent, Shape},
     source_map::SpanUtils,
     spanned::Spanned,
-    util::{format_code_block, format_snippet},
     utils::{
-        count_newlines, format_visibility, indent_next_line, is_empty_line, mk_sp,
-        remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout, wrap_str,
-        NodeIdExt,
+        count_newlines, format_code_block, format_snippet, format_visibility, indent_next_line,
+        is_empty_line, mk_sp, remove_trailing_white_spaces, rewrite_ident,
+        trim_left_preserve_layout, wrap_str, NodeIdExt,
     },
     visitor::FmtVisitor,
 };
