@@ -1,5 +1,5 @@
-// rustfmt-fn_generics_space: OnlyAfter
-// Trait space after function name
+// rustfmt-space_before_fn_paren: true
+// Trait space before function paren
 
 trait Story {
     fn swap_context<T>(&mut self, context: T) -> Option<Box<Context>>

@@ -94,10 +94,8 @@ create_config! {
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
     binop_separator: SeparatorPlace, SeparatorPlace::Front, true,
         "Where to put a binary operator when a binary expression goes multiline";
-    fn_generics_space: FnGenericsSpace, FnGenericsSpace::Never, false,
-        "Controls spacing around generics within a function signature";
-    fn_no_generics_space: bool, false, false,
-        "Whether to put a space between the function name and opening paren in signatures without generics";
+    space_before_fn_paren: bool, false, false,
+        "Whether to put a space before the opening paren in function signatures";
 
     // Misc.
     remove_nested_parens: bool, true, true, "Remove nested parens";
@@ -601,8 +599,7 @@ space_after_colon = true
 space_around_attr_eq = true
 spaces_around_ranges = false
 binop_separator = "Front"
-fn_generics_space = "Never"
-fn_no_generics_space = false
+space_before_fn_paren = false
 remove_nested_parens = true
 combine_control_expr = true
 overflow_delimited_expr = false

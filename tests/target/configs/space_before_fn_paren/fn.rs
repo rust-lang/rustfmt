@@ -1,6 +1,5 @@
-// rustfmt-fn_generics_space: OnlyAfter
-// rustfmt-fn_no_generics_space: true
-// Spacing around function generics
+// rustfmt-space_before_fn_paren: true
+// Function space before function paren
 
 fn lorem () {
     // body

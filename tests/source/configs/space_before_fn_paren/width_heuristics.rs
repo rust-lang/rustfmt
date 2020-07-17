@@ -1,6 +1,6 @@
-// rustfmt-fn_generics_space: OnlyAfter
+// rustfmt-space_before_fn_paren: true
 // rustfmt-max_width: 118
-// Spacing around trait function generics
+// Trait space before function paren
 
 trait Story {
     fn swap_context<T: 'static + Context + Send + Sync>(&mut self, context: T) -> Option<Box<Context + Send + Sync>>;

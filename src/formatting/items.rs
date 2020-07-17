@@ -9,7 +9,7 @@ use rustc_ast::{ast, ptr};
 use rustc_span::{source_map, symbol, BytePos, Span, DUMMY_SP};
 
 use crate::config::lists::*;
-use crate::config::{BraceStyle, Config, FnGenericsSpace, IndentStyle};
+use crate::config::{BraceStyle, Config, IndentStyle};
 use crate::formatting::{
     attr::filter_inline_attrs,
     comment::{
@@ -916,7 +916,7 @@ fn format_impl_ref_and_type(
         result.push_str(format_unsafety(unsafety));
 
         let shape = Shape::indented(offset + last_line_width(&result), context.config);
-        let generics_str = rewrite_generics(context, "impl", generics, shape, false)?;
+        let generics_str = rewrite_generics(context, "impl", generics, shape)?;
         result.push_str(&generics_str);
         result.push_str(format_constness_right(constness));
 
@@ -1095,13 +1095,8 @@ pub(crate) fn format_trait(
         let body_lo = context.snippet_provider.span_after(item.span, "{");
 
         let shape = Shape::indented(offset, context.config).offset_left(result.len())?;
-        let generics_str = rewrite_generics(
-            context,
-            rewrite_ident(context, item.ident),
-            generics,
-            shape,
-            false,
-        )?;
+        let generics_str =
+            rewrite_generics(context, rewrite_ident(context, item.ident), generics, shape)?;
         result.push_str(&generics_str);
 
         // FIXME(#2055): rustfmt fails to format when there are comments between trait bounds.
@@ -1299,7 +1294,7 @@ pub(crate) fn format_trait_alias(
     let alias = rewrite_ident(context, ident);
     // 6 = "trait ", 2 = " ="
     let g_shape = shape.offset_left(6)?.sub_width(2)?;
-    let generics_str = rewrite_generics(context, &alias, generics, g_shape, false)?;
+    let generics_str = rewrite_generics(context, &alias, generics, g_shape)?;
     let vis_str = format_visibility(context, vis);
     let lhs = format!("{}trait {} =", vis_str, generics_str);
     // 1 = ";"
@@ -1510,7 +1505,7 @@ fn format_tuple_struct(
         Some(generics) => {
             let budget = context.budget(last_line_width(&header_str));
             let shape = Shape::legacy(budget, offset);
-            let generics_str = rewrite_generics(context, "", generics, shape, false)?;
+            let generics_str = rewrite_generics(context, "", generics, shape)?;
             result.push_str(&generics_str);
 
             let where_budget = context.budget(last_line_width(&result));
@@ -1587,7 +1582,7 @@ fn rewrite_type<R: Rewrite>(
         let g_shape = Shape::indented(indent, context.config)
             .offset_left(result.len())?
             .sub_width(2)?;
-        let generics_str = rewrite_generics(context, ident_str, generics, g_shape, false)?;
+        let generics_str = rewrite_generics(context, ident_str, generics, g_shape)?;
         result.push_str(&generics_str);
     }
 
@@ -1937,7 +1932,7 @@ pub(crate) fn rewrite_opaque_impl_type(
     let ident_str = rewrite_ident(context, ident);
     // 5 = "type "
     let generics_shape = Shape::indented(indent, context.config).offset_left(5)?;
-    let generics_str = rewrite_generics(context, ident_str, generics, generics_shape, false)?;
+    let generics_str = rewrite_generics(context, ident_str, generics, generics_shape)?;
     let prefix = format!("type {} =", generics_str);
     let rhs = OpaqueType {
         bounds: generic_bounds,
@@ -2225,7 +2220,6 @@ fn rewrite_fn_base(
         rewrite_ident(context, ident),
         fn_sig.generics,
         shape,
-        true,
     )?;
     result.push_str(&generics_str);
 
@@ -2234,13 +2228,8 @@ fn rewrite_fn_base(
         .last()
         .map_or(false, |l| l.trim_start().len() == 1);
 
-    if !fn_sig.generics.params.is_empty() {
-        match context.config.fn_generics_space() {
-            FnGenericsSpace::OnlyAfter | FnGenericsSpace::BeforeAndAfter => {
-                result.push(' ');
-            }
-            _ => {}
-        }
+    if context.config.space_before_fn_paren() {
+        result.push(' ');
     }
 
     // Note that the width and indent don't really matter, we'll re-layout the
@@ -2717,33 +2706,16 @@ fn rewrite_generics(
     ident: &str,
     generics: &ast::Generics,
     shape: Shape,
-    fn_spaces: bool,
 ) -> Option<String> {
     // FIXME: convert bounds to where-clauses where they get too big or if
     // there is a where-clause at all.
 
     if generics.params.is_empty() {
-        let mut result = ident.to_owned();
-        if fn_spaces && context.config.fn_no_generics_space() {
-            result.push(' ');
-        }
-        return Some(result);
+        return Some(ident.to_owned());
     }
 
     let params = generics.params.iter();
-    let space_after_ident = fn_spaces
-        && matches!(
-            context.config.fn_generics_space(),
-            FnGenericsSpace::OnlyBefore | FnGenericsSpace::BeforeAndAfter
-        );
-    overflow::rewrite_with_angle_brackets(
-        context,
-        ident,
-        params,
-        shape,
-        generics.span,
-        space_after_ident,
-    )
+    overflow::rewrite_with_angle_brackets(context, ident, params, shape, generics.span)
 }
 
 fn rewrite_where_clause_rfc_style(
@@ -3069,7 +3041,7 @@ fn format_generics(
     used_width: usize,
 ) -> Option<String> {
     let shape = Shape::legacy(context.budget(used_width + offset.width()), offset);
-    let mut result = rewrite_generics(context, "", generics, shape, false)?;
+    let mut result = rewrite_generics(context, "", generics, shape)?;
 
     // If the generics are not parameterized then generics.span.hi() == 0,
     // so we use span.lo(), which is the position after `struct Foo`.

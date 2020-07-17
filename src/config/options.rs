@@ -359,19 +359,6 @@ pub enum MatchArmLeadingPipe {
     KeepExisting,
 }
 
-#[config_type]
-/// Spacing around function generics.
-pub enum FnGenericsSpace {
-    /// Never add spaces.
-    Never,
-    /// Add a space before generics.
-    OnlyBefore,
-    /// Add a space after generics.
-    OnlyAfter,
-    /// Add a space before and after generics.
-    BeforeAndAfter,
-}
-
 #[cfg(test)]
 mod test {
     use std::path::PathBuf;

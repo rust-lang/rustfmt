@@ -803,146 +803,6 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
-## `fn_generics_space`
-
-Controls spacing around generics within a function signature
-
-- **Default value**: `"Never"`
-- **Possible values**: `"OnlyBefore"`, `"OnlyAfter"`, `"BeforeAndAfter"`, `"Never"`
-- **Stable**: No
-
-#### `"Never"` (default):
-
-```rust
-fn lorem() {
-    // body
-}
-
-fn lorem(ipsum: usize) {
-    // body
-}
-
-// Spacing only affects this function with generics.
-fn lorem<T>(ipsum: T)
-where
-    T: Add + Sub + Mul + Div,
-{
-    // body
-}
-```
-
-#### `"OnlyBefore"`:
-
-```rust
-fn lorem() {
-    // body
-}
-
-fn lorem(ipsum: usize) {
-    // body
-}
-
-// Spacing only affects this function with generics.
-fn lorem <T>(ipsum: T)
-where
-    T: Add + Sub + Mul + Div,
-{
-    // body
-}
-```
-
-#### `"OnlyAfter"`:
-
-```rust
-fn lorem() {
-    // body
-}
-
-fn lorem(ipsum: usize) {
-    // body
-}
-
-// Spacing only affects this function with generics.
-fn lorem<T> (ipsum: T)
-where
-    T: Add + Sub + Mul + Div,
-{
-    // body
-}
-```
-
-#### `"BeforeAndAfter"`:
-
-```rust
-fn lorem() {
-    // body
-}
-
-fn lorem(ipsum: usize) {
-    // body
-}
-
-// Spacing only affects this function with generics.
-fn lorem <T> (ipsum: T)
-where
-    T: Add + Sub + Mul + Div,
-{
-    // body
-}
-```
-
-See also [`fn_no_generics_space`](#fn_no_generics_space).
-
-## `fn_no_generics_space`
-
-Whether to put a space between the function name and opening paren in signatures without generics
-
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
-- **Stable**: No
-
-#### `false` (default):
-
-```rust
-fn lorem() {
-    // body
-}
-
-fn lorem(ipsum: usize) {
-    // body
-}
-
-// Spacing doesn't affect this function with generics.
-fn lorem<T>(ipsum: T)
-where
-    T: Add + Sub + Mul + Div,
-{
-    // body
-}
-```
-
-#### `true`:
-
-```rust
-fn lorem () {
-    // body
-}
-
-fn lorem (ipsum: usize) {
-    // body
-}
-
-// Spacing doesn't affect this function with generics.
-fn lorem<T>(ipsum: T)
-where
-    T: Add + Sub + Mul + Div,
-{
-    // body
-}
-```
-
-See also [`fn_generics_space`](#fn_generics_space).
-
 ## `fn_single_line`
 
 Put single-expression functions on a single line
@@ -2234,6 +2094,52 @@ fn lorem<T : Eq>(t : T) {
 ```
 
 See also: [`space_after_colon`](#space_after_colon).
+
+## `space_before_fn_paren`
+
+Whether to put a space before the opening paren in function signatures
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+fn lorem() {
+    // body
+}
+
+fn lorem(ipsum: usize) {
+    // body
+}
+
+fn lorem<T>(ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+#### `true`:
+
+```rust
+fn lorem () {
+    // body
+}
+
+fn lorem (ipsum: usize) {
+    // body
+}
+
+fn lorem<T> (ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
 
 ## `spaces_around_ranges`
 
