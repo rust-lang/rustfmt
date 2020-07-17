@@ -108,7 +108,8 @@
                 shouldStable: false,
                 version: versionNumber,
                 oldVersion: undefined,
-                versionOptions: ['master']
+                versionOptions: ['master'],
+                scrolledOnce: false,
               },
               asyncComputed: {
                 async outputHtml() {
@@ -158,7 +159,7 @@
                   renderer.heading = function(text, level) {
                     const id = htmlToId(text);
                     return `<h${level}>
-                              <a href="#${id}" name="${id}" class="header-link">${text}</a>
+                              <a id="${id}" href="#${id}" name="${id}" class="header-link">${text}</a>
                             </h${level}>`;
                   };
 
@@ -186,12 +187,15 @@
                   .filter(tag => tag.startsWith('v'));
                 this.versionOptions = this.versionOptions.concat(tagOptions);
               },
-              mounted() {
+              updated() {
                 if (UrlHash === '') return;
-                const target = document.querySelector(`#${UrlHash}`);
-                if (target != null) {
-                  target.scrollIntoView(true);
-                }
+                this.$nextTick(() => {
+                  const target = document.querySelector(`#${UrlHash}`);
+                  if (target != null && !this.scrolledOnce) {
+                    target.scrollIntoView(true);
+                    this.scrolledOnce = true;
+                  }
+                });
               },
               methods: {
                 handleReqFailure(e) {
