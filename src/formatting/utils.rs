@@ -792,12 +792,6 @@ pub(crate) fn format_code_block(code_snippet: &str, config: &Config) -> Option<F
         }
         let trimmed_line = if !is_indented {
             line
-        } else if line.len() > config.max_width() {
-            // If there are lines that are larger than max width, we cannot tell
-            // whether we have succeeded but have some comments or strings that
-            // are too long, or we have failed to format code block. We will be
-            // conservative and just return `None` in this case.
-            return None;
         } else if line.len() > indent_str.len() {
             // Make sure that the line has leading whitespaces.
             if line.starts_with(indent_str.as_ref()) {
@@ -886,13 +880,6 @@ mod test {
     }
 
     #[test]
-    fn test_format_code_block_fail() {
-        #[rustfmt::skip]
-        let code_block = "this_line_is_100_characters_long_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx(x, y, z);";
-        assert!(format_code_block(code_block, &Config::default()).is_none());
-    }
-
-    #[test]
     fn test_format_code_block() {
         // simple code block
         let code_block = "let x=3;";
@@ -941,6 +928,12 @@ false,
         false,
     )
 };";
+        assert!(test_format_inner(format_code_block, code_block, expected));
+
+        #[rustfmt::skip]
+        let code_block = "this_line_is_100_characters_long_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx(x, y, z);";
+        #[rustfmt::skip]
+        let expected = "this_line_is_100_characters_long_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx(x, y, z);";
         assert!(test_format_inner(format_code_block, code_block, expected));
     }
 }
