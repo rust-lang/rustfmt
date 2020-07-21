@@ -114,6 +114,8 @@ binary and library targets of your crate.
 
 You can run `rustfmt --help` for information about available arguments.
 
+Running `rustfmt` without files provided will take in source code directly via stdin.
+
 When running with `--check`, Rustfmt will exit with `0` if Rustfmt would not
 make any formatting changes to the input, and `1` if Rustfmt would make changes.
 In other modes, Rustfmt will exit with `1` if there was some error during
