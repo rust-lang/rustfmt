@@ -1,4 +1,4 @@
-// rustfmt-space_before_fn_paren: true
+// rustfmt-space_before_fn_sig_paren: true
 // rustfmt-indent_style: Visual
 // rustfmt-max_width: 30
 // Function space before function paren

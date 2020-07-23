@@ -2228,7 +2228,7 @@ fn rewrite_fn_base(
         .last()
         .map_or(false, |l| l.trim_start().len() == 1);
 
-    if context.config.space_before_fn_paren() {
+    if context.config.space_before_fn_sig_paren() {
         result.push(' ');
     }
 

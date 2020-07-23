@@ -2095,7 +2095,7 @@ fn lorem<T : Eq>(t : T) {
 
 See also: [`space_after_colon`](#space_after_colon).
 
-## `space_before_fn_paren`
+## `space_before_fn_sig_paren`
 
 Whether to put a space before the opening paren in function signatures
 

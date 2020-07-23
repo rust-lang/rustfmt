@@ -1,4 +1,4 @@
-// rustfmt-space_before_fn_paren: true
+// rustfmt-space_before_fn_sig_paren: true
 // Function space before function paren
 
 fn lorem () {
