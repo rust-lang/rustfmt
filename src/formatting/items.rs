@@ -2255,6 +2255,10 @@ fn rewrite_fn_base(
         .last()
         .map_or(false, |l| l.trim_start().len() == 1);
 
+    if context.config.space_before_fn_sig_paren() {
+        result.push(' ');
+    }
+
     // Note that the width and indent don't really matter, we'll re-layout the
     // return type later anyway.
     let ret_str = fd

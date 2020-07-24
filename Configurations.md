@@ -2129,6 +2129,52 @@ fn lorem<T : Eq>(t : T) {
 
 See also: [`space_after_colon`](#space_after_colon).
 
+## `space_before_fn_sig_paren`
+
+Whether to put a space before the opening paren in function signatures
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+fn lorem() {
+    // body
+}
+
+fn lorem(ipsum: usize) {
+    // body
+}
+
+fn lorem<T>(ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
+#### `true`:
+
+```rust
+fn lorem () {
+    // body
+}
+
+fn lorem (ipsum: usize) {
+    // body
+}
+
+fn lorem<T> (ipsum: T)
+where
+    T: Add + Sub + Mul + Div,
+{
+    // body
+}
+```
+
 ## `spaces_around_ranges`
 
 Put spaces around the .., ..=, and ... range operators
