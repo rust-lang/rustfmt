@@ -48,8 +48,8 @@ pub struct Opts {
 
     /// Options passed to rustfmt
     ///
-    /// To see all rustfmt options, run `rustfmt --help' or visit
-    /// https://rust-lang.github.io/rustfmt.
+    /// To see all rustfmt options, run `rustfmt --help'.
+    /// To see all rustfmt configuration options, please visit https://rust-lang.github.io/rustfmt.
     // 'raw = true' to make `--` explicit.
     #[structopt(name = "rustfmt_options", raw(true))]
     rustfmt_options: Vec<String>,
