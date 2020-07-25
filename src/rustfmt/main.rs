@@ -58,8 +58,8 @@ EXAMPLES
     cat lib.rs | rustfmt
         Feed the contents of "lib.rs" to rustfmt via stdin
 
-    rustfmt --emit=files lib.rs main.rs
-        Run rustfmt over "lib.rs" and "main.rs", formatting in-place
+    rustfmt --emit=stdout lib.rs main.rs
+        Run rustfmt over "lib.rs" and "main.rs", writing to stdout (rather than in-place)
 
     rustfmt --config-path=rustfmt.toml --print-config=current
         Print the resolved rustfmt configuration formed by rustfmt.toml
