@@ -58,6 +58,9 @@ EXAMPLES
     cat lib.rs | rustfmt
         Feed the contents of "lib.rs" to rustfmt via stdin
 
+    rustfmt lib.rs main.rs
+        Run rustfmt over "lib.rs" and "main.rs", formatting in-place.
+
     rustfmt --emit=stdout lib.rs main.rs
         Run rustfmt over "lib.rs" and "main.rs", writing to stdout (rather than in-place)
 
@@ -80,8 +83,8 @@ struct Opt {
     config_path: Option<PathBuf>,
     /// Rust compiler edition
     ///
-    /// Specify which edition of the compiler to use when formatting code. Uses the default
-    /// configuration's edition if not specified.
+    /// Specify which edition of the compiler to use when formatting code. This behaves identically
+    /// to the "edition" configuration option.
     #[structopt(long, name = "2015|2018")]
     edition: Option<Edition>,
     /// Print configuration options.
