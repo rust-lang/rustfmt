@@ -1,5 +1,27 @@
 # rustfmt [![Linux badge][linux-build-status]][linux-build] [![Mac badge][mac-build-status]][mac-build] [![Windows badge][windows-build-status]][windows-build] [![crates.io badge][cratesio-badge]][cratesio-package] [![Travis config badge][travis-config-badge]][travis-config-job]
 
+<!-- To update: doctoc README.md --notitle -->
+<!-- https://github.com/thlorenz/doctoc -->
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+
+- [Quick start](#quick-start)
+  - [On the Stable toolchain](#on-the-stable-toolchain)
+  - [On the Nightly toolchain](#on-the-nightly-toolchain)
+  - [Installing from source](#installing-from-source)
+- [Running](#running)
+- [Configuring Rustfmt](#configuring-rustfmt)
+  - [Rust's Editions](#rusts-editions)
+- [Limitations](#limitations)
+- [Running Rustfmt from your editor](#running-rustfmt-from-your-editor)
+- [Checking style on a CI server](#checking-style-on-a-ci-server)
+- [How to build and test](#how-to-build-and-test)
+- [Tips](#tips)
+- [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 A tool for formatting Rust code according to style guidelines.
 
 If you'd like to help out (and you should, it's a fun project!), see
@@ -45,6 +67,70 @@ To run on a cargo project in the current working directory:
 cargo +nightly fmt
 ```
 
+### Installing from source
+
+To install from source (nightly required), first checkout to the tag or branch for the version of rustfmt you want. 
+
+The easiest way to install is via [cargo make][cargo-make]
+
+```sh
+cargo make install
+```
+
+Alternatively, you can run `cargo install` directly as long as you set the required environment variables and features.
+
+```sh
+export CFG_RELEASE=1.45.0-nightly
+export CFG_RELEASE_CHANNEL=nightly
+cargo install --path . --force --locked --features rustfmt,cargo-fmt
+```
+(Windows users can use `set` to specify the environment variable values)
+
+This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add `~/.cargo/bin` directory to
+your PATH variable.
+
+## Running
+
+You can run `rustfmt --help` for information about available arguments.
+
+You can run Rustfmt by just typing `rustfmt filename` if you used `cargo
+install`. This runs rustfmt on the given file, if the file includes out of line
+modules, then we reformat those too. So to run on a whole module or crate, you
+just need to run on the root file (usually mod.rs or lib.rs). Rustfmt can also
+read data from stdin. Alternatively, you can use `cargo fmt` to format all
+binary and library targets of your crate.
+
+When running with `--check`, Rustfmt will exit with `0` if Rustfmt would not
+make any formatting changes to the input, and `1` if Rustfmt would make changes.
+In other modes, Rustfmt will exit with `1` if there was some error during
+formatting (for example a parsing or internal error) and `0` if formatting
+completed without error (whether or not changes were made).
+
+## Configuring Rustfmt
+
+Rustfmt is designed to be very configurable. You can create a TOML file called
+`rustfmt.toml` or `.rustfmt.toml`, place it in the project or any other parent
+directory and it will apply the options in that file. See `rustfmt
+--help=config` for the options which are available, or if you prefer to see
+visual style previews, [GitHub page](https://rust-lang.github.io/rustfmt/).
+
+By default, Rustfmt uses a style which conforms to the [Rust style guide][style
+guide] that has been formalized through the [style RFC
+process][fmt rfcs].
+
+Configuration options are either stable or unstable. Stable options can always
+be used on any channel. Unstable options are always available on nightly, but can only be used on stable and beta with an explicit opt-in (starting in Rustfmt v2.0).
+
+Unstable options are not available on stable/beta with Rustfmt v1.x.
+
+See the configuration documentation on the Rustfmt [GitHub page](https://rust-lang.github.io/rustfmt/) for details (look for the `unstable_features` section).
+
+### Rust's Editions
+
+Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if
+executed through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition
+needs to be specified in `rustfmt.toml`, e.g., with `edition = "2018"`.
+
 ## Limitations
 
 Rustfmt tries to work on as much Rust code as possible. Sometimes, the code
@@ -73,55 +159,6 @@ because in the future Rustfmt might work on code where it currently does not):
 * Bugs in Rustfmt (like any software, Rustfmt has bugs, we do not consider bug
   fixes to break our stability guarantees).
 
-
-## Installation
-
-```sh
-rustup component add rustfmt
-```
-
-## Installing from source
-
-To install from source (nightly required), first checkout to the tag or branch for the version of rustfmt you want. 
-
-The easiest way to install is via [cargo make][cargo-make]
-
-```sh
-cargo make install
-```
-
-Alternatively, you can run `cargo install` directly as long as you set the required environment variables and features.
-
-```sh
-export CFG_RELEASE=1.45.0-nightly
-export CFG_RELEASE_CHANNEL=nightly
-cargo install --path . --force --locked --features rustfmt,cargo-fmt
-```
-(Windows users can use `set` to specify the environment variable values)
-
-This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add `~/.cargo/bin` directory to
-your PATH variable.
-
-
-## Running
-
-You can run Rustfmt by just typing `rustfmt filename` if you used `cargo
-install`. This runs rustfmt on the given file, if the file includes out of line
-modules, then we reformat those too. So to run on a whole module or crate, you
-just need to run on the root file (usually mod.rs or lib.rs). Rustfmt can also
-read data from stdin. Alternatively, you can use `cargo fmt` to format all
-binary and library targets of your crate.
-
-You can run `rustfmt --help` for information about available arguments.
-
-When running with `--check`, Rustfmt will exit with `0` if Rustfmt would not
-make any formatting changes to the input, and `1` if Rustfmt would make changes.
-In other modes, Rustfmt will exit with `1` if there was some error during
-formatting (for example a parsing or internal error) and `0` if formatting
-completed without error (whether or not changes were made).
-
-
-
 ## Running Rustfmt from your editor
 
 * [Vim](https://github.com/rust-lang/rust.vim#formatting-with-rustfmt)
@@ -130,7 +167,6 @@ completed without error (whether or not changes were made).
 * [Atom](atom.md)
 * Visual Studio Code using [vscode-rust](https://github.com/editor-rs/vscode-rust), [vsc-rustfmt](https://github.com/Connorcpu/vsc-rustfmt) or [rls_vscode](https://github.com/jonathandturner/rls_vscode) through RLS.
 * [IntelliJ or CLion](intellij.md)
-
 
 ## Checking style on a CI server
 
@@ -196,32 +232,6 @@ CFG_RELEASE_CHANNEL=nightly CFG_RELEASE=1.45.0-nightly cargo test --all-features
 
 To run rustfmt after this, use `cargo run --bin rustfmt -- filename`. See the
 notes above on running rustfmt.
-
-
-## Configuring Rustfmt
-
-Rustfmt is designed to be very configurable. You can create a TOML file called
-`rustfmt.toml` or `.rustfmt.toml`, place it in the project or any other parent
-directory and it will apply the options in that file. See `rustfmt
---help=config` for the options which are available, or if you prefer to see
-visual style previews, [GitHub page](https://rust-lang.github.io/rustfmt/).
-
-By default, Rustfmt uses a style which conforms to the [Rust style guide][style
-guide] that has been formalized through the [style RFC
-process][fmt rfcs].
-
-Configuration options are either stable or unstable. Stable options can always
-be used on any channel. Unstable options are always available on nightly, but can only be used on stable and beta with an explicit opt-in (starting in Rustfmt v2.0).
-
-Unstable options are not available on stable/beta with Rustfmt v1.x.
-
-See the configuration documentation on the Rustfmt [GitHub page](https://rust-lang.github.io/rustfmt/) for details (look for the `unstable_features` section).
-
-### Rust's Editions
-
-Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if
-executed through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition
-needs to be specified in `rustfmt.toml`, e.g., with `edition = "2018"`.
 
 ## Tips
 

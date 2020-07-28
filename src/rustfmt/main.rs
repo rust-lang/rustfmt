@@ -43,7 +43,30 @@ fn main() {
 
 /// Format Rust code
 #[derive(Debug, StructOpt, Clone)]
-#[structopt(name = "rustfmt", version = include_str!(concat!(env!("OUT_DIR"),"/version-info.txt")))]
+#[structopt(
+    name = "rustfmt",
+    version = include_str!(concat!(env!("OUT_DIR"),"/version-info.txt")),
+    about = r#"Format Rust code
+
+Rustfmt runs on a set of files or stdin. When invoked without any file arguments, rustfmt will
+read code from stdin.
+
+Please visit https://rust-lang.github.io/rustfmt to see all rustfmt configuration options.
+
+EXAMPLES
+
+    cat lib.rs | rustfmt
+        Feed the contents of "lib.rs" to rustfmt via stdin
+
+    rustfmt lib.rs main.rs
+        Run rustfmt over "lib.rs" and "main.rs", formatting in-place.
+
+    rustfmt --emit=stdout lib.rs main.rs
+        Run rustfmt over "lib.rs" and "main.rs", writing to stdout (rather than in-place)
+
+    rustfmt --config-path=rustfmt.toml --print-config=current
+        Print the resolved rustfmt configuration formed by rustfmt.toml
+"#)]
 struct Opt {
     /// Run in 'check' mode.
     ///
@@ -60,7 +83,8 @@ struct Opt {
     config_path: Option<PathBuf>,
     /// Rust compiler edition
     ///
-    /// Specify which edition of the compiler to use when formatting code.
+    /// Specify which edition of the compiler to use when formatting code. This behaves identically
+    /// to the "edition" configuration option.
     #[structopt(long, name = "2015|2018")]
     edition: Option<Edition>,
     /// Print configuration options.
