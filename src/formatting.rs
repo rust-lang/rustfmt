@@ -245,7 +245,7 @@ enum Timer {
 
 impl Timer {
     fn start() -> Timer {
-        if cfg!(target_arch = "wasm32") {
+        if cfg!(all(target_arch = "wasm32", not(target_os = "wasi"))) {
             Timer::Disabled
         } else {
             Timer::Initialized(Instant::now())

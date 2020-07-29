@@ -263,7 +263,7 @@ impl Config {
                 dir.to_path_buf()
             };
 
-            current = dunce::canonicalize(current)?;
+            current = dunce::canonicalize(&current).unwrap_or(current);
             let mut paths = Vec::new();
 
             loop {
