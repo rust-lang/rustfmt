@@ -13,7 +13,7 @@ use crate::formatting::{
 
 pub(crate) struct Stmt<'a> {
     inner: &'a ast::Stmt,
-    is_last: bool,
+    pub(crate) is_last: bool,
 }
 
 impl<'a> Spanned for Stmt<'a> {

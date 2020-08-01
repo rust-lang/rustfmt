@@ -8,6 +8,7 @@ use crate::config::{BraceStyle, Config};
 use crate::formatting::{
     attr::*,
     comment::{rewrite_comment, CodeCharKind, CommentCodeSlices},
+    expr::rewrite_unary_prefix,
     items::{
         format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
         rewrite_associated_impl_type, rewrite_extern_crate, rewrite_opaque_impl_type,
@@ -157,6 +158,15 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         stmt.span(),
                         get_span_without_attrs(stmt.as_ast_node()),
                     );
+                } else if self.get_context().config.explicit_return()
+                    && stmt.is_last
+                    && matches!(stmt.as_ast_node().kind, ast::StmtKind::Expr(..))
+                {
+                    let expr = stmt.as_ast_node().clone().add_trailing_semicolon();
+                    let shape = self.shape();
+                    let rewrite = self
+                        .with_context(|ctx| rewrite_unary_prefix(&ctx, "return ", &expr, shape));
+                    self.push_rewrite(stmt.span(), rewrite)
                 } else {
                     let shape = self.shape();
                     let rewrite = self.with_context(|ctx| stmt.rewrite(&ctx, shape));

@@ -134,6 +134,8 @@ create_config! {
     format_generated_files: bool, false, false, "Format generated files";
     preserve_block_start_blank_lines: bool, false, false, "Preserve blank lines at the start of \
         blocks.";
+    explicit_return: bool, false, false, "Replace trailing expressions with explicit return \
+        statements.";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -623,6 +625,7 @@ edition = "2018"
 inline_attribute_width = 0
 format_generated_files = false
 preserve_block_start_blank_lines = false
+explicit_return = false
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false

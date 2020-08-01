@@ -678,6 +678,38 @@ trailing whitespaces.
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#3392](https://github.com/rust-lang/rustfmt/issues/3392))
 
+## `explicit_return`
+
+Replace terminating block expressions with explicit return statements.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```
+fn is_divisible_by(lhs: u32, rhs: u32) -> bool {
+    if rhs == 0 {
+        return false;
+    }
+
+    lhs % rhs == 0
+}
+```
+
+#### `true` (default):
+
+```
+fn is_divisible_by(lhs: u32, rhs: u32) -> bool {
+    if rhs == 0 {
+        return false;
+    }
+
+    return lhs % rhs == 0;
+}
+```
+
 ## `fn_params_layout`
 
 Control the layout of parameters in a function signature
