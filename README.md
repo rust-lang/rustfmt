@@ -1,5 +1,8 @@
 # rustfmt [![Linux badge][linux-build-status]][linux-build] [![Mac badge][mac-build-status]][mac-build] [![Windows badge][windows-build-status]][windows-build] [![crates.io badge][cratesio-badge]][cratesio-package] [![Travis config badge][travis-config-badge]][travis-config-job]
 
+My patch of rustfmt, with the following additions:
+  - `explicit_return` config option (https://github.com/rust-lang/rustfmt/issues/4359)
+
 <!-- To update: doctoc README.md --notitle -->
 <!-- https://github.com/thlorenz/doctoc -->
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
