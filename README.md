@@ -10,8 +10,15 @@
   - [On the Stable toolchain](#on-the-stable-toolchain)
   - [On the Nightly toolchain](#on-the-nightly-toolchain)
   - [Installing from source](#installing-from-source)
-- [Running](#running)
+- [Usage](#usage)
+  - [Running `cargo fmt`](#running-cargo-fmt)
+  - [Running `rustfmt` directly](#running-rustfmt-directly)
+  - [Verifying code is formatted](#verifying-code-is-formatted)
+  - [Exit codes](#exit-codes)
 - [Configuring Rustfmt](#configuring-rustfmt)
+  - [Differences in rustfmt versions](#differences-in-rustfmt-versions)
+    - [Default formatting of submodules](#default-formatting-of-submodules)
+    - [Construction of config options](#construction-of-config-options)
   - [Rust's Editions](#rusts-editions)
 - [Limitations](#limitations)
 - [Running Rustfmt from your editor](#running-rustfmt-from-your-editor)
@@ -69,7 +76,7 @@ cargo +nightly fmt
 
 ### Installing from source
 
-To install from source (nightly required), first checkout to the tag or branch for the version of rustfmt you want. 
+To install from source (nightly required), first checkout to the tag or branch for the version of rustfmt you want.
 
 The easiest way to install is via [cargo make][cargo-make]
 
@@ -80,28 +87,43 @@ cargo make install
 Alternatively, you can run `cargo install` directly as long as you set the required environment variables and features.
 
 ```sh
-export CFG_RELEASE=1.45.0-nightly
+export CFG_RELEASE=nightly
 export CFG_RELEASE_CHANNEL=nightly
 cargo install --path . --force --locked --features rustfmt,cargo-fmt
 ```
 (Windows users can use `set` to specify the environment variable values)
 
-This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add `~/.cargo/bin` directory to
+This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add the `~/.cargo/bin` directory to
 your PATH variable.
 
-## Running
+## Usage
 
-You can run `rustfmt --help` for information about available arguments.
+Please use `rustfmt --help` to see information about available arguments.
 
-You can run Rustfmt by just typing `rustfmt filename` if you used `cargo
-install`. This runs rustfmt on the given file, if the file includes out of line
-modules, then we reformat those too. So to run on a whole module or crate, you
-just need to run on the root file (usually mod.rs or lib.rs). Rustfmt can also
-read data from stdin. Alternatively, you can use `cargo fmt` to format all
-binary and library targets of your crate.
+### Running `cargo fmt`
+
+The easiest way to run rustfmt against a project is with `cargo fmt`. `cargo fmt` works on both
+single-crate projects and [cargo workspaces](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html).
+Please see `cargo fmt --help` for usage information.
+
+### Running `rustfmt` directly
+
+To format individual files or arbitrary codes from stdin, the `rustfmt` binary should be used. Some
+examples follow:
+
+- `rustfmt lib.rs main.rs` will format "lib.rs" and "main.rs" in place
+- `rustfmt` will read a code from stdin and write formatting to stdout
+  - `echo "fn     main() {}" | rustfmt` would emit "fn main() {}".
+
+For more information, including arguments and emit options, see `rustfmt --help`.
+
+### Verifying code is formatted
 
 When running with `--check`, Rustfmt will exit with `0` if Rustfmt would not
 make any formatting changes to the input, and `1` if Rustfmt would make changes.
+
+### Exit codes
+
 In other modes, Rustfmt will exit with `1` if there was some error during
 formatting (for example a parsing or internal error) and `0` if formatting
 completed without error (whether or not changes were made).
@@ -110,13 +132,12 @@ completed without error (whether or not changes were made).
 
 Rustfmt is designed to be very configurable. You can create a TOML file called
 `rustfmt.toml` or `.rustfmt.toml`, place it in the project or any other parent
-directory and it will apply the options in that file. See `rustfmt
---help=config` for the options which are available, or if you prefer to see
-visual style previews, [GitHub page](https://rust-lang.github.io/rustfmt/).
+directory and it will apply the options in that file. See the [config website](https://rust-lang.github.io/rustfmt/)
+for all available options.
 
 By default, Rustfmt uses a style which conforms to the [Rust style guide][style
 guide] that has been formalized through the [style RFC
-process][fmt rfcs].
+process][fmt RFCs].
 
 Configuration options are either stable or unstable. Stable options can always
 be used on any channel. Unstable options are always available on nightly, but can only be used on stable and beta with an explicit opt-in (starting in Rustfmt v2.0).
@@ -124,6 +145,28 @@ be used on any channel. Unstable options are always available on nightly, but ca
 Unstable options are not available on stable/beta with Rustfmt v1.x.
 
 See the configuration documentation on the Rustfmt [GitHub page](https://rust-lang.github.io/rustfmt/) for details (look for the `unstable_features` section).
+
+### Differences in rustfmt versions
+
+#### Default formatting of submodules
+
+On an invocation `rustfmt lib.rs`, rustfmt 1.x would format both "lib.rs" and any out-of-file
+submodules referenced in "lib.rs", unless the `skip_children` configuration option was true.
+
+With rustfmt 2.x, this behavior requires the `--recursive` flag (#3587). By default, out-of-file
+submodules of given files are not formatted.
+
+Note that this only applies to the `rustfmt` binary, and does not impact `cargo fmt`.
+
+#### Construction of config options
+
+Rustfmt 1.x uses only the configuration options declared in the rustfmt configuration file nearest
+the directory `rustfmt` is invoked.
+
+Rustfmt 2.x merges configuration options from all configuration files in all parent directories,
+with configuration files nearer the current directory having priority.
+
+Please see [Configurations](https://github.com/rust-lang/rustfmt/blob/master/Configurations.md#configuration-file-resolution) for more information and #3881 for the motivating issue.
 
 ### Rust's Editions
 
@@ -134,28 +177,13 @@ needs to be specified in `rustfmt.toml`, e.g., with `edition = "2018"`.
 ## Limitations
 
 Rustfmt tries to work on as much Rust code as possible. Sometimes, the code
-doesn't even need to compile! As we approach a 1.0 release we are also looking
-to limit areas of instability; in particular, post-1.0, the formatting of most
-code should not change as Rustfmt improves. However, there are some things that
-Rustfmt can't do or can't do well (and thus where formatting might change
-significantly, even post-1.0). We would like to reduce the list of limitations
-over time.
+doesn't even need to compile! However, there are some things that
+Rustfmt can't do or can't do well. The following list enumerates such limitations:
 
-The following list enumerates areas where Rustfmt does not work or where the
-stability guarantees do not apply (we don't make a distinction between the two
-because in the future Rustfmt might work on code where it currently does not):
-
-* a program where any part of the program does not parse (parsing is an early
+* A program where any part of the program does not parse (parsing is an early
   stage of compilation and in Rust includes macro expansion).
-* Macro declarations and uses (current status: some macro declarations and uses
-  are formatted).
-* Comments, including any AST node with a comment 'inside' (Rustfmt does not
-  currently attempt to format comments, it does format code with comments inside, but that formatting may change in the future).
-* Rust code in code blocks in comments.
 * Any fragment of a program (i.e., stability guarantees only apply to whole
   programs, even where fragments of a program can be formatted today).
-* Code containing non-ascii unicode characters (we believe Rustfmt mostly works
-  here, but do not have the test coverage or experience to be 100% sure).
 * Bugs in Rustfmt (like any software, Rustfmt has bugs, we do not consider bug
   fixes to break our stability guarantees).
 
@@ -226,7 +254,7 @@ cargo make test
 Or alternatively with `cargo` directly:
 ```sh
 cargo test --all-features
-# or 
+# or
 CFG_RELEASE_CHANNEL=nightly CFG_RELEASE=1.45.0-nightly cargo test --all-features
 ```
 
@@ -237,13 +265,13 @@ notes above on running rustfmt.
 
 * For things you do not want rustfmt to mangle, use `#[rustfmt::skip]`
 * To prevent rustfmt from formatting a macro or an attribute,
-  use `#[rustfmt::skip::macros(target_macro_name)]` or 
+  use `#[rustfmt::skip::macros(target_macro_name)]` or
   `#[rustfmt::skip::attributes(target_attribute_name)]`
 
   Example:
 
     ```rust
-    #![rustfmt::skip::attributes(custom_attribute)]   
+    #![rustfmt::skip::attributes(custom_attribute)]
 
     #[custom_attribute(formatting , here , should , be , Skipped)]
     #[rustfmt::skip::macros(html)]
