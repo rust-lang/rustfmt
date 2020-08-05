@@ -148,13 +148,10 @@ See the configuration documentation on the Rustfmt [GitHub page](https://rust-la
 
 ### Differences in rustfmt versions
 
-Aside differences in [configuration options](#configuring-rustfmt), versions of rustfmt may differ
-in formatting behavior.
-
 #### Default formatting of submodules
 
 On an invocation `rustfmt lib.rs`, rustfmt 1.x would format both "lib.rs" and any out-of-file
-submodules referenced in "lib.rs".
+submodules referenced in "lib.rs", unless the `skip_children` configuration option was true.
 
 With rustfmt 2.x, this behavior requires the `--recursive` flag (#3587). By default, out-of-file
 submodules of given files are not formatted.
