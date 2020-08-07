@@ -2412,8 +2412,12 @@ fn rewrite_fn_base(
                     // type when it is on a newline entirely disconnected from the parentheses of
                     // the parameters.
                     force_new_line_for_brace = true;
-
-                    ret_shape.indent = ret_shape.indent + 4;
+                    ret_shape = if context.use_block_indent() && !ret_on_nl {
+                        ret_shape.offset_left(4).unwrap_or(ret_shape)
+                    } else {
+                        ret_shape.indent = ret_shape.indent + 4;
+                        ret_shape
+                    };
                 }
 
                 result.push_str(&ret_shape.indent.to_string_with_newline(context.config));
