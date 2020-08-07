@@ -2368,6 +2368,7 @@ fn rewrite_fn_base(
 
     // Return type.
     if let ast::FnRetTy::Ty(..) = fd.output {
+        let mut ret_on_nl = false;
         let ret_should_indent = match context.config.indent_style() {
             // If our params are block layout then we surely must have space.
             IndentStyle::Block if put_params_in_block || fd.inputs.is_empty() => false,
@@ -2385,7 +2386,8 @@ fn rewrite_fn_base(
                     sig_length += 2;
                 }
 
-                sig_length > context.config.max_width()
+                ret_on_nl = sig_length > context.config.max_width();
+                ret_on_nl
             }
         };
         let ret_shape = if ret_should_indent {
@@ -2405,10 +2407,12 @@ fn rewrite_fn_base(
                 Shape::indented(indent, context.config)
             } else {
                 let mut ret_shape = Shape::indented(indent, context.config);
-                if param_str.is_empty() {
-                    // Aligning with non-existent params looks silly.
+                if param_str.is_empty() || ret_on_nl {
+                    // Aligning with non-existent params looks silly, as does aligning the return
+                    // type when it is on a newline entirely disconnected from the parentheses of
+                    // the parameters.
                     force_new_line_for_brace = true;
-                    ret_shape = if context.use_block_indent() {
+                    ret_shape = if context.use_block_indent() && !ret_on_nl {
                         ret_shape.offset_left(4).unwrap_or(ret_shape)
                     } else {
                         ret_shape.indent = ret_shape.indent + 4;

@@ -4,7 +4,7 @@
 
 trait Story {
     fn swap_context<T: 'static + Context + Send + Sync> (&mut self, context: T)
-    -> Option<Box<Context + Send + Sync>>;
+        -> Option<Box<Context + Send + Sync>>;
 }
 
 impl Story for () {
