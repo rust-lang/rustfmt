@@ -201,16 +201,16 @@ fn system_tests() {
 #[test]
 fn checkstyle_test() {
     init_log();
-    let filename = "tests/writemode/source/fn-single-line.rs";
-    let expected_filename = "tests/writemode/target/checkstyle.xml";
+    let filename = "tests/emit/source/fn-single-line.rs";
+    let expected_filename = "tests/emit/target/checkstyle.xml";
     assert_output(Path::new(filename), Path::new(expected_filename));
 }
 
 #[test]
 fn json_test() {
     init_log();
-    let filename = "tests/writemode/source/json.rs";
-    let expected_filename = "tests/writemode/target/output.json";
+    let filename = "tests/emit/source/json.rs";
+    let expected_filename = "tests/emit/target/output.json";
     assert_output(Path::new(filename), Path::new(expected_filename));
 }
 
@@ -220,7 +220,7 @@ fn modified_test() {
     use std::io::BufRead;
 
     // Test "modified" output
-    let filename = "tests/writemode/source/modified.rs";
+    let filename = "tests/emit/source/modified.rs";
     let config = Config::default();
     let setting = OperationSetting::default();
 
@@ -481,8 +481,8 @@ fn stdin_works_with_modified_lines() {
 fn stdin_works_with_json() {
     init_log();
     assert_stdin_output(
-        Path::new("tests/writemode/source/stdin.rs"),
-        Path::new("tests/writemode/target/stdin.json"),
+        Path::new("tests/emit/source/stdin.rs"),
+        Path::new("tests/emit/target/stdin.json"),
         EmitMode::Json,
         true,
     );
@@ -493,8 +493,8 @@ fn stdin_works_with_json() {
 fn stdin_works_with_checkstyle() {
     init_log();
     assert_stdin_output(
-        Path::new("tests/writemode/source/stdin.rs"),
-        Path::new("tests/writemode/target/stdin.xml"),
+        Path::new("tests/emit/source/stdin.rs"),
+        Path::new("tests/emit/target/stdin.xml"),
         EmitMode::Checkstyle,
         false,
     );
