@@ -68,7 +68,7 @@ impl<'a> Display for FormatReportFormatter<'a> {
                 let slice = Slice {
                     source: error.line_str().unwrap_or(""),
                     line_start: error.line_num().unwrap_or(0),
-                    origin: origin.as_ref().map(|s| s.as_str()),
+                    origin: origin.as_deref(),
                     fold: false,
                     annotations: slice_annotation(error).into_iter().collect(),
                 };

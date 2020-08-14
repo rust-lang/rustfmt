@@ -54,7 +54,7 @@ impl FormatError {
 
     /// Return the content of the line on which this error arose.
     pub fn line_str(&self) -> Option<&str> {
-        self.line_str.as_ref().map(|s| s.as_str())
+        self.line_str.as_deref()
     }
 
     pub(crate) fn new(kind: ErrorKind, line_num: usize, line_str: String) -> Self {

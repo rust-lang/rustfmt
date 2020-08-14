@@ -540,7 +540,7 @@ impl UseTree {
     }
 
     fn flatten(self) -> Vec<UseTree> {
-        match self.path.clone().last() {
+        match self.path.last() {
             Some(UseSegment::List(list)) => {
                 if list.len() == 1 && list[0].path.len() == 1 {
                     if let UseSegment::Slf(..) = list[0].path[0] {

@@ -215,9 +215,9 @@ fn format_file(
     // source map instead of hitting the file system.
     let original_text = match original_snippet {
         Some(snippet) => snippet,
-        None => std::fs::read_to_string(path.as_path().ok_or(OperationError::IoError(
-            std::io::Error::from(std::io::ErrorKind::InvalidInput),
-        ))?)?,
+        None => std::fs::read_to_string(path.as_path().ok_or_else(|| {
+            OperationError::IoError(std::io::Error::from(std::io::ErrorKind::InvalidInput))
+        })?)?,
     };
     apply_newline_style(config.newline_style(), &mut visitor.buffer, &original_text);
 

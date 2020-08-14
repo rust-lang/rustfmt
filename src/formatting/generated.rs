@@ -12,11 +12,11 @@ pub(super) fn is_generated_file(file_name: &FileName, original_snippet: Option<&
         FileName::Stdin => original_snippet
             .and_then(|s| s.lines().next())
             .map(str::to_owned)
-            .unwrap_or("".to_owned()),
+            .unwrap_or_default(),
         FileName::Real(ref path) => fs::File::open(path)
             .ok()
             .and_then(|f| io::BufReader::new(f).lines().next()?.ok())
-            .unwrap_or("".to_owned()),
+            .unwrap_or_default(),
     };
 
     is_comment_with_generated_notation(&first_line)
