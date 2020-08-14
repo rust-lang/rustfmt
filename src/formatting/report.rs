@@ -189,9 +189,8 @@ impl FormatReport {
 
     pub fn has_attribute_errors(&self) -> bool {
         self.has_any_matching_format_result(|(_, format_result)| {
-            format_result.has_any_matching_errors(|e| match e.kind() {
-                ErrorKind::BadAttr | ErrorKind::DeprecatedAttr => true,
-                _ => false,
+            format_result.has_any_matching_errors(|e| {
+                matches!(e.kind(), ErrorKind::BadAttr | ErrorKind::DeprecatedAttr)
             })
         })
     }

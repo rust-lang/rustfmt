@@ -743,13 +743,9 @@ fn rewrite_nested_use_tree(
         }
     }
     let has_nested_list = use_tree_list.iter().any(|use_segment| {
-        use_segment
-            .path
-            .last()
-            .map_or(false, |last_segment| match last_segment {
-                UseSegment::List(..) => true,
-                _ => false,
-            })
+        use_segment.path.last().map_or(false, |last_segment| {
+            matches!(last_segment, UseSegment::List(..))
+        })
     });
 
     let remaining_width = if has_nested_list {
