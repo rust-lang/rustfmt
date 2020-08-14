@@ -65,7 +65,7 @@ impl FormatResult {
 
     /// Return the newline style used to format the result.
     pub fn newline_style(&self) -> NewlineStyle {
-        self.newline_style.clone()
+        self.newline_style
     }
 
     pub fn original_text(&self) -> &str {

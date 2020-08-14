@@ -332,7 +332,7 @@ impl str::FromStr for FileLines {
         let mut m = HashMap::new();
         for js in v {
             let (s, r) = JsonSpan::into_tuple(js)?;
-            m.entry(s).or_insert_with(|| vec![]).push(r);
+            m.entry(s).or_insert_with(Vec::new).push(r);
         }
         Ok(FileLines::from_ranges(m))
     }
