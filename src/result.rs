@@ -128,9 +128,6 @@ pub enum OperationError {
 impl OperationError {
     #[cfg(test)]
     pub fn is_parse_error(&self) -> bool {
-        match self {
-            OperationError::ParseError { .. } => true,
-            _ => false,
-        }
+        matches!(self, OperationError::ParseError { .. })
     }
 }

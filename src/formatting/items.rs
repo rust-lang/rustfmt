@@ -471,10 +471,7 @@ impl<'a> FmtVisitor<'a> {
     }
 
     pub(crate) fn visit_struct(&mut self, struct_parts: &StructParts<'_>) {
-        let is_tuple = match struct_parts.def {
-            ast::VariantData::Tuple(..) => true,
-            _ => false,
-        };
+        let is_tuple = matches!(struct_parts.def, ast::VariantData::Tuple(..));
         let rewrite = format_struct(&self.get_context(), struct_parts, self.block_indent, None)
             .map(|s| if is_tuple { s + ";" } else { s });
         self.push_rewrite(struct_parts.span, rewrite);
@@ -3318,15 +3315,9 @@ pub(crate) fn is_mod_decl(item: &ast::Item) -> bool {
 }
 
 pub(crate) fn is_use_item(item: &ast::Item) -> bool {
-    match item.kind {
-        ast::ItemKind::Use(_) => true,
-        _ => false,
-    }
+    matches!(item.kind, ast::ItemKind::Use(_))
 }
 
 pub(crate) fn is_extern_crate(item: &ast::Item) -> bool {
-    match item.kind {
-        ast::ItemKind::ExternCrate(..) => true,
-        _ => false,
-    }
+    matches!(item.kind, ast::ItemKind::ExternCrate(..))
 }

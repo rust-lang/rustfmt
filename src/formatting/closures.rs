@@ -124,19 +124,19 @@ fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext<'_>) -
 // TODO: The expressions "veto"ed here should align with expressions that are permitted on multiple
 // lines in rewrite_closure_expr#allow_multi_line. Consider refactoring to avoid this disparity.
 fn veto_block(e: &ast::Expr) -> bool {
-    match e.kind {
+    matches!(
+        e.kind,
         ast::ExprKind::Call(..)
-        | ast::ExprKind::Binary(..)
-        | ast::ExprKind::Cast(..)
-        | ast::ExprKind::Type(..)
-        | ast::ExprKind::Assign(..)
-        | ast::ExprKind::AssignOp(..)
-        | ast::ExprKind::Field(..)
-        | ast::ExprKind::Index(..)
-        | ast::ExprKind::Range(..)
-        | ast::ExprKind::Try(..) => true,
-        _ => false,
-    }
+            | ast::ExprKind::Binary(..)
+            | ast::ExprKind::Cast(..)
+            | ast::ExprKind::Type(..)
+            | ast::ExprKind::Assign(..)
+            | ast::ExprKind::AssignOp(..)
+            | ast::ExprKind::Field(..)
+            | ast::ExprKind::Index(..)
+            | ast::ExprKind::Range(..)
+            | ast::ExprKind::Try(..)
+    )
 }
 
 // Rewrite closure with a single expression wrapping its body with block.
@@ -402,10 +402,7 @@ pub(crate) fn rewrite_last_closure(
 pub(crate) fn args_have_many_closure(args: &[OverflowableItem<'_>]) -> bool {
     args.iter()
         .filter_map(OverflowableItem::to_expr)
-        .filter(|expr| match expr.kind {
-            ast::ExprKind::Closure(..) => true,
-            _ => false,
-        })
+        .filter(|expr| matches!(expr.kind, ast::ExprKind::Closure(..)))
         .count()
         > 1
 }
@@ -454,14 +451,14 @@ fn is_block_closure_forced_inner(expr: &ast::Expr) -> bool {
 /// isn't parsed as (if true {...} else {...} | x) | 5
 // From https://github.com/rust-lang/rust/blob/master/src/libsyntax/parse/classify.rs.
 fn expr_requires_semi_to_be_stmt(e: &ast::Expr) -> bool {
-    match e.kind {
+    !matches!(
+        e.kind,
         ast::ExprKind::If(..)
-        | ast::ExprKind::Match(..)
-        | ast::ExprKind::Block(..)
-        | ast::ExprKind::While(..)
-        | ast::ExprKind::Loop(..)
-        | ast::ExprKind::ForLoop(..)
-        | ast::ExprKind::TryBlock(..) => false,
-        _ => true,
-    }
+            | ast::ExprKind::Match(..)
+            | ast::ExprKind::Block(..)
+            | ast::ExprKind::While(..)
+            | ast::ExprKind::Loop(..)
+            | ast::ExprKind::ForLoop(..)
+            | ast::ExprKind::TryBlock(..)
+    )
 }

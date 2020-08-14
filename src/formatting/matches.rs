@@ -357,11 +357,7 @@ fn rewrite_match_body(
     arrow_span: Span,
     is_last: bool,
 ) -> Option<String> {
-    let was_block = if let ast::ExprKind::Block(..) = body.kind {
-        true
-    } else {
-        false
-    };
+    let was_block = matches!(body.kind, ast::ExprKind::Block(..));
 
     let (extend, body) = flatten_arm_body(
         context,

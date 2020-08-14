@@ -263,15 +263,12 @@ pub(crate) fn format_expr(
             }
 
             fn needs_space_after_range(rhs: &ast::Expr) -> bool {
-                match rhs.kind {
-                    // Don't format `.. ..` into `....`, which is invalid.
-                    //
-                    // This check is unnecessary for `lhs`, because a range
-                    // starting from another range needs parentheses as `(x ..) ..`
-                    // (`x .. ..` is a range from `x` to `..`).
-                    ast::ExprKind::Range(None, _, _) => true,
-                    _ => false,
-                }
+                // Don't format `.. ..` into `....`, which is invalid.
+                //
+                // This check is unnecessary for `lhs`, because a range
+                // starting from another range needs parentheses as `(x ..) ..`
+                // (`x .. ..` is a range from `x` to `..`).
+                matches!(rhs.kind, ast::ExprKind::Range(None, _, _))
             }
 
             let default_sp_delim = |lhs: Option<&ast::Expr>, rhs: Option<&ast::Expr>| {
@@ -1203,18 +1200,11 @@ pub(crate) fn is_empty_block(
 }
 
 pub(crate) fn stmt_is_expr(stmt: &ast::Stmt) -> bool {
-    match stmt.kind {
-        ast::StmtKind::Expr(..) => true,
-        _ => false,
-    }
+    matches!(stmt.kind, ast::StmtKind::Expr(..))
 }
 
 pub(crate) fn is_unsafe_block(block: &ast::Block) -> bool {
-    if let ast::BlockCheckMode::Unsafe(..) = block.rules {
-        true
-    } else {
-        false
-    }
+    matches!(block.rules, ast::BlockCheckMode::Unsafe(..))
 }
 
 pub(crate) fn rewrite_literal(

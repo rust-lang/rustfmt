@@ -196,10 +196,7 @@ impl ListItem {
     // Returns `true` if the item causes something to be written.
     fn is_substantial(&self) -> bool {
         fn empty(s: &Option<String>) -> bool {
-            match *s {
-                Some(ref s) if !s.is_empty() => false,
-                _ => true,
-            }
+            !matches!(*s, Some(ref s) if !s.is_empty())
         }
 
         !(empty(&self.pre_comment) && empty(&self.item) && empty(&self.post_comment))

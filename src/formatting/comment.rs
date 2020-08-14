@@ -48,13 +48,10 @@ fn custom_opener(s: &str) -> &str {
 impl<'a> CommentStyle<'a> {
     /// Returns `true` if the commenting style covers a line only.
     pub(crate) fn is_line_comment(&self) -> bool {
-        match *self {
-            CommentStyle::DoubleSlash
+        matches!(*self, CommentStyle::DoubleSlash
             | CommentStyle::TripleSlash
             | CommentStyle::Doc
-            | CommentStyle::Custom(_) => true,
-            _ => false,
-        }
+            | CommentStyle::Custom(_))
     }
 
     /// Returns `true` if the commenting style can span over multiple lines.
@@ -70,13 +67,13 @@ impl<'a> CommentStyle<'a> {
     /// Returns `true` if the commenting style is for documentation.
     /// https://doc.rust-lang.org/reference/comments.html
     pub(crate) fn is_doc_comment(&self) -> bool {
-        match *self {
+        matches!(
+            *self,
             CommentStyle::TripleSlash
-            | CommentStyle::Doc
-            | CommentStyle::DoubleBullet
-            | CommentStyle::Exclamation => true,
-            _ => false,
-        }
+                | CommentStyle::Doc
+                | CommentStyle::DoubleBullet
+                | CommentStyle::Exclamation
+        )
     }
 
     pub(crate) fn opener(&self) -> &'a str {
@@ -888,11 +885,7 @@ fn is_table_item(mut s: &str) -> bool {
     // This function may return false positive, but should get its job done in most cases (i.e.
     // markdown tables with two column delimiters).
     s = s.trim_start();
-    return s.starts_with('|')
-        && match s.rfind('|') {
-            Some(0) | None => false,
-            _ => true,
-        };
+    return s.starts_with('|') && !matches!(s.rfind('|'), Some(0) | None);
 }
 
 /// Given the span, rewrite the missing comment inside it if available.
@@ -1166,26 +1159,26 @@ pub(crate) enum FullCodeCharKind {
 
 impl FullCodeCharKind {
     pub(crate) fn is_comment(self) -> bool {
-        match self {
+        matches!(
+            self,
             FullCodeCharKind::StartComment
-            | FullCodeCharKind::InComment
-            | FullCodeCharKind::EndComment
-            | FullCodeCharKind::StartStringCommented
-            | FullCodeCharKind::InStringCommented
-            | FullCodeCharKind::EndStringCommented => true,
-            _ => false,
-        }
+                | FullCodeCharKind::InComment
+                | FullCodeCharKind::EndComment
+                | FullCodeCharKind::StartStringCommented
+                | FullCodeCharKind::InStringCommented
+                | FullCodeCharKind::EndStringCommented
+        )
     }
 
     /// Returns true if the character is inside a comment
     pub(crate) fn inside_comment(self) -> bool {
-        match self {
+        matches!(
+            self,
             FullCodeCharKind::InComment
-            | FullCodeCharKind::StartStringCommented
-            | FullCodeCharKind::InStringCommented
-            | FullCodeCharKind::EndStringCommented => true,
-            _ => false,
-        }
+                | FullCodeCharKind::StartStringCommented
+                | FullCodeCharKind::InStringCommented
+                | FullCodeCharKind::EndStringCommented
+        )
     }
 
     pub(crate) fn is_string(self) -> bool {

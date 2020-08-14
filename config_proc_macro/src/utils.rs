@@ -13,10 +13,7 @@ where
 }
 
 pub fn is_unit(v: &syn::Variant) -> bool {
-    match v.fields {
-        syn::Fields::Unit => true,
-        _ => false,
-    }
+    matches!(v.fields, syn::Fields::Unit)
 }
 
 /// Pretty-print the output of proc macro using rustfmt.

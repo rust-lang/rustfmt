@@ -413,10 +413,7 @@ impl<'a> Spanned for TuplePatField<'a> {
 impl<'a> TuplePatField<'a> {
     fn is_dotdot(&self) -> bool {
         match self {
-            TuplePatField::Pat(pat) => match pat.kind {
-                ast::PatKind::Rest => true,
-                _ => false,
-            },
+            TuplePatField::Pat(pat) => matches!(pat.kind, ast::PatKind::Rest),
             TuplePatField::Dotdot(_) => true,
         }
     }
@@ -512,10 +509,11 @@ fn count_wildcard_suffix_len(
     )
     .collect();
 
-    for item in items.iter().rev().take_while(|i| match i.item {
-        Some(ref internal_string) if internal_string == "_" => true,
-        _ => false,
-    }) {
+    for item in items
+        .iter()
+        .rev()
+        .take_while(|i| matches!(i.item, Some(ref internal_string) if internal_string == "_"))
+    {
         suffix_len += 1;
 
         if item.has_comment() {
