@@ -140,6 +140,7 @@ fn veto_block(e: &ast::Expr) -> bool {
 }
 
 // Rewrite closure with a single expression wrapping its body with block.
+// || { #[attr] foo() } -> Block { #[attr] foo() }
 fn rewrite_closure_with_block(
     body: &ast::Expr,
     prefix: &str,
@@ -160,7 +161,11 @@ fn rewrite_closure_with_block(
         }],
         id: ast::NodeId::root(),
         rules: ast::BlockCheckMode::Default,
-        span: body.span,
+        span: body
+            .attrs
+            .first()
+            .map(|attr| attr.span.to(body.span))
+            .unwrap_or(body.span),
     };
     let block =
         rewrite_block_with_visitor(context, "", &block, Some(&body.attrs), None, shape, false)?;
