@@ -504,6 +504,13 @@ where
             if formatted_comment.contains('\n') {
                 item_max_width = None;
             }
+            
+            /* If adding the comment will exceed max length - add new line */
+            if indent_str.len() + result.len() + formatted_comment.len() > formatting.shape.width {
+                result.push('\n');
+                result.push_str(indent_str);
+            }
+            
             result.push_str(&formatted_comment);
         } else {
             item_max_width = None;

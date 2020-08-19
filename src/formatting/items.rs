@@ -2078,6 +2078,11 @@ impl Rewrite for ast::Param {
                 has_multiple_attr_lines,
             )
         } else if is_named_param(self) {
+
+            let pat_str = &self
+                .pat
+                .rewrite(context, Shape::legacy(shape.width, shape.indent))?;
+        
             let mut result = combine_strs_with_missing_comments(
                 context,
                 &param_attrs_result,
@@ -2089,19 +2094,31 @@ impl Rewrite for ast::Param {
                 !has_multiple_attr_lines,
             )?;
 
+            let mut param_type_str = String::from(pat_str);
+
             if !is_empty_infer(&*self.ty, self.pat.span) {
                 let (before_comment, after_comment) =
                     get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
-                result.push_str(&before_comment);
-                result.push_str(colon_spaces(context.config));
-                result.push_str(&after_comment);
-                let overhead = last_line_width(&result);
+                param_type_str.push_str(&before_comment);
+                param_type_str.push_str(colon_spaces(context.config));
+                param_type_str.push_str(&after_comment);
+                let overhead = last_line_width(&param_type_str);
                 let max_width = shape.width.checked_sub(overhead)?;
-                let ty_str = self
-                    .ty
-                    .rewrite(context, Shape::legacy(max_width, shape.indent))?;
-                result.push_str(&ty_str);
+                param_type_str.push_str(
+                    &self
+                        .ty
+                        .rewrite(context, Shape::legacy(max_width, shape.indent))?,
+                );
             }
+            
+            let result = combine_strs_with_missing_comments(
+                context,
+                &param_attrs_result,
+                &param_type_str,
+                span,
+                shape,
+                !has_multiple_attr_lines,
+            )?;
 
             Some(result)
         } else {
