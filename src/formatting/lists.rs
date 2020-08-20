@@ -465,6 +465,8 @@ where
             let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
 
             if !starts_with_newline(comment) {
+                let mut r = String::with_capacity(formatting.config.max_width()); /* temporary buffer for result added in this block */
+
                 if formatting.align_comments {
                     let mut comment_alignment = post_comment_alignment(
                         item_max_width,
@@ -484,7 +486,7 @@ where
                         );
                     }
                     for _ in 0..=comment_alignment {
-                        result.push(' ');
+                        r.push(' ');
                     }
                 }
                 // An additional space for the missing trailing separator (or
@@ -495,7 +497,17 @@ where
                         && !separate
                         && !formatting.separator.is_empty())
                 {
-                    result.push(' ');
+                    r.push(' ');
+                }
+
+                /* If adding the comment will exceed max length - add new line */
+                if indent_str.len() + result.len() + r.len() + formatted_comment.len() > formatting.shape.width {
+                    result.push_str(r.to_string().trim_end());
+                    result.push('\n');
+                    result.push_str(indent_str);
+                }
+                else {
+                    result.push_str(&r);
                 }
             } else {
                 result.push('\n');
@@ -503,14 +515,7 @@ where
             }
             if formatted_comment.contains('\n') {
                 item_max_width = None;
-            }
-            
-            /* If adding the comment will exceed max length - add new line */
-            if indent_str.len() + result.len() + formatted_comment.len() > formatting.shape.width {
-                result.push('\n');
-                result.push_str(indent_str);
-            }
-            
+            }            
             result.push_str(&formatted_comment);
         } else {
             item_max_width = None;
