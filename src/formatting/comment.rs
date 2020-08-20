@@ -1604,7 +1604,17 @@ pub(crate) fn recover_comment_removed(
     let snippet = context.snippet(span);
     let includes_comment = contains_comment(snippet);
     if snippet != new && includes_comment && changed_comment_content(snippet, &new) {
-        Some(snippet.to_owned())
+        /* >>>>>>> #2896 [DBO] ADD/CHANGE */
+        /* Trim whitespace at end of lines */
+        let mut c = String::from("");
+        for line in snippet.to_owned().split('\n') {
+            if !c.is_empty() {
+                c.push('\n')
+            };
+            c.push_str(line.trim_end());
+        }
+        Some(c.to_owned())
+    /* <<<<<<< [DBO] ADD/CHANGE */
     } else {
         Some(new)
     }

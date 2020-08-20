@@ -2082,17 +2082,6 @@ impl Rewrite for ast::Param {
             let pat_str = &self
                 .pat
                 .rewrite(context, Shape::legacy(shape.width, shape.indent))?;
-        
-            let mut result = combine_strs_with_missing_comments(
-                context,
-                &param_attrs_result,
-                &self
-                    .pat
-                    .rewrite(context, Shape::legacy(shape.width, shape.indent))?,
-                span,
-                shape,
-                !has_multiple_attr_lines,
-            )?;
 
             let mut param_type_str = String::from(pat_str);
 
