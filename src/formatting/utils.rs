@@ -154,7 +154,7 @@ pub(crate) fn format_extern(
 ) -> Cow<'static, str> {
     let format_explicit_abi = |abi: &str| Cow::from(format!(r#"extern "{}" "#, abi));
     let explicit_conversion_preserves_semantics =
-        || !is_mod || (is_mod && attrs.map_or(true, |a| a.is_empty()));
+        || !is_mod || attrs.map_or(true, |a| a.is_empty());
 
     match ext {
         ast::Extern::None if !is_mod => Cow::from(""),

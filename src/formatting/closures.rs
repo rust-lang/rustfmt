@@ -364,7 +364,7 @@ pub(crate) fn rewrite_last_closure(
 
         // We force to use block for the body of the closure for certain kinds of expressions.
         if is_block_closure_forced(context, body, capture) {
-            return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(
+            return rewrite_closure_with_block(body, &prefix, context, body_shape).map(
                 |body_str| {
                     // If the expression can fit in a single line, we need not force block closure.
                     if body_str.lines().count() <= 7 {
@@ -372,12 +372,12 @@ pub(crate) fn rewrite_last_closure(
                             Some(ref single_line_body_str)
                                 if !single_line_body_str.contains('\n') =>
                             {
-                                Some(single_line_body_str.clone())
+                                single_line_body_str.clone()
                             }
-                            _ => Some(body_str),
+                            _ => body_str,
                         }
                     } else {
-                        Some(body_str)
+                        body_str
                     }
                 },
             );
@@ -415,15 +415,13 @@ fn is_block_closure_forced(
     // If we are inside macro, we do not want to add or remove block from closure body.
     if context.inside_macro() {
         false
-    } else {
-        if let ast::ExprKind::Match(..) = expr.kind {
-            let is_move_closure_without_brace = capture == ast::CaptureBy::Value
-                && !context.snippet(expr.span).trim().starts_with('{');
+    } else if let ast::ExprKind::Match(..) = expr.kind {
+        let is_move_closure_without_brace =
+            capture == ast::CaptureBy::Value && !context.snippet(expr.span).trim().starts_with('{');
 
-            is_block_closure_forced_inner(expr) || is_move_closure_without_brace
-        } else {
-            is_block_closure_forced_inner(expr)
-        }
+        is_block_closure_forced_inner(expr) || is_move_closure_without_brace
+    } else {
+        is_block_closure_forced_inner(expr)
     }
 }
 

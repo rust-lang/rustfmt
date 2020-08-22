@@ -626,12 +626,10 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
                 return;
             }
         }
-    } else {
-        if let Some(tree) = similar_trees.max_by_key(|tree| tree.path.len()) {
-            if tree.path.len() > 1 {
-                tree.merge(&use_tree);
-                return;
-            }
+    } else if let Some(tree) = similar_trees.max_by_key(|tree| tree.path.len()) {
+        if tree.path.len() > 1 {
+            tree.merge(&use_tree);
+            return;
         }
     }
     trees.push(use_tree);

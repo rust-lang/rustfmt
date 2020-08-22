@@ -80,12 +80,10 @@ pub(crate) fn format_expr(
         ast::ExprKind::Lit(ref l) => {
             if let Some(expr_rw) = rewrite_literal(context, l, shape) {
                 Some(expr_rw)
+            } else if let LitKind::StrRaw(_) = l.token.kind {
+                Some(context.snippet(l.span).trim().into())
             } else {
-                if let LitKind::StrRaw(_) = l.token.kind {
-                    Some(context.snippet(l.span).trim().into())
-                } else {
-                    None
-                }
+                None
             }
         }
         ast::ExprKind::Call(ref callee, ref args) => {
