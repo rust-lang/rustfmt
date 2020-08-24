@@ -116,6 +116,19 @@ fn rewrite_pairs_multiline<T: Rewrite>(
 
     result.push_str(&list.list[0].1.as_ref()?);
 
+    /* Determine the expression kind */
+    let (e, _s) = match list.list.first() {
+        Some(x) => x,
+        None => return None,
+    };
+    let list_len = list.list.len();
+    /* ???? Is there better way than transmute() ???? */
+    let list_expr = unsafe { std::mem::transmute::<&T, &ast::Expr>(e) };
+    let list_expr_lit = match list_expr.kind {
+        ast::ExprKind::Lit(_) => true,
+        _ => false,
+    };
+
     for ((e, default_rw), s) in list.list[1..].iter().zip(list.separators.iter()) {
         // The following test checks if we should keep two subexprs on the same
         // line. We do this if not doing so would create an orphan and there is
@@ -125,7 +138,15 @@ fn rewrite_pairs_multiline<T: Rewrite>(
         } else {
             shape.used_width()
         };
-        if last_line_width(&result) + offset <= nested_shape.used_width() {
+
+        /* Do not force adding add new line between Lit operation and righ operand */
+        let w = if list_len > 2 || !list_expr_lit {
+            nested_shape.used_width()
+        } else {
+            nested_shape.width
+        };
+
+        if last_line_width(&result) + offset <= w {
             // We must snuggle the next line onto the previous line to avoid an orphan.
             if let Some(line_shape) =
                 shape.offset_left(s.len() + 2 + trimmed_last_line_width(&result))
