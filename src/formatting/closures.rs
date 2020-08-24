@@ -66,9 +66,9 @@ pub(crate) fn rewrite_closure(
             rewrite_closure_block(block, &prefix, context, body_shape)
         })
     } else {
-        // Capture everything between the end of fn decl and start of body.
-        // Because this is a closure_expr, there is no return type in fn_decl. So the span we want
-        // is after the *second* "|".
+        // If there are comments between the fn decl and the body, the body (+ comments) need to be
+        // wrapped in a block. Since there's no return type annotation on closures with expr
+        // bodies, look for comments after the second "|".
         let between_span = mk_sp(
             context.snippet_provider.span_after(span, "|"),
             body.span.lo(),
