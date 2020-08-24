@@ -159,3 +159,24 @@ fn main() {
     }
   }).unwrap();
 }
+
+
+
+/*******************************************************************************************
+ * Added test cases for related issues that are supposed to be solved by Pull request #4391
+ * ******************************************************************************************/
+
+// ** Note the extra blank at the end of the 2nd line
+fn main() {
+  if 0 == 1 
+  /* x */ as i32 {} }
+
+// ** Note the extra blank at the end of the 2nd line
+fn main() {
+  if 0 == ' ' 
+  as i32 {} }
+
+// ** Note the extra blank at the end of the 3rd line
+fn main() {
+  if 0 == ' ' /* x */ 
+  as i32 {} }
