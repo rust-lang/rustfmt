@@ -4,7 +4,7 @@ use rustc_span::Span;
 use crate::config::{lists::*, IndentStyle, SeparatorTactic};
 use crate::formatting::{
     attr::get_attrs_from_stmt,
-    comment::{combine_strs_with_missing_comments, contains_comment, rewrite_missing_comment},
+    comment::{combine_strs_with_missing_comments, contains_comment},
     expr::{
         block_contains_comment, is_simple_block, is_unsafe_block, rewrite_block_with_visitor,
         rewrite_cond,
@@ -69,31 +69,34 @@ pub(crate) fn rewrite_closure(
         // Capture everything between the end of fn decl and start of body.
         // Because this is a closure_expr, there is no return type in fn_decl. So the span we want
         // is after the *second* "|".
-        let between_span = mk_sp(context.snippet_provider.span_after(span, "|"), body.span.lo());
-        let between_span = mk_sp(context.snippet_provider.span_after(between_span, "|"), body.span.lo());
-        rewrite_closure_expr(body, &prefix, context, body_shape)
-            .and_then(|rw| {
-                // let between_span = mk_sp(fn_decl.output.span().lo(), body.span.lo());
-                // if rewrite_missing_comment(between_span, shape, context).map_or(false, |c| !c.is_empty()) {
-                //     None
-                // } else {
-                    // let s = if rw.contains("*x != 2") {
-                    //     format!("/* {} */", context.snippet(between_span))
-                    // } else {
-                    //     format!("")
-                    // };
-                    // Some(format!("{}{}", rw, s))
-                // }
-                    if rw.contains("*x != 2") {
-                        None
-                    } else {
-                        Some(rw)
-                    }
-            })
-            .or_else(|| {
+        let between_span = mk_sp(
+            context.snippet_provider.span_after(span, "|"),
+            body.span.lo(),
+        );
+        let between_span = mk_sp(
+            context.snippet_provider.span_after(between_span, "|"),
+            body.span.lo(),
+        );
+        if contains_comment(context.snippet(between_span)) {
+            return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(|rw| {
+                let mut parts = rw.splitn(2, "\n");
+                let head = parts.next().unwrap();
+                let rest = parts.next().unwrap();
+                let new_shape = shape.block_indent(context.config.tab_spaces());
+                combine_strs_with_missing_comments(
+                    context,
+                    head,
+                    rest.trim(),
+                    between_span,
+                    new_shape,
+                    true,
+                )
+            });
+        }
+        rewrite_closure_expr(body, &prefix, context, body_shape).or_else(|| {
             // The closure originally had a non-block expression, but we can't fit on
             // one line, so we'll insert a block.
-            rewrite_closure_with_block(body, &prefix, between_span, context, body_shape)
+            rewrite_closure_with_block(body, &prefix, context, body_shape)
         })
     }
 }
@@ -109,7 +112,7 @@ fn try_rewrite_without_block(
     let expr = get_inner_expr(expr, prefix, context);
 
     if is_block_closure_forced(context, expr, capture) {
-        rewrite_closure_with_block(expr, prefix, expr.span, context, shape)
+        rewrite_closure_with_block(expr, prefix, context, shape)
     } else {
         rewrite_closure_expr(expr, prefix, context, body_shape)
     }
@@ -169,7 +172,6 @@ fn veto_block(e: &ast::Expr) -> bool {
 fn rewrite_closure_with_block(
     body: &ast::Expr,
     prefix: &str,
-    span: Span,
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
@@ -187,12 +189,11 @@ fn rewrite_closure_with_block(
         }],
         id: ast::NodeId::root(),
         rules: ast::BlockCheckMode::Default,
-        span: span.to(body.span),
-        // span: body
-        //     .attrs
-        //     .first()
-        //     .map(|attr| attr.span.to(body.span))
-        //     .unwrap_or(body.span),
+        span: body
+            .attrs
+            .first()
+            .map(|attr| attr.span.to(body.span))
+            .unwrap_or(body.span),
     };
     let block =
         rewrite_block_with_visitor(context, "", &block, Some(&body.attrs), None, shape, false)?;
@@ -416,7 +417,7 @@ pub(crate) fn rewrite_last_closure(
             cond.contains('\n') || cond.len() > body_shape.width
         });
         if is_multi_lined_cond {
-            return rewrite_closure_with_block(body, &prefix, expr.span, context, body_shape);
+            return rewrite_closure_with_block(body, &prefix, context, body_shape);
         }
 
         // Seems fine, just format the closure in usual manner.
