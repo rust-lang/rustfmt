@@ -82,13 +82,13 @@ pub(crate) fn rewrite_closure(
                 let mut parts = rw.splitn(2, "\n");
                 let head = parts.next().unwrap();
                 let rest = parts.next().unwrap();
-                let new_shape = shape.block_indent(context.config.tab_spaces());
+                let block_shape = shape.block_indent(context.config.tab_spaces());
                 combine_strs_with_missing_comments(
                     context,
                     head,
                     rest.trim(),
                     between_span,
-                    new_shape,
+                    block_shape,
                     true,
                 )
             });
