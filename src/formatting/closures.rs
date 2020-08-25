@@ -70,7 +70,13 @@ pub(crate) fn rewrite_closure(
         // If there are comments between the fn decl and the body, the body (+ comments) need to be
         // wrapped in a block. Since there's no return type annotation on closures with expr
         // bodies, look for comments after the argument block.
-        let between_span = Span::between(arg_span, body.span);
+        // Since attrs come before the body, check up to the first attr if there is one.
+        let first_span = body
+            .attrs
+            .first()
+            .map(|attr| attr.span)
+            .unwrap_or(body.span);
+        let between_span = Span::between(arg_span, first_span);
         if contains_comment(context.snippet(between_span)) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(|rw| {
                 let mut parts = rw.splitn(2, "\n");
