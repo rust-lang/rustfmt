@@ -15,7 +15,7 @@ use crate::formatting::{
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
     source_map::SpanUtils,
-    utils::{last_line_width, left_most_sub_expr, mk_sp, stmt_expr, NodeIdExt},
+    utils::{last_line_width, left_most_sub_expr, stmt_expr, NodeIdExt},
 };
 
 // This module is pretty messy because of the rules around closures and blocks:
@@ -35,6 +35,7 @@ pub(crate) fn rewrite_closure(
     fn_decl: &ast::FnDecl,
     body: &ast::Expr,
     span: Span,
+    arg_span: Span,
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
@@ -68,15 +69,8 @@ pub(crate) fn rewrite_closure(
     } else {
         // If there are comments between the fn decl and the body, the body (+ comments) need to be
         // wrapped in a block. Since there's no return type annotation on closures with expr
-        // bodies, look for comments after the second "|".
-        let between_span = mk_sp(
-            context.snippet_provider.span_after(span, "|"),
-            body.span.lo(),
-        );
-        let between_span = mk_sp(
-            context.snippet_provider.span_after(between_span, "|"),
-            body.span.lo(),
-        );
+        // bodies, look for comments after the argument block.
+        let between_span = Span::between(arg_span, body.span);
         if contains_comment(context.snippet(between_span)) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(|rw| {
                 let mut parts = rw.splitn(2, "\n");
