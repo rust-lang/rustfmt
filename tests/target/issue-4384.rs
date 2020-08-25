@@ -25,4 +25,17 @@ fn main() {
             || 1
         }
     };
+
+    let attrb = || {
+        // This block has an attr.
+        #[foo]
+        1
+    };
+
+    let after_attr = || {
+        // There's a comment before...
+        #[attr]
+        // and one after!
+        1
+    };
 }
