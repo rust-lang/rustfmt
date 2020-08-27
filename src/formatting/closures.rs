@@ -4,7 +4,7 @@ use rustc_span::Span;
 use crate::config::{lists::*, IndentStyle, SeparatorTactic};
 use crate::formatting::{
     attr::get_attrs_from_stmt,
-    comment::{combine_strs_with_missing_comments, contains_comment},
+    comment::{contains_comment, rewrite_missing_comment},
     expr::{
         block_contains_comment, is_simple_block, is_unsafe_block, rewrite_block_with_visitor,
         rewrite_cond,
@@ -83,14 +83,17 @@ pub(crate) fn rewrite_closure(
                 let head = parts.next().unwrap();
                 let rest = parts.next().unwrap();
                 let block_shape = shape.block_indent(context.config.tab_spaces());
-                combine_strs_with_missing_comments(
-                    context,
+                let indent = block_shape.indent.to_string_with_newline(context.config);
+                let missing_comment =
+                    rewrite_missing_comment(between_span, block_shape, context).unwrap();
+                Some(format!(
+                    "{}{}{}{}{}",
                     head,
-                    rest.trim(),
-                    between_span,
-                    block_shape,
-                    true,
-                )
+                    indent,
+                    missing_comment,
+                    indent,
+                    rest.trim()
+                ))
             });
         }
         rewrite_closure_expr(body, &prefix, context, body_shape).or_else(|| {

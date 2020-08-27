@@ -38,4 +38,14 @@ fn main() {
         // and one after!
         1
     };
+
+    let one_line = || {
+        /* one line */
+        1
+    };
+
+    let one_comment_line = || {
+        // put this comment in body
+        1
+    };
 }
