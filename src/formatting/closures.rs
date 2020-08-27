@@ -395,7 +395,7 @@ pub(crate) fn rewrite_last_closure(
 
         // We force to use block for the body of the closure for certain kinds of expressions.
         if is_block_closure_forced(context, body, capture) {
-            return rewrite_closure_with_block(body, &prefix, expr.span, context, body_shape).map(
+            return rewrite_closure_with_block(body, &prefix, context, body_shape).map(
                 |body_str| {
                     // If the expression can fit in a single line, we need not force block closure.
                     if body_str.lines().count() <= 7 {
