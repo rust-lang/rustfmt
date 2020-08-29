@@ -80,12 +80,11 @@ pub(crate) fn rewrite_closure(
         if contains_comment(context.snippet(between_span)) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(|rw| {
                 let mut parts = rw.splitn(2, "\n");
-                let head = parts.next().unwrap();
-                let rest = parts.next().unwrap();
+                let head = parts.next()?;
+                let rest = parts.next()?;
                 let block_shape = shape.block_indent(context.config.tab_spaces());
                 let indent = block_shape.indent.to_string_with_newline(context.config);
-                let missing_comment =
-                    rewrite_missing_comment(between_span, block_shape, context).unwrap();
+                let missing_comment = rewrite_missing_comment(between_span, block_shape, context)?;
                 Some(format!(
                     "{}{}{}{}{}",
                     head,
