@@ -125,8 +125,8 @@ There are a lot of open issues on the backlog for those interested in hacking on
 
 Here are some good starting issues:
 
-[![GitHub good-first-issue](https://img.shields.io/github/issues/rust-lang/rustfmt/good-first-issue?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Agood%20first%20issue)
-[![GitHub help-wanted](https://img.shields.io/github/issues/rust-lang/rustfmt/help-wanted?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Ahelp-wanted)
+[![GitHub good-first-issue](https://img.shields.io/github/issues/rust-lang/rustfmt/good%20first%20issue?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Agood%20first%20issue)
+[![GitHub help-wanted](https://img.shields.io/github/issues/rust-lang/rustfmt/help%20wanted?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Ahelp-wanted)
 
 
 If you've found areas which need polish and don't have issues, please submit a
