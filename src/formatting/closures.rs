@@ -4,6 +4,7 @@ use rustc_span::Span;
 use crate::config::{lists::*, IndentStyle, SeparatorTactic};
 use crate::formatting::{
     attr::get_attrs_from_stmt,
+    comment::{contains_comment, rewrite_missing_comment},
     expr::{
         block_contains_comment, is_simple_block, is_unsafe_block, rewrite_block_with_visitor,
         rewrite_cond,
@@ -34,6 +35,7 @@ pub(crate) fn rewrite_closure(
     fn_decl: &ast::FnDecl,
     body: &ast::Expr,
     span: Span,
+    arg_span: Span,
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
@@ -65,6 +67,34 @@ pub(crate) fn rewrite_closure(
             rewrite_closure_block(block, &prefix, context, body_shape)
         })
     } else {
+        // If there are comments between the fn decl and the body, the body (+ comments) need to be
+        // wrapped in a block. Since there's no return type annotation on closures with expr
+        // bodies, look for comments after the argument block.
+        // Since attrs come before the body, check up to the first attr if there is one.
+        let first_span = body
+            .attrs
+            .first()
+            .map(|attr| attr.span)
+            .unwrap_or(body.span);
+        let between_span = Span::between(arg_span, first_span);
+        if contains_comment(context.snippet(between_span)) {
+            return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(|rw| {
+                let mut parts = rw.splitn(2, "\n");
+                let head = parts.next()?;
+                let rest = parts.next()?;
+                let block_shape = shape.block_indent(context.config.tab_spaces());
+                let indent = block_shape.indent.to_string_with_newline(context.config);
+                let missing_comment = rewrite_missing_comment(between_span, block_shape, context)?;
+                Some(format!(
+                    "{}{}{}{}{}",
+                    head,
+                    indent,
+                    missing_comment,
+                    indent,
+                    rest.trim()
+                ))
+            });
+        }
         rewrite_closure_expr(body, &prefix, context, body_shape).or_else(|| {
             // The closure originally had a non-block expression, but we can't fit on
             // one line, so we'll insert a block.
