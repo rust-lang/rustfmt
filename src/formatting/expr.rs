@@ -214,14 +214,45 @@ pub(crate) fn format_expr(
         ast::ExprKind::AddrOf(borrow_kind, mutability, ref expr) => {
             rewrite_expr_addrof(context, borrow_kind, mutability, expr, shape)
         }
-        ast::ExprKind::Cast(ref expr, ref ty) => rewrite_pair(
-            &**expr,
-            &**ty,
-            PairParts::infix(" as "),
-            context,
-            shape,
-            SeparatorPlace::Front,
-        ),
+        ast::ExprKind::Cast(ref expr, ref ty) => {
+            /* Retrieving the comments before and after cast */
+            let i = context
+                .snippet_provider
+                .span_before(mk_sp(expr.span.hi(), ty.span.lo()), "as");
+            let infix_prefix_span = mk_sp(expr.span.hi(), i);
+            //let infix_prefix_comments = context.snippet(infix_prefix_span);
+            let c = rewrite_missing_comment(infix_prefix_span, shape, context)?;
+            let mut infix_prefix_comments = String::with_capacity(c.len() + 1);
+            if !c.is_empty() {
+                infix_prefix_comments.push(' ');
+            }
+            infix_prefix_comments.push_str(&c);
+            let i = context
+                .snippet_provider
+                .span_after(mk_sp(expr.span.hi(), ty.span.lo()), "as");
+            let infix_suffix_span = mk_sp(i, ty.span.lo());
+            //let infix_suffix_comments = context.snippet(infix_suffix_span);
+            let mut infix_suffix_comments =
+                rewrite_missing_comment(infix_suffix_span, shape, context)?;
+            if !infix_suffix_comments.is_empty() {
+                infix_suffix_comments.push(' ');
+            }
+
+            rewrite_pair(
+                &**expr,
+                &**ty,
+                PairParts::new(
+                    "",
+                    &infix_prefix_comments,
+                    " as ",
+                    &infix_suffix_comments,
+                    "",
+                ),
+                context,
+                shape,
+                SeparatorPlace::Front,
+            )
+        }
         ast::ExprKind::Type(ref expr, ref ty) => rewrite_pair(
             &**expr,
             &**ty,
@@ -236,7 +267,7 @@ pub(crate) fn format_expr(
         ast::ExprKind::Repeat(ref expr, ref repeats) => rewrite_pair(
             &**expr,
             &*repeats.value,
-            PairParts::new("[", "; ", "]"),
+            PairParts::new("[", "", "; ", "", "]"),
             context,
             shape,
             SeparatorPlace::Back,
