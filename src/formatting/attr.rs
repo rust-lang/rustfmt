@@ -2,7 +2,7 @@
 
 use rustc_ast::ast;
 use rustc_ast::attr::HasAttrs;
-use rustc_span::{symbol::sym, Span};
+use rustc_span::{symbol::sym, Span, Symbol};
 
 use crate::config::{lists::*, IndentStyle};
 use doc_comment::DocCommentFormatter;
@@ -21,6 +21,14 @@ use crate::formatting::{
 };
 
 mod doc_comment;
+
+pub(crate) fn contains_name(attrs: &[ast::Attribute], name: Symbol) -> bool {
+    attrs.iter().any(|attr| attr.has_name(name))
+}
+
+pub(crate) fn first_attr_value_str_by_name(attrs: &[ast::Attribute], name: Symbol) -> Option<Symbol> {
+    attrs.iter().find(|attr| attr.has_name(name)).and_then(|attr| attr.value_str())
+}
 
 /// Returns attributes on the given statement.
 pub(crate) fn get_attrs_from_stmt(stmt: &ast::Stmt) -> &[ast::Attribute] {
@@ -53,7 +61,7 @@ pub(crate) fn filter_inline_attrs(
 }
 
 fn is_derive(attr: &ast::Attribute) -> bool {
-    attr.check_name(sym::derive)
+    attr.has_name(sym::derive)
 }
 
 // The shape of the arguments to a function-like attribute.
