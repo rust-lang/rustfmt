@@ -647,7 +647,7 @@ ignore = []
             // this test requires nightly
             None | Some("nightly") => {
                 let _outer_config = make_temp_file(
-                    "a/rustfmt.toml",
+                    "fmt_test_merged_config/rustfmt.toml",
                     r#"
 tab_spaces = 2
 fn_call_width = 50
@@ -656,7 +656,7 @@ ignore = ["b/main.rs", "util.rs"]
                 );
 
                 let inner_config = make_temp_file(
-                    "a/b/rustfmt.toml",
+                    "fmt_test_merged_config/b/rustfmt.toml",
                     r#"
 version = "two"
 tab_spaces = 3
@@ -672,8 +672,8 @@ ignore = []
                 assert_eq!(config.ignore().to_string(), r#"["main.rs"]"#);
 
                 let paths = paths.unwrap();
-                assert!(paths[0].ends_with("a/rustfmt.toml"));
-                assert!(paths[1].ends_with("a/b/rustfmt.toml"));
+                assert!(paths[0].ends_with("fmt_test_merged_config/rustfmt.toml"));
+                assert!(paths[1].ends_with("fmt_test_merged_config/b/rustfmt.toml"));
             }
             _ => {}
         };
