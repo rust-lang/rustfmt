@@ -185,6 +185,8 @@ where
 {
     let tab_spaces = context.config.tab_spaces();
     let infix_result = format!("{}{}", pp.infix, pp.infix_suffix);
+    let infix_suffix_separator = if pp.infix_suffix.is_empty() { "" } else { " " };
+    let infix_prefix_separator = if pp.infix_prefix.is_empty() { "" } else { " " };
     let lhs_overhead = match separator_place {
         SeparatorPlace::Back => {
             shape.used_width() + pp.prefix.len() + pp.infix.trim_end().len() + pp.infix_prefix.len()
@@ -195,14 +197,19 @@ where
         width: context.budget(lhs_overhead),
         ..shape
     };
-    let lhs_result = lhs
-        .rewrite(context, lhs_shape)
-        .map(|lhs_str| format!("{}{}{}", pp.prefix, lhs_str, pp.infix_prefix))?;
+    let lhs_result = lhs.rewrite(context, lhs_shape).map(|lhs_str| {
+        format!(
+            "{}{}{}{}",
+            pp.prefix, lhs_str, infix_prefix_separator, pp.infix_prefix
+        )
+    })?;
 
     // Try to put both lhs and rhs on the same line.
     let rhs_orig_result = shape
         .offset_left(last_line_width(&lhs_result) + pp.infix.len())
-        .and_then(|s| s.sub_width(pp.suffix.len() + pp.infix_suffix.len()))
+        .and_then(|s| {
+            s.sub_width(pp.suffix.len() + pp.infix_suffix.len() + infix_suffix_separator.len())
+        })
         .and_then(|rhs_shape| rhs.rewrite(context, rhs_shape));
     if let Some(ref rhs_result) = rhs_orig_result {
         // If the length of the lhs is equal to or shorter than the tab width or
@@ -221,8 +228,8 @@ where
                 + pp.suffix.len();
             if one_line_width <= shape.width {
                 return Some(format!(
-                    "{}{}{}{}",
-                    lhs_result, infix_result, rhs_result, pp.suffix
+                    "{}{}{}{}{}",
+                    lhs_result, infix_result, infix_suffix_separator, rhs_result, pp.suffix
                 ));
             }
         }
@@ -263,7 +270,13 @@ where
     let indent_str = rhs_shape.indent.to_string_with_newline(context.config);
     let mut infix_with_sep = match separator_place {
         SeparatorPlace::Back => format!("{}{}{}", infix, infix_suffix.trim_end(), indent_str),
-        SeparatorPlace::Front => format!("{}{}{}", indent_str, infix.trim_start(), infix_suffix),
+        SeparatorPlace::Front => format!(
+            "{}{}{}{}",
+            indent_str,
+            infix.trim_start(),
+            infix_suffix,
+            infix_suffix_separator
+        ),
     };
     let new_line_width = infix_with_sep.len() - 1 + rhs_result.len() + pp.suffix.len();
     let rhs_with_sep = if separator_place == SeparatorPlace::Front && new_line_width > shape.width {

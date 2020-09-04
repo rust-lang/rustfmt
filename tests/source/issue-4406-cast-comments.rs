@@ -55,17 +55,17 @@ i32;
 /*****
  *  Tests for not leaving trailing spaces related to cast comments (related to #2896?)
  ******/
-// Test 10 - note the extra blank at the end of the 2nd line
+// Test 10 - extra blank after the binary rhs at the 2nd line (comment followws at 3rd line)
 fn main() {
     if 0 == 1 
     /* x */ as i32 {} }
 
-// Test 11 - note the extra blank at the end of the 2nd line
+// Test 11 - extra blank after the binary rhs at the end of 2nd line
 fn main() {
     if 0 == ' ' 
     as i32 {} }
 
-// Test 10 - note the extra blank at the end of the 2nd line
+// Test 12 - extra blank after the comment at the end of 2nd line
 fn main() {
     if 0 == ' ' /* x */ 
     as i32 {} }
