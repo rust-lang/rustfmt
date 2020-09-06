@@ -12,16 +12,26 @@ use crate::formatting::{
 #[derive(Clone, Copy)]
 pub(crate) struct PairParts<'a> {
     prefix: &'a str,
+    infix_prefix: &'a str, /* mainly for pre-infix comments */
     infix: &'a str,
+    infix_suffix: &'a str, /* mainly for post-infix comments */
     suffix: &'a str,
 }
 
 impl<'a> PairParts<'a> {
     /// Constructs a new `PairParts`.
-    pub(crate) fn new(prefix: &'a str, infix: &'a str, suffix: &'a str) -> Self {
-        Self {
+    pub(crate) fn new(
+        prefix: &'a str,
+        infix_prefix: &'a str,
+        infix: &'a str,
+        infix_suffix: &'a str,
+        suffix: &'a str,
+    ) -> Self {
+        PairParts {
             prefix,
+            infix_prefix,
             infix,
+            infix_suffix,
             suffix,
         }
     }
@@ -29,7 +39,9 @@ impl<'a> PairParts<'a> {
     pub(crate) fn infix(infix: &'a str) -> PairParts<'a> {
         PairParts {
             prefix: "",
+            infix_prefix: "",
             infix,
+            infix_suffix: "",
             suffix: "",
         }
     }
@@ -172,22 +184,32 @@ where
     RHS: Rewrite,
 {
     let tab_spaces = context.config.tab_spaces();
+    let infix_result = format!("{}{}", pp.infix, pp.infix_suffix);
+    let infix_suffix_separator = if pp.infix_suffix.is_empty() { "" } else { " " };
+    let infix_prefix_separator = if pp.infix_prefix.is_empty() { "" } else { " " };
     let lhs_overhead = match separator_place {
-        SeparatorPlace::Back => shape.used_width() + pp.prefix.len() + pp.infix.trim_end().len(),
+        SeparatorPlace::Back => {
+            shape.used_width() + pp.prefix.len() + pp.infix.trim_end().len() + pp.infix_prefix.len()
+        }
         SeparatorPlace::Front => shape.used_width(),
     };
     let lhs_shape = Shape {
         width: context.budget(lhs_overhead),
         ..shape
     };
-    let lhs_result = lhs
-        .rewrite(context, lhs_shape)
-        .map(|lhs_str| format!("{}{}", pp.prefix, lhs_str))?;
+    let lhs_result = lhs.rewrite(context, lhs_shape).map(|lhs_str| {
+        format!(
+            "{}{}{}{}",
+            pp.prefix, lhs_str, infix_prefix_separator, pp.infix_prefix
+        )
+    })?;
 
     // Try to put both lhs and rhs on the same line.
     let rhs_orig_result = shape
         .offset_left(last_line_width(&lhs_result) + pp.infix.len())
-        .and_then(|s| s.sub_width(pp.suffix.len()))
+        .and_then(|s| {
+            s.sub_width(pp.suffix.len() + pp.infix_suffix.len() + infix_suffix_separator.len())
+        })
         .and_then(|rhs_shape| rhs.rewrite(context, rhs_shape));
     if let Some(ref rhs_result) = rhs_orig_result {
         // If the length of the lhs is equal to or shorter than the tab width or
@@ -201,13 +223,13 @@ where
                 .unwrap_or(false);
         if !rhs_result.contains('\n') || allow_same_line {
             let one_line_width = last_line_width(&lhs_result)
-                + pp.infix.len()
+                + infix_result.len()
                 + first_line_width(rhs_result)
                 + pp.suffix.len();
             if one_line_width <= shape.width {
                 return Some(format!(
-                    "{}{}{}{}",
-                    lhs_result, pp.infix, rhs_result, pp.suffix
+                    "{}{}{}{}{}",
+                    lhs_result, infix_result, infix_suffix_separator, rhs_result, pp.suffix
                 ));
             }
         }
@@ -228,20 +250,45 @@ where
     };
     let infix = match separator_place {
         SeparatorPlace::Back => pp.infix.trim_end(),
-        SeparatorPlace::Front => pp.infix.trim_start(),
+        SeparatorPlace::Front => {
+            if pp.infix_suffix.is_empty() {
+                pp.infix.trim_start()
+            } else {
+                pp.infix
+            }
+        }
+    };
+    let infix_suffix = if separator_place == SeparatorPlace::Front && !pp.infix_suffix.is_empty() {
+        pp.infix_suffix.trim_start()
+    } else {
+        pp.infix_suffix
     };
     if separator_place == SeparatorPlace::Front {
         rhs_shape = rhs_shape.offset_left(infix.len())?;
     }
     let rhs_result = rhs.rewrite(context, rhs_shape)?;
     let indent_str = rhs_shape.indent.to_string_with_newline(context.config);
-    let infix_with_sep = match separator_place {
-        SeparatorPlace::Back => format!("{}{}", infix, indent_str),
-        SeparatorPlace::Front => format!("{}{}", indent_str, infix),
+    let mut infix_with_sep = match separator_place {
+        SeparatorPlace::Back => format!("{}{}{}", infix, infix_suffix.trim_end(), indent_str),
+        SeparatorPlace::Front => format!(
+            "{}{}{}{}",
+            indent_str,
+            infix.trim_start(),
+            infix_suffix,
+            infix_suffix_separator
+        ),
+    };
+    let new_line_width = infix_with_sep.len() - 1 + rhs_result.len() + pp.suffix.len();
+    let rhs_with_sep = if separator_place == SeparatorPlace::Front && new_line_width > shape.width {
+        let s: String = String::from(infix_with_sep);
+        infix_with_sep = s.trim_end().to_string();
+        format!("{}{}", indent_str, rhs_result.trim_start())
+    } else {
+        rhs_result
     };
     Some(format!(
         "{}{}{}{}",
-        lhs_result, infix_with_sep, rhs_result, pp.suffix
+        lhs_result, infix_with_sep, rhs_with_sep, pp.suffix
     ))
 }
 
