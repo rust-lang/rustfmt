@@ -6,7 +6,10 @@ use rustc_span::{symbol::kw, BytePos, Span};
 
 use crate::config::{lists::*, IndentStyle, TypeDensity};
 use crate::formatting::{
-    expr::{format_expr, rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix, ExprType},
+    expr::{
+        format_expr, rewrite_assign_rhs, rewrite_call, rewrite_tuple, rewrite_unary_prefix,
+        ExprType,
+    },
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator},
     macros::{rewrite_macro, MacroPosition},
     overflow,
@@ -756,7 +759,14 @@ impl Rewrite for ast::Ty {
                 })
             }
             ast::TyKind::CVarArgs => Some("...".to_owned()),
-            ast::TyKind::Err | ast::TyKind::Typeof(..) => unreachable!(),
+            ast::TyKind::Err => Some(context.snippet(self.span).to_owned()),
+            ast::TyKind::Typeof(ref anon_const) => rewrite_call(
+                context,
+                "typeof",
+                &[anon_const.value.clone()],
+                self.span,
+                shape,
+            ),
         }
     }
 }
