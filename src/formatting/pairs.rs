@@ -3,9 +3,13 @@ use rustc_ast::ast;
 use crate::config::lists::*;
 use crate::config::IndentStyle;
 use crate::formatting::{
+    comment::{rewrite_comment, rewrite_missing_comment},
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
-    utils::{first_line_width, is_single_line, last_line_width, trimmed_last_line_width, wrap_str},
+    utils::{
+        first_line_width, is_single_line, last_line_used_width, last_line_width, mk_sp,
+        trimmed_last_line_width, wrap_str,
+    },
 };
 
 /// Sigils that decorate a binop pair.
@@ -70,8 +74,18 @@ fn rewrite_pairs_one_line<T: Rewrite>(
 
             result.push_str(&rewrite);
             result.push(' ');
+            let c = list.sep_prefixes.iter().next()?.trim();
+            if !c.is_empty() {
+                result.push_str(c);
+                result.push(' ');
+            };
             result.push_str(s);
             result.push(' ');
+            let c = list.sep_suffixes.iter().next()?.trim();
+            if !c.is_empty() {
+                result.push_str(c);
+                result.push(' ');
+            };
         } else {
             return None;
         }
@@ -116,10 +130,35 @@ fn rewrite_pairs_multiline<T: Rewrite>(
 
     result.push_str(&list.list[0].1.as_ref()?);
 
+    let mut prefix_iter = list.sep_prefixes.iter();
+    let mut suffix_iter = list.sep_suffixes.iter();
+    let mut first_iter = true;
     for ((e, default_rw), s) in list.list[1..].iter().zip(list.separators.iter()) {
         // The following test checks if we should keep two subexprs on the same
         // line. We do this if not doing so would create an orphan and there is
         // enough space to do so.
+
+        /* First multiline comment prefix and suffix in SeparatorPlace::Back
+         * and that are added to existing line requires less alignment, compared to
+         * the other comments that are added to already block aligned lines */
+        let multiline_align_overhead = if first_iter {
+            first_iter = false;
+            0
+        } else {
+            shape.indent.block_indent
+        };
+        let prefix = prefix_iter.next()?.trim();
+        let suffix = suffix_iter.next()?.trim();
+        let prelen = if prefix.is_empty() {
+            0
+        } else {
+            first_line_width(&prefix) + 1 /* +1 if for separator suffix */
+        };
+        let suflen = if suffix.is_empty() {
+            0
+        } else {
+            first_line_width(&suffix) + 1 /* +1 if for separator suffix */
+        };
         let offset = if result.contains('\n') {
             0
         } else {
@@ -128,28 +167,122 @@ fn rewrite_pairs_multiline<T: Rewrite>(
         if last_line_width(&result) + offset <= nested_shape.used_width() {
             // We must snuggle the next line onto the previous line to avoid an orphan.
             if let Some(line_shape) =
-                shape.offset_left(s.len() + 2 + trimmed_last_line_width(&result))
+                shape.offset_left(s.len() + 2 + trimmed_last_line_width(&result) + prelen + suflen)
             {
                 if let Some(rewrite) = e.rewrite(context, line_shape) {
                     result.push(' ');
+                    if prelen > 0 {
+                        result.push_str(&rewrite_comment(
+                            &prefix,
+                            true,
+                            shape.block_indent(
+                                last_line_used_width(&result, shape.offset)
+                                    - multiline_align_overhead,
+                            ),
+                            context.config,
+                        )?);
+                        result.push(' ');
+                    };
                     result.push_str(s);
                     result.push(' ');
+                    if suflen > 0 {
+                        result.push_str(&rewrite_comment(
+                            &suffix,
+                            true,
+                            shape.block_indent(
+                                last_line_used_width(&result, shape.offset)
+                                    - shape.indent.block_indent,
+                            ),
+                            context.config,
+                        )?);
+                        result.push(' ');
+                    };
                     result.push_str(&rewrite);
                     continue;
                 }
             }
         }
 
+        /* Add pre-separator comment  - try to add at the end of current last line */
+        if prelen > 0 {
+            let align = if trimmed_last_line_width(&result) + prelen > shape.width {
+                result.push_str(&indent_str);
+                shape.indent.block_indent
+            } else {
+                result.push(' ');
+                multiline_align_overhead
+            };
+            result.push_str(&rewrite_comment(
+                &prefix,
+                true,
+                shape.block_indent(last_line_used_width(&result, shape.offset) - align),
+                context.config,
+            )?);
+        }
+        /* Add separator - in multiline each separator starts or ends a line */
         match context.config.binop_separator() {
             SeparatorPlace::Back => {
-                result.push(' ');
+                let mut sep_in_new_line = false; /* whether separator starts a new line */
+                /* add separator */
+                if trimmed_last_line_width(&result) + s.len() + 1 > shape.width {
+                    result.push_str(&indent_str);
+                    sep_in_new_line = true;
+                } else {
+                    result.push(' ');
+                }
                 result.push_str(s);
+                /* Add post-separator comment - same line with seperator if possible */
+                if suflen > 0 {
+                    let align = if trimmed_last_line_width(&result) + suflen > shape.width
+                        && !sep_in_new_line
+                    {
+                        result.push_str(&indent_str);
+                        shape.indent.block_indent
+                    } else {
+                        result.push(' ');
+                        multiline_align_overhead
+                    };
+                    result.push_str(&rewrite_comment(
+                        &suffix,
+                        true,
+                        shape.block_indent(last_line_used_width(&result, shape.offset) - align),
+                        context.config,
+                    )?);
+                };
                 result.push_str(&indent_str);
             }
             SeparatorPlace::Front => {
                 result.push_str(&indent_str);
                 result.push_str(s);
-                result.push(' ');
+                /* Add post-separator comment at the same line with seperator
+                 *  so it will not be left alone in the line */
+                if suflen > 0 {
+                    result.push(' ');
+                    result.push_str(&rewrite_comment(
+                        &suffix,
+                        true,
+                        shape.block_indent(
+                            last_line_used_width(&result, shape.offset) - shape.indent.block_indent,
+                        ),
+                        context.config,
+                    )?);
+                }
+                /* Whether rhs is in the same or new line */
+                let l = match default_rw {
+                    Some(x) => {
+                        if suflen > 0 {
+                            first_line_width(&x)
+                        } else {
+                            0
+                        }
+                    }
+                    None => 0,
+                };
+                if trimmed_last_line_width(&result) + 1 + l > shape.width {
+                    result.push_str(&indent_str);
+                } else {
+                    result.push(' ');
+                }
             }
         }
 
@@ -255,6 +388,8 @@ trait FlattenPair: Rewrite + Sized {
 struct PairList<'a, 'b, T: Rewrite> {
     list: Vec<(&'b T, Option<String>)>,
     separators: Vec<&'a str>,
+    sep_prefixes: Vec<String>,
+    sep_suffixes: Vec<String>,
 }
 
 impl FlattenPair for ast::Expr {
@@ -293,6 +428,8 @@ impl FlattenPair for ast::Expr {
         let mut list = vec![];
         let mut separators = vec![];
         let mut node = self;
+        let mut sep_prefixes = vec![]; /* pre separator comments */
+        let mut sep_suffixes = vec![]; /* post separator comments */
         loop {
             match node.kind {
                 ast::ExprKind::Binary(op, ref lhs, _) if op.node == top_op => {
@@ -307,6 +444,13 @@ impl FlattenPair for ast::Expr {
                         match pop.kind {
                             ast::ExprKind::Binary(op, _, ref rhs) => {
                                 separators.push(op.node.to_string());
+                                /* Collect pre and post opertor comments */
+                                let sp = mk_sp(node.span.hi(), op.span.lo());
+                                let c = rewrite_missing_comment(sp, shape, context)?;
+                                sep_prefixes.push(c.to_string());
+                                let sp = mk_sp(op.span.hi(), rhs.span.lo());
+                                let c = rewrite_missing_comment(sp, shape, context)?;
+                                sep_suffixes.push(c.to_string());
                                 node = rhs;
                             }
                             _ => unreachable!(),
@@ -319,7 +463,12 @@ impl FlattenPair for ast::Expr {
         }
 
         assert_eq!(list.len() - 1, separators.len());
-        Some(PairList { list, separators })
+        Some(PairList {
+            list,
+            separators,
+            sep_prefixes,
+            sep_suffixes,
+        })
     }
 }
 
