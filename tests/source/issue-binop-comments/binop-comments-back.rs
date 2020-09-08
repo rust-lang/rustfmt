@@ -88,14 +88,14 @@ fn main() {
 }
 
 
-// Test 17.1
+// Test 21.1
 fn main() {
     let x = 2        /* v */
 	/* w */        *       /* x */
 	        4   ;
 }
 
-// Test 17.2 
+// Test 21.2 
 fn main() {
     let x = 2        /* v */
 	/* w */        *       /* x */
@@ -103,7 +103,7 @@ fn main() {
 }
 
 
-// Test 18.1 - Multi separators - One line Pre-comments
+// Test 22.1 - Multi separators - One line Pre-comments
 fn main() {
 /* comments before the if statement */
     if context1()   /* condition 1 explanations */
@@ -114,7 +114,7 @@ fn main() {
     {a + b}
 }
 
-// Test 18.2 - Multi separators - One line Post-comments
+// Test 22.2 - Multi separators - One line Post-comments
 fn main() {
 	     /* comments before the if statement */
     if context1() &&   /* condition 1 explanations */
@@ -125,7 +125,7 @@ fn main() {
     {a + b}
 }
 
-// Test 19.1 - Multi separators - Multi line Pre-comments
+// Test 23.1 - Multi separators - Multi line Pre-comments
 fn main() {
 	/* comments before the if statement
 	 * with some explanations about the if */
@@ -142,7 +142,7 @@ fn main() {
     {a + b}
 }
 
-// Test 19.2 - Multi separators - Multi line Post-comments
+// Test 23.2 - Multi separators - Multi line Post-comments
 fn main() {
 	/* comments before the if statement
 	 * with some explanations about the if */
@@ -156,5 +156,29 @@ fn main() {
 		                   * with some added details about condition 4 */
 	/* comments to the executed block
 	 * with some explanations about the executed block */
+    {a + b}
+}
+
+// Test 24.1 - Multi separators - Multi line Pre-comments with long line
+fn main() {
+    if context1()   /* condition 1 explanations longgggggggggggggggggggggggggggggggggggggggggggggggggggggggg
+		            * with some added details about condition 1 */
+        && bounds.len() == 1    /* condition 2 explanations
+		                   * with some added details about condition 2 longggggggggggggggggggggg */
+        && context3 /* condition 3 explanations longgggggggggggggggggggggggggggggggggggggggg
+		                * with some added details about condition 3 longgggggggggggggggggggggggggg */
+    {a + b}
+}
+
+// Test 24.2 - Multi separators - Multi line Post-comments with long line
+fn main() {
+    if context1() /* pre condition1 longgggggggggggggggggggggggggggggggggggggggggggggggggggggggggg*/ &&  /* condition 1 explanations
+		              * with some added details about condition 1 */
+        bounds.len() == 1 &&   /* condition 2 explanations longgggggggggggggggggggggggggggggggggggggg
+		                   * with some added details about condition 2 */
+        context3 && /* condition 3 explanations
+		                * with some added details about condition 3 longggggggggggggggggggggggggggggggggggggg */
+        !res.ends('+') /* condition 4 explanations longgggggggggggggggggggggggggggggggggggggggggggggg
+		                   * with some added details about condition 4 longgggggggggggggggggggggggggggggggggggg*/
     {a + b}
 }

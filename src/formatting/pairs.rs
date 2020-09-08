@@ -7,8 +7,8 @@ use crate::formatting::{
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
     utils::{
-        first_line_width, is_single_line, last_line_used_width, last_line_width, mk_sp,
-        trimmed_last_line_width, wrap_str,
+        first_line_width, is_single_line, last_line_used_width, last_line_width,
+        longest_line_width, mk_sp, trimmed_last_line_width, wrap_str,
     },
 };
 
@@ -152,12 +152,12 @@ fn rewrite_pairs_multiline<T: Rewrite>(
         let prelen = if prefix.is_empty() {
             0
         } else {
-            first_line_width(&prefix) + 1 /* +1 if for separator suffix */
+            longest_line_width(&prefix) + 1 /* +1 if for separator suffix */
         };
         let suflen = if suffix.is_empty() {
             0
         } else {
-            first_line_width(&suffix) + 1 /* +1 if for separator suffix */
+            longest_line_width(&suffix) + 1 /* +1 if for separator suffix */
         };
         let offset = if result.contains('\n') {
             0
