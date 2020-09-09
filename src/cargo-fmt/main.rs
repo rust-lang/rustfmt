@@ -5,6 +5,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::ffi::OsStr;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
@@ -149,6 +150,15 @@ fn is_status_options(s: &str) -> bool {
         || s.starts_with("--print-config=")
 }
 
+fn rustfmt_command() -> Command {
+    let rustfmt_var = env::var_os("RUSTFMT");
+    let rustfmt = match &rustfmt_var {
+        Some(rustfmt) => rustfmt,
+        None => OsStr::new("rustfmt"),
+    };
+    Command::new(rustfmt)
+}
+
 fn build_rustfmt_args(opts: &Opts, rustfmt_args: &mut Vec<String>) -> Result<(), String> {
     let mut contains_check = false;
     let mut contains_emit_mode = false;
@@ -240,7 +250,7 @@ fn handle_command_status(status: Result<i32, io::Error>) -> i32 {
 }
 
 fn get_rustfmt_info(args: &[String]) -> Result<i32, io::Error> {
-    let mut command = Command::new("rustfmt")
+    let mut command = rustfmt_command()
         .stdout(std::process::Stdio::inherit())
         .args(args)
         .spawn()
@@ -625,7 +635,7 @@ fn run_rustfmt(
             println!();
         }
 
-        let mut command = Command::new("rustfmt")
+        let mut command = rustfmt_command()
             .stdout(stdout)
             .args(files)
             .args(&["--edition", edition])
