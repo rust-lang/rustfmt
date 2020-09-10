@@ -66,6 +66,8 @@ fn rewrite_pairs_one_line<T: Rewrite>(
     let mut result = String::new();
     let base_shape = shape.block();
 
+    let mut prefix_iter = list.sep_prefixes.iter();
+    let mut suffix_iter = list.sep_suffixes.iter();
     for ((_, rewrite), s) in list.list.iter().zip(list.separators.iter()) {
         if let Some(rewrite) = rewrite {
             if !is_single_line(&rewrite) || result.len() > shape.width {
@@ -74,14 +76,14 @@ fn rewrite_pairs_one_line<T: Rewrite>(
 
             result.push_str(&rewrite);
             result.push(' ');
-            let c = list.sep_prefixes.iter().next()?.trim();
+            let c = prefix_iter.next()?.trim();
             if !c.is_empty() {
                 result.push_str(c);
                 result.push(' ');
             };
             result.push_str(s);
             result.push(' ');
-            let c = list.sep_suffixes.iter().next()?.trim();
+            let c = suffix_iter.next()?.trim();
             if !c.is_empty() {
                 result.push_str(c);
                 result.push(' ');

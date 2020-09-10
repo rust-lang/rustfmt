@@ -42,6 +42,10 @@ fn main() {
         a + b
     }
 }
+// Test 11.3 - One line with comments
+fn main() {
+    if 1234 == 0 /*x*/ & /*y*/ cc & dd {}
+}
 
 // Test 12.1 - Pre-comments break to few lines - only "&&"
 fn main() {
