@@ -6,7 +6,7 @@ use rustc_ast::token::{DelimToken, LitKind};
 use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, Span};
 
-use crate::config::{lists::*, Config, ControlBraceStyle, IndentStyle};
+use crate::config::{lists::*, BraceStyle, Config, ControlBraceStyle, IndentStyle};
 use crate::formatting::{
     chains::rewrite_chain,
     closures,
@@ -127,9 +127,19 @@ pub(crate) fn format_expr(
         ast::ExprKind::Block(ref block, opt_label) => {
             match expr_type {
                 ExprType::Statement => {
-                    if let rw @ Some(_) =
-                        rewrite_empty_block(context, block, Some(&expr.attrs), opt_label, "", shape)
-                    {
+                    let empty_block_prefix = if is_unsafe_block(block) {
+                        "unsafe "
+                    } else {
+                        ""
+                    };
+                    if let rw @ Some(_) = rewrite_empty_block(
+                        context,
+                        block,
+                        Some(&expr.attrs),
+                        opt_label,
+                        empty_block_prefix,
+                        shape,
+                    ) {
                         // Rewrite block without trying to put it in a single line.
                         rw
                     } else {
@@ -486,17 +496,28 @@ fn block_prefix(context: &RewriteContext<'_>, block: &ast::Block, shape: Shape) 
             if !trimmed.is_empty() {
                 // 9 = "unsafe  {".len(), 7 = "unsafe ".len()
                 let budget = shape.width.checked_sub(9)?;
-                format!(
-                    "unsafe {} ",
-                    rewrite_comment(
-                        trimmed,
-                        true,
-                        Shape::legacy(budget, shape.indent + 7),
-                        context.config,
-                    )?
-                )
+                let rewritten_comment = rewrite_comment(
+                    trimmed,
+                    true,
+                    Shape::legacy(budget, shape.indent + 7),
+                    context.config,
+                )?;
+                match context.config.brace_style() {
+                    BraceStyle::AlwaysNextLine => format!(
+                        "unsafe {}{}",
+                        rewritten_comment,
+                        shape.indent.to_string_with_newline(&context.config)
+                    ),
+                    _ => format!("unsafe {} ", rewritten_comment),
+                }
             } else {
-                "unsafe ".to_owned()
+                match context.config.brace_style() {
+                    BraceStyle::AlwaysNextLine => format!(
+                        "unsafe{}",
+                        shape.indent.to_string_with_newline(&context.config)
+                    ),
+                    _ => "unsafe ".to_owned(),
+                }
             }
         }
         ast::BlockCheckMode::Default => String::new(),
