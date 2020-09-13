@@ -193,7 +193,7 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                             true,
                             shape.block_indent(
                                 last_line_used_width(&result, shape.offset)
-                                    - shape.indent.block_indent,
+                                    - multiline_align_overhead,
                             ),
                             context.config,
                         )?);
