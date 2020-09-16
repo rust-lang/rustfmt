@@ -805,6 +805,22 @@ impl<'a> CommentRewrite<'a> {
     }
 }
 
+/* Returns the required indentation depending on 'orig'last line:
+ * If last line includes one line comment: 'indent_str' (that should include new line)
+ * othewise: space
+*/
+pub(crate) fn indent_str_by_last_line_comment<'a>(
+    orig: &'a str,
+    indent_str: &'a str,
+    space: &'a str,
+) -> &'a str {
+    if orig.trim_start().starts_with("//") {
+        indent_str
+    } else {
+        space
+    }
+}
+
 fn rewrite_comment_inner(
     orig: &str,
     block_style: bool,

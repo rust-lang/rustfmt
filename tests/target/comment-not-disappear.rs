@@ -32,7 +32,8 @@ fn foo() -> Vec<i32> {
 
 fn calc_page_len(prefix_len: usize, sofar: usize) -> usize {
     2 // page type and flags
-    + 1 // stored depth
-    + 2 // stored count
-    + prefix_len + sofar // sum of size of all the actual items
+        + 1 // stored depth
+        + 2 // stored count
+        + prefix_len
+        + sofar // sum of size of all the actual items
 }

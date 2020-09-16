@@ -186,3 +186,36 @@ fn main() {
 		                   * with some added details about condition 4 longgggggggggggggggggggggggggggggggggggg*/
     {a + b}
 }
+
+// Test 25.1 - binop with one line comment
+fn main() {
+if
+a // comment1
+| bbbbbb    |    cccccc
+{}
+}
+
+// Test 25.2 - binop with one line comment
+fn main() {
+if
+a // comment1
+	// comment2
+| b
+{}
+}
+
+// Test 25.3 - binop with one line comment
+fn main() {
+if a
+|  // comment3
+b
+{}
+}
+
+// Test 25.4 - binop with one line comment
+fn main() {
+if a     // comment1
+|           // comment3
+b   |   c
+{}
+}

@@ -3,7 +3,7 @@ use rustc_ast::ast;
 use crate::config::lists::*;
 use crate::config::IndentStyle;
 use crate::formatting::{
-    comment::{rewrite_comment, rewrite_missing_comment},
+    comment::{indent_str_by_last_line_comment, rewrite_comment, rewrite_missing_comment},
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
     utils::{
@@ -78,15 +78,23 @@ fn rewrite_pairs_one_line<T: Rewrite>(
             result.push(' ');
             let c = prefix_iter.next()?.trim();
             if !c.is_empty() {
-                result.push_str(c);
-                result.push(' ');
+                if c.starts_with("//") {
+                    return None;
+                } else {
+                    result.push_str(c);
+                    result.push(' ');
+                };
             };
             result.push_str(s);
             result.push(' ');
             let c = suffix_iter.next()?.trim();
             if !c.is_empty() {
-                result.push_str(c);
-                result.push(' ');
+                if c.starts_with("//") {
+                    return None;
+                } else {
+                    result.push_str(c);
+                    result.push(' ');
+                };
             };
         } else {
             return None;
@@ -183,7 +191,7 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                             ),
                             context.config,
                         )?);
-                        result.push(' ');
+                        result.push_str(indent_str_by_last_line_comment(&prefix, &indent_str, " "));
                     };
                     result.push_str(s);
                     result.push(' ');
@@ -197,7 +205,7 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                             ),
                             context.config,
                         )?);
-                        result.push(' ');
+                        result.push_str(indent_str_by_last_line_comment(&suffix, &indent_str, " "));
                     };
                     result.push_str(&rewrite);
                     continue;
