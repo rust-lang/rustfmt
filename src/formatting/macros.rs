@@ -1181,8 +1181,7 @@ fn next_space(tok: &TokenKind) -> SpaceState {
         | TokenKind::Pound
         | TokenKind::Dollar
         | TokenKind::OpenDelim(_)
-        | TokenKind::CloseDelim(_)
-        | TokenKind::Whitespace => SpaceState::Never,
+        | TokenKind::CloseDelim(_) => SpaceState::Never,
 
         TokenKind::Literal(..) | TokenKind::Ident(..) | TokenKind::Lifetime(_) => SpaceState::Ident,
 
@@ -1287,11 +1286,11 @@ impl MacroParser {
             }
         };
         if let Some(TokenTree::Token(Token { kind, span })) = self.toks.look_ahead(0) {
-            if (is_macro_rules && kind == TokenKind::Semi)
-                || (!is_macro_rules && kind == TokenKind::Comma)
+            if (is_macro_rules && *kind == TokenKind::Semi)
+                || (!is_macro_rules && *kind == TokenKind::Comma)
             {
-                self.toks.next();
                 hi = span.hi();
+                self.toks.next();
             }
         }
         Some(MacroBranch {
