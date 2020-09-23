@@ -188,6 +188,7 @@ fn rewrite_closure_with_block(
             id: ast::NodeId::root(),
             kind: ast::StmtKind::Expr(ptr::P(body.clone())),
             span: body.span,
+            tokens: None,
         }],
         id: ast::NodeId::root(),
         rules: ast::BlockCheckMode::Default,
@@ -196,6 +197,7 @@ fn rewrite_closure_with_block(
             .first()
             .map(|attr| attr.span.to(body.span))
             .unwrap_or(body.span),
+        tokens: None,
     };
     let block =
         rewrite_block_with_visitor(context, "", &block, Some(&body.attrs), None, shape, false)?;
