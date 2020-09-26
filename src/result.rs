@@ -118,7 +118,7 @@ pub enum OperationError {
     #[error("invalid glob pattern found in ignore list: {0}")]
     InvalidGlobPattern(ignore::Error),
     /// Parse error occurred while parsing the input.
-    #[error("failed to parse {input:?}")]
+    #[error("failed to parse {input}")]
     ParseError { input: FileName, is_panic: bool },
     /// Io error.
     #[error("{0}")]
