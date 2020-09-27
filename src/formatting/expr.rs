@@ -892,22 +892,12 @@ impl<'a> ControlFlow<'a> {
                         .block_indent(context.config)
                         .to_string_with_newline(context.config);
                     let shape = pat_shape.block_indent(context.config.tab_spaces());
-                    let comment = format!(
-                        "{}{}",
+                    format!(
+                        "{}{}{}",
                         newline,
                         rewrite_missing_comment(comments_span, shape, context)?,
-                    );
-                    let lhs = format!("{}{}{}{}", matcher, pat_string, self.connector, comment);
-                    let orig_rhs = Some(format!("{}{}", newline, expr.rewrite(context, shape)?));
-                    let rhs = choose_rhs(
-                        context,
-                        expr,
-                        cond_shape,
-                        orig_rhs,
-                        RhsTactics::Default,
-                        true,
-                    )?;
-                    return Some(format!("{}{}", lhs, rhs));
+                        newline
+                    )
                 }
             };
             let result = format!(
@@ -1951,17 +1941,20 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     } else {
         0
     });
+
     // 1 = space between operator and rhs.
     let orig_shape = shape.offset_left(last_line_width + 1).unwrap_or(Shape {
         width: 0,
         offset: shape.offset + last_line_width + 1,
         ..shape
     });
-    let has_rhs_comment = if let Some(offset) = lhs.find_last_uncommented("=") {
-        lhs.trim_end().len() > offset + 1
-    } else {
-        false
-    };
+    let (has_rhs_comment, lhs_ends_with_line_comment) =
+        if let Some(offset) = lhs.find_last_uncommented("=") {
+            let lhs_end = &lhs[offset..lhs.len()];
+            (lhs.trim_end().len() > offset + 1, lhs_end.contains("//"))
+        } else {
+            (false, false)
+        };
 
     choose_rhs(
         context,
@@ -1970,6 +1963,7 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
         ex.rewrite(context, orig_shape),
         rhs_tactics,
         has_rhs_comment,
+        lhs_ends_with_line_comment,
     )
 }
 
@@ -1992,12 +1986,15 @@ fn choose_rhs<R: Rewrite>(
     orig_rhs: Option<String>,
     rhs_tactics: RhsTactics,
     has_rhs_comment: bool,
+    lhs_ends_with_line_comment: bool,
 ) -> Option<String> {
     match orig_rhs {
         Some(ref new_str)
             if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
         {
-            Some(format!(" {}", new_str))
+            let before_space_str = if lhs_ends_with_line_comment { "" } else { " " };
+
+            Some(format!("{}{}", before_space_str, new_str))
         }
         _ => {
             // Expression did not fit on the same line as the identifier.
@@ -2008,7 +2005,12 @@ fn choose_rhs<R: Rewrite>(
                 .indent
                 .block_indent(context.config)
                 .to_string_with_newline(context.config);
-            let before_space_str = if has_rhs_comment { "" } else { " " };
+
+            let before_space_str = if has_rhs_comment || lhs_ends_with_line_comment {
+                ""
+            } else {
+                " "
+            };
 
             match (orig_rhs, new_rhs) {
                 (Some(ref orig_rhs), Some(ref new_rhs))

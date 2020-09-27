@@ -13,7 +13,7 @@ use crate::config::{BraceStyle, Config, IndentStyle};
 use crate::formatting::{
     attr::filter_inline_attrs,
     comment::{
-        combine_strs_with_missing_comments, contains_comment, is_last_comment_block,
+        combine_strs_with_missing_comments, comment_style, contains_comment, is_last_comment_block,
         recover_comment_removed, recover_missing_comment_in_span, rewrite_missing_comment,
         FindUncommented,
     },
@@ -1878,7 +1878,31 @@ fn rewrite_static(
     };
 
     if let Some(expr) = static_parts.expr_opt {
-        let lhs = format!("{}{} =", prefix, ty_str);
+        let comments_lo = context.snippet_provider.span_after(static_parts.span, "=");
+        let expr_lo = expr.span.lo();
+        let comments_span = mk_sp(comments_lo, expr_lo);
+
+        let missing_comments = match rewrite_missing_comment(comments_span, ty_shape, context) {
+            None => "".to_owned(),
+            Some(comment) if comment.is_empty() => "".to_owned(),
+            Some(comment) if comment_style(&comment, false).is_line_comment() => {
+                let newline = &ty_shape
+                    .indent
+                    .block_indent(context.config)
+                    .to_string_with_newline(context.config);
+                let shape = ty_shape.block_indent(context.config.tab_spaces());
+                format!(
+                    "{}{}{}",
+                    newline,
+                    rewrite_missing_comment(comments_span, shape, context)?,
+                    newline
+                )
+            }
+            Some(comment) => format!(" {}", comment),
+        };
+
+        let lhs = format!("{}{} ={}", prefix, ty_str, missing_comments);
+
         // 1 = ;
         let remaining_width = context.budget(offset.block_indent + 1);
         rewrite_assign_rhs(
