@@ -3,5 +3,5 @@ const A: usize =
     2;
 
 const B: usize =   
-/*    Some constant */
+/* constant */
 3;
