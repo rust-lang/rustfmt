@@ -5,3 +5,5 @@ const A: usize =
 const B: usize =
     /* constant */
     3;
+
+const C: usize = /* foo */ 5;
