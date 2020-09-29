@@ -19,7 +19,7 @@ use crate::formatting::{
     },
     expr::{
         is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_expr,
-        rewrite_assign_rhs_with, RhsTactics,
+        rewrite_assign_rhs_with, rewrite_assign_rhs_with_comments, RhsTactics,
     },
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator},
     macros::{rewrite_macro, MacroPosition},
@@ -1878,14 +1878,22 @@ fn rewrite_static(
     };
 
     if let Some(expr) = static_parts.expr_opt {
+        let comments_lo = context.snippet_provider.span_after(static_parts.span, "=");
+        let expr_lo = expr.span.lo();
+        let comments_span = mk_sp(comments_lo, expr_lo);
+
         let lhs = format!("{}{} =", prefix, ty_str);
+
         // 1 = ;
         let remaining_width = context.budget(offset.block_indent + 1);
-        rewrite_assign_rhs(
+        rewrite_assign_rhs_with_comments(
             context,
             &lhs,
             &**expr,
             Shape::legacy(remaining_width, offset.block_only()),
+            RhsTactics::Default,
+            comments_span,
+            true,
         )
         .and_then(|res| recover_comment_removed(res, static_parts.span, context))
         .or_else(|| {
