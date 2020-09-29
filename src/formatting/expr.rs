@@ -11,8 +11,9 @@ use crate::formatting::{
     chains::rewrite_chain,
     closures,
     comment::{
-        combine_strs_with_missing_comments, contains_comment, recover_comment_removed,
-        rewrite_comment, rewrite_missing_comment, CharClasses, FindUncommented,
+        combine_strs_with_missing_comments, comment_style, contains_comment,
+        recover_comment_removed, rewrite_comment, rewrite_missing_comment, CharClasses,
+        FindUncommented,
     },
     lists::{
         definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
@@ -867,16 +868,54 @@ impl<'a> ControlFlow<'a> {
                 .span_after(self.span, self.connector.trim());
             let comments_span = mk_sp(comments_lo, expr.span.lo());
 
-            let result = format!("{}{}{}", matcher, pat_string, self.connector);
 
-            return rewrite_assign_rhs_with_comments(
-                context,
-                result,
-                expr,
-                cond_shape,
-                RhsTactics::Default,
-                comments_span,
+            let missing_comments = match rewrite_missing_comment(comments_span, cond_shape, context)
+            {
+                None => "".to_owned(),
+                Some(comment) if self.connector.is_empty() || comment.is_empty() => comment,
+                // Handle same-line block comments:
+                //     if let Some(foo) = /*bar*/ baz { ... }
+                //     if let Some(ref /*def*/ mut /*abc*/ state)...
+                Some(comment)
+                    if !comment_style(&comment, false).is_line_comment()
+                        && !comment.contains('\n') =>
+                {
+                    format!(" {}", comment)
+                }
+                // Handle sequence of multiple inline comments:
+                //     if let Some(n) =
+                //         // this is a test comment
+                //         // with another
+                //         foo { .... }
+                Some(_) => {
+                    let newline = &cond_shape
+                        .indent
+                        .block_indent(context.config)
+                        .to_string_with_newline(context.config);
+                    let shape = pat_shape.block_indent(context.config.tab_spaces());
+                    let comment = format!(
+                        "{}{}",
+                        newline,
+                        rewrite_missing_comment(comments_span, shape, context)?,
+                    );
+                    let lhs = format!("{}{}{}{}", matcher, pat_string, self.connector, comment);
+                    let orig_rhs = Some(format!("{}{}", newline, expr.rewrite(context, shape)?));
+                    let rhs = choose_rhs(
+                        context,
+                        expr,
+                        cond_shape,
+                        orig_rhs,
+                        RhsTactics::Default,
+                        true,
+                    )?;
+                    return Some(format!("{}{}", lhs, rhs));
+                }
+            };
+            let result = format!(
+                "{}{}{}{}",
+                matcher, pat_string, self.connector, missing_comments
             );
+            return rewrite_assign_rhs(context, result, expr, cond_shape);
         }
 
         let expr_rw = expr.rewrite(context, cond_shape);
@@ -1913,7 +1952,6 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     } else {
         0
     });
-
     // 1 = space between operator and rhs.
     let orig_shape = shape.offset_left(last_line_width + 1).unwrap_or(Shape {
         width: 0,
@@ -1954,17 +1992,21 @@ pub(crate) fn rewrite_assign_rhs_with_comments<S: Into<String>, R: Rewrite>(
     ex: &R,
     shape: Shape,
     rhs_tactics: RhsTactics,
-    between: Span,
+    between_span: Span,
+    allow_extend: bool,
 ) -> Option<String> {
     let lhs = lhs.into();
+    let contains_comment = contains_comment(context.snippet(between_span));
+    let shape = if contains_comment {
+        shape.block_left(context.config.tab_spaces())?
+    } else {
+        shape
+    };
     let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
-    let comment_shape = shape.block_left(context.config.tab_spaces())?;
 
-    let comment = context.snippet_provider.span_to_snippet(between)?;
-    if comment.trim().starts_with("/") {
+    if contains_comment {
         let rhs = rhs.trim_start();
-
-        combine_strs_with_missing_comments(context, &lhs, &rhs, between, comment_shape, false)
+        combine_strs_with_missing_comments(context, &lhs, &rhs, between_span, shape, allow_extend)
     } else {
         Some(lhs + &rhs)
     }

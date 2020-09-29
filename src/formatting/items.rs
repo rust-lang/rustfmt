@@ -1893,6 +1893,7 @@ fn rewrite_static(
             Shape::legacy(remaining_width, offset.block_only()),
             RhsTactics::Default,
             comments_span,
+            true,
         )
         .and_then(|res| recover_comment_removed(res, static_parts.span, context))
         .or_else(|| {
