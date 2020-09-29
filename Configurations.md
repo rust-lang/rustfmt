@@ -2006,6 +2006,33 @@ use dolor;
 use sit;
 ```
 
+## `reorder_imports_opinionated`
+
+Reorder imports, creating three groups for:
+- std (core, alloc would also fit here)
+- external crates
+- this module.
+
+Within each group, imports are sorted as with `reorder_imports`.
+
+This has no effect is `reorder_imports` is `false`.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `true`:
+
+```rust
+use lorem; // TODO
+```
+
+#### `false` (default):
+
+```rust
+use lorem; // TODO
+```
+
 
 ## `reorder_modules`
 
