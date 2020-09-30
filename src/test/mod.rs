@@ -198,13 +198,6 @@ fn system_tests() {
 }
 
 #[test]
-fn temp() {
-    let vpb = vec![Path::new("tests/source/import_opinionated.rs").to_path_buf()];
-    let (_reports, _count, fails) = check_files(vpb, &None);
-    assert_eq!(fails, 0);
-}
-
-#[test]
 fn checkstyle_test() {
     init_log();
     let filename = "tests/emit/source/fn-single-line.rs";

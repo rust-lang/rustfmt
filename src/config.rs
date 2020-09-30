@@ -81,7 +81,8 @@ create_config! {
 
     // Ordering
     reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
-    reorder_imports_opinionated: bool, false, false, "Reorder imports in blocks";
+    reorder_imports_opinionated: bool, false, false,
+        "Create blocks for standard, external, and local imports";
     reorder_modules: bool, true, true, "Reorder module statements alphabetically in group";
     reorder_impl_items: bool, false, false, "Reorder impl items";
 

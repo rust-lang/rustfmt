@@ -2008,10 +2008,10 @@ use sit;
 
 ## `reorder_imports_opinionated`
 
-Reorder imports, creating three groups for:
-- `std`, `core` and `alloc`,
-- external crates
-- this module.
+Discard existing import groups, and create three groups for:
+1. `std`, `core` and `alloc`,
+2. external crates,
+3. this module.
 
 Within each group, imports are sorted as with `reorder_imports`.
 
@@ -2020,23 +2020,6 @@ This has no effect is `reorder_imports` is `false`.
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
 - **Stable**: No
-
-#### `true`:
-
-```rust
-use alloc::alloc::Layout;
-use core::f32;
-use std::sync::Arc;
-
-use broker::database::PooledConnection;
-use chrono::Utc;
-use juniper::{FieldError, FieldResult};
-use uuid::Uuid;
-
-use super::schema::{Context, Payload};
-use super::update::convert_publish_payload;
-use crate::models::Event;
-```
 
 #### `false` (default):
 
@@ -2057,6 +2040,22 @@ use crate::models::Event;
 use core::f32;
 ```
 
+#### `true`:
+
+```rust
+use alloc::alloc::Layout;
+use core::f32;
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+use chrono::Utc;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+```
 
 ## `reorder_modules`
 
