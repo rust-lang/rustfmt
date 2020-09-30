@@ -2009,7 +2009,7 @@ use sit;
 ## `reorder_imports_opinionated`
 
 Reorder imports, creating three groups for:
-- std (core, alloc would also fit here)
+- `std`, `core` and `alloc`,
 - external crates
 - this module.
 
@@ -2041,20 +2041,20 @@ use crate::models::Event;
 #### `false` (default):
 
 ```rust
-use chrono::Utc;
 use super::update::convert_publish_payload;
+use chrono::Utc;
 
+use alloc::alloc::Layout;
 use juniper::{FieldError, FieldResult};
 use uuid::Uuid;
-use alloc::alloc::Layout;
 
 use std::sync::Arc;
 
 use broker::database::PooledConnection;
 
 use super::schema::{Context, Payload};
-use core::f32;
 use crate::models::Event;
+use core::f32;
 ```
 
 
