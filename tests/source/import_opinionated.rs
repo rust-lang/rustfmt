@@ -1,4 +1,4 @@
-// rustfmt:reorder_imports_opinionated: true
+// rustfmt-reorder_imports_opinionated: true
 use chrono::Utc;
 use super::update::convert_publish_payload;
 
