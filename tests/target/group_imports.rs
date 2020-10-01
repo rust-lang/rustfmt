@@ -1,4 +1,4 @@
-// rustfmt-reorder_imports_opinionated: true
+// rustfmt-group_imports: StdExternalCrate
 use alloc::alloc::Layout;
 use core::f32;
 use std::sync::Arc;

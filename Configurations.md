@@ -2006,22 +2006,22 @@ use dolor;
 use sit;
 ```
 
-## `reorder_imports_opinionated`
+## `group_imports`
 
 Discard existing import groups, and create three groups for:
 1. `std`, `core` and `alloc`,
 2. external crates,
-3. this module.
+3. `self`, `super` and `crate` imports.
 
 Within each group, imports are sorted as with `reorder_imports`.
 
 This has no effect is `reorder_imports` is `false`.
 
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
+- **Default value**: `None`
+- **Possible values**: `None`, `StdExternalCrate`
 - **Stable**: No
 
-#### `false` (default):
+#### `None` (default):
 
 ```rust
 use super::update::convert_publish_payload;
@@ -2040,7 +2040,7 @@ use crate::models::Event;
 use core::f32;
 ```
 
-#### `true`:
+#### `StdExternalCrate`:
 
 ```rust
 use alloc::alloc::Layout;

@@ -11,7 +11,7 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::ast;
 use rustc_span::{symbol::sym, Span};
 
-use crate::config::Config;
+use crate::config::{Config, GroupImportsTactic};
 use crate::formatting::imports::UseSegment;
 use crate::formatting::modules::{get_mod_inner_attrs, FileModMap};
 use crate::formatting::{
@@ -229,7 +229,7 @@ fn rewrite_reorderable_items(
                 normalized_items = merge_use_trees(normalized_items);
             }
 
-            let reordered_imports = if context.config.reorder_imports_opinionated() {
+            let reordered_imports = if context.config.group_imports() != GroupImportsTactic::None {
                 group_and_sort_imports(normalized_items)
             } else {
                 normalized_items.sort();
@@ -360,7 +360,7 @@ impl ReorderableItemKind {
     fn in_group(self, config: &Config) -> bool {
         match self {
             ReorderableItemKind::ExternCrate | ReorderableItemKind::Mod => true,
-            ReorderableItemKind::Use => !config.reorder_imports_opinionated(),
+            ReorderableItemKind::Use => config.group_imports() == GroupImportsTactic::None,
             ReorderableItemKind::Other => false,
         }
     }
