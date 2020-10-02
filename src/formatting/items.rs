@@ -322,8 +322,28 @@ impl<'a> FmtVisitor<'a> {
         let snippet = self.snippet(item.span);
         let brace_pos = snippet.find_uncommented("{").unwrap();
 
-        self.push_str("{");
         if !item.body.is_empty() || contains_comment(&snippet[brace_pos..]) {
+            // configure opening brace style
+            let brace_style = self.config.brace_style();
+            match brace_style {
+                BraceStyle::AlwaysNextLine => {
+                    // ensure we don't allow a space at the end so the line doesn't end with a space
+                    // (caused by &item.abi above => 'extern "C" ')
+                    if self.buffer.ends_with(' ') {
+                        self.buffer.pop();
+                    }
+
+                    let nested_indent = self.shape().indent;
+                    let line = &format!(
+                        "{}{}",
+                        nested_indent.to_string_with_newline(self.config),
+                        "{"
+                    );
+                    self.push_str(line);
+                }
+                _ => self.push_str("{"),
+            };
+
             // FIXME: this skips comments between the extern keyword and the opening
             // brace.
             self.last_pos = item.span.lo() + BytePos(brace_pos as u32 + 1);
@@ -347,9 +367,12 @@ impl<'a> FmtVisitor<'a> {
                 self.block_indent = self.block_indent.block_unindent(self.config);
                 self.format_missing_with_indent(item.span.hi() - BytePos(1));
             }
+
+            self.push_str("}");
+        } else {
+            self.push_str("{}");
         }
 
-        self.push_str("}");
         self.last_pos = item.span.hi();
     }
 
