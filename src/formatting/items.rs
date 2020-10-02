@@ -1596,6 +1596,7 @@ fn rewrite_type<R: Rewrite>(
     generics: &ast::Generics,
     generic_bounds_opt: Option<&ast::GenericBounds>,
     rhs: Option<&R>,
+    between: Option<Span>,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
     result.push_str(&format!("{}type ", format_visibility(context, vis)));
@@ -1642,12 +1643,28 @@ fn rewrite_type<R: Rewrite>(
     if let Some(ty) = rhs {
         // If there's a where clause, add a newline before the assignment. Otherwise just add a
         // space.
-        if !generics.where_clause.predicates.is_empty() {
+        let has_where = !generics.where_clause.predicates.is_empty();
+        if has_where {
             result.push_str(&indent.to_string_with_newline(context.config));
-        } else {
-            result.push(' ');
         }
-        let lhs = format!("{}=", result);
+
+        let lhs = match between {
+            Some(between)
+                if contains_comment(&context.snippet_provider.span_to_snippet(between)?) =>
+            {
+                let comment_shape = Shape::indented(indent, context.config)
+                    .block_left(context.config.tab_spaces())?;
+                combine_strs_with_missing_comments(
+                    context,
+                    &result,
+                    "=",
+                    between,
+                    comment_shape,
+                    true,
+                )?
+            }
+            _ => format!("{}{}=", result, if has_where { "" } else { " " }),
+        };
 
         // 1 = `;`
         let shape = Shape::indented(indent, context.config).sub_width(1)?;
@@ -1664,6 +1681,7 @@ pub(crate) fn rewrite_opaque_type(
     generic_bounds: &ast::GenericBounds,
     generics: &ast::Generics,
     vis: &ast::Visibility,
+    between: Option<Span>,
 ) -> Option<String> {
     let opaque_type_bounds = OpaqueTypeBounds { generic_bounds };
     rewrite_type(
@@ -1674,6 +1692,7 @@ pub(crate) fn rewrite_opaque_type(
         generics,
         Some(generic_bounds),
         Some(&opaque_type_bounds),
+        between,
     )
 }
 
@@ -1931,6 +1950,7 @@ pub(crate) fn rewrite_type_alias(
     context: &RewriteContext<'_>,
     indent: Indent,
     vis: &ast::Visibility,
+    between: Option<Span>,
 ) -> Option<String> {
     rewrite_type(
         context,
@@ -1940,6 +1960,7 @@ pub(crate) fn rewrite_type_alias(
         generics,
         generic_bounds_opt,
         ty_opt,
+        between,
     )
 }
 
@@ -1989,8 +2010,9 @@ pub(crate) fn rewrite_associated_impl_type(
     generics: &ast::Generics,
     context: &RewriteContext<'_>,
     indent: Indent,
+    between: Option<Span>,
 ) -> Option<String> {
-    let result = rewrite_type_alias(ident, ty_opt, generics, None, context, indent, vis)?;
+    let result = rewrite_type_alias(ident, ty_opt, generics, None, context, indent, vis, between)?;
 
     match defaultness {
         ast::Defaultness::Default(..) => Some(format!("default {}", result)),
@@ -3219,15 +3241,24 @@ impl Rewrite for ast::ForeignItem {
                 ref generics,
                 ref generic_bounds,
                 ref type_default,
-            ) => rewrite_type_alias(
-                self.ident,
-                type_default.as_ref(),
-                generics,
-                Some(generic_bounds),
-                &context,
-                shape.indent,
-                &self.vis,
-            ),
+            ) => {
+                let op_lo = context.snippet_provider.opt_span_before(self.span, "=");
+                let ident_hi = self.ident.span.hi();
+
+                rewrite_type_alias(
+                    self.ident,
+                    type_default.as_ref(),
+                    generics,
+                    Some(generic_bounds),
+                    &context,
+                    shape.indent,
+                    &self.vis,
+                    match op_lo {
+                        Some(op_lo) => Some(mk_sp(ident_hi, op_lo)),
+                        None => None,
+                    },
+                )
+            }
             ast::ForeignItemKind::MacCall(ref mac) => {
                 rewrite_macro(mac, None, context, shape, MacroPosition::Item)
             }

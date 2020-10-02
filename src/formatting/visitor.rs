@@ -598,6 +598,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 }
                 ast::ItemKind::TyAlias(_, ref generics, ref generic_bounds, ref ty) => match ty {
                     Some(ty) => {
+                        let op_lo = self.snippet_provider.opt_span_before(item.span, "=");
+                        let ident_hi = generics.span.hi();
+
                         let rewrite = rewrite_type_alias(
                             item.ident,
                             Some(&*ty),
@@ -606,10 +609,17 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             &self.get_context(),
                             self.block_indent,
                             &item.vis,
+                            match op_lo {
+                                Some(op_lo) => Some(mk_sp(ident_hi, op_lo)),
+                                None => None,
+                            },
                         );
                         self.push_rewrite(item.span, rewrite);
                     }
                     None => {
+                        let op_lo = self.snippet_provider.opt_span_before(item.span, "=");
+                        let ident_hi = generics.span.hi();
+
                         let rewrite = rewrite_opaque_type(
                             &self.get_context(),
                             self.block_indent,
@@ -617,6 +627,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             generic_bounds,
                             generics,
                             &item.vis,
+                            match op_lo {
+                                Some(op_lo) => Some(mk_sp(ident_hi, op_lo)),
+                                None => None,
+                            },
                         );
                         self.push_rewrite(item.span, rewrite);
                     }
@@ -677,6 +691,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 );
             }
             ast::AssocItemKind::TyAlias(_, ref generics, ref generic_bounds, ref type_default) => {
+                let op_lo = self.snippet_provider.opt_span_before(ti.span, "=");
+                let ident_hi = generics.span.hi();
+
                 let rewrite = rewrite_type_alias(
                     ti.ident,
                     type_default.as_ref(),
@@ -685,6 +702,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     &self.get_context(),
                     self.block_indent,
                     &ti.vis,
+                    match op_lo {
+                        Some(op_lo) => Some(mk_sp(ident_hi, op_lo)),
+                        None => None,
+                    },
                 );
                 self.push_rewrite(ti.span, rewrite);
             }
@@ -726,6 +747,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ast::AssocItemKind::Const(..) => self.visit_static(&StaticParts::from_impl_item(ii)),
             ast::AssocItemKind::TyAlias(defaultness, ref generics, _, ref ty) => {
                 let rewrite_associated = || {
+                    let op_lo = self.snippet_provider.opt_span_before(ii.span, "=");
+                    let ident_hi = generics.span.hi();
+
                     rewrite_associated_impl_type(
                         ii.ident,
                         &ii.vis,
@@ -734,6 +758,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         generics,
                         &self.get_context(),
                         self.block_indent,
+                        match op_lo {
+                            Some(op_lo) => Some(mk_sp(ident_hi, op_lo)),
+                            None => None,
+                        },
                     )
                 };
                 let rewrite = match ty {
