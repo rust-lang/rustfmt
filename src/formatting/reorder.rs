@@ -195,7 +195,7 @@ fn rewrite_reorderable_item(
 
 /// Rewrite a list of items with reordering and/or regrouping. Every item
 /// in `items` must have the same `ast::ItemKind`. Whether reordering, regrouping,
-/// or both ore done is determined from the `context`.
+/// or both are done is determined from the `context`.
 fn rewrite_reorderable_or_regroupable_items(
     context: &RewriteContext<'_>,
     reorderable_items: &[&ast::Item],
@@ -230,11 +230,9 @@ fn rewrite_reorderable_or_regroupable_items(
                 normalized_items = merge_use_trees(normalized_items);
             }
 
-            let mut regrouped_items = if context.config.group_imports() != GroupImportsTactic::None
-            {
-                group_imports(normalized_items)
-            } else {
-                vec![normalized_items]
+            let mut regrouped_items = match context.config.group_imports() {
+                GroupImportsTactic::Preserve => vec![normalized_items],
+                GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
             };
 
             if context.config.reorder_imports() {
@@ -363,14 +361,14 @@ impl ReorderableItemKind {
             ReorderableItemKind::ExternCrate
             | ReorderableItemKind::Mod
             | ReorderableItemKind::Other => false,
-            ReorderableItemKind::Use => config.group_imports() != GroupImportsTactic::None,
+            ReorderableItemKind::Use => config.group_imports() != GroupImportsTactic::Preserve,
         }
     }
 
     fn in_group(self, config: &Config) -> bool {
         match self {
             ReorderableItemKind::ExternCrate | ReorderableItemKind::Mod => true,
-            ReorderableItemKind::Use => config.group_imports() == GroupImportsTactic::None,
+            ReorderableItemKind::Use => config.group_imports() == GroupImportsTactic::Preserve,
             ReorderableItemKind::Other => false,
         }
     }

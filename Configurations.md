@@ -2008,20 +2008,15 @@ use sit;
 
 ## `group_imports`
 
-Discard existing import groups, and create three groups for:
-1. `std`, `core` and `alloc`,
-2. external crates,
-3. `self`, `super` and `crate` imports.
+Controls the strategy for how imports are grouped together.
 
-Within each group, imports are sorted as with `reorder_imports`.
-
-This has no effect is `reorder_imports` is `false`.
-
-- **Default value**: `None`
-- **Possible values**: `None`, `StdExternalCrate`
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `StdExternalCrate`
 - **Stable**: No
 
-#### `None` (default):
+#### `Preserve` (default):
+
+Preserve the source file's import groups.
 
 ```rust
 use super::update::convert_publish_payload;
@@ -2041,6 +2036,11 @@ use core::f32;
 ```
 
 #### `StdExternalCrate`:
+
+Discard existing import groups, and create three groups for:
+1. `std`, `core` and `alloc`,
+2. external crates,
+3. `self`, `super` and `crate` imports.
 
 ```rust
 use alloc::alloc::Layout;

@@ -78,7 +78,7 @@ create_config! {
     imports_indent: IndentStyle, IndentStyle::Block, false, "Indent of imports";
     imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
     merge_imports: bool, false, false, "Merge imports";
-    group_imports: GroupImportsTactic, GroupImportsTactic::None, false,
+    group_imports: GroupImportsTactic, GroupImportsTactic::Preserve, false,
         "Reorganize import groups";
 
     // Ordering
@@ -595,7 +595,7 @@ where_single_line = false
 imports_indent = "Block"
 imports_layout = "Mixed"
 merge_imports = false
-group_imports = "None"
+group_imports = "Preserve"
 reorder_imports = true
 reorder_modules = true
 reorder_impl_items = false
