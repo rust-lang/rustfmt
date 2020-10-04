@@ -1,8 +1,6 @@
 // rustfmt-group_imports: StdExternalCrate
 // rustfmt-reorder_imports: false
 
-// group_imports has no effect when reorder_imports is disabled.
-
 use chrono::Utc;
 use super::update::convert_publish_payload;
 
