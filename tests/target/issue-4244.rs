@@ -13,3 +13,8 @@ pub type C
 pub trait D<T> {
     type E /* Comment E */ = SS;
 }
+
+type F<'a: 'static, T: Ord + 'static>: Eq + PartialEq
+where
+    T: 'static + Copy, /* x */
+    = Vec<u8>;
