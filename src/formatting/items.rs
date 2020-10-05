@@ -1643,8 +1643,7 @@ fn rewrite_type<R: Rewrite>(
     if let Some(ty) = rhs {
         // If there's a where clause, add a newline before the assignment. Otherwise just add a
         // space.
-        let has_where = !generics.where_clause.predicates.is_empty();
-        if has_where {
+        if !generics.where_clause.predicates.is_empty() {
             result.push_str(&indent.to_string_with_newline(context.config));
         } else {
             result.push(' ');
