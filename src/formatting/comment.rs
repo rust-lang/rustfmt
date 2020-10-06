@@ -12,7 +12,8 @@ use crate::formatting::{
     string::{rewrite_string, StringFormat},
     utils::{
         count_newlines, first_line_width, format_code_block, last_line_width, tab_to_spaces,
-        trim_end_unless_two_whitespaces, trim_left_preserve_layout, unicode_str_width,
+        trim_end_unless_two_whitespaces, trim_left_preserve_layout, trimmed_last_line_width,
+        unicode_str_width,
     },
 };
 
@@ -177,11 +178,12 @@ pub(crate) fn combine_strs_with_missing_comments(
         String::with_capacity(prev_str.len() + next_str.len() + shape.indent.width() + 128);
     result.push_str(prev_str);
     let mut allow_one_line = !prev_str.contains('\n') && !next_str.contains('\n');
-    let first_sep = if prev_str.is_empty() || next_str.is_empty() {
-        ""
-    } else {
-        " "
-    };
+    let first_sep =
+        if prev_str.is_empty() || next_str.is_empty() || trimmed_last_line_width(prev_str) == 0 {
+            ""
+        } else {
+            " "
+        };
     let mut one_line_width =
         last_line_width(prev_str) + first_line_width(next_str) + first_sep.len();
 
