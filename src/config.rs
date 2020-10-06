@@ -79,7 +79,7 @@ create_config! {
     imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
     merge_imports: bool, false, false, "Merge imports";
     group_imports: GroupImportsTactic, GroupImportsTactic::Preserve, false,
-        "Reorganize import groups";
+        "Controls the strategy for how imports are grouped together";
 
     // Ordering
     reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
