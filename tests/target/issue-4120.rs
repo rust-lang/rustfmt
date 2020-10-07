@@ -1,8 +1,7 @@
 fn main() {
     let x = if true {
-
         1
-          // In if
+        // In if
     } else {
         0
         // in else

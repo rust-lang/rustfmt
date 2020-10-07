@@ -380,8 +380,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         _ => self.push_str("\n"),
                     }
                     newline_inserted = true;
-
+                    if unindent_comment {
+                        self.block_indent = self.block_indent.block_indent(self.config);
+                    }
                     self.push_str(&self.block_indent.to_string_with_newline(config));
+                    if unindent_comment {
+                        self.block_indent = self.block_indent.block_unindent(self.config);
+                    }
                 }
             }
             prev_kind = kind;
