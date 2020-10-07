@@ -1836,8 +1836,6 @@ fn say_hi() {
 }
 ```
 
-###
-
 ## `overflow_delimited_expr`
 
 When structs, slices, arrays, and block/array-like macros are used as the last
