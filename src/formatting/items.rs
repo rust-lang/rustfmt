@@ -1643,7 +1643,8 @@ fn rewrite_type<R: Rewrite>(
     if let Some(ty) = rhs {
         // If there's a where clause, add a newline before the assignment. Otherwise just add a
         // space.
-        if !generics.where_clause.predicates.is_empty() {
+        let has_where = !generics.where_clause.predicates.is_empty();
+        if has_where {
             result.push_str(&indent.to_string_with_newline(context.config));
         } else {
             result.push(' ');
@@ -1658,8 +1659,12 @@ fn rewrite_type<R: Rewrite>(
             Some(comment_span)
                 if contains_comment(context.snippet_provider.span_to_snippet(comment_span)?) =>
             {
-                let comment_shape = Shape::indented(indent, context.config)
-                    .block_left(context.config.tab_spaces())?;
+                let comment_shape = if has_where {
+                    Shape::indented(indent, context.config)
+                } else {
+                    Shape::indented(indent, context.config)
+                        .block_left(context.config.tab_spaces())?
+                };
 
                 combine_strs_with_missing_comments(
                     context,

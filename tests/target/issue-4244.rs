@@ -17,4 +17,4 @@ pub trait D<T> {
 type F<'a: 'static, T: Ord + 'static>: Eq + PartialEq
 where
     T: 'static + Copy, /* x */
-    = Vec<u8>;
+= Vec<u8>;
