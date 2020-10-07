@@ -349,12 +349,7 @@ impl<'a> FmtVisitor<'a> {
             self.last_pos = item.span.lo() + BytePos(brace_pos as u32 + 1);
             self.block_indent = self.block_indent.block_indent(self.config);
 
-            if item.body.is_empty() {
-                self.format_missing_no_indent(item.span.hi() - BytePos(1));
-                self.block_indent = self.block_indent.block_unindent(self.config);
-                let indent_str = self.block_indent.to_string(self.config);
-                self.push_str(&indent_str);
-            } else {
+            if !item.body.is_empty() {
                 let first_non_ws = item.body.first().map(|s| s.span().lo());
                 if let Some(opening_nls) = self.advance_to_first_block_item(first_non_ws) {
                     self.push_str(&opening_nls);
@@ -363,10 +358,11 @@ impl<'a> FmtVisitor<'a> {
                 for item in &item.body {
                     self.format_body_element(item);
                 }
-
-                self.block_indent = self.block_indent.block_unindent(self.config);
-                self.format_missing_with_indent(item.span.hi() - BytePos(1));
             }
+            self.format_missing_no_indent(item.span.hi() - BytePos(1));
+            self.block_indent = self.block_indent.block_unindent(self.config);
+            let indent_str = self.block_indent.to_string(self.config);
+            self.push_str(&indent_str);
 
             self.push_str("}");
         } else {
