@@ -20,7 +20,7 @@ use rustfmt_nightly::{
 };
 
 fn main() {
-    env_logger::init();
+    env_logger::Builder::from_env("RUSTFMT_LOG").init();
 
     let opt: Opt = Opt::from_args();
 
