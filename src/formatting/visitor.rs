@@ -606,6 +606,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             &self.get_context(),
                             self.block_indent,
                             &item.vis,
+                            item.span,
                         );
                         self.push_rewrite(item.span, rewrite);
                     }
@@ -617,6 +618,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             generic_bounds,
                             generics,
                             &item.vis,
+                            item.span,
                         );
                         self.push_rewrite(item.span, rewrite);
                     }
@@ -685,6 +687,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     &self.get_context(),
                     self.block_indent,
                     &ti.vis,
+                    ti.span,
                 );
                 self.push_rewrite(ti.span, rewrite);
             }
@@ -734,6 +737,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         generics,
                         &self.get_context(),
                         self.block_indent,
+                        ii.span,
                     )
                 };
                 let rewrite = match ty {
