@@ -388,7 +388,6 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         1 => {}
                         _ => self.push_str("\n"),
                     }
-
                     newline_inserted = true;
                     if unindent_comment && align_to_right {
                         self.block_indent = self.block_indent.block_indent(self.config);
