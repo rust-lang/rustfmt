@@ -6,6 +6,7 @@ use rustc_span::{symbol::kw, BytePos, Span};
 
 use crate::config::{lists::*, IndentStyle, TypeDensity};
 use crate::formatting::{
+    comment::recover_missing_comment_in_span,
     expr::{
         format_expr, rewrite_assign_rhs, rewrite_call, rewrite_tuple, rewrite_unary_prefix,
         ExprType,
@@ -851,9 +852,36 @@ fn join_bounds(
         TypeDensity::Compressed => "+",
         TypeDensity::Wide => " + ",
     };
+
+    let trailing_spans = items.iter().enumerate().map(|(i, item)| {
+        if i < items.len() - 1 {
+            let hi = context
+                .snippet_provider
+                .span_before(mk_sp(items[i + 1].span().lo(), item.span().hi()), "+");
+
+            Some(mk_sp(item.span().hi(), hi))
+        } else {
+            None
+        }
+    });
+
+    let leading_spans = items.iter().enumerate().map(|(i, item)| {
+        if i > 0 {
+            let lo = context
+                .snippet_provider
+                .span_after(mk_sp(items[i - 1].span().hi(), item.span().lo()), "+");
+
+            Some(mk_sp(lo, item.span().lo()))
+        } else {
+            None
+        }
+    });
+
     let type_strs = items
         .iter()
-        .map(|item| item.rewrite(context, shape))
+        .zip(leading_spans.clone())
+        .zip(trailing_spans.clone())
+        .map(|((item, ld), trl)| item.rewrite(context, shape))
         .collect::<Option<Vec<_>>>()?;
     let result = type_strs.join(joiner);
     if items.len() <= 1 || (!result.contains('\n') && result.len() <= shape.width) {
