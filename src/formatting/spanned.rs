@@ -202,3 +202,14 @@ impl Spanned for ast::NestedMetaItem {
         self.span()
     }
 }
+
+impl Spanned for ast::ExprKind {
+    fn span(&self) -> Span {
+        match *self {
+            rustc_ast::ExprKind::Cast(ref subexpr, _) => {
+                mk_sp(subexpr.attrs[0].span.lo(), subexpr.span.hi())
+            }
+            _ => self.span(),
+        }
+    }
+}
