@@ -306,6 +306,9 @@ notes above on running rustfmt.
   | checkstyle |           emits in a checkstyle format            |     Yes      |
   |    json    |           emits diffs in a json format            |     Yes      |
 
+* You can specify the path to your own `rustfmt` by setting the `RUSTFMT`
+  environment variable.
+
 ## License
 
 Rustfmt is distributed under the terms of both the MIT license and the
