@@ -106,6 +106,9 @@ The easiest way to run rustfmt against a project is with `cargo fmt`. `cargo fmt
 single-crate projects and [cargo workspaces](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html).
 Please see `cargo fmt --help` for usage information.
 
+You can specify the path to your own `rustfmt` binary for cargo to use by setting the`RUSTFMT` 
+environment variable.
+
 ### Running `rustfmt` directly
 
 To format individual files or arbitrary codes from stdin, the `rustfmt` binary should be used. Some
@@ -265,7 +268,6 @@ notes above on running rustfmt.
 
 * For things you do not want rustfmt to mangle, use `#[rustfmt::skip]`
 * To prevent rustfmt from formatting a macro or an attribute,
-  use `#[rustfmt::skip::macros(target_macro_name)]` or
   `#[rustfmt::skip::attributes(target_attribute_name)]`
 
   Example:
@@ -305,9 +307,6 @@ notes above on running rustfmt.
   |   stdout   |              writes output to stdout              |      No      |
   | checkstyle |           emits in a checkstyle format            |     Yes      |
   |    json    |           emits diffs in a json format            |     Yes      |
-
-* You can specify the path to your own `rustfmt` by setting the `RUSTFMT`
-  environment variable.
 
 ## License
 
