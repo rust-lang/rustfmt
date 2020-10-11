@@ -268,6 +268,7 @@ notes above on running rustfmt.
 
 * For things you do not want rustfmt to mangle, use `#[rustfmt::skip]`
 * To prevent rustfmt from formatting a macro or an attribute,
+  use `#[rustfmt::skip::macros(target_macro_name)]` or
   `#[rustfmt::skip::attributes(target_attribute_name)]`
 
   Example:
