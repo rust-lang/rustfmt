@@ -107,7 +107,7 @@ single-crate projects and [cargo workspaces](https://doc.rust-lang.org/book/ch14
 Please see `cargo fmt --help` for usage information.
 
 You can specify the path to your own `rustfmt` binary for cargo to use by setting the`RUSTFMT` 
-environment variable.
+environment variable. This was added in v1.4.22, so you must have this version or newer to leverage this feature (`cargo fmt --version`)
 
 ### Running `rustfmt` directly
 
