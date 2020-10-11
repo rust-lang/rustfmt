@@ -106,6 +106,9 @@ The easiest way to run rustfmt against a project is with `cargo fmt`. `cargo fmt
 single-crate projects and [cargo workspaces](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html).
 Please see `cargo fmt --help` for usage information.
 
+You can specify the path to your own `rustfmt` binary for cargo to use by setting the`RUSTFMT` 
+environment variable. This was added in v1.4.22, so you must have this version or newer to leverage this feature (`cargo fmt --version`)
+
 ### Running `rustfmt` directly
 
 To format individual files or arbitrary codes from stdin, the `rustfmt` binary should be used. Some
