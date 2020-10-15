@@ -21,7 +21,7 @@ use crate::formatting::{
     spanned::Spanned,
     utils::{
         colon_spaces, extra_offset, first_line_width, format_extern, format_mutability,
-        format_unsafety, is_valid_str, last_line_extendable, last_line_width, mk_sp, rewrite_ident,
+        format_unsafety, last_line_extendable, last_line_width, mk_sp, rewrite_ident,
     },
 };
 
@@ -877,7 +877,7 @@ fn join_bounds_inner(
                 None
             };
 
-            let (leading_span, leading_comment) = if i > 0 {
+            let (leading_span, has_leading_comment) = if i > 0 {
                 let lo = context
                     .snippet_provider
                     .span_after(mk_sp(items[i - 1].span().hi(), item.span().lo()), "+");
@@ -891,7 +891,7 @@ fn join_bounds_inner(
                 (None, false)
             };
 
-            let prev_trailing_comment = match prev_trailing_span {
+            let prev_has_trailing_comment = match prev_trailing_span {
                 Some(ts) => contains_comment(context.snippet(ts)),
                 _ => false,
             };
@@ -918,13 +918,13 @@ fn join_bounds_inner(
                 TypeDensity::Wide => whitespace + "+ ",
             };
 
-            let joiner = if leading_comment {
+            let joiner = if has_leading_comment {
                 joiner.trim_end()
             } else {
                 &joiner
             };
 
-            let joiner = if prev_trailing_comment {
+            let joiner = if prev_has_trailing_comment {
                 joiner.trim_start()
             } else {
                 joiner
@@ -940,7 +940,7 @@ fn join_bounds_inner(
                 let bound_str = &item.rewrite(context, shape)?;
 
                 match leading_span {
-                    Some(ls) if leading_comment => (
+                    Some(ls) if has_leading_comment => (
                         combine_strs_with_missing_comments(
                             context, joiner, bound_str, ls, shape, true,
                         )?,
@@ -954,7 +954,7 @@ fn join_bounds_inner(
             };
 
             match prev_trailing_span {
-                Some(ts) if prev_trailing_comment => combine_strs_with_missing_comments(
+                Some(ts) if prev_has_trailing_comment => combine_strs_with_missing_comments(
                     context,
                     &strs,
                     &trailing_str,
@@ -974,7 +974,7 @@ fn join_bounds_inner(
 
     if !force_newline
         && items.len() > 1
-        && (!is_valid_str(&result.0, shape.width, shape) || result.0.len() > shape.width)
+        && (result.0.contains('\n') || result.0.len() > shape.width)
     {
         join_bounds_inner(context, shape, items, need_indent, true)
     } else {

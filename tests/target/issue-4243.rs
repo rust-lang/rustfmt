@@ -1,9 +1,10 @@
 fn main() {
     type A: AA /*AA*/ + /*AB*/ AB + AC = AA
-    /*AA*/
-    +
-    /*AB*/
-    AB + AC;
+        /*AA*/
+        +
+        /*AB*/
+        AB
+        + AC;
 
     type B: BA /*BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA*/
         + /*BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB*/ BB
