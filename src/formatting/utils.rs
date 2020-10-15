@@ -404,7 +404,7 @@ pub(crate) fn wrap_str(s: String, max_width: usize, shape: Shape) -> Option<Stri
     }
 }
 
-fn is_valid_str(snippet: &str, max_width: usize, shape: Shape) -> bool {
+pub(crate) fn is_valid_str(snippet: &str, max_width: usize, shape: Shape) -> bool {
     if !snippet.is_empty() {
         // First line must fits with `shape.width`.
         if first_line_width(snippet) > shape.width {
