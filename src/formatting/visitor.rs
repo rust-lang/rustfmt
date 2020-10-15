@@ -7,7 +7,7 @@ use rustc_span::{symbol, BytePos, Pos, Span, DUMMY_SP};
 use crate::config::{BraceStyle, Config};
 use crate::formatting::{
     attr::*,
-    comment::{rewrite_comment, CodeCharKind, CommentCodeSlices},
+    comment::{contains_comment, rewrite_comment, CodeCharKind, CommentCodeSlices},
     items::{
         format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
         rewrite_associated_impl_type, rewrite_extern_crate, rewrite_opaque_impl_type,
@@ -316,8 +316,17 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             self.block_indent = self.block_indent.block_unindent(config);
         }
 
+        let comment_snippet = self.snippet(span);
+
+        let align_to_right = if unindent_comment && contains_comment(&comment_snippet) {
+            let first_lines = comment_snippet.splitn(2, '/').next().unwrap_or("");
+            last_line_width(first_lines) > last_line_width(&comment_snippet)
+        } else {
+            false
+        };
+
         let mut iter = CommentCodeSlices::with_offset(
-            self.snippet(span),
+            comment_snippet,
             last_line_offset,
             self.config.tab_spaces(),
         )
@@ -380,8 +389,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         _ => self.push_str("\n"),
                     }
                     newline_inserted = true;
-
+                    if unindent_comment && align_to_right {
+                        self.block_indent = self.block_indent.block_indent(self.config);
+                    }
                     self.push_str(&self.block_indent.to_string_with_newline(config));
+                    if unindent_comment && align_to_right {
+                        self.block_indent = self.block_indent.block_unindent(self.config);
+                    }
                 }
             }
             prev_kind = kind;
