@@ -858,7 +858,6 @@ fn join_bounds_inner(
     debug_assert!(!items.is_empty());
 
     let generic_bounds_in_order = is_generic_bounds_in_order(items);
-
     let is_bound_extendable = |s: &str, b: &ast::GenericBound| match b {
         ast::GenericBound::Outlives(..) => true,
         ast::GenericBound::Trait(..) => last_line_extendable(s),
@@ -876,7 +875,6 @@ fn join_bounds_inner(
             } else {
                 None
             };
-
             let (leading_span, has_leading_comment) = if i > 0 {
                 let lo = context
                     .snippet_provider
@@ -890,7 +888,6 @@ fn join_bounds_inner(
             } else {
                 (None, false)
             };
-
             let prev_has_trailing_comment = match prev_trailing_span {
                 Some(ts) => contains_comment(context.snippet(ts)),
                 _ => false,
@@ -903,7 +900,6 @@ fn join_bounds_inner(
             } else {
                 shape
             };
-
             let whitespace = if force_newline && (!prev_extendable || !generic_bounds_in_order) {
                 shape
                     .indent
@@ -917,13 +913,11 @@ fn join_bounds_inner(
                 TypeDensity::Compressed => String::from("+"),
                 TypeDensity::Wide => whitespace + "+ ",
             };
-
             let joiner = if has_leading_comment {
                 joiner.trim_end()
             } else {
                 &joiner
             };
-
             let joiner = if prev_has_trailing_comment {
                 joiner.trim_start()
             } else {
@@ -932,13 +926,10 @@ fn join_bounds_inner(
 
             let (trailing_str, extendable) = if i == 0 {
                 let bound_str = item.rewrite(context, shape)?;
-
                 let bound_str_clone = bound_str.clone();
-
                 (bound_str, is_bound_extendable(&bound_str_clone, item))
             } else {
                 let bound_str = &item.rewrite(context, shape)?;
-
                 match leading_span {
                     Some(ls) if has_leading_comment => (
                         combine_strs_with_missing_comments(
@@ -952,7 +943,6 @@ fn join_bounds_inner(
                     ),
                 }
             };
-
             match prev_trailing_span {
                 Some(ts) if prev_has_trailing_comment => combine_strs_with_missing_comments(
                     context,
