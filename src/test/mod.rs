@@ -11,13 +11,12 @@ use crate::emitter::rustfmt_diff::{make_diff, print_diff, Mismatch, ModifiedChun
 use crate::config::{Config, FileName, NewlineStyle};
 use crate::{
     emitter::{emit_format_report, Color, EmitMode, EmitterConfig},
-    format,
-    formatting::modules::{ModuleResolutionError, ModuleResolutionErrorKind},
-    is_nightly_channel, FormatReport, FormatReportFormatterBuilder, Input, OperationError,
+    format, is_nightly_channel, FormatReport, FormatReportFormatterBuilder, Input, OperationError,
     OperationSetting,
 };
 
 mod configuration_snippet;
+mod parser;
 
 const DIFF_CONTEXT_SIZE: usize = 3;
 
@@ -521,44 +520,6 @@ fn format_lines_errors_are_reported_with_tabs() {
     config.set().hard_tabs(true);
     let report = format(input, &config, OperationSetting::default()).unwrap();
     assert!(report.has_errors());
-}
-
-#[test]
-fn parser_errors_in_submods_are_surfaced() {
-    // See also https://github.com/rust-lang/rustfmt/issues/4126
-    let filename = "tests/parser/issue-4126/lib.rs";
-    let file = PathBuf::from(filename);
-    let exp_mod_name = "invalid";
-    let (config, operation, _) = read_config(&file);
-    if let Err(OperationError::ModuleResolutionError { 0: inner }) =
-        format_file(&file, operation, config)
-    {
-        let ModuleResolutionError { module, kind } = inner;
-        assert_eq!(&module, exp_mod_name);
-        if let ModuleResolutionErrorKind::ParseError { file } = kind {
-            assert_eq!(file, PathBuf::from("tests/parser/issue-4126/invalid.rs"));
-        } else {
-            panic!("Expected parser error");
-        }
-    } else {
-        panic!("Expected ModuleResolution operation error");
-    }
-}
-
-#[test]
-fn parser_creation_errors_on_entry_new_parser_from_file_panic() {
-    // See also https://github.com/rust-lang/rustfmt/issues/4418
-    let filename = "tests/parser/issue_4418.rs";
-    let file = PathBuf::from(filename);
-    let (config, operation, _) = read_config(&file);
-    if let Err(OperationError::ParseError { input, is_panic }) =
-        format_file(&file, operation, config)
-    {
-        assert_eq!(input.as_path().unwrap(), file);
-        assert!(is_panic);
-    } else {
-        panic!("Expected ParseError operation error");
-    }
 }
 
 // For each file, run rustfmt and collect the output.
