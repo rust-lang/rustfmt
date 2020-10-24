@@ -493,6 +493,9 @@ mod test {
 
     #[test]
     fn test_override_existing_license_with_no_license() {
+        if !crate::is_nightly_channel!() {
+            return;
+        }
         let toml = r#"license_template_path = "tests/license-template/lt.txt""#;
         let mut config = Config::from_toml(toml, Path::new("")).unwrap();
         assert!(config.license_template.is_some());
