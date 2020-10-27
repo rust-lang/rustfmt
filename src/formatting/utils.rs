@@ -300,6 +300,12 @@ pub(crate) fn contains_skip(attrs: &[Attribute]) -> bool {
 
 #[inline]
 pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr) -> bool {
+    // Never try to insert semicolons on expressions when we're inside
+    // a macro definition - this can prevent the macro from compiling
+    // when used in expression position
+    if context.is_macro_def {
+        return false;
+    }
     match expr.kind {
         ast::ExprKind::Ret(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Break(..) => {
             context.config.trailing_semicolon()
@@ -700,7 +706,11 @@ pub(crate) fn unicode_str_width(s: &str) -> usize {
 
 /// Format the given snippet. The snippet is expected to be *complete* code.
 /// When we cannot parse the given snippet, this function returns `None`.
-pub(crate) fn format_snippet(snippet: &str, config: &Config) -> Option<FormattedSnippet> {
+pub(crate) fn format_snippet(
+    snippet: &str,
+    config: &Config,
+    is_macro_def: bool,
+) -> Option<FormattedSnippet> {
     let mut config = config.clone();
     std::panic::catch_unwind(move || {
         config.set().hide_parse_errors(true);
@@ -712,6 +722,7 @@ pub(crate) fn format_snippet(snippet: &str, config: &Config) -> Option<Formatted
                 &config,
                 OperationSetting {
                     verbosity: Verbosity::Quiet,
+                    is_macro_def,
                     ..OperationSetting::default()
                 },
             )
@@ -740,7 +751,11 @@ pub(crate) fn format_snippet(snippet: &str, config: &Config) -> Option<Formatted
 /// The code block may be incomplete (i.e., parser may be unable to parse it).
 /// To avoid panic in parser, we wrap the code block with a dummy function.
 /// The returned code block does **not** end with newline.
-pub(crate) fn format_code_block(code_snippet: &str, config: &Config) -> Option<FormattedSnippet> {
+pub(crate) fn format_code_block(
+    code_snippet: &str,
+    config: &Config,
+    is_macro_def: bool,
+) -> Option<FormattedSnippet> {
     const FN_MAIN_PREFIX: &str = "fn main() {\n";
 
     fn enclose_in_main_block(s: &str, config: &Config) -> String {
@@ -773,7 +788,7 @@ pub(crate) fn format_code_block(code_snippet: &str, config: &Config) -> Option<F
     config_with_unix_newline
         .set()
         .newline_style(NewlineStyle::Unix);
-    let mut formatted = format_snippet(&snippet, &config_with_unix_newline)?;
+    let mut formatted = format_snippet(&snippet, &config_with_unix_newline, is_macro_def)?;
     // Remove wrapping main block
     formatted.unwrap_code_block();
 
@@ -854,15 +869,15 @@ mod test {
         // `format_snippet()` and `format_code_block()` should not panic
         // even when we cannot parse the given snippet.
         let snippet = "let";
-        assert!(format_snippet(snippet, &Config::default()).is_none());
-        assert!(format_code_block(snippet, &Config::default()).is_none());
+        assert!(format_snippet(snippet, &Config::default(), false).is_none());
+        assert!(format_code_block(snippet, &Config::default(), false).is_none());
     }
 
     fn test_format_inner<F>(formatter: F, input: &str, expected: &str) -> bool
     where
-        F: Fn(&str, &Config) -> Option<FormattedSnippet>,
+        F: Fn(&str, &Config, bool /* is_code_block */) -> Option<FormattedSnippet>,
     {
-        let output = formatter(input, &Config::default());
+        let output = formatter(input, &Config::default(), false);
         output.is_some() && output.unwrap().snippet == expected
     }
 

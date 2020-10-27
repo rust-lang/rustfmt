@@ -438,6 +438,7 @@ fn format_string(input: String, opt: Opt) -> Result<i32> {
     let setting = OperationSetting {
         recursive: opt.recursive,
         verbosity: Verbosity::Quiet,
+        is_macro_def: false,
     };
     let report = rustfmt_nightly::format(Input::Text(input), &config, setting)?;
 
@@ -538,6 +539,7 @@ fn format(opt: Opt) -> Result<i32> {
     let setting = OperationSetting {
         recursive: opt.recursive,
         verbosity: opt.verbosity(),
+        is_macro_def: false,
     };
 
     let inputs = FileConfigPairIter::new(&opt, config_paths.is_some()).collect::<Vec<_>>();
