@@ -13,7 +13,9 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_ast::token::{BinOpToken, DelimToken, Token, TokenKind};
-use rustc_ast::tokenstream::{Cursor, TokenStream, TokenTree};
+use rustc_ast::tokenstream::{
+    Cursor, LazyTokenStream, LazyTokenStreamInner, TokenStream, TokenTree,
+};
 use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_parse::parser::Parser;
@@ -1224,7 +1226,7 @@ pub(crate) fn convert_try_mac(
             kind: ast::ExprKind::Try(kind),
             span: mac.span(), // incorrect span, but shouldn't matter too much
             attrs: ast::AttrVec::new(),
-            tokens: Some(ts),
+            tokens: Some(LazyTokenStream::new(LazyTokenStreamInner::Ready(ts))),
         })
     } else {
         None
@@ -1295,8 +1297,8 @@ impl MacroParser {
             }
         };
         if let Some(TokenTree::Token(Token { kind, span })) = self.toks.look_ahead(0) {
-            if (is_macro_rules && kind == TokenKind::Semi)
-                || (!is_macro_rules && kind == TokenKind::Comma)
+            if (is_macro_rules && *kind == TokenKind::Semi)
+                || (!is_macro_rules && *kind == TokenKind::Comma)
             {
                 hi = span.hi();
                 self.toks.next();
