@@ -655,93 +655,59 @@ impl Rewrite for ast::Ty {
                 let mut_len = mut_str.len();
                 let mut result = String::with_capacity(128);
                 result.push_str("&");
-                let and_hi = context.snippet_provider.span_after(self.span(), "&");
+                let ref_hi = context.snippet_provider.span_after(self.span(), "&");
+                let mut cmnt_lo = ref_hi;
 
-                let last_span = match *lifetime {
-                    Some(ref lifetime) => {
-                        let lt_budget = shape.width.checked_sub(2 + mut_len)?;
-                        let lt_str = lifetime.rewrite(
+                if let Some(ref lifetime) = *lifetime {
+                    let lt_budget = shape.width.checked_sub(2 + mut_len)?;
+                    let lt_str = lifetime.rewrite(
+                        context,
+                        Shape::legacy(lt_budget, shape.indent + 2 + mut_len),
+                    )?;
+                    let before_lt_span = mk_sp(cmnt_lo, lifetime.ident.span.lo());
+                    if contains_comment(context.snippet(before_lt_span)) {
+                        result = combine_strs_with_missing_comments(
                             context,
-                            Shape::legacy(lt_budget, shape.indent + 2 + mut_len),
+                            &result,
+                            &lt_str,
+                            before_lt_span,
+                            shape,
+                            true,
                         )?;
-
-                        let before_lt_span = mk_sp(and_hi, lifetime.ident.span.lo());
-                        if contains_comment(context.snippet(before_lt_span)) {
-                            result = combine_strs_with_missing_comments(
-                                context,
-                                &result,
-                                &lt_str,
-                                before_lt_span,
-                                shape,
-                                true,
-                            )?;
-                        } else {
-                            result.push_str(&lt_str);
-                        }
-                        result.push_str(" ");
-
-                        let after_lt_span = mk_sp(lifetime.ident.span.hi(), mt.ty.span.lo());
-                        let snip = context.snippet(after_lt_span);
-                        // Mutability span dropped from the compiler
-                        match snip.find_uncommented("mut") {
-                            Some(mut_pos) => {
-                                let mut_lo =
-                                    lifetime.ident.span.hi() + BytePos::from_usize(mut_pos);
-                                let mut_hi =
-                                    lifetime.ident.span.hi() + BytePos::from_usize(mut_pos + 3);
-                                let before_mut_span = mk_sp(lifetime.ident.span.hi(), mut_lo);
-                                if contains_comment(context.snippet(before_mut_span)) {
-                                    result = combine_strs_with_missing_comments(
-                                        context,
-                                        result.trim_end(),
-                                        mut_str,
-                                        before_mut_span,
-                                        shape,
-                                        true,
-                                    )?;
-                                } else {
-                                    result.push_str(mut_str);
-                                }
-                                mk_sp(mut_hi, mt.ty.span.lo())
-                            }
-                            None => after_lt_span,
-                        }
+                    } else {
+                        result.push_str(&lt_str);
                     }
-                    _ => {
-                        let btwn_span = mk_sp(
-                            context.snippet_provider.span_after(self.span(), "&"),
-                            mt.ty.span.lo(),
-                        );
-                        match context.snippet(btwn_span).find_uncommented("mut") {
-                            Some(pos) => {
-                                let mut_lo = and_hi + BytePos::from_usize(pos);
-                                let mut_hi = and_hi + BytePos::from_usize(pos + 3);
-                                let before_mut_span = mk_sp(and_hi, mut_lo);
-                                if contains_comment(context.snippet(before_mut_span)) {
-                                    result = combine_strs_with_missing_comments(
-                                        context,
-                                        &result,
-                                        mut_str,
-                                        before_mut_span,
-                                        shape,
-                                        true,
-                                    )?;
-                                } else {
-                                    result.push_str(mut_str);
-                                }
-                                mk_sp(mut_hi, mt.ty.span.lo())
-                            }
-                            None => btwn_span,
-                        }
-                    }
-                };
+                    result.push_str(" ");
+                    cmnt_lo = lifetime.ident.span.hi();
+                }
 
-                if contains_comment(context.snippet(last_span)) {
+                let after_lt_span = mk_sp(cmnt_lo, mt.ty.span.lo());
+                let snip = context.snippet(after_lt_span);
+                if let Some(mut_pos) = snip.find_uncommented("mut") {
+                    let mut_lo = cmnt_lo + BytePos::from_usize(mut_pos);
+                    let before_mut_span = mk_sp(cmnt_lo, mut_lo);
+                    if contains_comment(context.snippet(before_mut_span)) {
+                        result = combine_strs_with_missing_comments(
+                            context,
+                            result.trim_end(),
+                            mut_str,
+                            before_mut_span,
+                            shape,
+                            true,
+                        )?;
+                    } else {
+                        result.push_str(mut_str);
+                    }
+                    cmnt_lo = cmnt_lo + BytePos::from_usize(mut_pos + 3);
+                }
+
+                let before_ty_span = mk_sp(cmnt_lo, mt.ty.span.lo());
+                if contains_comment(context.snippet(before_ty_span)) {
                     result = combine_strs_with_missing_comments(
                         context,
                         result.trim_end(),
                         &mt.ty.rewrite(&context, shape)?,
-                        last_span,
+                        before_ty_span,
                         shape,
                         true,
                     )?;
