@@ -39,6 +39,8 @@ mod test;
 pub struct OperationSetting {
     /// If set to `true`, format sub-modules which are defined in the given input.
     pub recursive: bool,
+    /// If set to `true`, we are formatting a macro definition
+    pub is_macro_def: bool,
     pub verbosity: Verbosity,
 }
 

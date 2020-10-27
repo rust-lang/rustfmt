@@ -149,6 +149,7 @@ fn format_project(
             &format_report,
             &files,
             original_snippet.clone(),
+            operation_setting.is_macro_def,
         )?;
     }
     timer = timer.done_formatting();
@@ -173,6 +174,7 @@ fn format_file(
     report: &FormatReport,
     file_mod_map: &FileModMap<'_>,
     original_snippet: Option<String>,
+    is_macro_def: bool,
 ) -> Result<(), OperationError> {
     let snippet_provider = parse_session.snippet_provider(module.as_ref().inner);
     let mut visitor = FmtVisitor::from_parse_sess(
@@ -182,6 +184,7 @@ fn format_file(
         file_mod_map,
         report.clone(),
     );
+    visitor.is_macro_def = is_macro_def;
     visitor.skip_context.update_with_attrs(&krate.attrs);
     visitor.last_pos = snippet_provider.start_pos();
     visitor.skip_empty_lines(snippet_provider.end_pos());
