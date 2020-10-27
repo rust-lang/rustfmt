@@ -256,7 +256,8 @@ fn rewrite_reorderable_or_regroupable_items(
                 })
                 .collect::<Option<Vec<_>>>()?;
 
-            Some(item_vec.join("\n\n"))
+            let join_string = format!("\n\n{}", shape.indent.to_string(context.config));
+            Some(item_vec.join(&join_string))
         }
         _ => {
             let list_items = itemize_list(
