@@ -69,7 +69,7 @@ jobs:
     - name: install mingw32
       run: |
         7z x -y ${{ matrix.mingw-7z-path }}/mingw.7z -oC:\msys64 | Out-Null
-        echo ::add-path::C:\msys64\mingw32\bin
+        echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
       if: matrix.target == 'i686-pc-windows-gnu' && matrix.channel == 'nightly'
       shell: powershell
 
