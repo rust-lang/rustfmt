@@ -121,7 +121,7 @@ macro_rules! create_config {
                         | "array_width"
                         | "chain_width" => self.0.set_heuristics(),
                         "license_template_path" => self.0.set_license_template(),
-                        &_ => (),
+                        _ => (),
                     }
                 }
             }
@@ -272,7 +272,7 @@ macro_rules! create_config {
                     | "array_width"
                     | "chain_width" => self.set_heuristics(),
                     "license_template_path" => self.set_license_template(),
-                    &_ => (),
+                    _ => (),
                 }
             }
 
