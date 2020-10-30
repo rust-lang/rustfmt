@@ -9,11 +9,12 @@
 use std::cmp::{Ord, Ordering};
 
 use rustc_ast::ast;
-use rustc_span::{symbol::sym, Span};
+use rustc_span::{symbol::sym, BytePos, Pos, Span};
 
 use crate::config::Config;
 use crate::formatting::modules::{get_mod_inner_attrs, FileModMap};
 use crate::formatting::{
+    comment::{comment_style, contains_comment, is_first_comment_block, is_last_comment_block},
     imports::{merge_use_trees, UseTree},
     items::{is_mod_decl, rewrite_extern_crate, rewrite_mod},
     lists::{itemize_list, write_list, ListFormatting, ListItem},
@@ -352,8 +353,41 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
         if at_least_one_in_file_lines && !items.is_empty() {
             self.normalize_vertical_spaces = true;
-            let lo = items.first().unwrap().span().lo();
-            let hi = items.last().unwrap().span().hi();
+            let context = self.get_context();
+
+            let first_lo = items.first().unwrap().span().lo();
+            let line_lo = self.parse_sess.line_bounds(first_lo).0;
+            let leading_snip = context.snippet(mk_sp(line_lo, first_lo));
+            let lo = if contains_comment(leading_snip) {
+                let comment_started = if is_last_comment_block(leading_snip) {
+                    is_first_comment_block(leading_snip)
+                } else {
+                    true
+                };
+                if comment_started { line_lo } else { first_lo }
+            } else {
+                first_lo
+            };
+
+            let last_hi = items.last().unwrap().span().hi();
+            let line_hi = self.parse_sess.line_bounds(last_hi).1;
+            let trailing_snip = context.snippet(mk_sp(last_hi, line_hi));
+            let hi = if contains_comment(trailing_snip) {
+                let comment_ended = if is_first_comment_block(trailing_snip) {
+                    comment_style(trailing_snip, false).is_block_comment()
+                } else {
+                    true
+                };
+                if comment_ended {
+                    // 1 = '\n'
+                    line_hi - BytePos::from_usize(1)
+                } else {
+                    last_hi
+                }
+            } else {
+                last_hi
+            };
+
             let span = mk_sp(lo, hi);
             let rw = rewrite_reorderable_items(&self.get_context(), items, self.shape(), span);
             self.push_rewrite(span, rw);
