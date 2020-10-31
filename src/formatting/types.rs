@@ -6,7 +6,7 @@ use rustc_span::{symbol::kw, BytePos, Pos, Span};
 
 use crate::config::{lists::*, IndentStyle, TypeDensity};
 use crate::formatting::{
-    comment::{combine_strs_with_missing_comments, contains_comment, FindUncommented},
+    comment::{combine_strs_with_missing_comments, contains_comment},
     expr::{
         format_expr, rewrite_assign_rhs, rewrite_call, rewrite_tuple, rewrite_unary_prefix,
         ExprType,
@@ -681,11 +681,9 @@ impl Rewrite for ast::Ty {
                     cmnt_lo = lifetime.ident.span.hi();
                 }
 
-                let after_lt_span = mk_sp(cmnt_lo, mt.ty.span.lo());
-                let snip = context.snippet(after_lt_span);
-                if let Some(mut_pos) = snip.find_uncommented("mut") {
-                    let mut_lo = cmnt_lo + BytePos::from_usize(mut_pos);
-                    let before_mut_span = mk_sp(cmnt_lo, mut_lo);
+                if ast::Mutability::Mut == mt.mutbl {
+                    let mut_hi = context.snippet_provider.span_after(self.span(), "mut");
+                    let before_mut_span = mk_sp(cmnt_lo, mut_hi - BytePos::from_usize(3));
                     if contains_comment(context.snippet(before_mut_span)) {
                         result = combine_strs_with_missing_comments(
                             context,
@@ -698,7 +696,7 @@ impl Rewrite for ast::Ty {
                     } else {
                         result.push_str(mut_str);
                     }
-                    cmnt_lo = cmnt_lo + BytePos::from_usize(mut_pos + 3);
+                    cmnt_lo = mut_hi;
                 }
 
                 let before_ty_span = mk_sp(cmnt_lo, mt.ty.span.lo());
