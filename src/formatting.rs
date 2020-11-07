@@ -62,13 +62,14 @@ pub(crate) fn format_input_inner(
     input: Input,
     config: &Config,
     operation_setting: OperationSetting,
+    is_macro_def: bool,
 ) -> Result<FormatReport, OperationError> {
     if !config.version_meets_requirement() {
         return Err(OperationError::VersionMismatch);
     }
 
     rustc_span::with_session_globals(config.edition().into(), || {
-        format_project(input, config, operation_setting)
+        format_project(input, config, operation_setting, is_macro_def)
     })
 }
 
@@ -76,6 +77,7 @@ fn format_project(
     input: Input,
     config: &Config,
     operation_setting: OperationSetting,
+    is_macro_def: bool,
 ) -> Result<FormatReport, OperationError> {
     let mut timer = Timer::start();
 
@@ -149,7 +151,7 @@ fn format_project(
             &format_report,
             &files,
             original_snippet.clone(),
-            operation_setting.is_macro_def,
+            is_macro_def,
         )?;
     }
     timer = timer.done_formatting();

@@ -717,14 +717,14 @@ pub(crate) fn format_snippet(
 
         let result = {
             let input = Input::Text(snippet.into());
-            crate::format(
+            crate::format_input_inner(
                 input,
                 &config,
                 OperationSetting {
                     verbosity: Verbosity::Quiet,
-                    is_macro_def,
                     ..OperationSetting::default()
                 },
+                is_macro_def,
             )
         };
         match result {
