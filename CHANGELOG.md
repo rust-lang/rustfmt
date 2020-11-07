@@ -54,6 +54,47 @@
 - Stabilize `match_block_trailing_comma` configuration option.
 - Stabilize `ignore` configuration option.
 
+
+## [1.4.24] 2020-11-05
+
+### Changed
+
+- Block wrapped match arm bodies containing a single macro call expression are no longer flattened ([#4496](https://github.com/rust-lang/rustfmt/pull/4496)). This allows programmer discretion so that the block wrapping can be preserved in cases where needed to prevent issues in expansion, such as with trailing semicolons, and aligns with updated [Style Guide guidance](https://github.com/rust-dev-tools/fmt-rfcs/blob/master/guide/expressions.md#macro-call-expressions) for such scenarios.
+
+### Fixed
+- Remove useless `deprecated` attribute on a trait impl block in the rustfmt lib, as these now trigger errors ([rust-lang/rust/#78626](https://github.com/rust-lang/rust/pull/78626))
+
+## [1.4.23] 2020-10-30
+
+### Changed
+
+- Update `rustc-ap-*` crates to v686.0.0
+
+### Added
+- Initial support for formatting new ConstBlock syntax ([#4478](https://github.com/rust-lang/rustfmt/pull/4478))
+
+### Fixed
+- Handling of unclosed delimiter-only parsing errors in input files ([#4466](https://github.com/rust-lang/rustfmt/issues/4466))
+- Misc. minor parser bugs ([#4418](https://github.com/rust-lang/rustfmt/issues/4418) and [#4431](https://github.com/rust-lang/rustfmt/issues/4431))
+- Panic on nested tuple access ([#4355](https://github.com/rust-lang/rustfmt/issues/4355))
+- Unable to disable license template path via cli override ([#4487](https://github.com/rust-lang/rustfmt/issues/4487))
+- Preserve comments in empty statements [#4018](https://github.com/rust-lang/rustfmt/issues/4018))
+- Indentation on skipped code [#4398](https://github.com/rust-lang/rustfmt/issues/4398))
+
+
+## [1.4.22] 2020-10-04
+
+### Changed
+
+- Update `rustc-ap-*` crates to v679.0.0
+- Add config option to allow control of leading match arm pipes
+- Support `RUSTFMT` environment variable in `cargo fmt` to run specified `rustfmt` instance
+
+### Fixed
+
+- Fix preservation of type aliases within extern blocks
+
+
 ## [1.4.17] 2020-06-08
 
 ### Fixed
