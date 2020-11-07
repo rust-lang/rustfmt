@@ -22,12 +22,12 @@
 
 - Change the default edition to 2018.
 - Do not format sub-modules by default.
-- Do not overwrite files on critial errors by default.
+- Do not overwrite files on critical errors by default.
 - Normalize an empty match arm to `{}`.
 - Rename `use_small_heuristics` to `width_heuristics`
 - Rename `fn_args_layout` to `fn_params_layout`.
 - Rename the default value of `width_heuristics` to `Scaled` from `Default`.
-- Update `rustc-ap-*` crates to 666.0.0.
+- Update `rustc-ap-*` crates to v686.0.0.
 
 ### Fixed
 
@@ -81,7 +81,6 @@
 - Preserve comments in empty statements [#4018](https://github.com/rust-lang/rustfmt/issues/4018))
 - Indentation on skipped code [#4398](https://github.com/rust-lang/rustfmt/issues/4398))
 
-
 ## [1.4.22] 2020-10-04
 
 ### Changed
@@ -93,7 +92,6 @@
 ### Fixed
 
 - Fix preservation of type aliases within extern blocks
-
 
 ## [1.4.17] 2020-06-08
 
