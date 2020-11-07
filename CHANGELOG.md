@@ -64,6 +64,12 @@
 ### Fixed
 - Remove useless `deprecated` attribute on a trait impl block in the rustfmt lib, as these now trigger errors ([rust-lang/rust/#78626](https://github.com/rust-lang/rust/pull/78626))
 
+### Install/Download Options
+- **crates.io package** - **pending**
+- **rustup (nightly)** - **pending**
+- **GitHub Release Binaries** - [Release v1.4.24](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.24)
+- **Build from source** - [Tag v1.4.24](https://github.com/rust-lang/rustfmt/tree/v1.4.24), see instructions for how to [install rustfmt from source][install-from-source]
+
 ## [1.4.23] 2020-10-30
 
 ### Changed
@@ -80,6 +86,12 @@
 - Unable to disable license template path via cli override ([#4487](https://github.com/rust-lang/rustfmt/issues/4487))
 - Preserve comments in empty statements [#4018](https://github.com/rust-lang/rustfmt/issues/4018))
 - Indentation on skipped code [#4398](https://github.com/rust-lang/rustfmt/issues/4398))
+
+### Install/Download Options
+- **crates.io package** - **pending**
+- **rustup (nightly)** - n/a (superseded by [v1.4.24](#1424-2020-11-05))
+- **GitHub Release Binaries** - [Release v1.4.23](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.23)
+- **Build from source** - [Tag v1.4.23](https://github.com/rust-lang/rustfmt/tree/v1.4.23), see instructions for how to [install rustfmt from source][install-from-source]
 
 ## [1.4.22] 2020-10-04
 
@@ -1024,3 +1036,6 @@ from formatting an attribute #3665
 - Handle tabs properly inside macro with braces (#1918).
 - Fix a typo in `compute_budgets_for_args()` (#1924).
 - Recover comment between keyword (`impl` and `trait`) and `{` which used to get removed (#1925).
+
+
+[install-from-source]: https://github.com/rust-lang/rustfmt#installing-from-source
