@@ -13,9 +13,10 @@ use crate::config::{BraceStyle, Config, IndentStyle};
 use crate::formatting::{
     attr::filter_inline_attrs,
     comment::{
-        combine_strs_with_missing_comments, contains_comment, is_last_comment_block,
-        recover_comment_removed, recover_missing_comment_in_span, rewrite_missing_comment,
-        FindUncommented,
+        combine_strs_with_comments, combine_strs_with_missing_comments,
+        combine_strs_with_missing_indented_comments, contains_comment,
+        is_comment_snippet_starts_newline, is_last_comment_block, recover_comment_removed,
+        recover_missing_comment_in_span, rewrite_missing_comment, FindUncommented,
     },
     expr::{
         is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_expr,
@@ -76,6 +77,10 @@ impl Rewrite for ast::Local {
                 false,
             )?
         };
+        debug!(
+            "** [DBO] Rewrite for ast::Local: attrs_str={:?}, result={:?};",
+            attrs_str, result
+        );
 
         // 4 = "let ".len()
         let pat_shape = shape.offset_left(4)?;
@@ -111,10 +116,21 @@ impl Rewrite for ast::Local {
 
             infix
         };
+        debug!(
+            "** [DBO] Rewrite for ast::Local: infix={:?}, result={:?};",
+            infix, result
+        );
 
-        result.push_str(&infix);
-
-        if let Some(ref ex) = self.init {
+        let mut need_newline_after_comment_after_assign = false;
+        if self.init.is_none() {
+            debug!("** [DBO] Rewrite for ast::Local: self.init.is_none();");
+            result.push_str(&infix);
+        } else {
+            let ex = self.init.as_ref().unwrap();
+            debug!(
+                "** [DBO] Rewrite for ast::Local: result={:?}, ex={:?};",
+                result, ex
+            );
             let base_span = if let Some(ref ty) = self.ty {
                 mk_sp(ty.span.hi(), self.span.hi())
             } else {
@@ -150,35 +166,101 @@ impl Rewrite for ast::Local {
                 let comment_after_assign =
                     context.snippet(mk_sp(assign_hi, comment_end_pos)).trim();
 
-                if !comment_before_assign.is_empty() {
-                    let new_indent_str = &pat_shape
-                        .block_indent(0)
-                        .to_string_with_newline(context.config);
-                    result = format!("{}{}{}", comment_before_assign, new_indent_str, result);
+                if comment_before_assign.is_empty() {
+                    result.push_str(&infix);
+                } else {
+                    result = combine_strs_with_missing_comments(
+                        context,
+                        &result,
+                        &infix.trim_start(),
+                        mk_sp(comment_start_pos, assign_lo),
+                        shape,
+                        true,
+                    )?;
+                    debug!(
+                        "** [DBO] Rewrite for ast::Local: comment_before_assign result={:?}, comment snippet={:?};",
+                        result,
+                        context.snippet(mk_sp(comment_start_pos, assign_lo))
+                    );
                 }
 
                 if !comment_after_assign.is_empty() {
-                    let new_indent_str =
-                        &shape.block_indent(0).to_string_with_newline(context.config);
-                    result.push_str(new_indent_str);
-                    result.push_str(comment_after_assign);
-                    result.push_str(new_indent_str);
+                    // If comment after assign is in new line - indent it.
+                    let sp_after = mk_sp(assign_hi, comment_end_pos);
+                    let snippet_after = context.snippet(sp_after);
+                    let indentation_offset = if is_comment_snippet_starts_newline(&snippet_after) {
+                        context.config.tab_spaces()
+                    } else {
+                        0
+                    };
+                    result = combine_strs_with_missing_indented_comments(
+                        context,
+                        &result,
+                        "",
+                        sp_after,
+                        shape,
+                        indentation_offset,
+                        true,
+                    )?;
+
+                    need_newline_after_comment_after_assign =
+                        comment_after_assign.trim_start().starts_with("//")
+                            || comment_after_assign.contains('\n');
+                    if need_newline_after_comment_after_assign {
+                        let new_indent_str = &shape
+                            .block_indent(context.config.tab_spaces())
+                            .to_string_with_newline(context.config);
+                        result = result + &new_indent_str
+                    }
+                    debug!(
+                        "** [DBO] Rewrite for ast::Local: comment_after_assign result={:?}, comment snippet={:?};",
+                        result,
+                        context.snippet(mk_sp(assign_hi, comment_end_pos))
+                    );
                 }
             }
 
             // 1 = trailing semicolon;
-            let nested_shape = shape.sub_width(1)?;
+            let mut nested_shape = shape.sub_width(1)?;
+            if need_newline_after_comment_after_assign {
+                nested_shape = nested_shape.block_indent(context.config.tab_spaces())
+            };
+            debug!(
+                "** [DBO] Rewrite for ast::Local: result={:?}, nested_shape={:?};",
+                result, shape,
+            );
             let rhs = rewrite_assign_rhs_expr(
                 context,
                 &result,
                 &**ex,
                 nested_shape,
                 RhsTactics::Default,
+                true,
             )?;
-            result = result + &rhs;
+            debug!(
+                "** [DBO] Rewrite for ast::Local: rhs={:?}, nested_shape={:?}, result={:?};",
+                rhs, nested_shape, result,
+            );
+            let missing_width = 0;
+            if missing_width == 0 {
+                if !(rhs.chars().next()?.is_whitespace() || result.chars().last()?.is_whitespace())
+                {
+                    result.push(' ');
+                }
+                result = result + &rhs;
+            } else {
+                debug!(
+                    "** [DBO] Rewrite for ast::Local: extend line indent by w={:?};",
+                    missing_width
+                );
+                for _ in 0..=missing_width - 1 {
+                    result.push(' ');
+                }
+                result = result + &rhs.trim_start();
+            }
         }
 
-        result.push(';');
+        debug!("** [DBO] Rewrite for ast::Local: resultE={:?};", result);
         Some(result)
     }
 }
@@ -666,6 +748,7 @@ impl<'a> FmtVisitor<'a> {
                 &*expr.value,
                 shape,
                 RhsTactics::AllowOverflow,
+                true,
             )?
         } else {
             variant_body
@@ -1155,6 +1238,7 @@ pub(crate) fn format_trait(
                 generic_bounds,
                 shape,
                 RhsTactics::ForceNextLineWithoutIndent,
+                false,
             )?;
         }
 
@@ -2106,10 +2190,10 @@ fn get_missing_param_comments(
 
     let comment_before_colon = rewrite_missing_comment(span_before_colon, shape, context)
         .filter(|comment| !comment.is_empty())
-        .map_or(String::new(), |comment| format!(" {}", comment));
+        .map_or(String::new(), |comment| comment);
     let comment_after_colon = rewrite_missing_comment(span_after_colon, shape, context)
         .filter(|comment| !comment.is_empty())
-        .map_or(String::new(), |comment| format!("{} ", comment));
+        .map_or(String::new(), |comment| comment);
     (comment_before_colon, comment_after_colon)
 }
 
@@ -2153,9 +2237,40 @@ impl Rewrite for ast::Param {
             if !is_empty_infer(&*self.ty, self.pat.span) {
                 let (before_comment, after_comment) =
                     get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
-                result.push_str(&before_comment);
+
+                if !before_comment.trim().is_empty() {
+                    result = combine_strs_with_comments(
+                        context,
+                        &result,
+                        "",
+                        &before_comment,
+                        shape,
+                        0,
+                        true,
+                        true,
+                        true,
+                        false,
+                    )?;
+                };
+
                 result.push_str(colon_spaces(context.config));
-                result.push_str(&after_comment);
+
+                if !after_comment.trim().is_empty() {
+                    result = combine_strs_with_comments(
+                        context,
+                        &result,
+                        "",
+                        &after_comment,
+                        shape,
+                        0,
+                        true,
+                        true,
+                        true,
+                        false,
+                    )?;
+                    result.push(' ');
+                };
+
                 let overhead = last_line_width(&result);
                 let max_width = shape.width.checked_sub(overhead)?;
                 if let Some(ty_str) = self

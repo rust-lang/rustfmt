@@ -1,19 +1,21 @@
 fn main() {
+    let before
     // before_comment
-    let before = if true {
+    = if true {
         1.0
     };
 
     let after =
-    // after_comment
-    if true {
-        1.0
-    };
+        // after_comment
+        if true {
+            1.0
+        };
 
+    let both
     // before_comment
-    let both =
-    // after_comment
-    if true {
-        1.0
-    };
+    =
+        // after_comment
+        if true {
+            1.0
+        };
 }

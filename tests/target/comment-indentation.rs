@@ -97,7 +97,7 @@ fn main() {
     let xxxxxxxx = uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu // cccccccccccccccc
         && tttttttttttttttttttttttttttttttttttttttttttt;
 }
-// Test 26- Comment moved to new line because will exceed line width ??????????????????????????????
+// Test 26- Comment moved to new line because will exceed line width
 fn main() {
     let xxxxxxxxxxxxxxxxxxxxxxxxxxx = uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
         // cccccccccccccccc
@@ -105,7 +105,7 @@ fn main() {
 }
 
 /*********************************
- * Comment moved to new line after block starting '{' ?????????????????????????????????????
+ * Comment moved to new line after block starting '{'
 ************************************/
 // Test 31 - comment moved to new line after '{'
 fn main() {

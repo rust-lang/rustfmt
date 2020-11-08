@@ -12,7 +12,7 @@ use crate::formatting::{
     rewrite::RewriteContext,
     shape::{Indent, Shape},
     utils::{
-        count_newlines, first_line_width, last_line_width, mk_sp, starts_with_newline,
+        count_newlines, last_line_width, longest_line_width, mk_sp, starts_with_newline,
         unicode_str_width,
     },
     visitor::SnippetProvider,
@@ -131,6 +131,8 @@ pub(crate) struct ListItem {
     pub(crate) post_comment: Option<String>,
     // Whether there is extra whitespace before this item.
     pub(crate) new_lines: bool,
+    // The position follows the item.  At least required for Closures
+    pub(crate) item_end: Option<BytePos>,
 }
 
 impl ListItem {
@@ -141,6 +143,7 @@ impl ListItem {
             item: None,
             post_comment: None,
             new_lines: false,
+            item_end: None,
         }
     }
 
@@ -154,7 +157,7 @@ impl ListItem {
             || self
                 .post_comment
                 .as_ref()
-                .map_or(false, |s| s.contains('\n'))
+                .map_or(false, |s| s.starts_with('\n'))
     }
 
     pub(crate) fn is_multiline(&self) -> bool {
@@ -190,6 +193,7 @@ impl ListItem {
             item: Some(s.into()),
             post_comment: None,
             new_lines: false,
+            item_end: None,
         }
     }
 
@@ -404,6 +408,18 @@ where
         result.push_str(inner_item);
 
         // Post-comments
+        // New post-comments group starts if line + comment exeeds maxmum line width
+        if item.post_comment.is_some() && item_max_width.is_some() {
+            let inner_item_width =
+                UnicodeSegmentation::graphemes(item.inner_as_ref(), true).count();
+            if item_max_width? < inner_item_width {
+                item_max_width = None;
+            }
+            debug!(
+                "** [DBO] write_list: item_max_width={:?}, inner_item_width={}, inner_item={:?};",
+                item_max_width, inner_item_width, inner_item
+            );
+        }
         if tactic == DefinitiveListTactic::Horizontal && item.post_comment.is_some() {
             let comment = item.post_comment.as_ref().unwrap();
             let formatted_comment = rewrite_comment(
@@ -423,7 +439,7 @@ where
 
         if tactic != DefinitiveListTactic::Horizontal && item.post_comment.is_some() {
             let comment = item.post_comment.as_ref().unwrap();
-            let overhead = last_line_width(&result) + first_line_width(comment.trim());
+            let overhead = indent_str.len() + 3;
 
             let rewrite_post_comment = |item_max_width: &mut Option<usize>| {
                 if item_max_width.is_none() && !last && !inner_item.contains('\n') {
@@ -467,7 +483,7 @@ where
                         item_max_width,
                         UnicodeSegmentation::graphemes(inner_item.as_str(), true).count(),
                     );
-                    if first_line_width(&formatted_comment)
+                    if longest_line_width(&formatted_comment)
                         + last_line_width(&result)
                         + comment_alignment
                         + 1
@@ -533,14 +549,21 @@ where
     T: AsRef<ListItem>,
 {
     let mut max_width = 0;
+    let mut max_commment_width = 0;
     let mut first = true;
     for item in items.clone().into_iter().skip(i) {
         let item = item.as_ref();
         let inner_item_width = UnicodeSegmentation::graphemes(item.inner_as_ref(), true).count();
+        if item.post_comment.is_some() {
+            let w = longest_line_width(item.post_comment.as_ref().unwrap().trim());
+            if w > max_commment_width {
+                max_commment_width = w;
+            }
+        }
         if !first
             && (item.is_different_group()
                 || item.post_comment.is_none()
-                || inner_item_width + overhead > max_budget)
+                || inner_item_width + overhead + max_commment_width > max_budget)
         {
             return max_width;
         }
@@ -761,6 +784,7 @@ where
             let post_comment = extract_post_comment(post_snippet, comment_end, self.separator);
 
             self.prev_span_end = (self.get_hi)(&item) + BytePos(comment_end as u32);
+            let item_end = Some(self.prev_span_end);
 
             ListItem {
                 pre_comment,
@@ -772,6 +796,7 @@ where
                 },
                 post_comment,
                 new_lines,
+                item_end,
             }
         })
     }

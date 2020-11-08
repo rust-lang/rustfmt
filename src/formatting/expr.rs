@@ -11,9 +11,9 @@ use crate::formatting::{
     chains::rewrite_chain,
     closures,
     comment::{
-        combine_strs_with_missing_comments, comment_style, contains_comment,
-        recover_comment_removed, rewrite_comment, rewrite_missing_comment, CharClasses,
-        FindUncommented,
+        combine_strs_with_missing_comments, combine_strs_with_missing_indented_comments,
+        comment_style, contains_comment, recover_comment_removed, rewrite_comment,
+        rewrite_missing_comment, CharClasses, FindUncommented,
     },
     lists::{
         definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
@@ -32,7 +32,7 @@ use crate::formatting::{
     utils::{
         colon_spaces, contains_skip, count_newlines, first_line_ends_with, inner_attributes,
         last_line_extendable, last_line_width, mk_sp, outer_attributes, semicolon_for_expr,
-        unicode_str_width, wrap_str,
+        string_is_closing_brackets, unicode_str_width, wrap_str,
     },
     vertical::rewrite_with_alignment,
     visitor::FmtVisitor,
@@ -233,6 +233,7 @@ pub(crate) fn format_expr(
             rewrite_expr_addrof(context, borrow_kind, mutability, expr, shape)
         }
         ast::ExprKind::Cast(ref subexpr, ref ty) => {
+            debug!("** [DBO] format_expr: in ExprKind::Cast;");
             /* Retrieving the comments before and after cast */
             let prefix_span = mk_sp(
                 subexpr.span.hi(),
@@ -242,8 +243,26 @@ pub(crate) fn format_expr(
                 context.snippet_provider.span_after(expr.span, "as"),
                 ty.span.lo(),
             );
-            let infix_prefix_comments = rewrite_missing_comment(prefix_span, shape, context)?;
-            let infix_suffix_comments = rewrite_missing_comment(suffix_span, shape, context)?;
+
+            let c = rewrite_missing_comment(prefix_span, shape, context)?;
+            let mut infix_prefix_comments = String::with_capacity(c.len() + 1);
+            if !c.is_empty() {
+                infix_prefix_comments.push(' ');
+            }
+            infix_prefix_comments.push_str(&c);
+            debug!(
+                "** [DBO] format_expr: cast infix_prefix_comments={:?}",
+                infix_prefix_comments
+            );
+
+            let mut infix_suffix_comments = rewrite_missing_comment(suffix_span, shape, context)?;
+            if !infix_suffix_comments.is_empty() {
+                infix_suffix_comments.push(' ');
+            }
+            debug!(
+                "** [DBO] format_expr: cast infix_suffix_comments={:?},;",
+                infix_suffix_comments
+            );
 
             rewrite_pair(
                 &**subexpr,
@@ -909,6 +928,8 @@ impl<'a> ControlFlow<'a> {
                         orig_rhs,
                         RhsTactics::Default,
                         true,
+                        true, // Allow same line with lhs if rhs multiline
+                        &lhs,
                     )?;
                     return Some(format!("{}{}", lhs, rhs));
                 }
@@ -1034,31 +1055,69 @@ impl<'a> ControlFlow<'a> {
             " "
         };
 
-        let used_width = if pat_expr_string.contains('\n') {
+        /* Combine with pre condition comment */
+        let label_and_keyword = &format!("{}{}", label_string, self.keyword);
+        let r1 = combine_strs_with_missing_indented_comments(
+            context,
+            &label_and_keyword,
+            &pat_expr_string,
+            between_kwd_cond,
+            shape,
+            offset,
+            true,
+        )
+        .unwrap();
+
+        /* Combine with post-condition comment */
+        let r2 = combine_strs_with_missing_comments(
+            context,
+            &r1,
+            "",
+            mk_sp(cond_span.hi(), self.block.span.lo()),
+            shape,
+            true,
+        )
+        .unwrap();
+
+        /* Add separator before block */
+        let last = r2.lines().last()?.trim_end();
+        let closing_sep = if last.trim_start().is_empty() {
+            ""
+        } else if after_cond_comment
+            .as_ref()
+            .map_or(false, |s| s.starts_with("//"))
+        {
+            alt_block_sep
+        } else if last.len() + brace_overhead > context.config.max_width() {
+            alt_block_sep
+        } else {
+            block_sep
+        };
+        let r3 = format!("{}{}", r2, closing_sep);
+
+        let used_width = if closing_sep.contains('\n') {
+            closing_sep.len()
+        } else if pat_expr_string.contains('\n') {
             last_line_width(&pat_expr_string)
         } else {
             // 2 = spaces after keyword and condition.
             label_string.len() + self.keyword.len() + pat_expr_string.len() + 2
         };
 
-        Some((
-            format!(
-                "{}{}{}{}{}",
-                label_string,
-                self.keyword,
-                between_kwd_cond_comment.as_ref().map_or(
-                    if pat_expr_string.is_empty() || pat_expr_string.starts_with('\n') {
-                        ""
-                    } else {
-                        " "
-                    },
-                    |s| &**s,
-                ),
-                pat_expr_string,
-                after_cond_comment.as_ref().map_or(block_sep, |s| &**s)
-            ),
-            used_width,
-        ))
+        let ret = Some((r3, used_width));
+
+        debug!(
+            "** [DBO] ControlFlow rewrite_cond: resultEE={:?}, r1={:?}, r2={:?}, closing_sep={:?}, config.max_width={}, prev_last_line/len={:?}/{};",
+            ret,
+            r1,
+            r2,
+            closing_sep,
+            context.config.max_width(),
+            last,
+            last.len(),
+        );
+
+        ret
     }
 }
 
@@ -1134,8 +1193,6 @@ impl<'a> Rewrite for ControlFlow<'a> {
                     .snippet_provider
                     .span_before(mk_sp(self.block.span.hi(), else_block.span.lo()), "else"),
             );
-            let between_kwd_else_block_comment =
-                extract_comment(between_kwd_else_block, context, shape);
 
             let after_else = mk_sp(
                 context
@@ -1156,13 +1213,45 @@ impl<'a> Rewrite for ControlFlow<'a> {
                 _ => " ",
             };
 
-            result.push_str(&format!(
-                "{}else{}",
-                between_kwd_else_block_comment
-                    .as_ref()
-                    .map_or(between_sep, |s| &**s),
-                after_else_comment.as_ref().map_or(after_sep, |s| &**s),
-            ));
+            let brace_overhead =
+                if context.config.control_brace_style() != ControlBraceStyle::AlwaysNextLine {
+                    2
+                } else {
+                    0
+                };
+
+            // Combine with pre-else comment.
+            let r1 = combine_strs_with_missing_comments(
+                context,
+                between_sep,
+                "else",
+                between_kwd_else_block,
+                shape,
+                true,
+            )
+            .unwrap();
+
+            // Combine with post-else comment.
+            let r2 = combine_strs_with_missing_comments(context, &r1, "", after_else, shape, true)
+                .unwrap();
+
+            // Add separator befor block.
+            let last = r2.lines().last()?.trim_end();
+            let closing_sep = if last.trim_start().is_empty() || last.trim_start() == "\n" {
+                ""
+            } else if after_else_comment
+                .as_ref()
+                .map_or(false, |s| s.starts_with("//"))
+            {
+                alt_block_sep
+            } else if last.len() + brace_overhead > context.config.max_width() {
+                alt_block_sep
+            } else {
+                after_sep
+            };
+            let r3 = format!("{}{}", r2, closing_sep);
+
+            result.push_str(&r3);
             result.push_str(&rewrite?);
         }
 
@@ -1179,11 +1268,9 @@ fn rewrite_label(opt_label: Option<ast::Label>) -> Cow<'static, str> {
 
 fn extract_comment(span: Span, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
     match rewrite_missing_comment(span, shape, context) {
-        Some(ref comment) if !comment.is_empty() => Some(format!(
-            "{indent}{}{indent}",
-            comment,
-            indent = shape.indent.to_string_with_newline(context.config)
-        )),
+        Some(ref comment) if !comment.is_empty() => {
+            Some(format!("{indent}{}{indent}", comment, indent = ""))
+        }
         _ => None,
     }
 }
@@ -1939,7 +2026,9 @@ pub(crate) fn rewrite_assign_rhs<S: Into<String>, R: Rewrite>(
     ex: &R,
     shape: Shape,
 ) -> Option<String> {
-    rewrite_assign_rhs_with(context, lhs, ex, shape, RhsTactics::Default)
+    let ret = rewrite_assign_rhs_with(context, lhs, ex, shape, RhsTactics::Default, true);
+    debug!("** [DBO] rewrite_assign_rhs: enter resultE={:?};", ret);
+    ret
 }
 
 pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
@@ -1948,6 +2037,7 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     ex: &R,
     shape: Shape,
     rhs_tactics: RhsTactics,
+    allow_in_same_line: bool,
 ) -> Option<String> {
     let last_line_width = last_line_width(&lhs).saturating_sub(if lhs.contains('\n') {
         shape.indent.width()
@@ -1957,7 +2047,7 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     // 1 = space between operator and rhs.
     let orig_shape = shape.offset_left(last_line_width + 1).unwrap_or(Shape {
         width: 0,
-        offset: shape.offset + last_line_width + 1,
+        offset: last_line_width + 1,
         ..shape
     });
     let has_rhs_comment = if let Some(offset) = lhs.find_last_uncommented("=") {
@@ -1966,14 +2056,41 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
         false
     };
 
-    choose_rhs(
+    let exrw = ex.rewrite(context, orig_shape);
+
+    // Whether rhs can start in the same line with lhs end
+    let allow_same_line = if !allow_in_same_line || exrw.is_none() {
+        false
+    } else {
+        let rhs_first_line_width = &exrw.clone().unwrap().lines().next().unwrap_or("").len();
+        debug!(
+            "** [DBO] rewrite_assign_rhs_expr: rhs_first_line_width={}, indent.width()={};",
+            rhs_first_line_width,
+            shape.indent.width(),
+        );
+        if last_line_width + 1 + rhs_first_line_width + shape.indent.width()
+            <= context.config.max_width()
+        {
+            true
+        } else {
+            false
+        }
+    };
+    let ret = choose_rhs(
         context,
         ex,
         orig_shape,
-        ex.rewrite(context, orig_shape),
+        exrw,
         rhs_tactics,
         has_rhs_comment,
-    )
+        allow_same_line,
+        &lhs,
+    );
+    debug!(
+        "** [DBO] rewrite_assign_rhs_expr: resultE=choose_rhs={:?};",
+        ret
+    );
+    return ret;
 }
 
 pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
@@ -1982,9 +2099,10 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
     ex: &R,
     shape: Shape,
     rhs_tactics: RhsTactics,
+    allow_in_same_line: bool,
 ) -> Option<String> {
     let lhs = lhs.into();
-    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
+    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics, allow_in_same_line)?;
     Some(lhs + &rhs)
 }
 
@@ -2004,7 +2122,7 @@ pub(crate) fn rewrite_assign_rhs_with_comments<S: Into<String>, R: Rewrite>(
     } else {
         shape
     };
-    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
+    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics, true)?;
 
     if contains_comment {
         let rhs = rhs.trim_start();
@@ -2021,23 +2139,120 @@ fn choose_rhs<R: Rewrite>(
     orig_rhs: Option<String>,
     rhs_tactics: RhsTactics,
     has_rhs_comment: bool,
+    // allow_same_line: in case rhs is multiline, whether the first line can be in the
+    // same line with lhs.
+    allow_same_line: bool,
+    lhs: &str,
 ) -> Option<String> {
+    let lhs_ends_with_empty_line = if lhs.lines().last()?.trim().is_empty() {
+        true
+    } else {
+        false
+    };
+
     match orig_rhs {
         Some(ref new_str)
             if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
         {
-            Some(format!(" {}", new_str))
+            let result_prefix = if lhs_ends_with_empty_line { "" } else { " " };
+            let ret = Some(format!("{}{}", result_prefix, new_str));
+            debug!("** [DBO] choose_rhs: resltE1={:?};", ret);
+            ret
         }
         _ => {
             // Expression did not fit on the same line as the identifier.
             // Try splitting the line and see if that works better.
-            let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
-            let new_rhs = expr.rewrite(context, new_shape);
-            let new_indent_str = &shape
-                .indent
-                .block_indent(context.config)
-                .to_string_with_newline(context.config);
             let before_space_str = if has_rhs_comment { "" } else { " " };
+            let orig_same_line_tactic = if orig_rhs.is_none() {
+                false
+            } else {
+                match context.config.indent_style() {
+                    IndentStyle::Block => true,
+                    IndentStyle::Visual => {
+                        let orhs = orig_rhs.clone();
+                        let o = orhs?;
+                        let orig_first_line = o.lines().next();
+                        if orig_first_line.is_none() {
+                            false
+                        } else if orig_first_line.unwrap().ends_with("{") {
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                }
+            };
+
+            let (new_shape, new_rhs, new_in_same_line) = if allow_same_line && orig_same_line_tactic
+            {
+                let new_shape = shape_from_rhs_tactic_same_line(context, shape, rhs_tactics)?;
+                let rw = expr.rewrite(context, new_shape);
+                if rw.is_none() {
+                    debug!("** [DBO] choose_rhs: new_rhs1;");
+                    let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
+                    (new_shape, expr.rewrite(context, new_shape), false)
+                } else {
+                    let orhs = orig_rhs.clone();
+                    let o = orhs?;
+                    let nrhs = rw.clone();
+                    let n = nrhs?;
+                    let orig_first_line = o.lines().next();
+                    let new_first_line = n.lines().next();
+                    debug!(
+                        "** [DBO] choose_rhs: orig_first_line={:?}, new_first_line={:?};",
+                        orig_first_line, new_first_line,
+                    );
+                    if orig_first_line.is_none() || new_first_line.is_none() {
+                        debug!("** [DBO] choose_rhs: new_rhs2;");
+                        let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
+                        (new_shape, expr.rewrite(context, new_shape), false)
+                    } else if orig_first_line? != new_first_line? {
+                        debug!("** [DBO] choose_rhs: new_rhs3;");
+                        let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
+                        (new_shape, expr.rewrite(context, new_shape), false)
+                    } else {
+                        debug!("** [DBO] choose_rhs: new_rhs4 (new new);");
+                        (new_shape, rw, true)
+                    }
+                }
+            } else {
+                debug!("** [DBO] choose_rhs: new_rhs5;");
+                let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
+                (new_shape, expr.rewrite(context, new_shape), false)
+            };
+
+            let new_indent_str = if new_in_same_line {
+                Cow::from(before_space_str)
+            } else {
+                shape
+                    .indent
+                    .block_indent(context.config)
+                    .to_string_with_newline(context.config)
+            };
+
+            // Actual orig_rhs indentation is determined by the second line indentation
+            let mut orig_indent = context.config.max_width();
+            if orig_rhs.is_some() {
+                let orhs = orig_rhs.clone();
+                let o = orhs?;
+                let mut lv = o.lines();
+                if lv.next().is_some() {
+                    let l2 = lv.next();
+                    if l2.is_some() {
+                        orig_indent = l2?.len() - l2?.trim_start().len();
+                    }
+                }
+            };
+            debug!(
+                "** [DBO] choose_rhs: before_space_str={:?}, new_indent_str={:?}, new_in_same_line={}, used_width={}, orig_indent={}, new_shape={:?}, new_rhs={:?};",
+                before_space_str,
+                new_indent_str,
+                new_in_same_line,
+                shape.used_width(),
+                orig_indent,
+                new_shape,
+                new_rhs,
+            );
 
             match (orig_rhs, new_rhs) {
                 (Some(ref orig_rhs), Some(ref new_rhs))
@@ -2050,6 +2265,15 @@ fn choose_rhs<R: Rewrite>(
                     if prefer_next_line(orig_rhs, new_rhs, rhs_tactics) =>
                 {
                     Some(format!("{}{}", new_indent_str, new_rhs))
+                }
+                (Some(ref orig_rhs), Some(ref new_rhs))
+                    if new_in_same_line
+                        && orig_indent < shape.used_width()
+                        && !string_is_closing_brackets(orig_rhs.lines().last()?, true)
+                        && count_newlines(orig_rhs) >= count_newlines(new_rhs) =>
+                {
+                    debug!("** [DBO] choose_rhs: matchX;");
+                    Some(format!("{}{}", before_space_str, new_rhs))
                 }
                 (None, Some(ref new_rhs)) => Some(format!("{}{}", new_indent_str, new_rhs)),
                 (None, None) if rhs_tactics == RhsTactics::AllowOverflow => {
@@ -2076,6 +2300,36 @@ fn shape_from_rhs_tactic(
         RhsTactics::Default | RhsTactics::AllowOverflow => {
             Shape::indented(shape.indent.block_indent(context.config), context.config)
                 .sub_width(shape.rhs_overhead(context.config))
+        }
+    }
+}
+
+fn shape_from_rhs_tactic_same_line(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    rhs_tactic: RhsTactics,
+) -> Option<Shape> {
+    match rhs_tactic {
+        RhsTactics::ForceNextLineWithoutIndent => {
+            let ret = shape
+                .with_max_width(context.config)
+                .sub_width(shape.indent.width());
+            debug!(
+                "** [DBO] shape_from_rhs_tactic_same_line: resultE1=new_shape={:?};",
+                ret
+            );
+            ret
+        }
+        RhsTactics::Default | RhsTactics::AllowOverflow => {
+            let new_shape = Shape::indented(shape.indent, context.config)
+                .sub_width(context.config.tab_spaces());
+            debug!(
+                "** [DBO] shape_from_rhs_tactic_same_line: resultE2=new_shape={:?}, shape.rhs_overhead={}, shape={:?},;",
+                new_shape,
+                shape.rhs_overhead(context.config),
+                shape,
+            );
+            new_shape
         }
     }
 }

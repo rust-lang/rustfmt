@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::borrow::Cow;
 
 use rustc_ast::ast::{
@@ -218,6 +219,19 @@ pub(crate) fn last_line_contains_single_line_comment(s: &str) -> bool {
     s.lines().last().map_or(false, |l| l.contains("//"))
 }
 
+/// Whether last line is optional '}' - when starts_with_closing_curl_bracket) is true,
+/// followed by at least one ')' and optinally ends with ';'
+#[inline]
+pub(crate) fn string_is_closing_brackets(s: &str, starts_with_closing_curl_bracket: bool) -> bool {
+    let regex_str = if starts_with_closing_curl_bracket {
+        "^\\}\\)+;?$"
+    } else {
+        "^\\)+;?$"
+    };
+    let re = Regex::new(regex_str).unwrap();
+    re.is_match(s.trim())
+}
+
 #[inline]
 pub(crate) fn is_attributes_extendable(attrs_str: &str) -> bool {
     !attrs_str.contains('\n') && !last_line_contains_single_line_comment(attrs_str)
@@ -227,6 +241,30 @@ pub(crate) fn is_attributes_extendable(attrs_str: &str) -> bool {
 #[inline]
 pub(crate) fn first_line_width(s: &str) -> usize {
     unicode_str_width(s.splitn(2, '\n').next().unwrap_or(""))
+}
+
+/// The width of the longest line in s.
+#[inline]
+pub(crate) fn longest_line_width(s: &str) -> usize {
+    let w = s
+        .split("\n")
+        .map(|l| unicode_str_width(l))
+        .max()
+        .unwrap_or(0);
+    debug!("**** [DBO] longest_line_width: w={}, s={:?};", w, s);
+    w
+}
+
+/// The width of the longest trimmed line in s.
+#[inline]
+pub(crate) fn longest_trimmed_line_width(s: &str) -> usize {
+    let w = s
+        .split("\n")
+        .map(|l| unicode_str_width(l.trim()))
+        .max()
+        .unwrap_or(0);
+    debug!("**** [DBO] longest_trimmed_line_width: w={}, s={:?};", w, s);
+    w
 }
 
 /// The width of the last line in s.
@@ -429,6 +467,22 @@ fn is_valid_str(snippet: &str, max_width: usize, shape: Shape) -> bool {
         }
     }
     true
+}
+
+#[inline]
+pub(crate) fn is_compare_op(op: &str) -> bool {
+    match op {
+        "==" | "!=" | "<" | ">" | "<=" | ">=" => true,
+        _ => false,
+    }
+}
+
+#[inline]
+pub(crate) fn is_arithmetic_op(op: &str) -> bool {
+    match op {
+        "*" | "*=" | "/" | "/=" | "+" | "+=" | "-" | "-=" | "%" | "%=" => true,
+        _ => false,
+    }
 }
 
 #[inline]

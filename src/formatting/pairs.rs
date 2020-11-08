@@ -1,11 +1,20 @@
 use rustc_ast::ast;
+use std::borrow::Cow;
 
 use crate::config::lists::*;
 use crate::config::IndentStyle;
 use crate::formatting::{
+    comment::{
+        combine_strs_with_comments, comment_style, rewrite_comment,
+        rewrite_missing_comment_with_newline_start,
+    },
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
-    utils::{first_line_width, is_single_line, last_line_width, trimmed_last_line_width, wrap_str},
+    utils::{
+        first_line_width, is_arithmetic_op, is_compare_op, is_single_line, last_line_used_width,
+        last_line_width, longest_line_width, mk_sp, string_is_closing_brackets,
+        trimmed_last_line_width, wrap_str,
+    },
 };
 
 /// Sigils that decorate a binop pair.
@@ -74,6 +83,8 @@ fn rewrite_pairs_one_line<T: Rewrite>(
     let mut result = String::new();
     let base_shape = shape.block();
 
+    let mut prefix_iter = list.sep_prefixes.iter();
+    let mut suffix_iter = list.sep_suffixes.iter();
     for ((_, rewrite), s) in list.list.iter().zip(list.separators.iter()) {
         if let Some(rewrite) = rewrite {
             if !is_single_line(&rewrite) || result.len() > shape.width {
@@ -82,8 +93,44 @@ fn rewrite_pairs_one_line<T: Rewrite>(
 
             result.push_str(&rewrite);
             result.push(' ');
+
+            let c = prefix_iter.next()?.trim();
+            if !c.is_empty() {
+                if c.starts_with("//") || c.starts_with("\n") {
+                    debug!(
+                        "[DBO] ** rewrite_pairs_one_line: resulE2.1=None, prefix={:?}, result={:?};",
+                        c, result
+                    );
+                    return None;
+                } else {
+                    result.push_str(c);
+                    result.push(' ');
+                };
+            };
+
             result.push_str(s);
             result.push(' ');
+
+            let c = suffix_iter.next()?.trim();
+            if !c.is_empty() {
+                if c.starts_with("\n") {
+                    return None;
+                }
+                result.push_str(c);
+                if c.starts_with("//") {
+                    let rhs_offset = shape.rhs_overhead(&context.config);
+                    let nested_shape = (match context.config.indent_style() {
+                        IndentStyle::Visual => shape.visual_indent(0),
+                        IndentStyle::Block => shape.block_indent(context.config.tab_spaces()),
+                    })
+                    .with_max_width(&context.config)
+                    .sub_width(rhs_offset)?;
+                    let indent_str = nested_shape.indent.to_string_with_newline(context.config);
+                    result.push_str(&indent_str);
+                } else {
+                    result.push(' ');
+                }
+            };
         } else {
             return None;
         }
@@ -128,7 +175,30 @@ fn rewrite_pairs_multiline<T: Rewrite>(
 
     result.push_str(&list.list[0].1.as_ref()?);
 
+    let mut prefix_iter = list.sep_prefixes.iter();
+    let mut suffix_iter = list.sep_suffixes.iter();
+    let mut first_iter = true;
     for ((e, default_rw), s) in list.list[1..].iter().zip(list.separators.iter()) {
+        /* First multiline comment prefix and suffix in SeparatorPlace::Back
+         * and that are added to existing line requires less alignment, compared to
+         * the other comments that are added to already block aligned lines */
+        let multiline_align_overhead = if first_iter { 0 } else { shape.indent.width() };
+
+        let prefix_with_start = prefix_iter.next()?.trim_end();
+        let prefix = prefix_with_start.trim_start();
+        let suffix_with_start = suffix_iter.next()?.trim_end();
+        let suffix = suffix_with_start.trim_start();
+        let prelen = if prefix.is_empty() {
+            0
+        } else {
+            longest_line_width(&prefix) + 1 /* +1 if for separator suffix */
+        };
+        let suflen = if suffix.is_empty() {
+            0
+        } else {
+            longest_line_width(&suffix) + 1 /* +1 if for separator suffix */
+        };
+
         // The following test checks if we should keep two subexprs on the same
         // line. We do this if not doing so would create an orphan and there is
         // enough space to do so.
@@ -137,36 +207,268 @@ fn rewrite_pairs_multiline<T: Rewrite>(
         } else {
             shape.used_width()
         };
-        if last_line_width(&result) + offset <= nested_shape.used_width() {
-            // We must snuggle the next line onto the previous line to avoid an orphan.
-            if let Some(line_shape) =
-                shape.offset_left(s.len() + 2 + trimmed_last_line_width(&result))
-            {
-                if let Some(rewrite) = e.rewrite(context, line_shape) {
-                    result.push(' ');
-                    result.push_str(s);
-                    result.push(' ');
-                    result.push_str(&rewrite);
-                    continue;
-                }
-            }
-        }
 
+        // Add pre-separator comment  - try to add at the end of current last line.
+        let rw_prefix = if prelen <= 0 {
+            String::new()
+        } else {
+            let (align, separator, one_line) =
+                if trimmed_last_line_width(&result) + prelen > shape.width {
+                    (shape.indent.block_indent, &indent_str, false)
+                } else {
+                    (multiline_align_overhead + 1, &Cow::Borrowed(" "), true)
+                };
+            debug!(
+                "** [DBO] rewrite_pairs_multiline: last_line_used_width(&result, shape.offset)={}, multiline_align_overhead)={}, align={}, separator={:?}, one_line={:?}, prefix={:?}, shape={:?}, result={:?};",
+                last_line_used_width(&result, shape.offset),
+                multiline_align_overhead,
+                align,
+                separator,
+                one_line,
+                prefix,
+                shape,
+                result,
+            );
+            rewrite_comment(
+                &prefix,
+                true,
+                if result.contains('\n') || prefix_with_start.starts_with("\n") {
+                    nested_shape
+                } else {
+                    shape
+                },
+                context.config,
+            )?
+        };
+        debug!(
+            "[DBO] ** rewrite_pairs_multiline: rw_prefix={:?}, result3.1={:?};",
+            rw_prefix, result
+        );
+
+        let width_for_one_line = last_line_width(&result) + offset + s.len() + 2;
+        let line_shape = if width_for_one_line <= shape.used_width() {
+            // We must snuggle the next line onto the previous line to avoid an orphan.
+            debug!("[DBO] ** rewrite_pairs_multiline: line_shape from one-line;");
+            shape.offset_left(s.len() + 2 + trimmed_last_line_width(&result))
+        } else if width_for_one_line < shape.width && is_compare_op(s) {
+            debug!("[DBO] ** rewrite_pairs_multiline: line_shape from extended one-line;");
+            shape.offset_left(s.len() + 2)
+        } else {
+            debug!("[DBO] ** rewrite_pairs_multiline: line_shape from multi-line;");
+            nested_shape.offset_left(s.len() + 1)
+        };
+        debug!(
+            "[DBO] ** rewrite_pairs_multiline: line_shape={:?}, width_for_one_line={}, last_line_width={}, offset={}, result={:?};",
+            line_shape,
+            width_for_one_line,
+            last_line_width(&result),
+            offset,
+            result
+        );
+        let rw = if line_shape.is_some() {
+            e.rewrite(context, line_shape?)?
+        } else {
+            String::new()
+        };
+        debug!(
+            "[DBO] ** rewrite_pairs_multiline: line_shape={:?}, rw={:?};",
+            line_shape, rw,
+        );
+        let rewrite = if !rw.is_empty() {
+            debug!("[DBO] ** rewrite_pairs_multiline: rewrite=e.rewrite();");
+            &rw
+        } else {
+            debug!("[DBO] ** rewrite_pairs_multiline: rewrite=default_rw;");
+            &default_rw.as_ref()?
+        };
+        debug!(
+            "[DBO] ** rewrite_pairs_multiline: separator=s={:?}, indent_str={:?}, rewrite={:?};",
+            s, indent_str, rewrite
+        );
+
+        /* Add separator - in multiline each separator starts or ends a line */
         match context.config.binop_separator() {
             SeparatorPlace::Back => {
-                result.push(' ');
-                result.push_str(s);
+                let prefix_shape = if !result.contains('\n') {
+                    shape
+                } else {
+                    nested_shape
+                };
+                // Combine comment with initial shape - including start new line if needed
+                result = combine_strs_with_comments(
+                    context,
+                    &result,
+                    "",
+                    &rw_prefix,
+                    prefix_shape,
+                    0,
+                    true,
+                    !prefix_with_start.starts_with("\n"),
+                    true,
+                    true,
+                )?;
+                // Combine separator - using nested_shape in case it is in new line
+                result = combine_strs_with_comments(
+                    context,
+                    &result,
+                    s,
+                    "",
+                    nested_shape,
+                    0,
+                    true,
+                    true,
+                    true,
+                    false,
+                )?;
+                debug!(
+                    "[DBO] ** rewrite_pairs_multiline: BACK result after combining prefix={:?};",
+                    result
+                );
+
+                let suffix_shape = if !result.contains('\n') {
+                    shape
+                } else {
+                    nested_shape
+                };
+                let rw_suffix = if suflen <= 0 {
+                    String::new()
+                } else {
+                    rewrite_comment(&suffix, true, suffix_shape, context.config)?
+                };
+                result = combine_strs_with_comments(
+                    context,
+                    &result,
+                    &"",
+                    &rw_suffix,
+                    suffix_shape,
+                    0,
+                    true,
+                    !suffix_with_start.starts_with("\n"),
+                    true,
+                    false,
+                )?;
                 result.push_str(&indent_str);
+                result.push_str(&rewrite);
+                debug!(
+                    "[DBO] ** rewrite_pairs_multiline: BACK result after combining suffix={:?};",
+                    result
+                );
             }
             SeparatorPlace::Front => {
-                result.push_str(&indent_str);
-                result.push_str(s);
-                result.push(' ');
+                let empty_cow = Cow::from("");
+                // Find if result ensds with clocsing brackets line
+                let result_last_line = result.lines().last().unwrap();
+                let last_ends_with_closing_brackets =
+                    result_last_line.rfind('}').map_or(false, |i| {
+                    debug!(
+                        "[DBO] ** rewrite_pairs_multiline: last_line[i..]={:?}, last_line[..i - 1]={:?}, trimmed={:?};",
+                        &result_last_line[i..],
+                        &result_last_line[..i - 1],
+                        result_last_line[..i - 1].trim()
+                    );
+                    if string_is_closing_brackets(&result_last_line[i..], true) {
+                        if i == 0 {
+                            true
+                        } else if result_last_line[..i - 1].trim().is_empty() {
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                });
+
+                // Put compare operator in same line only if there are no comments
+                // and all statement fits one line.
+                let compare_op_in_same_line = is_compare_op(s)
+                    && prelen == 0
+                    && suflen == 0
+                    // ????? && is_single_line(&rewrite)
+                    && (is_single_line(&result)
+                        || string_is_closing_brackets(result_last_line, false))
+                    && trimmed_last_line_width(&result)
+                        + s.len()
+                        + 2
+                        + rewrite.lines().next()?.len()
+                        <= shape.width;
+                let pre_sep_indent_str = if result.ends_with("}")
+                    || (last_ends_with_closing_brackets && !is_arithmetic_op(s))
+                    || compare_op_in_same_line
+                {
+                    &empty_cow
+                } else {
+                    &indent_str
+                };
+
+                let (prefix_shape, indentation_offset) = if is_single_line(&result) {
+                    (shape, context.config.tab_spaces())
+                } else {
+                    (nested_shape, 0)
+                };
+                debug!(
+                    "[DBO] ** rewrite_pairs_multiline: FRONT last_ends_with_closing_brackets={}, indentation_offset={}, pre_sep_indent_str={:?};",
+                    last_ends_with_closing_brackets, indentation_offset, pre_sep_indent_str,
+                );
+
+                result = combine_strs_with_comments(
+                    context,
+                    &result,
+                    &format!("{}{}", pre_sep_indent_str, s),
+                    &rw_prefix,
+                    prefix_shape,
+                    indentation_offset,
+                    true,
+                    !prefix_with_start.starts_with("\n"),
+                    true,
+                    false,
+                )?;
+                debug!(
+                    "[DBO] ** rewrite_pairs_multiline: FRONT result after combining prefix={:?}, prefix_shape={:?};",
+                    result, prefix_shape,
+                );
+
+                let rw_suffix = if suflen <= 0 {
+                    String::new()
+                } else {
+                    rewrite_comment(&suffix, true, nested_shape, context.config)?
+                };
+
+                let (suffix_shape, indentation_offset) = if !result.contains('\n') {
+                    (shape, context.config.tab_spaces())
+                } else {
+                    (shape, context.config.tab_spaces())
+                };
+
+                result = combine_strs_with_comments(
+                    context,
+                    &result,
+                    &rewrite,
+                    &rw_suffix,
+                    suffix_shape,
+                    indentation_offset,
+                    true,
+                    !suffix_with_start.starts_with("\n"),
+                    true,
+                    false,
+                )?;
+                debug!(
+                    "[DBO] ** rewrite_pairs_multiline: FRONT result after combining suffix={:?}, suffix_shape={:?};",
+                    result, suffix_shape
+                );
             }
         }
+        debug!("[DBO] ** rewrite_pairs_multiline: result3.2={:?};", result);
 
-        result.push_str(&default_rw.as_ref()?);
+        debug!(
+            "[DBO] ** rewrite_pairs_multiline: resultNextLoopEnd={:?};",
+            result
+        );
+
+        first_iter = false;
     }
+
+    debug!("[DBO] ** rewrite_pairs_multiline: resultEE={:?};", result);
     Some(result)
 }
 
@@ -183,10 +485,28 @@ where
     LHS: Rewrite,
     RHS: Rewrite,
 {
+    debug!("** [DBO] rewrite_pair: enter shape={:?};", shape);
     let tab_spaces = context.config.tab_spaces();
-    let infix_result = format!("{}{}", pp.infix, pp.infix_suffix);
-    let infix_suffix_separator = if pp.infix_suffix.is_empty() { "" } else { " " };
-    let infix_prefix_separator = if pp.infix_prefix.is_empty() { "" } else { " " };
+
+    // If infix_suffix is open-comment then a new line should be added to it.
+    let c = pp.infix_suffix.trim_start();
+    let rhs_infix_suffix =
+        if !c.is_empty() && comment_style(c, false).is_line_comment() && !c.contains("\n") {
+            format!(
+                "{}{}",
+                pp.infix_suffix.trim_end(),
+                shape
+                    .indent
+                    .to_string_with_newline(context.config)
+                    .to_string(),
+            )
+        } else {
+            String::from(pp.infix_suffix)
+        };
+
+    let infix_result = format!("{}{}", pp.infix, rhs_infix_suffix);
+    debug!("** [DBO] rewrite_pair: infix_result={:?};", infix_result);
+
     let lhs_overhead = match separator_place {
         SeparatorPlace::Back => {
             shape.used_width() + pp.prefix.len() + pp.infix.trim_end().len() + pp.infix_prefix.len()
@@ -197,20 +517,38 @@ where
         width: context.budget(lhs_overhead),
         ..shape
     };
-    let lhs_result = lhs.rewrite(context, lhs_shape).map(|lhs_str| {
-        format!(
-            "{}{}{}{}",
-            pp.prefix, lhs_str, infix_prefix_separator, pp.infix_prefix
-        )
-    })?;
+
+    // If infix_prefix is open-comment then a new line should be added to it.
+    let c = pp.infix_prefix.trim_start();
+    let lhs_infix_suffix =
+        if !c.is_empty() && comment_style(c, false).is_line_comment() && !c.contains("\n") {
+            format!(
+                "{}{}",
+                pp.infix_prefix.trim_end(),
+                shape
+                    .indent
+                    .to_string_with_newline(context.config)
+                    .to_string(),
+            )
+        } else {
+            String::from(pp.infix_prefix)
+        };
+
+    let lhs_result = lhs
+        .rewrite(context, lhs_shape)
+        .map(|lhs_str| format!("{}{}{}", pp.prefix, lhs_str, lhs_infix_suffix))?;
+    debug!("** [DBO] rewrite_pair: lhs_result={:?};", lhs_result);
 
     // Try to put both lhs and rhs on the same line.
     let rhs_orig_result = shape
         .offset_left(last_line_width(&lhs_result) + pp.infix.len())
-        .and_then(|s| {
-            s.sub_width(pp.suffix.len() + pp.infix_suffix.len() + infix_suffix_separator.len())
-        })
+        .and_then(|s| s.sub_width(pp.suffix.len() + pp.infix_suffix.len()))
         .and_then(|rhs_shape| rhs.rewrite(context, rhs_shape));
+    debug!(
+        "** [DBO] rewrite_pair: rhs_orig_result={:?};",
+        rhs_orig_result
+    );
+
     if let Some(ref rhs_result) = rhs_orig_result {
         // If the length of the lhs is equal to or shorter than the tab width or
         // the rhs looks like block expression, we put the rhs on the same
@@ -221,16 +559,26 @@ where
                 .next()
                 .map(|first_line| first_line.ends_with('{'))
                 .unwrap_or(false);
+        debug!(
+            "** [DBO] rewrite_pair: allow_same_line={:?};",
+            allow_same_line
+        );
         if !rhs_result.contains('\n') || allow_same_line {
             let one_line_width = last_line_width(&lhs_result)
                 + infix_result.len()
                 + first_line_width(rhs_result)
                 + pp.suffix.len();
+            debug!(
+                "** [DBO] rewrite_pair: one_line_width={}, shape.width={:?};",
+                one_line_width, shape.width
+            );
             if one_line_width <= shape.width {
-                return Some(format!(
-                    "{}{}{}{}{}",
-                    lhs_result, infix_result, infix_suffix_separator, rhs_result, pp.suffix
+                let ret = Some(format!(
+                    "{}{}{}{}",
+                    lhs_result, infix_result, rhs_result, pp.suffix
                 ));
+                debug!("** [DBO] rewrite_pair: resultE1={:?};", ret);
+                return ret;
             }
         }
     }
@@ -263,33 +611,65 @@ where
     } else {
         pp.infix_suffix
     };
+    debug!(
+        "** [DBO] rewrite_pair: separator_place={:?}, infix={:?}, rhs_shape={:?}",
+        separator_place, infix, rhs_shape
+    );
     if separator_place == SeparatorPlace::Front {
         rhs_shape = rhs_shape.offset_left(infix.len())?;
     }
+    debug!("** [DBO] rewrite_pair: rhs_shape2={:?}", rhs_shape);
     let rhs_result = rhs.rewrite(context, rhs_shape)?;
     let indent_str = rhs_shape.indent.to_string_with_newline(context.config);
-    let mut infix_with_sep = match separator_place {
-        SeparatorPlace::Back => format!("{}{}{}", infix, infix_suffix.trim_end(), indent_str),
-        SeparatorPlace::Front => format!(
-            "{}{}{}{}",
-            indent_str,
-            infix.trim_start(),
-            infix_suffix,
-            infix_suffix_separator
-        ),
+    debug!(
+        "** [DBO] rewrite_pair: rhs_result={:?}, indent_str={:?};",
+        rhs_result, indent_str
+    );
+    let (mut infix_with_sep, infix_with_sep_len, max_width) = match separator_place {
+        SeparatorPlace::Back => {
+            let s = format!("{}{}", infix, infix_suffix.trim_end());
+            (format!("{}{}", s, indent_str), s.len(), shape.width)
+        }
+        SeparatorPlace::Front => {
+            let new_indent_str = if string_is_closing_brackets(lhs_result.lines().last()?, true) {
+                Cow::from(" ")
+            } else {
+                indent_str.clone()
+            };
+            let s = format!("{}{}{}", new_indent_str, infix.trim_start(), infix_suffix);
+            (s.clone(), s.len() - 1, context.config.max_width())
+        }
     };
-    let new_line_width = infix_with_sep.len() - 1 + rhs_result.len() + pp.suffix.len();
-    let rhs_with_sep = if separator_place == SeparatorPlace::Front && new_line_width > shape.width {
+
+    let new_line_width = infix_with_sep_len + rhs_result.len() + pp.suffix.len();
+    debug!(
+        "** [DBO] rewrite_pair: new_line_width={}, infix_with_sep/len={:?}/{}, pp.suffix/len={:?}/{}, rhs_result/len={:?}/{};",
+        new_line_width,
+        infix_with_sep,
+        infix_with_sep.len(),
+        pp.suffix,
+        pp.suffix.len(),
+        rhs_result,
+        rhs_result.len(),
+    );
+    let rhs_with_sep = if separator_place == SeparatorPlace::Front && new_line_width > max_width {
         let s: String = String::from(infix_with_sep);
         infix_with_sep = s.trim_end().to_string();
         format!("{}{}", indent_str, rhs_result.trim_start())
     } else {
         rhs_result
     };
-    Some(format!(
+    debug!(
+        "** [DBO] rewrite_pair: new_line_width={}, shape.width={:?}, rhs_with_sep={:?};",
+        new_line_width, shape.width, rhs_with_sep,
+    );
+
+    let ret = Some(format!(
         "{}{}{}{}",
         lhs_result, infix_with_sep, rhs_with_sep, pp.suffix
-    ))
+    ));
+    debug!("** [DBO] rewrite_pair: resultE2={:?};", ret);
+    ret
 }
 
 // A pair which forms a tree and can be flattened (e.g., binops).
@@ -302,6 +682,8 @@ trait FlattenPair: Rewrite + Sized {
 struct PairList<'a, 'b, T: Rewrite> {
     list: Vec<(&'b T, Option<String>)>,
     separators: Vec<&'a str>,
+    sep_prefixes: Vec<String>,
+    sep_suffixes: Vec<String>,
 }
 
 impl FlattenPair for ast::Expr {
@@ -340,6 +722,8 @@ impl FlattenPair for ast::Expr {
         let mut list = vec![];
         let mut separators = vec![];
         let mut node = self;
+        let mut sep_prefixes = vec![]; /* pre separator comments */
+        let mut sep_suffixes = vec![]; /* post separator comments */
         loop {
             match node.kind {
                 ast::ExprKind::Binary(op, ref lhs, _) if op.node == top_op => {
@@ -354,6 +738,19 @@ impl FlattenPair for ast::Expr {
                         match pop.kind {
                             ast::ExprKind::Binary(op, _, ref rhs) => {
                                 separators.push(op.node.to_string());
+                                debug!(
+                                    "*** [DBO] FlattenPair for ast::Expr: lspan={:?}, rspan={:?}, node.span={:?};",
+                                    pop.span, rhs.span, node.span
+                                );
+                                // Collect pre and post opertor comments.
+                                let sp = mk_sp(node.span.hi(), op.span.lo());
+                                let c =
+                                    rewrite_missing_comment_with_newline_start(sp, shape, context)?;
+                                sep_prefixes.push(c.to_string());
+                                let sp = mk_sp(op.span.hi(), rhs.span.lo());
+                                let c =
+                                    rewrite_missing_comment_with_newline_start(sp, shape, context)?;
+                                sep_suffixes.push(c.to_string());
                                 node = rhs;
                             }
                             _ => unreachable!(),
@@ -366,7 +763,16 @@ impl FlattenPair for ast::Expr {
         }
 
         assert_eq!(list.len() - 1, separators.len());
-        Some(PairList { list, separators })
+        debug!(
+            "*** [DBO] FlattenPair for ast::Expr: almost at end separators={:?}, sep_prefixes={:?}, sep_suffixes={:?}, list={:?};",
+            separators, sep_prefixes, sep_suffixes, list
+        );
+        Some(PairList {
+            list,
+            separators,
+            sep_prefixes,
+            sep_suffixes,
+        })
     }
 }
 

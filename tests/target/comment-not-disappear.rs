@@ -25,14 +25,23 @@ fn c() {
 fn foo() -> Vec<i32> {
     (0..11)
         .map(|x|
-        // This comment disappears.
-        if x % 2 == 0 { x } else { x * 2 })
+            // This comment disappears.
+            if x % 2 == 0 { x } else { x * 2 })
+        .collect()
+}
+
+fn foo() -> Vec<i32> {
+    (0..11)
+        .map(|x|
+            /* This comment disappears */
+            if x % 2 == 0 { x } else { x * 2 })
         .collect()
 }
 
 fn calc_page_len(prefix_len: usize, sofar: usize) -> usize {
     2 // page type and flags
-    + 1 // stored depth
-    + 2 // stored count
-    + prefix_len + sofar // sum of size of all the actual items
+        + 1 // stored depth
+        + 2 // stored count
+        + prefix_len
+        + sofar // sum of size of all the actual items
 }

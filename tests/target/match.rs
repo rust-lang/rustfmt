@@ -157,7 +157,7 @@ fn issue339() {
         u => 2,
         v => {} /* funky block
                  * comment */
-                /* final comment */
+        /* final comment */
     }
 }
 

@@ -67,8 +67,7 @@ name if //BAD COMMENT
 // Test 10
 fn main() {
 match name{
-name if /*BAD COMMENT*/
-5 => 6
+name if /*BAD COMMENT*/      5 => 6
 } }
 // Test 11
 fn main() {

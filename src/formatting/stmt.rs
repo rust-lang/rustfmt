@@ -1,14 +1,14 @@
 use rustc_ast::ast;
-use rustc_span::Span;
+use rustc_span::{BytePos, Span};
 
 use crate::formatting::{
-    comment::recover_comment_removed,
+    comment::{combine_strs_with_missing_comments, recover_comment_removed},
     expr::{format_expr, ExprType},
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
     source_map::LineRangeUtils,
     spanned::Spanned,
-    utils::semicolon_for_stmt,
+    utils::{mk_sp, semicolon_for_stmt},
 };
 
 pub(crate) struct Stmt<'a> {
@@ -100,7 +100,43 @@ fn format_stmt(
     skip_out_of_file_lines_range!(context, stmt.span());
 
     let result = match stmt.kind {
-        ast::StmtKind::Local(ref local) => local.rewrite(context, shape),
+        ast::StmtKind::Local(ref local) => {
+            let result = local.rewrite(context, shape);
+            debug!("** [DBO] format_stmt: result1={:?};", result);
+            /* Add comment between expression and ";" */
+            if result.is_some() {
+                debug!(
+                    "** [DBO] format_stmt: local.span.hi()={:?}, stmt.span.hi()={:?}, local={:?};",
+                    local.span.hi(),
+                    stmt.span.hi(),
+                    local
+                );
+                if local.init.as_ref().is_some()
+                    && local.init.as_ref()?.span.hi() < local.span.hi() - BytePos(1)
+                {
+                    let comment_span =
+                        mk_sp(local.init.as_ref()?.span.hi(), local.span.hi() - BytePos(1));
+                    let r = combine_strs_with_missing_comments(
+                        context,
+                        &result?,
+                        ";",
+                        comment_span,
+                        shape,
+                        true,
+                    );
+                    debug!(
+                        "** [DBO] format_stmt: combine_strs_with_missing_comments={:?};",
+                        r
+                    );
+                    r
+                } else {
+                    Some(result? + ";")
+                }
+            } else {
+                None
+            }
+        }
+
         ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
             let suffix = if semicolon_for_stmt(context, stmt) {
                 ";"

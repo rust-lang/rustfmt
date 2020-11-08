@@ -11,13 +11,18 @@ fn mut_block_before_ident() {
 }
 
 fn ref_and_mut_blocks_before_ident() {
-    if let Some(ref /*abc*/ mut /*def*/ state) = foo {
+    if let Some(
+        ref /*abc*/
+        mut /*def*/ state,
+    ) = foo
+    {
         println!("deefefefefefwea");
     }
 }
 
 fn sub_pattern() {
-    let foo @ /*foo*/ bar(f) = 42;
+    let foo @ /*foo*/
+    bar(f) = 42;
 }
 
 fn no_prefix_block_before_ident() {

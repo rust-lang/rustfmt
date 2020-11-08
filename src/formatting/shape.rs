@@ -96,6 +96,11 @@ impl Indent {
             Cow::from(indent)
         }
     }
+
+    pub(crate) fn align(mut self, offset: usize) -> Indent {
+        self.alignment += offset;
+        self
+    }
 }
 
 impl Add for Indent {
@@ -208,7 +213,7 @@ impl Shape {
             Shape {
                 width: self.width,
                 indent: self.indent + extra_width,
-                offset: self.indent.alignment + extra_width,
+                offset: 0,
             }
         }
     }
@@ -284,6 +289,15 @@ impl Shape {
             width: INFINITE_SHAPE_WIDTH,
             ..*self
         }
+    }
+
+    // Create `Indent` from `Shape` for a acomment indentation.
+    // `Indent` width is the total `shape.indent` witdh and `alignment` is:
+    //     `shape.offset` when in the same line of preceding code,
+    //     or 0 when in new line.
+    pub(crate) fn to_comment_indent(self, in_new_line: bool) -> Indent {
+        let offset = if in_new_line { 0 } else { self.offset };
+        self.indent.block_only().align(offset)
     }
 }
 
@@ -368,6 +382,6 @@ mod test {
         assert_eq!(config.max_width(), shape.width);
         assert_eq!(4, shape.indent.block_indent);
         assert_eq!(28, shape.indent.alignment);
-        assert_eq!(28, shape.offset);
+        assert_eq!(0, shape.offset);
     }
 }

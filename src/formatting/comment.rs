@@ -11,9 +11,9 @@ use crate::formatting::{
     shape::{Indent, Shape},
     string::{rewrite_string, StringFormat},
     utils::{
-        count_newlines, first_line_width, format_code_block, last_line_width, tab_to_spaces,
-        trim_end_unless_two_whitespaces, trim_left_preserve_layout, trimmed_last_line_width,
-        unicode_str_width,
+        count_newlines, first_line_width, format_code_block, last_line_used_width, last_line_width,
+        longest_trimmed_line_width, tab_to_spaces, trim_end_unless_two_whitespaces,
+        trim_left_preserve_layout, unicode_str_width,
     },
 };
 
@@ -153,6 +153,241 @@ pub(crate) fn is_last_comment_block(s: &str) -> bool {
     s.trim_end().ends_with("*/")
 }
 
+/// Combine `prev_str` and `next_str` into a single `String`. with `comment_in`.
+/// `comment_in` may start with '\n' to indicate the comment must start a new line.
+/// comments between the two strings: 'prev str comment next_str'.
+/// If `allow_extend` is true and there is no comment between the two
+/// strings, then they will be put on a single line as long as doing so does not
+/// exceed max width.
+/// If `force_new_line_after_line_comment` is true and the comment is one-line,
+/// then new line will be added after the comment, event if `next_str` is empty
+/// (set to `true` when it is known that some text may follow in the same line).
+pub(crate) fn combine_strs_with_comments(
+    context: &RewriteContext<'_>,
+    prev_str: &str,
+    next_str: &str,
+    comment_in: &str,
+    shape: Shape,
+    indentation_offset: usize, // For next_str extra indentation
+    allow_extend: bool,
+    prefer_same_line_comment: bool, // >>>>> ?????[DBO] RENAME - for all function <<<<
+    prefer_same_line_next: bool,    // ?????[DBO] ADD ????? <<<<<
+    force_new_line_after_line_comment: bool,
+) -> Option<String> {
+    let comment = &comment_in.trim_start();
+    // let indent_str_prefix_comment = shape.indent.to_string_with_newline(context.config);
+    let indented_indent = shape.indent.align(indentation_offset);
+    let indent_str = indented_indent.to_string_with_newline(context.config);
+
+    debug!(
+        "** [DBO] combine_strs_with_comments: enter prev_str={:?}, comment={:?}, next_str={:?}, allow_extend={}, prefer_same_line_comment={}, prefer_same_line_next={}, force_new_line_after_line_comment={}, indentation_offset={}, indented_indent={:?}, shape={:?}, indent_str={:?};",
+        prev_str,
+        comment,
+        next_str,
+        allow_extend,
+        prefer_same_line_comment,
+        prefer_same_line_next,
+        force_new_line_after_line_comment,
+        indentation_offset,
+        indented_indent,
+        shape,
+        indent_str,
+    );
+    let mut result =
+        String::with_capacity(prev_str.len() + next_str.len() + shape.indent.width() + 128);
+    result.push_str(prev_str);
+    let mut allow_one_line =
+        !prev_str.contains('\n') && !next_str.contains('\n') && !comment_in.contains('\n');
+
+    let first_sep = if prev_str.trim().is_empty()
+        || next_str.trim().is_empty()
+        || next_str == ";"
+        || (comment.is_empty() && next_str.trim_start().starts_with(";"))
+        || !prev_str.is_empty() && prev_str.chars().last()?.is_whitespace()
+    {
+        ""
+    } else {
+        " "
+    };
+    let prev_last_line_width =
+        unicode_str_width(prev_str.lines().last().unwrap_or("").trim_start());
+    let mut one_line_width = prev_last_line_width + first_line_width(next_str) + first_sep.len();
+
+    let config = context.config;
+
+    if comment.is_empty() {
+        // If next starrs new line - trim existing trailing whitespaces,
+        // else if line fits in one line or starting next in new line will not reduce size,
+        // else if next is not ';' trim end and add indent.
+        if next_str.starts_with("\n") {
+            result = result.trim_end().to_string();
+        } else if allow_extend && one_line_width <= shape.width
+            || prev_last_line_width <= indentation_offset
+        {
+            result.push_str(first_sep);
+        } else if !prev_str.is_empty() && next_str != ";" {
+            result = result.trim_end().to_string();
+            result.push_str(&indent_str)
+        }
+        result.push_str(next_str);
+        debug!(
+            "** [DBO] combine_strs_with_comments: resultE1={:?}, one_line_width={}, prev_last_line_width={}, shape.width={}, shape.used_width={}, first_sep={:?};",
+            result,
+            one_line_width,
+            prev_last_line_width,
+            shape.width,
+            shape.used_width(),
+            first_sep,
+        );
+        return Some(result);
+    }
+
+    // There is a commment between the first expression and the second expression.
+
+    one_line_width -= first_sep.len();
+    let (first_sep, one_line, sep_overhead) = if prev_str.is_empty() || comment.is_empty() {
+        (Cow::from(""), true, 0)
+    } else if comment_in.starts_with("\n") {
+        // Comment that starts new line should start new line
+        (indent_str.clone(), false, 0)
+    } else {
+        let one_line_width_offset = if result.contains('\n') {
+            0
+        } else {
+            shape.offset
+        };
+        one_line_width =
+            last_line_used_width(&result, shape.indent.width() + one_line_width_offset)
+                + longest_trimmed_line_width(&comment);
+        let sep_in_same_line = if !prev_str.is_empty() && prev_str.chars().last()?.is_whitespace() {
+            ""
+        } else {
+            // "+1" for one space separator (and ignore space for the " *" internal comment lines).
+            one_line_width += 1;
+            " "
+        };
+        debug!(
+            "** [DBO] combine_strs_with_comments: 1st one_line_width={:?}, last_line_width={:?}, longest_trimmed_line_width={}, shape.indent.width={}, result={:?};",
+            one_line_width,
+            last_line_used_width(&result, shape.indent.width()),
+            longest_trimmed_line_width(&comment),
+            shape.indent.width(),
+            result,
+        );
+        if prefer_same_line_comment
+            && one_line_width <= context.config.max_width()
+            && comment.chars().next().map_or(true, |s| s != '}')
+        {
+            (Cow::from(sep_in_same_line), true, sep_in_same_line.len())
+        } else {
+            result = result.trim_end().to_string();
+            (indent_str.clone(), false, 0)
+        }
+    };
+
+    result.push_str(&first_sep);
+    let comment_indent = if one_line {
+        // If line already starts with indentation (e.g. bacause of preceding mutliline comment),
+        // when needed extend the alignment of internal multiline comments for that indentation.
+        let w = last_line_width(&result);
+        let str = shape
+            .indent
+            .block_only()
+            .to_string(&context.config)
+            .to_string();
+        debug!(
+            "** [DBO] combine_strs_with_comments: w={}, last_line_width(&result)={}, shape.indent.width={}, str={:?};",
+            w,
+            last_line_width(&result),
+            shape.indent.width(),
+            str,
+        );
+        /* >>>>>> ?????????[DBO] #MMMM ADD with following "else" ????????*/
+        if result.is_empty() {
+            shape.to_comment_indent(false).align(w)
+        /* <<<<< ?????????[DBO] #MMMM ADD with following "} else" below ????????*/
+        } else if result.lines().last()?.starts_with(&str) {
+            Indent::new(shape.indent.width(), w - shape.indent.width())
+        } else {
+            shape.to_comment_indent(false).align(w)
+        }
+    } else {
+        shape
+            .block_indent(indentation_offset)
+            .to_comment_indent(true)
+    };
+    debug!(
+        "** [DBO] combine_strs_with_comments: comment_indent={:?}, shape={:?}, one_line={}, prefer_same_line={}, prefer_same_line_next={}, one_line_width={}, last_line_used_width={}, last_line_width={}, offset={}, first_sep={:?}, sep_overhead={}, result={:?};",
+        comment_indent,
+        shape,
+        one_line,
+        prefer_same_line_comment,
+        prefer_same_line_next,
+        one_line_width,
+        last_line_used_width(&result, shape.indent.width()),
+        last_line_width(&result),
+        shape.offset,
+        first_sep,
+        sep_overhead,
+        result,
+    );
+    let lrc = light_rewrite_comment(comment, comment_indent, config, false);
+    result.push_str(&lrc);
+    debug!(
+        "** [DBO] combine_strs_with_comments: lrc={:?}, comment={:?};",
+        lrc, comment
+    );
+
+    let second_sep = if comment.is_empty()
+        || (next_str.is_empty() && !force_new_line_after_line_comment)
+        || (next_str == ";" && !comment.starts_with("//"))
+    {
+        Cow::from("")
+    } else if next_str.starts_with("\n") {
+        result = result.trim_end().to_string();
+        Cow::from("")
+    // Always put next in new line if one-line or multi-line comment.
+    } else if comment.starts_with("//") || comment.contains('\n') {
+        result = result.trim_end().to_string();
+        indent_str
+    } else {
+        one_line_width = last_line_width(&result) + next_str.len();
+        debug!(
+            "** [DBO] combine_strs_with_comments: 2nd one_line_width={:?}, last_line_width={:?}, next_str.len={};",
+            one_line_width,
+            last_line_width(&result),
+            next_str.len(),
+        );
+        let sep_in_same_line = if next_str.is_empty() || next_str.trim_start().starts_with(";") {
+            ""
+        } else {
+            one_line_width += 1;
+            " "
+        };
+        allow_one_line = !comment.starts_with("//") && !comment.contains('\n');
+        /* >>>>> ???????[DBO] #MMM REPLACE next <<<<<< */
+        // if prefer_same_line && allow_one_line && one_line_width <= shape.width {
+        if prefer_same_line_next && allow_one_line && one_line_width <= shape.width {
+            Cow::from(sep_in_same_line)
+        } else {
+            result = result.trim_end().to_string();
+            indent_str
+        }
+    };
+    result.push_str(&second_sep);
+    result.push_str(next_str);
+    debug!(
+        "** [DBO] combine_strs_with_comments: resultEE={:?}, second_sep={:?}, one_line_width={}, shape.width={}, allow_one_line={}, next_str.trim_start()={:?};",
+        result,
+        second_sep,
+        one_line_width,
+        shape.width,
+        allow_one_line,
+        next_str.trim_start(),
+    );
+    Some(result)
+}
+
 /// Combine `prev_str` and `next_str` into a single `String`. `span` may contain
 /// comments between two strings. If there are such comments, then that will be
 /// recovered. If `allow_extend` is true and there is no comment between the two
@@ -166,89 +401,102 @@ pub(crate) fn combine_strs_with_missing_comments(
     shape: Shape,
     allow_extend: bool,
 ) -> Option<String> {
-    trace!(
-        "combine_strs_with_missing_comments `{}` `{}` {:?} {:?}",
+    debug!(
+        "** [DBO] combine_strs_with_missing_comments: calling combine_strs_with_missing_indented_comments() with 0 indentation_offset;"
+    );
+    combine_strs_with_missing_indented_comments(
+        context,
         prev_str,
         next_str,
         span,
-        shape
+        shape,
+        0,
+        allow_extend,
+    )
+}
+
+pub(crate) fn combine_strs_with_missing_indented_comments(
+    context: &RewriteContext<'_>,
+    prev_str: &str,
+    next_str: &str,
+    span: Span,
+    shape: Shape,
+    indentation_offset: usize, // For next_str extra indentation
+    allow_extend: bool,
+) -> Option<String> {
+    debug!(
+        "** [DBO] combine_strs_with_missing_indented_comments: enter prev_str={:?}, next_str={:?}, allow_extend={}, indentation_offset={:?}, shape={:?}, original_snippet={:?};",
+        prev_str,
+        next_str,
+        allow_extend,
+        indentation_offset,
+        shape,
+        context.snippet(span),
     );
 
-    let mut result =
-        String::with_capacity(prev_str.len() + next_str.len() + shape.indent.width() + 128);
-    result.push_str(prev_str);
-    let mut allow_one_line = !prev_str.contains('\n') && !next_str.contains('\n');
-    let first_sep =
-        if prev_str.is_empty() || next_str.is_empty() || trimmed_last_line_width(prev_str) == 0 {
-            ""
-        } else {
-            " "
-        };
-    let mut one_line_width =
-        last_line_width(prev_str) + first_line_width(next_str) + first_sep.len();
-
-    let config = context.config;
-    let indent = shape.indent;
     let missing_comment = rewrite_missing_comment(span, shape, context)?;
 
-    if missing_comment.is_empty() {
-        if allow_extend && one_line_width <= shape.width {
-            result.push_str(first_sep);
-        } else if !prev_str.is_empty() {
-            result.push_str(&indent.to_string_with_newline(config))
-        }
-        result.push_str(next_str);
-        return Some(result);
+    debug!(
+        "** [DBO] combine_strs_with_missing_indented_comments: comment_first_line_width={}, prev_str_first_line_witdth={}, shape.width={}, missing_comment={:?};",
+        first_line_width(&missing_comment),
+        last_line_width(&prev_str),
+        shape.width,
+        missing_comment,
+    );
+
+    let mut prefer_same_line_comment = true;
+    let mut prefer_same_line_next = true; // >>>>>> ??????[DBO] ADD <<<<<<*/
+    if !missing_comment.is_empty() {
+        // We have a missing comment between the first expression and the second expression.
+        // Peek the the original source code and find out whether there is a newline between the first
+        // expression and the second expression or the missing comment. We will preserve the original
+        // layout whenever possible.
+        let original_snippet = context.snippet(span);
+        prefer_same_line_comment = if let Some(pos) = original_snippet.find('/') {
+            !original_snippet[..pos].contains('\n')
+        } else {
+            !original_snippet.contains('\n')
+        };
+        /* >>>>>>> ?????[DBO] #MMMM ADD *****************/
+        prefer_same_line_next = if let Some(pos) = original_snippet.rfind('/') {
+            !original_snippet[pos..].contains('\n')
+        } else {
+            !original_snippet.contains('\n')
+        };
+        /* <<<<<<<< ?????[DBO] #MMMM ADD *****************/
+        debug!(
+            "** [DBO] combine_strs_with_missing_indented_comments: prefer_same_line_comment={}, prefer_same_line_next={}, original_snippet={:?};",
+            prefer_same_line_comment, prefer_same_line_next, original_snippet
+        );
     }
 
-    // We have a missing comment between the first expression and the second expression.
-
-    // Peek the the original source code and find out whether there is a newline between the first
-    // expression and the second expression or the missing comment. We will preserve the original
-    // layout whenever possible.
-    let original_snippet = context.snippet(span);
-    let prefer_same_line = if let Some(pos) = original_snippet.find('/') {
-        !original_snippet[..pos].contains('\n')
-    } else {
-        !original_snippet.contains('\n')
-    };
-
-    one_line_width -= first_sep.len();
-    let first_sep = if prev_str.is_empty() || missing_comment.is_empty() {
-        Cow::from("")
-    } else {
-        let one_line_width = last_line_width(prev_str) + first_line_width(&missing_comment) + 1;
-        if prefer_same_line && one_line_width <= shape.width {
-            Cow::from(" ")
-        } else {
-            indent.to_string_with_newline(config)
-        }
-    };
-    result.push_str(&first_sep);
-    result.push_str(&missing_comment);
-
-    let second_sep = if missing_comment.is_empty() || next_str.is_empty() {
-        Cow::from("")
-    } else if missing_comment.starts_with("//") {
-        indent.to_string_with_newline(config)
-    } else {
-        one_line_width += missing_comment.len() + first_sep.len() + 1;
-        allow_one_line &= !missing_comment.starts_with("//") && !missing_comment.contains('\n');
-        if prefer_same_line && allow_one_line && one_line_width <= shape.width {
-            Cow::from(" ")
-        } else {
-            indent.to_string_with_newline(config)
-        }
-    };
-    result.push_str(&second_sep);
-    result.push_str(next_str);
-
-    Some(result)
+    let result = combine_strs_with_comments(
+        context,
+        prev_str,
+        next_str,
+        &missing_comment,
+        shape,
+        indentation_offset,
+        allow_extend,
+        prefer_same_line_comment,
+        prefer_same_line_next,
+        false,
+    );
+    debug!(
+        "** [DBO] combine_strs_with_missing_indented_comments: resultE={:?};",
+        result
+    );
+    return result;
 }
 
 pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> Option<String> {
     debug!("rewrite_doc_comment: {:?}", orig);
-    identify_comment(orig, false, shape, config, true)
+    let c = identify_comment(orig, false, shape, config, true, true);
+    if c.is_some() {
+        Some(c?.trim_start().to_string())
+    } else {
+        None
+    }
 }
 
 pub(crate) fn rewrite_comment(
@@ -258,7 +506,14 @@ pub(crate) fn rewrite_comment(
     config: &Config,
 ) -> Option<String> {
     debug!("rewrite_comment: {:?}", orig);
-    identify_comment(orig, block_style, shape, config, false)
+    let rw = identify_comment(orig, block_style, shape, config, false, true);
+    let rw = if rw.is_some() {
+        Some(rw?.trim_start().to_string())
+    } else {
+        None
+    };
+    debug!("** [DBO] rewrite_comment: resultE={:?}", rw);
+    return rw;
 }
 
 fn identify_comment(
@@ -267,8 +522,14 @@ fn identify_comment(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
+    is_first: bool,
 ) -> Option<String> {
     let style = comment_style(orig, false);
+    let comment_indent = if is_first {
+        shape.to_comment_indent(false)
+    } else {
+        shape.to_comment_indent(true).block_only()
+    };
 
     // Computes the byte length of line taking into account a newline if the line is part of a
     // paragraph.
@@ -373,7 +634,7 @@ fn identify_comment(
             && !config.wrap_comments()
             && !config.format_code_in_doc_comments()
         {
-            light_rewrite_comment(first_group, shape.indent, config, is_doc_comment)
+            light_rewrite_comment(first_group, comment_indent, config, is_doc_comment)
         } else {
             rewrite_comment_inner(
                 first_group,
@@ -384,31 +645,48 @@ fn identify_comment(
                 is_doc_comment || style.is_doc_comment(),
             )?
         };
-    if rest.is_empty() {
-        Some(rewritten_first_group)
+    let first_indent = if is_first {
+        Cow::from("")
     } else {
-        identify_comment(
-            rest.trim_start(),
-            block_style,
-            shape,
-            config,
-            is_doc_comment,
-        )
-        .map(|rest_str| {
-            format!(
-                "{}\n{}{}{}",
-                rewritten_first_group,
-                // insert back the blank line
-                if has_bare_lines && style.is_line_comment() {
-                    "\n"
-                } else {
-                    ""
-                },
-                shape.indent.to_string(config),
-                rest_str
+        comment_indent.to_string_with_newline(config)
+    };
+
+    let (rest_str, second_indent) = if rest.is_empty() {
+        (String::new(), Cow::from(""))
+    } else {
+        (
+            identify_comment(
+                rest.trim_start(),
+                block_style,
+                shape,
+                config,
+                is_doc_comment,
+                false,
             )
-        })
-    }
+            .unwrap(),
+            shape.indent.to_string_with_newline(config),
+        )
+    };
+    debug!(
+        "** [DBO] identify_comment: first_indent={:?}, second_indent={:?}, rewritten_first_group={:?}, rest_str={:?}",
+        first_indent, second_indent, rewritten_first_group, rest_str
+    );
+
+    let ret = format!(
+        "{}{}{}{}",
+        first_indent,
+        rewritten_first_group,
+        // insert back the blank line
+        if has_bare_lines && style.is_line_comment() {
+            "\n"
+        } else {
+            ""
+        },
+        rest_str,
+    );
+
+    debug!("** [DBO] identify_comment: resultE2={:?}", ret);
+    Some(ret)
 }
 
 /// Attributes for code blocks in rustdoc.
@@ -908,6 +1186,47 @@ pub(crate) fn rewrite_missing_comment(
     }
 }
 
+/// Returs whether the comment is started in new line
+pub(crate) fn is_comment_snippet_starts_newline(comment_snippet: &str) -> bool {
+    comment_snippet.find('/').map_or(false, |p| {
+        if comment_snippet[..p].find('\n').is_some() {
+            true
+        } else {
+            false
+        }
+    })
+}
+
+/// Return rewrite_missing_comment() output with optional '\n' prefix
+/// in case the original comment starts in a new line.
+pub(crate) fn rewrite_missing_comment_with_newline_start(
+    span: Span,
+    shape: Shape,
+    context: &RewriteContext<'_>,
+) -> Option<String> {
+    let missing_snippet = context.snippet(span);
+    let rw = rewrite_missing_comment(span, shape, context);
+    // Check whether the span before the first comment includes new line.
+    let starts_newline = rw.as_ref().map_or(false, |s| {
+        if s.is_empty() {
+            false
+        } else {
+            is_comment_snippet_starts_newline(missing_snippet)
+        }
+    });
+    let rw_with_newline = if starts_newline {
+        Some(format!("\n{}", rw?))
+    } else {
+        rw
+    };
+
+    debug!(
+        "** [DBO] rewrite_missing_comment_with_newline_start: resultE={:?}, starts_newline={}, missing_snippet={:?};",
+        rw_with_newline, starts_newline, missing_snippet
+    );
+    return rw_with_newline;
+}
+
 /// Recover the missing comments in the specified span, if available.
 /// The layout of the comments will be preserved as long as it does not break the code
 /// and its total width does not exceed the max width.
@@ -943,27 +1262,64 @@ fn light_rewrite_comment(
     config: &Config,
     is_doc_comment: bool,
 ) -> String {
-    let lines: Vec<&str> = orig
+    let mut first_line: bool = true; // First line of first comment
+    let mut first_comment: bool = true;
+    // Indentation of comments that are put in new lines
+    let offset_new_line = offset.block_only();
+    debug!(
+        "** [DBO] light_rewrite_comment: enter is_doc_comment={}, offset={:?}, offset_new_line={:?}, orig={:?};",
+        is_doc_comment, offset, offset_new_line, orig
+    );
+
+    let lines: Vec<String> = orig
         .lines()
         .map(|l| {
             // This is basically just l.trim(), but in the case that a line starts
             // with `*` we want to leave one space before it, so it aligns with the
             // `*` in `/*`.
             let first_non_whitespace = l.find(|c| !char::is_whitespace(c));
-            let left_trimmed = if let Some(fnw) = first_non_whitespace {
+            let (blank, left_trimmed) = if let Some(fnw) = first_non_whitespace {
                 if l.as_bytes()[fnw] == b'*' && fnw > 0 {
-                    &l[fnw - 1..]
+                    // Ensure '*' is preceeded by blank and not by a tab.
+                    (" ", &l[fnw..])
                 } else {
-                    &l[fnw..]
+                    if !first_line && l.as_bytes()[fnw] == b'/' {
+                        first_comment = false;
+                    }
+                    ("", &l[fnw..])
                 }
             } else {
-                ""
+                ("", "")
             };
+
+            let indent_str = if first_line {
+                first_line = false;
+                Cow::from("")
+            } else {
+                if first_comment {
+                    offset.to_string(config)
+                } else {
+                    offset_new_line.to_string(config)
+                }
+            };
+            debug!(
+                "** [DBO] light_rewrite_comment: blank={:?}, indent_str.len={}, left_trimmed={:?}, line={:?};",
+                blank, indent_str.len(), left_trimmed, l
+            );
+
             // Preserve markdown's double-space line break syntax in doc comment.
-            trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment)
+            (
+                indent_str,
+                blank,
+                trim_end_unless_two_whitespaces(left_trimmed,
+                    is_doc_comment)
+            )
         })
+        .map(|(i, b, l)| format!("{}{}{}", i, b, l))
         .collect();
-    lines.join(&format!("\n{}", offset.to_string(config)))
+    let ret = lines.join("\n");
+    debug!("** [DBO] light_rewrite_comment: resultE={:?};", ret);
+    ret
 }
 
 /// Trims comment characters and possibly a single space from the left of a string.

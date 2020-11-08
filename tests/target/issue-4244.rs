@@ -7,8 +7,7 @@ pub type B // Comment
     = SS;
 
 pub type C
-    /* Comment C */
-    = SS;
+    /* Comment C */ = SS;
 
 pub trait D<T> {
     type E /* Comment E */ = SS;
@@ -16,5 +15,4 @@ pub trait D<T> {
 
 type F<'a: 'static, T: Ord + 'static>: Eq + PartialEq
 where
-    T: 'static + Copy, /* x */
-= Vec<u8>;
+    T: 'static + Copy, /* x */ = Vec<u8>;
