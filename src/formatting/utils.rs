@@ -251,7 +251,6 @@ pub(crate) fn longest_line_width(s: &str) -> usize {
         .map(|l| unicode_str_width(l))
         .max()
         .unwrap_or(0);
-    debug!("**** [DBO] longest_line_width: w={}, s={:?};", w, s);
     w
 }
 
@@ -263,7 +262,6 @@ pub(crate) fn longest_trimmed_line_width(s: &str) -> usize {
         .map(|l| unicode_str_width(l.trim()))
         .max()
         .unwrap_or(0);
-    debug!("**** [DBO] longest_trimmed_line_width: w={}, s={:?};", w, s);
     w
 }
 

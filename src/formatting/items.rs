@@ -51,7 +51,7 @@ fn type_annotation_separator(config: &Config) -> &str {
 impl Rewrite for ast::Local {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         debug!(
-            "Local::rewrite {:?} {} {:?}",
+            "Rewrite for ast::Local::rewrite {:?} {} {:?}",
             self, shape.width, shape.indent
         );
 
@@ -77,10 +77,6 @@ impl Rewrite for ast::Local {
                 false,
             )?
         };
-        debug!(
-            "** [DBO] Rewrite for ast::Local: attrs_str={:?}, result={:?};",
-            attrs_str, result
-        );
 
         // 4 = "let ".len()
         let pat_shape = shape.offset_left(4)?;
@@ -116,21 +112,12 @@ impl Rewrite for ast::Local {
 
             infix
         };
-        debug!(
-            "** [DBO] Rewrite for ast::Local: infix={:?}, result={:?};",
-            infix, result
-        );
 
         let mut need_newline_after_comment_after_assign = false;
         if self.init.is_none() {
-            debug!("** [DBO] Rewrite for ast::Local: self.init.is_none();");
             result.push_str(&infix);
         } else {
             let ex = self.init.as_ref().unwrap();
-            debug!(
-                "** [DBO] Rewrite for ast::Local: result={:?}, ex={:?};",
-                result, ex
-            );
             let base_span = if let Some(ref ty) = self.ty {
                 mk_sp(ty.span.hi(), self.span.hi())
             } else {
@@ -177,11 +164,6 @@ impl Rewrite for ast::Local {
                         shape,
                         true,
                     )?;
-                    debug!(
-                        "** [DBO] Rewrite for ast::Local: comment_before_assign result={:?}, comment snippet={:?};",
-                        result,
-                        context.snippet(mk_sp(comment_start_pos, assign_lo))
-                    );
                 }
 
                 if !comment_after_assign.is_empty() {
@@ -212,11 +194,6 @@ impl Rewrite for ast::Local {
                             .to_string_with_newline(context.config);
                         result = result + &new_indent_str
                     }
-                    debug!(
-                        "** [DBO] Rewrite for ast::Local: comment_after_assign result={:?}, comment snippet={:?};",
-                        result,
-                        context.snippet(mk_sp(assign_hi, comment_end_pos))
-                    );
                 }
             }
 
@@ -225,10 +202,6 @@ impl Rewrite for ast::Local {
             if need_newline_after_comment_after_assign {
                 nested_shape = nested_shape.block_indent(context.config.tab_spaces())
             };
-            debug!(
-                "** [DBO] Rewrite for ast::Local: result={:?}, nested_shape={:?};",
-                result, shape,
-            );
             let rhs = rewrite_assign_rhs_expr(
                 context,
                 &result,
@@ -237,10 +210,6 @@ impl Rewrite for ast::Local {
                 RhsTactics::Default,
                 true,
             )?;
-            debug!(
-                "** [DBO] Rewrite for ast::Local: rhs={:?}, nested_shape={:?}, result={:?};",
-                rhs, nested_shape, result,
-            );
             let missing_width = 0;
             if missing_width == 0 {
                 if !(rhs.chars().next()?.is_whitespace() || result.chars().last()?.is_whitespace())
@@ -249,10 +218,6 @@ impl Rewrite for ast::Local {
                 }
                 result = result + &rhs;
             } else {
-                debug!(
-                    "** [DBO] Rewrite for ast::Local: extend line indent by w={:?};",
-                    missing_width
-                );
                 for _ in 0..=missing_width - 1 {
                     result.push(' ');
                 }
@@ -260,7 +225,6 @@ impl Rewrite for ast::Local {
             }
         }
 
-        debug!("** [DBO] Rewrite for ast::Local: resultE={:?};", result);
         Some(result)
     }
 }

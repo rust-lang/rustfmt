@@ -270,6 +270,7 @@ where
 {
     let tactic = formatting.tactic;
     let sep_len = formatting.separator.len();
+    debug!("write_list: {:?} {:?}", tactic, sep_len);
 
     // Now that we know how we will layout, we can decide for sure if there
     // will be a trailing separator.
@@ -415,10 +416,6 @@ where
             if item_max_width? < inner_item_width {
                 item_max_width = None;
             }
-            debug!(
-                "** [DBO] write_list: item_max_width={:?}, inner_item_width={}, inner_item={:?};",
-                item_max_width, inner_item_width, inner_item
-            );
         }
         if tactic == DefinitiveListTactic::Horizontal && item.post_comment.is_some() {
             let comment = item.post_comment.as_ref().unwrap();

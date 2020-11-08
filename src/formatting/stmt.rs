@@ -97,38 +97,27 @@ fn format_stmt(
     stmt: &ast::Stmt,
     expr_type: ExprType,
 ) -> Option<String> {
+    debug!("format_stmt: {:?} {:?}", stmt.kind, shape);
     skip_out_of_file_lines_range!(context, stmt.span());
 
     let result = match stmt.kind {
         ast::StmtKind::Local(ref local) => {
             let result = local.rewrite(context, shape);
-            debug!("** [DBO] format_stmt: result1={:?};", result);
             /* Add comment between expression and ";" */
             if result.is_some() {
-                debug!(
-                    "** [DBO] format_stmt: local.span.hi()={:?}, stmt.span.hi()={:?}, local={:?};",
-                    local.span.hi(),
-                    stmt.span.hi(),
-                    local
-                );
                 if local.init.as_ref().is_some()
                     && local.init.as_ref()?.span.hi() < local.span.hi() - BytePos(1)
                 {
                     let comment_span =
                         mk_sp(local.init.as_ref()?.span.hi(), local.span.hi() - BytePos(1));
-                    let r = combine_strs_with_missing_comments(
+                    combine_strs_with_missing_comments(
                         context,
                         &result?,
                         ";",
                         comment_span,
                         shape,
                         true,
-                    );
-                    debug!(
-                        "** [DBO] format_stmt: combine_strs_with_missing_comments={:?};",
-                        r
-                    );
-                    r
+                    )
                 } else {
                     Some(result? + ";")
                 }

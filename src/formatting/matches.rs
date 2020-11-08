@@ -224,6 +224,10 @@ fn rewrite_match_arm(
     is_last: bool,
     has_leading_pipe: bool,
 ) -> Option<String> {
+    debug!(
+        "rewrite_match_arm: {} {} {:?}",
+        is_last, has_leading_pipe, shape
+    );
     let (missing_span, attrs_str) = if !arm.attrs.is_empty() {
         if contains_skip(&arm.attrs) {
             let (_, body) = flatten_arm_body(context, &arm.body, None);
@@ -262,10 +266,6 @@ fn rewrite_match_arm(
     let pat_shape = shape.sub_width(sub_width)?.offset_left(pipe_offset)?;
 
     let pats_str = arm.pat.rewrite(context, pat_shape)?;
-    debug!(
-        "** [DBO] rewrite_match_arm: is_empty_block={}, sub_width={}, pipe_offset={}, pipe_str={:?}, shape={:?}, pat_shape={:?}, pats_str={:?};",
-        is_empty_block, sub_width, pipe_offset, pipe_str, shape, pat_shape, pats_str
-    );
 
     // Pre-guard comments span
     let mut pre_arrow_lo = arm.pat.span.hi();
@@ -275,11 +275,6 @@ fn rewrite_match_arm(
     } else {
         mk_sp(arm.pat.span.hi(), arm.pat.span.hi())
     };
-    debug!(
-        "** [DBO] rewrite_match_arm: pre_guard_span={:?}, pre_guard_nippet={:?};",
-        pre_guard_span,
-        context.snippet(pre_guard_span)
-    );
 
     let arrow_span = mk_sp(pre_arrow_lo, arm.body.span().lo());
     let arrow_snippet = context.snippet(arrow_span).trim();
@@ -301,10 +296,6 @@ fn rewrite_match_arm(
             ""
         }
     };
-    debug!(
-        "** [DBO] rewrite_match_arm: pre_arrow_comment={:?};",
-        pre_arrow_comment
-    );
 
     // Guard
     let block_like_pat = trimmed_last_line_width(&pats_str) <= context.config.tab_spaces();
@@ -326,10 +317,6 @@ fn rewrite_match_arm(
         shape,
         false,
     )?;
-    debug!(
-        "** [DBO] rewrite_match_arm: pipe_str={:?}, pats_str={:?}, guard_str={:?}, lhs_str1={:?};",
-        pipe_str, pats_str, guard_str, lhs_str
-    );
 
     /* Add the comment between guard and the arrow */
     if !pre_arrow_comment.is_empty() {
@@ -345,10 +332,9 @@ fn rewrite_match_arm(
             true,
             true,
         )?;
-        debug!("** [DBO] rewrite_match_arm: lhs_str2={:?};", lhs_str);
     }
 
-    let ret = rewrite_match_body(
+    rewrite_match_body(
         context,
         &arm.body,
         &lhs_str,
@@ -356,9 +342,7 @@ fn rewrite_match_arm(
         guard_str.contains('\n'),
         arrow_comment_str,
         is_last,
-    );
-    debug!("** [DBO] rewrite_match_arm: resultE={:?};", ret);
-    ret
+    )
 }
 
 fn block_can_be_flattened<'a>(
@@ -614,7 +598,7 @@ fn rewrite_guard(
         };
         let guard_comment_snippet = context.snippet(guard_comment_span);
         debug!(
-            "** [DBO] rewrite_guard: guard_comment_snippet={:?}, guard_comment_span={:?}",
+            "rewrite_guard: {:?} {:?}",
             guard_comment_snippet, guard_comment_span
         );
 
@@ -629,7 +613,7 @@ fn rewrite_guard(
                     if (!cond_str.contains('\n') || pattern_width <= context.config.tab_spaces())
                         && context.config.control_brace_style() != ControlBraceStyle::AlwaysNextLine
                     {
-                        let r = if guard_comment_snippet.trim().is_empty() {
+                        return if guard_comment_snippet.trim().is_empty() {
                             Some(format!(" if {}", cond_str))
                         } else {
                             combine_strs_with_missing_comments(
@@ -641,11 +625,6 @@ fn rewrite_guard(
                                 true,
                             )
                         };
-                        debug!(
-                            "** [DBO] rewrite_guard: return cond_str={:?}, resultE1={:?};",
-                            cond_str, r
-                        );
-                        return r;
                     }
                 }
             }
@@ -658,7 +637,7 @@ fn rewrite_guard(
             .and_then(|s| s.sub_width(5));
         if let Some(cond_shape) = cond_shape {
             if let Some(cond_str) = guard.rewrite(context, cond_shape) {
-                let ret = if guard_comment_snippet.trim().is_empty() {
+                return if guard_comment_snippet.trim().is_empty() {
                     Some(format!(
                         "{}if {}",
                         cond_shape.indent.to_string_with_newline(context.config),
@@ -677,17 +656,11 @@ fn rewrite_guard(
                         true,
                     )
                 };
-                debug!(
-                    "** [DBO] rewrite_guard: return cond_str={:?}, resultE2={:?};",
-                    cond_str, ret
-                );
-                return ret;
             }
         }
-
         None
     } else {
-        Some(String::new())
+        return Some(String::new());
     }
 }
 

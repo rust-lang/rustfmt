@@ -56,6 +56,7 @@ pub(crate) fn format_expr(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
+    debug!("format_expr: {:?} {:?}", expr.kind, shape);
     skip_out_of_file_lines_range!(context, expr.span);
 
     if contains_skip(&*expr.attrs) {
@@ -233,7 +234,6 @@ pub(crate) fn format_expr(
             rewrite_expr_addrof(context, borrow_kind, mutability, expr, shape)
         }
         ast::ExprKind::Cast(ref subexpr, ref ty) => {
-            debug!("** [DBO] format_expr: in ExprKind::Cast;");
             /* Retrieving the comments before and after cast */
             let prefix_span = mk_sp(
                 subexpr.span.hi(),
@@ -250,19 +250,11 @@ pub(crate) fn format_expr(
                 infix_prefix_comments.push(' ');
             }
             infix_prefix_comments.push_str(&c);
-            debug!(
-                "** [DBO] format_expr: cast infix_prefix_comments={:?}",
-                infix_prefix_comments
-            );
 
             let mut infix_suffix_comments = rewrite_missing_comment(suffix_span, shape, context)?;
             if !infix_suffix_comments.is_empty() {
                 infix_suffix_comments.push(' ');
             }
-            debug!(
-                "** [DBO] format_expr: cast infix_suffix_comments={:?},;",
-                infix_suffix_comments
-            );
 
             rewrite_pair(
                 &**subexpr,
@@ -1104,20 +1096,7 @@ impl<'a> ControlFlow<'a> {
             label_string.len() + self.keyword.len() + pat_expr_string.len() + 2
         };
 
-        let ret = Some((r3, used_width));
-
-        debug!(
-            "** [DBO] ControlFlow rewrite_cond: resultEE={:?}, r1={:?}, r2={:?}, closing_sep={:?}, config.max_width={}, prev_last_line/len={:?}/{};",
-            ret,
-            r1,
-            r2,
-            closing_sep,
-            context.config.max_width(),
-            last,
-            last.len(),
-        );
-
-        ret
+        Some((r3, used_width))
     }
 }
 
@@ -2026,9 +2005,7 @@ pub(crate) fn rewrite_assign_rhs<S: Into<String>, R: Rewrite>(
     ex: &R,
     shape: Shape,
 ) -> Option<String> {
-    let ret = rewrite_assign_rhs_with(context, lhs, ex, shape, RhsTactics::Default, true);
-    debug!("** [DBO] rewrite_assign_rhs: enter resultE={:?};", ret);
-    ret
+    rewrite_assign_rhs_with(context, lhs, ex, shape, RhsTactics::Default, true)
 }
 
 pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
@@ -2039,6 +2016,7 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     rhs_tactics: RhsTactics,
     allow_in_same_line: bool,
 ) -> Option<String> {
+    debug!("rewrite_assign_rhs_expr: {:?} {:?}", shape, lhs);
     let last_line_width = last_line_width(&lhs).saturating_sub(if lhs.contains('\n') {
         shape.indent.width()
     } else {
@@ -2063,11 +2041,6 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
         false
     } else {
         let rhs_first_line_width = &exrw.clone().unwrap().lines().next().unwrap_or("").len();
-        debug!(
-            "** [DBO] rewrite_assign_rhs_expr: rhs_first_line_width={}, indent.width()={};",
-            rhs_first_line_width,
-            shape.indent.width(),
-        );
         if last_line_width + 1 + rhs_first_line_width + shape.indent.width()
             <= context.config.max_width()
         {
@@ -2076,7 +2049,7 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
             false
         }
     };
-    let ret = choose_rhs(
+    choose_rhs(
         context,
         ex,
         orig_shape,
@@ -2085,12 +2058,7 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
         has_rhs_comment,
         allow_same_line,
         &lhs,
-    );
-    debug!(
-        "** [DBO] rewrite_assign_rhs_expr: resultE=choose_rhs={:?};",
-        ret
-    );
-    return ret;
+    )
 }
 
 pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
@@ -2102,7 +2070,9 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
     allow_in_same_line: bool,
 ) -> Option<String> {
     let lhs = lhs.into();
+    debug!("rewrite_assign_rhs_with: enter {:?} {:?}", shape, lhs);
     let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics, allow_in_same_line)?;
+    debug!("rewrite_assign_rhs_with: result {:?} {:?}", lhs, rhs);
     Some(lhs + &rhs)
 }
 
@@ -2116,6 +2086,7 @@ pub(crate) fn rewrite_assign_rhs_with_comments<S: Into<String>, R: Rewrite>(
     allow_extend: bool,
 ) -> Option<String> {
     let lhs = lhs.into();
+    debug!("rewrite_assign_rhs_with_comments: {:?} {:?}", shape, lhs);
     let contains_comment = contains_comment(context.snippet(between_span));
     let shape = if contains_comment {
         shape.block_left(context.config.tab_spaces())?
@@ -2144,6 +2115,7 @@ fn choose_rhs<R: Rewrite>(
     allow_same_line: bool,
     lhs: &str,
 ) -> Option<String> {
+    debug!("choose_rhs: {:?} {:?}", shape, orig_rhs);
     let lhs_ends_with_empty_line = if lhs.lines().last()?.trim().is_empty() {
         true
     } else {
@@ -2155,9 +2127,7 @@ fn choose_rhs<R: Rewrite>(
             if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
         {
             let result_prefix = if lhs_ends_with_empty_line { "" } else { " " };
-            let ret = Some(format!("{}{}", result_prefix, new_str));
-            debug!("** [DBO] choose_rhs: resltE1={:?};", ret);
-            ret
+            Some(format!("{}{}", result_prefix, new_str))
         }
         _ => {
             // Expression did not fit on the same line as the identifier.
@@ -2188,7 +2158,6 @@ fn choose_rhs<R: Rewrite>(
                 let new_shape = shape_from_rhs_tactic_same_line(context, shape, rhs_tactics)?;
                 let rw = expr.rewrite(context, new_shape);
                 if rw.is_none() {
-                    debug!("** [DBO] choose_rhs: new_rhs1;");
                     let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
                     (new_shape, expr.rewrite(context, new_shape), false)
                 } else {
@@ -2198,25 +2167,17 @@ fn choose_rhs<R: Rewrite>(
                     let n = nrhs?;
                     let orig_first_line = o.lines().next();
                     let new_first_line = n.lines().next();
-                    debug!(
-                        "** [DBO] choose_rhs: orig_first_line={:?}, new_first_line={:?};",
-                        orig_first_line, new_first_line,
-                    );
                     if orig_first_line.is_none() || new_first_line.is_none() {
-                        debug!("** [DBO] choose_rhs: new_rhs2;");
                         let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
                         (new_shape, expr.rewrite(context, new_shape), false)
                     } else if orig_first_line? != new_first_line? {
-                        debug!("** [DBO] choose_rhs: new_rhs3;");
                         let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
                         (new_shape, expr.rewrite(context, new_shape), false)
                     } else {
-                        debug!("** [DBO] choose_rhs: new_rhs4 (new new);");
                         (new_shape, rw, true)
                     }
                 }
             } else {
-                debug!("** [DBO] choose_rhs: new_rhs5;");
                 let new_shape = shape_from_rhs_tactic(context, shape, rhs_tactics)?;
                 (new_shape, expr.rewrite(context, new_shape), false)
             };
@@ -2243,16 +2204,6 @@ fn choose_rhs<R: Rewrite>(
                     }
                 }
             };
-            debug!(
-                "** [DBO] choose_rhs: before_space_str={:?}, new_indent_str={:?}, new_in_same_line={}, used_width={}, orig_indent={}, new_shape={:?}, new_rhs={:?};",
-                before_space_str,
-                new_indent_str,
-                new_in_same_line,
-                shape.used_width(),
-                orig_indent,
-                new_shape,
-                new_rhs,
-            );
 
             match (orig_rhs, new_rhs) {
                 (Some(ref orig_rhs), Some(ref new_rhs))
@@ -2272,7 +2223,6 @@ fn choose_rhs<R: Rewrite>(
                         && !string_is_closing_brackets(orig_rhs.lines().last()?, true)
                         && count_newlines(orig_rhs) >= count_newlines(new_rhs) =>
                 {
-                    debug!("** [DBO] choose_rhs: matchX;");
                     Some(format!("{}{}", before_space_str, new_rhs))
                 }
                 (None, Some(ref new_rhs)) => Some(format!("{}{}", new_indent_str, new_rhs)),
@@ -2310,25 +2260,12 @@ fn shape_from_rhs_tactic_same_line(
     rhs_tactic: RhsTactics,
 ) -> Option<Shape> {
     match rhs_tactic {
-        RhsTactics::ForceNextLineWithoutIndent => {
-            let ret = shape
-                .with_max_width(context.config)
-                .sub_width(shape.indent.width());
-            debug!(
-                "** [DBO] shape_from_rhs_tactic_same_line: resultE1=new_shape={:?};",
-                ret
-            );
-            ret
-        }
+        RhsTactics::ForceNextLineWithoutIndent => shape
+            .with_max_width(context.config)
+            .sub_width(shape.indent.width()),
         RhsTactics::Default | RhsTactics::AllowOverflow => {
             let new_shape = Shape::indented(shape.indent, context.config)
                 .sub_width(context.config.tab_spaces());
-            debug!(
-                "** [DBO] shape_from_rhs_tactic_same_line: resultE2=new_shape={:?}, shape.rhs_overhead={}, shape={:?},;",
-                new_shape,
-                shape.rhs_overhead(context.config),
-                shape,
-            );
             new_shape
         }
     }

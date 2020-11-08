@@ -11,9 +11,8 @@ use crate::formatting::{
     rewrite::{Rewrite, RewriteContext},
     shape::Shape,
     utils::{
-        first_line_width, is_arithmetic_op, is_compare_op, is_single_line, last_line_used_width,
-        last_line_width, longest_line_width, mk_sp, string_is_closing_brackets,
-        trimmed_last_line_width, wrap_str,
+        first_line_width, is_arithmetic_op, is_compare_op, is_single_line, last_line_width,
+        longest_line_width, mk_sp, string_is_closing_brackets, trimmed_last_line_width, wrap_str,
     },
 };
 
@@ -78,6 +77,7 @@ fn rewrite_pairs_one_line<T: Rewrite>(
     shape: Shape,
     context: &RewriteContext<'_>,
 ) -> Option<String> {
+    debug!("rewrite_pairs_one_line: {:?}", shape);
     assert!(list.list.len() >= 2, "Not a pair?");
 
     let mut result = String::new();
@@ -97,10 +97,6 @@ fn rewrite_pairs_one_line<T: Rewrite>(
             let c = prefix_iter.next()?.trim();
             if !c.is_empty() {
                 if c.starts_with("//") || c.starts_with("\n") {
-                    debug!(
-                        "[DBO] ** rewrite_pairs_one_line: resulE2.1=None, prefix={:?}, result={:?};",
-                        c, result
-                    );
                     return None;
                 } else {
                     result.push_str(c);
@@ -162,6 +158,7 @@ fn rewrite_pairs_multiline<T: Rewrite>(
     shape: Shape,
     context: &RewriteContext<'_>,
 ) -> Option<String> {
+    debug!("rewrite_pairs_multiline: {:?}", shape);
     let rhs_offset = shape.rhs_overhead(&context.config);
     let nested_shape = (match context.config.indent_style() {
         IndentStyle::Visual => shape.visual_indent(0),
@@ -177,13 +174,10 @@ fn rewrite_pairs_multiline<T: Rewrite>(
 
     let mut prefix_iter = list.sep_prefixes.iter();
     let mut suffix_iter = list.sep_suffixes.iter();
-    let mut first_iter = true;
     for ((e, default_rw), s) in list.list[1..].iter().zip(list.separators.iter()) {
         /* First multiline comment prefix and suffix in SeparatorPlace::Back
          * and that are added to existing line requires less alignment, compared to
          * the other comments that are added to already block aligned lines */
-        let multiline_align_overhead = if first_iter { 0 } else { shape.indent.width() };
-
         let prefix_with_start = prefix_iter.next()?.trim_end();
         let prefix = prefix_with_start.trim_start();
         let suffix_with_start = suffix_iter.next()?.trim_end();
@@ -212,23 +206,6 @@ fn rewrite_pairs_multiline<T: Rewrite>(
         let rw_prefix = if prelen <= 0 {
             String::new()
         } else {
-            let (align, separator, one_line) =
-                if trimmed_last_line_width(&result) + prelen > shape.width {
-                    (shape.indent.block_indent, &indent_str, false)
-                } else {
-                    (multiline_align_overhead + 1, &Cow::Borrowed(" "), true)
-                };
-            debug!(
-                "** [DBO] rewrite_pairs_multiline: last_line_used_width(&result, shape.offset)={}, multiline_align_overhead)={}, align={}, separator={:?}, one_line={:?}, prefix={:?}, shape={:?}, result={:?};",
-                last_line_used_width(&result, shape.offset),
-                multiline_align_overhead,
-                align,
-                separator,
-                one_line,
-                prefix,
-                shape,
-                result,
-            );
             rewrite_comment(
                 &prefix,
                 true,
@@ -240,51 +217,28 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                 context.config,
             )?
         };
-        debug!(
-            "[DBO] ** rewrite_pairs_multiline: rw_prefix={:?}, result3.1={:?};",
-            rw_prefix, result
-        );
 
         let width_for_one_line = last_line_width(&result) + offset + s.len() + 2;
         let line_shape = if width_for_one_line <= shape.used_width() {
             // We must snuggle the next line onto the previous line to avoid an orphan.
-            debug!("[DBO] ** rewrite_pairs_multiline: line_shape from one-line;");
             shape.offset_left(s.len() + 2 + trimmed_last_line_width(&result))
         } else if width_for_one_line < shape.width && is_compare_op(s) {
-            debug!("[DBO] ** rewrite_pairs_multiline: line_shape from extended one-line;");
             shape.offset_left(s.len() + 2)
         } else {
-            debug!("[DBO] ** rewrite_pairs_multiline: line_shape from multi-line;");
             nested_shape.offset_left(s.len() + 1)
         };
-        debug!(
-            "[DBO] ** rewrite_pairs_multiline: line_shape={:?}, width_for_one_line={}, last_line_width={}, offset={}, result={:?};",
-            line_shape,
-            width_for_one_line,
-            last_line_width(&result),
-            offset,
-            result
-        );
+
         let rw = if line_shape.is_some() {
             e.rewrite(context, line_shape?)?
         } else {
             String::new()
         };
-        debug!(
-            "[DBO] ** rewrite_pairs_multiline: line_shape={:?}, rw={:?};",
-            line_shape, rw,
-        );
+
         let rewrite = if !rw.is_empty() {
-            debug!("[DBO] ** rewrite_pairs_multiline: rewrite=e.rewrite();");
             &rw
         } else {
-            debug!("[DBO] ** rewrite_pairs_multiline: rewrite=default_rw;");
             &default_rw.as_ref()?
         };
-        debug!(
-            "[DBO] ** rewrite_pairs_multiline: separator=s={:?}, indent_str={:?}, rewrite={:?};",
-            s, indent_str, rewrite
-        );
 
         /* Add separator - in multiline each separator starts or ends a line */
         match context.config.binop_separator() {
@@ -320,10 +274,6 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                     true,
                     false,
                 )?;
-                debug!(
-                    "[DBO] ** rewrite_pairs_multiline: BACK result after combining prefix={:?};",
-                    result
-                );
 
                 let suffix_shape = if !result.contains('\n') {
                     shape
@@ -349,10 +299,6 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                 )?;
                 result.push_str(&indent_str);
                 result.push_str(&rewrite);
-                debug!(
-                    "[DBO] ** rewrite_pairs_multiline: BACK result after combining suffix={:?};",
-                    result
-                );
             }
             SeparatorPlace::Front => {
                 let empty_cow = Cow::from("");
@@ -360,24 +306,18 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                 let result_last_line = result.lines().last().unwrap();
                 let last_ends_with_closing_brackets =
                     result_last_line.rfind('}').map_or(false, |i| {
-                    debug!(
-                        "[DBO] ** rewrite_pairs_multiline: last_line[i..]={:?}, last_line[..i - 1]={:?}, trimmed={:?};",
-                        &result_last_line[i..],
-                        &result_last_line[..i - 1],
-                        result_last_line[..i - 1].trim()
-                    );
-                    if string_is_closing_brackets(&result_last_line[i..], true) {
-                        if i == 0 {
-                            true
-                        } else if result_last_line[..i - 1].trim().is_empty() {
-                            true
+                        if string_is_closing_brackets(&result_last_line[i..], true) {
+                            if i == 0 {
+                                true
+                            } else if result_last_line[..i - 1].trim().is_empty() {
+                                true
+                            } else {
+                                false
+                            }
                         } else {
                             false
                         }
-                    } else {
-                        false
-                    }
-                });
+                    });
 
                 // Put compare operator in same line only if there are no comments
                 // and all statement fits one line.
@@ -406,10 +346,6 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                 } else {
                     (nested_shape, 0)
                 };
-                debug!(
-                    "[DBO] ** rewrite_pairs_multiline: FRONT last_ends_with_closing_brackets={}, indentation_offset={}, pre_sep_indent_str={:?};",
-                    last_ends_with_closing_brackets, indentation_offset, pre_sep_indent_str,
-                );
 
                 result = combine_strs_with_comments(
                     context,
@@ -423,10 +359,6 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                     true,
                     false,
                 )?;
-                debug!(
-                    "[DBO] ** rewrite_pairs_multiline: FRONT result after combining prefix={:?}, prefix_shape={:?};",
-                    result, prefix_shape,
-                );
 
                 let rw_suffix = if suflen <= 0 {
                     String::new()
@@ -452,23 +384,10 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                     true,
                     false,
                 )?;
-                debug!(
-                    "[DBO] ** rewrite_pairs_multiline: FRONT result after combining suffix={:?}, suffix_shape={:?};",
-                    result, suffix_shape
-                );
             }
         }
-        debug!("[DBO] ** rewrite_pairs_multiline: result3.2={:?};", result);
-
-        debug!(
-            "[DBO] ** rewrite_pairs_multiline: resultNextLoopEnd={:?};",
-            result
-        );
-
-        first_iter = false;
     }
 
-    debug!("[DBO] ** rewrite_pairs_multiline: resultEE={:?};", result);
     Some(result)
 }
 
@@ -485,7 +404,7 @@ where
     LHS: Rewrite,
     RHS: Rewrite,
 {
-    debug!("** [DBO] rewrite_pair: enter shape={:?};", shape);
+    debug!("rewrite_pair: {:?}", shape);
     let tab_spaces = context.config.tab_spaces();
 
     // If infix_suffix is open-comment then a new line should be added to it.
@@ -505,7 +424,6 @@ where
         };
 
     let infix_result = format!("{}{}", pp.infix, rhs_infix_suffix);
-    debug!("** [DBO] rewrite_pair: infix_result={:?};", infix_result);
 
     let lhs_overhead = match separator_place {
         SeparatorPlace::Back => {
@@ -537,17 +455,12 @@ where
     let lhs_result = lhs
         .rewrite(context, lhs_shape)
         .map(|lhs_str| format!("{}{}{}", pp.prefix, lhs_str, lhs_infix_suffix))?;
-    debug!("** [DBO] rewrite_pair: lhs_result={:?};", lhs_result);
 
     // Try to put both lhs and rhs on the same line.
     let rhs_orig_result = shape
         .offset_left(last_line_width(&lhs_result) + pp.infix.len())
         .and_then(|s| s.sub_width(pp.suffix.len() + pp.infix_suffix.len()))
         .and_then(|rhs_shape| rhs.rewrite(context, rhs_shape));
-    debug!(
-        "** [DBO] rewrite_pair: rhs_orig_result={:?};",
-        rhs_orig_result
-    );
 
     if let Some(ref rhs_result) = rhs_orig_result {
         // If the length of the lhs is equal to or shorter than the tab width or
@@ -559,26 +472,16 @@ where
                 .next()
                 .map(|first_line| first_line.ends_with('{'))
                 .unwrap_or(false);
-        debug!(
-            "** [DBO] rewrite_pair: allow_same_line={:?};",
-            allow_same_line
-        );
         if !rhs_result.contains('\n') || allow_same_line {
             let one_line_width = last_line_width(&lhs_result)
                 + infix_result.len()
                 + first_line_width(rhs_result)
                 + pp.suffix.len();
-            debug!(
-                "** [DBO] rewrite_pair: one_line_width={}, shape.width={:?};",
-                one_line_width, shape.width
-            );
             if one_line_width <= shape.width {
-                let ret = Some(format!(
+                return Some(format!(
                     "{}{}{}{}",
                     lhs_result, infix_result, rhs_result, pp.suffix
                 ));
-                debug!("** [DBO] rewrite_pair: resultE1={:?};", ret);
-                return ret;
             }
         }
     }
@@ -611,20 +514,12 @@ where
     } else {
         pp.infix_suffix
     };
-    debug!(
-        "** [DBO] rewrite_pair: separator_place={:?}, infix={:?}, rhs_shape={:?}",
-        separator_place, infix, rhs_shape
-    );
+
     if separator_place == SeparatorPlace::Front {
         rhs_shape = rhs_shape.offset_left(infix.len())?;
     }
-    debug!("** [DBO] rewrite_pair: rhs_shape2={:?}", rhs_shape);
     let rhs_result = rhs.rewrite(context, rhs_shape)?;
     let indent_str = rhs_shape.indent.to_string_with_newline(context.config);
-    debug!(
-        "** [DBO] rewrite_pair: rhs_result={:?}, indent_str={:?};",
-        rhs_result, indent_str
-    );
     let (mut infix_with_sep, infix_with_sep_len, max_width) = match separator_place {
         SeparatorPlace::Back => {
             let s = format!("{}{}", infix, infix_suffix.trim_end());
@@ -642,16 +537,6 @@ where
     };
 
     let new_line_width = infix_with_sep_len + rhs_result.len() + pp.suffix.len();
-    debug!(
-        "** [DBO] rewrite_pair: new_line_width={}, infix_with_sep/len={:?}/{}, pp.suffix/len={:?}/{}, rhs_result/len={:?}/{};",
-        new_line_width,
-        infix_with_sep,
-        infix_with_sep.len(),
-        pp.suffix,
-        pp.suffix.len(),
-        rhs_result,
-        rhs_result.len(),
-    );
     let rhs_with_sep = if separator_place == SeparatorPlace::Front && new_line_width > max_width {
         let s: String = String::from(infix_with_sep);
         infix_with_sep = s.trim_end().to_string();
@@ -659,17 +544,11 @@ where
     } else {
         rhs_result
     };
-    debug!(
-        "** [DBO] rewrite_pair: new_line_width={}, shape.width={:?}, rhs_with_sep={:?};",
-        new_line_width, shape.width, rhs_with_sep,
-    );
 
-    let ret = Some(format!(
+    Some(format!(
         "{}{}{}{}",
         lhs_result, infix_with_sep, rhs_with_sep, pp.suffix
-    ));
-    debug!("** [DBO] rewrite_pair: resultE2={:?};", ret);
-    ret
+    ))
 }
 
 // A pair which forms a tree and can be flattened (e.g., binops).
@@ -692,6 +571,7 @@ impl FlattenPair for ast::Expr {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<PairList<'_, '_, ast::Expr>> {
+        debug!("FlattenPair: {:?} {:?}", shape, self);
         let top_op = match self.kind {
             ast::ExprKind::Binary(op, _, _) => op.node,
             _ => return None,
@@ -738,10 +618,6 @@ impl FlattenPair for ast::Expr {
                         match pop.kind {
                             ast::ExprKind::Binary(op, _, ref rhs) => {
                                 separators.push(op.node.to_string());
-                                debug!(
-                                    "*** [DBO] FlattenPair for ast::Expr: lspan={:?}, rspan={:?}, node.span={:?};",
-                                    pop.span, rhs.span, node.span
-                                );
                                 // Collect pre and post opertor comments.
                                 let sp = mk_sp(node.span.hi(), op.span.lo());
                                 let c =
@@ -763,10 +639,6 @@ impl FlattenPair for ast::Expr {
         }
 
         assert_eq!(list.len() - 1, separators.len());
-        debug!(
-            "*** [DBO] FlattenPair for ast::Expr: almost at end separators={:?}, sep_prefixes={:?}, sep_suffixes={:?}, list={:?};",
-            separators, sep_prefixes, sep_suffixes, list
-        );
         Some(PairList {
             list,
             separators,
