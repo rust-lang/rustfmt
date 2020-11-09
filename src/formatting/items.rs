@@ -150,8 +150,10 @@ impl Rewrite for ast::Local {
                         attr_span_lo
                     }
                 };
-                let comment_after_assign =
-                    context.snippet(mk_sp(assign_hi, comment_end_pos)).trim();
+                let comment_after_assign_with_end = context
+                    .snippet(mk_sp(assign_hi, comment_end_pos))
+                    .trim_start();
+                let comment_after_assign = comment_after_assign_with_end.trim_end();
 
                 if comment_before_assign.is_empty() {
                     result.push_str(&infix);
@@ -187,7 +189,7 @@ impl Rewrite for ast::Local {
 
                     need_newline_after_comment_after_assign =
                         comment_after_assign.trim_start().starts_with("//")
-                            || comment_after_assign.contains('\n');
+                            || comment_after_assign_with_end.contains('\n');
                     if need_newline_after_comment_after_assign {
                         let new_indent_str = &shape
                             .block_indent(context.config.tab_spaces())

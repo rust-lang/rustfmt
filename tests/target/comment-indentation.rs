@@ -225,15 +225,16 @@ fn main() {
 }
 // Test 56
 fn main() {
-    let y = /* 0 Multiplication of two numebers */ 2 * 4
-    /* 5 This is the second argument */
+    let y = /* 0 Multiplication of two numebers */
+        2 * 4 /* 5 This is the second argument */
     /* 6 which is multiplied by the first argument */;
     /* 7 And this is a comment for the next operation */
     let i = 7;
 }
 // Test 57
 fn main() {
-    let y = /* 0 Multiplication of two numebers */ 2 * 4; /* 5 This is the second argument */
+    let y = /* 0 Multiplication of two numebers */
+        2 * 4; /* 5 This is the second argument */
     /* 6 which is multiplied by the first argument */
     /* 7 And this is a comment for the next operation */
     let i = 7;

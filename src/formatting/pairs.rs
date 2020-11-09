@@ -178,10 +178,24 @@ fn rewrite_pairs_multiline<T: Rewrite>(
         /* First multiline comment prefix and suffix in SeparatorPlace::Back
          * and that are added to existing line requires less alignment, compared to
          * the other comments that are added to already block aligned lines */
-        let prefix_with_start = prefix_iter.next()?.trim_end();
+        let prefix_with_start_and_end = prefix_iter.next()?;
+        let prefix_with_start = prefix_with_start_and_end.trim_end();
         let prefix = prefix_with_start.trim_start();
-        let suffix_with_start = suffix_iter.next()?.trim_end();
+        let suffix_with_start_and_end = suffix_iter.next()?;
+        let suffix_with_start = suffix_with_start_and_end.trim_end();
         let suffix = suffix_with_start.trim_start();
+
+        let prefix_ends_line = if let Some(pos) = prefix_with_start_and_end.rfind('/') {
+            prefix_with_start_and_end[pos..].contains('\n')
+        } else {
+            prefix_with_start_and_end.contains('\n')
+        };
+        let suffix_ends_line = if let Some(pos) = suffix_with_start_and_end.rfind('/') {
+            suffix_with_start_and_end[pos..].contains('\n')
+        } else {
+            suffix_with_start_and_end.contains('\n')
+        };
+
         let prelen = if prefix.is_empty() {
             0
         } else {
@@ -258,7 +272,7 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                     0,
                     true,
                     !prefix_with_start.starts_with("\n"),
-                    true,
+                    !prefix_ends_line,
                     true,
                 )?;
                 // Combine separator - using nested_shape in case it is in new line
@@ -294,7 +308,7 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                     0,
                     true,
                     !suffix_with_start.starts_with("\n"),
-                    true,
+                    !suffix_ends_line,
                     false,
                 )?;
                 result.push_str(&indent_str);
@@ -356,7 +370,7 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                     indentation_offset,
                     true,
                     !prefix_with_start.starts_with("\n"),
-                    true,
+                    !prefix_ends_line,
                     false,
                 )?;
 
@@ -381,7 +395,7 @@ fn rewrite_pairs_multiline<T: Rewrite>(
                     indentation_offset,
                     true,
                     !suffix_with_start.starts_with("\n"),
-                    true,
+                    !suffix_ends_line,
                     false,
                 )?;
             }
