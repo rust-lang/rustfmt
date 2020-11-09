@@ -80,9 +80,11 @@ fn main() {
 	});
 	a.b.c.d();
 
-	x().y(|| match cond() {
-		true => {}
-		false => {}
+	x().y(|| {
+		match cond() {
+			true => {}
+			false => {}
+		}
 	});
 }
 

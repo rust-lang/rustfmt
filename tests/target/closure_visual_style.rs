@@ -56,7 +56,7 @@ fn main() {
         }
     };
 
-    let unblock_me = |trivial| closure();
+    let unblock_me = |trivial| { closure() };
 
     let empty = |arg| {};
 
@@ -74,7 +74,7 @@ fn main() {
         |big_argument_name, test123| looooooooooooooooooong_function_naaaaaaaaaaaaaaaaame();
 
     let arg_test =
-        |big_argument_name, test123| looooooooooooooooooong_function_naaaaaaaaaaaaaaaaame();
+        |big_argument_name, test123| { looooooooooooooooooong_function_naaaaaaaaaaaaaaaaame() };
 
     let simple_closure = move || -> () {};
 
