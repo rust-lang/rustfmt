@@ -22,12 +22,12 @@
 
 - Change the default edition to 2018.
 - Do not format sub-modules by default.
-- Do not overwrite files on critial errors by default.
+- Do not overwrite files on critical errors by default.
 - Normalize an empty match arm to `{}`.
 - Rename `use_small_heuristics` to `width_heuristics`
 - Rename `fn_args_layout` to `fn_params_layout`.
 - Rename the default value of `width_heuristics` to `Scaled` from `Default`.
-- Update `rustc-ap-*` crates to 666.0.0.
+- Update `rustc-ap-*` crates to v686.0.0.
 
 ### Fixed
 
@@ -53,6 +53,57 @@
 - Stabilize `bin_op_separator` configuration option.
 - Stabilize `match_block_trailing_comma` configuration option.
 - Stabilize `ignore` configuration option.
+
+
+## [1.4.24] 2020-11-05
+
+### Changed
+
+- Block wrapped match arm bodies containing a single macro call expression are no longer flattened ([#4496](https://github.com/rust-lang/rustfmt/pull/4496)). This allows programmer discretion so that the block wrapping can be preserved in cases where needed to prevent issues in expansion, such as with trailing semicolons, and aligns with updated [Style Guide guidance](https://github.com/rust-dev-tools/fmt-rfcs/blob/master/guide/expressions.md#macro-call-expressions) for such scenarios.
+
+### Fixed
+- Remove useless `deprecated` attribute on a trait impl block in the rustfmt lib, as these now trigger errors ([rust-lang/rust/#78626](https://github.com/rust-lang/rust/pull/78626))
+
+### Install/Download Options
+- **crates.io package** - **pending**
+- **rustup (nightly)** - **pending**
+- **GitHub Release Binaries** - [Release v1.4.24](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.24)
+- **Build from source** - [Tag v1.4.24](https://github.com/rust-lang/rustfmt/tree/v1.4.24), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.23] 2020-10-30
+
+### Changed
+
+- Update `rustc-ap-*` crates to v686.0.0
+
+### Added
+- Initial support for formatting new ConstBlock syntax ([#4478](https://github.com/rust-lang/rustfmt/pull/4478))
+
+### Fixed
+- Handling of unclosed delimiter-only parsing errors in input files ([#4466](https://github.com/rust-lang/rustfmt/issues/4466))
+- Misc. minor parser bugs ([#4418](https://github.com/rust-lang/rustfmt/issues/4418) and [#4431](https://github.com/rust-lang/rustfmt/issues/4431))
+- Panic on nested tuple access ([#4355](https://github.com/rust-lang/rustfmt/issues/4355))
+- Unable to disable license template path via cli override ([#4487](https://github.com/rust-lang/rustfmt/issues/4487))
+- Preserve comments in empty statements [#4018](https://github.com/rust-lang/rustfmt/issues/4018))
+- Indentation on skipped code [#4398](https://github.com/rust-lang/rustfmt/issues/4398))
+
+### Install/Download Options
+- **crates.io package** - **pending**
+- **rustup (nightly)** - n/a (superseded by [v1.4.24](#1424-2020-11-05))
+- **GitHub Release Binaries** - [Release v1.4.23](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.23)
+- **Build from source** - [Tag v1.4.23](https://github.com/rust-lang/rustfmt/tree/v1.4.23), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.22] 2020-10-04
+
+### Changed
+
+- Update `rustc-ap-*` crates to v679.0.0
+- Add config option to allow control of leading match arm pipes
+- Support `RUSTFMT` environment variable in `cargo fmt` to run specified `rustfmt` instance
+
+### Fixed
+
+- Fix preservation of type aliases within extern blocks
 
 ## [1.4.17] 2020-06-08
 
@@ -985,3 +1036,6 @@ from formatting an attribute #3665
 - Handle tabs properly inside macro with braces (#1918).
 - Fix a typo in `compute_budgets_for_args()` (#1924).
 - Recover comment between keyword (`impl` and `trait`) and `{` which used to get removed (#1925).
+
+
+[install-from-source]: https://github.com/rust-lang/rustfmt#installing-from-source

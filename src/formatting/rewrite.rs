@@ -33,6 +33,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) file_mod_map: &'a FileModMap<'a>,
     pub(crate) config: &'a Config,
     pub(crate) inside_macro: Rc<Cell<bool>>,
+    pub(crate) is_macro_def: bool,
     // Force block indent style even if we are using visual indent style.
     pub(crate) use_block: Cell<bool>,
     // When `is_if_else_block` is true, unindent the comment on top

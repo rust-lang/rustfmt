@@ -689,7 +689,9 @@ impl<'a> CommentRewrite<'a> {
                         let mut config = self.fmt.config.clone();
                         config.set().wrap_comments(false);
                         if config.format_code_in_doc_comments() {
-                            if let Some(s) = format_code_block(&self.code_block_buffer, &config) {
+                            if let Some(s) =
+                                format_code_block(&self.code_block_buffer, &config, false)
+                            {
                                 trim_custom_comment_prefix(s.as_ref())
                             } else {
                                 trim_custom_comment_prefix(&self.code_block_buffer)
