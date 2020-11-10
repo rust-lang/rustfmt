@@ -417,7 +417,12 @@ where
             result.push_str(&formatted_comment);
         }
 
-        if separate && sep_place.is_back() {
+        let need_extra_separator = separate
+            && last
+            && item.post_comment.as_ref().map_or(true, |cmnt| {
+                cmnt.find_uncommented(formatting.separator).is_none()
+            });
+        if separate && sep_place.is_back() && (!last || need_extra_separator) {
             result.push_str(formatting.separator);
         }
 
