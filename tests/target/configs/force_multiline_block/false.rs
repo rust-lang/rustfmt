@@ -13,10 +13,8 @@ fn main() {
 }
 
 fn main() {
-    result.and_then(|maybe_value| {
-        match maybe_value {
-            None => Err("oops"),
-            Some(value) => Ok(1),
-        }
+    result.and_then(|maybe_value| match maybe_value {
+        None => Err("oops"),
+        Some(value) => Ok(1),
     });
 }

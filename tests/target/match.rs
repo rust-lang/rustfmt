@@ -364,13 +364,11 @@ fn issue1395() {
     let bar = Some(true);
     let foo = Some(true);
     let mut x = false;
-    bar.and_then(|_| {
-        match foo {
-            None => None,
-            Some(b) => {
-                x = true;
-                Some(b)
-            }
+    bar.and_then(|_| match foo {
+        None => None,
+        Some(b) => {
+            x = true;
+            Some(b)
         }
     });
 }

@@ -56,12 +56,15 @@ pub(crate) fn rewrite_closure(
         }
 
         let result = match fn_decl.output {
-            // Try-without-block only if not a macro and original code is not a block (#4394)
-            ast::FnRetTy::Default(_)
-                if !context.inside_macro()
-                    && !context.snippet(body.span).trim().starts_with('{') =>
-            {
-                try_rewrite_without_block(body, &prefix, capture, context, shape, body_shape)
+            ast::FnRetTy::Default(_) if !context.inside_macro() => {
+                // Try-without-block only if configured and original code is not a block (#4394)
+                if !context.config.preserve_closure_block_wrapping()
+                    || !context.snippet(body.span).trim().starts_with('{')
+                {
+                    try_rewrite_without_block(body, &prefix, capture, context, shape, body_shape)
+                } else {
+                    None
+                }
             }
             _ => None,
         };

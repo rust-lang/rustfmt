@@ -33,7 +33,7 @@ fn main() {
         }
     };
 
-    let unblock_me = |trivial| { closure() };
+    let unblock_me = |trivial| closure();
 
     let empty = |arg| {};
 
@@ -51,7 +51,7 @@ fn main() {
         |big_argument_name, test123| looooooooooooooooooong_function_naaaaaaaaaaaaaaaaame();
 
     let arg_test =
-        |big_argument_name, test123| { looooooooooooooooooong_function_naaaaaaaaaaaaaaaaame() };
+        |big_argument_name, test123| looooooooooooooooooong_function_naaaaaaaaaaaaaaaaame();
 
     let simple_closure = move || -> () {};
 
@@ -164,9 +164,7 @@ fn issue470() {
 impl Foo {
     pub fn bar(&self) {
         Some(SomeType {
-            push_closure_out_to_100_chars: iter(
-                otherwise_it_works_ok.into_iter().map(|f| { Ok(f) }),
-            ),
+            push_closure_out_to_100_chars: iter(otherwise_it_works_ok.into_iter().map(|f| Ok(f))),
         })
     }
 }
@@ -221,22 +219,10 @@ fn issue2063() {
 }
 
 fn issue1524() {
-    let f = |x| {
-        {
-            {
-                { x }
-            }
-        }
-    };
-    let f = |x| {
-        {
-            { x }
-        }
-    };
-    let f = |x| {
-        { x }
-    };
-    let f = |x| { x };
+    let f = |x| x;
+    let f = |x| x;
+    let f = |x| x;
+    let f = |x| x;
     let f = |x| x;
 }
 
