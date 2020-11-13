@@ -268,6 +268,24 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
         }
     };
 
+    // Don't allow break at `\` as it is used to concat string lines.
+    let break_not_at_backslash = |index /* grapheme at index is included */| {
+        if input[0..=index].iter().last().unwrap().ne(&"\\") {
+            break_at(index)
+        } else {
+            let backslash_count = match input[0..index]
+                .iter()
+                .rposition(|grapheme| grapheme.ne(&"\\"))
+            {
+                // Break at the reverse-first non `\`
+                Some(non_backslash_index) => index - non_backslash_index,
+                // Only `\` to the right - break after even number to not break after escape `\`
+                None => index % 2,
+            };
+            break_at(index - backslash_count % 2)
+        }
+    };
+
     // find a first index where the unicode width of input[0..x] become > max_width
     let max_width_index_in_input = {
         let mut cur_width = 0;
@@ -320,7 +338,7 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
             .rposition(|grapheme| is_punctuation(grapheme))
         {
             // Found a punctuation and what is on its left side is big enough.
-            Some(index) if index >= MIN_STRING => break_at(index),
+            Some(index) if index >= MIN_STRING => break_not_at_backslash(index),
             // Either no boundary character was found to the left of `input[max_chars]`, or the line
             // got too small. We try searching for a boundary character to the right.
             _ => match input[max_width_index_in_input..]
@@ -328,7 +346,7 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
                 .position(|grapheme| is_whitespace(grapheme) || is_punctuation(grapheme))
             {
                 // A boundary was found after the line limit
-                Some(index) => break_at(max_width_index_in_input + index),
+                Some(index) => break_not_at_backslash(max_width_index_in_input + index),
                 // No boundary to the right, the input cannot be broken
                 None => SnippetState::EndOfInput(input.concat()),
             },
