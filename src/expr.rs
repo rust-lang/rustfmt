@@ -233,10 +233,10 @@ pub(crate) fn format_expr(
             /* Retrieving the comments before and after cast */
             let prefix_span = mk_sp(
                 subexpr.span.hi(),
-                context.snippet_provider.span_before(expr.span, "as"),
+                context.snippet_provider.span_before_last(expr.span, "as") - BytePos(1),
             );
             let suffix_span = mk_sp(
-                context.snippet_provider.span_after(expr.span, "as"),
+                context.snippet_provider.span_after_last(expr.span, "as"),
                 ty.span.lo(),
             );
             let infix_prefix_comments = rewrite_missing_comment(prefix_span, shape, context)?;
