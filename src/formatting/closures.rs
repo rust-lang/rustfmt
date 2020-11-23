@@ -56,15 +56,8 @@ pub(crate) fn rewrite_closure(
         }
 
         let result = match fn_decl.output {
-            ast::FnRetTy::Default(_) if !context.inside_macro() => {
-                // Try-without-block only if configured and original code is not a block (#4394)
-                if !context.config.preserve_closure_block_wrapping()
-                    || !context.snippet(body.span).trim().starts_with('{')
-                {
-                    try_rewrite_without_block(body, &prefix, capture, context, shape, body_shape)
-                } else {
-                    None
-                }
+            ast::FnRetTy::Default(_) if can_try_rewrite_without_block(body, context) => {
+                try_rewrite_without_block(body, &prefix, capture, context, shape, body_shape)
             }
             _ => None,
         };
@@ -107,6 +100,18 @@ pub(crate) fn rewrite_closure(
             // one line, so we'll insert a block.
             rewrite_closure_with_block(body, &prefix, context, body_shape)
         })
+    }
+}
+
+// Check if closure block wrapping may not be preserved (#4394)
+fn can_try_rewrite_without_block(body: &ast::Expr, context: &RewriteContext<'_>) -> bool {
+    if !context.inside_macro()
+        && (!context.config.preserve_closure_block_wrapping()
+            || !context.snippet(body.span).trim().starts_with('{'))
+    {
+        true
+    } else {
+        false
     }
 }
 
