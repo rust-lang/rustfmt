@@ -121,6 +121,7 @@ impl Rewrite for ast::Local {
                 mk_sp(self.pat.span.hi(), self.span.hi())
             };
 
+            let mut indentation_offset: usize = 0; // For extra indent is case of forced new line
             if let Some(offset) = context.snippet(base_span).find_uncommented("=") {
                 let base_span_lo = base_span.lo();
 
@@ -158,8 +159,12 @@ impl Rewrite for ast::Local {
                 }
 
                 if !comment_after_assign.is_empty() {
-                    let new_indent_str =
-                        &shape.block_indent(0).to_string_with_newline(context.config);
+                    if comment_after_assign.starts_with("//") {
+                        indentation_offset = context.config.tab_spaces();
+                    }
+                    let new_indent_str = &shape
+                        .block_indent(indentation_offset)
+                        .to_string_with_newline(context.config);
                     result.push_str(new_indent_str);
                     result.push_str(comment_after_assign);
                     result.push_str(new_indent_str);
@@ -167,7 +172,10 @@ impl Rewrite for ast::Local {
             }
 
             // 1 = trailing semicolon;
-            let nested_shape = shape.sub_width(1)?;
+            let mut nested_shape = shape.sub_width(1)?;
+            if indentation_offset > 0 {
+                nested_shape = nested_shape.block_indent(indentation_offset);
+            }
             let rhs = rewrite_assign_rhs_expr(
                 context,
                 &result,

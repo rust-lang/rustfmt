@@ -19,4 +19,9 @@ fn main() {
     if true {
      1.0
     };
-}
+
+    let after = 
+            // after_comment 
+     1.0;
+  }
+  

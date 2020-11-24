@@ -32,7 +32,7 @@ use crate::formatting::{
     utils::{
         colon_spaces, contains_skip, count_newlines, first_line_ends_with, inner_attributes,
         last_line_extendable, last_line_width, mk_sp, outer_attributes, semicolon_for_expr,
-        unicode_str_width, wrap_str,
+        trimmed_last_line_width, unicode_str_width, wrap_str,
     },
     vertical::rewrite_with_alignment,
     visitor::FmtVisitor,
@@ -909,6 +909,7 @@ impl<'a> ControlFlow<'a> {
                         orig_rhs,
                         RhsTactics::Default,
                         true,
+                        &lhs,
                     )?;
                     return Some(format!("{}{}", lhs, rhs));
                 }
@@ -1973,6 +1974,7 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
         ex.rewrite(context, orig_shape),
         rhs_tactics,
         has_rhs_comment,
+        &lhs,
     )
 }
 
@@ -2021,12 +2023,19 @@ fn choose_rhs<R: Rewrite>(
     orig_rhs: Option<String>,
     rhs_tactics: RhsTactics,
     has_rhs_comment: bool,
+    lhs: &str,
 ) -> Option<String> {
     match orig_rhs {
         Some(ref new_str)
             if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
         {
-            Some(format!(" {}", new_str))
+            // If last lhs line is only indetation then no need to add a space before rhs
+            let result_prefix = if trimmed_last_line_width(lhs) == 0 {
+                ""
+            } else {
+                " "
+            };
+            Some(format!("{}{}", result_prefix, new_str))
         }
         _ => {
             // Expression did not fit on the same line as the identifier.
