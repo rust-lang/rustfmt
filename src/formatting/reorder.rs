@@ -15,7 +15,7 @@ use crate::config::{Config, GroupImportsTactic};
 use crate::formatting::imports::UseSegment;
 use crate::formatting::modules::{get_mod_inner_attrs, FileModMap};
 use crate::formatting::{
-    imports::{merge_use_trees, UseTree},
+    imports::{flatten_use_trees, merge_use_trees, UseTree},
     items::{is_mod_decl, rewrite_extern_crate, rewrite_mod},
     lists::{itemize_list, write_list, ListFormatting, ListItem},
     rewrite::RewriteContext,
@@ -228,6 +228,8 @@ fn rewrite_reorderable_or_regroupable_items(
             }
             if context.config.merge_imports() {
                 normalized_items = merge_use_trees(normalized_items);
+            } else if context.config.flatten_imports() {
+                normalized_items = flatten_use_trees(normalized_items);
             }
 
             let mut regrouped_items = match context.config.group_imports() {

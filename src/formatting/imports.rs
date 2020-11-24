@@ -179,6 +179,27 @@ pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
     result
 }
 
+pub(crate) fn flatten_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
+    let mut result = Vec::with_capacity(use_trees.len());
+    for use_tree in use_trees {
+        if use_tree.has_comment() || use_tree.attrs.is_some() {
+            result.push(use_tree);
+            continue;
+        }
+
+        for mut flattened in use_tree.flatten() {
+            match flattened.path.last() {
+                Some(UseSegment::Slf(None)) => {
+                    flattened.path.pop();
+                }
+                _ => {}
+            }
+            result.push(flattened);
+        }
+    }
+    result
+}
+
 impl fmt::Debug for UseTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
