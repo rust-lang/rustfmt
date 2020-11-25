@@ -73,7 +73,7 @@ Below you can find a detailed visual guide on all the supported configuration op
 
 For version- and channel-specific configurations, please visit https://rust-lang.github.io/rustfmt/.
 
-## `array_width` 
+## `array_width`
 
 Maximum width of an array literal before falling back to vertical formatting.
 
@@ -81,11 +81,11 @@ Maximum width of an array literal before falling back to vertical formatting.
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
-By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `array_width` will take precedence. 
+By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `array_width` will take precedence.
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
-## `attr_fn_like_width` 
+## `attr_fn_like_width`
 
 Maximum width of the args of a function-like attributes before falling back to vertical formatting.
 
@@ -93,7 +93,7 @@ Maximum width of the args of a function-like attributes before falling back to v
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
-By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `attr_fn_like_width` will take precedence. 
+By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `attr_fn_like_width` will take precedence.
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
@@ -348,7 +348,7 @@ where
 }
 ```
 
-## `chain_width` 
+## `chain_width`
 
 Maximum width of a chain to fit on one line.
 
@@ -356,7 +356,7 @@ Maximum width of a chain to fit on one line.
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
-By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `chain_width` will take precedence. 
+By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `chain_width` will take precedence.
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
@@ -788,7 +788,7 @@ trait Lorem {
 }
 ```
 
-## `fn_call_width` 
+## `fn_call_width`
 
 Maximum width of the args of a function call before falling back to vertical formatting.
 
@@ -796,7 +796,7 @@ Maximum width of the args of a function call before falling back to vertical for
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
-By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `fn_call_width` will take precedence. 
+By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `fn_call_width` will take precedence.
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
@@ -1728,6 +1728,36 @@ use foo::{a, b, c, d, e, f, g};
 ```
 
 
+## `flatten_imports`
+
+Remove all nesting from all imports. (The opposite of `merge_imports`.)
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: TODO)
+
+#### `false` (default):
+
+```rust
+use foo::{self, a, c, d};
+use foo::{b, g};
+use foo::{e, f};
+```
+
+#### `true`:
+
+```rust
+use foo;
+use foo::a;
+use foo::b;
+use foo::c;
+use foo::d;
+use foo::e;
+use foo::f;
+use foo::g;
+```
+
+
 ## `newline_style`
 
 Unix or Windows line endings
@@ -2101,7 +2131,7 @@ specific version of rustfmt is used in your CI, use this option.
 - **Possible values**: any published version (e.g. `"0.3.8"`)
 - **Stable**: No (tracking issue: [#3386](https://github.com/rust-lang/rustfmt/issues/3386))
 
-## `single_line_if_else_max_width` 
+## `single_line_if_else_max_width`
 
 Maximum line length for single line if-else expressions. A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `width_heuristics` is set to `Off`.
 
@@ -2109,7 +2139,7 @@ Maximum line length for single line if-else expressions. A value of `0` (zero) r
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
-By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `single_line_if_else_max_width` will take precedence. 
+By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `single_line_if_else_max_width` will take precedence.
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
@@ -2358,7 +2388,7 @@ fn main() {
 
 See also: [`indent_style`](#indent_style).
 
-## `struct_lit_width` 
+## `struct_lit_width`
 
 Maximum width in the body of a struct literal before falling back to vertical formatting. A value of `0` (zero) results in struct literals always being broken into multiple lines. Note this occurs when `width_heuristics` is set to `Off`.
 
@@ -2366,11 +2396,11 @@ Maximum width in the body of a struct literal before falling back to vertical fo
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
-By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `struct_lit_width` will take precedence. 
+By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `struct_lit_width` will take precedence.
 
 See also [`max_width`](#max_width), [`width_heuristics`](#width_heuristics), and [`struct_lit_single_line`](#struct_lit_single_line)
 
-## `struct_variant_width` 
+## `struct_variant_width`
 
 Maximum width in the body of a struct variant before falling back to vertical formatting. A value of `0` (zero) results in struct literals always being broken into multiple lines. Note this occurs when `width_heuristics` is set to `Off`.
 
@@ -2378,7 +2408,7 @@ Maximum width in the body of a struct variant before falling back to vertical fo
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
-By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `struct_variant_width` will take precedence. 
+By default this option is set as a percentage of [`max_width`](#max_width) provided by [`width_heuristics`](#width_heuristics), but a value set directly for `struct_variant_width` will take precedence.
 
 See also [`max_width`](#max_width) and [`width_heuristics`](#width_heuristics)
 
@@ -2582,7 +2612,7 @@ fn main() {
 
 This option can be used to simplify the management and bulk updates of the granular width configuration settings ([`fn_call_width`](#fn_call_width), [`attr_fn_like_width`](#attr_fn_like_width), [`struct_lit_width`](#struct_lit_width), [`struct_variant_width`](#struct_variant_width), [`array_width`](#array_width), [`chain_width`](#chain_width), [`single_line_if_else_max_width`](#single_line_if_else_max_width)), that respectively control when formatted constructs are multi-lined/vertical based on width.
 
-Note that explicitly provided values for the width configuration settings take precedence and override the calculated values determined by `width_heuristics`. 
+Note that explicitly provided values for the width configuration settings take precedence and override the calculated values determined by `width_heuristics`.
 
 - **Default value**: `"Scaled"`
 - **Possible values**: `"Scaled"`, `"Off"`, `"Max"`
@@ -2647,7 +2677,7 @@ fn main() {
 ```
 
 #### `Off`:
-When `width_heuristics` is set to `Off`, the granular width settings are functionally disabled and ignored. See the documentation for the respective width config options for specifics. 
+When `width_heuristics` is set to `Off`, the granular width settings are functionally disabled and ignored. See the documentation for the respective width config options for specifics.
 
 ```rust
 enum Lorem {
