@@ -13,7 +13,7 @@ use crate::comment::{
     rewrite_missing_comment, CharClasses, FindUncommented,
 };
 use crate::config::lists::*;
-use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, Version};
+use crate::config::{BraceStyle, Config, ControlBraceStyle, HexLiteralCase, IndentStyle, Version};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
     struct_lit_tactic, write_list, ListFormatting, Separator,
@@ -134,7 +134,32 @@ pub(crate) fn format_expr(
         | ast::ExprKind::While(..) => to_control_flow(expr, expr_type)
             .and_then(|control_flow| control_flow.rewrite(context, shape)),
         ast::ExprKind::ConstBlock(ref anon_const) => {
-            Some(format!("const {}", anon_const.rewrite(context, shape)?))
+            let between_span = mk_sp(
+                context.snippet_provider.span_after(expr.span, "const"),
+                anon_const.value.span.lo(),
+            );
+            let anon_const_str = anon_const.rewrite(context, shape)?;
+            let contains_comments =
+                contains_comment(context.snippet_provider.span_to_snippet(between_span)?);
+            match context.config.brace_style() {
+                BraceStyle::AlwaysNextLine => combine_strs_with_missing_comments(
+                    context,
+                    "const",
+                    &anon_const_str,
+                    between_span,
+                    shape,
+                    !anon_const_str.contains('\n'),
+                ),
+                _ if !contains_comments => Some(format!("const {}", &anon_const_str)),
+                _ => combine_strs_with_missing_comments(
+                    context,
+                    "const",
+                    &anon_const_str,
+                    between_span,
+                    shape,
+                    true,
+                ),
+            }
         }
         ast::ExprKind::Block(ref block, opt_label) => {
             match expr_type {
