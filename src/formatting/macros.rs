@@ -705,8 +705,11 @@ fn delim_token_to_str(
 
 impl MacroArgKind {
     fn starts_with_brace(&self) -> bool {
-        matches!(*self, MacroArgKind::Repeat(DelimToken::Brace, _, _, _)
-            | MacroArgKind::Delimited(DelimToken::Brace, _))
+        matches!(
+            *self,
+            MacroArgKind::Repeat(DelimToken::Brace, _, _, _)
+                | MacroArgKind::Delimited(DelimToken::Brace, _)
+        )
     }
 
     fn starts_with_dollar(&self) -> bool {
@@ -1146,29 +1149,35 @@ enum SpaceState {
 fn force_space_before(tok: &TokenKind) -> bool {
     debug!("tok: force_space_before {:?}", tok);
 
-    matches!(tok, TokenKind::Eq
-        | TokenKind::Lt
-        | TokenKind::Le
-        | TokenKind::EqEq
-        | TokenKind::Ne
-        | TokenKind::Ge
-        | TokenKind::Gt
-        | TokenKind::AndAnd
-        | TokenKind::OrOr
-        | TokenKind::Not
-        | TokenKind::Tilde
-        | TokenKind::BinOpEq(_)
-        | TokenKind::At
-        | TokenKind::RArrow
-        | TokenKind::LArrow
-        | TokenKind::FatArrow
-        | TokenKind::BinOp(_)
-        | TokenKind::Pound
-        | TokenKind::Dollar)
+    matches!(
+        tok,
+        TokenKind::Eq
+            | TokenKind::Lt
+            | TokenKind::Le
+            | TokenKind::EqEq
+            | TokenKind::Ne
+            | TokenKind::Ge
+            | TokenKind::Gt
+            | TokenKind::AndAnd
+            | TokenKind::OrOr
+            | TokenKind::Not
+            | TokenKind::Tilde
+            | TokenKind::BinOpEq(_)
+            | TokenKind::At
+            | TokenKind::RArrow
+            | TokenKind::LArrow
+            | TokenKind::FatArrow
+            | TokenKind::BinOp(_)
+            | TokenKind::Pound
+            | TokenKind::Dollar
+    )
 }
 
 fn ident_like(tok: &Token) -> bool {
-    matches!(tok.kind, TokenKind::Ident(..) | TokenKind::Literal(..) | TokenKind::Lifetime(_))
+    matches!(
+        tok.kind,
+        TokenKind::Ident(..) | TokenKind::Literal(..) | TokenKind::Lifetime(_)
+    )
 }
 
 fn next_space(tok: &TokenKind) -> SpaceState {
