@@ -55,7 +55,7 @@ pub(crate) fn rewrite_closure(
                 .map(|s| format!("{} {}", prefix, s));
         }
 
-        // Whether closure block wrapping may not be preserved (#4394).
+        // Whether a closure block wrapping may not be preserved (#4394).
         let can_try_rewrite_without_block = if context.inside_macro() {
             false
         } else if context.config.preserve_closure_block_wrapping()
