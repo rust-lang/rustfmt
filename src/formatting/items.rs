@@ -834,7 +834,7 @@ pub(crate) fn format_impl(
                 // there is only one where-clause predicate
                 // recover the suppressed comma in single line where_clause formatting
                 if generics.where_clause.predicates.len() == 1 {
-                    result.push_str(",");
+                    result.push(',');
                 }
                 result.push_str(&format!("{}{{{}}}", sep, sep));
             } else {
@@ -1737,10 +1737,10 @@ fn type_annotation_spacing(config: &Config) -> (&str, &str) {
 pub(crate) fn rewrite_struct_field_prefix(
     context: &RewriteContext<'_>,
     field: &ast::StructField,
-) -> Option<String> {
+) -> String {
     let vis = format_visibility(context, &field.vis);
     let type_annotation_spacing = type_annotation_spacing(context.config);
-    Some(match field.ident {
+    match field.ident {
         Some(name) => format!(
             "{}{}{}:",
             vis,
@@ -1748,7 +1748,7 @@ pub(crate) fn rewrite_struct_field_prefix(
             type_annotation_spacing.0
         ),
         None => vis.to_string(),
-    })
+    }
 }
 
 impl Rewrite for ast::StructField {
@@ -1768,7 +1768,7 @@ pub(crate) fn rewrite_struct_field(
     }
 
     let type_annotation_spacing = type_annotation_spacing(context.config);
-    let prefix = rewrite_struct_field_prefix(context, field)?;
+    let prefix = rewrite_struct_field_prefix(context, field);
 
     let attrs_str = field.attrs.rewrite(context, shape)?;
     let attrs_extendable = field.ident.is_none() && is_attributes_extendable(&attrs_str);
@@ -1945,7 +1945,7 @@ fn rewrite_static(
             comments_span,
             true,
         )
-        .and_then(|res| recover_comment_removed(res, static_parts.span, context))
+        .map(|res| recover_comment_removed(res, static_parts.span, context))
         .or_else(|| {
             let nested_indent = offset.block_indent(context.config);
             let ty_span_hi = static_parts.ty.span.hi();
@@ -2357,7 +2357,7 @@ fn rewrite_fn_base(
         ret_str_len,
         fn_brace_style,
         multi_line_ret_str,
-    )?;
+    );
 
     debug!(
         "rewrite_fn_base: one_line_budget: {}, multi_line_budget: {}, param_indent: {:?}",
@@ -2744,7 +2744,7 @@ fn compute_budgets_for_params(
     ret_str_len: usize,
     fn_brace_style: FnBraceStyle,
     force_vertical_layout: bool,
-) -> Option<(usize, usize, Indent)> {
+) -> (usize, usize, Indent) {
     debug!(
         "compute_budgets_for_params {} {:?}, {}, {:?}",
         result.len(),
@@ -2781,7 +2781,7 @@ fn compute_budgets_for_params(
                 }
             };
 
-            return Some((one_line_budget, multi_line_budget, indent));
+            return (one_line_budget, multi_line_budget, indent);
         }
     }
 
@@ -2793,7 +2793,7 @@ fn compute_budgets_for_params(
         // Account for `)` and possibly ` {`.
         IndentStyle::Visual => new_indent.width() + if ret_str_len == 0 { 1 } else { 3 },
     };
-    Some((0, context.budget(used_space), new_indent))
+    (0, context.budget(used_space), new_indent)
 }
 
 fn newline_for_brace(config: &Config, where_clause: &ast::WhereClause) -> FnBraceStyle {

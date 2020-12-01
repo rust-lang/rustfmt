@@ -361,7 +361,7 @@ impl CliOptions for Opt {
             config.set().error_on_unformatted(true);
         }
         if let Some(ref edition) = self.edition {
-            config.set().edition((*edition).clone());
+            config.set().edition(*edition);
         }
         if let Some(ref inline_configs) = self.inline_config {
             for inline_config in inline_configs {
@@ -527,7 +527,7 @@ fn format(opt: Opt) -> Result<i32> {
             println!(
                 "Using rustfmt config file(s) {}",
                 paths
-                    .into_iter()
+                    .iter()
                     .map(|p| p.display().to_string())
                     .collect::<Vec<_>>()
                     .join(","),

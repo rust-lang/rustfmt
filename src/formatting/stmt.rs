@@ -113,5 +113,5 @@ fn format_stmt(
         }
         ast::StmtKind::MacCall(..) | ast::StmtKind::Item(..) | ast::StmtKind::Empty => None,
     };
-    result.and_then(|res| recover_comment_removed(res, stmt.span(), context))
+    result.map(|res| recover_comment_removed(res, stmt.span(), context))
 }
