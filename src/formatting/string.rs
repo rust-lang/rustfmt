@@ -101,7 +101,7 @@ pub(crate) fn rewrite_string<'a>(
                 if is_new_line(grapheme) {
                     // take care of blank lines
                     result = trim_end_but_line_feed(fmt.trim_end, result);
-                    result.push_str("\n");
+                    result.push('\n');
                     if !is_bareline_ok && cur_start + i + 1 < graphemes.len() {
                         result.push_str(&indent_without_newline);
                         result.push_str(fmt.line_start);

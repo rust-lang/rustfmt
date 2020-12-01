@@ -90,7 +90,7 @@ pub(crate) fn rewrite_closure(
         let between_span = Span::between(arg_span, first_span);
         if contains_comment(context.snippet(between_span)) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(|rw| {
-                let mut parts = rw.splitn(2, "\n");
+                let mut parts = rw.splitn(2, '\n');
                 let head = parts.next()?;
                 let rest = parts.next()?;
                 let block_shape = shape.block_indent(context.config.tab_spaces());

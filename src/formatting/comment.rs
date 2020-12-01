@@ -385,7 +385,7 @@ fn identify_comment(
                 shape,
                 config,
                 is_doc_comment || style.is_doc_comment(),
-            )?
+            )
         };
     if rest.is_empty() {
         Some(rewritten_first_group)
@@ -720,8 +720,8 @@ impl<'a> CommentRewrite<'a> {
 
         self.code_block_attr = None;
         self.item_block = None;
-        if line.starts_with("```") {
-            self.code_block_attr = Some(CodeBlockAttribute::new(&line[3..]))
+        if let Some(line) = line.strip_prefix("```") {
+            self.code_block_attr = Some(CodeBlockAttribute::new(&line))
         } else if self.fmt.config.wrap_comments() && ItemizedBlock::is_itemized_line(&line) {
             let ib = ItemizedBlock::new(&line);
             self.item_block = Some(ib);
@@ -819,7 +819,7 @@ fn rewrite_comment_inner(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
-) -> Option<String> {
+) -> String {
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
     let line_breaks = count_newlines(orig.trim_end());
@@ -853,7 +853,7 @@ fn rewrite_comment_inner(
         }
     }
 
-    Some(rewriter.finish())
+    rewriter.finish()
 }
 
 const RUSTFMT_CUSTOM_COMMENT_PREFIX: &str = "//#### ";
@@ -982,8 +982,8 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
     {
         (&line[4..], true)
     } else if let CommentStyle::Custom(opener) = *style {
-        if line.starts_with(opener) {
-            (&line[opener.len()..], true)
+        if let Some(line) = line.strip_prefix(opener) {
+            (&line, true)
         } else {
             (&line[opener.trim_end().len()..], false)
         }
@@ -1002,8 +1002,8 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
         || line.starts_with("**")
     {
         (&line[2..], line.chars().nth(1).unwrap() == ' ')
-    } else if line.starts_with('*') {
-        (&line[1..], false)
+    } else if let Some(line) = line.strip_prefix('*') {
+        (&line, false)
     } else {
         (line, line.starts_with(' '))
     }
@@ -1595,18 +1595,18 @@ impl<'a> Iterator for CommentCodeSlices<'a> {
 }
 
 /// Checks is `new` didn't miss any comment from `span`, if it removed any, return previous text
-/// (if it fits in the width/offset, else return `None`), else return `new`
+/// and `new` otherwise
 pub(crate) fn recover_comment_removed(
     new: String,
     span: Span,
     context: &RewriteContext<'_>,
-) -> Option<String> {
+) -> String {
     let snippet = context.snippet(span);
     let includes_comment = contains_comment(snippet);
     if snippet != new && includes_comment && changed_comment_content(snippet, &new) {
-        Some(snippet.to_owned())
+        snippet.to_owned()
     } else {
-        Some(new)
+        new
     }
 }
 

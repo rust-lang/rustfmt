@@ -639,8 +639,8 @@ pub(crate) fn extract_post_comment(
     let post_snippet = post_snippet[..comment_end].trim();
     let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
         post_snippet[1..].trim_matches(white_space)
-    } else if post_snippet.starts_with(separator) {
-        post_snippet[separator.len()..].trim_matches(white_space)
+    } else if let Some(post_snippet) = post_snippet.strip_prefix(separator) {
+        post_snippet.trim_matches(white_space)
     }
     // not comment or over two lines
     else if post_snippet.ends_with(',')
