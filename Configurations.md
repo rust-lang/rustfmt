@@ -1836,6 +1836,33 @@ fn say_hi() {
 }
 ```
 
+## `preserve_closure_block_wrapping`
+
+Preserves block wraping arround closures.  For example, useful when the closure `||` can be
+confused with OR.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `true`:
+Original block wrapping is preserved:
+```rust
+fn main() {
+    let explicit_conversion_preserves_semantics =
+        || { !is_mod || (is_mod && attrs.map_or(true, |a| a.is_empty())) };
+}
+```
+
+#### `false` (default):
+Block is not preserved:
+```rust
+fn main() {
+    let explicit_conversion_preserves_semantics =
+        || !is_mod || (is_mod && attrs.map_or(true, |a| a.is_empty()));
+}
+```
+
 ## `overflow_delimited_expr`
 
 When structs, slices, arrays, and block/array-like macros are used as the last
