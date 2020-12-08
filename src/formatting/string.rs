@@ -225,7 +225,25 @@ fn not_whitespace_except_line_feed(g: &str) -> bool {
 /// character is either a punctuation or a whitespace.
 /// FIXME(issue#3281): We must follow UAX#14 algorithm instead of this.
 fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]) -> SnippetState {
-    let break_at = |index /* grapheme at index is included */| {
+    let break_at = |index_in /* grapheme at index is included */| {
+        // Ensure break is not after an escape '\' as it will "escape" the `\` that is added
+        // for concatenating the two parts of the broken line.
+        let index = if (input[index_in] as &str).ne("\\") {
+            index_in
+        } else {
+            let index_offset = match input[0..index_in]
+                .iter()
+                .rposition(|grapheme| grapheme.ne(&"\\"))
+            {
+                // There is a non-`\` to the left
+                Some(non_backslash_index) => (index_in - non_backslash_index) % 2,
+                // Only `\` to the left
+                None => index_in % 2,
+            };
+            // Make sure break is after even number (including zero) of `\`
+            index_in - index_offset
+        };
+
         // Take in any whitespaces to the left/right of `input[index]` while
         // preserving line feeds
         let index_minus_ws = input[0..=index]
@@ -265,24 +283,6 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
             SnippetState::LineEnd(input[0..=index_minus_ws].concat(), index_plus_ws + 1)
         } else {
             SnippetState::LineEnd(input[0..=index_plus_ws].concat(), index_plus_ws + 1)
-        }
-    };
-
-    // Don't allow break at `\` as it is used to concat string lines.
-    let break_not_at_backslash = |index /* grapheme at index is included */| {
-        if input[0..=index].iter().last().unwrap().ne(&"\\") {
-            break_at(index)
-        } else {
-            let backslash_count = match input[0..index]
-                .iter()
-                .rposition(|grapheme| grapheme.ne(&"\\"))
-            {
-                // Break at the reverse-first non `\`
-                Some(non_backslash_index) => index - non_backslash_index,
-                // Only `\` to the right - break after even number to not break after escape `\`
-                None => index % 2,
-            };
-            break_at(index - backslash_count % 2)
         }
     };
 
@@ -338,7 +338,7 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
             .rposition(|grapheme| is_punctuation(grapheme))
         {
             // Found a punctuation and what is on its left side is big enough.
-            Some(index) if index >= MIN_STRING => break_not_at_backslash(index),
+            Some(index) if index >= MIN_STRING => break_at(index),
             // Either no boundary character was found to the left of `input[max_chars]`, or the line
             // got too small. We try searching for a boundary character to the right.
             _ => match input[max_width_index_in_input..]
@@ -346,7 +346,7 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
                 .position(|grapheme| is_whitespace(grapheme) || is_punctuation(grapheme))
             {
                 // A boundary was found after the line limit
-                Some(index) => break_not_at_backslash(max_width_index_in_input + index),
+                Some(index) => break_at(max_width_index_in_input + index),
                 // No boundary to the right, the input cannot be broken
                 None => SnippetState::EndOfInput(input.concat()),
             },
