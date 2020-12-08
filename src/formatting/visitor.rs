@@ -90,6 +90,8 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) skip_context: SkipContext,
     /// If set to `true`, normalize number of vertical spaces on formatting missing snippets.
     pub(crate) normalize_vertical_spaces: bool,
+    /// If set to `true`, we are formatting a macro definition
+    pub(crate) is_macro_def: bool,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -888,6 +890,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             report,
             skip_context: Default::default(),
             normalize_vertical_spaces: false,
+            is_macro_def: false,
         }
     }
 
@@ -914,7 +917,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 );
             } else {
                 match &attr.kind {
-                    ast::AttrKind::Normal(ref attribute_item)
+                    ast::AttrKind::Normal(ref attribute_item, _)
                         if self.is_unknown_rustfmt_attr(&attribute_item.path.segments) =>
                     {
                         let file_name = self.parse_sess.span_to_filename(attr.span);
@@ -1091,6 +1094,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             report: self.report.clone(),
             skip_context: self.skip_context.clone(),
             skipped_range: self.skipped_range.clone(),
+            is_macro_def: self.is_macro_def,
         }
     }
 }

@@ -106,11 +106,11 @@ pub(crate) fn format_expr(
             })
         }
         ast::ExprKind::Unary(op, ref subexpr) => rewrite_unary_op(context, op, subexpr, shape),
-        ast::ExprKind::Struct(ref path, ref fields, ref base) => rewrite_struct_lit(
+        ast::ExprKind::Struct(ref path, ref fields, ref struct_rest) => rewrite_struct_lit(
             context,
             path,
             fields,
-            base.as_ref().map(|e| &**e),
+            struct_rest,
             &expr.attrs,
             expr.span,
             shape,
@@ -125,7 +125,32 @@ pub(crate) fn format_expr(
         | ast::ExprKind::While(..) => to_control_flow(expr, expr_type)
             .and_then(|control_flow| control_flow.rewrite(context, shape)),
         ast::ExprKind::ConstBlock(ref anon_const) => {
-            Some(format!("const {}", anon_const.rewrite(context, shape)?))
+            let between_span = mk_sp(
+                context.snippet_provider.span_after(expr.span, "const"),
+                anon_const.value.span.lo(),
+            );
+            let anon_const_str = anon_const.rewrite(context, shape)?;
+            let contains_comments =
+                contains_comment(context.snippet_provider.span_to_snippet(between_span)?);
+            match context.config.brace_style() {
+                BraceStyle::AlwaysNextLine => combine_strs_with_missing_comments(
+                    context,
+                    "const",
+                    &anon_const_str,
+                    between_span,
+                    shape,
+                    !anon_const_str.contains('\n'),
+                ),
+                _ if !contains_comments => Some(format!("const {}", &anon_const_str)),
+                _ => combine_strs_with_missing_comments(
+                    context,
+                    "const",
+                    &anon_const_str,
+                    between_span,
+                    shape,
+                    true,
+                ),
+            }
         }
         ast::ExprKind::Block(ref block, opt_label) => {
             match expr_type {
@@ -236,10 +261,10 @@ pub(crate) fn format_expr(
             /* Retrieving the comments before and after cast */
             let prefix_span = mk_sp(
                 subexpr.span.hi(),
-                context.snippet_provider.span_before(expr.span, "as"),
+                context.snippet_provider.span_before_last(expr.span, "as") - BytePos(1),
             );
             let suffix_span = mk_sp(
-                context.snippet_provider.span_after(expr.span, "as"),
+                context.snippet_provider.span_after_last(expr.span, "as"),
                 ty.span.lo(),
             );
             let infix_prefix_comments = rewrite_missing_comment(prefix_span, shape, context)?;
@@ -414,6 +439,7 @@ pub(crate) fn format_expr(
             }
         }
         ast::ExprKind::Await(_) => rewrite_chain(expr, context, shape),
+        ast::ExprKind::Underscore => Some("_".to_owned()),
         ast::ExprKind::Err => None,
     };
 
@@ -1564,19 +1590,15 @@ fn rewrite_index(
     }
 }
 
-fn struct_lit_can_be_aligned(fields: &[ast::Field], base: Option<&ast::Expr>) -> bool {
-    if base.is_some() {
-        return false;
-    }
-
-    fields.iter().all(|field| !field.is_shorthand)
+fn struct_lit_can_be_aligned(fields: &[ast::Field], has_base: bool) -> bool {
+    !has_base && fields.iter().all(|field| !field.is_shorthand)
 }
 
 fn rewrite_struct_lit<'a>(
     context: &RewriteContext<'_>,
     path: &ast::Path,
     fields: &'a [ast::Field],
-    base: Option<&'a ast::Expr>,
+    struct_rest: &ast::StructRest,
     attrs: &[ast::Attribute],
     span: Span,
     shape: Shape,
@@ -1586,22 +1608,29 @@ fn rewrite_struct_lit<'a>(
     enum StructLitField<'a> {
         Regular(&'a ast::Field),
         Base(&'a ast::Expr),
+        Rest(&'a Span),
     }
 
     // 2 = " {".len()
     let path_shape = shape.sub_width(2)?;
     let path_str = rewrite_path(context, PathContext::Expr, None, path, path_shape)?;
 
-    if fields.is_empty() && base.is_none() {
-        return Some(format!("{} {{}}", path_str));
-    }
+
+    let has_base = match struct_rest {
+        ast::StructRest::None if fields.is_empty() => return Some(format!("{} {{}}", path_str)),
+        ast::StructRest::Rest(_) if fields.is_empty() => {
+            return Some(format!("{} {{ .. }}", path_str));
+        }
+        ast::StructRest::Base(_) => true,
+        _ => false,
+    };
 
     // Foo { a: Foo } - indent is +3, width is -5.
     let (h_shape, v_shape) = struct_lit_shape(shape, context, path_str.len() + 3, 2)?;
 
     let one_line_width = h_shape.map_or(0, |shape| shape.width);
     let body_lo = context.snippet_provider.span_after(span, "{");
-    let fields_str = if struct_lit_can_be_aligned(fields, base)
+    let fields_str = if struct_lit_can_be_aligned(fields, has_base)
         && context.config.struct_field_align_threshold() > 0
     {
         rewrite_with_alignment(
@@ -1612,10 +1641,14 @@ fn rewrite_struct_lit<'a>(
             one_line_width,
         )?
     } else {
-        let field_iter = fields
-            .iter()
-            .map(StructLitField::Regular)
-            .chain(base.into_iter().map(StructLitField::Base));
+        let field_iter = fields.iter().map(StructLitField::Regular).chain(
+            match struct_rest {
+                ast::StructRest::Base(expr) => Some(StructLitField::Base(&**expr)),
+                ast::StructRest::Rest(span) => Some(StructLitField::Rest(span)),
+                ast::StructRest::None => None,
+            }
+            .into_iter(),
+        );
 
         let span_lo = |item: &StructLitField<'_>| match *item {
             StructLitField::Regular(field) => field.span().lo(),
@@ -1625,10 +1658,12 @@ fn rewrite_struct_lit<'a>(
                 let pos = snippet.find_uncommented("..").unwrap();
                 last_field_hi + BytePos(pos as u32)
             }
+            StructLitField::Rest(span) => span.lo(),
         };
         let span_hi = |item: &StructLitField<'_>| match *item {
             StructLitField::Regular(field) => field.span().hi(),
             StructLitField::Base(expr) => expr.span.hi(),
+            StructLitField::Rest(span) => span.hi(),
         };
         let rewrite = |item: &StructLitField<'_>| match *item {
             StructLitField::Regular(field) => {
@@ -1640,6 +1675,7 @@ fn rewrite_struct_lit<'a>(
                 expr.rewrite(context, v_shape.offset_left(2)?)
                     .map(|s| format!("..{}", s))
             }
+            StructLitField::Rest(_) => Some("..".to_owned()),
         };
 
         let items = itemize_list(
@@ -1666,7 +1702,7 @@ fn rewrite_struct_lit<'a>(
             nested_shape,
             tactic,
             context,
-            force_no_trailing_comma || base.is_some() || !context.use_block_indent(),
+            force_no_trailing_comma || has_base || !context.use_block_indent(),
         );
 
         write_list(&item_vec, &fmt)?

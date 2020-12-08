@@ -18,7 +18,7 @@ pub use crate::emitter::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
 pub use crate::formatting::report::{FormatReport, FormatResult};
 
-use crate::formatting::format_input_inner;
+pub(crate) use crate::formatting::format_input_inner;
 use crate::{emitter::Verbosity, result::OperationError};
 
 #[cfg(feature = "config")]
@@ -49,7 +49,12 @@ pub fn format(
     config: &Config,
     operation_setting: OperationSetting,
 ) -> Result<FormatReport, OperationError> {
-    format_input_inner(input, config, operation_setting)
+    format_input_inner(
+        input,
+        config,
+        operation_setting,
+        /* is_macro_def */ false,
+    )
 }
 
 pub fn format_inputs<'a>(

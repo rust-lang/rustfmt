@@ -1836,6 +1836,33 @@ fn say_hi() {
 }
 ```
 
+## `preserve_closure_block_wrapping`
+
+Preserves block wraping arround closures.  For example, useful when the closure `||` can be
+confused with OR.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `true`:
+Original block wrapping is preserved:
+```rust
+fn main() {
+    let explicit_conversion_preserves_semantics =
+        || { !is_mod || (is_mod && attrs.map_or(true, |a| a.is_empty())) };
+}
+```
+
+#### `false` (default):
+Block is not preserved:
+```rust
+fn main() {
+    let explicit_conversion_preserves_semantics =
+        || !is_mod || (is_mod && attrs.map_or(true, |a| a.is_empty()));
+}
+```
+
 ## `overflow_delimited_expr`
 
 When structs, slices, arrays, and block/array-like macros are used as the last
@@ -2006,6 +2033,56 @@ use dolor;
 use sit;
 ```
 
+## `group_imports`
+
+Controls the strategy for how imports are grouped together.
+
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `StdExternalCrate`
+- **Stable**: No
+
+#### `Preserve` (default):
+
+Preserve the source file's import groups.
+
+```rust
+use super::update::convert_publish_payload;
+use chrono::Utc;
+
+use alloc::alloc::Layout;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+
+use super::schema::{Context, Payload};
+use crate::models::Event;
+use core::f32;
+```
+
+#### `StdExternalCrate`:
+
+Discard existing import groups, and create three groups for:
+1. `std`, `core` and `alloc`,
+2. external crates,
+3. `self`, `super` and `crate` imports.
+
+```rust
+use alloc::alloc::Layout;
+use core::f32;
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+use chrono::Utc;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+```
 
 ## `reorder_modules`
 
