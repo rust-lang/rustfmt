@@ -225,23 +225,23 @@ fn not_whitespace_except_line_feed(g: &str) -> bool {
 /// character is either a punctuation or a whitespace.
 /// FIXME(issue#3281): We must follow UAX#14 algorithm instead of this.
 fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]) -> SnippetState {
-    let break_at = |index_in /* grapheme at index is included */| {
+    let break_at = |index /* grapheme at index is included */| {
         // Ensure break is not after an escape '\' as it will "escape" the `\` that is added
         // for concatenating the two parts of the broken line.
-        let index = if (input[index_in] as &str).ne("\\") {
-            index_in
+        let index = if input[index] != "\\" {
+            index
         } else {
-            let index_offset = match input[0..index_in]
+            let index_offset = match input[0..index]
                 .iter()
                 .rposition(|grapheme| grapheme.ne(&"\\"))
             {
                 // There is a non-`\` to the left
-                Some(non_backslash_index) => (index_in - non_backslash_index) % 2,
+                Some(non_backslash_index) => (index - non_backslash_index) % 2,
                 // Only `\` to the left
-                None => index_in % 2,
+                None => index % 2,
             };
             // Make sure break is after even number (including zero) of `\`
-            index_in - index_offset
+            index - index_offset
         };
 
         // Take in any whitespaces to the left/right of `input[index]` while
