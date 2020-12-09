@@ -415,9 +415,13 @@ where
 
             result.push(' ');
             result.push_str(&formatted_comment);
-        }
-
-        if separate && sep_place.is_back() {
+            // When `Horizontal`, post-comment always preceeds the separator,
+            // regardless of `sep_place`.  Otherwise pos-comment of a list item
+            // may be read as the pre-comment of the next ietm.
+            if separate {
+                result.push_str(formatting.separator);
+            }
+        } else if separate && sep_place.is_back() {
             result.push_str(formatting.separator);
         }
 
