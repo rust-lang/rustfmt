@@ -18,8 +18,8 @@ use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
-    bin_name = "cargo fmt",
-    about = "This utility formats all bin and lib files of \
+bin_name = "cargo fmt",
+about = "This utility formats all bin and lib files of \
              the current crate using rustfmt."
 )]
 pub struct Opts {
@@ -300,15 +300,13 @@ impl Target {
         target: &cargo_metadata::Target,
         nested_int_test_files: Option<Vec<PathBuf>>,
     ) -> Self {
-        let path = PathBuf::from(&target.src_path);
-        let canonicalized = dunce::canonicalize(&path).unwrap_or(path);
-        let test_files = nested_int_test_files.unwrap_or_else(Vec::new);
+        let mut path = PathBuf::from(&target.src_path);
 
         Self {
-            path: canonicalized,
+            path: dunce::canonicalize(&path).unwrap_or(path),
             kind: target.kind[0].clone(),
             edition: target.edition.clone(),
-            nested_int_test_files: test_files,
+            nested_int_test_files: nested_int_test_files.unwrap_or_else(Vec::new),
         }
     }
 }
@@ -427,7 +425,7 @@ fn get_targets_root_only(
                 .filter(|p| {
                     in_workspace_root
                         || dunce::canonicalize(PathBuf::from(&p.manifest_path)).unwrap_or_default()
-                            == current_dir_manifest
+                        == current_dir_manifest
                 })
                 .map(|p| p.targets)
                 .flatten()
