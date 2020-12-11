@@ -365,18 +365,23 @@ fn get_targets(
 ) -> Result<BTreeSet<Target>, io::Error> {
     let mut targets = BTreeSet::new();
 
+    // Define one variable to ensure that all paths was `dunce::canonicalize`.
+    // Instead of repeating the definition.
+    let canonicalize = dunce::canonicalize(PathBuf::from(&manifest_path))
+        .unwrap_or(PathBuf::from(manifest_path.unwrap()))?;
+
     match *strategy {
         CargoFmtStrategy::Root => {
-            get_targets_root_only(manifest_path, &mut targets, include_nested_test_files)?
+            get_targets_root_only(canonicalize, &mut targets, include_nested_test_files)?
         }
         CargoFmtStrategy::All => get_targets_recursive(
-            manifest_path,
+            canonicalize,
             &mut targets,
             &mut BTreeSet::new(),
             include_nested_test_files,
         )?,
         CargoFmtStrategy::Some(ref hitlist) => get_targets_with_hitlist(
-            manifest_path,
+            canonicalize,
             hitlist,
             &mut targets,
             include_nested_test_files,
@@ -394,16 +399,16 @@ fn get_targets(
 }
 
 fn get_targets_root_only(
-    manifest_path: Option<&Path>,
+    manifest_path: PathBuf,
     mut targets: &mut BTreeSet<Target>,
     include_nested_test_files: bool,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
-    let workspace_root_path = dunce::canonicalize(PathBuf::from(&metadata.workspace_root))?;
-    let (in_workspace_root, current_dir_manifest) = if let Some(target_manifest) = manifest_path {
+    let metadata = get_cargo_metadata(Some(&manifest_path), false)?;
+    let workspace_root_path = PathBuf::from(&metadata.workspace_root);
+    let (in_workspace_root, current_dir_manifest) = if let Some(target_manifest) = *manifest_path {
         (
-            workspace_root_path.as_path() == target_manifest,
-            dunce::canonicalize(target_manifest)?,
+            workspace_root_path.as_path() == &target_manifest,
+            dunce::canonicalize(*target_manifest)?,
         )
     } else {
         let current_dir = dunce::canonicalize(env::current_dir()?)?;
@@ -436,7 +441,7 @@ fn get_targets_root_only(
 
     add_targets(
         &package_manifest_path,
-        &package_targets,
+        &*package_targets,
         &mut targets,
         include_nested_test_files,
     )?;
@@ -445,18 +450,18 @@ fn get_targets_root_only(
 }
 
 fn get_targets_recursive(
-    manifest_path: Option<&Path>,
+    manifest_path: PathBuf,
     mut targets: &mut BTreeSet<Target>,
     visited: &mut BTreeSet<String>,
     include_nested_test_files: bool,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
-    let metadata_with_deps = get_cargo_metadata(manifest_path, true)?;
+    let metadata = get_cargo_metadata(Some(&manifest_path), false)?;
+    let metadata_with_deps = get_cargo_metadata(Some(&*manifest_path), true)?;
 
     for package in metadata.packages {
         add_targets(
             &package.manifest_path,
-            &package.targets,
+            &*package.targets,
             &mut targets,
             include_nested_test_files,
         )?;
@@ -486,7 +491,7 @@ fn get_targets_recursive(
             if manifest_path.exists() {
                 visited.insert(dependency.name);
                 get_targets_recursive(
-                    Some(&manifest_path),
+                    manifest_path,
                     &mut targets,
                     visited,
                     include_nested_test_files,
@@ -499,12 +504,12 @@ fn get_targets_recursive(
 }
 
 fn get_targets_with_hitlist(
-    manifest_path: Option<&Path>,
+    manifest_path: PathBuf,
     hitlist: &[String],
     mut targets: &mut BTreeSet<Target>,
     include_nested_test_files: bool,
 ) -> Result<(), io::Error> {
-    let metadata = get_cargo_metadata(manifest_path, false)?;
+    let metadata = get_cargo_metadata(Some(&manifest_path), false)?;
 
     let mut workspace_hitlist: BTreeSet<&String> = BTreeSet::from_iter(hitlist);
 
@@ -512,7 +517,7 @@ fn get_targets_with_hitlist(
         if workspace_hitlist.remove(&package.name) {
             add_targets(
                 &package.manifest_path,
-                &package.targets,
+                &*package.targets,
                 &mut targets,
                 include_nested_test_files,
             )?;
