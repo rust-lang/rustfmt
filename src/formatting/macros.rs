@@ -13,9 +13,7 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_ast::token::{BinOpToken, DelimToken, Token, TokenKind};
-use rustc_ast::tokenstream::{
-    Cursor, LazyTokenStream, LazyTokenStreamInner, TokenStream, TokenTree,
-};
+use rustc_ast::tokenstream::{Cursor, LazyTokenStream, TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_parse::parser::Parser;
@@ -707,8 +705,11 @@ fn delim_token_to_str(
 
 impl MacroArgKind {
     fn starts_with_brace(&self) -> bool {
-        matches!(*self, MacroArgKind::Repeat(DelimToken::Brace, _, _, _)
-            | MacroArgKind::Delimited(DelimToken::Brace, _))
+        matches!(
+            *self,
+            MacroArgKind::Repeat(DelimToken::Brace, _, _, _)
+                | MacroArgKind::Delimited(DelimToken::Brace, _)
+        )
     }
 
     fn starts_with_dollar(&self) -> bool {
@@ -1148,29 +1149,35 @@ enum SpaceState {
 fn force_space_before(tok: &TokenKind) -> bool {
     debug!("tok: force_space_before {:?}", tok);
 
-    matches!(tok, TokenKind::Eq
-        | TokenKind::Lt
-        | TokenKind::Le
-        | TokenKind::EqEq
-        | TokenKind::Ne
-        | TokenKind::Ge
-        | TokenKind::Gt
-        | TokenKind::AndAnd
-        | TokenKind::OrOr
-        | TokenKind::Not
-        | TokenKind::Tilde
-        | TokenKind::BinOpEq(_)
-        | TokenKind::At
-        | TokenKind::RArrow
-        | TokenKind::LArrow
-        | TokenKind::FatArrow
-        | TokenKind::BinOp(_)
-        | TokenKind::Pound
-        | TokenKind::Dollar)
+    matches!(
+        tok,
+        TokenKind::Eq
+            | TokenKind::Lt
+            | TokenKind::Le
+            | TokenKind::EqEq
+            | TokenKind::Ne
+            | TokenKind::Ge
+            | TokenKind::Gt
+            | TokenKind::AndAnd
+            | TokenKind::OrOr
+            | TokenKind::Not
+            | TokenKind::Tilde
+            | TokenKind::BinOpEq(_)
+            | TokenKind::At
+            | TokenKind::RArrow
+            | TokenKind::LArrow
+            | TokenKind::FatArrow
+            | TokenKind::BinOp(_)
+            | TokenKind::Pound
+            | TokenKind::Dollar
+    )
 }
 
 fn ident_like(tok: &Token) -> bool {
-    matches!(tok.kind, TokenKind::Ident(..) | TokenKind::Literal(..) | TokenKind::Lifetime(_))
+    matches!(
+        tok.kind,
+        TokenKind::Ident(..) | TokenKind::Literal(..) | TokenKind::Lifetime(_)
+    )
 }
 
 fn next_space(tok: &TokenKind) -> SpaceState {
@@ -1226,7 +1233,7 @@ pub(crate) fn convert_try_mac(
             kind: ast::ExprKind::Try(kind),
             span: mac.span(), // incorrect span, but shouldn't matter too much
             attrs: ast::AttrVec::new(),
-            tokens: Some(LazyTokenStream::new(LazyTokenStreamInner::Ready(ts))),
+            tokens: Some(LazyTokenStream::new(ts)),
         })
     } else {
         None

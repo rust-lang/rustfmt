@@ -49,10 +49,13 @@ fn custom_opener(s: &str) -> &str {
 impl<'a> CommentStyle<'a> {
     /// Returns `true` if the commenting style covers a line only.
     pub(crate) fn is_line_comment(&self) -> bool {
-        matches!(*self, CommentStyle::DoubleSlash
-            | CommentStyle::TripleSlash
-            | CommentStyle::Doc
-            | CommentStyle::Custom(_))
+        matches!(
+            *self,
+            CommentStyle::DoubleSlash
+                | CommentStyle::TripleSlash
+                | CommentStyle::Doc
+                | CommentStyle::Custom(_)
+        )
     }
 
     /// Returns `true` if the commenting style can span over multiple lines.
