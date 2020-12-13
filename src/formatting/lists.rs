@@ -444,7 +444,22 @@ where
                 };
                 let width = formatting.shape.width.checked_sub(overhead).unwrap_or(1);
                 let offset = formatting.shape.indent + overhead;
-                let comment_shape = Shape::legacy(width, offset);
+
+                /* >>>>>> [DBO] REPLACE next */
+                //let comment_shape = Shape::legacy(width, offset);
+                // If `normalize_comments` is NOT set, second (and on) one-line comment should
+                // be formatted without the item's line indentation, since moving the separator
+                // to the front of the item make ithese post-comments unrelated to the item.
+                let comment_start_trimmed = comment.trim_start();
+                let comment_shape = if comment_start_trimmed.starts_with("//")
+                    && comment_start_trimmed.contains("\n")
+                    && !formatting.config.normalize_comments()
+                {
+                    formatting.shape
+                } else {
+                    Shape::legacy(width, offset)
+                };
+                /* <<<<<< [DBO] ADD */
 
                 // Use block-style only for the last item or multiline comments.
                 let block_style = !formatting.ends_with_newline && last
@@ -452,7 +467,7 @@ where
                     || comment.trim().len() > width;
 
                 rewrite_comment(
-                    comment.trim_start(),
+                    comment_start_trimmed, // >>> [DBO] REPLACED "comment.trim_start()," <<<<
                     block_style,
                     comment_shape,
                     formatting.config,
