@@ -18,8 +18,8 @@ use crate::formatting::{
         FindUncommented,
     },
     expr::{
-        is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_expr,
-        rewrite_assign_rhs_with, rewrite_assign_rhs_with_comments, RhsTactics,
+        is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with,
+        rewrite_assign_rhs_with_comments, RhsTactics,
     },
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator},
     macros::{rewrite_macro, MacroPosition},
@@ -121,7 +121,7 @@ impl Rewrite for ast::Local {
                 mk_sp(self.pat.span.hi(), self.span.hi())
             };
 
-            let mut indentation_offset: usize = 0; // For extra indent is case of forced new line
+            let mut comment_after_assign_span = base_span;
             if let Some(offset) = context.snippet(base_span).find_uncommented("=") {
                 let base_span_lo = base_span.lo();
 
@@ -148,8 +148,8 @@ impl Rewrite for ast::Local {
                         attr_span_lo
                     }
                 };
-                let comment_after_assign =
-                    context.snippet(mk_sp(assign_hi, comment_end_pos)).trim();
+
+                comment_after_assign_span = mk_sp(assign_hi, comment_end_pos);
 
                 if !comment_before_assign.is_empty() {
                     let new_indent_str = &pat_shape
@@ -157,33 +157,19 @@ impl Rewrite for ast::Local {
                         .to_string_with_newline(context.config);
                     result = format!("{}{}{}", comment_before_assign, new_indent_str, result);
                 }
-
-                if !comment_after_assign.is_empty() {
-                    if comment_after_assign.starts_with("//") {
-                        indentation_offset = context.config.tab_spaces();
-                    }
-                    let new_indent_str = &shape
-                        .block_indent(indentation_offset)
-                        .to_string_with_newline(context.config);
-                    result.push_str(new_indent_str);
-                    result.push_str(comment_after_assign);
-                    result.push_str(new_indent_str);
-                }
             }
 
             // 1 = trailing semicolon;
-            let mut nested_shape = shape.sub_width(1)?;
-            if indentation_offset > 0 {
-                nested_shape = nested_shape.block_indent(indentation_offset);
-            }
-            let rhs = rewrite_assign_rhs_expr(
+            let nested_shape = shape.sub_width(1)?;
+            result = rewrite_assign_rhs_with_comments(
                 context,
                 &result,
                 &**ex,
                 nested_shape,
                 RhsTactics::Default,
+                comment_after_assign_span,
+                true,
             )?;
-            result = result + &rhs;
         }
 
         result.push(';');
