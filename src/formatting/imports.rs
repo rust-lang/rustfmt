@@ -118,6 +118,7 @@ impl Eq for UseTree {}
 
 impl Spanned for UseTree {
     fn span(&self) -> Span {
+        debug!("** [DBO] Spanned for UseTree: span: enter ;\n");
         let lo = if let Some(ref attrs) = self.attrs {
             attrs.iter().next().map_or(self.span.lo(), |a| a.span.lo())
         } else {
@@ -126,6 +127,15 @@ impl Spanned for UseTree {
         mk_sp(lo, self.span.hi())
     }
 }
+
+/* >>>>>>> [DBO] ADD */
+macro_rules! to_use_segment_ident {
+    ($seg:ident, $modsep:ident) => {{
+        let mod_sep = if $modsep { "::" } else { "" };
+        UseSegment::Ident(format!("{}{}", mod_sep, $seg), None)
+    }};
+}
+/* <<<<<<< [DBO] ADD */
 
 impl UseSegment {
     // Clone a version of self with any top-level alias removed.
@@ -153,11 +163,21 @@ impl UseSegment {
             "super" => UseSegment::Super(None),
             "crate" => UseSegment::Crate(None),
             _ => {
+                /* >>>>> [DBO] REPLACE ********
                 let mod_sep = if modsep { "::" } else { "" };
                 UseSegment::Ident(format!("{}{}", mod_sep, name), None)
+                ********** [DBO] REPLACE *********/
+                to_use_segment_ident!(name, modsep)
+                /* <<<<<<< [DBO] REPLACE */
             }
         })
     }
+
+    /* >>>>>>> [DBO] ADD */
+    fn from_use_segment(use_seg: &UseSegment, modsep: bool) -> UseSegment {
+        to_use_segment_ident!(use_seg, modsep)
+    }
+    /* <<<<<<< [DBO] ADD */
 }
 
 pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
@@ -419,6 +439,10 @@ impl UseTree {
 
     // Do the adjustments that rustfmt does elsewhere to use paths.
     pub(crate) fn normalize(mut self) -> UseTree {
+        debug!(
+            "** [DBO] UseTree: normalize: enter self={:?}, self.path={:?}\n",
+            self, self.path
+        );
         let mut last = self.path.pop().expect("Empty use tree?");
         // Hack around borrow checker.
         let mut normalize_sole_list = false;
@@ -429,10 +453,12 @@ impl UseTree {
             _ if self.attrs.is_some() => {}
             UseSegment::List(ref list) if list.is_empty() => {
                 self.path = vec![];
+                debug!("** [DBO] UseTree: normalize: retE1={:?}\n", self);
                 return self;
             }
             UseSegment::Slf(None) if self.path.is_empty() && self.visibility.is_some() => {
                 self.path = vec![];
+                debug!("** [DBO] UseTree: normalize: retE2={:?}\n", self);
                 return self;
             }
             _ => {}
@@ -441,6 +467,7 @@ impl UseTree {
         // Normalise foo::self -> foo.
         if let UseSegment::Slf(None) = last {
             if !self.path.is_empty() {
+                debug!("** [DBO] UseTree: normalize: retE3={:?}\n", self);
                 return self;
             }
         }
@@ -467,6 +494,7 @@ impl UseTree {
         }
 
         if done {
+            debug!("** [DBO] UseTree: normalize: retE4={:?}\n", self);
             return self;
         }
 
@@ -480,9 +508,30 @@ impl UseTree {
         if normalize_sole_list {
             match last {
                 UseSegment::List(list) => {
+                    debug!("** [DBO] UseTree: normalize: list={:?}\n", list);
                     for seg in &list[0].path {
+                        debug!(
+                            "** [DBO] UseTree: normalize: seg={:?}, self.path[0]={:?};\n",
+                            seg, self.path[0]
+                        );
+
+                        /****** >>>>>>> [DBO] REPLACE next ********
                         self.path.push(seg.clone());
+                        *************************************************/
+                        if !self.path[0].to_string().is_empty() {
+                            self.path.push(seg.clone());
+                        } else {
+                            self.path = vec![];
+                            let useseg = UseSegment::from_use_segment(seg, true);
+                            debug!("** [DBO] UseTree: normalize: useseg={:?}\n", useseg);
+                            self.path.push(useseg);
+                        }
+                        /****** <<<<<<<<< [DBO] REPLACE next ********/
                     }
+                    debug!(
+                        "** [DBO] UseTree: normalize: retE5 before self.normalize() self={:?}, self.path={:?}\n",
+                        self, self.path
+                    );
                     return self.normalize();
                 }
                 _ => unreachable!(),
@@ -493,9 +542,14 @@ impl UseTree {
         if let UseSegment::List(list) = last {
             let mut list = list.into_iter().map(UseTree::normalize).collect::<Vec<_>>();
             list.sort();
+            //debug!("** [DBO] UseTree: normalize: after sort list={:?}\n", list);
             last = UseSegment::List(list);
         }
 
+        debug!(
+            "** [DBO] UseTree: normalize: retEE (almost)={:?}, last={:?}\n",
+            self, last
+        );
         self.path.push(last);
         self
     }
@@ -539,6 +593,7 @@ impl UseTree {
     }
 
     fn flatten(self) -> Vec<UseTree> {
+        debug!("** [DBO] UseTree: flatten: enter self={:?};\n", self);
         match self.path.last() {
             Some(UseSegment::List(list)) => {
                 if list.len() == 1 && list[0].path.len() == 1 {
@@ -569,6 +624,7 @@ impl UseTree {
     }
 
     fn merge(&mut self, other: &UseTree) {
+        debug!("** [DBO] UseTree: merge: enter self={:?};\n", self);
         let mut prefix = 0;
         for (a, b) in self.path.iter().zip(other.path.iter()) {
             if *a == *b {
@@ -585,6 +641,7 @@ impl UseTree {
 }
 
 fn merge_rest(a: &[UseSegment], b: &[UseSegment], mut len: usize) -> Option<Vec<UseSegment>> {
+    debug!("** [DBO] merge_rest: enter ;\n");
     if a.len() == len && b.len() == len {
         return None;
     }
@@ -618,6 +675,7 @@ fn merge_rest(a: &[UseSegment], b: &[UseSegment], mut len: usize) -> Option<Vec<
 }
 
 fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
+    debug!("** [DBO] merge_use_trees_inner: enter ;\n");
     let similar_trees = trees.iter_mut().filter(|tree| tree.share_prefix(&use_tree));
     if use_tree.path.len() == 1 {
         if let Some(tree) = similar_trees.min_by_key(|tree| tree.path.len()) {
@@ -637,16 +695,30 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
 
 impl PartialOrd for UseSegment {
     fn partial_cmp(&self, other: &UseSegment) -> Option<Ordering> {
+        debug!("** [DBO] PartialOrd for UseSegment: partial_cmp: enter ;\n");
         Some(self.cmp(other))
     }
 }
 impl PartialOrd for UseTree {
     fn partial_cmp(&self, other: &UseTree) -> Option<Ordering> {
-        Some(self.cmp(other))
+        debug!(
+            "** [DBO] PartialOrd for UseTree: partial_cmp: enter self={:?}, other={:?};\n",
+            self, other
+        );
+        let ret = Some(self.cmp(other));
+        debug!(
+            "** [DBO] PartialOrd for UseTree: partial_cmp: retE={:?};\n",
+            ret
+        );
+        ret
     }
 }
 impl Ord for UseSegment {
     fn cmp(&self, other: &UseSegment) -> Ordering {
+        debug!(
+            "** [DBO] Ord for UseSegment: cmp: enter self={:?}, other={:?};\n",
+            self, other
+        );
         use self::UseSegment::*;
 
         fn is_upper_snake_case(s: &str) -> bool {
@@ -654,7 +726,7 @@ impl Ord for UseSegment {
                 .all(|c| c.is_uppercase() || c == '_' || c.is_numeric())
         }
 
-        match (self, other) {
+        let ret = match (self, other) {
             (&Slf(ref a), &Slf(ref b))
             | (&Super(ref a), &Super(ref b))
             | (&Crate(ref a), &Crate(ref b)) => compare_opt_ident_as_versions(&a, &b),
@@ -662,17 +734,37 @@ impl Ord for UseSegment {
             (&Ident(ref pia, ref aa), &Ident(ref pib, ref ab)) => {
                 let ia = pia.trim_start_matches("r#");
                 let ib = pib.trim_start_matches("r#");
+                debug!(
+                    "** [DBO] Ord for UseSegment: cmp: ia={:?}, ib={:?};\n",
+                    ia, ib
+                );
                 // snake_case < CamelCase < UPPER_SNAKE_CASE
+
+                /*********** >>>>>>> [DBO] ADD ********************
+                if !ia.is_empty() && ib.is_empty() {
+                    debug!("** [DBO] Ord for UseSegment: cmp: retE11=Greater;\n");
+                    return Ordering::Greater;
+                }
+                if ia.is_empty() && !ib.is_empty() {
+                    debug!("** [DBO] Ord for UseSegment: cmp: retE12=Less;\n");
+                    return Ordering::Less;
+                }
+                ***************** <<<<<<< [DBO] ADD ***************/
+
                 if ia.starts_with(char::is_uppercase) && ib.starts_with(char::is_lowercase) {
+                    debug!("** [DBO] Ord for UseSegment: cmp: retE1=Greater;\n");
                     return Ordering::Greater;
                 }
                 if ia.starts_with(char::is_lowercase) && ib.starts_with(char::is_uppercase) {
+                    debug!("** [DBO] Ord for UseSegment: cmp: retE2=Less;\n");
                     return Ordering::Less;
                 }
                 if is_upper_snake_case(ia) && !is_upper_snake_case(ib) {
+                    debug!("** [DBO] Ord for UseSegment: cmp: retE3=Greater;\n");
                     return Ordering::Greater;
                 }
                 if !is_upper_snake_case(ia) && is_upper_snake_case(ib) {
+                    debug!("** [DBO] Ord for UseSegment: cmp: retE4=Less;\n");
                     return Ordering::Less;
                 }
 
@@ -682,6 +774,7 @@ impl Ord for UseSegment {
                 for (a, b) in a.iter().zip(b.iter()) {
                     let ord = a.cmp(b);
                     if ord != Ordering::Equal {
+                        debug!("** [DBO] Ord for UseSegment: cmp: ord=retE5={:?};\n", ord);
                         return ord;
                     }
                 }
@@ -698,23 +791,50 @@ impl Ord for UseSegment {
             (_, &Ident(..)) => Ordering::Greater,
             (&Glob, _) => Ordering::Less,
             (_, &Glob) => Ordering::Greater,
-        }
+        };
+        debug!("** [DBO] Ord for UseSegment: cmp: retEE={:?};\n", ret);
+        ret
     }
 }
 impl Ord for UseTree {
     fn cmp(&self, other: &UseTree) -> Ordering {
+        debug!(
+            "** [DBO] Ord for UseTree: cmp: enter self={:?}, other={:?}, self.path.iter={:?}, other.path.iter={:?};\n",
+            self,
+            other,
+            self.path.iter(),
+            other.path.iter(),
+        );
         for (a, b) in self.path.iter().zip(other.path.iter()) {
             // The comparison without aliases is a hack to avoid situations like
             // comparing `a::b` to `a as c` - where the latter should be ordered
             // first since it is shorter.
+            debug!(
+                "** [DBO] Ord for UseTree: cmp: a={:?}, a.remove_alias={:?}, b={:?}, b.remove_alias={:?};\n",
+                a,
+                a.remove_alias(),
+                b,
+                b.remove_alias(),
+            );
+
             let ord = a.remove_alias().cmp(&b.remove_alias());
             if ord != Ordering::Equal {
+                debug!("** [DBO] Ord for UseTree: cmp: ord=retE1={:?};\n", ord);
                 return ord;
             }
         }
 
-        Ord::cmp(&self.path.len(), &other.path.len())
-            .then(Ord::cmp(&self.path.last(), &other.path.last()))
+        debug!(
+            "** [DBO] Ord for UseTree: cmp: self.path.len={:?}, other.path.len={:?}, self.path.last={:?}, other.path.last()={:?};\n",
+            self.path.len(),
+            other.path.len(),
+            self.path.last(),
+            other.path.last(),
+        );
+        let ret = Ord::cmp(&self.path.len(), &other.path.len())
+            .then(Ord::cmp(&self.path.last(), &other.path.last()));
+        debug!("** [DBO] Ord for UseTree: cmp: retEE={:?};\n", ret);
+        ret
     }
 }
 
@@ -723,6 +843,7 @@ fn rewrite_nested_use_tree(
     use_tree_list: &[UseTree],
     shape: Shape,
 ) -> Option<String> {
+    debug!("** [DBO] rewrite_nested_use_tree: enter ;\n");
     let mut list_items = Vec::with_capacity(use_tree_list.len());
     let nested_shape = match context.config.imports_indent() {
         IndentStyle::Block => shape
@@ -792,6 +913,7 @@ fn rewrite_nested_use_tree(
 
 impl Rewrite for UseSegment {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        debug!("** [DBO] Rewrite for UseSegment: rewrite: enter ;\n");
         Some(match self {
             UseSegment::Ident(ref ident, Some(ref rename)) => format!("{} as {}", ident, rename),
             UseSegment::Ident(ref ident, None) => ident.clone(),
@@ -815,6 +937,7 @@ impl Rewrite for UseSegment {
 impl Rewrite for UseTree {
     // This does NOT format attributes and visibility or add a trailing `;`.
     fn rewrite(&self, context: &RewriteContext<'_>, mut shape: Shape) -> Option<String> {
+        debug!("** [DBO] Rewrite for UseTree: rewrite: enter ;\n");
         let mut result = String::with_capacity(256);
         let mut iter = self.path.iter().peekable();
         while let Some(ref segment) = iter.next() {
