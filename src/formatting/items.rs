@@ -121,42 +121,37 @@ impl Rewrite for ast::Local {
                 mk_sp(self.pat.span.hi(), self.span.hi())
             };
 
-            let mut comment_after_assign_span = base_span;
-            if let Some(offset) = context.snippet(base_span).find_uncommented("=") {
-                let base_span_lo = base_span.lo();
+            let offset = context.snippet(base_span).find_uncommented("=")?;
+            let base_span_lo = base_span.lo();
 
-                let assign_lo = base_span_lo + BytePos(offset as u32);
-                let comment_start_pos = if let Some(ref ty) = self.ty {
-                    ty.span.hi()
-                } else {
-                    self.pat.span.hi()
-                };
-                let comment_before_assign =
-                    context.snippet(mk_sp(comment_start_pos, assign_lo)).trim();
+            let assign_lo = base_span_lo + BytePos(offset as u32);
+            let comment_start_pos = if let Some(ref ty) = self.ty {
+                ty.span.hi()
+            } else {
+                self.pat.span.hi()
+            };
+            let comment_before_assign = context.snippet(mk_sp(comment_start_pos, assign_lo)).trim();
 
-                let assign_hi = base_span_lo + BytePos((offset + 1) as u32);
-                let rhs_span_lo = ex.span.lo();
-                let comment_end_pos = if ex.attrs.is_empty() {
+            let assign_hi = base_span_lo + BytePos((offset + 1) as u32);
+            let rhs_span_lo = ex.span.lo();
+            let comment_end_pos = if ex.attrs.is_empty() {
+                rhs_span_lo
+            } else {
+                let attr_span_lo = ex.attrs.first().unwrap().span.lo();
+                // for the case using block
+                // ex. let x = { #![my_attr]do_something(); }
+                if rhs_span_lo < attr_span_lo {
                     rhs_span_lo
                 } else {
-                    let attr_span_lo = ex.attrs.first().unwrap().span.lo();
-                    // for the case using block
-                    // ex. let x = { #![my_attr]do_something(); }
-                    if rhs_span_lo < attr_span_lo {
-                        rhs_span_lo
-                    } else {
-                        attr_span_lo
-                    }
-                };
-
-                comment_after_assign_span = mk_sp(assign_hi, comment_end_pos);
-
-                if !comment_before_assign.is_empty() {
-                    let new_indent_str = &pat_shape
-                        .block_indent(0)
-                        .to_string_with_newline(context.config);
-                    result = format!("{}{}{}", comment_before_assign, new_indent_str, result);
+                    attr_span_lo
                 }
+            };
+
+            if !comment_before_assign.is_empty() {
+                let new_indent_str = &pat_shape
+                    .block_indent(0)
+                    .to_string_with_newline(context.config);
+                result = format!("{}{}{}", comment_before_assign, new_indent_str, result);
             }
 
             // 1 = trailing semicolon;
@@ -167,7 +162,7 @@ impl Rewrite for ast::Local {
                 &**ex,
                 nested_shape,
                 RhsTactics::Default,
-                comment_after_assign_span,
+                mk_sp(assign_hi, comment_end_pos),
                 true,
             )?;
         }
