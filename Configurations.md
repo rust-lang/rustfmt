@@ -2562,7 +2562,10 @@ not merge into a single tree.
 
 ```rust
 use foo::{a::b, c};
-use foo::{d::{e, f}, g::{h, i}};
+use foo::{
+    d::{e, f},
+    g::{h, i},
+};
 ```
 
 #### `true`:
