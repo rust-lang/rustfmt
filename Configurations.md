@@ -2548,6 +2548,32 @@ fn lorem<Ipsum: Dolor+Sit=Amet>() {
 }
 ```
 
+## `unnest_imports`
+
+Break apart nested import groups into separate `use` statements.
+When used with `merge_imports`, imports will be merged together by module but
+not merge into a single tree.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+use foo::{a::b, c};
+use foo::{d::{e, f}, g::{h, i}};
+```
+
+#### `true`:
+
+```rust
+use foo::a::b;
+use foo::c;
+use foo::d::{e, f};
+use foo::g::{h, i};
+```
+
 ## `unstable_features`
 
 Enable unstable features on stable and beta channels (unstable features are available by default on nightly).
