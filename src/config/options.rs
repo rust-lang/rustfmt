@@ -119,6 +119,17 @@ pub enum GroupImportsTactic {
 }
 
 #[config_type]
+/// How to merge imports.
+pub enum MergeImports {
+    /// Do not merge imports.
+    Never,
+    /// Use one `use` statement per crate.
+    Crate,
+    /// Use one `use` statement per module.
+    Module,
+}
+
+#[config_type]
 pub enum ReportTactic {
     Always,
     Unnumbered,

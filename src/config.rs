@@ -77,7 +77,7 @@ create_config! {
     // Imports
     imports_indent: IndentStyle, IndentStyle::Block, false, "Indent of imports";
     imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
-    merge_imports: bool, false, false, "Merge imports";
+    merge_imports: MergeImports, MergeImports::Never, false, "Merge imports";
     group_imports: GroupImportsTactic, GroupImportsTactic::Preserve, false,
         "Controls the strategy for how imports are grouped together";
 
@@ -595,7 +595,7 @@ fn_single_line = false
 where_single_line = false
 imports_indent = "Block"
 imports_layout = "Mixed"
-merge_imports = false
+merge_imports = "Never"
 group_imports = "Preserve"
 reorder_imports = true
 reorder_modules = true
@@ -716,13 +716,13 @@ ignore = []
             }
             let toml = r#"
                 unstable_features = true
-                merge_imports = true
+                merge_imports = "Crate"
             "#;
             let config = Config::from_toml(toml, Path::new("")).unwrap();
             assert_eq!(config.was_set().unstable_features(), true);
             assert_eq!(config.was_set().merge_imports(), true);
             assert_eq!(config.unstable_features(), true);
-            assert_eq!(config.merge_imports(), true);
+            assert_eq!(config.merge_imports(), MergeImports::Crate);
         }
 
         #[test]
@@ -731,9 +731,9 @@ ignore = []
                 // This test requires non-nightly
                 return;
             }
-            let config = Config::from_toml("merge_imports = true", Path::new("")).unwrap();
+            let config = Config::from_toml("merge_imports = Crate", Path::new("")).unwrap();
             assert_eq!(config.was_set().merge_imports(), false);
-            assert_eq!(config.merge_imports(), false);
+            assert_eq!(config.merge_imports(), MergeImports::Never);
         }
 
         #[test]
@@ -778,12 +778,12 @@ ignore = []
             }
             let mut config = Config::default();
             assert_eq!(config.unstable_features(), false);
-            config.override_value("merge_imports", "true");
-            assert_eq!(config.merge_imports(), false);
+            config.override_value("merge_imports", "Crate");
+            assert_eq!(config.merge_imports(), MergeImports::Crate);
             config.override_value("unstable_features", "true");
             assert_eq!(config.unstable_features(), true);
-            config.override_value("merge_imports", "true");
-            assert_eq!(config.merge_imports(), true);
+            config.override_value("merge_imports", "Crate");
+            assert_eq!(config.merge_imports(), MergeImports::Crate);
         }
 
         #[test]
