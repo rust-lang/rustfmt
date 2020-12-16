@@ -1,4 +1,4 @@
-// rustfmt-merge_imports: true
+// rustfmt-merge_imports: Crate
 
 pub mod foo {
     pub mod bar {

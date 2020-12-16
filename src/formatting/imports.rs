@@ -179,6 +179,48 @@ pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
     result
 }
 
+/// Split apart nested imports in use trees.
+pub(crate) fn unnest_use_trees(mut use_trees: Vec<UseTree>) -> Vec<UseTree> {
+    let mut result = Vec::with_capacity(use_trees.len());
+    while let Some(mut use_tree) = use_trees.pop() {
+        if !use_tree.has_comment() && use_tree.attrs.is_none() {
+            if let Some((UseSegment::List(list), ref prefix)) = use_tree.path.split_last_mut() {
+                let span = use_tree.span;
+                let visibility = &use_tree.visibility;
+                list.retain(|nested_use_tree| {
+                    if matches!(
+                        nested_use_tree.path[..],
+                        [UseSegment::Ident(..)] | [UseSegment::Slf(..)] | [UseSegment::Glob]
+                    ) {
+                        return true;
+                    }
+                    if nested_use_tree.has_comment() {
+                        return true;
+                    }
+                    // nested item detected; flatten once, but process it again
+                    // in case it has more nesting
+                    use_trees.push(UseTree {
+                        path: prefix
+                            .iter()
+                            .cloned()
+                            .chain(nested_use_tree.path.iter().cloned())
+                            .collect(),
+                        span,
+                        list_item: None,
+                        visibility: visibility.clone(),
+                        attrs: None,
+                    });
+                    // remove this item
+                    false
+                });
+                use_tree = use_tree.normalize();
+            }
+        }
+        result.push(use_tree);
+    }
+    result
+}
+
 impl fmt::Debug for UseTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)

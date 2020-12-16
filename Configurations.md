@@ -1707,26 +1707,43 @@ pub enum Foo {}
 
 ## `merge_imports`
 
-Merge multiple imports into a single nested import.
+Merge together related imports based on their paths.
 
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
+This option requires `reorder_imports`, which is enabled by default.
+
+- **Default value**: `Never`
+- **Possible values**: `Never`, `Crate`, `Module`
 - **Stable**: No (tracking issue: [#3362](https://github.com/rust-lang/rustfmt/issues/3362))
 
-#### `false` (default):
+#### `Never` (default):
 
 ```rust
-use foo::{a, c, d};
-use foo::{b, g};
-use foo::{e, f};
+use foo::b;
+use foo::b::{f, g};
+use foo::{a, c, d::e};
+use qux::{h, i};
 ```
 
-#### `true`:
+#### `Crate`:
 
 ```rust
-use foo::{a, b, c, d, e, f, g};
+use foo::{
+    a, b,
+    b::{f, g},
+    c,
+    d::e,
+};
+use qux::{h, i};
 ```
 
+#### `Module`:
+
+```rust
+use foo::b::{f, g};
+use foo::d::e;
+use foo::{a, b, c};
+use qux::{h, i};
+```
 
 ## `newline_style`
 
@@ -2560,7 +2577,7 @@ Enable unstable features on stable and beta channels (unstable features are avai
 
 For example:
 ```bash
-rustfmt src/lib.rs --config unstable_features=true merge_imports=true
+rustfmt src/lib.rs --config unstable_features=true merge_imports=Crate
 ```
 
 ## `use_field_init_shorthand`

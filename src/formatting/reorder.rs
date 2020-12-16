@@ -11,11 +11,11 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::ast;
 use rustc_span::{symbol::sym, Span};
 
-use crate::config::{Config, GroupImportsTactic};
+use crate::config::{Config, GroupImportsTactic, MergeImports};
 use crate::formatting::imports::UseSegment;
 use crate::formatting::modules::{get_mod_inner_attrs, FileModMap};
 use crate::formatting::{
-    imports::{merge_use_trees, UseTree},
+    imports::{merge_use_trees, unnest_use_trees, UseTree},
     items::{is_mod_decl, rewrite_extern_crate, rewrite_mod},
     lists::{itemize_list, write_list, ListFormatting, ListItem},
     rewrite::RewriteContext,
@@ -226,8 +226,12 @@ fn rewrite_reorderable_or_regroupable_items(
             for (item, list_item) in normalized_items.iter_mut().zip(list_items) {
                 item.list_item = Some(list_item.clone());
             }
-            if context.config.merge_imports() {
-                normalized_items = merge_use_trees(normalized_items);
+            match context.config.merge_imports() {
+                MergeImports::Crate => normalized_items = merge_use_trees(normalized_items),
+                MergeImports::Module => {
+                    normalized_items = unnest_use_trees(merge_use_trees(normalized_items))
+                }
+                MergeImports::Never => {}
             }
 
             let mut regrouped_items = match context.config.group_imports() {
