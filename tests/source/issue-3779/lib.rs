@@ -1,3 +1,4 @@
+// rustfmt-recursive: true
 // rustfmt-unstable: true
 // rustfmt-config: issue-3779.toml
 
