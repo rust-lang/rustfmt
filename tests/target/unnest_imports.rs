@@ -10,3 +10,14 @@ use a::n::o::p;
 use a::n::q;
 pub use a::r::s;
 pub use a::t;
+
+#[cfg(test)]
+use foo::{a::b, c::d};
+
+use bar::e::f;
+use bar::{
+    // comment
+    a::b,
+    // more comment
+    c::d,
+};

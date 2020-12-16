@@ -193,6 +193,9 @@ pub(crate) fn unnest_use_trees(mut use_trees: Vec<UseTree>) -> Vec<UseTree> {
                     ) {
                         return true;
                     }
+                    if nested_use_tree.has_comment() {
+                        return true;
+                    }
                     // nested item detected; flatten once, but process it again
                     // in case it has more nesting
                     use_trees.push(UseTree {
