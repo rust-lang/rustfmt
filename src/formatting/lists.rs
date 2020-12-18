@@ -461,8 +461,8 @@ where
 
             let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
 
-            // Mmultiline comments are not included in a previous "indentation group".
-            // Each multiline comment is a considered as a separage group.
+            // Multiline comments are not included in a previous "indentation group".
+            // Each multiline comment is considered as a separate group.
             if formatted_comment.contains('\n') {
                 item_max_width = None;
                 formatted_comment = rewrite_post_comment(&mut item_max_width)?;
