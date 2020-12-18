@@ -1,3 +1,4 @@
+// rustfmt-recursive: true
 #[cfg_attr(feature = "foo", path = "foo.rs")]
 #[cfg_attr(not(feture = "foo"), path = "bar.rs")]
 mod sub_mod;
