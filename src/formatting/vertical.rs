@@ -50,16 +50,15 @@ impl AlignedItem for ast::StructField {
             mk_sp(self.attrs.last().unwrap().span.hi(), self.span.lo())
         };
         let attrs_extendable = self.ident.is_none() && is_attributes_extendable(&attrs_str);
-        Some(rewrite_struct_field_prefix(context, self)).and_then(|field_str| {
-            combine_strs_with_missing_comments(
-                context,
-                &attrs_str,
-                &field_str,
-                missing_span,
-                shape,
-                attrs_extendable,
-            )
-        })
+        let prefix = rewrite_struct_field_prefix(context, self);
+        combine_strs_with_missing_comments(
+            context,
+            &attrs_str,
+            &prefix,
+            missing_span,
+            shape,
+            attrs_extendable,
+        )
     }
 
     fn rewrite_aligned_item(
