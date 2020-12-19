@@ -1704,8 +1704,8 @@ impl<'a> Iterator for CommentReducer<'a> {
 fn remove_comment_header(comment: &str) -> &str {
     if comment.starts_with("///") || comment.starts_with("//!") {
         &comment[3..]
-    } else if comment.starts_with("//") {
-        &comment[2..]
+    } else if let Some(stripped) = comment.strip_prefix("//") {
+        &stripped
     } else if (comment.starts_with("/**") && !comment.starts_with("/**/"))
         || comment.starts_with("/*!")
     {
