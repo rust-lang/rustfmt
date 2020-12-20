@@ -447,8 +447,8 @@ where
 
                 // If `normalize_comments` is not set, second and on one-line comments should
                 // be formatted without the item's line indentation, since the separator
-                // is moved right after the list item, making these (non-first) post-comments unrelated
-                // to the item.
+                // is moved right after the list item, making these (non-first) post-comments
+                // unrelated to the item.
                 let comment_start_trimmed = comment.trim_start();
                 let comment_shape = if !formatting.config.normalize_comments()
                     && comment_start_trimmed.starts_with("//")
