@@ -444,7 +444,7 @@ pub(crate) fn format_expr(
     };
 
     expr_rw
-        .and_then(|expr_str| recover_comment_removed(expr_str, expr.span, context))
+        .map(|expr_str| recover_comment_removed(expr_str, expr.span, context))
         .and_then(|expr_str| {
             let attrs = outer_attributes(&expr.attrs);
             let attrs_str = attrs.rewrite(context, shape)?;

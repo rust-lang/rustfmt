@@ -476,6 +476,13 @@ where
 
             let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
 
+            // Multiline comments are not included in a previous "indentation group".
+            // Each multiline comment is considered as a separate group.
+            if formatted_comment.contains('\n') {
+                item_max_width = None;
+                formatted_comment = rewrite_post_comment(&mut item_max_width)?;
+            }
+
             if !starts_with_newline(comment) {
                 if formatting.align_comments {
                     let mut comment_alignment = post_comment_alignment(
@@ -552,10 +559,21 @@ where
     for item in items.clone().into_iter().skip(i) {
         let item = item.as_ref();
         let inner_item_width = UnicodeSegmentation::graphemes(item.inner_as_ref(), true).count();
+        let post_comment_is_multiline = item
+            .post_comment
+            .as_ref()
+            .map_or(false, |s| s.trim().contains('\n'));
+
+        // Each multiline comment is an "indentation group" on its own
+        if first && post_comment_is_multiline {
+            return inner_item_width;
+        }
+
         if !first
             && (item.is_different_group()
                 || item.post_comment.is_none()
-                || inner_item_width + overhead > max_budget)
+                || inner_item_width + overhead > max_budget
+                || post_comment_is_multiline)
         {
             return max_width;
         }
@@ -636,8 +654,8 @@ pub(crate) fn extract_post_comment(
     let post_snippet = post_snippet[..comment_end].trim();
     let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
         post_snippet[1..].trim_matches(white_space)
-    } else if post_snippet.starts_with(separator) {
-        post_snippet[separator.len()..].trim_matches(white_space)
+    } else if let Some(post_snippet) = post_snippet.strip_prefix(separator) {
+        post_snippet.trim_matches(white_space)
     }
     // not comment or over two lines
     else if post_snippet.ends_with(',')

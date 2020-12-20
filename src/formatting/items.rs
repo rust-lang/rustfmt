@@ -18,8 +18,8 @@ use crate::formatting::{
         FindUncommented,
     },
     expr::{
-        is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_expr,
-        rewrite_assign_rhs_with, rewrite_assign_rhs_with_comments, RhsTactics,
+        is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with,
+        rewrite_assign_rhs_with_comments, RhsTactics,
     },
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator},
     macros::{rewrite_macro, MacroPosition},
@@ -121,61 +121,50 @@ impl Rewrite for ast::Local {
                 mk_sp(self.pat.span.hi(), self.span.hi())
             };
 
-            if let Some(offset) = context.snippet(base_span).find_uncommented("=") {
-                let base_span_lo = base_span.lo();
+            let offset = context.snippet(base_span).find_uncommented("=")?;
+            let base_span_lo = base_span.lo();
 
-                let assign_lo = base_span_lo + BytePos(offset as u32);
-                let comment_start_pos = if let Some(ref ty) = self.ty {
-                    ty.span.hi()
-                } else {
-                    self.pat.span.hi()
-                };
-                let comment_before_assign =
-                    context.snippet(mk_sp(comment_start_pos, assign_lo)).trim();
+            let assign_lo = base_span_lo + BytePos(offset as u32);
+            let comment_start_pos = if let Some(ref ty) = self.ty {
+                ty.span.hi()
+            } else {
+                self.pat.span.hi()
+            };
+            let comment_before_assign = context.snippet(mk_sp(comment_start_pos, assign_lo)).trim();
 
-                let assign_hi = base_span_lo + BytePos((offset + 1) as u32);
-                let rhs_span_lo = ex.span.lo();
-                let comment_end_pos = if ex.attrs.is_empty() {
+            let assign_hi = base_span_lo + BytePos((offset + 1) as u32);
+            let rhs_span_lo = ex.span.lo();
+            let comment_end_pos = if ex.attrs.is_empty() {
+                rhs_span_lo
+            } else {
+                let attr_span_lo = ex.attrs.first().unwrap().span.lo();
+                // for the case using block
+                // ex. let x = { #![my_attr]do_something(); }
+                if rhs_span_lo < attr_span_lo {
                     rhs_span_lo
                 } else {
-                    let attr_span_lo = ex.attrs.first().unwrap().span.lo();
-                    // for the case using block
-                    // ex. let x = { #![my_attr]do_something(); }
-                    if rhs_span_lo < attr_span_lo {
-                        rhs_span_lo
-                    } else {
-                        attr_span_lo
-                    }
-                };
-                let comment_after_assign =
-                    context.snippet(mk_sp(assign_hi, comment_end_pos)).trim();
-
-                if !comment_before_assign.is_empty() {
-                    let new_indent_str = &pat_shape
-                        .block_indent(0)
-                        .to_string_with_newline(context.config);
-                    result = format!("{}{}{}", comment_before_assign, new_indent_str, result);
+                    attr_span_lo
                 }
+            };
 
-                if !comment_after_assign.is_empty() {
-                    let new_indent_str =
-                        &shape.block_indent(0).to_string_with_newline(context.config);
-                    result.push_str(new_indent_str);
-                    result.push_str(comment_after_assign);
-                    result.push_str(new_indent_str);
-                }
+            if !comment_before_assign.is_empty() {
+                let new_indent_str = &pat_shape
+                    .block_indent(0)
+                    .to_string_with_newline(context.config);
+                result = format!("{}{}{}", comment_before_assign, new_indent_str, result);
             }
 
             // 1 = trailing semicolon;
             let nested_shape = shape.sub_width(1)?;
-            let rhs = rewrite_assign_rhs_expr(
+            result = rewrite_assign_rhs_with_comments(
                 context,
                 &result,
                 &**ex,
                 nested_shape,
                 RhsTactics::Default,
+                mk_sp(assign_hi, comment_end_pos),
+                true,
             )?;
-            result = result + &rhs;
         }
 
         result.push(';');
@@ -845,7 +834,7 @@ pub(crate) fn format_impl(
                 // there is only one where-clause predicate
                 // recover the suppressed comma in single line where_clause formatting
                 if generics.where_clause.predicates.len() == 1 {
-                    result.push_str(",");
+                    result.push(',');
                 }
                 result.push_str(&format!("{}{{{}}}", sep, sep));
             } else {
@@ -1748,10 +1737,10 @@ fn type_annotation_spacing(config: &Config) -> (&str, &str) {
 pub(crate) fn rewrite_struct_field_prefix(
     context: &RewriteContext<'_>,
     field: &ast::StructField,
-) -> Option<String> {
+) -> String {
     let vis = format_visibility(context, &field.vis);
     let type_annotation_spacing = type_annotation_spacing(context.config);
-    Some(match field.ident {
+    match field.ident {
         Some(name) => format!(
             "{}{}{}:",
             vis,
@@ -1759,7 +1748,7 @@ pub(crate) fn rewrite_struct_field_prefix(
             type_annotation_spacing.0
         ),
         None => vis.to_string(),
-    })
+    }
 }
 
 impl Rewrite for ast::StructField {
@@ -1779,7 +1768,7 @@ pub(crate) fn rewrite_struct_field(
     }
 
     let type_annotation_spacing = type_annotation_spacing(context.config);
-    let prefix = rewrite_struct_field_prefix(context, field)?;
+    let prefix = rewrite_struct_field_prefix(context, field);
 
     let attrs_str = field.attrs.rewrite(context, shape)?;
     let attrs_extendable = field.ident.is_none() && is_attributes_extendable(&attrs_str);
@@ -1956,7 +1945,7 @@ fn rewrite_static(
             comments_span,
             true,
         )
-        .and_then(|res| recover_comment_removed(res, static_parts.span, context))
+        .map(|res| recover_comment_removed(res, static_parts.span, context))
         .or_else(|| {
             let nested_indent = offset.block_indent(context.config);
             let ty_span_hi = static_parts.ty.span.hi();
@@ -2368,7 +2357,7 @@ fn rewrite_fn_base(
         ret_str_len,
         fn_brace_style,
         multi_line_ret_str,
-    )?;
+    );
 
     debug!(
         "rewrite_fn_base: one_line_budget: {}, multi_line_budget: {}, param_indent: {:?}",
@@ -2613,7 +2602,8 @@ fn rewrite_fn_base(
     result.push_str(&where_clause_str);
 
     force_new_line_for_brace |= last_line_contains_single_line_comment(&result);
-    force_new_line_for_brace |= is_params_multi_lined && context.config.where_single_line();
+    force_new_line_for_brace |=
+        is_params_multi_lined && context.config.where_single_line() && !where_clause_str.is_empty();
     Some((result, force_new_line_for_brace))
 }
 
@@ -2754,7 +2744,7 @@ fn compute_budgets_for_params(
     ret_str_len: usize,
     fn_brace_style: FnBraceStyle,
     force_vertical_layout: bool,
-) -> Option<(usize, usize, Indent)> {
+) -> (usize, usize, Indent) {
     debug!(
         "compute_budgets_for_params {} {:?}, {}, {:?}",
         result.len(),
@@ -2791,7 +2781,7 @@ fn compute_budgets_for_params(
                 }
             };
 
-            return Some((one_line_budget, multi_line_budget, indent));
+            return (one_line_budget, multi_line_budget, indent);
         }
     }
 
@@ -2803,7 +2793,7 @@ fn compute_budgets_for_params(
         // Account for `)` and possibly ` {`.
         IndentStyle::Visual => new_indent.width() + if ret_str_len == 0 { 1 } else { 3 },
     };
-    Some((0, context.budget(used_space), new_indent))
+    (0, context.budget(used_space), new_indent)
 }
 
 fn newline_for_brace(config: &Config, where_clause: &ast::WhereClause) -> FnBraceStyle {

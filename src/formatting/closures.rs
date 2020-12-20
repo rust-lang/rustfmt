@@ -90,7 +90,7 @@ pub(crate) fn rewrite_closure(
         let between_span = Span::between(arg_span, first_span);
         if contains_comment(context.snippet(between_span)) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(|rw| {
-                let mut parts = rw.splitn(2, "\n");
+                let mut parts = rw.splitn(2, '\n');
                 let head = parts.next()?;
                 let rest = parts.next()?;
                 let block_shape = shape.block_indent(context.config.tab_spaces());
@@ -409,18 +409,21 @@ pub(crate) fn rewrite_last_closure(
         if is_block_closure_forced(context, body, capture) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).map(
                 |body_str| {
-                    // If the expression can fit in a single line, we need not force block closure.
-                    if body_str.lines().count() <= 7 {
-                        match rewrite_closure_expr(body, &prefix, context, shape) {
-                            Some(ref single_line_body_str)
-                                if !single_line_body_str.contains('\n') =>
-                            {
-                                single_line_body_str.clone()
+                    match fn_decl.output {
+                        ast::FnRetTy::Default(..) if body_str.lines().count() <= 7 => {
+                            // If the expression can fit in a single line, we need not force block
+                            // closure.  However, if the closure has a return type, then we must
+                            // keep the blocks.
+                            match rewrite_closure_expr(body, &prefix, context, shape) {
+                                Some(ref single_line_body_str)
+                                    if !single_line_body_str.contains('\n') =>
+                                {
+                                    single_line_body_str.clone()
+                                }
+                                _ => body_str,
                             }
-                            _ => body_str,
                         }
-                    } else {
-                        body_str
+                        _ => body_str,
                     }
                 },
             );
