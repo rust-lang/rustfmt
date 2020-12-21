@@ -1,5 +1,5 @@
 use crate::config::file_lines::FileLines;
-use crate::config::options::{IgnoreList, WidthHeuristics};
+use crate::config::options::{IgnoreList, MergeImports, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
 pub(crate) trait ConfigType: Sized {
@@ -47,6 +47,12 @@ impl ConfigType for WidthHeuristics {
 impl ConfigType for IgnoreList {
     fn doc_hint() -> String {
         String::from("[<string>,..]")
+    }
+}
+
+impl ConfigType for MergeImports {
+    fn doc_hint() -> String {
+        "[Never|Crate|Module]".to_owned()
     }
 }
 

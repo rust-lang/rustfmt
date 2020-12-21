@@ -1,6 +1,7 @@
 use std::collections::{hash_set, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use rustfmt_config_proc_macro::config_type;
 use serde::de::{SeqAccess, Visitor};
@@ -118,7 +119,7 @@ pub enum GroupImportsTactic {
     StdExternalCrate,
 }
 
-#[config_type]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize)]
 /// How to merge imports.
 pub enum MergeImports {
     /// Do not merge imports.
@@ -127,6 +128,50 @@ pub enum MergeImports {
     Crate,
     /// Use one `use` statement per module.
     Module,
+}
+
+impl FromStr for MergeImports {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if "false".eq_ignore_ascii_case(s) {
+            eprintln!("Warning: merge_imports=false is being renamed to Never");
+            return Ok(MergeImports::Never);
+        }
+        if "true".eq_ignore_ascii_case(s) {
+            eprintln!("Warning: merge_imports=true is being renamed to Crate");
+            return Ok(MergeImports::Crate);
+        }
+        if "Never".eq_ignore_ascii_case(s) {
+            return Ok(MergeImports::Never);
+        }
+        if "Crate".eq_ignore_ascii_case(s) {
+            return Ok(MergeImports::Crate);
+        }
+        if "Module".eq_ignore_ascii_case(s) {
+            return Ok(MergeImports::Module);
+        }
+        return Err("Bad variant, expected one of: `Never` `Crate` `Module`");
+    }
+}
+
+impl fmt::Display for MergeImports {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl<'de> Deserialize<'de> for MergeImports {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(|_| {
+            static ALLOWED: &'static [&str] = &["Never", "Crate", "Module"];
+            serde::de::Error::unknown_variant(&s, ALLOWED)
+        })
+    }
 }
 
 #[config_type]
@@ -328,7 +373,7 @@ impl IgnoreList {
     }
 }
 
-impl std::str::FromStr for IgnoreList {
+impl FromStr for IgnoreList {
     type Err = &'static str;
 
     fn from_str(_: &str) -> Result<Self, Self::Err> {
