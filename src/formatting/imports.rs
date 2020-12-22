@@ -127,13 +127,6 @@ impl Spanned for UseTree {
     }
 }
 
-macro_rules! to_use_segment_ident {
-    ($seg:ident, $modsep:ident) => {{
-        let mod_sep = if $modsep { "::" } else { "" };
-        UseSegment::Ident(format!("{}{}", mod_sep, $seg), None)
-    }};
-}
-
 impl UseSegment {
     // Clone a version of self with any top-level alias removed.
     fn remove_alias(&self) -> UseSegment {
@@ -160,13 +153,10 @@ impl UseSegment {
             "super" => UseSegment::Super(None),
             "crate" => UseSegment::Crate(None),
             _ => {
-                to_use_segment_ident!(name, modsep)
+                let mod_sep = if modsep { "::" } else { "" };
+                UseSegment::Ident(format!("{}{}", mod_sep, name), None)
             }
         })
-    }
-
-    fn from_use_segment(use_seg: &UseSegment, modsep: bool) -> UseSegment {
-        to_use_segment_ident!(use_seg, modsep)
     }
 }
 
@@ -329,6 +319,11 @@ impl UseTree {
         opt_lo: Option<BytePos>,
         attrs: Option<Vec<ast::Attribute>>,
     ) -> UseTree {
+        debug!(
+            "** [DBO] from_ast: enter a={:?}, list_item={:?}, opt_lo={:?}, attrs={:?};",
+            a, list_item, opt_lo, attrs
+        );
+
         let span = if let Some(lo) = opt_lo {
             mk_sp(lo, a.span.hi())
         } else {
@@ -346,6 +341,10 @@ impl UseTree {
             context.config.edition() == Edition::Edition2018 && a.prefix.is_global();
 
         let mut modsep = leading_modsep;
+        debug!(
+            "** [DBO] from_ast: leading_modsep={:?}, init modsep={:?}, span={:?};",
+            leading_modsep, modsep, span
+        );
 
         for p in &a.prefix.segments {
             if let Some(use_segment) = UseSegment::from_path_segment(context, p, modsep) {
@@ -353,6 +352,7 @@ impl UseTree {
                 modsep = false;
             }
         }
+        debug!("** [DBO] from_ast: modified modsep={:?};", modsep);
 
         match a.kind {
             UseTreeKind::Glob => {
@@ -378,19 +378,75 @@ impl UseTree {
                     false,
                 )
                 .collect();
-                // in case of a global path and the nested list starts at the root,
-                // e.g., "::{foo, bar}"
-                if a.prefix.segments.len() == 1 && leading_modsep {
-                    result.path.push(UseSegment::Ident("".to_owned(), None));
-                }
-                result.path.push(UseSegment::List(
-                    list.iter()
-                        .zip(items.into_iter())
-                        .map(|(t, list_item)| {
-                            Self::from_ast(context, &t.0, Some(list_item), None, None, None)
-                        })
-                        .collect(),
-                ));
+                debug!(
+                    "** [DBO] from_ast: Nested: len={:?}, list={:?}, items={:?}, result={:?};",
+                    list.len(),
+                    list,
+                    items,
+                    result,
+                );
+
+                /* >>>>>> [DBO] ADD  */
+                // find whether a case of a global path and the nested list starts at the root
+                // with one item, e.g., "::{foo}", and does not include comments or "as".
+                let first_item = if a.prefix.segments.len() == 1
+                    && list.len() == 1
+                    && result.to_string().is_empty()
+                {
+                    let first = &list[0].0;
+                    debug!(
+                        "** [DBO] from_ast: Nested: first.span={:?}, item_span={:?};",
+                        first.span,
+                        context.snippet(mk_sp(first.span.lo(), span.hi() - BytePos(1))),
+                    );
+                    match first.kind {
+                        UseTreeKind::Simple(..) => {
+                            // "-1" for the "}"
+                            let snippet = context
+                                .snippet(mk_sp(first.span.lo(), span.hi() - BytePos(1)))
+                                .trim();
+                            // Ensure that indent includes only the name and not
+                            // "as" clause, comments, etc.
+                            if snippet.eq(&format!("{}", first.prefix.segments[0].ident)) {
+                                Some(first)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                debug!(
+                    "** [DBO] from_ast: Nested: modsep={:?}, first_item={:?};",
+                    modsep, first_item
+                );
+                if let Some(first) = first_item {
+                    // in case of a global path and the nested list starts at the root
+                    // with one item, e.g., "::{foo}"
+                    let tree = Self::from_ast(context, first, None, None, None, None);
+                    let mod_sep = if leading_modsep { "::" } else { "" };
+                    let seg = UseSegment::Ident(format!("{}{}", mod_sep, tree), None);
+                    debug!("** [DBO] from_ast: Nested: tree={:?}, seg={:?};", tree, seg);
+                    result.path.pop();
+                    result.path.push(seg);
+                } else {
+                    /******* <<<<<<<<< [DBO] ADD */
+                    // in case of a global path and the nested list starts at the root,
+                    // e.g., "::{foo, bar}"
+                    if a.prefix.segments.len() == 1 && leading_modsep {
+                        result.path.push(UseSegment::Ident("".to_owned(), None));
+                    }
+                    result.path.push(UseSegment::List(
+                        list.iter()
+                            .zip(items.into_iter())
+                            .map(|(t, list_item)| {
+                                Self::from_ast(context, &t.0, Some(list_item), None, None, None)
+                            })
+                            .collect(),
+                    ));
+                }; // >>>>> [DBO] ADD <<<<<< */
             }
             UseTreeKind::Simple(ref rename, ..) => {
                 // If the path has leading double colons and is composed of only 2 segments, then we
@@ -412,18 +468,30 @@ impl UseTree {
                         Some(rewrite_ident(context, ident).to_owned())
                     }
                 });
+                debug!(
+                    "** [DBO] from_ast: Simple: seg.len={:?}, rename={:?}, name={:?}, alias={:?};",
+                    a.prefix.segments.len(),
+                    rename,
+                    name,
+                    alias,
+                );
                 let segment = match name.as_ref() {
                     "self" => UseSegment::Slf(alias),
                     "super" => UseSegment::Super(alias),
                     "crate" => UseSegment::Crate(alias),
                     _ => UseSegment::Ident(name, alias),
                 };
+                debug!(
+                    "** [DBO] from_ast: UseTreeKind::Simple: segment={:?}, result={:?};",
+                    segment, result
+                );
 
                 // `name` is already in result.
                 result.path.pop();
                 result.path.push(segment);
             }
         }
+        debug!("** [DBO] from_ast: resltEE={:?};", result);
         result
     }
 
@@ -491,16 +559,7 @@ impl UseTree {
             match last {
                 UseSegment::List(list) => {
                     for seg in &list[0].path {
-                        if self.path.len() == 0 || !self.path[0].to_string().is_empty() {
-                            self.path.push(seg.clone());
-                        } else {
-                            // In case of single item list, when the `{...}` are removed,
-                            // path vector should include single item, like [::Foo],
-                            // and not two items like [, Foo]
-                            self.path = vec![];
-                            let useseg = UseSegment::from_use_segment(seg, true);
-                            self.path.push(useseg);
-                        }
+                        self.path.push(seg.clone());
                     }
                     return self.normalize();
                 }
