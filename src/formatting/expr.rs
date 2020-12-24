@@ -11,9 +11,8 @@ use crate::formatting::{
     chains::rewrite_chain,
     closures,
     comment::{
-        combine_strs_with_missing_comments, comment_style, contains_comment,
-        recover_comment_removed, rewrite_comment, rewrite_missing_comment, CharClasses,
-        FindUncommented,
+        combine_strs_with_missing_comments, contains_comment, recover_comment_removed,
+        rewrite_comment, rewrite_missing_comment, CharClasses, FindUncommented,
     },
     lists::{
         definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
@@ -896,7 +895,12 @@ impl<'a> ControlFlow<'a> {
                 .snippet_provider
                 .span_after(self.span, self.connector.trim());
             let comments_span = mk_sp(comments_lo, expr.span.lo());
-
+            debug!(
+                "** [DBO] ControlFlow::rewrite_pat_expr: pat_string={:?}, comments_span={:?}, comments_snippet;",
+                pat_string,
+                context.snippet(comments_span),
+            );
+            /***************** >>>>>>>>>>> [DBO] REPLACE *********************************
             let missing_comments = match rewrite_missing_comment(comments_span, cond_shape, context)
             {
                 None => "".to_owned(),
@@ -921,12 +925,23 @@ impl<'a> ControlFlow<'a> {
                         .block_indent(context.config)
                         .to_string_with_newline(context.config);
                     let shape = pat_shape.block_indent(context.config.tab_spaces());
+                    /* >>>>>> [DBO] REPLACE ************************
                     let comment = format!(
                         "{}{}",
                         newline,
                         rewrite_missing_comment(comments_span, shape, context)?,
                     );
                     let lhs = format!("{}{}{}{}", matcher, pat_string, self.connector, comment);
+                    ************** [DBO] REPLACE ************************/
+                    let lhs = combine_strs_with_missing_comments(
+                        context,
+                        &format!("{}{}{}", matcher, pat_string, self.connector),
+                        "",
+                        comments_span,
+                        shape,
+                        true,
+                    )?;
+                    /* <<<<<<<< [DBO] [DBO] REPLACE ************************/
                     let orig_rhs = Some(format!("{}{}", newline, expr.rewrite(context, shape)?));
                     let rhs = choose_rhs(
                         context,
@@ -939,11 +954,42 @@ impl<'a> ControlFlow<'a> {
                     return Some(format!("{}{}", lhs, rhs));
                 }
             };
+            /* >>>>>> [DBO] REPLACE ************************
             let result = format!(
                 "{}{}{}{}",
                 matcher, pat_string, self.connector, missing_comments
             );
+            ************** [DBO] REPLACE ************************
+            let result = combine_strs_with_missing_comments(
+                context,
+                &format!("{}{}{}", matcher, pat_string, self.connector),
+                "",
+                comments_span,
+                shape,
+                true,
+            )?;
+            * <<<<<<<< [DBO] [DBO] REPLACE ************************
+            debug!(
+                "** [DBO] ControlFlow::rewrite_pat_expr: missing_comments={:?}, result={:?};",
+                missing_comments, result
+            );
             return rewrite_assign_rhs(context, result, expr, cond_shape);
+            * <<<<<<<< [DBO] [DBO] REPLACE ************************/
+            debug!(
+                "** [DBO] ControlFlow::rewrite_pat_expr: REDUNDANT ??? missing_comments={:?};",
+                missing_comments
+            );
+            <<<<<<<<<<<<<<<<<<<<< [DBO] REPLACE ************************/
+            return rewrite_assign_rhs_with_comments(
+                context,
+                &format!("{}{}{}", matcher, pat_string, self.connector),
+                expr,
+                cond_shape,
+                RhsTactics::Default,
+                comments_span,
+                true,
+            );
+            /* <<<<<<<< [DBO] [DBO] REPLACE ************************/
         }
 
         let expr_rw = expr.rewrite(context, cond_shape);
@@ -991,6 +1037,10 @@ impl<'a> ControlFlow<'a> {
             Some(cond) => self.rewrite_pat_expr(context, cond, constr_shape, offset)?,
             None => String::new(),
         };
+        debug!(
+            "** [DBO] ControlFlow::rewrite_cond: label_string={:?}, pat_expr_string={:?};",
+            label_string, pat_expr_string
+        );
 
         let brace_overhead =
             if context.config.control_brace_style() != ControlBraceStyle::AlwaysNextLine {
@@ -1049,7 +1099,12 @@ impl<'a> ControlFlow<'a> {
 
         let after_cond_comment =
             rewrite_missing_comment(mk_sp(cond_span.hi(), self.block.span.lo()), shape, context);
+        debug!(
+            "** [DBO] ControlFlow::rewrite_cond: between_kwd_cond_comment={:?}, after_cond_comment={:?};",
+            between_kwd_cond_comment, after_cond_comment
+        );
 
+        /* >>>>>> [DBO] REPLACE  *********************
         let block_sep = if self.cond.is_none()
             && between_kwd_cond_comment
                 .as_ref()
@@ -1063,6 +1118,15 @@ impl<'a> ControlFlow<'a> {
         } else {
             " "
         };
+        ****************** [DBO] REPLACE  *********************/
+        let block_sep = if context.config.control_brace_style() == ControlBraceStyle::AlwaysNextLine
+            || force_newline_brace
+        {
+            alt_block_sep
+        } else {
+            " "
+        };
+        /* <<<<<<<<<< [DBO] REPLACE  *********************/
 
         /* Combine with pre condition comment */
         let label_and_keyword = &format!("{}{}", label_string, self.keyword);
@@ -1091,6 +1155,10 @@ impl<'a> ControlFlow<'a> {
             )
             .unwrap()
         };
+        debug!(
+            "** [DBO] ControlFlow::rewrite_cond: cond_with_between_kwd_cond_comment={:?};",
+            cond_with_between_kwd_cond_comment
+        );
 
         /* Combine with post-condition comment */
         let cond_with_after_cond_comment = combine_strs_with_missing_comments(
@@ -1102,6 +1170,10 @@ impl<'a> ControlFlow<'a> {
             true,
         )
         .unwrap();
+        debug!(
+            "** [DBO] ControlFlow::rewrite_cond: cond_with_after_cond_comment={:?};",
+            cond_with_after_cond_comment
+        );
 
         /* Add separator before block */
         let last = cond_with_after_cond_comment.lines().last()?.trim_end();
@@ -1118,6 +1190,10 @@ impl<'a> ControlFlow<'a> {
             block_sep
         };
         let cond_string = format!("{}{}", cond_with_after_cond_comment, closing_sep);
+        debug!(
+            "** [DBO] ControlFlow::rewrite_cond: closing_sep={:?}, block_sep={:?};",
+            block_sep, closing_sep
+        );
 
         let used_width = if closing_sep.contains('\n') {
             closing_sep.len()
@@ -1138,6 +1214,8 @@ impl<'a> Rewrite for ControlFlow<'a> {
 
         let alt_block_sep = &shape.indent.to_string_with_newline(context.config);
         let (cond_str, used_width) = self.rewrite_cond(context, shape, alt_block_sep)?;
+        debug!("** [DBO] ControlFlow::rewrite: cond_str={:?};", cond_str);
+
         // If `used_width` is 0, it indicates that whole control flow is written in a single line.
         if used_width == 0 {
             return Some(cond_str);
