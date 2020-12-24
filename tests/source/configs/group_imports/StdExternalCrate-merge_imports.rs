@@ -1,5 +1,5 @@
 // rustfmt-group_imports: StdExternalCrate
-// rustfmt-merge_imports: Crate
+// rustfmt-imports_merge_style: Crate
 use chrono::Utc;
 use super::update::convert_publish_payload;
 

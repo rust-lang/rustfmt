@@ -119,59 +119,15 @@ pub enum GroupImportsTactic {
     StdExternalCrate,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize)]
+#[config_type]
 /// How to merge imports.
-pub enum MergeImports {
+pub enum ImportMergeStyle {
     /// Do not merge imports.
-    Never,
+    Preserve,
     /// Use one `use` statement per crate.
     Crate,
     /// Use one `use` statement per module.
     Module,
-}
-
-impl FromStr for MergeImports {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if "false".eq_ignore_ascii_case(s) {
-            eprintln!("Warning: merge_imports=false is being renamed to Never");
-            return Ok(MergeImports::Never);
-        }
-        if "true".eq_ignore_ascii_case(s) {
-            eprintln!("Warning: merge_imports=true is being renamed to Crate");
-            return Ok(MergeImports::Crate);
-        }
-        if "Never".eq_ignore_ascii_case(s) {
-            return Ok(MergeImports::Never);
-        }
-        if "Crate".eq_ignore_ascii_case(s) {
-            return Ok(MergeImports::Crate);
-        }
-        if "Module".eq_ignore_ascii_case(s) {
-            return Ok(MergeImports::Module);
-        }
-        return Err("Bad variant, expected one of: `Never` `Crate` `Module`");
-    }
-}
-
-impl fmt::Display for MergeImports {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl<'de> Deserialize<'de> for MergeImports {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(|_| {
-            static ALLOWED: &'static [&str] = &["Never", "Crate", "Module"];
-            serde::de::Error::unknown_variant(&s, ALLOWED)
-        })
-    }
 }
 
 #[config_type]
