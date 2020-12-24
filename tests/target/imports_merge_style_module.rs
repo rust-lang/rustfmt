@@ -1,4 +1,4 @@
-// rustfmt-merge_imports: Module
+// rustfmt-imports_merge_style: Module
 
 use a::b::c;
 use a::d::e;

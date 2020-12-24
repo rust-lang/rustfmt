@@ -77,9 +77,10 @@ create_config! {
     // Imports
     imports_indent: IndentStyle, IndentStyle::Block, false, "Indent of imports";
     imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
-    merge_imports: MergeImports, MergeImports::Never, false, "Merge imports";
+    imports_merge_style: ImportMergeStyle, ImportMergeStyle::Preserve, false, "Merge imports";
     group_imports: GroupImportsTactic, GroupImportsTactic::Preserve, false,
         "Controls the strategy for how imports are grouped together";
+    merge_imports: bool, false, false, "(deprecated: use imports_merge_style instead)";
 
     // Ordering
     reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
@@ -175,6 +176,7 @@ impl PartialConfig {
         // Non-user-facing options can't be specified in TOML
         let mut cloned = self.clone();
         cloned.file_lines = None;
+        cloned.merge_imports = None;
 
         ::toml::to_string(&cloned).map_err(ToTomlError)
     }
@@ -444,6 +446,10 @@ mod test {
             chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
             single_line_if_else_max_width: usize, 50, true, "Maximum line length for single \
                 line if-else expressions. A value of zero means always break if-else expressions.";
+            // merge_imports deprecation
+            imports_merge_style: ImportMergeStyle, ImportMergeStyle::Preserve, false,
+                "Merge imports";
+            merge_imports: bool, false, false, "(deprecated: use imports_merge_style instead)";
 
             unstable_features: bool, false, true,
                 "Enables unstable features on stable and beta channels \
@@ -595,7 +601,7 @@ fn_single_line = false
 where_single_line = false
 imports_indent = "Block"
 imports_layout = "Mixed"
-merge_imports = "Never"
+imports_merge_style = "Preserve"
 group_imports = "Preserve"
 reorder_imports = true
 reorder_modules = true
@@ -716,13 +722,13 @@ ignore = []
             }
             let toml = r#"
                 unstable_features = true
-                merge_imports = "Crate"
+                imports_merge_style = "Crate"
             "#;
             let config = Config::from_toml(toml, Path::new("")).unwrap();
             assert_eq!(config.was_set().unstable_features(), true);
-            assert_eq!(config.was_set().merge_imports(), true);
+            assert_eq!(config.was_set().imports_merge_style(), true);
             assert_eq!(config.unstable_features(), true);
-            assert_eq!(config.merge_imports(), MergeImports::Crate);
+            assert_eq!(config.imports_merge_style(), ImportMergeStyle::Crate);
         }
 
         #[test]
@@ -731,9 +737,10 @@ ignore = []
                 // This test requires non-nightly
                 return;
             }
-            let config = Config::from_toml("merge_imports = Crate", Path::new("")).unwrap();
-            assert_eq!(config.was_set().merge_imports(), false);
-            assert_eq!(config.merge_imports(), MergeImports::Never);
+            let config =
+                Config::from_toml("imports_merge_style = \"Crate\"", Path::new("")).unwrap();
+            assert_eq!(config.was_set().imports_merge_style(), false);
+            assert_eq!(config.imports_merge_style(), ImportMergeStyle::Preserve);
         }
 
         #[test]
@@ -778,12 +785,12 @@ ignore = []
             }
             let mut config = Config::default();
             assert_eq!(config.unstable_features(), false);
-            config.override_value("merge_imports", "Crate");
-            assert_eq!(config.merge_imports(), MergeImports::Crate);
+            config.override_value("imports_merge_style", "Crate");
+            assert_eq!(config.imports_merge_style(), ImportMergeStyle::Preserve);
             config.override_value("unstable_features", "true");
             assert_eq!(config.unstable_features(), true);
-            config.override_value("merge_imports", "Crate");
-            assert_eq!(config.merge_imports(), MergeImports::Crate);
+            config.override_value("imports_merge_style", "Crate");
+            assert_eq!(config.imports_merge_style(), ImportMergeStyle::Crate);
         }
 
         #[test]
@@ -1034,6 +1041,55 @@ ignore = []
             let mut config = Config::default();
             config.override_value("single_line_if_else_max_width", "101");
             assert_eq!(config.single_line_if_else_max_width(), 100);
+        }
+    }
+
+    #[cfg(test)]
+    mod deprecated_option_merge_imports {
+        use super::*;
+
+        #[test]
+        fn test_old_option_set() {
+            let toml = r#"
+                unstable_features = true
+                merge_imports = true
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.imports_merge_style(), ImportMergeStyle::Crate);
+        }
+
+        #[test]
+        fn test_both_set() {
+            let toml = r#"
+                unstable_features = true
+                merge_imports = true
+                imports_merge_style = "Preserve"
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.imports_merge_style(), ImportMergeStyle::Preserve);
+        }
+
+        #[test]
+        fn test_new_overridden() {
+            let toml = r#"
+                unstable_features = true
+                merge_imports = true
+            "#;
+            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            config.override_value("imports_merge_style", "Preserve");
+            assert_eq!(config.imports_merge_style(), ImportMergeStyle::Preserve);
+        }
+
+        #[test]
+        fn test_old_overridden() {
+            let toml = r#"
+                unstable_features = true
+                imports_merge_style = "Module"
+            "#;
+            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            config.override_value("merge_imports", "true");
+            // no effect: the new option always takes precedence
+            assert_eq!(config.imports_merge_style(), ImportMergeStyle::Module);
         }
     }
 }

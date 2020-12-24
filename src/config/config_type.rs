@@ -1,5 +1,5 @@
 use crate::config::file_lines::FileLines;
-use crate::config::options::{IgnoreList, MergeImports, WidthHeuristics};
+use crate::config::options::{IgnoreList, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
 pub(crate) trait ConfigType: Sized {
@@ -50,12 +50,6 @@ impl ConfigType for IgnoreList {
     }
 }
 
-impl ConfigType for MergeImports {
-    fn doc_hint() -> String {
-        "[Never|Crate|Module]".to_owned()
-    }
-}
-
 macro_rules! update_config {
     ($config:ident, ignore = $val:ident, $dir:ident) => {
         $config.ignore.1 = true;
@@ -64,6 +58,12 @@ macro_rules! update_config {
         new_ignored.add_prefix($dir);
         let old_ignored = $config.ignore.2;
         $config.ignore.2 = old_ignored.merge_into(new_ignored);
+    };
+
+    ($config:ident, merge_imports = $val:ident, $dir:ident) => {
+        $config.merge_imports.1 = true;
+        $config.merge_imports.2 = $val;
+        $config.set_merge_imports();
     };
 
     ($config:ident, $i:ident = $val:ident, $dir:ident) => {
@@ -127,6 +127,7 @@ macro_rules! create_config {
                         | "array_width"
                         | "chain_width" => self.0.set_heuristics(),
                         "license_template_path" => self.0.set_license_template(),
+                        "merge_imports" => self.0.set_merge_imports(),
                         &_ => (),
                     }
                 }
@@ -278,14 +279,16 @@ macro_rules! create_config {
                     | "array_width"
                     | "chain_width" => self.set_heuristics(),
                     "license_template_path" => self.set_license_template(),
+                    "merge_imports" => self.set_merge_imports(),
                     &_ => (),
                 }
             }
 
             #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
-                const HIDE_OPTIONS: [&str; 1] = [
+                const HIDE_OPTIONS: [&str; 2] = [
                     "file_lines",
+                    "merge_imports",
                 ];
                 HIDE_OPTIONS.contains(&name)
             }
@@ -425,6 +428,22 @@ macro_rules! create_config {
                             Err(msg) => eprintln!("Warning for license template file {:?}: {}",
                                                 lt_path, msg),
                         }
+                    }
+                }
+            }
+
+            fn set_merge_imports(&mut self) {
+                if self.was_set().merge_imports() {
+                    eprintln!(
+                        "Warning: the `merge_imports` option is deprecated. \
+                        Use `imports_merge_style=Crate` instead"
+                    );
+                    if !self.was_set().imports_merge_style() {
+                        self.imports_merge_style.2 = if self.merge_imports() {
+                            ImportMergeStyle::Crate
+                        } else {
+                            ImportMergeStyle::Preserve
+                        };
                     }
                 }
             }
