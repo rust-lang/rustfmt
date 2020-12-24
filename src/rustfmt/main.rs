@@ -100,7 +100,7 @@ struct Opt {
     /// Set options from command line.
     ///
     /// Set configuration options via command line by specifying a list of key-value pairs
-    /// separated by commas (e.g., rustfmt --config=max_width=100,merge_imports=Crate).
+    /// separated by commas (e.g., rustfmt --config=max_width=100,imports_merge_style=Crate).
     /// These settings precedes any other settings specified in configuration files.
     #[structopt(long = "config")]
     inline_config: Option<Vec<InlineConfig>>,

@@ -1,4 +1,4 @@
-// rustfmt-merge_imports: Crate
+// rustfmt-imports_merge_style: Crate
 
 use a::{c,d,b};
 use a::{d, e, b, a, f};
