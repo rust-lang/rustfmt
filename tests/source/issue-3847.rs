@@ -53,3 +53,35 @@ fn main() {
 			"CCC",
 			];
 }
+
+// Addtional test with one-line block-comments
+type T5_good = Result<
+    u32 /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+        /* diam ac cursus. Aliquam condimentum in erat quis pretium. */
+        /* accumsan urna. Cras volutpat sit amet quam. */
+		 ,
+    bool,
+>;
+type T6_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+        /* diam ac cursus. Aliquam condimentum in erat quis pretium. */
+        /* accumsan urna. Cras volutpat sit amet quam. */
+    bool,
+>;
+
+// Addtional test with mix one-line and multi-linecomments
+type T8_good = Result<
+    u32 // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+        /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+        * diam ac cursus. Aliquam condimentum in erat quis pretium.
+        * accumsan urna. Cras volutpat sit amet quam. */,
+    bool,
+>;
+type T9_good = Result<
+    u32 /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+        /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+        * diam ac cursus. Aliquam condimentum in erat quis pretium.
+        * accumsan urna. Cras volutpat sit amet quam. */,
+        // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+        bool,
+>;

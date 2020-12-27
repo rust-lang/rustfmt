@@ -450,14 +450,24 @@ where
                 // is moved right after the list item, making these (non-first) post-comments
                 // unrelated to the item.
                 let comment_start_trimmed = comment.trim_start();
-                let comment_shape = if !formatting.config.normalize_comments()
+                let first_comment_single_line = if !formatting.config.normalize_comments()
                     && comment_start_trimmed.starts_with("//")
-                    && comment_start_trimmed.contains("\n")
                 {
-                    formatting.shape
+                    true
+                } else if comment_start_trimmed.starts_with("/*") {
+                    match comment_start_trimmed.find("*/") {
+                        Some(i) if !comment_start_trimmed[..i].contains('\n') => true,
+                        _ => false,
+                    }
                 } else {
-                    Shape::legacy(width, offset)
+                    false
                 };
+                let comment_shape =
+                    if first_comment_single_line && comment_start_trimmed.contains("\n") {
+                        formatting.shape
+                    } else {
+                        Shape::legacy(width, offset)
+                    };
 
                 // Use block-style only for the last item or multiline comments.
                 let block_style = !formatting.ends_with_newline && last
