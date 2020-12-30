@@ -8,7 +8,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::config::{lists::*, Config, IndentStyle};
 use crate::formatting::{
-    comment::{find_comment_end, rewrite_comment, FindUncommented},
+    comment::{comment_style, find_comment_end, rewrite_comment, FindUncommented},
     rewrite::RewriteContext,
     shape::{Indent, Shape},
     utils::{
@@ -451,10 +451,15 @@ where
                 // unrelated to the item.
                 let comment_start_trimmed = comment.trim_start();
                 let first_comment_single_line = if !formatting.config.normalize_comments()
-                    && comment_start_trimmed.starts_with("//")
+                    && comment_style(comment_start_trimmed, false).is_line_comment()
                 {
                     true
-                } else if comment_start_trimmed.starts_with("/*") {
+                } else if comment_style(
+                    comment_start_trimmed,
+                    formatting.config.normalize_comments(),
+                )
+                .is_block_comment()
+                {
                     match comment_start_trimmed.find("*/") {
                         Some(i) if !comment_start_trimmed[..i].contains('\n') => true,
                         _ => false,
