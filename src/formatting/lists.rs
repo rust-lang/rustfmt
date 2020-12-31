@@ -450,11 +450,6 @@ where
                 // is moved right after the list item, making these (non-first) post-comments
                 // unrelated to the item.
                 let comment_start_trimmed = comment.trim_start();
-                debug!(
-                    "** [DBO] write_list: is_line_comment={:?}, comment_start_trimmed={:?};",
-                    comment_style(comment_start_trimmed, false).is_line_comment(),
-                    comment_start_trimmed,
-                );
                 // Find if first comment is single line and the end of multi-line block comment
                 let (first_comment_single_line, first_comment_end) =
                     if !formatting.config.normalize_comments()
@@ -467,10 +462,8 @@ where
                     )
                     .is_block_comment()
                     {
-                        debug!("** [DBO] write_list: block comment;");
                         match find_comment_end(&comment_start_trimmed) {
                             Some(i) => {
-                                debug!("** [DBO] write_list: block comment end={:?};", i);
                                 if comment_start_trimmed[..i].contains('\n') {
                                     (false, Some(i))
                                 } else {
@@ -482,13 +475,7 @@ where
                     } else {
                         (false, None)
                     };
-                debug!(
-                    "** [DBO] write_list: first_comment_single_line={:?}, first_comment_end={:?}, formatting.shape={:?}, Shape::legacy(width, offset)={:?};",
-                    first_comment_single_line,
-                    first_comment_end,
-                    formatting.shape,
-                    Shape::legacy(width, offset),
-                );
+
                 // Properly indent comments
                 match (first_comment_single_line, first_comment_end) {
                     (_, None) => {
@@ -498,7 +485,6 @@ where
                             } else {
                                 Shape::legacy(width, offset)
                             };
-                        debug!("** [DBO] write_list: comment_shape={:?};", comment_shape);
                         // Use block-style only for the last item or multiline comments.
                         let block_style = !formatting.ends_with_newline && last
                             || comment.trim().contains('\n')
@@ -518,17 +504,9 @@ where
                             Shape::legacy(width, offset),
                             formatting.config,
                         )?;
-                        debug!(
-                            "** [DBO] write_list: formatted_first_comment={:?};",
-                            formatted_first_comment
-                        );
                         let second_comment_start = comment_start_trimmed[comment_end..]
                             .find(|c: char| !c.is_whitespace())
                             .map_or(None, |i| Some(i + comment_end));
-                        debug!(
-                            "** [DBO] write_list: second_comment_start={:?};",
-                            second_comment_start
-                        );
                         let formatted_all_comments = match second_comment_start {
                             Some(i) => {
                                 let second_comment = comment_start_trimmed[i..].to_string();
@@ -541,32 +519,12 @@ where
                                     block_style,
                                     formatting.shape,
                                     formatting.config,
-                                );
-                                debug!(
-                                    "** [DBO] write_list: formatted second comment={:?};",
-                                    formatted
-                                );
-                                // Fined number of new lines between the first and other comments
-                                // and combine the comments.
-                                let comment_with_newlines = match formatted {
-                                    None => String::new(),
-                                    Some(c) => {
-                                        let newline_count = comment_start_trimmed[comment_end..i]
-                                            .split('\n')
-                                            .count();
-                                        let gap = if newline_count > 1 {
-                                            formatting
-                                                .shape
-                                                .indent
-                                                .to_string_with_newline(formatting.config)
-                                                .repeat(newline_count - 1)
-                                        } else {
-                                            String::new()
-                                        };
-                                        format!("{}{}{}", formatted_first_comment, gap, c)
-                                    }
-                                };
-                                comment_with_newlines
+                                )?;
+                                let indent = formatting
+                                    .shape
+                                    .indent
+                                    .to_string_with_newline(formatting.config);
+                                format!("{}{}{}", formatted_first_comment, indent, formatted)
                             }
                             _ => formatted_first_comment,
                         };
@@ -577,10 +535,6 @@ where
             };
 
             let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
-            debug!(
-                "** [DBO] write_list: formatted_comment1={:?};",
-                formatted_comment
-            );
 
             // Multiline comments are not included in a previous "indentation group".
             // Each multiline comment is considered as a separate group.
@@ -588,10 +542,6 @@ where
                 item_max_width = None;
                 formatted_comment = rewrite_post_comment(&mut item_max_width)?;
             }
-            debug!(
-                "** [DBO] write_list: formatted_comment2={:?};",
-                formatted_comment
-            );
 
             if !starts_with_newline(comment) {
                 if formatting.align_comments {

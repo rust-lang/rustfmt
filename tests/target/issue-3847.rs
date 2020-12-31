@@ -115,3 +115,38 @@ type T12_good = Result<
     // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
     bool,
 >;
+type T12_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+          * diam ac cursus. Aliquam condimentum in erat quis pretium.
+          * accumsan urna. Cras volutpat sit amet quam. */
+    /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+    bool,
+>;
+type T13_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+          * diam ac cursus. Aliquam condimentum in erat quis pretium.
+          * accumsan urna. */
+    /*Cras volutpat sit amet quam. */
+    /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    bool,
+>;
+
+// Tests with mix one-line and multi-linecomments -
+// multi-line is first with newline between comments
+type T14_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+          * diam ac cursus. Aliquam condimentum in erat quis pretium.
+          * accumsan urna. Cras volutpat sit amet quam. */
+    /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+    bool,
+>;
+type T15_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+          * diam ac cursus. Aliquam condimentum in erat quis pretium.
+          * accumsan urna. Cras volutpat sit amet quam. */
+    /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+    bool,
+>;
