@@ -948,32 +948,14 @@ fn light_rewrite_comment(
     config: &Config,
     is_doc_comment: bool,
 ) -> String {
-    debug!(
-        "** [DBO] light_rewrite_comment: enter offset={:?}, orig={:?};",
-        offset, orig
-    );
-    /* >>>>> [DBO] REPLACE next <<<< */
-    //let lines: Vec<&str> = orig
     let lines: Vec<String> = orig
         .lines()
         .map(|l| {
             // This is basically just l.trim(), but in the case that a line starts
             // with `*` we want to leave one space before it, so it aligns with the
             // `*` in `/*`.
-            debug!("** [DBO] light_rewrite_comment: line={:?};", l);
 
             let first_non_whitespace = l.find(|c| !char::is_whitespace(c));
-            /* >>>>>>> [DBO] REPLACE **********************
-            let left_trimmed = if let Some(fnw) = first_non_whitespace {
-                if l.as_bytes()[fnw] == b'*' && fnw > 0 {
-                    &l[fnw - 1..]
-                } else {
-                    &l[fnw..]
-                }
-            } else {
-                ""
-            };
-            ******* <<<<<<<<<<< [DBO] REPLACE *********/
             let (blank, left_trimmed) = if let Some(fnw) = first_non_whitespace {
                 if l.as_bytes()[fnw] == b'*' {
                     // Ensure '*' is preceeded by blank and not by a tab.
@@ -984,11 +966,6 @@ fn light_rewrite_comment(
             } else {
                 ("", "")
             };
-            /* <<<<<<<<<<<< [DBO] REPLACE *********/
-            debug!(
-                "** [DBO] light_rewrite_comment: blank={:?}, left_trimmed={:?};",
-                blank, left_trimmed
-            );
             // Preserve markdown's double-space line break syntax in doc comment.
             (
                 blank,
