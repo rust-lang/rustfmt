@@ -121,7 +121,7 @@ pub enum GroupImportsTactic {
 
 #[config_type]
 /// How to merge imports.
-pub enum ImportMergeStyle {
+pub enum ImportGranularity {
     /// Do not merge imports.
     Preserve,
     /// Use one `use` statement per crate.
