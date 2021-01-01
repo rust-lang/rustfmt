@@ -15,7 +15,7 @@ use crate::config::{Config, GroupImportsTactic, ImportMergeStyle};
 use crate::formatting::imports::UseSegment;
 use crate::formatting::modules::{get_mod_inner_attrs, FileModMap};
 use crate::formatting::{
-    imports::{merge_use_trees, unnest_use_trees, UseTree},
+    imports::{merge_use_trees, UseTree},
     items::{is_mod_decl, rewrite_extern_crate, rewrite_mod},
     lists::{itemize_list, write_list, ListFormatting, ListItem},
     rewrite::RewriteContext,
@@ -25,6 +25,8 @@ use crate::formatting::{
     utils::{contains_skip, mk_sp},
     visitor::FmtVisitor,
 };
+
+use super::imports::SharedPrefix;
 
 /// Compare strings according to version sort (roughly equivalent to `strverscmp`)
 pub(crate) fn compare_as_versions(left: &str, right: &str) -> Ordering {
@@ -227,9 +229,11 @@ fn rewrite_reorderable_or_regroupable_items(
                 item.list_item = Some(list_item.clone());
             }
             match context.config.imports_merge_style() {
-                ImportMergeStyle::Crate => normalized_items = merge_use_trees(normalized_items),
+                ImportMergeStyle::Crate => {
+                    normalized_items = merge_use_trees(normalized_items, SharedPrefix::Crate)
+                }
                 ImportMergeStyle::Module => {
-                    normalized_items = unnest_use_trees(merge_use_trees(normalized_items))
+                    normalized_items = merge_use_trees(normalized_items, SharedPrefix::Module)
                 }
                 ImportMergeStyle::Preserve => {}
             }
