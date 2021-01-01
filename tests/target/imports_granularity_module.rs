@@ -1,4 +1,4 @@
-// rustfmt-imports_merge_style: Module
+// rustfmt-imports_granularity: Module
 
 use a::b::c;
 use a::d::e;

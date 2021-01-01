@@ -436,13 +436,13 @@ macro_rules! create_config {
                 if self.was_set().merge_imports() {
                     eprintln!(
                         "Warning: the `merge_imports` option is deprecated. \
-                        Use `imports_merge_style=Crate` instead"
+                        Use `imports_granularity=Crate` instead"
                     );
-                    if !self.was_set().imports_merge_style() {
-                        self.imports_merge_style.2 = if self.merge_imports() {
-                            ImportMergeStyle::Crate
+                    if !self.was_set().imports_granularity() {
+                        self.imports_granularity.2 = if self.merge_imports() {
+                            ImportGranularity::Crate
                         } else {
-                            ImportMergeStyle::Preserve
+                            ImportGranularity::Preserve
                         };
                     }
                 }

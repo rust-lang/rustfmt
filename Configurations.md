@@ -1705,7 +1705,7 @@ pub enum Foo {}
 pub enum Foo {}
 ```
 
-## `imports_merge_style`
+## `imports_granularity`
 
 Merge together related imports based on their paths.
 
@@ -1751,7 +1751,7 @@ use qux::{h, i};
 
 ## `merge_imports`
  
-This option is deprecated. Use `imports_merge_style = "Crate"` instead.
+This option is deprecated. Use `imports_granularity = "Crate"` instead.
  
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
@@ -2602,7 +2602,7 @@ Enable unstable features on stable and beta channels (unstable features are avai
 
 For example:
 ```bash
-rustfmt src/lib.rs --config unstable_features=true imports_merge_style=Crate
+rustfmt src/lib.rs --config unstable_features=true imports_granularity=Crate
 ```
 
 ## `use_field_init_shorthand`
