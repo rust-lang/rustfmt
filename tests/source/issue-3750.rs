@@ -1,4 +1,4 @@
-// rustfmt-imports_merge_style: Crate
+// rustfmt-imports_granularity: Crate
 
 pub mod foo {
     pub mod bar {
