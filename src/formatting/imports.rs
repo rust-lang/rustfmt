@@ -160,7 +160,7 @@ impl UseSegment {
     }
 }
 
-pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
+pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>, merge_by: SharedPrefix) -> Vec<UseTree> {
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
         if use_tree.has_comment() || use_tree.attrs.is_some() {
@@ -169,54 +169,15 @@ pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
         }
 
         for flattened in use_tree.flatten() {
-            if let Some(tree) = result.iter_mut().find(|tree| tree.share_prefix(&flattened)) {
-                tree.merge(&flattened);
+            if let Some(tree) = result
+                .iter_mut()
+                .find(|tree| tree.share_prefix(&flattened, merge_by))
+            {
+                tree.merge(&flattened, merge_by);
             } else {
                 result.push(flattened);
             }
         }
-    }
-    result
-}
-
-/// Split apart nested imports in use trees.
-pub(crate) fn unnest_use_trees(mut use_trees: Vec<UseTree>) -> Vec<UseTree> {
-    let mut result = Vec::with_capacity(use_trees.len());
-    while let Some(mut use_tree) = use_trees.pop() {
-        if !use_tree.has_comment() && use_tree.attrs.is_none() {
-            if let Some((UseSegment::List(list), ref prefix)) = use_tree.path.split_last_mut() {
-                let span = use_tree.span;
-                let visibility = &use_tree.visibility;
-                list.retain(|nested_use_tree| {
-                    if matches!(
-                        nested_use_tree.path[..],
-                        [UseSegment::Ident(..)] | [UseSegment::Slf(..)] | [UseSegment::Glob]
-                    ) {
-                        return true;
-                    }
-                    if nested_use_tree.has_comment() {
-                        return true;
-                    }
-                    // nested item detected; flatten once, but process it again
-                    // in case it has more nesting
-                    use_trees.push(UseTree {
-                        path: prefix
-                            .iter()
-                            .cloned()
-                            .chain(nested_use_tree.path.iter().cloned())
-                            .collect(),
-                        span,
-                        list_item: None,
-                        visibility: visibility.clone(),
-                        attrs: None,
-                    });
-                    // remove this item
-                    false
-                });
-                use_tree = use_tree.normalize();
-            }
-        }
-        result.push(use_tree);
     }
     result
 }
@@ -568,7 +529,7 @@ impl UseTree {
         }
     }
 
-    fn share_prefix(&self, other: &UseTree) -> bool {
+    fn share_prefix(&self, other: &UseTree, shared_prefix: SharedPrefix) -> bool {
         if self.path.is_empty()
             || other.path.is_empty()
             || self.attrs.is_some()
@@ -576,7 +537,12 @@ impl UseTree {
         {
             false
         } else {
-            self.path[0] == other.path[0]
+            match shared_prefix {
+                SharedPrefix::Crate => self.path[0] == other.path[0],
+                SharedPrefix::Module => {
+                    self.path[..self.path.len() - 1] == other.path[..other.path.len() - 1]
+                }
+            }
         }
     }
 
@@ -610,7 +576,7 @@ impl UseTree {
         }
     }
 
-    fn merge(&mut self, other: &UseTree) {
+    fn merge(&mut self, other: &UseTree, merge_by: SharedPrefix) {
         let mut prefix = 0;
         for (a, b) in self.path.iter().zip(other.path.iter()) {
             if *a == *b {
@@ -619,20 +585,30 @@ impl UseTree {
                 break;
             }
         }
-        if let Some(new_path) = merge_rest(&self.path, &other.path, prefix) {
+        if let Some(new_path) = merge_rest(&self.path, &other.path, prefix, merge_by) {
             self.path = new_path;
             self.span = self.span.to(other.span);
         }
     }
 }
 
-fn merge_rest(a: &[UseSegment], b: &[UseSegment], mut len: usize) -> Option<Vec<UseSegment>> {
+fn merge_rest(
+    a: &[UseSegment],
+    b: &[UseSegment],
+    mut len: usize,
+    merge_by: SharedPrefix,
+) -> Option<Vec<UseSegment>> {
     if a.len() == len && b.len() == len {
         return None;
     }
     if a.len() != len && b.len() != len {
-        if let UseSegment::List(mut list) = a[len].clone() {
-            merge_use_trees_inner(&mut list, UseTree::from_path(b[len..].to_vec(), DUMMY_SP));
+        if let UseSegment::List(ref list) = a[len] {
+            let mut list = list.clone();
+            merge_use_trees_inner(
+                &mut list,
+                UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
+                merge_by,
+            );
             let mut new_path = b[..len].to_vec();
             new_path.push(UseSegment::List(list));
             return Some(new_path);
@@ -659,9 +635,11 @@ fn merge_rest(a: &[UseSegment], b: &[UseSegment], mut len: usize) -> Option<Vec<
     Some(new_path)
 }
 
-fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
-    let similar_trees = trees.iter_mut().filter(|tree| tree.share_prefix(&use_tree));
-    if use_tree.path.len() == 1 {
+fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: SharedPrefix) {
+    let similar_trees = trees
+        .iter_mut()
+        .filter(|tree| tree.share_prefix(&use_tree, merge_by));
+    if use_tree.path.len() == 1 && merge_by == SharedPrefix::Crate {
         if let Some(tree) = similar_trees.min_by_key(|tree| tree.path.len()) {
             if tree.path.len() == 1 {
                 return;
@@ -669,7 +647,7 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree) {
         }
     } else if let Some(tree) = similar_trees.max_by_key(|tree| tree.path.len()) {
         if tree.path.len() > 1 {
-            tree.merge(&use_tree);
+            tree.merge(&use_tree, merge_by);
             return;
         }
     }
@@ -872,6 +850,12 @@ impl Rewrite for UseTree {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum SharedPrefix {
+    Crate,
+    Module,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -1018,41 +1002,69 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_use_tree_merge() {
-        macro_rules! test_merge {
-            ([$($input:expr),* $(,)*], [$($output:expr),* $(,)*]) => {
-                assert_eq!(
-                    merge_use_trees(parse_use_trees!($($input,)*)),
-                    parse_use_trees!($($output,)*),
-                );
-            }
+    macro_rules! test_merge {
+        ($by:ident, [$($input:expr),* $(,)*], [$($output:expr),* $(,)*]) => {
+            assert_eq!(
+                merge_use_trees(parse_use_trees!($($input,)*), SharedPrefix::$by),
+                parse_use_trees!($($output,)*),
+            );
         }
+    }
 
-        test_merge!(["a::b::{c, d}", "a::b::{e, f}"], ["a::b::{c, d, e, f}"]);
-        test_merge!(["a::b::c", "a::b"], ["a::{b, b::c}"]);
-        test_merge!(["a::b", "a::b"], ["a::b"]);
-        test_merge!(["a", "a::b", "a::b::c"], ["a::{self, b, b::c}"]);
+    #[test]
+    fn test_use_tree_merge_crate() {
         test_merge!(
+            Crate,
+            ["a::b::{c, d}", "a::b::{e, f}"],
+            ["a::b::{c, d, e, f}"]
+        );
+        test_merge!(Crate, ["a::b::c", "a::b"], ["a::{b, b::c}"]);
+        test_merge!(Crate, ["a::b", "a::b"], ["a::b"]);
+        test_merge!(Crate, ["a", "a::b", "a::b::c"], ["a::{self, b, b::c}"]);
+        test_merge!(
+            Crate,
             ["a", "a::b", "a::b::c", "a::b::c::d"],
             ["a::{self, b, b::{c, c::d}}"]
         );
-        test_merge!(["a", "a::b", "a::b::c", "a::b"], ["a::{self, b, b::c}"]);
         test_merge!(
+            Crate,
+            ["a", "a::b", "a::b::c", "a::b"],
+            ["a::{self, b, b::c}"]
+        );
+        test_merge!(
+            Crate,
             ["a::{b::{self, c}, d::e}", "a::d::f"],
             ["a::{b::{self, c}, d::{e, f}}"]
         );
         test_merge!(
+            Crate,
             ["a::d::f", "a::{b::{self, c}, d::e}"],
             ["a::{b::{self, c}, d::{e, f}}"]
         );
         test_merge!(
+            Crate,
             ["a::{c, d, b}", "a::{d, e, b, a, f}", "a::{f, g, c}"],
             ["a::{a, b, c, d, e, f, g}"]
         );
         test_merge!(
+            Crate,
             ["a::{self}", "b::{self as foo}"],
             ["a::{self}", "b::{self as foo}"]
+        );
+    }
+
+    #[test]
+    fn test_use_tree_merge_module() {
+        test_merge!(
+            Module,
+            ["foo::b", "foo::{a, c, d::e}"],
+            ["foo::{a, b, c}", "foo::d::e"]
+        );
+
+        test_merge!(
+            Module,
+            ["foo::{a::b, a::c, d::e, d::f}"],
+            ["foo::a::{b, c}", "foo::d::{e, f}"]
         );
     }
 
