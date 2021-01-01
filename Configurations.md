@@ -1709,13 +1709,13 @@ pub enum Foo {}
 
 Merge together related imports based on their paths.
 
-This option requires `reorder_imports`, which is enabled by default.
-
 - **Default value**: `Preserve`
 - **Possible values**: `Preserve`, `Crate`, `Module`
-- **Stable**: No (tracking issue: [#3362](https://github.com/rust-lang/rustfmt/issues/3362))
+- **Stable**: No
 
 #### `Preserve` (default):
+
+Do not perform any merging and preserve the original structure written by the developer.
 
 ```rust
 use foo::b;
@@ -1725,6 +1725,8 @@ use qux::{h, i};
 ```
 
 #### `Crate`:
+
+Merge imports from the same crate into a single `use` statement. Conversely, imports from different crates are split into separate statements.
 
 ```rust
 use foo::{
@@ -1737,6 +1739,8 @@ use qux::{h, i};
 ```
 
 #### `Module`:
+
+Merge imports from the same module into a single `use` statement. Conversely, imports from different modules are split into separate statements.
 
 ```rust
 use foo::b::{f, g};
