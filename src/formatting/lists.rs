@@ -424,26 +424,29 @@ where
         // Note about post-comments indentation:
         // In the original code the the item separator may follow some comments that
         // may span over some lines.  E.g.:
-        //     item1 /* 1st comment */
-        //          /* 2nd comment */,
+        //     item1 /* 1st comment line 1
+        //            * line 2 */
+        //           /* 2nd comment */,
         //     item2,
         //
-        // In this case, rustfmt move the separator right after the item:
-        //     item1, /* 1st comment */
+        // In this case, rustfmt moves the separator right after the item:
+        //     item1, /* 1st comment line 1
+        //             * line 2 */
         //            /* 2nd comment */
         //     item2,
         //
         // In this code, only the 1st comment is regarded as post comment of item1.
         // 2nd comment is regarded as pre-comment of item2, therefore the output
-        // of formatting this code is:
-        //     item1, /* 1st comment */
+        // of another round of formatting this code is:
+        //     item1, /* 1st comment line 1
+        //             * line 2 */
         //     /* 2nd comment */
         //     item2,
         //
         // i.e. 2nd comment is now indented as pre-comment.
         //
-        // This why in the code below the first post-comment is indented differently
-        // then the other comments.
+        // This why in the code below a first multiline post-comment is indented
+        // differently then the other post-comments.
 
         if tactic != DefinitiveListTactic::Horizontal && item.post_comment.is_some() {
             let comment = item.post_comment.as_ref().unwrap();
@@ -789,6 +792,11 @@ pub(crate) fn get_comment_end(
             ),
             // Block-style post-comment. Either before or after the separator.
             (Some(i), Some(j)) if i < j => cmp::max(
+                find_comment_end(&post_snippet[i..]).unwrap() + i,
+                separator_index + 1,
+            ),
+            // Comment is preceeded by new line and followed by a separator.
+            (Some(i), Some(_)) if separator_index > i => cmp::max(
                 find_comment_end(&post_snippet[i..]).unwrap() + i,
                 separator_index + 1,
             ),

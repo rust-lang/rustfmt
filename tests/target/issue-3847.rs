@@ -164,3 +164,25 @@ type T17_good = Result<
     /* accumsan urna. Cras volutpat sit amet quam. */
     bool,
 >;
+type T18_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    /* diam ac cursus. Aliquam condimentum in erat quis pretium. */
+    /* accumsan urna. Cras volutpat sit amet quam. */
+    bool,
+>;
+type T19_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+          * diam ac cursus. Aliquam condimentum in erat quis pretium.
+          * accumsan urna. Cras volutpat sit amet quam. */
+    /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+    bool,
+>;
+type T20_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+          * diam ac cursus. Aliquam condimentum in erat quis pretium.
+          * accumsan urna. Cras volutpat sit amet quam. */
+    /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
+    bool,
+>;
