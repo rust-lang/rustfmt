@@ -150,3 +150,17 @@ type T15_good = Result<
     // Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam
     bool,
 >;
+
+// Tests with first comment is not in same line of item
+type T16_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    /* diam ac cursus. Aliquam condimentum in erat quis pretium. */
+    /* accumsan urna. Cras volutpat sit amet quam. */
+    bool,
+>;
+type T17_good = Result<
+    u32, /* Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam */
+    /* diam ac cursus. Aliquam condimentum in erat quis pretium. */
+    /* accumsan urna. Cras volutpat sit amet quam. */
+    bool,
+>;
