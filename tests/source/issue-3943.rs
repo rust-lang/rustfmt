@@ -29,3 +29,16 @@ use super::{auxvec};
 use a::{/* pre-comment */ item};
 use a::{ item  /* post-comment */};
 use a::{/* pre-comment */ item    /* post-comment */   };
+
+// Misc
+use ::{Foo};
+use ::foo;
+use ::{Foo1};
+use std;
+use dummy;
+use Super::foo;
+use ::*;
+use ::foo::{Foo, foo};
+use self::std::fs as self_fs;
+use ::foo as bar;
+use ::{Foo as baz};
