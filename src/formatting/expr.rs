@@ -1042,8 +1042,7 @@ impl<'a> ControlFlow<'a> {
                 between_kwd_cond,
                 shape,
                 true,
-            )
-            .unwrap()
+            )?
         };
 
         /* Combine with post-condition comment */
@@ -1054,8 +1053,7 @@ impl<'a> ControlFlow<'a> {
             mk_sp(cond_span.hi(), self.block.span.lo()),
             shape,
             true,
-        )
-        .unwrap();
+        )?;
 
         /* Add separator before block */
         let last = cond_with_after_cond_comment.lines().last()?.trim_end();
@@ -1204,8 +1202,7 @@ impl<'a> Rewrite for ControlFlow<'a> {
                 after_else,
                 shape,
                 true,
-            )
-            .unwrap();
+            )?;
 
             /* Add separator befor block */
             let last = else_with_post_comment.lines().last()?.trim_end();
