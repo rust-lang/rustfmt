@@ -25,11 +25,6 @@ use crate::formatting::{
 /// Returns a name imported by a `use` declaration.
 /// E.g., returns `Ordering` for `std::cmp::Ordering` and `self` for `std::cmp::self`.
 pub(crate) fn path_to_imported_ident(path: &ast::Path) -> symbol::Ident {
-    debug!(
-        "** [DBO] path_to_imported_ident: enter last segment={:?}, path={:?};",
-        path.segments.last(),
-        path,
-    );
     path.segments.last().unwrap().ident
 }
 
@@ -99,7 +94,7 @@ pub(crate) enum UseSegment {
     Super(Option<String>),
     Crate(Option<String>),
     Glob,
-    Empty, // >>>> [DBO] ADD <<<<<<<
+    Empty,
     List(Vec<UseTree>),
 }
 
@@ -151,33 +146,19 @@ impl UseSegment {
         modsep: bool,
     ) -> Option<UseSegment> {
         let name = rewrite_ident(context, path_seg.ident);
-        debug!(
-            "** [DBO]: from_path_segment: enter name={:?}, modsep={:?};",
-            name, modsep
-        );
         if name.is_empty() || name == "{{root}}" {
-            /* >>>>> [DBO] REPLACE next */
             //return None;
-            debug!("** [DBO]: from_path_segment: replacing {{root}} empty sengment on None;");
             if modsep {
                 return Some(UseSegment::Empty);
             } else {
                 return None;
             }
-            /* <<<<< [DBO] REPLACE next */
         }
         Some(match name {
             "self" => UseSegment::Slf(None),
             "super" => UseSegment::Super(None),
             "crate" => UseSegment::Crate(None),
-            _ => {
-                //let mod_sep = if modsep { "::" } else { "" }; // >>>> [DBO] DELETE <<<<
-                /* >>>>> [DBO] REPLACE next */
-                //UseSegment::Ident(format!("{}{}", mod_sep, name), None)
-                // ????????!!!!!!! ADD here and empty segment ???????
-                UseSegment::Ident(name.to_string(), None)
-                /* <<<<<< [DBO] REPLACE next */
-            }
+            _ => UseSegment::Ident(name.to_string(), None),
         })
     }
 }
@@ -217,13 +198,8 @@ impl fmt::Display for UseSegment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             UseSegment::Glob => write!(f, "*"),
-            UseSegment::Empty => write!(f, ""), // >>>>> [DBO] ADD <<<<<<
-            //UseSegment::Ident(ref s, _) => write!(f, "{}", s),  >>>>> [DBO] without debug <<<<<
-            UseSegment::Ident(ref s, ref s1) => {
-                debug!(
-                    "** [DBO] fmt::Display for UseSegment: Ident s={:?}, s1={:?};",
-                    s, s1
-                );
+            UseSegment::Empty => write!(f, ""),
+            UseSegment::Ident(ref s, _) => {
                 write!(f, "{}", s)
             }
             UseSegment::Slf(..) => write!(f, "self"),
@@ -349,8 +325,6 @@ impl UseTree {
         opt_lo: Option<BytePos>,
         attrs: Option<Vec<ast::Attribute>>,
     ) -> UseTree {
-        debug!("** [DBO] from_ast: enter a={:?};", a);
-
         let span = if let Some(lo) = opt_lo {
             mk_sp(lo, a.span.hi())
         } else {
@@ -376,7 +350,6 @@ impl UseTree {
             }
         }
 
-        /* >>>>>>>> [DBO] ADD */
         let segment_from_simple = |path: &ast::Path, rename: &Option<symbol::Ident>| {
             let name = rewrite_ident(context, path_to_imported_ident(&path)).to_owned();
             let alias = rename.and_then(|ident| {
@@ -389,10 +362,6 @@ impl UseTree {
                     Some(rewrite_ident(context, ident).to_owned())
                 }
             });
-            debug!(
-                "** [DBO] from_ast: segment_from_simple: name={:?}, alias={:?}, rename={:?};",
-                name, alias, rename
-            );
             match name.as_ref() {
                 "self" => UseSegment::Slf(alias),
                 "super" => UseSegment::Super(alias),
@@ -400,26 +369,10 @@ impl UseTree {
                 _ => UseSegment::Ident(name, alias),
             }
         };
-        /* <<<<<<< [DBO] ADD */
-
-        debug!(
-            "** [DBO] from_ast: before match result.path={:?};",
-            result.path
-        );
 
         match a.kind {
             UseTreeKind::Glob => {
-                /* >>>>>>>> ????!!!! [DBO] DELETE **********
-                // in case of a global path and the glob starts at the root, e.g., "::*"
-                if a.prefix.segments.len() == 1 && leading_modsep {
-                    /* >>>>>> [DBO] REPLACE next <<<<< */
-                    //result.path.push(UseSegment::Ident("".to_owned(), None));
-                    result.path.push(UseSegment::Empty);
-                    debug!("** [DBO] from_ast: Glob result.path1={:?};", result.path);
-                }
-                ******** <<<<<<<<<<<< [DBO] DELETE */
                 result.path.push(UseSegment::Glob);
-                debug!("** [DBO] from_ast: Glob result.pathE={:?};", result.path);
             }
             UseTreeKind::Nested(ref list) => {
                 // Extract comments between nested use items.
@@ -437,58 +390,9 @@ impl UseTree {
                     false,
                 )
                 .collect();
-                debug!(
-                    "** [DBO] from_ast: Nested: len={:?}, list={:?}, items={:?}, result={:?};",
-                    list.len(),
-                    list,
-                    items,
-                    result,
-                );
 
                 // find whether a case of a global path and the nested list starts at the root
                 // with one item, e.g., "::{foo}", and does not include comments or "as".
-                /******** >>>>>>> REPLACE PREVIOUS CHANGE **************************
-                let first_item = if a.prefix.segments.len() == 1
-                    && list.len() == 1
-                    && result.to_string().is_empty()
-                {
-                    let first = &list[0].0;
-                    match first.kind {
-                        UseTreeKind::Simple(..) => {
-                            // "-1" for the "}"
-                            let snippet = context
-                                .snippet(mk_sp(first.span.lo(), span.hi() - BytePos(1)))
-                                .trim();
-                            // Ensure that indent includes only the name and not
-                            // "as" clause, comments, etc.
-                            if snippet.eq(&format!("{}", first.prefix.segments[0].ident)) {
-                                Some(first)
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None,
-                    }
-                } else {
-                    None
-                };
-
-                if let Some(first) = first_item {
-                    // in case of a global path and the nested list starts at the root
-                    // with one item, e.g., "::{foo}"
-                    let tree = Self::from_ast(context, first, None, None, None, None);
-                    //let mod_sep = if leading_modsep { "::" } else { "" }; //>>>> [DBO] DEL <<<<
-                    /* >>>>>> [DBO] REPLACE next <<<<< */
-                    //let seg = UseSegment::Ident(format!("{}{}", mod_sep, tree), None);
-                    let seg = UseSegment::Ident(format!("{}", tree), None);
-                    result.path.pop();
-                    /* >>>>> [DBO] ADD */
-                    if leading_modsep {
-                        result.path.push(UseSegment::Empty);
-                    }
-                    /* <<<<<< [DBO] ADD */
-                    result.path.push(seg);
-                ***************** REPLACE PREVIOUS CHANGE **************************/
                 let mut path = None;
                 let mut rename = None;
                 if a.prefix.segments.len() == 1 && list.len() == 1 && result.to_string().is_empty()
@@ -513,17 +417,7 @@ impl UseTree {
 
                 if let (Some(path), Some(rename)) = (path, rename) {
                     result.path.push(segment_from_simple(path, rename));
-                /******** <<<<<<<< REPLACE PREVIOUS CHANGE **************************/
                 } else {
-                    /******* >>>>>>>> [DBO] DELETE ***********
-                    // in case of a global path and the nested list starts at the root,
-                    // e.g., "::{foo, bar}"
-                    if a.prefix.segments.len() == 1 && leading_modsep {
-                        /* >>>>>> [DBO] REPLACE next <<<<< */
-                        //result.path.push(UseSegment::Ident("".to_owned(), None));
-                        result.path.push(UseSegment::Empty);
-                    }
-                    ********* <<<<<<< [DBO] DELETE *********/
                     result.path.push(UseSegment::List(
                         list.iter()
                             .zip(items.into_iter())
@@ -533,55 +427,18 @@ impl UseTree {
                             .collect(),
                     ));
                 };
-                debug!("** [DBO] from_ast: Nested result.path={:?};", result.path);
             }
             UseTreeKind::Simple(ref rename, ..) => {
                 // If the path has leading double colons and is composed of only 2 segments, then we
                 // bypass the call to path_to_imported_ident which would get only the ident and
                 // lose the path root, e.g., `that` in `::that`.
                 // The span of `a.prefix` contains the leading colons.
-                /******* >>>>>>>> [DBO] REAPLCE ***********
-                let name = if a.prefix.segments.len() == 2 && leading_modsep {
-                    debug!(
-                        "** [DBO] from_ast: snippet(a.prefix.span)={:?}, a.prefix.segments={:?}",
-                        context.snippet(a.prefix.span), a.prefix.segments
-                    );
-                    context.snippet(a.prefix.span).to_owned()
-                } else {
-                    rewrite_ident(context, path_to_imported_ident(&a.prefix)).to_owned()
-                };
-                *************** [DBO] REPLACE ***********/
-                /********* >>>>>> [DBO] MOVE into closure simple_to_segment **********
-                let name = rewrite_ident(context, path_to_imported_ident(&a.prefix)).to_owned();
-                /* <<<<<<<< [DBO] REPLACE *********/
-                let alias = rename.and_then(|ident| {
-                    if ident.name == sym::underscore_imports {
-                        // for impl-only-use
-                        Some("_".to_owned())
-                    } else if ident == path_to_imported_ident(&a.prefix) {
-                        None
-                    } else {
-                        Some(rewrite_ident(context, ident).to_owned())
-                    }
-                });
-
-                /* >>>>>> [DBO] REPLACE ********************/
-                let segment = match name.as_ref() {
-                    "self" => UseSegment::Slf(alias),
-                    "super" => UseSegment::Super(alias),
-                    "crate" => UseSegment::Crate(alias),
-                    _ => UseSegment::Ident(name, alias),
-                };
-                ************* [DBO] MOVE into closure simple_to_segment **********/
                 let segment = segment_from_simple(&a.prefix, rename);
                 // `name` is already in result.
                 result.path.pop();
                 result.path.push(segment);
-                debug!("** [DBO] from_ast: Simple result.path={:?};", result.path);
-                /********* >>>>>> [DBO] MOVE into closure simple_to_segment **********/
             }
         }
-        debug!("** [DBO] from_ast: resltEE.path={:?};", result.path);
         result
     }
 
@@ -822,7 +679,7 @@ impl Ord for UseSegment {
                 .all(|c| c.is_uppercase() || c == '_' || c.is_numeric())
         }
 
-        let ret = match (self, other) {
+        match (self, other) {
             (&Slf(ref a), &Slf(ref b))
             | (&Super(ref a), &Super(ref b))
             | (&Crate(ref a), &Crate(ref b)) => compare_opt_ident_as_versions(&a, &b),
@@ -830,7 +687,6 @@ impl Ord for UseSegment {
             (&Ident(ref pia, ref aa), &Ident(ref pib, ref ab)) => {
                 let ia = pia.trim_start_matches("r#");
                 let ib = pib.trim_start_matches("r#");
-                debug!("** [DBO] cmp for UseSegment: ia={:?}, ib={:?};", ia, ib);
                 // snake_case < CamelCase < UPPER_SNAKE_CASE
                 if ia.starts_with(char::is_uppercase) && ib.starts_with(char::is_lowercase) {
                     return Ordering::Greater;
@@ -863,58 +719,30 @@ impl Ord for UseSegment {
             (_, &Super(_)) => Ordering::Greater,
             (&Crate(_), _) => Ordering::Less,
             (_, &Crate(_)) => Ordering::Greater,
-            /* >>>>>>> [DBO] ADD */
             (&Empty, &Empty) => Ordering::Equal,
             (&Empty, _) => Ordering::Less,
             (_, &Empty) => Ordering::Greater,
-            /* <<<<<<< [DBO] ADD */
             (&Ident(..), _) => Ordering::Less,
             (_, &Ident(..)) => Ordering::Greater,
             (&Glob, _) => Ordering::Less,
             (_, &Glob) => Ordering::Greater,
-        };
-        debug!(
-            "** [DBO] cmp for UseSegment: retEE={:?}, self={:?}, other={:?};",
-            ret, self, other
-        );
-        ret
+        }
     }
 }
 impl Ord for UseTree {
     fn cmp(&self, other: &UseTree) -> Ordering {
-        debug!(
-            "** [DBO] cmp for UseTree: enter self={:?}, other={:?};",
-            self, other
-        );
         for (a, b) in self.path.iter().zip(other.path.iter()) {
             // The comparison without aliases is a hack to avoid situations like
             // comparing `a::b` to `a as c` - where the latter should be ordered
             // first since it is shorter.
-            //??????!!!!!!!
             let ord = a.remove_alias().cmp(&b.remove_alias());
-            debug!(
-                "** [DBO] cmp for UseTree: next loop ord={:?}, self={:?}, other={:?};",
-                ord, a, b
-            );
             if ord != Ordering::Equal {
                 return ord;
             }
         }
 
-        /* >>>>>> [DBO] REPLACE next */
-        //Ord::cmp(&self.path.len(), &other.path.len())
-        //  .then(Ord::cmp(&self.path.last(), &other.path.last()))
-        //????!!!!!!!
-        let ret = Ord::cmp(&self.path.len(), &other.path.len())
-            .then(Ord::cmp(&self.path.last(), &other.path.last()));
-        debug!(
-            "** [DBO] cmp for UseTree: end cmp ord={:?}, self.len={:?}, other.len={:?};",
-            ret,
-            self.path.len(),
-            other.path.len(),
-        );
-        ret
-        /* <<<<<<< [DBO] REPLACE next */
+        Ord::cmp(&self.path.len(), &other.path.len())
+            .then(Ord::cmp(&self.path.last(), &other.path.last()))
     }
 }
 
@@ -1002,7 +830,7 @@ impl Rewrite for UseSegment {
             UseSegment::Crate(Some(ref rename)) => format!("crate as {}", rename),
             UseSegment::Crate(None) => "crate".to_owned(),
             UseSegment::Glob => "*".to_owned(),
-            UseSegment::Empty => "".to_owned(), // >>>>>> [DBO] ADD <<<<<<<<
+            UseSegment::Empty => "".to_owned(),
             UseSegment::List(ref use_tree_list) => rewrite_nested_use_tree(
                 context,
                 use_tree_list,
