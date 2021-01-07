@@ -1206,18 +1206,10 @@ pub(crate) fn is_simple_block_stmt(
 }
 
 fn block_has_statements(block: &ast::Block) -> bool {
-    block.stmts.iter().any(|stmt| match stmt.kind {
-        ast::StmtKind::Semi(ref expr) => {
-            if let ast::ExprKind::Tup(ref tup_exprs) = expr.kind {
-                if tup_exprs.is_empty() {
-                    return false;
-                }
-            }
-            true
-        }
-        ast::StmtKind::Empty => false,
-        _ => true,
-    })
+    !block
+        .stmts
+        .iter()
+        .all(|stmt| matches!(stmt.kind, ast::StmtKind::Empty))
 }
 
 /// Checks whether a block contains no statements, expressions, comments, or
