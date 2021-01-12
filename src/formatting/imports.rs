@@ -542,6 +542,7 @@ impl UseTree {
                 SharedPrefix::Module => {
                     self.path[..self.path.len() - 1] == other.path[..other.path.len() - 1]
                 }
+                SharedPrefix::NoPrefix => false,
             }
         }
     }
@@ -854,6 +855,7 @@ impl Rewrite for UseTree {
 pub(crate) enum SharedPrefix {
     Crate,
     Module,
+    NoPrefix,
 }
 
 #[cfg(test)]
@@ -1066,6 +1068,21 @@ mod test {
             ["foo::{a::b, a::c, d::e, d::f}"],
             ["foo::a::{b, c}", "foo::d::{e, f}"]
         );
+    }
+
+    #[test]
+    fn test_use_tree_merge_no_prefix() {
+        test_merge!(
+            NoPrefix,
+            ["foo::{a::{b, c}, d::e}"],
+            ["foo::a::b", "foo::a::c", "foo::d::e"]
+        );
+
+        test_merge!(
+            NoPrefix,
+            ["foo::{self, a, b::{c, d}, e::*}"],
+            ["foo::self", "foo::a", "foo::b::c", "foo::b::d", "foo::e::*"]
+        )
     }
 
     #[test]

@@ -228,15 +228,16 @@ fn rewrite_reorderable_or_regroupable_items(
             for (item, list_item) in normalized_items.iter_mut().zip(list_items) {
                 item.list_item = Some(list_item.clone());
             }
-            match context.config.imports_granularity() {
-                ImportGranularity::Crate => {
-                    normalized_items = merge_use_trees(normalized_items, SharedPrefix::Crate)
-                }
+            normalized_items = match context.config.imports_granularity() {
+                ImportGranularity::Crate => merge_use_trees(normalized_items, SharedPrefix::Crate),
                 ImportGranularity::Module => {
-                    normalized_items = merge_use_trees(normalized_items, SharedPrefix::Module)
+                    merge_use_trees(normalized_items, SharedPrefix::Module)
                 }
-                ImportGranularity::Preserve => {}
-            }
+                ImportGranularity::Item => {
+                    merge_use_trees(normalized_items, SharedPrefix::NoPrefix)
+                }
+                ImportGranularity::Preserve => normalized_items,
+            };
 
             let mut regrouped_items = match context.config.group_imports() {
                 GroupImportsTactic::Preserve => vec![normalized_items],
