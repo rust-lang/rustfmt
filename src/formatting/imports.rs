@@ -561,6 +561,11 @@ impl UseTree {
                     for flattened in &mut nested_use_tree.clone().flatten() {
                         let mut new_path = prefix.to_vec();
                         new_path.append(&mut flattened.path);
+                        if flattened.path.len() == 1 {
+                            if let UseSegment::Slf(..) = flattened.path[0] {
+                                new_path.pop();
+                            }
+                        }
                         result.push(UseTree {
                             path: new_path,
                             span: self.span,

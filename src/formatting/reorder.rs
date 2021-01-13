@@ -238,6 +238,11 @@ fn rewrite_reorderable_or_regroupable_items(
                 }
                 ImportGranularity::Preserve => normalized_items,
             };
+            for item in normalized_items.iter_mut() {
+                if let Some(UseSegment::Slf(None)) = item.path.last() {
+                    item.path.pop().unwrap();
+                }
+            }
 
             let mut regrouped_items = match context.config.group_imports() {
                 GroupImportsTactic::Preserve => vec![normalized_items],
