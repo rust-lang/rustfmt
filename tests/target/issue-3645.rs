@@ -1,3 +1,3 @@
 mod x {
-    use super::self as x;
+    use super as x;
 }

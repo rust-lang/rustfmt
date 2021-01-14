@@ -239,8 +239,17 @@ fn rewrite_reorderable_or_regroupable_items(
                 ImportGranularity::Preserve => normalized_items,
             };
             for item in normalized_items.iter_mut() {
-                if let Some(UseSegment::Slf(None)) = item.path.last() {
-                    item.path.pop().unwrap();
+                if let Some(UseSegment::Slf(..)) = item.path.last() {
+                    let self_seg = item.path.pop().unwrap();
+                    match self_seg {
+                        UseSegment::Slf(Some(self_rename)) => match item.path.last_mut() {
+                            Some(UseSegment::Ident(_, rename @ None))
+                            | Some(UseSegment::Crate(rename @ None))
+                            | Some(UseSegment::Super(rename @ None)) => *rename = Some(self_rename),
+                            _ => {}
+                        },
+                        _ => {}
+                    }
                 }
             }
 

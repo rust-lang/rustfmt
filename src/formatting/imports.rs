@@ -550,11 +550,6 @@ impl UseTree {
     fn flatten(self) -> Vec<UseTree> {
         match self.path.last() {
             Some(UseSegment::List(list)) => {
-                if list.len() == 1 && list[0].path.len() == 1 {
-                    if let UseSegment::Slf(..) = list[0].path[0] {
-                        return vec![self];
-                    };
-                }
                 let prefix = &self.path[..self.path.len() - 1];
                 let mut result = vec![];
                 for nested_use_tree in list {
@@ -1056,7 +1051,7 @@ mod test {
         test_merge!(
             Crate,
             ["a::{self}", "b::{self as foo}"],
-            ["a::{self}", "b::{self as foo}"]
+            ["a::self", "b::self as foo"]
         );
     }
 
