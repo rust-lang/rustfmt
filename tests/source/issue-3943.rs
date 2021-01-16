@@ -25,7 +25,7 @@ use aaaa::{BBBB};
 use crate::detect::{Feature, cache};
 use super::{auxvec};
 
-// Tests with comments and "as"
+// Tests with comments
 use a::{/* pre-comment */ item};
 use a::{ item  /* post-comment */};
 use a::{/* pre-comment */ item    /* post-comment */   };

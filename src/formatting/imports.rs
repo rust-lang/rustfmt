@@ -11,7 +11,7 @@ use rustc_span::{
 use crate::config::lists::*;
 use crate::config::{Edition, IndentStyle};
 use crate::formatting::{
-    comment::combine_strs_with_missing_comments,
+    comment::{combine_strs_with_missing_comments, contains_comment},
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator},
     reorder::{compare_as_versions, compare_opt_ident_as_versions},
     rewrite::{Rewrite, RewriteContext},
@@ -94,7 +94,6 @@ pub(crate) enum UseSegment {
     Super(Option<String>),
     Crate(Option<String>),
     Glob,
-    Empty,
     List(Vec<UseTree>),
 }
 
@@ -147,18 +146,16 @@ impl UseSegment {
     ) -> Option<UseSegment> {
         let name = rewrite_ident(context, path_seg.ident);
         if name.is_empty() || name == "{{root}}" {
-            //return None;
-            if modsep {
-                return Some(UseSegment::Empty);
-            } else {
-                return None;
-            }
+            return None;
         }
         Some(match name {
             "self" => UseSegment::Slf(None),
             "super" => UseSegment::Super(None),
             "crate" => UseSegment::Crate(None),
-            _ => UseSegment::Ident(name.to_string(), None),
+            _ => {
+                let mod_sep = if modsep { "::" } else { "" };
+                UseSegment::Ident(format!("{}{}", mod_sep, name), None)
+            }
         })
     }
 }
@@ -198,10 +195,7 @@ impl fmt::Display for UseSegment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             UseSegment::Glob => write!(f, "*"),
-            UseSegment::Empty => write!(f, ""),
-            UseSegment::Ident(ref s, _) => {
-                write!(f, "{}", s)
-            }
+            UseSegment::Ident(ref s, _) => write!(f, "{}", s),
             UseSegment::Slf(..) => write!(f, "self"),
             UseSegment::Super(..) => write!(f, "super"),
             UseSegment::Crate(..) => write!(f, "crate"),
@@ -350,28 +344,25 @@ impl UseTree {
             }
         }
 
-        let segment_from_simple = |path: &ast::Path, rename: &Option<symbol::Ident>| {
-            let name = rewrite_ident(context, path_to_imported_ident(&path)).to_owned();
-            let alias = rename.and_then(|ident| {
+        let rename_to_alias = |rename: &Option<symbol::Ident>| {
+            rename.and_then(|ident| {
                 if ident.name == sym::underscore_imports {
                     // for impl-only-use
                     Some("_".to_owned())
-                } else if ident == path_to_imported_ident(&path) {
+                } else if ident == path_to_imported_ident(&a.prefix) {
                     None
                 } else {
                     Some(rewrite_ident(context, ident).to_owned())
                 }
-            });
-            match name.as_ref() {
-                "self" => UseSegment::Slf(alias),
-                "super" => UseSegment::Super(alias),
-                "crate" => UseSegment::Crate(alias),
-                _ => UseSegment::Ident(name, alias),
-            }
+            })
         };
 
         match a.kind {
             UseTreeKind::Glob => {
+                // in case of a global path and the glob starts at the root, e.g., "::*"
+                if a.prefix.segments.len() == 1 && leading_modsep {
+                    result.path.push(UseSegment::Ident("".to_owned(), None));
+                }
                 result.path.push(UseSegment::Glob);
             }
             UseTreeKind::Nested(ref list) => {
@@ -392,32 +383,42 @@ impl UseTree {
                 .collect();
 
                 // find whether a case of a global path and the nested list starts at the root
-                // with one item, e.g., "::{foo}", and does not include comments or "as".
-                let mut path = None;
-                let mut rename = None;
+                // with one item, e.g., "::{foo as bar}", and does not include comments.
+                let mut first_item = None;
+                let mut first_alias = None;
                 if a.prefix.segments.len() == 1 && list.len() == 1 && result.to_string().is_empty()
                 {
                     let first = &list[0].0;
                     match first.kind {
-                        UseTreeKind::Simple(ref ren, ..) => {
+                        UseTreeKind::Simple(ref rename, ..) => {
                             // "-1" for the "}"
                             let snippet = context
                                 .snippet(mk_sp(first.span.lo(), span.hi() - BytePos(1)))
                                 .trim();
-                            // Ensure that indent includes only the name and not
-                            // "as" clause, comments, etc.
-                            if snippet.eq(&format!("{}", first.prefix.segments[0].ident)) {
-                                path = Some(&first.prefix);
-                                rename = Some(ren);
+                            // Ensure that indent does not include comments
+                            if !contains_comment(&snippet) {
+                                first_item = Some(first);
+                                first_alias = rename_to_alias(rename);
                             }
                         }
                         _ => {}
                     }
                 };
 
-                if let (Some(path), Some(rename)) = (path, rename) {
-                    result.path.push(segment_from_simple(path, rename));
+                if let Some(first) = first_item {
+                    // in case of a global path and the nested list starts at the root
+                    // with one item, e.g., "::{foo as bar}"
+                    let tree = Self::from_ast(context, first, None, None, None, None);
+                    let mod_sep = if leading_modsep { "::" } else { "" };
+                    let seg = UseSegment::Ident(format!("{}{}", mod_sep, tree), first_alias);
+                    result.path.pop();
+                    result.path.push(seg);
                 } else {
+                    // in case of a global path and the nested list starts at the root,
+                    // e.g., "::{foo, bar}"
+                    if a.prefix.segments.len() == 1 && leading_modsep {
+                        result.path.push(UseSegment::Ident("".to_owned(), None));
+                    }
                     result.path.push(UseSegment::List(
                         list.iter()
                             .zip(items.into_iter())
@@ -433,7 +434,19 @@ impl UseTree {
                 // bypass the call to path_to_imported_ident which would get only the ident and
                 // lose the path root, e.g., `that` in `::that`.
                 // The span of `a.prefix` contains the leading colons.
-                let segment = segment_from_simple(&a.prefix, rename);
+                let name = if a.prefix.segments.len() == 2 && leading_modsep {
+                    context.snippet(a.prefix.span).to_owned()
+                } else {
+                    rewrite_ident(context, path_to_imported_ident(&a.prefix)).to_owned()
+                };
+                let alias = rename_to_alias(rename);
+                let segment = match name.as_ref() {
+                    "self" => UseSegment::Slf(alias),
+                    "super" => UseSegment::Super(alias),
+                    "crate" => UseSegment::Crate(alias),
+                    _ => UseSegment::Ident(name, alias),
+                };
+
                 // `name` is already in result.
                 result.path.pop();
                 result.path.push(segment);
@@ -719,9 +732,6 @@ impl Ord for UseSegment {
             (_, &Super(_)) => Ordering::Greater,
             (&Crate(_), _) => Ordering::Less,
             (_, &Crate(_)) => Ordering::Greater,
-            (&Empty, &Empty) => Ordering::Equal,
-            (&Empty, _) => Ordering::Less,
-            (_, &Empty) => Ordering::Greater,
             (&Ident(..), _) => Ordering::Less,
             (_, &Ident(..)) => Ordering::Greater,
             (&Glob, _) => Ordering::Less,
@@ -830,7 +840,6 @@ impl Rewrite for UseSegment {
             UseSegment::Crate(Some(ref rename)) => format!("crate as {}", rename),
             UseSegment::Crate(None) => "crate".to_owned(),
             UseSegment::Glob => "*".to_owned(),
-            UseSegment::Empty => "".to_owned(),
             UseSegment::List(ref use_tree_list) => rewrite_nested_use_tree(
                 context,
                 use_tree_list,

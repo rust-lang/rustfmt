@@ -307,7 +307,7 @@ fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
                 local_imports.push(ut)
             }
             // These are probably illegal here
-            UseSegment::Empty | UseSegment::Glob | UseSegment::List(_) => external_imports.push(ut),
+            UseSegment::Glob | UseSegment::List(_) => external_imports.push(ut),
         }
     }
 
