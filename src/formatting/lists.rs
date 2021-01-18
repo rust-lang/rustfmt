@@ -632,23 +632,28 @@ pub(crate) fn extract_post_comment(
     post_snippet: &str,
     comment_end: usize,
     separator: &str,
+    leave_last: bool,
 ) -> Option<String> {
     let white_space: &[_] = &[' ', '\t'];
 
     // Cleanup post-comment: strip separators and whitespace.
-    let post_snippet = post_snippet[..comment_end].trim();
-    let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
-        post_snippet[1..].trim_matches(white_space)
-    } else if let Some(post_snippet) = post_snippet.strip_prefix(separator) {
+    let (post_snippet, comment_end) = post_snippet.split_at(comment_end);
+    let post_snippet_trimmed = post_snippet.trim();
+
+    let post_snippet_trimmed = if post_snippet_trimmed.starts_with(|c| c == ',' || c == ':') {
+        post_snippet_trimmed[1..].trim_matches(white_space)
+    } else if let Some(post_snippet) = post_snippet_trimmed.strip_prefix(separator) {
         post_snippet.trim_matches(white_space)
     }
     // not comment or over two lines
-    else if post_snippet.ends_with(',')
-        && (!post_snippet.trim().starts_with("//") || post_snippet.trim().contains('\n'))
+    else if post_snippet_trimmed.ends_with(',')
+        && (!post_snippet_trimmed.starts_with("//") || post_snippet_trimmed.contains('\n'))
     {
-        post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
+        post_snippet_trimmed[..(post_snippet_trimmed.len() - 1)].trim_matches(white_space)
+    } else if comment_end == ")" && !leave_last {
+        post_snippet_trimmed
     } else {
-        post_snippet
+        post_snippet.trim_start_matches(white_space).trim_end()
     };
     // FIXME(#3441): post_snippet includes 'const' now
     // it should not include here
@@ -776,7 +781,8 @@ where
                 self.inner.peek().is_none(),
             );
             let new_lines = has_extra_newline(post_snippet, comment_end);
-            let post_comment = extract_post_comment(post_snippet, comment_end, self.separator);
+            let post_comment =
+                extract_post_comment(post_snippet, comment_end, self.separator, self.leave_last);
 
             self.prev_span_end = (self.get_hi)(&item) + BytePos(comment_end as u32);
 
