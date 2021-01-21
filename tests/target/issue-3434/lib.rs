@@ -1,3 +1,4 @@
+// rustfmt-recursive: true
 #![rustfmt::skip::macros(skip_macro_mod)]
 
 mod no_entry;

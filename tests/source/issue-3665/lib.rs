@@ -1,3 +1,4 @@
+// rustfmt-recursive: true
 #![rustfmt::skip::attributes(skip_mod_attr)]
 
 mod sub_mod;

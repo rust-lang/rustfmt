@@ -157,7 +157,7 @@ fn rewrite_macro_name(
         format!("{}!", pprust::path_to_string(path))
     };
     match extra_ident {
-        Some(ident) if ident.name != kw::Invalid => format!("{} {}", name, ident),
+        Some(ident) if ident.name != kw::Empty => format!("{} {}", name, ident),
         _ => name,
     }
 }
@@ -1424,7 +1424,7 @@ impl MacroBranch {
         // Undo our replacement of macro variables.
         // FIXME: this could be *much* more efficient.
         for (old, new) in &substs {
-            if old_body.find(new).is_some() {
+            if old_body.contains(new) {
                 debug!("rewrite_macro_def: bailing matching variable: `{}`", new);
                 return None;
             }

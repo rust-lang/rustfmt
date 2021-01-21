@@ -11,8 +11,8 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::ast;
 use rustc_span::{symbol::sym, Span};
 
-use crate::config::{Config, GroupImportsTactic};
-use crate::formatting::imports::UseSegment;
+use crate::config::{Config, GroupImportsTactic, ImportGranularity};
+use crate::formatting::imports::{flatten_use_trees, UseSegment};
 use crate::formatting::modules::{get_mod_inner_attrs, FileModMap};
 use crate::formatting::{
     imports::{merge_use_trees, UseTree},
@@ -25,6 +25,8 @@ use crate::formatting::{
     utils::{contains_skip, mk_sp},
     visitor::FmtVisitor,
 };
+
+use super::imports::SharedPrefix;
 
 /// Compare strings according to version sort (roughly equivalent to `strverscmp`)
 pub(crate) fn compare_as_versions(left: &str, right: &str) -> Ordering {
@@ -226,9 +228,14 @@ fn rewrite_reorderable_or_regroupable_items(
             for (item, list_item) in normalized_items.iter_mut().zip(list_items) {
                 item.list_item = Some(list_item.clone());
             }
-            if context.config.merge_imports() {
-                normalized_items = merge_use_trees(normalized_items);
-            }
+            normalized_items = match context.config.imports_granularity() {
+                ImportGranularity::Crate => merge_use_trees(normalized_items, SharedPrefix::Crate),
+                ImportGranularity::Module => {
+                    merge_use_trees(normalized_items, SharedPrefix::Module)
+                }
+                ImportGranularity::Item => flatten_use_trees(normalized_items),
+                ImportGranularity::Preserve => normalized_items,
+            };
 
             let mut regrouped_items = match context.config.group_imports() {
                 GroupImportsTactic::Preserve => vec![normalized_items],

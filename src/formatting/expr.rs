@@ -11,9 +11,8 @@ use crate::formatting::{
     chains::rewrite_chain,
     closures,
     comment::{
-        combine_strs_with_missing_comments, comment_style, contains_comment,
-        recover_comment_removed, rewrite_comment, rewrite_missing_comment, CharClasses,
-        FindUncommented,
+        combine_strs_with_missing_comments, contains_comment, recover_comment_removed,
+        rewrite_comment, rewrite_missing_comment, CharClasses, FindUncommented,
     },
     lists::{
         definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
@@ -444,7 +443,7 @@ pub(crate) fn format_expr(
     };
 
     expr_rw
-        .and_then(|expr_str| recover_comment_removed(expr_str, expr.span, context))
+        .map(|expr_str| recover_comment_removed(expr_str, expr.span, context))
         .and_then(|expr_str| {
             let attrs = outer_attributes(&expr.attrs);
             let attrs_str = attrs.rewrite(context, shape)?;
@@ -896,54 +895,15 @@ impl<'a> ControlFlow<'a> {
                 .snippet_provider
                 .span_after(self.span, self.connector.trim());
             let comments_span = mk_sp(comments_lo, expr.span.lo());
-
-            let missing_comments = match rewrite_missing_comment(comments_span, cond_shape, context)
-            {
-                None => "".to_owned(),
-                Some(comment) if self.connector.is_empty() || comment.is_empty() => comment,
-                // Handle same-line block comments:
-                //     if let Some(foo) = /*bar*/ baz { ... }
-                //     if let Some(ref /*def*/ mut /*abc*/ state)...
-                Some(comment)
-                    if !comment_style(&comment, false).is_line_comment()
-                        && !comment.contains('\n') =>
-                {
-                    format!(" {}", comment)
-                }
-                // Handle sequence of multiple inline comments:
-                //     if let Some(n) =
-                //         // this is a test comment
-                //         // with another
-                //         foo { .... }
-                Some(_) => {
-                    let newline = &cond_shape
-                        .indent
-                        .block_indent(context.config)
-                        .to_string_with_newline(context.config);
-                    let shape = pat_shape.block_indent(context.config.tab_spaces());
-                    let comment = format!(
-                        "{}{}",
-                        newline,
-                        rewrite_missing_comment(comments_span, shape, context)?,
-                    );
-                    let lhs = format!("{}{}{}{}", matcher, pat_string, self.connector, comment);
-                    let orig_rhs = Some(format!("{}{}", newline, expr.rewrite(context, shape)?));
-                    let rhs = choose_rhs(
-                        context,
-                        expr,
-                        cond_shape,
-                        orig_rhs,
-                        RhsTactics::Default,
-                        true,
-                    )?;
-                    return Some(format!("{}{}", lhs, rhs));
-                }
-            };
-            let result = format!(
-                "{}{}{}{}",
-                matcher, pat_string, self.connector, missing_comments
+            return rewrite_assign_rhs_with_comments(
+                context,
+                &format!("{}{}{}", matcher, pat_string, self.connector),
+                expr,
+                cond_shape,
+                RhsTactics::Default,
+                comments_span,
+                true,
             );
-            return rewrite_assign_rhs(context, result, expr, cond_shape);
         }
 
         let expr_rw = expr.rewrite(context, cond_shape);
@@ -1246,18 +1206,10 @@ pub(crate) fn is_simple_block_stmt(
 }
 
 fn block_has_statements(block: &ast::Block) -> bool {
-    block.stmts.iter().any(|stmt| match stmt.kind {
-        ast::StmtKind::Semi(ref expr) => {
-            if let ast::ExprKind::Tup(ref tup_exprs) = expr.kind {
-                if tup_exprs.is_empty() {
-                    return false;
-                }
-            }
-            true
-        }
-        ast::StmtKind::Empty => false,
-        _ => true,
-    })
+    !block
+        .stmts
+        .iter()
+        .all(|stmt| matches!(stmt.kind, ast::StmtKind::Empty))
 }
 
 /// Checks whether a block contains no statements, expressions, comments, or

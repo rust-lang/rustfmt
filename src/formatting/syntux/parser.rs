@@ -90,7 +90,7 @@ impl<'a> ParserBuilder<'a> {
                 rustc_span::FileName::Custom("stdin".to_owned()),
                 text,
             )
-            .map_err(|db| Some(db)),
+            .map_err(Some),
         }
     }
 }

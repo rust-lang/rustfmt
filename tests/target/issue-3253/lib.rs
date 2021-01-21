@@ -1,3 +1,4 @@
+// rustfmt-recursive: true
 #[macro_use]
 extern crate cfg_if;
 

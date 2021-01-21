@@ -312,9 +312,9 @@ fn rewrite_struct_pat(
         if fields_str.contains('\n') || fields_str.len() > one_line_width {
             // Add a missing trailing comma.
             if context.config.trailing_comma() == SeparatorTactic::Never {
-                fields_str.push_str(",");
+                fields_str.push(',');
             }
-            fields_str.push_str("\n");
+            fields_str.push('\n');
             fields_str.push_str(&nested_shape.indent.to_string(context.config));
             fields_str.push_str("..");
         } else {
@@ -322,7 +322,7 @@ fn rewrite_struct_pat(
                 // there are preceding struct fields being matched on
                 if tactic == DefinitiveListTactic::Vertical {
                     // if the tactic is Vertical, write_list already added a trailing ,
-                    fields_str.push_str(" ");
+                    fields_str.push(' ');
                 } else {
                     fields_str.push_str(", ");
                 }

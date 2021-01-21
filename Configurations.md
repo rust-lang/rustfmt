@@ -569,7 +569,7 @@ fn main() {
 Specifies which edition is used by the parser.
 
 - **Default value**: `"2015"`
-- **Possible values**: `"2015"`, `"2018"`
+- **Possible values**: `"2015"`, `"2018"`, `"2021"`
 - **Stable**: Yes
 
 Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
@@ -1705,13 +1705,71 @@ pub enum Foo {}
 pub enum Foo {}
 ```
 
+## `imports_granularity`
+
+Merge together related imports based on their paths.
+
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `Crate`, `Module`, `Item`
+- **Stable**: No
+
+#### `Preserve` (default):
+
+Do not perform any merging and preserve the original structure written by the developer.
+
+```rust
+use foo::b;
+use foo::b::{f, g};
+use foo::{a, c, d::e};
+use qux::{h, i};
+```
+
+#### `Crate`:
+
+Merge imports from the same crate into a single `use` statement. Conversely, imports from different crates are split into separate statements.
+
+```rust
+use foo::{
+    a, b,
+    b::{f, g},
+    c,
+    d::e,
+};
+use qux::{h, i};
+```
+
+#### `Module`:
+
+Merge imports from the same module into a single `use` statement. Conversely, imports from different modules are split into separate statements.
+
+```rust
+use foo::b::{f, g};
+use foo::d::e;
+use foo::{a, b, c};
+use qux::{h, i};
+```
+
+#### `Item`:
+
+Flatten imports so that each has its own `use` statement.
+
+```rust
+use foo::a;
+use foo::b;
+use foo::b::f;
+use foo::b::g;
+use foo::c;
+use foo::d::e;
+use qux::h;
+use qux::i;
+```
+
 ## `merge_imports`
-
-Merge multiple imports into a single nested import.
-
+ 
+This option is deprecated. Use `imports_granularity = "Crate"` instead.
+ 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3362](https://github.com/rust-lang/rustfmt/issues/3362))
 
 #### `false` (default):
 
@@ -1726,7 +1784,6 @@ use foo::{e, f};
 ```rust
 use foo::{a, b, c, d, e, f, g};
 ```
-
 
 ## `newline_style`
 
@@ -2560,7 +2617,7 @@ Enable unstable features on stable and beta channels (unstable features are avai
 
 For example:
 ```bash
-rustfmt src/lib.rs --config unstable_features=true merge_imports=true
+rustfmt src/lib.rs --config unstable_features=true imports_granularity=Crate
 ```
 
 ## `use_field_init_shorthand`
