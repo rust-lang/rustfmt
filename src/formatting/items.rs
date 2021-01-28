@@ -1131,6 +1131,11 @@ pub(crate) fn format_trait(
         );
         result.push_str(&header);
 
+        // FIXME: rustfmt fails to format when there are comments before the ident.
+        if contains_comment(context.snippet(mk_sp(item.span.lo(), generics.span.lo()))) {
+            return None;
+        }
+
         let body_lo = context.snippet_provider.span_after(item.span, "{");
 
         let shape = Shape::indented(offset, context.config).offset_left(result.len())?;
@@ -1138,23 +1143,30 @@ pub(crate) fn format_trait(
             rewrite_generics(context, rewrite_ident(context, item.ident), generics, shape)?;
         result.push_str(&generics_str);
 
-        // FIXME(#2055): rustfmt fails to format when there are comments between trait bounds.
+        // FIXME(#2055): rustfmt fails to format when there are comments within trait bounds.
         if !generic_bounds.is_empty() {
-            let ident_hi = context
-                .snippet_provider
-                .span_after(item.span, &item.ident.as_str());
+            let bound_lo = generic_bounds.first().unwrap().span().lo();
             let bound_hi = generic_bounds.last().unwrap().span().hi();
-            let snippet = context.snippet(mk_sp(ident_hi, bound_hi));
+            let snippet = context.snippet(mk_sp(bound_lo, bound_hi));
             if contains_comment(snippet) {
                 return None;
             }
 
-            result = rewrite_assign_rhs_with(
+            // Rewrite rhs and combine lhs with pre-bound comment
+            let ident_hi = context
+                .snippet_provider
+                .span_after(item.span, &item.ident.as_str());
+            let ident_hi = context
+                .snippet_provider
+                .span_after(mk_sp(ident_hi, item.span.hi()), ":");
+            result = rewrite_assign_rhs_with_comments(
                 context,
                 result + ":",
                 generic_bounds,
                 shape,
                 RhsTactics::ForceNextLineWithoutIndent,
+                mk_sp(ident_hi, bound_lo),
+                true,
             )?;
         }
 
@@ -1194,6 +1206,8 @@ pub(crate) fn format_trait(
         }
         let pre_block_span = if !generics.where_clause.predicates.is_empty() {
             mk_sp(generics.where_clause.span.hi(), item.span.hi())
+        } else if !generic_bounds.is_empty() {
+            mk_sp(generic_bounds.last().unwrap().span().hi(), item.span.hi())
         } else {
             item.span
         };
