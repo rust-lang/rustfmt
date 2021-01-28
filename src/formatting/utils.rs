@@ -13,6 +13,7 @@ use crate::config::Config;
 use crate::emitter::Verbosity;
 use crate::formatting::{
     comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses},
+    format_input_inner_for_catch_unwind,
     rewrite::RewriteContext,
     shape::{Indent, Shape},
     FormattedSnippet,
@@ -711,14 +712,15 @@ pub(crate) fn format_snippet(
     snippet: &str,
     config: &Config,
     is_macro_def: bool,
+    macro_original_code_was_used: &mut bool,
 ) -> Option<FormattedSnippet> {
     let mut config = config.clone();
     std::panic::catch_unwind(move || {
         config.set().hide_parse_errors(true);
 
-        let result = {
+        let (result, orig_code_was_used) = {
             let input = Input::Text(snippet.into());
-            crate::format_input_inner(
+            format_input_inner_for_catch_unwind(
                 input,
                 &config,
                 OperationSetting {
@@ -728,7 +730,8 @@ pub(crate) fn format_snippet(
                 is_macro_def,
             )
         };
-        match result {
+
+        let out = match result {
             Ok(report) if !report.has_errors() => {
                 match report.format_result_as_rc().borrow().iter().next() {
                     Some((_, format_result))
@@ -741,7 +744,15 @@ pub(crate) fn format_snippet(
                 }
             }
             _ => None,
+        };
+        (out, orig_code_was_used)
+    })
+    // Update `macro_original_code_was_used` as it could not be done inside the `catch_unwind`
+    .map(|(out, orig_code_was_used)| {
+        if orig_code_was_used {
+            *macro_original_code_was_used = true;
         }
+        out
     })
     // Discard panics encountered while formatting the snippet
     // The ? operator is needed to remove the extra Option
@@ -756,6 +767,7 @@ pub(crate) fn format_code_block(
     code_snippet: &str,
     config: &Config,
     is_macro_def: bool,
+    macro_original_code_was_used: &mut bool,
 ) -> Option<FormattedSnippet> {
     const FN_MAIN_PREFIX: &str = "fn main() {\n";
 
@@ -789,7 +801,13 @@ pub(crate) fn format_code_block(
     config_with_unix_newline
         .set()
         .newline_style(NewlineStyle::Unix);
-    let mut formatted = format_snippet(&snippet, &config_with_unix_newline, is_macro_def)?;
+    let mut formatted = format_snippet(
+        &snippet,
+        &config_with_unix_newline,
+        is_macro_def,
+        macro_original_code_was_used,
+    )?;
+
     // Remove wrapping main block
     formatted.unwrap_code_block();
 
@@ -827,6 +845,7 @@ pub(crate) fn format_code_block(
         result.push_str(trimmed_line);
         is_indented = indent_next_line(kind);
     }
+
     Some(FormattedSnippet {
         snippet: result,
         non_formatted_ranges: formatted.non_formatted_ranges,
@@ -870,15 +889,23 @@ mod test {
         // `format_snippet()` and `format_code_block()` should not panic
         // even when we cannot parse the given snippet.
         let snippet = "let";
-        assert!(format_snippet(snippet, &Config::default(), false).is_none());
-        assert!(format_code_block(snippet, &Config::default(), false).is_none());
+        let mut b = false;
+        assert!(format_snippet(snippet, &Config::default(), false, &mut b).is_none());
+        let mut b = false;
+        assert!(format_code_block(snippet, &Config::default(), false, &mut b).is_none());
     }
 
     fn test_format_inner<F>(formatter: F, input: &str, expected: &str) -> bool
     where
-        F: Fn(&str, &Config, bool /* is_code_block */) -> Option<FormattedSnippet>,
+        F: Fn(
+            &str,
+            &Config,
+            bool,      /* is_code_block */
+            &mut bool, /* Macro Orig Code Used */
+        ) -> Option<FormattedSnippet>,
     {
-        let output = formatter(input, &Config::default(), false);
+        let mut b = false;
+        let output = formatter(input, &Config::default(), false, &mut b);
         output.is_some() && output.unwrap().snippet == expected
     }
 

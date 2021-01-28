@@ -606,6 +606,11 @@ pub(crate) fn rewrite_block_with_visitor(
         .skipped_range
         .borrow_mut()
         .append(&mut visitor_context.skipped_range.borrow_mut());
+
+    if visitor.macro_original_code_was_used.get() {
+        context.macro_original_code_was_used.replace(true);
+    }
+
     Some(format!("{}{}{}", prefix, label_str, visitor.buffer))
 }
 

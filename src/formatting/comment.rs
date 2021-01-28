@@ -687,9 +687,13 @@ impl<'a> CommentRewrite<'a> {
                         let mut config = self.fmt.config.clone();
                         config.set().wrap_comments(false);
                         if config.format_code_in_doc_comments() {
-                            if let Some(s) =
-                                format_code_block(&self.code_block_buffer, &config, false)
-                            {
+                            let mut macro_original_code_was_used = false;
+                            if let Some(s) = format_code_block(
+                                &self.code_block_buffer,
+                                &config,
+                                false,
+                                &mut macro_original_code_was_used,
+                            ) {
                                 trim_custom_comment_prefix(s.as_ref())
                             } else {
                                 trim_custom_comment_prefix(&self.code_block_buffer)
@@ -1604,6 +1608,7 @@ pub(crate) fn recover_comment_removed(
     let snippet = context.snippet(span);
     let includes_comment = contains_comment(snippet);
     if snippet != new && includes_comment && changed_comment_content(snippet, &new) {
+        context.macro_original_code_was_used.replace(true);
         snippet.to_owned()
     } else {
         new

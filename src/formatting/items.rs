@@ -890,6 +890,10 @@ pub(crate) fn format_impl(
             result.push_str(&inner_indent_str);
             result.push_str(visitor.buffer.trim());
             result.push_str(&outer_indent_str);
+
+            if visitor.macro_original_code_was_used.get() {
+                context.macro_original_code_was_used.replace(true);
+            }
         } else if need_newline || !context.config.empty_item_single_line() {
             result.push_str(&sep);
         }
@@ -1266,6 +1270,10 @@ pub(crate) fn format_trait(
             result.push_str(&inner_indent_str);
             result.push_str(visitor.buffer.trim());
             result.push_str(&outer_indent_str);
+
+            if visitor.macro_original_code_was_used.get() {
+                context.macro_original_code_was_used.replace(true);
+            }
         } else if result.contains('\n') {
             result.push_str(&outer_indent_str);
         }
@@ -3264,6 +3272,11 @@ impl Rewrite for ast::ForeignItem {
                     defaultness,
                     Some(&inner_attrs),
                 );
+
+                if visitor.macro_original_code_was_used.get() {
+                    context.macro_original_code_was_used.replace(true);
+                }
+
                 Some(visitor.buffer.to_owned())
             }
             ast::ForeignItemKind::Fn(_, ref fn_sig, ref generics, None) => rewrite_fn_base(

@@ -49,11 +49,13 @@ pub fn format(
     config: &Config,
     operation_setting: OperationSetting,
 ) -> Result<FormatReport, OperationError> {
+    let mut macro_original_code_was_used = false;
     format_input_inner(
         input,
         config,
         operation_setting,
         /* is_macro_def */ false,
+        &mut macro_original_code_was_used,
     )
 }
 

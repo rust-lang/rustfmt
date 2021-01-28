@@ -58,18 +58,45 @@ pub(crate) mod visitor;
 
 pub(crate) mod report;
 
+// As `catch_unwind` in `format_snippet()` does not allow the the of a `mut bool`,
+// this function is used to `format_input_inner()` using a reference to a new
+// `bool` variable, and return its value as part of the function return value.
+pub(crate) fn format_input_inner_for_catch_unwind(
+    input: Input,
+    config: &Config,
+    operation_setting: OperationSetting,
+    is_macro_def: bool,
+) -> (Result<FormatReport, OperationError>, bool) {
+    let mut macro_original_code_was_used = false;
+    let result = crate::format_input_inner(
+        input,
+        &config,
+        operation_setting,
+        is_macro_def,
+        &mut macro_original_code_was_used,
+    );
+    return (result, macro_original_code_was_used);
+}
+
 pub(crate) fn format_input_inner(
     input: Input,
     config: &Config,
     operation_setting: OperationSetting,
     is_macro_def: bool,
+    macro_original_code_was_used: &mut bool,
 ) -> Result<FormatReport, OperationError> {
     if !config.version_meets_requirement() {
         return Err(OperationError::VersionMismatch);
     }
 
     rustc_span::with_session_globals(config.edition().into(), || {
-        format_project(input, config, operation_setting, is_macro_def)
+        format_project(
+            input,
+            config,
+            operation_setting,
+            is_macro_def,
+            macro_original_code_was_used,
+        )
     })
 }
 
@@ -78,6 +105,7 @@ fn format_project(
     config: &Config,
     operation_setting: OperationSetting,
     is_macro_def: bool,
+    macro_original_code_was_used: &mut bool,
 ) -> Result<FormatReport, OperationError> {
     let mut timer = Timer::start();
 
@@ -87,6 +115,7 @@ fn format_project(
     let input_is_stdin = main_file == FileName::Stdin;
 
     let mut parse_session = ParseSess::new(config)?;
+
     if !operation_setting.recursive && parse_session.ignore_file(&main_file) {
         format_report.add_ignored_file(main_file);
         return Ok(format_report);
@@ -152,6 +181,7 @@ fn format_project(
             &files,
             original_snippet.clone(),
             is_macro_def,
+            macro_original_code_was_used,
         )?;
     }
     timer = timer.done_formatting();
@@ -177,8 +207,10 @@ fn format_file(
     file_mod_map: &FileModMap<'_>,
     original_snippet: Option<String>,
     is_macro_def: bool,
+    macro_original_code_was_used: &mut bool,
 ) -> Result<(), OperationError> {
     let snippet_provider = parse_session.snippet_provider(module.as_ref().inner);
+
     let mut visitor = FmtVisitor::from_parse_sess(
         &parse_session,
         config,
@@ -186,6 +218,7 @@ fn format_file(
         file_mod_map,
         report.clone(),
     );
+
     visitor.is_macro_def = is_macro_def;
     visitor.skip_context.update_with_attrs(&krate.attrs);
     visitor.last_pos = snippet_provider.start_pos();
@@ -236,6 +269,10 @@ fn format_file(
         config.newline_style(),
     );
     report.add_format_result(path.clone(), format_result);
+
+    if visitor.macro_original_code_was_used.get() {
+        *macro_original_code_was_used = true;
+    }
 
     Ok(())
 }

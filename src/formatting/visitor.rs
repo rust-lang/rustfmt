@@ -92,6 +92,7 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) normalize_vertical_spaces: bool,
     /// If set to `true`, we are formatting a macro definition
     pub(crate) is_macro_def: bool,
+    pub(crate) macro_original_code_was_used: Cell<bool>,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -644,8 +645,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.push_rewrite(item.span, snippet);
                 }
                 ast::ItemKind::MacroDef(ref def) => {
+                    let self_context = self.get_context();
                     let rewrite = rewrite_macro_def(
-                        &self.get_context(),
+                        &self_context,
                         self.shape(),
                         self.block_indent,
                         def,
@@ -653,6 +655,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         &item.vis,
                         item.span,
                     );
+                    if self_context.macro_original_code_was_used.get() {
+                        self.macro_original_code_was_used.replace(true);
+                    }
                     self.push_rewrite(item.span, rewrite);
                 }
             };
@@ -891,6 +896,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             skip_context: Default::default(),
             normalize_vertical_spaces: false,
             is_macro_def: false,
+            macro_original_code_was_used: Cell::new(false),
         }
     }
 
@@ -1076,7 +1082,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let context = self.get_context();
         let result = f(&context);
 
+        if context.macro_original_code_was_used.get() {
+            self.macro_original_code_was_used.replace(true);
+        }
+
         self.macro_rewrite_failure |= context.macro_rewrite_failure.get();
+
         result
     }
 
@@ -1095,6 +1106,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             skip_context: self.skip_context.clone(),
             skipped_range: self.skipped_range.clone(),
             is_macro_def: self.is_macro_def,
+            macro_original_code_was_used: Cell::new(self.macro_original_code_was_used.get()),
         }
     }
 }

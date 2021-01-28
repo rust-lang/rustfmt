@@ -170,7 +170,7 @@ fn return_macro_parse_failure_fallback(
 ) -> Option<String> {
     // Mark this as a failure however we format it
     context.macro_rewrite_failure.replace(true);
-
+    context.macro_original_code_was_used.replace(true);
     // Heuristically determine whether the last line of the macro uses "Block" style
     // rather than using "Visual" style, or another indentation style.
     let is_like_block_indent_style = context
@@ -229,6 +229,7 @@ pub(crate) fn rewrite_macro(
                 guard.is_nested(),
             )
         }));
+
         match result {
             Err(..) | Ok(None) => {
                 context.macro_rewrite_failure.replace(true);
@@ -510,13 +511,17 @@ pub(crate) fn rewrite_macro_def(
 ) -> Option<String> {
     let snippet = Some(remove_trailing_white_spaces(context.snippet(span)));
     if snippet.as_ref().map_or(true, |s| s.ends_with(';')) {
+        context.macro_original_code_was_used.replace(true);
         return snippet;
     }
     let ts = def.body.inner_tokens();
     let mut parser = MacroParser::new(ts.into_trees());
     let parsed_def = match parser.parse(def.macro_rules) {
         Some(def) => def,
-        None => return snippet,
+        None => {
+            context.macro_original_code_was_used.replace(true);
+            return snippet;
+        }
     };
 
     let mut result = if def.macro_rules {
@@ -527,7 +532,6 @@ pub(crate) fn rewrite_macro_def(
 
     result += " ";
     result += rewrite_ident(context, ident);
-
     let multi_branch_style = def.macro_rules || parsed_def.branches.len() != 1;
 
     let arm_shape = if multi_branch_style {
@@ -550,6 +554,7 @@ pub(crate) fn rewrite_macro_def(
             // if the rewrite returned None because a macro could not be rewritten, then return the
             // original body
             None if context.macro_rewrite_failure.get() => {
+                context.macro_original_code_was_used.replace(true);
                 Some(context.snippet(branch.body).trim().to_string())
             }
             None => None,
@@ -576,14 +581,16 @@ pub(crate) fn rewrite_macro_def(
 
     match write_list(&branch_items, &fmt) {
         Some(ref s) => result += s,
-        None => return snippet,
+        None => {
+            context.macro_original_code_was_used.replace(true);
+            return snippet;
+        }
     }
 
     if multi_branch_style {
         result += &indent.to_string_with_newline(context.config);
         result += "}";
     }
-
     Some(result)
 }
 
@@ -1274,7 +1281,8 @@ impl MacroParser {
             branches.push(self.parse_branch(is_macro_rules)?);
         }
 
-        Some(Macro { branches })
+        let ret = Some(Macro { branches });
+        ret
     }
 
     // `(` ... `)` `=>` `{` ... `}`
@@ -1356,6 +1364,10 @@ impl MacroBranch {
             result += " =>";
         }
 
+        // Prepare for restoring original macro body if original code was use during formatting
+        // (since in this case indentation done by this function doesn't work properly).
+        let result_without_body = result.clone();
+
         if !context.config.format_macro_bodies() {
             result += " ";
             result += context.snippet(self.whole_body);
@@ -1386,22 +1398,43 @@ impl MacroBranch {
         config.set().max_width(new_width);
 
         // First try to format as items, then as statements.
-        let new_body_snippet = match format_snippet(&body_str, &config, true) {
-            Some(new_body) => new_body,
-            None => {
-                let new_width = new_width + config.tab_spaces();
-                config.set().max_width(new_width);
-                match format_code_block(&body_str, &config, true) {
-                    Some(new_body) => new_body,
-                    None => return None,
+
+        let mut macro_original_code_was_used = false;
+
+        let new_body_snippet =
+            match format_snippet(&body_str, &config, true, &mut macro_original_code_was_used) {
+                Some(new_body) => new_body,
+                None => {
+                    let new_width = new_width + config.tab_spaces();
+                    config.set().max_width(new_width);
+                    match format_code_block(
+                        &body_str,
+                        &config,
+                        true,
+                        &mut macro_original_code_was_used,
+                    ) {
+                        Some(new_body) => new_body,
+                        None => {
+                            return None;
+                        }
+                    }
                 }
-            }
-        };
+            };
+
         let new_body = wrap_str(
             new_body_snippet.as_ref().to_owned(),
             config.max_width(),
             shape,
         )?;
+
+        // If original code was used during the macro body formatting -
+        // use whole original body without formatting
+        if macro_original_code_was_used {
+            result = result_without_body;
+            result += " ";
+            result += context.snippet(self.whole_body);
+            return Some(result);
+        }
 
         // Indent the body since it is in a block.
         let indent_str = body_indent.to_string(&config);
@@ -1425,7 +1458,6 @@ impl MacroBranch {
         // FIXME: this could be *much* more efficient.
         for (old, new) in &substs {
             if old_body.contains(new) {
-                debug!("rewrite_macro_def: bailing matching variable: `{}`", new);
                 return None;
             }
             new_body = new_body.replace(new, old);
@@ -1576,6 +1608,11 @@ fn rewrite_macro_with_items(
     result.push_str(&shape.indent.to_string_with_newline(context.config));
     result.push_str(closer);
     result.push_str(trailing_semicolon);
+
+    if visitor.macro_original_code_was_used.get() {
+        context.macro_original_code_was_used.replace(true);
+    }
+
     Some(result)
 }
 
