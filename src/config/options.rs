@@ -130,6 +130,8 @@ pub enum ImportGranularity {
     Module,
     /// Use one `use` statement per imported item.
     Item,
+    /// Use one `use` statement including all items.
+    One,
 }
 
 #[config_type]
