@@ -9,7 +9,7 @@ jobs:
     name: build-release
     strategy:
       matrix:
-        build: [linux, macos, windows-gnu, windows-msvc]
+        build: [linux-x86_64, macos-x86_64, windows-x86_64-gnu, windows-x86_64-msvc]
         include:
           - build: linux-x86_64
             os: ubuntu-latest
