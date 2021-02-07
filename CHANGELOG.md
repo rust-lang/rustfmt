@@ -54,6 +54,220 @@
 - Stabilize `match_block_trailing_comma` configuration option.
 - Stabilize `ignore` configuration option.
 
+## [1.4.36] 2021-02-07
+
+### Changed
+
+- `rustc-ap-*` crates updated to v705.0.0
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - *pending*
+- **GitHub Release Binaries** - [Release v1.4.36](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.36)
+- **Build from source** - [Tag v1.4.36](https://github.com/rust-lang/rustfmt/tree/v1.4.36), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.35] 2021-02-03
+
+### Changed
+
+- `rustc-ap-*` crates updated to v702.0.0
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - *n/a (superseded by [v1.4.36](#1436-2021-02-07))
+- **GitHub Release Binaries** - [Release v1.4.35](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.35)
+- **Build from source** - [Tag v1.4.35](https://github.com/rust-lang/rustfmt/tree/v1.4.35), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.34] 2021-01-28
+
+### Fixed
+- Don't insert trailing comma on (base-less) rest in struct literals within macros ([#4675](https://github.com/rust-lang/rustfmt/issues/4675))
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - Starting in `2021-01-31`
+- **GitHub Release Binaries** - [Release v1.4.34](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.34)
+- **Build from source** - [Tag v1.4.34](https://github.com/rust-lang/rustfmt/tree/v1.4.34), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.33] 2021-01-27
+
+### Changed
+- `merge_imports` configuration has been deprecated in favor of the new `imports_granularity` option. Any existing usage of `merge_imports` will be automatically mapped to the corresponding value on `imports_granularity` with a warning message printed to encourage users to update their config files.
+
+### Added
+- New `imports_granularity` option has been added which succeeds `merge_imports`. This new option supports several additional variants which allow users to merge imports at different levels (crate or module), and even flatten imports to have a single use statement per item. ([PR #4634](https://github.com/rust-lang/rustfmt/pull/4634), [PR #4639](https://github.com/rust-lang/rustfmt/pull/4639))
+
+See the section on the configuration site for more information
+https://rust-lang.github.io/rustfmt/?version=v1.4.33&search=#imports_granularity
+
+### Fixed
+- Fix erroneous removal of `const` keyword on const trait impl ([#4084](https://github.com/rust-lang/rustfmt/issues/4084))
+- Fix incorrect span usage wit const generics in supertraits ([#4204](https://github.com/rust-lang/rustfmt/issues/4204))
+- Use correct span for const generic params ([#4263](https://github.com/rust-lang/rustfmt/issues/4263))
+- Correct span on const generics to include type bounds ([#4310](https://github.com/rust-lang/rustfmt/issues/4310))
+- Idempotence issue on blocks containing only empty statements ([#4627](https://github.com/rust-lang/rustfmt/issues/4627) and [#3868](https://github.com/rust-lang/rustfmt/issues/3868))
+- Fix issue with semicolon placement on required functions that have a trailing comment that ends in a line-style comment before the semicolon ([#4646](https://github.com/rust-lang/rustfmt/issues/4646))
+- Avoid shared interned cfg_if symbol since rustfmt can re-initialize the rustc_ast globals on multiple inputs ([#4656](https://github.com/rust-lang/rustfmt/issues/4656))
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - n/a (superseded by [v1.4.34](#1434-2021-01-28))
+- **GitHub Release Binaries** - [Release v1.4.33](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.33)
+- **Build from source** - [Tag v1.4.33](https://github.com/rust-lang/rustfmt/tree/v1.4.33), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.32] 2021-01-16
+
+### Fixed
+- Indentation now correct on first bound in cases where the generic bounds are multiline formatted and the first bound itself is multiline formatted ([#4636](https://github.com/rust-lang/rustfmt/issues/4636))
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - Starting in `2021-01-18`
+- **GitHub Release Binaries** - [Release v1.4.32](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.32)
+- **Build from source** - [Tag v1.4.32](https://github.com/rust-lang/rustfmt/tree/v1.4.32), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.31] 2021-01-09
+
+### Changed
+
+- `rustc-ap-*` crates updated to v697.0.0
+
+### Added
+- Support for 2021 Edition [#4618](https://github.com/rust-lang/rustfmt/pull/4618))
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - Starting in `2021-01-16`
+- **GitHub Release Binaries** - [Release v1.4.31](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.31)
+- **Build from source** - [Tag v1.4.31](https://github.com/rust-lang/rustfmt/tree/v1.4.31), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.30] 2020-12-20
+
+### Fixed
+- Last character in derive no longer erroneously stripped when `indent_style` is overridden to `Visual`. ([#4584](https://github.com/rust-lang/rustfmt/issues/4584))
+- Brace wrapping of closure bodies maintained in cases where the closure has an explicit return type and the body consists of a single expression statement. ([#4577](https://github.com/rust-lang/rustfmt/issues/4577))
+- No more panics on invalid code with `err` and `typeof` types ([#4357](https://github.com/rust-lang/rustfmt/issues/4357), [#4586](https://github.com/rust-lang/rustfmt/issues/4586))
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - Starting in `2020-12-25`
+- **GitHub Release Binaries** - [Release v1.4.30](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.30)
+- **Build from source** - [Tag v1.4.30](https://github.com/rust-lang/rustfmt/tree/v1.4.30), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.29] 2020-12-04
+
+### Fixed
+- Negative polarity on non-trait impl now preserved. ([#4566](https://github.com/rust-lang/rustfmt/issues/4566))
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - Starting in `2020-12-07`
+- **GitHub Release Binaries** - [Release v1.4.29](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.29)
+- **Build from source** - [Tag v1.4.29](https://github.com/rust-lang/rustfmt/tree/v1.4.29), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.28] 2020-11-29
+
+### Changed
+
+- `rustc-ap-*` crates updated to v691.0.0
+- In the event of an invalid inner attribute on a `cfg_if` condition, rustfmt will now attempt to continue and format the imported modules. Previously rustfmt would emit the parser error about an inner attribute being invalid in this position, but for rustfmt's purposes the invalid attribute doesn't prevent nor impact module formatting.
+
+### Added
+
+- [`group_imports`][group-imports-config-docs] - a new configuration option that allows users to control the strategy used for grouping imports ([#4107](https://github.com/rust-lang/rustfmt/issues/4107))
+
+[group-imports-config-docs]: https://github.com/rust-lang/rustfmt/blob/v1.4.28/Configurations.md#group_imports
+
+### Fixed
+- Formatting of malformed derived attributes is no longer butchered. ([#3898](https://github.com/rust-lang/rustfmt/issues/3898), [#4029](https://github.com/rust-lang/rustfmt/issues/4029), [#4115](https://github.com/rust-lang/rustfmt/issues/4115), [#4545](https://github.com/rust-lang/rustfmt/issues/4545))
+- Correct indentation used in macro branches when `hard_tabs` is enabled. ([#4152](https://github.com/rust-lang/rustfmt/issues/4152))
+- Comments between the visibility modifier and item name are no longer dropped. ([#2781](https://github.com/rust-lang/rustfmt/issues/2781))
+- Comments preceding the assignment operator in type aliases are no longer dropped. ([#4244](https://github.com/rust-lang/rustfmt/issues/4244))
+- Comments between {`&` operator, lifetime, `mut` kw, type} are no longer dropped. ([#4245](https://github.com/rust-lang/rustfmt/issues/4245))
+- Comments between type bounds are no longer dropped. ([#4243](https://github.com/rust-lang/rustfmt/issues/4243))
+- Function headers are no longer dropped on foreign function items. ([#4288](https://github.com/rust-lang/rustfmt/issues/4288))
+- Foreign function blocks are no longer dropped. ([#4313](https://github.com/rust-lang/rustfmt/issues/4313))
+- `where_single_line` is no longer incorrectly applied to multiline function signatures that have no `where` clause. ([#4547](https://github.com/rust-lang/rustfmt/issues/4547))
+- `matches!` expressions with multiple patterns and a destructure pattern are now able to be formatted. ([#4512](https://github.com/rust-lang/rustfmt/issues/4512))
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - n/a (superseded by [v1.4.29](#1429-2020-12-04))
+- **GitHub Release Binaries** - [Release v1.4.28](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.28)
+- **Build from source** - [Tag v1.4.28](https://github.com/rust-lang/rustfmt/tree/v1.4.28), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.27] 2020-11-16
+
+### Fixed
+
+- Leading comments in an extern block are no longer dropped (a bug that exists in v1.4.26). ([#4528](https://github.com/rust-lang/rustfmt/issues/4528))
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - Starting in `2020-11-18`
+- **GitHub Release Binaries** - [Release v1.4.27](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.27)
+- **Build from source** - [Tag v1.4.27](https://github.com/rust-lang/rustfmt/tree/v1.4.27), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.26] 2020-11-14
+
+### Changed
+
+- Original comment indentation for trailing comments within an `if` is now taken into account when determining the indentation level to use for the trailing comment in formatted code. This does not modify any existing code formatted with rustfmt; it simply gives the programmer discretion to specify whether the comment is associated to the `else` block, or if the trailing comment is just a member of the `if` block. ([#1575](https://github.com/rust-lang/rustfmt/issues/1575), [#4120](https://github.com/rust-lang/rustfmt/issues/4120), [#4506](https://github.com/rust-lang/rustfmt/issues/4506)) 
+
+In this example the `// else comment` refers to the `else`:
+```rust
+// if comment
+if cond {
+    "if"
+// else comment
+} else {
+    "else"
+}
+```
+
+Whereas in this case the `// continue` comments are members of their respective blocks and do not refer to the `else` below.
+```rust
+if toks.eat_token(Token::Word("modify"))? && toks.eat_token(Token::Word("labels"))? {
+    if toks.eat_token(Token::Colon)? {
+        // ate the token
+    } else if toks.eat_token(Token::Word("to"))? {
+        // optionally eat the colon after to, e.g.:
+        // @rustbot modify labels to: -S-waiting-on-author, +S-waiting-on-review
+        toks.eat_token(Token::Colon)?;
+    } else {
+        // It's okay if there's no to or colon, we can just eat labels
+        // afterwards.
+    }
+    1 + 2;
+    // continue
+} else if toks.eat_token(Token::Word("label"))? {
+    // continue
+} else {
+    return Ok(None);
+}
+```
+
+### Fixed
+- Formatting of empty blocks with attributes which only contained comments is no longer butchered.([#4475](https://github.com/rust-lang/rustfmt/issues/4475), [#4467](https://github.com/rust-lang/rustfmt/issues/4467), [#4452](https://github.com/rust-lang/rustfmt/issues/4452#issuecomment-705886282), [#4522](https://github.com/rust-lang/rustfmt/issues/4522))
+- Indentation of trailing comments in non-empty extern blocks is now correct. ([#4120](https://github.com/rust-lang/rustfmt/issues/4120#issuecomment-696491872)) 
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - Starting in `2020-11-16`
+- **GitHub Release Binaries** - [Release v1.4.26](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.26)
+- **Build from source** - [Tag v1.4.26](https://github.com/rust-lang/rustfmt/tree/v1.4.26), see instructions for how to [install rustfmt from source][install-from-source]
+
+## [1.4.25] 2020-11-10
+
+### Changed
+
+- Semicolons are no longer automatically inserted on trailing expressions in macro definition arms ([#4507](https://github.com/rust-lang/rustfmt/pull/4507)). This gives the programmer control and discretion over whether there should be semicolons in these scenarios so that potential expansion issues can be avoided.
+
+### Install/Download Options
+- **crates.io package** - *pending*
+- **rustup (nightly)** - Starting in `2020-11-14`
+- **GitHub Release Binaries** - [Release v1.4.25](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.25)
+- **Build from source** - [Tag v1.4.25](https://github.com/rust-lang/rustfmt/tree/v1.4.25), see instructions for how to [install rustfmt from source][install-from-source]
 
 ## [1.4.24] 2020-11-05
 
@@ -66,7 +280,7 @@
 
 ### Install/Download Options
 - **crates.io package** - **pending**
-- **rustup (nightly)** - **pending**
+- **rustup (nightly)** - Starting in `2020-11-09`
 - **GitHub Release Binaries** - [Release v1.4.24](https://github.com/rust-lang/rustfmt/releases/tag/v1.4.24)
 - **Build from source** - [Tag v1.4.24](https://github.com/rust-lang/rustfmt/tree/v1.4.24), see instructions for how to [install rustfmt from source][install-from-source]
 
