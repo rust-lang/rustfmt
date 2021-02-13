@@ -181,3 +181,15 @@ impl<T: ?const Trait> Foo<T> {
 // #4357
 type T = typeof(1);
 impl T for .. {}
+
+fn gat_object(
+    x: &dyn for<'a> StreamingIterator<Item<'a> = &'a i32>,
+) -> &dyn for<'a> StreamingIterator<Item<'a> = &'a i32> {
+    x
+}
+
+fn gat_impl_trait(
+    x: &impl for<'a> StreamingIterator<Item<'a> = &'a i32>,
+) -> &impl for<'a> StreamingIterator<Item<'a> = &'a i32> {
+    x
+}
