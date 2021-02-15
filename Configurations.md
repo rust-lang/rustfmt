@@ -181,7 +181,7 @@ lines are found, they are trimmed down to match this integer.
 
 - **Default value**: `1`
 - **Possible values**: any non-negative integer
-- **Stable**: No (tracking issue: [#3381](https://github.com/rust-lang/rustfmt/issues/3381))
+- **Stable**: Yes
 
 ### Example
 Original Code:
