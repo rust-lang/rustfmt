@@ -280,8 +280,7 @@ where
     };
     let new_line_width = infix_with_sep.len() - 1 + rhs_result.len() + pp.suffix.len();
     let rhs_with_sep = if separator_place == SeparatorPlace::Front && new_line_width > shape.width {
-        let s: String = String::from(infix_with_sep);
-        infix_with_sep = s.trim_end().to_string();
+        infix_with_sep = infix_with_sep.trim_end().to_string();
         format!("{}{}", indent_str, rhs_result.trim_start())
     } else {
         rhs_result

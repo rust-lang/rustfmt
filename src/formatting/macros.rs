@@ -13,12 +13,10 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_ast::token::{BinOpToken, DelimToken, Token, TokenKind};
-use rustc_ast::tokenstream::{
-    Cursor, LazyTokenStream, LazyTokenStreamInner, TokenStream, TokenTree,
-};
+use rustc_ast::tokenstream::{Cursor, LazyTokenStream, TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
-use rustc_parse::parser::Parser;
+use rustc_parse::parser::{ForceCollect, Parser};
 use rustc_parse::{stream_to_parser, MACRO_ARGUMENTS};
 use rustc_span::{
     symbol::{self, kw},
@@ -139,7 +137,7 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
     // `parse_item` returns `Option<ptr::P<ast::Item>>`.
     parse_macro_arg!(
         Item,
-        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_item(),
+        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_item(ForceCollect::No),
         |x: Option<ptr::P<ast::Item>>| x
     );
 
@@ -159,7 +157,7 @@ fn rewrite_macro_name(
         format!("{}!", pprust::path_to_string(path))
     };
     match extra_ident {
-        Some(ident) if ident.name != kw::Invalid => format!("{} {}", name, ident),
+        Some(ident) if ident.name != kw::Empty => format!("{} {}", name, ident),
         _ => name,
     }
 }
@@ -707,8 +705,11 @@ fn delim_token_to_str(
 
 impl MacroArgKind {
     fn starts_with_brace(&self) -> bool {
-        matches!(*self, MacroArgKind::Repeat(DelimToken::Brace, _, _, _)
-            | MacroArgKind::Delimited(DelimToken::Brace, _))
+        matches!(
+            *self,
+            MacroArgKind::Repeat(DelimToken::Brace, _, _, _)
+                | MacroArgKind::Delimited(DelimToken::Brace, _)
+        )
     }
 
     fn starts_with_dollar(&self) -> bool {
@@ -1148,29 +1149,35 @@ enum SpaceState {
 fn force_space_before(tok: &TokenKind) -> bool {
     debug!("tok: force_space_before {:?}", tok);
 
-    matches!(tok, TokenKind::Eq
-        | TokenKind::Lt
-        | TokenKind::Le
-        | TokenKind::EqEq
-        | TokenKind::Ne
-        | TokenKind::Ge
-        | TokenKind::Gt
-        | TokenKind::AndAnd
-        | TokenKind::OrOr
-        | TokenKind::Not
-        | TokenKind::Tilde
-        | TokenKind::BinOpEq(_)
-        | TokenKind::At
-        | TokenKind::RArrow
-        | TokenKind::LArrow
-        | TokenKind::FatArrow
-        | TokenKind::BinOp(_)
-        | TokenKind::Pound
-        | TokenKind::Dollar)
+    matches!(
+        tok,
+        TokenKind::Eq
+            | TokenKind::Lt
+            | TokenKind::Le
+            | TokenKind::EqEq
+            | TokenKind::Ne
+            | TokenKind::Ge
+            | TokenKind::Gt
+            | TokenKind::AndAnd
+            | TokenKind::OrOr
+            | TokenKind::Not
+            | TokenKind::Tilde
+            | TokenKind::BinOpEq(_)
+            | TokenKind::At
+            | TokenKind::RArrow
+            | TokenKind::LArrow
+            | TokenKind::FatArrow
+            | TokenKind::BinOp(_)
+            | TokenKind::Pound
+            | TokenKind::Dollar
+    )
 }
 
 fn ident_like(tok: &Token) -> bool {
-    matches!(tok.kind, TokenKind::Ident(..) | TokenKind::Literal(..) | TokenKind::Lifetime(_))
+    matches!(
+        tok.kind,
+        TokenKind::Ident(..) | TokenKind::Literal(..) | TokenKind::Lifetime(_)
+    )
 }
 
 fn next_space(tok: &TokenKind) -> SpaceState {
@@ -1226,7 +1233,7 @@ pub(crate) fn convert_try_mac(
             kind: ast::ExprKind::Try(kind),
             span: mac.span(), // incorrect span, but shouldn't matter too much
             attrs: ast::AttrVec::new(),
-            tokens: Some(LazyTokenStream::new(LazyTokenStreamInner::Ready(ts))),
+            tokens: Some(LazyTokenStream::new(ts)),
         })
     } else {
         None
@@ -1417,7 +1424,7 @@ impl MacroBranch {
         // Undo our replacement of macro variables.
         // FIXME: this could be *much* more efficient.
         for (old, new) in &substs {
-            if old_body.find(new).is_some() {
+            if old_body.contains(new) {
                 debug!("rewrite_macro_def: bailing matching variable: `{}`", new);
                 return None;
             }
@@ -1496,7 +1503,7 @@ fn format_lazy_static(
         parser.eat(&TokenKind::Colon);
         let ty = parse_or!(parse_ty);
         parser.eat(&TokenKind::Eq);
-        let expr = parse_or!(parse_stmt)?;
+        let expr = parse_or!(parse_stmt, ForceCollect::No)?;
         parser.eat(&TokenKind::Semi);
 
         // Rewrite as a static item.

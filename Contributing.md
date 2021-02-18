@@ -125,8 +125,8 @@ There are a lot of open issues on the backlog for those interested in hacking on
 
 Here are some good starting issues:
 
-[![GitHub good-first-issue](https://img.shields.io/github/issues/rust-lang/rustfmt/good%20first%20issue?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Agood%20first%20issue)
-[![GitHub help-wanted](https://img.shields.io/github/issues/rust-lang/rustfmt/help%20wanted?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3Ahelp-wanted)
+[![GitHub good-first-issue](https://img.shields.io/github/issues/rust-lang/rustfmt/good%20first%20issue?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3A%22good%20first%20issue%22)
+[![GitHub help-wanted](https://img.shields.io/github/issues/rust-lang/rustfmt/help%20wanted?style=flat-square)](https://github.com/rust-lang/rustfmt/issues?q=is%3Aopen+is%3Aissue+label%3A%22help%20wanted%22)
 
 
 If you've found areas which need polish and don't have issues, please submit a
@@ -186,7 +186,7 @@ Rustfmt is basically a pretty printer - that is, its mode of operation is to
 take an AST (abstract syntax tree) and print it in a nice way (including staying
 under the maximum permitted width for a line). In order to get that AST, we
 first have to parse the source text, we use the Rust compiler's parser to do
-that (see [lib.rs in rustfmt-lib](rustfmt-core/rustfmt-lib/src/lib.rs)). We shy away from doing anything too fancy, such as
+that (see [lib.rs](src/lib.rs)). We shy away from doing anything too fancy, such as
 algebraic approaches to pretty printing, instead relying on an heuristic
 approach, 'manually' crafting a string for each AST node. This results in quite
 a lot of code, but it is relatively simple.
@@ -200,8 +200,8 @@ format.
 
 There are different nodes for every kind of item and expression in Rust. For
 more details see the source code in the compiler -
-[ast.rs](https://dxr.mozilla.org/rust/source/src/libsyntax/ast.rs) - and/or the
-[docs](https://doc.rust-lang.org/nightly/nightly-rustc/syntax/ast/index.html).
+[ast.rs](https://github.com/rust-lang/rust/blob/master/compiler/rustc_ast/src/ast.rs) - and/or the
+[docs](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/ast/index.html).
 
 Many nodes in the AST (but not all, annoyingly) have a `Span`. A `Span` is a
 range in the source code, it can easily be converted to a snippet of source
@@ -226,19 +226,19 @@ At a higher level, Rustfmt has machinery so that we account for text between
 'top level' items. Then we can reproduce that text pretty much verbatim. We only
 count spans we actually reformat, so if we can't format a span it is not missed
 completely but is reproduced in the output without being formatted. This is
-mostly handled in [missed_spans.rs](rustfmt-core/rustfmt-lib/src/missed_spans.rs). See also `FmtVisitor::last_pos` in
-[visitor.rs](rustfmt-core/rustfmt-lib/src/visitor.rs).
+mostly handled in [missed_spans.rs](src/formatting/missed_spans.rs). See also `FmtVisitor::last_pos` in
+[visitor.rs](src/formatting/visitor.rs).
 
 
 #### Some important elements
 
 At the highest level, Rustfmt uses a `Visitor` implementation called `FmtVisitor`
-to walk the AST. This is in [visitor.rs](rustfmt-core/rustfmt-lib/src/visitor.rs). This is really just used to walk
+to walk the AST. This is in [visitor.rs](src/formatting/visitor.rs). This is really just used to walk
 items, rather than the bodies of functions. We also cover macros and attributes
 here. Most methods of the visitor call out to `Rewrite` implementations that
 then walk their own children.
 
-The `Rewrite` trait is defined in [rewrite.rs](rustfmt-core/rustfmt-lib/src/rewrite.rs). It is implemented for many
+The `Rewrite` trait is defined in [rewrite.rs](src/formatting/rewrite.rs). It is implemented for many
 things that can be rewritten, mostly AST nodes. It has a single function,
 `rewrite`, which is called to rewrite `self` into an `Option<String>`. The
 arguments are `width` which is the horizontal space we write into and `offset`
@@ -296,7 +296,7 @@ Much of the syntax in Rust is lists: lists of arguments, lists of fields, lists 
 array elements, etc. We have some generic code to handle lists, including how to
 space them in horizontal and vertical space, indentation, comments between
 items, trailing separators, etc. However, since there are so many options, the
-code is a bit complex. Look in [lists.rs](rustfmt-core/rustfmt-lib/src/lists.rs). `write_list` is the key function,
+code is a bit complex. Look in [lists.rs](src/formatting/lists.rs). `write_list` is the key function,
 and `ListFormatting` the key structure for configuration. You'll need to make a
 `ListItems` for input, this is usually done using `itemize_list`.
 
@@ -304,7 +304,7 @@ and `ListFormatting` the key structure for configuration. You'll need to make a
 
 Rustfmt strives to be highly configurable. Often the first part of a patch is
 creating a configuration option for the feature you are implementing. All
-handling of configuration options is done in [lib.rs in rustfmt-config](rustfmt-core/rustfmt-config/src/lib.rs). Look for the
+handling of configuration options is done in [config.rs](src/config.rs). Look for the
 `create_config!` macro at the end of the file for all the options. The rest of
 the file defines a bunch of enums used for options, and the machinery to produce
 the config struct and parse a config file, etc. Checking an option is done by

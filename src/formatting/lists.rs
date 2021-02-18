@@ -8,7 +8,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::config::{lists::*, Config, IndentStyle};
 use crate::formatting::{
-    comment::{find_comment_end, rewrite_comment, FindUncommented},
+    comment::{comment_style, find_comment_end, rewrite_comment, FindUncommented},
     rewrite::RewriteContext,
     shape::{Indent, Shape},
     utils::{
@@ -426,6 +426,33 @@ where
             result.push_str(formatting.separator);
         }
 
+        // Note about post-comments indentation:
+        // In the original code the the item separator may follow some comments that
+        // may span over some lines.  E.g.:
+        //     item1 /* 1st comment line 1
+        //            * line 2 */
+        //           /* 2nd comment */,
+        //     item2,
+        //
+        // In this case, rustfmt moves the separator right after the item:
+        //     item1, /* 1st comment line 1
+        //             * line 2 */
+        //            /* 2nd comment */
+        //     item2,
+        //
+        // In this code, only the 1st comment is regarded as post comment of item1.
+        // 2nd comment is regarded as pre-comment of item2, therefore the output
+        // of another round of formatting this code is:
+        //     item1, /* 1st comment line 1
+        //             * line 2 */
+        //     /* 2nd comment */
+        //     item2,
+        //
+        // i.e. 2nd comment is now indented as pre-comment.
+        //
+        // This why in the code below a first multiline post-comment is indented
+        // differently then the other post-comments.
+
         if tactic != DefinitiveListTactic::Horizontal && item.post_comment.is_some() {
             let comment = item.post_comment.as_ref().unwrap();
             let overhead = last_line_width(&result) + first_line_width(comment.trim());
@@ -449,22 +476,98 @@ where
                 };
                 let width = formatting.shape.width.checked_sub(overhead).unwrap_or(1);
                 let offset = formatting.shape.indent + overhead;
-                let comment_shape = Shape::legacy(width, offset);
+                let comment_start_trimmed = comment.trim_start();
 
-                // Use block-style only for the last item or multiline comments.
-                let block_style = !formatting.ends_with_newline && last
-                    || comment.trim().contains('\n')
-                    || comment.trim().len() > width;
+                // Find if first comment is single line and the end of the first comment
+                // when it is a multi-line block comment (since the first post-comment
+                // is added to the same line of the list item, its indentation is important
+                // only when it is a multiline comment).
+                let style = comment_style(
+                    comment_start_trimmed,
+                    formatting.config.normalize_comments(),
+                );
+                let (first_comment_single_line, first_comment_end) =
+                    if !formatting.config.normalize_comments() && style.is_line_comment() {
+                        // Line comment (not normalizaed)
+                        (true, None)
+                    } else if style.is_block_comment() {
+                        match find_comment_end(&comment_start_trimmed) {
+                            Some(i) => {
+                                if comment_start_trimmed[..i].contains('\n') {
+                                    // Multiline-comment (may be because of normalization)
+                                    (false, Some(i))
+                                } else {
+                                    // One line coment (Block or normalizaed Line)
+                                    (true, None)
+                                }
+                            }
+                            _ => (false, None), // Unknow comment end
+                        }
+                    } else {
+                        (false, None) // Unexpected case - non-block comment with normalization
+                    };
 
-                rewrite_comment(
-                    comment.trim_start(),
-                    block_style,
-                    comment_shape,
-                    formatting.config,
-                )
+                // Closure for formatting post-comment with specific Shape
+                let rewrite_post_comment_with_shape = |cmt: &str, shape: Shape| {
+                    // Use block-style only for the last item or multiline comments.
+                    let block_style = !formatting.ends_with_newline && last
+                        || cmt.trim().contains('\n')
+                        || cmt.trim().len() > width;
+                    rewrite_comment(&cmt, block_style, shape, formatting.config)
+                };
+
+                // Properly indent first and other comments
+                match (first_comment_single_line, first_comment_end) {
+                    (_, None) => {
+                        // First comment not multiline - same indentation for all comments
+                        let comment_shape =
+                            if first_comment_single_line && comment_start_trimmed.contains("\n") {
+                                formatting.shape
+                            } else {
+                                Shape::legacy(width, offset)
+                            };
+                        rewrite_post_comment_with_shape(comment_start_trimmed, comment_shape)
+                    }
+                    (false, Some(comment_end)) => {
+                        // Separate indentation for first multi-line block comment
+                        let formatted_first_comment = rewrite_comment(
+                            &comment_start_trimmed[..comment_end],
+                            true,
+                            Shape::legacy(width, offset),
+                            formatting.config,
+                        )?;
+                        let second_comment_start = comment_start_trimmed[comment_end..]
+                            .find(|c: char| !c.is_whitespace())
+                            .map_or(None, |i| Some(i + comment_end));
+                        let formatted_all_comments = match second_comment_start {
+                            Some(i) => {
+                                let second_comment = comment_start_trimmed[i..].to_string();
+                                let formatted = rewrite_post_comment_with_shape(
+                                    &second_comment,
+                                    formatting.shape,
+                                )?;
+                                let indent = formatting
+                                    .shape
+                                    .indent
+                                    .to_string_with_newline(formatting.config);
+                                format!("{}{}{}", formatted_first_comment, indent, formatted)
+                            }
+                            _ => formatted_first_comment,
+                        };
+                        Some(formatted_all_comments)
+                    }
+                    (_, _) => unreachable!(),
+                }
             };
 
             let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
+
+            // Multiline comments are not included in a previous "indentation group".
+            // Each multiline comment is considered as a separate group.
+            if formatted_comment.contains('\n') {
+                item_max_width = None;
+                formatted_comment = rewrite_post_comment(&mut item_max_width)?;
+            }
 
             if !starts_with_newline(comment) {
                 if formatting.align_comments {
@@ -542,10 +645,21 @@ where
     for item in items.clone().into_iter().skip(i) {
         let item = item.as_ref();
         let inner_item_width = UnicodeSegmentation::graphemes(item.inner_as_ref(), true).count();
+        let post_comment_is_multiline = item
+            .post_comment
+            .as_ref()
+            .map_or(false, |s| s.trim().contains('\n'));
+
+        // Each multiline comment is an "indentation group" on its own
+        if first && post_comment_is_multiline {
+            return inner_item_width;
+        }
+
         if !first
             && (item.is_different_group()
                 || item.post_comment.is_none()
-                || inner_item_width + overhead > max_budget)
+                || inner_item_width + overhead > max_budget
+                || post_comment_is_multiline)
         {
             return max_width;
         }
@@ -626,8 +740,8 @@ pub(crate) fn extract_post_comment(
     let post_snippet = post_snippet[..comment_end].trim();
     let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
         post_snippet[1..].trim_matches(white_space)
-    } else if post_snippet.starts_with(separator) {
-        post_snippet[separator.len()..].trim_matches(white_space)
+    } else if let Some(post_snippet) = post_snippet.strip_prefix(separator) {
+        post_snippet.trim_matches(white_space)
     }
     // not comment or over two lines
     else if post_snippet.ends_with(',')
@@ -683,6 +797,11 @@ pub(crate) fn get_comment_end(
             ),
             // Block-style post-comment. Either before or after the separator.
             (Some(i), Some(j)) if i < j => cmp::max(
+                find_comment_end(&post_snippet[i..]).unwrap() + i,
+                separator_index + 1,
+            ),
+            // Comment is preceeded by new line and followed by a separator.
+            (Some(i), Some(_)) if separator_index > i => cmp::max(
                 find_comment_end(&post_snippet[i..]).unwrap() + i,
                 separator_index + 1,
             ),

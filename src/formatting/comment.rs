@@ -49,10 +49,13 @@ fn custom_opener(s: &str) -> &str {
 impl<'a> CommentStyle<'a> {
     /// Returns `true` if the commenting style covers a line only.
     pub(crate) fn is_line_comment(&self) -> bool {
-        matches!(*self, CommentStyle::DoubleSlash
-            | CommentStyle::TripleSlash
-            | CommentStyle::Doc
-            | CommentStyle::Custom(_))
+        matches!(
+            *self,
+            CommentStyle::DoubleSlash
+                | CommentStyle::TripleSlash
+                | CommentStyle::Doc
+                | CommentStyle::Custom(_)
+        )
     }
 
     /// Returns `true` if the commenting style can span over multiple lines.
@@ -382,7 +385,7 @@ fn identify_comment(
                 shape,
                 config,
                 is_doc_comment || style.is_doc_comment(),
-            )?
+            )
         };
     if rest.is_empty() {
         Some(rewritten_first_group)
@@ -717,8 +720,8 @@ impl<'a> CommentRewrite<'a> {
 
         self.code_block_attr = None;
         self.item_block = None;
-        if line.starts_with("```") {
-            self.code_block_attr = Some(CodeBlockAttribute::new(&line[3..]))
+        if let Some(line) = line.strip_prefix("```") {
+            self.code_block_attr = Some(CodeBlockAttribute::new(&line))
         } else if self.fmt.config.wrap_comments() && ItemizedBlock::is_itemized_line(&line) {
             let ib = ItemizedBlock::new(&line);
             self.item_block = Some(ib);
@@ -816,7 +819,7 @@ fn rewrite_comment_inner(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
-) -> Option<String> {
+) -> String {
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
     let line_breaks = count_newlines(orig.trim_end());
@@ -850,7 +853,7 @@ fn rewrite_comment_inner(
         }
     }
 
-    Some(rewriter.finish())
+    rewriter.finish()
 }
 
 const RUSTFMT_CUSTOM_COMMENT_PREFIX: &str = "//#### ";
@@ -945,24 +948,29 @@ fn light_rewrite_comment(
     config: &Config,
     is_doc_comment: bool,
 ) -> String {
-    let lines: Vec<&str> = orig
+    let lines: Vec<String> = orig
         .lines()
         .map(|l| {
             // This is basically just l.trim(), but in the case that a line starts
             // with `*` we want to leave one space before it, so it aligns with the
             // `*` in `/*`.
             let first_non_whitespace = l.find(|c| !char::is_whitespace(c));
-            let left_trimmed = if let Some(fnw) = first_non_whitespace {
-                if l.as_bytes()[fnw] == b'*' && fnw > 0 {
-                    &l[fnw - 1..]
+            let (blank, left_trimmed) = if let Some(fnw) = first_non_whitespace {
+                if l.as_bytes()[fnw] == b'*' {
+                    // Ensure '*' is preceeded by blank and not by a tab.
+                    (" ", &l[fnw..])
                 } else {
-                    &l[fnw..]
+                    ("", &l[fnw..])
                 }
             } else {
-                ""
+                ("", "")
             };
             // Preserve markdown's double-space line break syntax in doc comment.
-            trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment)
+            format!(
+                "{}{}",
+                blank,
+                trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment),
+            )
         })
         .collect();
     lines.join(&format!("\n{}", offset.to_string(config)))
@@ -979,8 +987,8 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
     {
         (&line[4..], true)
     } else if let CommentStyle::Custom(opener) = *style {
-        if line.starts_with(opener) {
-            (&line[opener.len()..], true)
+        if let Some(line) = line.strip_prefix(opener) {
+            (&line, true)
         } else {
             (&line[opener.trim_end().len()..], false)
         }
@@ -999,8 +1007,8 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
         || line.starts_with("**")
     {
         (&line[2..], line.chars().nth(1).unwrap() == ' ')
-    } else if line.starts_with('*') {
-        (&line[1..], false)
+    } else if let Some(line) = line.strip_prefix('*') {
+        (&line, false)
     } else {
         (line, line.starts_with(' '))
     }
@@ -1592,18 +1600,18 @@ impl<'a> Iterator for CommentCodeSlices<'a> {
 }
 
 /// Checks is `new` didn't miss any comment from `span`, if it removed any, return previous text
-/// (if it fits in the width/offset, else return `None`), else return `new`
+/// and `new` otherwise
 pub(crate) fn recover_comment_removed(
     new: String,
     span: Span,
     context: &RewriteContext<'_>,
-) -> Option<String> {
+) -> String {
     let snippet = context.snippet(span);
     let includes_comment = contains_comment(snippet);
     if snippet != new && includes_comment && changed_comment_content(snippet, &new) {
-        Some(snippet.to_owned())
+        snippet.to_owned()
     } else {
-        Some(new)
+        new
     }
 }
 
@@ -1701,8 +1709,8 @@ impl<'a> Iterator for CommentReducer<'a> {
 fn remove_comment_header(comment: &str) -> &str {
     if comment.starts_with("///") || comment.starts_with("//!") {
         &comment[3..]
-    } else if comment.starts_with("//") {
-        &comment[2..]
+    } else if let Some(stripped) = comment.strip_prefix("//") {
+        &stripped
     } else if (comment.starts_with("/**") && !comment.starts_with("/**/"))
         || comment.starts_with("/*!")
     {
