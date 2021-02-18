@@ -1422,8 +1422,10 @@ impl<'a> Iterator for LineClasses<'a> {
             None => unreachable!(),
         };
 
+        let mut prev_kind = FullCodeCharKind::Normal;
         while let Some((kind, c)) = self.base.next() {
             // needed to set the kind of the ending character on the last line
+            prev_kind = self.kind;
             self.kind = kind;
             if c == '\n' {
                 self.kind = match (start_kind, kind) {
@@ -1438,6 +1440,9 @@ impl<'a> Iterator for LineClasses<'a> {
                     }
                     (FullCodeCharKind::InStringCommented, FullCodeCharKind::InComment) => {
                         FullCodeCharKind::EndStringCommented
+                    }
+                    (_, FullCodeCharKind::Normal) if prev_kind == FullCodeCharKind::EndComment => {
+                        FullCodeCharKind::EndComment
                     }
                     _ => kind,
                 };
@@ -1993,12 +1998,28 @@ fn main() {
 }
 "#;
         assert_eq!(s, filter_normal_code(s));
-        let s_with_comment = r#"
+        let s_with_line_comment = r#"
 fn main() {
     // hello, world
     println!("hello, world");
 }
 "#;
-        assert_eq!(s, filter_normal_code(s_with_comment));
+        assert_eq!(s, filter_normal_code(s_with_line_comment));
+        let s_with_block_comment = r#"
+fn main() {
+    /* hello, world */
+    println!("hello, world");
+}
+"#;
+        assert_eq!(s, filter_normal_code(s_with_block_comment));
+        let s_with_multi_line_comment = r#"
+fn main() {
+    /* hello,
+     * world
+     */
+    println!("hello, world");
+}
+"#;
+        assert_eq!(s, filter_normal_code(s_with_multi_line_comment));
     }
 }
