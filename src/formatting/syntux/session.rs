@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::ops::Range;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -8,7 +9,7 @@ use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
 use rustc_session::parse::ParseSess as RawParseSess;
 use rustc_span::{
     source_map::{FilePathMapping, SourceMap},
-    symbol, BytePos, Pos, Span,
+    symbol, BytePos, Span,
 };
 
 use crate::config::{file_lines::LineRange, Config, FileName};
@@ -189,12 +190,12 @@ impl ParseSess {
         }
     }
 
-    pub(crate) fn line_bounds(&self, pos: BytePos) -> (BytePos, BytePos) {
+    pub(crate) fn line_bounds(&self, pos: BytePos) -> Option<Range<BytePos>> {
         let line = self.parse_sess.source_map().lookup_line(pos).ok();
 
         match line {
-            Some(line_info) => line_info.sf.line_bounds(line_info.line),
-            None => (BytePos::from_usize(0), BytePos::from_usize(0)),
+            Some(line_info) => Some(line_info.sf.line_bounds(line_info.line)),
+            None => None,
         }
     }
 

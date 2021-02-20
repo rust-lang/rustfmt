@@ -137,11 +137,10 @@ impl<'a> OverflowableItem<'a> {
     }
 
     pub(crate) fn is_expr(&self) -> bool {
-        match self {
-            OverflowableItem::Expr(..) => true,
-            OverflowableItem::MacroArg(MacroArg::Expr(..)) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            OverflowableItem::Expr(..) | OverflowableItem::MacroArg(MacroArg::Expr(..))
+        )
     }
 
     pub(crate) fn is_nested_call(&self) -> bool {

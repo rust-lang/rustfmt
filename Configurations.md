@@ -569,7 +569,7 @@ fn main() {
 Specifies which edition is used by the parser.
 
 - **Default value**: `"2015"`
-- **Possible values**: `"2015"`, `"2018"`
+- **Possible values**: `"2015"`, `"2018"`, `"2021"`
 - **Stable**: Yes
 
 Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
@@ -1705,13 +1705,71 @@ pub enum Foo {}
 pub enum Foo {}
 ```
 
+## `imports_granularity`
+
+Merge together related imports based on their paths.
+
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `Crate`, `Module`, `Item`
+- **Stable**: No
+
+#### `Preserve` (default):
+
+Do not perform any merging and preserve the original structure written by the developer.
+
+```rust
+use foo::b;
+use foo::b::{f, g};
+use foo::{a, c, d::e};
+use qux::{h, i};
+```
+
+#### `Crate`:
+
+Merge imports from the same crate into a single `use` statement. Conversely, imports from different crates are split into separate statements.
+
+```rust
+use foo::{
+    a, b,
+    b::{f, g},
+    c,
+    d::e,
+};
+use qux::{h, i};
+```
+
+#### `Module`:
+
+Merge imports from the same module into a single `use` statement. Conversely, imports from different modules are split into separate statements.
+
+```rust
+use foo::b::{f, g};
+use foo::d::e;
+use foo::{a, b, c};
+use qux::{h, i};
+```
+
+#### `Item`:
+
+Flatten imports so that each has its own `use` statement.
+
+```rust
+use foo::a;
+use foo::b;
+use foo::b::f;
+use foo::b::g;
+use foo::c;
+use foo::d::e;
+use qux::h;
+use qux::i;
+```
+
 ## `merge_imports`
-
-Merge multiple imports into a single nested import.
-
+ 
+This option is deprecated. Use `imports_granularity = "Crate"` instead.
+ 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3362](https://github.com/rust-lang/rustfmt/issues/3362))
 
 #### `false` (default):
 
@@ -1726,7 +1784,6 @@ use foo::{e, f};
 ```rust
 use foo::{a, b, c, d, e, f, g};
 ```
-
 
 ## `newline_style`
 
@@ -1833,6 +1890,33 @@ fn say_hi() {
 
 
     println!("hi");
+}
+```
+
+## `preserve_closure_block_wrapping`
+
+Preserves block wraping arround closures.  For example, useful when the closure `||` can be
+confused with OR.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `true`:
+Original block wrapping is preserved:
+```rust
+fn main() {
+    let explicit_conversion_preserves_semantics =
+        || { !is_mod || (is_mod && attrs.map_or(true, |a| a.is_empty())) };
+}
+```
+
+#### `false` (default):
+Block is not preserved:
+```rust
+fn main() {
+    let explicit_conversion_preserves_semantics =
+        || !is_mod || (is_mod && attrs.map_or(true, |a| a.is_empty()));
 }
 ```
 
@@ -2006,6 +2090,56 @@ use dolor;
 use sit;
 ```
 
+## `group_imports`
+
+Controls the strategy for how imports are grouped together.
+
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `StdExternalCrate`
+- **Stable**: No
+
+#### `Preserve` (default):
+
+Preserve the source file's import groups.
+
+```rust
+use super::update::convert_publish_payload;
+use chrono::Utc;
+
+use alloc::alloc::Layout;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+
+use super::schema::{Context, Payload};
+use crate::models::Event;
+use core::f32;
+```
+
+#### `StdExternalCrate`:
+
+Discard existing import groups, and create three groups for:
+1. `std`, `core` and `alloc`,
+2. external crates,
+3. `self`, `super` and `crate` imports.
+
+```rust
+use alloc::alloc::Layout;
+use core::f32;
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+use chrono::Utc;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+```
 
 ## `reorder_modules`
 
@@ -2483,7 +2617,7 @@ Enable unstable features on stable and beta channels (unstable features are avai
 
 For example:
 ```bash
-rustfmt src/lib.rs --config unstable_features=true merge_imports=true
+rustfmt src/lib.rs --config unstable_features=true imports_granularity=Crate
 ```
 
 ## `use_field_init_shorthand`

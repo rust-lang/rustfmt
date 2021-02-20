@@ -55,8 +55,19 @@ pub(crate) fn rewrite_closure(
                 .map(|s| format!("{} {}", prefix, s));
         }
 
+        // Whether a closure block wrapping may not be preserved (#4394).
+        let can_try_rewrite_without_block = if context.inside_macro() {
+            false
+        } else if context.config.preserve_closure_block_wrapping()
+            && context.snippet(body.span).trim_start().starts_with('{')
+        {
+            false
+        } else {
+            true
+        };
+
         let result = match fn_decl.output {
-            ast::FnRetTy::Default(_) if !context.inside_macro() => {
+            ast::FnRetTy::Default(_) if can_try_rewrite_without_block => {
                 try_rewrite_without_block(body, &prefix, capture, context, shape, body_shape)
             }
             _ => None,
@@ -79,7 +90,7 @@ pub(crate) fn rewrite_closure(
         let between_span = Span::between(arg_span, first_span);
         if contains_comment(context.snippet(between_span)) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).and_then(|rw| {
-                let mut parts = rw.splitn(2, "\n");
+                let mut parts = rw.splitn(2, '\n');
                 let head = parts.next()?;
                 let rest = parts.next()?;
                 let block_shape = shape.block_indent(context.config.tab_spaces());
@@ -188,7 +199,6 @@ fn rewrite_closure_with_block(
             id: ast::NodeId::root(),
             kind: ast::StmtKind::Expr(ptr::P(body.clone())),
             span: body.span,
-            tokens: None,
         }],
         id: ast::NodeId::root(),
         rules: ast::BlockCheckMode::Default,
@@ -398,18 +408,21 @@ pub(crate) fn rewrite_last_closure(
         if is_block_closure_forced(context, body, capture) {
             return rewrite_closure_with_block(body, &prefix, context, body_shape).map(
                 |body_str| {
-                    // If the expression can fit in a single line, we need not force block closure.
-                    if body_str.lines().count() <= 7 {
-                        match rewrite_closure_expr(body, &prefix, context, shape) {
-                            Some(ref single_line_body_str)
-                                if !single_line_body_str.contains('\n') =>
-                            {
-                                single_line_body_str.clone()
+                    match fn_decl.output {
+                        ast::FnRetTy::Default(..) if body_str.lines().count() <= 7 => {
+                            // If the expression can fit in a single line, we need not force block
+                            // closure.  However, if the closure has a return type, then we must
+                            // keep the blocks.
+                            match rewrite_closure_expr(body, &prefix, context, shape) {
+                                Some(ref single_line_body_str)
+                                    if !single_line_body_str.contains('\n') =>
+                                {
+                                    single_line_body_str.clone()
+                                }
+                                _ => body_str,
                             }
-                            _ => body_str,
                         }
-                    } else {
-                        body_str
+                        _ => body_str,
                     }
                 },
             );

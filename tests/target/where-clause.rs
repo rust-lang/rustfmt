@@ -110,3 +110,8 @@ impl<'a, 'gcx, 'tcx> ProbeContext<'a, 'gcx, 'tcx> {
 pub trait AsUnindented {
     type Output<'ast> where Self: 'ast;
 }
+
+fn f<T: AsUnindented<Output<'static> = U>, U>()
+    where U: AsUnindented<Output<'static> = i32>
+{
+}

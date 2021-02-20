@@ -11,7 +11,8 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::ast;
 use rustc_span::{symbol::sym, BytePos, Pos, Span};
 
-use crate::config::Config;
+use crate::config::{Config, GroupImportsTactic, ImportGranularity};
+use crate::formatting::imports::{flatten_use_trees, UseSegment};
 use crate::formatting::modules::{get_mod_inner_attrs, FileModMap};
 use crate::formatting::{
     comment::{comment_style, contains_comment, is_first_comment_block, is_last_comment_block},
@@ -25,6 +26,8 @@ use crate::formatting::{
     utils::{contains_skip, mk_sp},
     visitor::FmtVisitor,
 };
+
+use super::imports::SharedPrefix;
 
 /// Compare strings according to version sort (roughly equivalent to `strverscmp`)
 pub(crate) fn compare_as_versions(left: &str, right: &str) -> Ordering {
@@ -193,9 +196,10 @@ fn rewrite_reorderable_item(
     }
 }
 
-/// Rewrite a list of items with reordering. Every item in `items` must have
-/// the same `ast::ItemKind`.
-fn rewrite_reorderable_items(
+/// Rewrite a list of items with reordering and/or regrouping. Every item
+/// in `items` must have the same `ast::ItemKind`. Whether reordering, regrouping,
+/// or both are done is determined from the `context`.
+fn rewrite_reorderable_or_regroupable_items(
     context: &RewriteContext<'_>,
     reorderable_items: &[&ast::Item],
     shape: Shape,
@@ -225,22 +229,43 @@ fn rewrite_reorderable_items(
             for (item, list_item) in normalized_items.iter_mut().zip(list_items) {
                 item.list_item = Some(list_item.clone());
             }
-            if context.config.merge_imports() {
-                normalized_items = merge_use_trees(normalized_items);
+            normalized_items = match context.config.imports_granularity() {
+                ImportGranularity::Crate => merge_use_trees(normalized_items, SharedPrefix::Crate),
+                ImportGranularity::Module => {
+                    merge_use_trees(normalized_items, SharedPrefix::Module)
+                }
+                ImportGranularity::Item => flatten_use_trees(normalized_items),
+                ImportGranularity::Preserve => normalized_items,
+            };
+
+            let mut regrouped_items = match context.config.group_imports() {
+                GroupImportsTactic::Preserve => vec![normalized_items],
+                GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
+            };
+
+            if context.config.reorder_imports() {
+                regrouped_items.iter_mut().for_each(|items| items.sort())
             }
-            normalized_items.sort();
 
             // 4 = "use ", 1 = ";"
             let nested_shape = shape.offset_left(4)?.sub_width(1)?;
-            let item_vec: Vec<_> = normalized_items
+            let item_vec: Vec<_> = regrouped_items
                 .into_iter()
-                .map(|use_tree| ListItem {
-                    item: use_tree.rewrite_top_level(context, nested_shape),
-                    ..use_tree.list_item.unwrap_or_else(ListItem::empty)
+                .filter(|use_group| !use_group.is_empty())
+                .map(|use_group| {
+                    let item_vec: Vec<_> = use_group
+                        .into_iter()
+                        .map(|use_tree| ListItem {
+                            item: use_tree.rewrite_top_level(context, nested_shape),
+                            ..use_tree.list_item.unwrap_or_else(ListItem::empty)
+                        })
+                        .collect();
+                    wrap_reorderable_items(context, &item_vec, nested_shape)
                 })
-                .collect();
+                .collect::<Option<Vec<_>>>()?;
 
-            wrap_reorderable_items(context, &item_vec, nested_shape)
+            let join_string = format!("\n\n{}", shape.indent.to_string(context.config));
+            Some(item_vec.join(&join_string))
         }
         _ => {
             let list_items = itemize_list(
@@ -267,6 +292,34 @@ fn rewrite_reorderable_items(
 
 fn contains_macro_use_attr(attrs: &[ast::Attribute]) -> bool {
     crate::formatting::attr::contains_name(attrs, sym::macro_use)
+}
+
+/// Divides imports into three groups, corresponding to standard, external
+/// and local imports. Sorts each subgroup.
+fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
+    let mut std_imports = Vec::new();
+    let mut external_imports = Vec::new();
+    let mut local_imports = Vec::new();
+
+    for ut in uts.into_iter() {
+        if ut.path.is_empty() {
+            external_imports.push(ut);
+            continue;
+        }
+        match &ut.path[0] {
+            UseSegment::Ident(id, _) => match id.as_ref() {
+                "std" | "alloc" | "core" => std_imports.push(ut),
+                _ => external_imports.push(ut),
+            },
+            UseSegment::Slf(_) | UseSegment::Super(_) | UseSegment::Crate(_) => {
+                local_imports.push(ut)
+            }
+            // These are probably illegal here
+            UseSegment::Glob | UseSegment::List(_) => external_imports.push(ut),
+        }
+    }
+
+    vec![std_imports, external_imports, local_imports]
 }
 
 /// A simplified version of `ast::ItemKind`.
@@ -312,21 +365,29 @@ impl ReorderableItemKind {
         }
     }
 
-    fn in_group(self) -> bool {
+    fn is_regroupable(self, config: &Config) -> bool {
         match self {
             ReorderableItemKind::ExternCrate
             | ReorderableItemKind::Mod
-            | ReorderableItemKind::Use => true,
+            | ReorderableItemKind::Other => false,
+            ReorderableItemKind::Use => config.group_imports() != GroupImportsTactic::Preserve,
+        }
+    }
+
+    fn in_group(self, config: &Config) -> bool {
+        match self {
+            ReorderableItemKind::ExternCrate | ReorderableItemKind::Mod => true,
+            ReorderableItemKind::Use => config.group_imports() == GroupImportsTactic::Preserve,
             ReorderableItemKind::Other => false,
         }
     }
 }
 
 impl<'b, 'a: 'b> FmtVisitor<'a> {
-    /// Format items with the same item kind and reorder them. If `in_group` is
-    /// `true`, then the items separated by an empty line will not be reordered
-    /// together.
-    fn walk_reorderable_items(
+    /// Format items with the same item kind and reorder them, regroup them, or
+    /// both. If `in_group` is `true`, then the items separated by an empty line
+    /// will not be reordered together.
+    fn walk_reorderable_or_regroupable_items(
         &mut self,
         items: &[&ast::Item],
         item_kind: ReorderableItemKind,
@@ -356,7 +417,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             let context = self.get_context();
 
             let first_lo = items.first().unwrap().span().lo();
-            let line_lo = self.parse_sess.line_bounds(first_lo).0;
+            let line_lo = self.parse_sess.line_bounds(first_lo).unwrap().start;
             let leading_snip = context.snippet(mk_sp(line_lo, first_lo));
             let lo = if contains_comment(leading_snip) {
                 let comment_started = if is_last_comment_block(leading_snip) {
@@ -370,11 +431,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             };
 
             let last_hi = items.last().unwrap().span().hi();
-            let line_hi = self.parse_sess.line_bounds(last_hi).1;
+            let line_hi = self.parse_sess.line_bounds(last_hi).unwrap().end;
             let trailing_snip = context.snippet(mk_sp(last_hi, line_hi));
             let hi = if contains_comment(trailing_snip) {
                 let comment_ended = if is_first_comment_block(trailing_snip) {
-                    comment_style(trailing_snip, false).is_block_comment()
+                    is_last_comment_block(trailing_snip.trim())
                 } else {
                     true
                 };
@@ -389,7 +450,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             };
 
             let span = mk_sp(lo, hi);
-            let rw = rewrite_reorderable_items(&self.get_context(), items, self.shape(), span);
+            let rw = rewrite_reorderable_or_regroupable_items(
+                &self.get_context(),
+                items,
+                self.shape(),
+                span,
+            );
             self.push_rewrite(span, rw);
         } else {
             for item in items {
@@ -408,9 +474,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             // subsequent items that have the same item kind to be reordered within
             // `walk_reorderable_items`. Otherwise, just format the next item for output.
             let item_kind = ReorderableItemKind::from(items[0], self.file_mod_map);
-            if item_kind.is_reorderable(self.config) {
-                let visited_items_num =
-                    self.walk_reorderable_items(items, item_kind, item_kind.in_group());
+            if item_kind.is_reorderable(self.config) || item_kind.is_regroupable(self.config) {
+                let visited_items_num = self.walk_reorderable_or_regroupable_items(
+                    items,
+                    item_kind,
+                    item_kind.in_group(self.config),
+                );
                 let (_, rest) = items.split_at(visited_items_num);
                 items = rest;
             } else {

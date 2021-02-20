@@ -2,7 +2,7 @@ use std::iter::ExactSizeIterator;
 use std::ops::Deref;
 
 use rustc_ast::ast::{self, FnRetTy, Mutability};
-use rustc_span::{symbol::kw, BytePos, Pos, Span};
+use rustc_span::{symbol::kw, symbol::Ident, BytePos, Pos, Span};
 
 use crate::config::{lists::*, IndentStyle, TypeDensity};
 use crate::formatting::{
@@ -170,17 +170,32 @@ impl<'a> Rewrite for SegmentParam<'a> {
             SegmentParam::LifeTime(lt) => lt.rewrite(context, shape),
             SegmentParam::Type(ty) => ty.rewrite(context, shape),
             SegmentParam::Binding(assoc_ty_constraint) => {
+                let ident = rewrite_ident(context, assoc_ty_constraint.ident);
+                let segment = if let Some(ref gen_args) = assoc_ty_constraint.gen_args {
+                    append_rewrite_args(
+                        PathContext::Type,
+                        assoc_ty_constraint.ident,
+                        gen_args,
+                        &mut assoc_ty_constraint.span.lo(),
+                        assoc_ty_constraint.span.hi(),
+                        context,
+                        shape,
+                        ident.to_string(),
+                    )?
+                } else {
+                    ident.to_string()
+                };
                 let mut result = match assoc_ty_constraint.kind {
                     ast::AssocTyConstraintKind::Bound { .. } => {
-                        format!("{}: ", rewrite_ident(context, assoc_ty_constraint.ident))
+                        format!("{}: ", segment)
                     }
                     ast::AssocTyConstraintKind::Equality { .. } => {
                         match context.config.type_punctuation_density() {
                             TypeDensity::Wide => {
-                                format!("{} = ", rewrite_ident(context, assoc_ty_constraint.ident))
+                                format!("{} = ", segment)
                             }
                             TypeDensity::Compressed => {
-                                format!("{}=", rewrite_ident(context, assoc_ty_constraint.ident))
+                                format!("{}=", segment)
                             }
                         }
                     }
@@ -235,63 +250,87 @@ fn rewrite_segment(
     };
 
     if let Some(ref args) = segment.args {
-        match **args {
-            ast::GenericArgs::AngleBracketed(ref data) if !data.args.is_empty() => {
-                let param_list = data
-                    .args
-                    .iter()
-                    .map(|x| match x {
-                        ast::AngleBracketedArg::Arg(generic_arg) => {
-                            SegmentParam::from_generic_arg(generic_arg)
-                        }
-                        ast::AngleBracketedArg::Constraint(constraint) => {
-                            SegmentParam::Binding(constraint)
-                        }
-                    })
-                    .collect::<Vec<_>>();
+        append_rewrite_args(
+            path_context,
+            segment.ident,
+            args,
+            span_lo,
+            span_hi,
+            context,
+            shape,
+            result,
+        )
+    } else {
+        Some(result)
+    }
+}
 
-                // HACK: squeeze out the span between the identifier and the parameters.
-                // The hack is requried so that we don't remove the separator inside macro calls.
-                // This does not work in the presence of comment, hoping that people are
-                // sane about where to put their comment.
-                let separator_snippet = context
-                    .snippet(mk_sp(segment.ident.span.hi(), data.span.lo()))
-                    .trim();
-                let force_separator = context.inside_macro() && separator_snippet.starts_with("::");
-                let separator = if path_context == PathContext::Expr || force_separator {
-                    "::"
-                } else {
-                    ""
-                };
-                result.push_str(separator);
+fn append_rewrite_args(
+    path_context: PathContext,
+    ident: Ident,
+    args: &ast::GenericArgs,
+    span_lo: &mut BytePos,
+    span_hi: BytePos,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    mut result: String,
+) -> Option<String> {
+    match args {
+        ast::GenericArgs::AngleBracketed(ref data) if !data.args.is_empty() => {
+            let param_list = data
+                .args
+                .iter()
+                .map(|x| match x {
+                    ast::AngleBracketedArg::Arg(generic_arg) => {
+                        SegmentParam::from_generic_arg(generic_arg)
+                    }
+                    ast::AngleBracketedArg::Constraint(constraint) => {
+                        SegmentParam::Binding(constraint)
+                    }
+                })
+                .collect::<Vec<_>>();
 
-                let generics_str = overflow::rewrite_with_angle_brackets(
-                    context,
-                    "",
-                    param_list.iter(),
-                    shape,
-                    mk_sp(*span_lo, span_hi),
-                )?;
+            // HACK: squeeze out the span between the identifier and the parameters.
+            // The hack is requried so that we don't remove the separator inside macro calls.
+            // This does not work in the presence of comment, hoping that people are
+            // sane about where to put their comment.
+            let separator_snippet = context
+                .snippet(mk_sp(ident.span.hi(), data.span.lo()))
+                .trim();
+            let force_separator = context.inside_macro() && separator_snippet.starts_with("::");
+            let separator = if path_context == PathContext::Expr || force_separator {
+                "::"
+            } else {
+                ""
+            };
+            result.push_str(separator);
 
-                // Update position of last bracket.
-                *span_lo = context
-                    .snippet_provider
-                    .span_after(mk_sp(*span_lo, span_hi), "<");
+            let generics_str = overflow::rewrite_with_angle_brackets(
+                context,
+                "",
+                param_list.iter(),
+                shape,
+                mk_sp(*span_lo, span_hi),
+            )?;
 
-                result.push_str(&generics_str)
-            }
-            ast::GenericArgs::Parenthesized(ref data) => {
-                result.push_str(&format_function_type(
-                    data.inputs.iter().map(|x| &**x),
-                    &data.output,
-                    false,
-                    data.span,
-                    context,
-                    shape,
-                )?);
-            }
-            _ => {}
+            // Update position of last bracket.
+            *span_lo = context
+                .snippet_provider
+                .span_after(mk_sp(*span_lo, span_hi), "<");
+
+            result.push_str(&generics_str)
         }
+        ast::GenericArgs::Parenthesized(ref data) => {
+            result.push_str(&format_function_type(
+                data.inputs.iter().map(|x| &**x),
+                &data.output,
+                false,
+                data.span,
+                context,
+                shape,
+            )?);
+        }
+        _ => {}
     }
 
     Some(result)
@@ -563,7 +602,12 @@ impl Rewrite for ast::GenericParam {
             _ => {}
         }
 
-        if let ast::GenericParamKind::Const { ref ty, kw_span: _ } = &self.kind {
+        if let ast::GenericParamKind::Const {
+            ref ty,
+            kw_span: _,
+            default: _,
+        } = &self.kind
+        {
             result.push_str("const ");
             result.push_str(rewrite_ident(context, self.ident));
             result.push_str(": ");
@@ -654,7 +698,7 @@ impl Rewrite for ast::Ty {
                 let mut_str = format_mutability(mt.mutbl);
                 let mut_len = mut_str.len();
                 let mut result = String::with_capacity(128);
-                result.push_str("&");
+                result.push('&');
                 let ref_hi = context.snippet_provider.span_after(self.span(), "&");
                 let mut cmnt_lo = ref_hi;
 
@@ -677,7 +721,7 @@ impl Rewrite for ast::Ty {
                     } else {
                         result.push_str(&lt_str);
                     }
-                    result.push_str(" ");
+                    result.push(' ');
                     cmnt_lo = lifetime.ident.span.hi();
                 }
 
@@ -928,7 +972,7 @@ fn join_bounds_inner(
                 _ => false,
             };
 
-            let shape = if i > 0 && need_indent && force_newline {
+            let shape = if need_indent && force_newline {
                 shape
                     .block_indent(context.config.tab_spaces())
                     .with_max_width(context.config)
@@ -959,22 +1003,21 @@ fn join_bounds_inner(
                 joiner
             };
 
-            let (trailing_str, extendable) = if i == 0 {
+            let (extendable, trailing_str) = if i == 0 {
                 let bound_str = item.rewrite(context, shape)?;
-                let bound_str_clone = bound_str.clone();
-                (bound_str, is_bound_extendable(&bound_str_clone, item))
+                (is_bound_extendable(&bound_str, item), bound_str)
             } else {
                 let bound_str = &item.rewrite(context, shape)?;
                 match leading_span {
                     Some(ls) if has_leading_comment => (
+                        is_bound_extendable(bound_str, item),
                         combine_strs_with_missing_comments(
                             context, joiner, bound_str, ls, shape, true,
                         )?,
-                        is_bound_extendable(bound_str, item),
                     ),
                     _ => (
-                        String::from(joiner) + bound_str,
                         is_bound_extendable(bound_str, item),
+                        String::from(joiner) + bound_str,
                     ),
                 }
             };
@@ -988,11 +1031,7 @@ fn join_bounds_inner(
                     true,
                 )
                 .map(|v| (v, trailing_span, extendable)),
-                _ => Some((
-                    String::from(strs) + &trailing_str,
-                    trailing_span,
-                    extendable,
-                )),
+                _ => Some((strs + &trailing_str, trailing_span, extendable)),
             }
         },
     )?;

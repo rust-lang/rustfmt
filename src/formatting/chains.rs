@@ -119,7 +119,7 @@ enum ChainItemKind {
         Vec<ptr::P<ast::Expr>>,
     ),
     StructField(symbol::Ident),
-    TupleField(symbol::Ident, bool),
+    TupleField(symbol::Ident),
     Await,
     Comment(String, CommentPosition),
 }
@@ -171,7 +171,7 @@ impl ChainItemKind {
             }
             ast::ExprKind::Field(ref nested, field) => {
                 let kind = if Self::is_tup_field_access(expr) {
-                    ChainItemKind::TupleField(field, Self::is_tup_field_access(nested))
+                    ChainItemKind::TupleField(field)
                 } else {
                     ChainItemKind::StructField(field)
                 };
@@ -199,12 +199,9 @@ impl Rewrite for ChainItem {
             ChainItemKind::MethodCall(ref segment, ref types, ref exprs) => {
                 Self::rewrite_method_call(segment.ident, types, exprs, self.span, context, shape)?
             }
-            ChainItemKind::StructField(ident) => format!(".{}", rewrite_ident(context, ident)),
-            ChainItemKind::TupleField(ident, nested) => format!(
-                "{}.{}",
-                if nested { " " } else { "" },
-                rewrite_ident(context, ident)
-            ),
+            ChainItemKind::StructField(ident) | ChainItemKind::TupleField(ident) => {
+                format!(".{}", rewrite_ident(context, ident))
+            }
             ChainItemKind::Await => ".await".to_owned(),
             ChainItemKind::Comment(ref comment, _) => {
                 rewrite_comment(comment, false, shape, context.config)?

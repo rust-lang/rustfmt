@@ -60,6 +60,12 @@ macro_rules! update_config {
         $config.ignore.2 = old_ignored.merge_into(new_ignored);
     };
 
+    ($config:ident, merge_imports = $val:ident, $dir:ident) => {
+        $config.merge_imports.1 = true;
+        $config.merge_imports.2 = $val;
+        $config.set_merge_imports();
+    };
+
     ($config:ident, $i:ident = $val:ident, $dir:ident) => {
         $config.$i.1 = true;
         $config.$i.2 = $val;
@@ -121,6 +127,7 @@ macro_rules! create_config {
                         | "array_width"
                         | "chain_width" => self.0.set_heuristics(),
                         "license_template_path" => self.0.set_license_template(),
+                        "merge_imports" => self.0.set_merge_imports(),
                         &_ => (),
                     }
                 }
@@ -272,14 +279,16 @@ macro_rules! create_config {
                     | "array_width"
                     | "chain_width" => self.set_heuristics(),
                     "license_template_path" => self.set_license_template(),
+                    "merge_imports" => self.set_merge_imports(),
                     &_ => (),
                 }
             }
 
             #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
-                const HIDE_OPTIONS: [&str; 1] = [
+                const HIDE_OPTIONS: [&str; 2] = [
                     "file_lines",
+                    "merge_imports",
                 ];
                 HIDE_OPTIONS.contains(&name)
             }
@@ -419,6 +428,22 @@ macro_rules! create_config {
                             Err(msg) => eprintln!("Warning for license template file {:?}: {}",
                                                 lt_path, msg),
                         }
+                    }
+                }
+            }
+
+            fn set_merge_imports(&mut self) {
+                if self.was_set().merge_imports() {
+                    eprintln!(
+                        "Warning: the `merge_imports` option is deprecated. \
+                        Use `imports_granularity=Crate` instead"
+                    );
+                    if !self.was_set().imports_granularity() {
+                        self.imports_granularity.2 = if self.merge_imports() {
+                            ImportGranularity::Crate
+                        } else {
+                            ImportGranularity::Preserve
+                        };
                     }
                 }
             }
