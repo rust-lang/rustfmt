@@ -7,6 +7,11 @@ use a; // use a;
 use b; // use b;
 use c; // use c;
 
+// #3127
+extern crate serde; // 1.0.78
+extern crate serde_derive; // 1.0.78
+extern crate serde_json; // 1.0.27
+
 mod a;
 mod b;
 mod c;
