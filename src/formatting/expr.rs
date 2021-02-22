@@ -1205,7 +1205,7 @@ pub(crate) fn is_simple_block_stmt(
         && attrs.map_or(true, |a| a.is_empty())
 }
 
-fn block_has_statements(block: &ast::Block) -> bool {
+pub(crate) fn block_has_statements(block: &ast::Block) -> bool {
     !block
         .stmts
         .iter()

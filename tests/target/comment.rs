@@ -59,8 +59,8 @@ fn issue_1086() {
 
 // random comment
 
-fn main() { // Test
-}
+// Test
+fn main() {}
 
 // #1643
 fn some_fn() // some comment

@@ -18,7 +18,7 @@ use crate::formatting::{
         FindUncommented,
     },
     expr::{
-        is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with,
+        block_has_statements, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with,
         rewrite_assign_rhs_with_comments, RhsTactics,
     },
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator},
@@ -457,8 +457,15 @@ impl<'a> FmtVisitor<'a> {
 
         let context = self.get_context();
 
+        let block_snip = self.snippet_provider.span_to_snippet(block.span)?;
+        let has_comments = if let Some(firstline_end) = block_snip.find('\n') {
+            contains_comment(&block_snip[firstline_end..])
+        } else {
+            false
+        };
         if self.config.empty_item_single_line()
-            && is_empty_block(&context, block, None)
+            && !block_has_statements(&block)
+            && !has_comments
             && self.block_indent.width() + fn_str.len() + 3 <= self.config.max_width()
             && !last_line_contains_single_line_comment(fn_str)
         {

@@ -7,7 +7,10 @@ use rustc_span::{symbol, BytePos, Pos, Span, DUMMY_SP};
 use crate::config::{BraceStyle, Config};
 use crate::formatting::{
     attr::*,
-    comment::{contains_comment, rewrite_comment, CodeCharKind, CommentCodeSlices},
+    comment::{
+        contains_comment, is_first_comment_block, is_last_comment_block, rewrite_comment,
+        CodeCharKind, CommentCodeSlices,
+    },
     items::{
         format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item,
         rewrite_associated_impl_type, rewrite_extern_crate, rewrite_opaque_impl_type,
@@ -443,6 +446,39 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if let Some((fn_str, fn_brace_style)) = rewrite {
             self.format_missing_with_indent(source!(self, s).lo());
 
+            let mut last_pos = source!(self, block.span).lo();
+            let block_snip = self.snippet(block.span);
+            if let Some(first_line) = block_snip.lines().next() {
+                let block_line_range = self.parse_sess.lookup_line_range(block.span);
+                let first_line_contains_stmt = if let Some(first_stmt) = block.stmts.first() {
+                    self.parse_sess.lookup_line_range(first_stmt.span).lo == block_line_range.lo
+                } else {
+                    false
+                };
+
+                let comment_snip = if block_line_range.lo == block_line_range.hi {
+                    // 1= {, 1 = }
+                    &first_line[1..first_line.len() - 1]
+                } else {
+                    // 1= {
+                    &first_line[1..]
+                };
+
+                if !first_line_contains_stmt
+                    && contains_comment(comment_snip)
+                    && (is_first_comment_block(comment_snip) && is_last_comment_block(comment_snip)
+                        || !is_first_comment_block(comment_snip))
+                {
+                    if let Some(comment) =
+                        rewrite_comment(comment_snip.trim(), false, self.shape(), self.config)
+                    {
+                        self.push_str(&comment);
+                        self.push_str(&self.block_indent.to_string_with_newline(self.config));
+                        last_pos = last_pos + BytePos(comment_snip.len() as u32);
+                    }
+                }
+            }
+
             if let Some(rw) = self.single_line_fn(&fn_str, block, inner_attrs) {
                 self.push_str(&rw);
                 self.last_pos = s.hi();
@@ -457,7 +493,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 }
                 _ => unreachable!(),
             }
-            self.last_pos = source!(self, block.span).lo();
+            self.last_pos = last_pos;
         } else {
             self.format_missing(source!(self, block.span).lo());
         }
