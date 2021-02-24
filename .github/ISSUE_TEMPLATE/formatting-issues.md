@@ -3,7 +3,6 @@ name: Formatting issues
 about: Poor formatting issues
 title: ''
 labels: poor-formatting
-assignees: topecongiro
 
 ---
 
