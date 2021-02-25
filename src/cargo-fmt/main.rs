@@ -56,8 +56,8 @@ pub struct Opts {
     rustfmt_options: Vec<String>,
 
     /// Format all packages, and also their local path-based dependencies
-    #[structopt(long = "all")]
-    format_all: bool,
+    #[structopt(long = "workspace", alias = "all")]
+    format_workspace: bool,
 
     /// Run rustfmt in check mode
     #[structopt(long = "check")]
@@ -351,7 +351,7 @@ pub enum CargoFmtStrategy {
 
 impl CargoFmtStrategy {
     pub fn from_opts(opts: &Opts) -> CargoFmtStrategy {
-        match (opts.format_all, opts.packages.is_empty()) {
+        match (opts.format_workspace, opts.packages.is_empty()) {
             (false, true) => CargoFmtStrategy::Root,
             (true, _) => CargoFmtStrategy::All,
             (false, false) => CargoFmtStrategy::Some(opts.packages.clone()),
@@ -698,7 +698,7 @@ mod cargo_fmt_tests {
         assert_eq!(false, o.check);
         assert_eq!(empty, o.packages);
         assert_eq!(empty, o.rustfmt_options);
-        assert_eq!(false, o.format_all);
+        assert_eq!(false, o.format_workspace);
         assert_eq!(None, o.manifest_path);
         assert_eq!(None, o.message_format);
     }
@@ -725,8 +725,14 @@ mod cargo_fmt_tests {
         assert_eq!(true, o.check);
         assert_eq!(vec!["p1", "p2"], o.packages);
         assert_eq!(vec!["--edition", "2018"], o.rustfmt_options);
-        assert_eq!(false, o.format_all);
+        assert_eq!(false, o.format_workspace);
         assert_eq!(Some(String::from("short")), o.message_format);
+    }
+
+    #[test]
+    fn workspace_alias() {
+        let o = Opts::from_iter(&["test", "--all"]);
+        assert_eq!(true, o.format_workspace);
     }
 
     #[test]
