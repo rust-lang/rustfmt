@@ -738,21 +738,19 @@ pub(crate) fn extract_post_comment(
 
     // Cleanup post-comment: strip separators and whitespace.
     let post_snippet = post_snippet[..comment_end].trim();
+    let mut _post_snippet_without_sep = String::new();
     let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
-        post_snippet[1..].trim_matches(white_space).to_string()
+        post_snippet[1..].trim_matches(white_space)
     } else if let Some(post_snippet) = post_snippet.strip_prefix(separator) {
-        post_snippet.trim_matches(white_space).to_string()
+        post_snippet.trim_matches(white_space)
     }
     // not comment or over two lines
     else if post_snippet.ends_with(',')
         && (!post_snippet.trim().starts_with("//") || post_snippet.trim().contains('\n'))
     {
-        post_snippet[..(post_snippet.len() - 1)]
-            .trim_matches(white_space)
-            .to_string()
-    } else if post_snippet.find_uncommented(",").is_some() {
-        let sep_pos = post_snippet.find_uncommented(",").unwrap();
-        [
+        post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
+    } else if let Some(sep_pos) = post_snippet.find_uncommented(",") {
+         _post_snippet_without_sep = [
             post_snippet[..sep_pos]
                 .trim_matches(white_space)
                 .trim_matches('\n'),
@@ -761,9 +759,11 @@ pub(crate) fn extract_post_comment(
                 .trim_matches(white_space)
                 .trim_matches('\n'),
         ]
-        .concat()
+        .concat();
+
+        &_post_snippet_without_sep
     } else {
-        post_snippet.to_string()
+        post_snippet
     };
     // FIXME(#3441): post_snippet includes 'const' now
     // it should not include here
