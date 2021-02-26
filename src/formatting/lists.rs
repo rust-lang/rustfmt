@@ -750,7 +750,7 @@ pub(crate) fn extract_post_comment(
     {
         post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
     } else if let Some(sep_pos) = post_snippet.find_uncommented(",") {
-         _post_snippet_without_sep = [
+        _post_snippet_without_sep = [
             post_snippet[..sep_pos]
                 .trim_matches(white_space)
                 .trim_matches('\n'),
