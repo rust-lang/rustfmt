@@ -194,11 +194,11 @@ pub(crate) fn format_expr(
         ast::ExprKind::Path(ref qself, ref path) => {
             rewrite_path(context, PathContext::Expr, qself.as_ref(), path, shape)
         }
-        ast::ExprKind::Assign(ref lhs, ref rhs, _) => {
-            rewrite_assignment(context, lhs, rhs, None, shape)
+        ast::ExprKind::Assign(ref lhs, ref rhs, op_span) => {
+            rewrite_assignment(context, lhs, rhs, op_span, shape)
         }
         ast::ExprKind::AssignOp(ref op, ref lhs, ref rhs) => {
-            rewrite_assignment(context, lhs, rhs, Some(op), shape)
+            rewrite_assignment(context, lhs, rhs, op.span, shape)
         }
         ast::ExprKind::Continue(ref opt_label) => {
             let id_str = match *opt_label {
@@ -1895,25 +1895,24 @@ fn rewrite_assignment(
     context: &RewriteContext<'_>,
     lhs: &ast::Expr,
     rhs: &ast::Expr,
-    op: Option<&ast::BinOp>,
+    op_span: Span,
     shape: Shape,
 ) -> Option<String> {
-    let span_hi = rhs.span.lo();
-    let (operator_str, span_lo) = match op {
-        Some(op) => (context.snippet(op.span), op.span.hi()),
-        None => {
-            let lo = lhs.span.hi();
-            let offset = context.snippet(mk_sp(lo, span_hi)).find_uncommented("=")? + 1;
-            ("=", lo + BytePos(offset as u32))
-        }
-    };
-
     // 1 = space between lhs and operator.
+    let operator_str = context.snippet(op_span);
     let lhs_shape = shape.sub_width(operator_str.len() + 1)?;
     let lhs_str = format!("{} {}", lhs.rewrite(context, lhs_shape)?, operator_str);
 
-    let between_span = mk_sp(span_lo, span_hi);
-    rewrite_assign_rhs_with_span(context, lhs_str, rhs, shape, between_span)
+    let comments_span = mk_sp(op_span.hi(), rhs.span.lo());
+    rewrite_assign_rhs_with_comments(
+        context,
+        lhs_str,
+        rhs,
+        shape,
+        RhsTactics::Default,
+        comments_span,
+        true,
+    )
 }
 
 /// Controls where to put the rhs.
@@ -1937,26 +1936,6 @@ pub(crate) fn rewrite_assign_rhs<S: Into<String>, R: Rewrite>(
     shape: Shape,
 ) -> Option<String> {
     rewrite_assign_rhs_with(context, lhs, ex, shape, RhsTactics::Default)
-}
-
-// The left hand side must contain everything up to, and including, the
-// assignment operator.
-pub(crate) fn rewrite_assign_rhs_with_span<S: Into<String>, R: Rewrite>(
-    context: &RewriteContext<'_>,
-    lhs: S,
-    ex: &R,
-    shape: Shape,
-    between_span: Span,
-) -> Option<String> {
-    rewrite_assign_rhs_with_comments(
-        context,
-        lhs,
-        ex,
-        shape,
-        RhsTactics::Default,
-        between_span,
-        true,
-    )
 }
 
 pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
