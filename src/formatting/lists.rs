@@ -417,7 +417,12 @@ where
             result.push_str(&formatted_comment);
         }
 
-        if separate && sep_place.is_back() {
+        let need_extra_separator = separate
+            && last
+            && item.post_comment.as_ref().map_or(true, |cmnt| {
+                cmnt.find_uncommented(formatting.separator).is_none()
+            });
+        if separate && sep_place.is_back() && (!last || need_extra_separator) {
             result.push_str(formatting.separator);
         }
 
@@ -733,6 +738,7 @@ pub(crate) fn extract_post_comment(
 
     // Cleanup post-comment: strip separators and whitespace.
     let post_snippet = post_snippet[..comment_end].trim();
+    let mut _post_snippet_without_sep = String::new();
     let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
         post_snippet[1..].trim_matches(white_space)
     } else if let Some(post_snippet) = post_snippet.strip_prefix(separator) {
@@ -743,6 +749,19 @@ pub(crate) fn extract_post_comment(
         && (!post_snippet.trim().starts_with("//") || post_snippet.trim().contains('\n'))
     {
         post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
+    } else if let Some(sep_pos) = post_snippet.find_uncommented(",") {
+        _post_snippet_without_sep = [
+            post_snippet[..sep_pos]
+                .trim_matches(white_space)
+                .trim_matches('\n'),
+            "\n",
+            post_snippet[sep_pos + separator.len()..]
+                .trim_matches(white_space)
+                .trim_matches('\n'),
+        ]
+        .concat();
+
+        &_post_snippet_without_sep
     } else {
         post_snippet
     };
