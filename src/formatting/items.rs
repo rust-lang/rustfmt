@@ -1204,13 +1204,9 @@ pub(crate) fn format_trait(
             }
             result.push_str(&where_clause_str);
         }
-        let pre_block_span = if !generics.where_clause.predicates.is_empty() {
-            mk_sp(generics.where_clause.span.hi(), item.span.hi())
-        } else if !generic_bounds.is_empty() {
-            mk_sp(generic_bounds.last().unwrap().span().hi(), item.span.hi())
-        } else {
-            item.span
-        };
+
+        /* Note: `where_clause` always exists; Span is empty when no where clause in the code */
+        let pre_block_span = mk_sp(generics.where_clause.span.hi(), item.span.hi());
         let pre_block_snippet = context.snippet(pre_block_span);
         if let Some(lo) = pre_block_snippet.find('/') {
             // 1 = `{`
