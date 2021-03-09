@@ -1816,7 +1816,7 @@ pub(crate) fn rewrite_struct_field(
 
     let is_prefix_empty = prefix.is_empty();
     // We must use multiline. We are going to put attributes and a field on different lines.
-    let field_str = rewrite_assign_rhs(context, prefix, &*field.ty, shape)?;
+    let field_str = rewrite_assign_rhs(context, prefix.trim_end(), &*field.ty, shape)?;
     // Remove a leading white-space from `rewrite_assign_rhs()` when rewriting a tuple struct.
     let field_str = if is_prefix_empty {
         field_str.trim_start()
