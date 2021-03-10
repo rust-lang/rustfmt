@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 
+use itertools::Itertools;
+
 use rustc_ast::ast::{self, UseTreeKind};
 use rustc_span::{
     symbol::{self, sym},
@@ -183,6 +185,8 @@ pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>, merge_by: SharedPrefix) -
 }
 
 pub(crate) fn flatten_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
+    // Return non-sorted single occurance of the use-trees text string;
+    // order is by first occurance of the use-tree.
     use_trees
         .into_iter()
         .flat_map(UseTree::flatten)
@@ -197,6 +201,7 @@ pub(crate) fn flatten_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
             }
             tree
         })
+        .unique_by(|ut| format!("{}", ut))
         .collect()
 }
 
