@@ -168,7 +168,19 @@ pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>, merge_by: SharedPrefix) -
             continue;
         }
 
-        for flattened in use_tree.flatten() {
+        for mut flattened in use_tree.flatten() {
+            if merge_by == SharedPrefix::Module {
+                // If a path ends in `::self`, rewrite it to `::{self}`.
+                if let Some(UseSegment::Slf(..)) = flattened.path.last() {
+                    let self_segment = flattened.path.pop().unwrap();
+                    flattened
+                        .path
+                        .push(UseSegment::List(vec![UseTree::from_path(
+                            vec![self_segment],
+                            DUMMY_SP,
+                        )]));
+                }
+            }
             if let Some(tree) = result
                 .iter_mut()
                 .find(|tree| tree.share_prefix(&flattened, merge_by))
