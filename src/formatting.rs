@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use rustc_ast::{ast, attr::HasAttrs};
+use rustc_ast::{ast, AstLike};
 use rustc_span::symbol;
 
 pub(crate) use syntux::session::ParseSess;
