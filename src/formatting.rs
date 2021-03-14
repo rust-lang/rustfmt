@@ -178,7 +178,7 @@ fn format_file(
     original_snippet: Option<String>,
     is_macro_def: bool,
 ) -> Result<(), OperationError> {
-    let snippet_provider = parse_session.snippet_provider(module.as_ref().inner);
+    let snippet_provider = parse_session.snippet_provider(module.span);
     let mut visitor = FmtVisitor::from_parse_sess(
         &parse_session,
         config,
