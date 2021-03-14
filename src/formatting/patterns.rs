@@ -18,7 +18,7 @@ use crate::formatting::{
     source_map::SpanUtils,
     spanned::Spanned,
     types::{rewrite_path, PathContext},
-    utils::{format_mutability, mk_sp, rewrite_ident},
+    utils::{format_mutability, mk_sp, mk_sp_lo_plus_one, rewrite_ident},
 };
 
 /// Returns `true` if the given pattern is "short".
@@ -459,7 +459,7 @@ fn rewrite_tuple_pat(
         let sp = pat_vec[new_item_count - 1].span();
         let snippet = context.snippet(sp);
         let lo = sp.lo() + BytePos(snippet.find_uncommented("_").unwrap() as u32);
-        pat_vec[new_item_count - 1] = TuplePatField::Dotdot(mk_sp(lo, lo + BytePos(1)));
+        pat_vec[new_item_count - 1] = TuplePatField::Dotdot(mk_sp_lo_plus_one(lo));
         (
             &pat_vec[..new_item_count],
             mk_sp(span.lo(), lo + BytePos(1)),
