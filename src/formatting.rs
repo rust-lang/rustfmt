@@ -117,7 +117,7 @@ fn format_project(
 
     let files = modules::ModResolver::new(
         &parse_session,
-        directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod),
+        directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaBlock),
         !input_is_stdin && operation_setting.recursive,
     )
     .visit_crate(&krate)?;
