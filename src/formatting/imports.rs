@@ -2,6 +2,10 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 
+use core::hash::{Hash, Hasher};
+
+use itertools::Itertools;
+
 use rustc_ast::ast::{self, UseTreeKind};
 use rustc_span::{
     symbol::{self, sym},
@@ -87,7 +91,7 @@ impl<'a> FmtVisitor<'a> {
 // sorting.
 
 // FIXME we do a lot of allocation to make our own representation.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub(crate) enum UseSegment {
     Ident(String, Option<String>),
     Slf(Option<String>),
@@ -195,6 +199,8 @@ pub(crate) fn merge_use_trees(use_trees: Vec<UseTree>, merge_by: SharedPrefix) -
 }
 
 pub(crate) fn flatten_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
+    // Return non-sorted single occurance of the use-trees text string;
+    // order is by first occurance of the use-tree.
     use_trees
         .into_iter()
         .flat_map(UseTree::flatten)
@@ -209,6 +215,7 @@ pub(crate) fn flatten_use_trees(use_trees: Vec<UseTree>) -> Vec<UseTree> {
             }
             tree
         })
+        .unique()
         .collect()
 }
 
@@ -683,6 +690,12 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: 
     }
     trees.push(use_tree);
     trees.sort();
+}
+
+impl Hash for UseTree {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.path.hash(state);
+    }
 }
 
 impl PartialOrd for UseSegment {
