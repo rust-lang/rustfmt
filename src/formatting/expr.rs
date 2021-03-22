@@ -1938,12 +1938,13 @@ pub(crate) fn rewrite_assign_rhs<S: Into<String>, R: Rewrite>(
     rewrite_assign_rhs_with(context, lhs, ex, shape, RhsTactics::Default)
 }
 
-pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
+pub(crate) fn rewrite_rhs_expr<R: Rewrite>(
     context: &RewriteContext<'_>,
     lhs: &str,
     ex: &R,
     shape: Shape,
     rhs_tactics: RhsTactics,
+    lhs_separator: &str,
 ) -> Option<String> {
     let last_line_width = last_line_width(&lhs).saturating_sub(if lhs.contains('\n') {
         shape.indent.width()
@@ -1956,7 +1957,7 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
         offset: shape.offset + last_line_width + 1,
         ..shape
     });
-    let has_rhs_comment = if let Some(offset) = lhs.find_last_uncommented("=") {
+    let has_rhs_comment = if let Some(offset) = lhs.find_last_uncommented(lhs_separator) {
         lhs.trim_end().len() > offset + 1
     } else {
         false
@@ -1980,7 +1981,7 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
     rhs_tactics: RhsTactics,
 ) -> Option<String> {
     let lhs = lhs.into();
-    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
+    let rhs = rewrite_rhs_expr(context, &lhs, ex, shape, rhs_tactics, "=")?;
     Some(lhs + &rhs)
 }
 
@@ -2000,11 +2001,40 @@ pub(crate) fn rewrite_assign_rhs_with_comments<S: Into<String>, R: Rewrite>(
     } else {
         shape
     };
-    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
+    let rhs = rewrite_rhs_expr(context, &lhs, ex, shape, rhs_tactics, "=")?;
 
     if contains_comment {
         let rhs = rhs.trim_start();
         combine_strs_with_missing_comments(context, &lhs, &rhs, between_span, shape, allow_extend)
+    } else {
+        Some(lhs + &rhs)
+    }
+}
+
+pub(crate) fn rewrite_trait_rhs_with_comments<S: Into<String>, R: Rewrite>(
+    context: &RewriteContext<'_>,
+    lhs: S,
+    ex: &R,
+    shape: Shape,
+    rhs_tactics: RhsTactics,
+    between_span: Span,
+    allow_extend: bool,
+) -> Option<String> {
+    let lhs = lhs.into();
+    let contains_comment = contains_comment(context.snippet(between_span));
+
+    let rhs = rewrite_rhs_expr(context, &lhs, ex, shape, rhs_tactics, ":")?;
+
+    if contains_comment {
+        let rhs = rhs.trim_start();
+        combine_strs_with_missing_comments(
+            context,
+            &lhs,
+            &rhs,
+            between_span,
+            shape.block_left(context.config.tab_spaces())?,
+            allow_extend,
+        )
     } else {
         Some(lhs + &rhs)
     }

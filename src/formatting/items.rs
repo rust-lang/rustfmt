@@ -19,7 +19,7 @@ use crate::formatting::{
     },
     expr::{
         is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with,
-        rewrite_assign_rhs_with_comments, RhsTactics,
+        rewrite_assign_rhs_with_comments, rewrite_trait_rhs_with_comments, RhsTactics,
     },
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator},
     macros::{rewrite_macro, MacroPosition},
@@ -1122,6 +1122,12 @@ pub(crate) fn format_trait(
     if let ast::ItemKind::Trait(trait_kind) = &item.kind {
         let ast::TraitKind(is_auto, unsafety, ref generics, ref generic_bounds, ref trait_items) =
             **trait_kind;
+
+        // FIXME: rustfmt fails to format when there are comments before the ident.
+        if contains_comment(context.snippet(mk_sp(item.span.lo(), item.ident.span.lo()))) {
+            return None;
+        }
+
         let mut result = String::with_capacity(128);
         let header = format!(
             "{}{}{}trait ",
@@ -1131,11 +1137,6 @@ pub(crate) fn format_trait(
         );
         result.push_str(&header);
 
-        // FIXME: rustfmt fails to format when there are comments before the ident.
-        if contains_comment(context.snippet(mk_sp(item.span.lo(), generics.span.lo()))) {
-            return None;
-        }
-
         let body_lo = context.snippet_provider.span_after(item.span, "{");
 
         let shape = Shape::indented(offset, context.config).offset_left(result.len())?;
@@ -1143,23 +1144,16 @@ pub(crate) fn format_trait(
             rewrite_generics(context, rewrite_ident(context, item.ident), generics, shape)?;
         result.push_str(&generics_str);
 
-        // FIXME(#2055): rustfmt fails to format when there are comments within trait bounds.
         if !generic_bounds.is_empty() {
-            let bound_lo = generic_bounds.first().unwrap().span().lo();
-            let bound_hi = generic_bounds.last().unwrap().span().hi();
-            let snippet = context.snippet(mk_sp(bound_lo, bound_hi));
-            if contains_comment(snippet) {
-                return None;
-            }
-
             // Rewrite rhs and combine lhs with pre-bound comment
+            let bound_lo = generic_bounds.first().unwrap().span().lo();
             let ident_hi = context
                 .snippet_provider
                 .span_after(item.span, &item.ident.as_str());
             let ident_hi = context
                 .snippet_provider
                 .span_after(mk_sp(ident_hi, item.span.hi()), ":");
-            result = rewrite_assign_rhs_with_comments(
+            result = rewrite_trait_rhs_with_comments(
                 context,
                 result + ":",
                 generic_bounds,
@@ -1205,7 +1199,7 @@ pub(crate) fn format_trait(
             result.push_str(&where_clause_str);
         }
 
-        /* Note: `where_clause` always exists; Span is empty when no where clause in the code */
+        /* Note: `where_clause` always exists; Span is empty when no `where` clause in the code */
         let pre_block_span = mk_sp(generics.where_clause.span.hi(), item.span.hi());
         let pre_block_snippet = context.snippet(pre_block_span);
         if let Some(lo) = pre_block_snippet.find('/') {

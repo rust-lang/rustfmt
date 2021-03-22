@@ -25,6 +25,15 @@ A + C
 + B
 {}
 pub trait Foo6:/* A and C */A + C    + B{}
+pub trait Foo7:
+A+C
+// and B
++B{}
+pub trait Foo8:
+// A and C
+A+C
+// and B
++B{}
 
 // Other cases
 trait Person{
@@ -67,4 +76,36 @@ trait /* comment 1 */ Programmer /* comment2 */ {
 }
 trait /* comment1 */ CompSciStudent1: /* comment2 */ Programmer + Student /* comment3 */ {
     fn git_username(&self) -> String;
+}
+
+// Traits with where and comments
+trait Bar where Self: Sized, Option<Self>: Foo
+{}
+/*comment0*/trait Bar/*comment1*/where Self: Sized/*comment2*/,/*comment3*/Option<Self>: Foo/*comment4*/
+{}
+trait Bar//comment1 Longgggggggggggggggggggggggggggggggggggggggggggggggggg
+where Self: Sized/*comment2*/,/*comment3*/Option<Self>: Foo/*comment4*/
+{}
+trait Bar/*comment1*/where Self: Sized/*comment2*/,/*comment3*/Option<Self>: Foo//comment4 Longgggggggggggggggggggggggggggggggggggggggggggggggggg
+{}
+trait Bar/*comment1 Longgggggggggggggggggggggggggggggggggggggggggggggggggg*/where Self: Sized/*comment2 Longgggggggggggggggggggggggggggggggggggggggggggggggggg*/,/*comment3 Longgggggggggggggggggggggggggggggggggggggggggggggggggg*/Option<Self>: Foo/*comment4 Longgggggggggggggggggggggggggggggggggggggggggggggggggg*/
+{}
+trait ConstCheck<T>:/*comment1*/Foo where T: Baz/*comment2*/{ 
+    const   J:   i32;
+}
+
+// Some other trait cases with comments
+/*comment0*/auto trait Example/*comment1*/{}
+pub unsafe auto trait PubUnsafeExample/*comment1*/{}
+pub unsafe auto trait PubUnsafeExample// comment1
+{}
+trait Foo/*comment1*/{ type Bar: Baz; type Inner: Foo   = Box< Foo >; }
+pub trait Iterator/*comment1*/{
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+pub trait Iterator//comment1
+{
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
 }
