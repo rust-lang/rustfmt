@@ -589,10 +589,9 @@ impl<'a> Context<'a> {
 
     fn rewrite_items(&self) -> Option<(bool, String)> {
         let span = self.items_span();
-        if self.items.len() == 0 && contains_comment(self.context.snippet(span)) {
+        if self.items.is_empty() && contains_comment(self.context.snippet(span)) {
             let hi = self.context.snippet_provider.span_before(span, self.suffix);
-            let cmnt =
-                rewrite_missing_comment(mk_sp(span.lo(), hi), self.nested_shape, self.context)?;
+            let cmnt = rewrite_missing_comment(span.with_hi(hi), self.nested_shape, self.context)?;
             let cmnt_style = comment_style(&cmnt, self.context.config.normalize_comments());
             return Some((!cmnt.contains('\n') && cmnt_style.is_block_comment(), cmnt));
         }
