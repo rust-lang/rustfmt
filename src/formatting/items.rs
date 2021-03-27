@@ -213,7 +213,7 @@ impl<'a> Item<'a> {
 #[derive(Debug)]
 enum BodyElement<'a> {
     // Stmt(&'a ast::Stmt),
-    // Field(&'a ast::Field),
+    // Field(&'a ast::ExprField),
     // Variant(&'a ast::Variant),
     // Item(&'a ast::Item),
     ForeignItem(&'a ast::ForeignItem),
@@ -1377,7 +1377,7 @@ fn format_unit_struct(
 pub(crate) fn format_struct_struct(
     context: &RewriteContext<'_>,
     struct_parts: &StructParts<'_>,
-    fields: &[ast::StructField],
+    fields: &[ast::FieldDef],
     offset: Indent,
     one_line_width: Option<usize>,
 ) -> Option<String> {
@@ -1521,7 +1521,7 @@ fn format_empty_struct_or_tuple(
 fn format_tuple_struct(
     context: &RewriteContext<'_>,
     struct_parts: &StructParts<'_>,
-    fields: &[ast::StructField],
+    fields: &[ast::FieldDef],
     offset: Indent,
 ) -> Option<String> {
     let mut result = String::with_capacity(1024);
@@ -1741,7 +1741,7 @@ fn type_annotation_spacing(config: &Config) -> (&str, &str) {
 
 pub(crate) fn rewrite_struct_field_prefix(
     context: &RewriteContext<'_>,
-    field: &ast::StructField,
+    field: &ast::FieldDef,
 ) -> String {
     let vis = format_visibility(context, &field.vis);
     let type_annotation_spacing = type_annotation_spacing(context.config);
@@ -1756,7 +1756,7 @@ pub(crate) fn rewrite_struct_field_prefix(
     }
 }
 
-impl Rewrite for ast::StructField {
+impl Rewrite for ast::FieldDef {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         rewrite_struct_field(context, self, shape, 0)
     }
@@ -1764,7 +1764,7 @@ impl Rewrite for ast::StructField {
 
 pub(crate) fn rewrite_struct_field(
     context: &RewriteContext<'_>,
-    field: &ast::StructField,
+    field: &ast::FieldDef,
     shape: Shape,
     lhs_max_width: usize,
 ) -> Option<String> {
