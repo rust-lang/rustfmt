@@ -105,15 +105,10 @@ pub(crate) fn format_expr(
             })
         }
         ast::ExprKind::Unary(op, ref subexpr) => rewrite_unary_op(context, op, subexpr, shape),
-        ast::ExprKind::Struct(ref path, ref fields, ref struct_rest) => rewrite_struct_lit(
-            context,
-            path,
-            fields,
-            struct_rest,
-            &expr.attrs,
-            expr.span,
-            shape,
-        ),
+        ast::ExprKind::Struct(ref struct_expr) => {
+            let ast::StructExpr { fields, path, rest } = &**struct_expr;
+            rewrite_struct_lit(context, path, fields, rest, &expr.attrs, expr.span, shape)
+        }
         ast::ExprKind::Tup(ref items) => {
             rewrite_tuple(context, items.iter(), expr.span, shape, items.len() == 1)
         }
@@ -1552,14 +1547,14 @@ fn rewrite_index(
     }
 }
 
-fn struct_lit_can_be_aligned(fields: &[ast::Field], has_base: bool) -> bool {
+fn struct_lit_can_be_aligned(fields: &[ast::ExprField], has_base: bool) -> bool {
     !has_base && fields.iter().all(|field| !field.is_shorthand)
 }
 
 fn rewrite_struct_lit<'a>(
     context: &RewriteContext<'_>,
     path: &ast::Path,
-    fields: &'a [ast::Field],
+    fields: &'a [ast::ExprField],
     struct_rest: &ast::StructRest,
     attrs: &[ast::Attribute],
     span: Span,
@@ -1568,7 +1563,7 @@ fn rewrite_struct_lit<'a>(
     debug!("rewrite_struct_lit: shape {:?}", shape);
 
     enum StructLitField<'a> {
-        Regular(&'a ast::Field),
+        Regular(&'a ast::ExprField),
         Base(&'a ast::Expr),
         Rest(&'a Span),
     }
@@ -1725,7 +1720,7 @@ pub(crate) fn struct_lit_field_separator(config: &Config) -> &str {
 
 pub(crate) fn rewrite_field(
     context: &RewriteContext<'_>,
-    field: &ast::Field,
+    field: &ast::ExprField,
     shape: Shape,
     prefix_max_width: usize,
 ) -> Option<String> {
