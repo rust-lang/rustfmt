@@ -10,6 +10,7 @@ use rustc_span::Span;
 use crate::config::lists::*;
 use crate::formatting::{
     closures,
+    comment::{comment_style, contains_comment, rewrite_missing_comment},
     expr::{
         can_be_overflowed_expr, is_every_expr_simple, is_method_call, is_nested_call,
         is_simple_expr, rewrite_cond,
@@ -588,6 +589,12 @@ impl<'a> Context<'a> {
 
     fn rewrite_items(&self) -> Option<(bool, String)> {
         let span = self.items_span();
+        if self.items.is_empty() && contains_comment(self.context.snippet(span)) {
+            let hi = self.context.snippet_provider.span_before(span, self.suffix);
+            let cmnt = rewrite_missing_comment(span.with_hi(hi), self.nested_shape, self.context)?;
+            let cmnt_style = comment_style(&cmnt, self.context.config.normalize_comments());
+            return Some((!cmnt.contains('\n') && cmnt_style.is_block_comment(), cmnt));
+        }
         let items = itemize_list(
             self.context.snippet_provider,
             self.items.iter(),
