@@ -1973,6 +1973,16 @@ pub(crate) fn rewrite_rhs_expr<R: Rewrite>(
     )
 }
 
+fn rewrite_assign_rhs_expr<R: Rewrite>(
+    context: &RewriteContext<'_>,
+    lhs: &str,
+    ex: &R,
+    shape: Shape,
+    rhs_tactics: RhsTactics,
+) -> Option<String> {
+    rewrite_rhs_expr(context, &lhs, ex, shape, rhs_tactics, "=")
+}
+
 pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
     context: &RewriteContext<'_>,
     lhs: S,
@@ -1981,7 +1991,7 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
     rhs_tactics: RhsTactics,
 ) -> Option<String> {
     let lhs = lhs.into();
-    let rhs = rewrite_rhs_expr(context, &lhs, ex, shape, rhs_tactics, "=")?;
+    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
     Some(lhs + &rhs)
 }
 
@@ -2001,40 +2011,11 @@ pub(crate) fn rewrite_assign_rhs_with_comments<S: Into<String>, R: Rewrite>(
     } else {
         shape
     };
-    let rhs = rewrite_rhs_expr(context, &lhs, ex, shape, rhs_tactics, "=")?;
+    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
 
     if contains_comment {
         let rhs = rhs.trim_start();
         combine_strs_with_missing_comments(context, &lhs, &rhs, between_span, shape, allow_extend)
-    } else {
-        Some(lhs + &rhs)
-    }
-}
-
-pub(crate) fn rewrite_trait_rhs_with_comments<S: Into<String>, R: Rewrite>(
-    context: &RewriteContext<'_>,
-    lhs: S,
-    ex: &R,
-    shape: Shape,
-    rhs_tactics: RhsTactics,
-    between_span: Span,
-    allow_extend: bool,
-) -> Option<String> {
-    let lhs = lhs.into();
-    let contains_comment = contains_comment(context.snippet(between_span));
-
-    let rhs = rewrite_rhs_expr(context, &lhs, ex, shape, rhs_tactics, ":")?;
-
-    if contains_comment {
-        let rhs = rhs.trim_start();
-        combine_strs_with_missing_comments(
-            context,
-            &lhs,
-            &rhs,
-            between_span,
-            shape.block_left(context.config.tab_spaces())?,
-            allow_extend,
-        )
     } else {
         Some(lhs + &rhs)
     }

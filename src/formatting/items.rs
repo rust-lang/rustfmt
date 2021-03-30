@@ -19,7 +19,7 @@ use crate::formatting::{
     },
     expr::{
         is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with,
-        rewrite_assign_rhs_with_comments, rewrite_trait_rhs_with_comments, RhsTactics,
+        rewrite_assign_rhs_with_comments, rewrite_rhs_expr, RhsTactics,
     },
     lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator},
     macros::{rewrite_macro, MacroPosition},
@@ -1111,6 +1111,36 @@ fn format_struct(
         ast::VariantData::Struct(ref fields, _) => {
             format_struct_struct(context, struct_parts, fields, offset, one_line_width)
         }
+    }
+}
+
+pub(crate) fn rewrite_trait_rhs_with_comments<S: Into<String>, R: Rewrite>(
+    context: &RewriteContext<'_>,
+    lhs: S,
+    ex: &R,
+    shape: Shape,
+    rhs_tactics: RhsTactics,
+    between_span: Span,
+    allow_extend: bool,
+) -> Option<String> {
+    let lhs = lhs.into();
+    let contains_comment = contains_comment(context.snippet(between_span));
+
+    // Not as with `expr` - `shape` is changed only for comments combine, not for rewrite
+    let rhs = rewrite_rhs_expr(context, &lhs, ex, shape, rhs_tactics, ":")?;
+
+    if contains_comment {
+        let rhs = rhs.trim_start();
+        combine_strs_with_missing_comments(
+            context,
+            &lhs,
+            &rhs,
+            between_span,
+            shape.block_left(context.config.tab_spaces())?,
+            allow_extend,
+        )
+    } else {
+        Some(lhs + &rhs)
     }
 }
 
