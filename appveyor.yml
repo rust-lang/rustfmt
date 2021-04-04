@@ -48,6 +48,7 @@ install:
 build: false
 
 test_script:
+  - set RUSTFLAGS=-C link-self-contained=yes
   - cargo install cargo-make
   - cargo make build-bins
   - cargo make test-all
