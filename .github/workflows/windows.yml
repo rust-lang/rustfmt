@@ -52,6 +52,8 @@ jobs:
 
     - name: cargo-make
       run: cargo install --force cargo-make
+      env:
+        RUSTFLAGS: -C link-self-contained=yes
 
     - name: build
       run: |
