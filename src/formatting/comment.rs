@@ -1422,7 +1422,7 @@ impl<'a> Iterator for LineClasses<'a> {
             None => unreachable!(),
         };
 
-        let mut prev_kind = FullCodeCharKind::Normal;
+        let mut prev_kind: FullCodeCharKind;
         while let Some((kind, c)) = self.base.next() {
             prev_kind = self.kind;
             // needed to set the kind of the ending character on the last line
@@ -1723,7 +1723,8 @@ fn remove_comment_header(comment: &str) -> &str {
     } else {
         assert!(
             comment.starts_with("/*"),
-            format!("string '{}' is not a comment", comment)
+            "string '{}' is not a comment",
+            comment,
         );
         &comment[2..comment.len() - 2]
     }
