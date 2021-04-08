@@ -100,7 +100,7 @@ fn format_project(
         None
     };
 
-    let krate = match Parser::parse_crate(config, input, directory_ownership, &parse_session) {
+    let krate = match Parser::parse_crate(input, &parse_session) {
         Ok(krate) => krate,
         Err(e) => {
             return Err(OperationError::ParseError {

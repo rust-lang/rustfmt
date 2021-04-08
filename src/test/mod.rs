@@ -136,10 +136,8 @@ fn verify_config_used(path: &Path, config_name: &str) {
                     .map(Result::unwrap)
                     .take_while(|l| l.starts_with("//"))
                     .any(|l| l.starts_with(&format!("// rustfmt-{}", config_name))),
-                format!(
-                    "config option file {} does not contain expected config name",
-                    path.display()
-                )
+                "config option file {} does not contain expected config name",
+                path.display(),
             );
         }
     }

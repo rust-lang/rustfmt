@@ -662,6 +662,7 @@ mod test {
                 me.push("rustfmt");
                 assert!(
                     me.is_file() || me.with_extension("exe").is_file(),
+                    "{}",
                     if cfg!(release) {
                         "no rustfmt bin, try running `cargo build --release` before testing"
                     } else {
