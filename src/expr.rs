@@ -106,15 +106,10 @@ pub(crate) fn format_expr(
             })
         }
         ast::ExprKind::Unary(op, ref subexpr) => rewrite_unary_op(context, op, subexpr, shape),
-        ast::ExprKind::Struct(ref path, ref fields, ref struct_rest) => rewrite_struct_lit(
-            context,
-            path,
-            fields,
-            struct_rest,
-            &expr.attrs,
-            expr.span,
-            shape,
-        ),
+        ast::ExprKind::Struct(ref struct_expr) => {
+            let ast::StructExpr { fields, path, rest } = &**struct_expr;
+            rewrite_struct_lit(context, path, fields, rest, &expr.attrs, expr.span, shape)
+        }
         ast::ExprKind::Tup(ref items) => {
             rewrite_tuple(context, items.iter(), expr.span, shape, items.len() == 1)
         }
@@ -904,22 +899,11 @@ impl<'a> ControlFlow<'a> {
                 || last_line_offsetted(shape.used_width(), &pat_expr_string));
 
         // Try to format if-else on single line.
-        if self.allow_single_line
-            && context
-                .config
-                .width_heuristics()
-                .single_line_if_else_max_width
-                > 0
-        {
+        if self.allow_single_line && context.config.single_line_if_else_max_width() > 0 {
             let trial = self.rewrite_single_line(&pat_expr_string, context, shape.width);
 
             if let Some(cond_str) = trial {
-                if cond_str.len()
-                    <= context
-                        .config
-                        .width_heuristics()
-                        .single_line_if_else_max_width
-                {
+                if cond_str.len() <= context.config.single_line_if_else_max_width() {
                     return Some((cond_str, 0));
                 }
             }
@@ -1251,7 +1235,7 @@ pub(crate) fn rewrite_call(
         args.iter(),
         shape,
         span,
-        context.config.width_heuristics().fn_call_width,
+        context.config.fn_call_width(),
         choose_separator_tactic(context, span),
     )
 }
@@ -1496,14 +1480,14 @@ fn rewrite_index(
     }
 }
 
-fn struct_lit_can_be_aligned(fields: &[ast::Field], has_base: bool) -> bool {
+fn struct_lit_can_be_aligned(fields: &[ast::ExprField], has_base: bool) -> bool {
     !has_base && fields.iter().all(|field| !field.is_shorthand)
 }
 
 fn rewrite_struct_lit<'a>(
     context: &RewriteContext<'_>,
     path: &ast::Path,
-    fields: &'a [ast::Field],
+    fields: &'a [ast::ExprField],
     struct_rest: &ast::StructRest,
     attrs: &[ast::Attribute],
     span: Span,
@@ -1512,7 +1496,7 @@ fn rewrite_struct_lit<'a>(
     debug!("rewrite_struct_lit: shape {:?}", shape);
 
     enum StructLitField<'a> {
-        Regular(&'a ast::Field),
+        Regular(&'a ast::ExprField),
         Base(&'a ast::Expr),
         Rest(&'a Span),
     }
@@ -1668,7 +1652,7 @@ pub(crate) fn struct_lit_field_separator(config: &Config) -> &str {
 
 pub(crate) fn rewrite_field(
     context: &RewriteContext<'_>,
-    field: &ast::Field,
+    field: &ast::ExprField,
     shape: Shape,
     prefix_max_width: usize,
 ) -> Option<String> {
@@ -1790,7 +1774,7 @@ pub(crate) fn rewrite_tuple<'a, T: 'a + IntoOverflowableItem<'a>>(
             items,
             shape,
             span,
-            context.config.width_heuristics().fn_call_width,
+            context.config.fn_call_width(),
             force_tactic,
         )
     } else {

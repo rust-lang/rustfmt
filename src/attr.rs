@@ -1,7 +1,7 @@
 //! Format attributes and meta items.
 
 use rustc_ast::ast;
-use rustc_ast::attr::HasAttrs;
+use rustc_ast::AstLike;
 use rustc_span::{symbol::sym, Span, Symbol};
 
 use self::doc_comment::DocCommentFormatter;
@@ -300,7 +300,7 @@ impl Rewrite for ast::MetaItem {
                     // 1 = "]"
                     shape.sub_width(1)?,
                     self.span,
-                    context.config.width_heuristics().attr_fn_like_width,
+                    context.config.attr_fn_like_width(),
                     Some(if has_trailing_comma {
                         SeparatorTactic::Always
                     } else {
@@ -376,7 +376,7 @@ impl Rewrite for ast::Attribute {
     }
 }
 
-impl<'a> Rewrite for [ast::Attribute] {
+impl Rewrite for [ast::Attribute] {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         if self.is_empty() {
             return Some(String::new());

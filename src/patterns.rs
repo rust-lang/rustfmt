@@ -1,4 +1,4 @@
-use rustc_ast::ast::{self, BindingMode, FieldPat, Pat, PatKind, RangeEnd, RangeSyntax};
+use rustc_ast::ast::{self, BindingMode, Pat, PatField, PatKind, RangeEnd, RangeSyntax};
 use rustc_ast::ptr;
 use rustc_span::{BytePos, Span};
 
@@ -17,7 +17,7 @@ use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::types::{rewrite_path, PathContext};
-use crate::utils::{format_mutability, mk_sp, rewrite_ident};
+use crate::utils::{format_mutability, mk_sp, mk_sp_lo_plus_one, rewrite_ident};
 
 /// Returns `true` if the given pattern is "short".
 /// A short pattern is defined by the following grammar:
@@ -259,7 +259,7 @@ impl Rewrite for Pat {
 
 fn rewrite_struct_pat(
     path: &ast::Path,
-    fields: &[ast::FieldPat],
+    fields: &[ast::PatField],
     ellipsis: bool,
     span: Span,
     context: &RewriteContext<'_>,
@@ -334,7 +334,7 @@ fn rewrite_struct_pat(
     Some(format!("{} {{{}}}", path_str, fields_str))
 }
 
-impl Rewrite for FieldPat {
+impl Rewrite for PatField {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let hi_pos = if let Some(last) = self.attrs.last() {
             last.span.hi()
@@ -460,7 +460,7 @@ fn rewrite_tuple_pat(
         let sp = pat_vec[new_item_count - 1].span();
         let snippet = context.snippet(sp);
         let lo = sp.lo() + BytePos(snippet.find_uncommented("_").unwrap() as u32);
-        pat_vec[new_item_count - 1] = TuplePatField::Dotdot(mk_sp(lo, lo + BytePos(1)));
+        pat_vec[new_item_count - 1] = TuplePatField::Dotdot(mk_sp_lo_plus_one(lo));
         (
             &pat_vec[..new_item_count],
             mk_sp(span.lo(), lo + BytePos(1)),
