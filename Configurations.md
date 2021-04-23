@@ -1912,7 +1912,7 @@ fn say_hi() {
 
 ## `preserve_closure_block_wrapping`
 
-Preserves block wraping arround closures.  For example, useful when the closure `||` can be
+Preserves block wraping around closures.  For example, useful when the closure `||` can be
 confused with OR.
 
 - **Default value**: `false`
