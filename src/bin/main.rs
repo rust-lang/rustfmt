@@ -178,10 +178,18 @@ fn make_opts() -> Options {
     opts.optflag("v", "verbose", "Print verbose output");
     opts.optflag("q", "quiet", "Print less output");
     opts.optflag("V", "version", "Show version information");
+    let help_topics = if is_nightly {
+        "`config` or `file-lines`"
+    } else {
+        "`config`"
+    };
+    let mut help_topic_msg = "Show this message or help about a specific topic: ".to_owned();
+    help_topic_msg.push_str(help_topics);
+
     opts.optflagopt(
         "h",
         "help",
-        "Show this message or help about a specific topic: `config` or `file-lines`",
+        &help_topic_msg,
         "=TOPIC",
     );
 
@@ -437,7 +445,7 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
             return Ok(Operation::Help(HelpOp::None));
         } else if topic == Some("config".to_owned()) {
             return Ok(Operation::Help(HelpOp::Config));
-        } else if topic == Some("file-lines".to_owned()) {
+        } else if topic == Some("file-lines".to_owned()) && is_nightly() {
             return Ok(Operation::Help(HelpOp::FileLines));
         } else {
             return Err(OperationError::UnknownHelpTopic(topic.unwrap()));
