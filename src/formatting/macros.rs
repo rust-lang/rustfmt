@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_ast::token::{BinOpToken, DelimToken, Token, TokenKind};
-use rustc_ast::tokenstream::{Cursor, LazyTokenStream, TokenStream, TokenTree};
+use rustc_ast::tokenstream::{Cursor, Spacing, TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_parse::parser::{ForceCollect, Parser};
@@ -1233,7 +1233,7 @@ pub(crate) fn convert_try_mac(
             kind: ast::ExprKind::Try(kind),
             span: mac.span(), // incorrect span, but shouldn't matter too much
             attrs: ast::AttrVec::new(),
-            tokens: Some(LazyTokenStream::new(ts)),
+            tokens: None,
         })
     } else {
         None
@@ -1284,7 +1284,7 @@ impl MacroParser {
             TokenTree::Token(..) => return None,
             TokenTree::Delimited(delimited_span, d, _) => (delimited_span.open.lo(), d),
         };
-        let args = tok.joint();
+        let args = TokenStream::new(vec![(tok, Spacing::Joint)]);
         match self.toks.next()? {
             TokenTree::Token(Token {
                 kind: TokenKind::FatArrow,
