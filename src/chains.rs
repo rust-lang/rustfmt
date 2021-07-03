@@ -674,6 +674,13 @@ impl<'a> ChainFormatterShared<'a> {
             match chain_item.kind {
                 ChainItemKind::Comment(_, CommentPosition::Back) => result.push(' '),
                 ChainItemKind::Comment(_, CommentPosition::Top) => result.push_str(&connector),
+                ChainItemKind::Await if context.config.await_same_line() => {
+                    let current_line_len = result.len() - result.rfind('\n').unwrap_or(0);
+                    // If adding .await on the same line would overflow max width, do emit connector
+                    if current_line_len + rewrite.len() > child_shape.width {
+                        result.push_str(&connector)
+                    }
+                }
                 _ => result.push_str(&connector),
             }
             result.push_str(&rewrite);
