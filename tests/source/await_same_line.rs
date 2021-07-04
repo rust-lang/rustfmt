@@ -16,8 +16,10 @@ fn main() {
             arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7, arg_8, arg_9,
         )
         .await
-        .function_with_args(
-            arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7, arg_8, arg_9, arg_10,
-        )
+        /* comment */
+        .await
+        .await /* comment */
+        .await
+        .async_function() /* comment */
         .await;
 }
