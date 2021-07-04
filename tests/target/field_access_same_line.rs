@@ -15,5 +15,7 @@ fn main() {
         .field.field.field // test
         .field.field.field // test
         // test
-        .function();
+        .function()
+        .field.0.field[5][6]
+        .1.test[3];
 }
