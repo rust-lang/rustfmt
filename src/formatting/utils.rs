@@ -780,6 +780,13 @@ pub(crate) fn format_code_block(
         result
     }
 
+    if code_snippet.is_empty() {
+        return Some(FormattedSnippet {
+            snippet: String::new(),
+            non_formatted_ranges: vec![],
+        });
+    }
+
     // Wrap the given code block with `fn main()` if it does not have one.
     let snippet = enclose_in_main_block(code_snippet, config);
     let mut result = String::with_capacity(snippet.len());
@@ -805,32 +812,42 @@ pub(crate) fn format_code_block(
         .unwrap_or_else(|| formatted.snippet.len());
     let mut is_indented = true;
     let indent_str = Indent::from_width(config, config.tab_spaces()).to_string(config);
-    for (kind, ref line) in LineClasses::new(&formatted.snippet[FN_MAIN_PREFIX.len()..block_len]) {
-        if !is_first {
-            result.push('\n');
-        } else {
-            is_first = false;
-        }
-        let trimmed_line = if !is_indented {
-            line
-        } else if line.len() > indent_str.len() {
-            // Make sure that the line has leading whitespaces.
-            if line.starts_with(indent_str.as_ref()) {
-                let offset = if config.hard_tabs() {
-                    1
+
+    if FN_MAIN_PREFIX.len() >= block_len {
+        // Code block with empty lines
+        result.push_str("\n\n");
+    } else {
+        // Non-empty code block
+        for (kind, ref line) in
+            LineClasses::new(&formatted.snippet[FN_MAIN_PREFIX.len()..block_len])
+        {
+            if !is_first {
+                result.push('\n');
+            } else {
+                is_first = false;
+            }
+            let trimmed_line = if !is_indented {
+                line
+            } else if line.len() > indent_str.len() {
+                // Make sure that the line has leading whitespaces.
+                if line.starts_with(indent_str.as_ref()) {
+                    let offset = if config.hard_tabs() {
+                        1
+                    } else {
+                        config.tab_spaces()
+                    };
+                    &line[offset..]
                 } else {
-                    config.tab_spaces()
-                };
-                &line[offset..]
+                    line
+                }
             } else {
                 line
-            }
-        } else {
-            line
-        };
-        result.push_str(trimmed_line);
-        is_indented = indent_next_line(kind);
+            };
+            result.push_str(trimmed_line);
+            is_indented = indent_next_line(kind);
+        }
     }
+
     Some(FormattedSnippet {
         snippet: result,
         non_formatted_ranges: formatted.non_formatted_ranges,
