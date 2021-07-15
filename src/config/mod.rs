@@ -731,6 +731,74 @@ make_backup = false
     }
 
     #[cfg(test)]
+    mod deprecated_option_match_arm_blocks {
+        use super::*;
+
+        #[test]
+        fn test_old_option_set() {
+            if !crate::is_nightly_channel!() {
+                return;
+            }
+            // Old option defaults to true - set it to false
+            let toml = r#"
+                unstable_features = true
+                match_arm_blocks = false
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(
+                config.match_arm_wrapping(),
+                MatchArmWrapping::NoBlockFirstLine
+            );
+        }
+
+        #[test]
+        fn test_both_set() {
+            if !crate::is_nightly_channel!() {
+                return;
+            }
+            let toml = r#"
+                unstable_features = true
+                match_arm_blocks = false
+                match_arm_wrapping = "Default"
+            "#;
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            assert_eq!(config.match_arm_wrapping(), MatchArmWrapping::Default);
+        }
+
+        #[test]
+        fn test_new_overridden() {
+            if !crate::is_nightly_channel!() {
+                return;
+            }
+            let toml = r#"
+                unstable_features = true
+                merge_imports = false
+            "#;
+            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            config.override_value("match_arm_wrapping", "Default");
+            assert_eq!(config.match_arm_wrapping(), MatchArmWrapping::Default);
+        }
+
+        #[test]
+        fn test_old_overridden() {
+            if !crate::is_nightly_channel!() {
+                return;
+            }
+            let toml = r#"
+                unstable_features = true
+                match_arm_wrapping = "NoBlockFirstLine"
+            "#;
+            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            config.override_value("match_arm_blocks", "false");
+            // no effect: the new option always takes precedence
+            assert_eq!(
+                config.match_arm_wrapping(),
+                MatchArmWrapping::NoBlockFirstLine
+            );
+        }
+    }
+
+    #[cfg(test)]
     mod use_small_heuristics {
         use super::*;
 
