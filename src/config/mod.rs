@@ -110,8 +110,9 @@ create_config! {
         "Align struct fields if their diffs fits within threshold";
     enum_discrim_align_threshold: usize, 0, false,
         "Align enum variants discrims, if their diffs fit within threshold";
-    match_arm_blocks: bool, true, false, "Wrap the body of arms in blocks when it does not fit on \
-        the same line with the pattern of arms";
+    match_arm_wrapping: MatchArmWrapping, MatchArmWrapping::Default, false,
+        "Wrap the body of match arms according to the given options";
+    match_arm_blocks: bool, true, false, "(deprecated: use match_arm_wrapping instead)";
     match_arm_leading_pipes: MatchArmLeadingPipe, MatchArmLeadingPipe::Never, true,
         "Determines whether leading pipes are emitted on match arms";
     force_multiline_blocks: bool, false, false,
@@ -426,6 +427,11 @@ mod test {
                 "Merge imports";
             merge_imports: bool, false, false, "(deprecated: use imports_granularity instead)";
 
+            // match_arm_blocks deprecation
+            match_arm_blocks: bool, true, false, "(deprecated: use match_arm_wrapping instead)";
+            match_arm_wrapping: MatchArmWrapping, MatchArmWrapping::Default, false,
+                "Wrap the body of match arms according to the given options";
+
             // Width Heuristics
             use_small_heuristics: Heuristics, Heuristics::Default, true,
                 "Whether to use different formatting for items and \
@@ -590,6 +596,7 @@ combine_control_expr = true
 overflow_delimited_expr = false
 struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
+match_arm_wrapping = "Default"
 match_arm_blocks = true
 match_arm_leading_pipes = "Never"
 force_multiline_blocks = false

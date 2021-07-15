@@ -442,3 +442,12 @@ pub enum MatchArmLeadingPipe {
     /// Preserve any existing leading pipes
     Preserve,
 }
+
+/// Controls wrapping for match arm bodies
+#[config_type]
+pub enum MatchArmWrapping {
+    /// Follow the Style Guide Prescription
+    Default,
+    /// Don't block wrap when the first line can't fit
+    NoBlockFirstLine,
+}
