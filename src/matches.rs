@@ -415,27 +415,23 @@ fn rewrite_match_body(
         }
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
-        let (body_prefix, body_suffix) = if context.config.match_arm_wrapping()
-            == MatchArmWrapping::Default
-            && !context.inside_macro()
-        {
-            let comma = if context.config.match_block_trailing_comma() {
-                ","
-            } else {
-                ""
-            };
-            let semicolon = if context.config.version() == Version::One {
-                ""
-            } else {
-                if semicolon_for_expr(context, body) {
-                    ";"
+        let (body_prefix, body_suffix) = match context.config.match_arm_wrapping() {
+            MatchArmWrapping::Default | MatchArmWrapping::Always if !context.inside_macro() => {
+                let comma = if context.config.match_block_trailing_comma() {
+                    ","
                 } else {
                     ""
-                }
-            };
-            ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
-        } else {
-            ("", String::from(","))
+                };
+
+                let semicolon = match context.config.version() {
+                    Version::One => "",
+                    _ if semicolon_for_expr(context, body) => ";",
+                    _ => "",
+                };
+
+                ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
+            }
+            _ => ("", String::from(",")),
         };
 
         let block_sep = match context.config.control_brace_style() {
@@ -464,7 +460,10 @@ fn rewrite_match_body(
     let orig_body_shape = shape
         .offset_left(extra_offset(pats_str, shape) + 4)
         .and_then(|shape| shape.sub_width(comma.len()));
-    let orig_body = if forbid_same_line || !arrow_comment.is_empty() {
+    let orig_body = if forbid_same_line
+        || !arrow_comment.is_empty()
+        || (!is_block && context.config.match_arm_wrapping() == MatchArmWrapping::Always)
+    {
         None
     } else if let Some(body_shape) = orig_body_shape {
         let rewrite = nop_block_collapse(
@@ -485,6 +484,7 @@ fn rewrite_match_body(
     } else {
         None
     };
+
     let orig_budget = orig_body_shape.map_or(0, |shape| shape.width);
 
     // Try putting body on the next line and see if it looks better.
@@ -493,6 +493,7 @@ fn rewrite_match_body(
         format_expr(body, ExprType::Statement, context, next_line_body_shape),
         next_line_body_shape.width,
     );
+
     match (orig_body, next_line_body) {
         (Some(ref orig_str), Some(ref next_line_str))
             if prefer_next_line(orig_str, next_line_str, RhsTactics::Default) =>

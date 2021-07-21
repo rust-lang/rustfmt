@@ -450,4 +450,6 @@ pub enum MatchArmWrapping {
     Default,
     /// Don't block wrap when the first line can't fit
     NoBlockFirstLine,
+    /// Always wrap match arms
+    Always,
 }
