@@ -326,6 +326,10 @@ fn flatten_arm_body<'a>(
             if let ast::ExprKind::Block(..) = expr.kind {
                 flatten_arm_body(context, expr, None)
             } else {
+                if context.config.match_arm_wrapping() == MatchArmWrapping::Preserve {
+                    return (false, body);
+                }
+
                 let cond_becomes_muti_line = opt_shape
                     .and_then(|shape| rewrite_cond(context, expr, shape))
                     .map_or(false, |cond| cond.contains('\n'));
@@ -416,7 +420,8 @@ fn rewrite_match_body(
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
         let (body_prefix, body_suffix) = match context.config.match_arm_wrapping() {
-            MatchArmWrapping::Default | MatchArmWrapping::Always if !context.inside_macro() => {
+            MatchArmWrapping::NoBlockFirstLine => ("", String::from(",")),
+            _ if !context.inside_macro() => {
                 let comma = if context.config.match_block_trailing_comma() {
                     ","
                 } else {

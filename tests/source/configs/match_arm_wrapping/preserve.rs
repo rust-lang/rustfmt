@@ -1,17 +1,13 @@
-// rustfmt-match_arm_wrapping: Always
+// rustfmt-match_arm_wrapping: Preserve
 // Wrap match-arms
 
 fn main() {
     match lorem {
-        1000 => {
-            foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x)
-        }
+        1000 => foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x),
         2000 => {
             println!("{}", sit)
         }
-        3000 => {
-            panic!()
-        }
+        3000 => panic!(),
         4000 => {
             ()
         }

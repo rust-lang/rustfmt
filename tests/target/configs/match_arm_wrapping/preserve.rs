@@ -1,4 +1,4 @@
-// rustfmt-match_arm_wrapping: Always
+// rustfmt-match_arm_wrapping: Preserve
 // Wrap match-arms
 
 fn main() {
@@ -9,9 +9,7 @@ fn main() {
         2000 => {
             println!("{}", sit)
         }
-        3000 => {
-            panic!()
-        }
+        3000 => panic!(),
         4000 => {
             ()
         }

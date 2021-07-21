@@ -448,8 +448,11 @@ pub enum MatchArmLeadingPipe {
 pub enum MatchArmWrapping {
     /// Follow the Style Guide Prescription
     Default,
-    /// Don't block wrap when the first line can't fit
+    /// Same as Default, except don't block wrap match arms when the opening line of its body
+    /// can't fit on the same line as the `=>`.
     NoBlockFirstLine,
-    /// Always wrap match arms
+    /// Always block wrap match arms
     Always,
+    /// Preserve the block wrapping on match arms
+    Preserve,
 }
