@@ -1,11 +1,10 @@
-// rustfmt-match_arm_wrapping: Default
+// rustfmt-match_arm_wrapping: FitFirstLine
 // Wrap match-arms
 
 fn main() {
     match lorem {
-        1000 => {
-            foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x)
-        }
+        1000 =>
+            foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x),
         2000 => {
             println!("{}", sit)
         }

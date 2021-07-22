@@ -15,6 +15,17 @@ fn main() {
         4000 => {
             ()
         }
+        5000 => {
+            this.a_very_long_function_name(
+                foo,
+                bar,
+                bazz,
+                fizz,
+                another_argument,
+                some_more_arguments,
+                which_dont_fit,
+            )
+        }
         ipsum => {
             // Some comment
             let dolor = ipsum % 2;

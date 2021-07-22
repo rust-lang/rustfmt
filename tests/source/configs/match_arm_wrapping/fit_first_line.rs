@@ -1,4 +1,4 @@
-// rustfmt-match_arm_wrapping: Always
+// rustfmt-match_arm_wrapping: FitFirstLine
 // Wrap match-arms
 
 fn main() {
@@ -8,7 +8,7 @@ fn main() {
             println!("{}", sit)
         }
         3000 => panic!(),
-        4000 => {
+        4000 => { 
             ()
         }
         5000 => this.a_very_long_function_name(foo, bar, bazz, fizz, another_argument, some_more_arguments, which_dont_fit),

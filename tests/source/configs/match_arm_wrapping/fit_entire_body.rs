@@ -1,4 +1,4 @@
-// rustfmt-match_arm_wrapping: Always
+// rustfmt-match_arm_wrapping: FitEntireBody
 // Wrap match-arms
 
 fn main() {
