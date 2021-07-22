@@ -450,9 +450,12 @@ pub enum MatchArmWrapping {
     Default,
     /// Same as Default, except don't block wrap match arms when the opening line of its body
     /// can't fit on the same line as the `=>`.
-    NoBlockFirstLine,
+    FitFirstLine,
     /// Always block wrap match arms
     Always,
     /// Preserve the block wrapping on match arms
     Preserve,
+    /// Same as Default, except wrap the match arm if the entire body cannot fit on the same line
+    /// as the `=>`.
+    FitEntireBody,
 }

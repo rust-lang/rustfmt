@@ -435,7 +435,7 @@ macro_rules! create_config {
                         self.match_arm_wrapping.2 = if self.match_arm_blocks() {
                             MatchArmWrapping::Default
                         } else {
-                            MatchArmWrapping::NoBlockFirstLine
+                            MatchArmWrapping::FitFirstLine
                         };
                     }
                 }

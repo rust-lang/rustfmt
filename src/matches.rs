@@ -420,7 +420,7 @@ fn rewrite_match_body(
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
         let (body_prefix, body_suffix) = match context.config.match_arm_wrapping() {
-            MatchArmWrapping::NoBlockFirstLine => ("", String::from(",")),
+            MatchArmWrapping::FitFirstLine => ("", String::from(",")),
             _ if !context.inside_macro() => {
                 let comma = if context.config.match_block_trailing_comma() {
                     ","
@@ -501,7 +501,9 @@ fn rewrite_match_body(
 
     match (orig_body, next_line_body) {
         (Some(ref orig_str), Some(ref next_line_str))
-            if prefer_next_line(orig_str, next_line_str, RhsTactics::Default) =>
+            if prefer_next_line(orig_str, next_line_str, RhsTactics::Default)
+                || (context.config.match_arm_wrapping() == MatchArmWrapping::FitEntireBody
+                    && orig_str.contains('\n')) =>
         {
             combine_next_line_body(next_line_str)
         }

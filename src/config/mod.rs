@@ -745,10 +745,7 @@ make_backup = false
                 match_arm_blocks = false
             "#;
             let config = Config::from_toml(toml, Path::new("")).unwrap();
-            assert_eq!(
-                config.match_arm_wrapping(),
-                MatchArmWrapping::NoBlockFirstLine
-            );
+            assert_eq!(config.match_arm_wrapping(), MatchArmWrapping::FitFirstLine);
         }
 
         #[test]
@@ -786,15 +783,12 @@ make_backup = false
             }
             let toml = r#"
                 unstable_features = true
-                match_arm_wrapping = "NoBlockFirstLine"
+                match_arm_wrapping = "FitFirstLine"
             "#;
             let mut config = Config::from_toml(toml, Path::new("")).unwrap();
             config.override_value("match_arm_blocks", "false");
             // no effect: the new option always takes precedence
-            assert_eq!(
-                config.match_arm_wrapping(),
-                MatchArmWrapping::NoBlockFirstLine
-            );
+            assert_eq!(config.match_arm_wrapping(), MatchArmWrapping::FitFirstLine);
         }
     }
 
