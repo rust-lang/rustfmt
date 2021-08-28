@@ -30,7 +30,7 @@ foo! { x, y }
 /// ```
 foo! { x, y }
 
-/// ```complie_fail
+/// ```compile_fail
 ///fn main() {
 ///x = y;
 ///}
@@ -76,5 +76,17 @@ foo! { x, y }
 ///fn main() {
 ///x = y;
 ///}
+/// ```
+foo! { x, y }
+
+/// ```
+/// ```
+foo! { x, y }
+
+/// ```rust
+/// ```
+foo! { x, y }
+
+/// ```ignore
 /// ```
 foo! { x, y }

@@ -428,10 +428,9 @@ enum CodeBlockAttribute {
 
 impl CodeBlockAttribute {
     fn new(attributes: &str) -> Vec<CodeBlockAttribute> {
-        let mut result: Vec<CodeBlockAttribute> = vec![];
-        let attrs_iter = attributes.split(',');
-        for cba in attrs_iter {
-            result.push(match cba.trim() {
+        attributes
+            .split(',')
+            .map(|cba| match cba.trim() {
                 "rust" | "" => CodeBlockAttribute::Rust,
                 "ignore" => CodeBlockAttribute::Ignore,
                 "text" => CodeBlockAttribute::Text,
@@ -440,8 +439,7 @@ impl CodeBlockAttribute {
                 "compile_fail" => CodeBlockAttribute::CompileFail,
                 _ => CodeBlockAttribute::Text,
             })
-        }
-        return result;
+            .collect()
     }
 }
 
@@ -692,7 +690,7 @@ impl<'a> CommentRewrite<'a> {
                     _ => false,
                 }) {
                     trim_custom_comment_prefix(&self.code_block_buffer)
-                } else if code_block_attr_inner.is_empty() {
+                } else if self.code_block_buffer.is_empty() {
                     String::new()
                 } else {
                     let mut config = self.fmt.config.clone();
