@@ -390,7 +390,7 @@ macro_rules! create_config {
                 if self.was_set().license_template_path() {
                     let lt_path = self.license_template_path();
                     if lt_path.len() > 0 {
-                        match license::load_and_compile_template(&lt_path) {
+                        match license::load_and_compile_template(self.get_ignore(), &lt_path) {
                             Ok(re) => self.license_template = Some(re),
                             Err(msg) => eprintln!("Warning for license template file {:?}: {}",
                                                 lt_path, msg),
