@@ -1668,6 +1668,9 @@ pub enum Foo {}
 #### `false`:
 
 ```rust
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
+pub enum Bar {}
+
 #[derive(Eq, PartialEq)]
 #[derive(Debug)]
 #[derive(Copy, Clone)]
@@ -1841,6 +1844,9 @@ Convert `#![doc]` and `#[doc]` attributes to `//!` and `///` doc comments.
 #![doc = "Example documentation"]
 
 #[doc = "Example item documentation"]
+pub enum Bar {}
+
+/// Example item documentation
 pub enum Foo {}
 ```
 
@@ -1955,6 +1961,8 @@ fn main() {
 #### `false`:
 ```rust
 fn main() {
+    (foo());
+
     ((((foo()))));
 }
 ```
@@ -1979,6 +1987,14 @@ impl Iterator for Dummy {
     }
 
     type Item = i32;
+}
+
+impl Iterator for Dummy {
+    type Item = i32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
 }
 ```
 
@@ -2536,7 +2552,8 @@ fn main() {
     let x = 1;
     let y = 2;
     let z = 3;
-    let a = Foo { x: x, y: y, z: z };
+    let a = Foo { x, y, z };
+    let b = Foo { x: x, y: y, z: z };
 }
 ```
 
@@ -2705,6 +2722,8 @@ Replace uses of the try! macro by the ? shorthand
 
 ```rust
 fn main() {
+    let lorem = ipsum.map(|dolor| dolor.sit())?;
+
     let lorem = try!(ipsum.map(|dolor| dolor.sit()));
 }
 ```
@@ -2776,6 +2795,12 @@ Break comments to fit on the line
 #### `false` (default):
 
 ```rust
+// Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+// sed do eiusmod tempor incididunt ut labore et dolore
+// magna aliqua. Ut enim ad minim veniam, quis nostrud
+// exercitation ullamco laboris nisi ut aliquip ex ea
+// commodo consequat.
+
 // Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 ```
 
