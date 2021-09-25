@@ -160,6 +160,26 @@ pub(crate) fn combine_strs_with_missing_comments(
     shape: Shape,
     allow_extend: bool,
 ) -> Option<String> {
+    combine_lines_with_missing_comments(
+        context,
+        prev_str,
+        next_str,
+        span,
+        shape,
+        false,
+        allow_extend,
+    )
+}
+
+pub(crate) fn combine_lines_with_missing_comments(
+    context: &RewriteContext<'_>,
+    prev_str: &str,
+    next_str: &str,
+    span: Span,
+    shape: Shape,
+    allow_multiline_join: bool,
+    allow_extend: bool,
+) -> Option<String> {
     trace!(
         "combine_strs_with_missing_comments `{}` `{}` {:?} {:?}",
         prev_str,
@@ -171,7 +191,8 @@ pub(crate) fn combine_strs_with_missing_comments(
     let mut result =
         String::with_capacity(prev_str.len() + next_str.len() + shape.indent.width() + 128);
     result.push_str(prev_str);
-    let mut allow_one_line = !prev_str.contains('\n') && !next_str.contains('\n');
+    let contains_nl = prev_str.contains('\n') || next_str.contains('\n');
+    let mut allow_line_join = allow_multiline_join || !contains_nl;
     let first_sep =
         if prev_str.is_empty() || next_str.is_empty() || trimmed_last_line_width(prev_str) == 0 {
             ""
@@ -221,14 +242,16 @@ pub(crate) fn combine_strs_with_missing_comments(
     result.push_str(&first_sep);
     result.push_str(&missing_comment);
 
-    let second_sep = if missing_comment.is_empty() || next_str.is_empty() {
+    let skip_second_sep =
+        missing_comment.is_empty() || next_str.is_empty() || next_str.starts_with("\n");
+    let second_sep = if skip_second_sep {
         Cow::from("")
     } else if missing_comment.starts_with("//") {
         indent.to_string_with_newline(config)
     } else {
         one_line_width += missing_comment.len() + first_sep.len() + 1;
-        allow_one_line &= !missing_comment.starts_with("//") && !missing_comment.contains('\n');
-        if prefer_same_line && allow_one_line && one_line_width <= shape.width {
+        allow_line_join &= !missing_comment.starts_with("//") && !missing_comment.contains('\n');
+        if prefer_same_line && allow_line_join && one_line_width <= shape.width {
             Cow::from(" ")
         } else {
             indent.to_string_with_newline(config)

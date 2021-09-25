@@ -2573,6 +2573,56 @@ fn main() {
 }
 ```
 
+## `type_separator`
+
+Where to put an operator when a type-level expression goes multiline.
+
+- **Default value**: `"Front"`
+- **Possible values**: `"Front"`, `"Back"`
+- **Stable**: No
+
+#### `"Front"` (default):
+
+```rust
+pub trait Foo:
+    Add
+    + AddAssign
+    + Clone
+    + Copy
+    + Debug
+    + Default
+    + Eq
+    + Hash
+    + Ord
+    + PartialEq
+    + PartialOrd
+    + Sized
+{
+    //
+}
+```
+
+#### `"Back"`:
+
+```rust
+pub trait Foo:
+    Add +
+    AddAssign +
+    Clone +
+    Copy +
+    Debug +
+    Default +
+    Eq +
+    Hash +
+    Ord +
+    PartialEq +
+    PartialOrd +
+    Sized
+{
+    //
+}
+```
+
 ## `use_small_heuristics`
 
 This option can be used to simplify the management and bulk updates of the granular width configuration settings ([`fn_call_width`](#fn_call_width), [`attr_fn_like_width`](#attr_fn_like_width), [`struct_lit_width`](#struct_lit_width), [`struct_variant_width`](#struct_variant_width), [`array_width`](#array_width), [`chain_width`](#chain_width), [`single_line_if_else_max_width`](#single_line_if_else_max_width)), that respectively control when formatted constructs are multi-lined/vertical based on width.

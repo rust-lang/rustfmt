@@ -7,7 +7,8 @@ use rustc_span::{symbol::kw, symbol::Ident, BytePos, Pos, Span};
 use crate::config::lists::*;
 use crate::config::{IndentStyle, TypeDensity, Version};
 use crate::expr::{
-    format_expr, rewrite_assign_rhs, rewrite_call, rewrite_tuple, rewrite_unary_prefix, ExprType,
+    format_expr, rewrite_assign_rhs, rewrite_assign_rhs_with_comments, rewrite_call, rewrite_tuple,
+    rewrite_unary_prefix, ExprType, RhsTactics,
 };
 use crate::items::StructParts;
 use crate::lists::{
@@ -26,7 +27,9 @@ use crate::utils::{
 };
 use crate::DEFAULT_VISIBILITY;
 use crate::{
-    comment::{combine_strs_with_missing_comments, contains_comment},
+    comment::{
+        combine_lines_with_missing_comments, combine_strs_with_missing_comments, contains_comment,
+    },
     items::format_struct_struct,
 };
 
@@ -434,7 +437,23 @@ impl Rewrite for ast::WherePredicate {
                     format!("{}{}", type_str, colon)
                 };
 
-                rewrite_assign_rhs(context, lhs, bounds, shape)?
+                let comment_lo = context.snippet_provider.span_after(self.span(), ":");
+                let comment_hi = if bounds.is_empty() {
+                    comment_lo
+                } else {
+                    bounds[0].span().lo()
+                };
+                let comment_span = mk_sp(comment_lo, comment_hi);
+
+                rewrite_assign_rhs_with_comments(
+                    context,
+                    lhs,
+                    bounds,
+                    shape,
+                    RhsTactics::Default,
+                    comment_span,
+                    true,
+                )?
             }
             ast::WherePredicate::RegionPredicate(ast::WhereRegionPredicate {
                 ref lifetime,
@@ -956,6 +975,13 @@ fn is_generic_bounds_in_order(generic_bounds: &[ast::GenericBound]) -> bool {
     }
 }
 
+fn is_bound_extendable(s: &str, b: &ast::GenericBound) -> bool {
+    match b {
+        ast::GenericBound::Outlives(..) => true,
+        ast::GenericBound::Trait(..) => last_line_extendable(s),
+    }
+}
+
 fn join_bounds(
     context: &RewriteContext<'_>,
     shape: Shape,
@@ -967,22 +993,45 @@ fn join_bounds(
 
 fn join_bounds_inner(
     context: &RewriteContext<'_>,
-    shape: Shape,
+    orig_shape: Shape,
     items: &[ast::GenericBound],
     need_indent: bool,
     force_newline: bool,
 ) -> Option<String> {
     debug_assert!(!items.is_empty());
 
-    let generic_bounds_in_order = is_generic_bounds_in_order(items);
-    let is_bound_extendable = |s: &str, b: &ast::GenericBound| match b {
-        ast::GenericBound::Outlives(..) => true,
-        ast::GenericBound::Trait(..) => last_line_extendable(s),
+    let shape = if need_indent && force_newline {
+        orig_shape
+            .block_indent(context.config.tab_spaces())
+            .with_max_width(context.config)
+    } else {
+        orig_shape
     };
+
+    let combine_comment_span =
+        |span: Option<Span>, has_comment: bool, lhs: &str, rhs: &str| -> Option<String> {
+            match span {
+                Some(span) if has_comment => {
+                    combine_lines_with_missing_comments(context, lhs, rhs, span, shape, true, true)
+                }
+                _ => Some(String::from(lhs) + rhs),
+            }
+        };
+
+    let generic_bounds_in_order = is_generic_bounds_in_order(items);
+    let density = context.config.type_punctuation_density();
+    let placesep = context.config.type_separator();
 
     let result = items.iter().enumerate().try_fold(
         (String::new(), None, false),
         |(strs, prev_trailing_span, prev_extendable), (i, item)| {
+            // Check whether the previous bound had a comment just after it.
+            let prev_has_trailing_comment = match prev_trailing_span {
+                Some(ts) => contains_comment(context.snippet(ts)),
+                _ => false,
+            };
+
+            // Check whether there are any comments written just after this bound.
             let trailing_span = if i < items.len() - 1 {
                 let hi = context
                     .snippet_provider
@@ -992,6 +1041,8 @@ fn join_bounds_inner(
             } else {
                 None
             };
+
+            // Check whether there are any comments written just before this bound.
             let (leading_span, has_leading_comment) = if i > 0 {
                 let lo = context
                     .snippet_provider
@@ -1001,76 +1052,73 @@ fn join_bounds_inner(
 
                 let has_comments = contains_comment(context.snippet(span));
 
-                (Some(mk_sp(lo, item.span().lo())), has_comments)
+                (Some(span), has_comments)
             } else {
                 (None, false)
             };
-            let prev_has_trailing_comment = match prev_trailing_span {
-                Some(ts) => contains_comment(context.snippet(ts)),
-                _ => false,
-            };
 
-            let shape = if need_indent && force_newline {
-                shape
-                    .block_indent(context.config.tab_spaces())
-                    .with_max_width(context.config)
-            } else {
-                shape
-            };
-            let whitespace = if force_newline && (!prev_extendable || !generic_bounds_in_order) {
+            let continue_lastline =
+                !prev_extendable || !generic_bounds_in_order || placesep == SeparatorPlace::Back;
+            let whitespace = if force_newline && continue_lastline {
                 shape
                     .indent
                     .to_string_with_newline(context.config)
                     .to_string()
+            } else if prev_has_trailing_comment && has_leading_comment {
+                String::from("")
             } else {
-                String::from(" ")
-            };
-
-            let joiner = match context.config.type_punctuation_density() {
-                TypeDensity::Compressed => String::from("+"),
-                TypeDensity::Wide => whitespace + "+ ",
-            };
-            let joiner = if has_leading_comment {
-                joiner.trim_end()
-            } else {
-                &joiner
-            };
-            let joiner = if prev_has_trailing_comment {
-                joiner.trim_start()
-            } else {
-                joiner
-            };
-
-            let (extendable, trailing_str) = if i == 0 {
-                let bound_str = item.rewrite(context, shape)?;
-                (is_bound_extendable(&bound_str, item), bound_str)
-            } else {
-                let bound_str = &item.rewrite(context, shape)?;
-                match leading_span {
-                    Some(ls) if has_leading_comment => (
-                        is_bound_extendable(bound_str, item),
-                        combine_strs_with_missing_comments(
-                            context, joiner, bound_str, ls, shape, true,
-                        )?,
-                    ),
-                    _ => (
-                        is_bound_extendable(bound_str, item),
-                        String::from(joiner) + bound_str,
-                    ),
+                match density {
+                    TypeDensity::Wide => String::from(" "),
+                    TypeDensity::Compressed => String::from(""),
                 }
             };
-            match prev_trailing_span {
-                Some(ts) if prev_has_trailing_comment => combine_strs_with_missing_comments(
-                    context,
-                    &strs,
-                    &trailing_str,
-                    ts,
-                    shape,
-                    true,
-                )
-                .map(|v| (v, trailing_span, extendable)),
-                _ => Some((strs + &trailing_str, trailing_span, extendable)),
-            }
+
+            let bound_str = item.rewrite(context, shape)?;
+            let extendable = is_bound_extendable(&bound_str, item);
+
+            let trailing_str = match placesep {
+                SeparatorPlace::Back => {
+                    let joiner = match (i, density, prev_has_trailing_comment) {
+                        (0, _, _) => "",
+                        (_, TypeDensity::Wide, false) => " +",
+                        (_, TypeDensity::Compressed, false) => "+",
+                        (_, _, true) => "+",
+                    };
+
+                    let bound_str = if i == 0 {
+                        bound_str
+                    } else {
+                        whitespace + &bound_str
+                    };
+
+                    combine_comment_span(leading_span, has_leading_comment, joiner, &bound_str)?
+                }
+                SeparatorPlace::Front => {
+                    let joiner = match (i, density, has_leading_comment) {
+                        (0, _, _) => "",
+                        (_, TypeDensity::Wide, false) => "+ ",
+                        (_, TypeDensity::Compressed, false) => "+",
+                        (_, _, true) => "+",
+                    };
+
+                    let result = combine_comment_span(
+                        leading_span,
+                        has_leading_comment,
+                        joiner,
+                        &bound_str,
+                    )?;
+
+                    if i == 0 { result } else { whitespace + &result }
+                }
+            };
+
+            combine_comment_span(
+                prev_trailing_span,
+                prev_has_trailing_comment,
+                &strs,
+                &trailing_str,
+            )
+            .map(|v| (v, trailing_span, extendable))
         },
     )?;
 
@@ -1078,7 +1126,7 @@ fn join_bounds_inner(
         && items.len() > 1
         && (result.0.contains('\n') || result.0.len() > shape.width)
     {
-        join_bounds_inner(context, shape, items, need_indent, true)
+        join_bounds_inner(context, orig_shape, items, need_indent, true)
     } else {
         Some(result.0)
     }

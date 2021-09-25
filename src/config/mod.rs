@@ -102,6 +102,8 @@ create_config! {
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
     binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
         "Where to put a binary operator when a binary expression goes multiline";
+    type_separator: SeparatorPlace, SeparatorPlace::Front, false,
+        "Where to put the operator when a type-level expression goes multiline";
 
     // Misc.
     remove_nested_parens: bool, true, true, "Remove nested parens";
@@ -589,6 +591,7 @@ space_before_colon = false
 space_after_colon = true
 spaces_around_ranges = false
 binop_separator = "Front"
+type_separator = "Front"
 remove_nested_parens = true
 combine_control_expr = true
 overflow_delimited_expr = false
