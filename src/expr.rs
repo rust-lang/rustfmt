@@ -1938,18 +1938,36 @@ pub(crate) fn rewrite_assign_rhs_with_comments<S: Into<String>, R: Rewrite>(
 ) -> Option<String> {
     let lhs = lhs.into();
     let contains_comment = contains_comment(context.snippet(between_span));
-    let shape = if contains_comment {
-        shape.block_left(context.config.tab_spaces())?
-    } else {
-        shape
-    };
-    let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
 
-    if contains_comment {
-        let rhs = rhs.trim_start();
-        combine_strs_with_missing_comments(context, &lhs, rhs, between_span, shape, allow_extend)
-    } else {
-        Some(lhs + &rhs)
+    match (contains_comment, rhs_tactics) {
+        (true, RhsTactics::ForceNextLineWithoutIndent) => {
+            let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
+            let rhs = rhs.trim_start();
+
+            combine_strs_with_missing_comments(
+                context,
+                &lhs,
+                rhs,
+                between_span,
+                shape.block_left(context.config.tab_spaces())?,
+                allow_extend,
+            )
+        }
+        (true, RhsTactics::Default | RhsTactics::AllowOverflow) => {
+            let shape = shape.block_left(context.config.tab_spaces())?;
+            let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_tactics)?;
+            let rhs = rhs.trim_start();
+
+            combine_strs_with_missing_comments(
+                context,
+                &lhs,
+                rhs,
+                between_span,
+                shape,
+                allow_extend,
+            )
+        }
+        (false, _) => rewrite_assign_rhs_with(context, lhs, ex, shape, rhs_tactics),
     }
 }
 
@@ -2014,7 +2032,7 @@ fn shape_from_rhs_tactic(
     match rhs_tactic {
         RhsTactics::ForceNextLineWithoutIndent => shape
             .with_max_width(context.config)
-            .sub_width(shape.indent.width()),
+            .sub_width(shape.indent.block_indent(context.config).width()),
         RhsTactics::Default | RhsTactics::AllowOverflow => {
             Shape::indented(shape.indent.block_indent(context.config), context.config)
                 .sub_width(shape.rhs_overhead(context.config))
