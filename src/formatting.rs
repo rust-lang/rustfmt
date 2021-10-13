@@ -35,6 +35,20 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             return Err(ErrorKind::VersionMismatch);
         }
 
+        if !crate::is_nightly_channel!() {
+            let using_unstalbe_options = self.config.unstable_options().has_unstable_options();
+            let abort_on_unstable_options = self.config.abort_on_unrecognised_options();
+            if using_unstalbe_options && abort_on_unstable_options {
+                return Err(ErrorKind::NightlyOnlyOptions(
+                    self.config.unstable_options().clone(),
+                ));
+            } else if using_unstalbe_options && !abort_on_unstable_options {
+                if let Some(warning) = self.config.unstable_options().warning_message() {
+                    eprintln!("{}", warning);
+                }
+            }
+        }
+
         rustc_span::create_session_if_not_set_then(self.config.edition().into(), |_| {
             if self.config.disable_all_formatting() {
                 // When the input is from stdin, echo back the input.

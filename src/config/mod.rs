@@ -9,6 +9,8 @@ use thiserror::Error;
 
 use crate::config::config_type::ConfigType;
 #[allow(unreachable_pub)]
+pub use crate::config::config_type::UnstableOptions;
+#[allow(unreachable_pub)]
 pub use crate::config::file_lines::{FileLines, FileName, Range};
 #[allow(unreachable_pub)]
 pub use crate::config::lists::*;
@@ -164,6 +166,8 @@ create_config! {
          or they are left with trailing whitespaces";
     ignore: IgnoreList, IgnoreList::default(), false,
         "Skip formatting the specified files and directories";
+    abort_on_unrecognised_options: bool, false, false,
+        "Exit early when using nightly only options on the stable channel";
 
     // Not user-facing
     verbose: Verbosity, Verbosity::Normal, false, "How much to information to emit to the user";
@@ -586,6 +590,59 @@ mod test {
         assert_eq!(s.contains(PRINT_DOCS_PARTIALLY_UNSTABLE_OPTION), true);
     }
 
+    #[stable_only_test]
+    #[test]
+    fn test_get_all_unstable_options_set_in_toml() {
+        use std::collections::HashMap;
+        let toml = r#"
+            reorder_impl_items = true
+        "#;
+        let config = Config::from_toml(toml, Path::new("")).unwrap();
+        let mut expected = HashMap::new();
+        expected.insert("reorder_impl_items", String::from("true"));
+        assert_eq!(config.unstable_options().options, expected);
+    }
+
+    #[stable_only_test]
+    #[test]
+    fn test_warning_message_when_using_unstable_options() {
+        let toml = r#"
+            reorder_impl_items = true
+        "#;
+        let config = Config::from_toml(toml, Path::new("")).unwrap();
+        let warning = "\
+Warning: can't set `reorder_impl_items = true`, unstable features are only available in \
+nightly channel.
+
+Set `abort_on_unrecognised_options = true` to convert this warning into an error
+
+";
+        assert_eq!(
+            warning,
+            config.unstable_options().warning_message().unwrap()
+        )
+    }
+
+    #[stable_only_test]
+    #[test]
+    fn test_abort_message_when_using_unstable_options() {
+        let toml = r#"
+            reorder_impl_items = true
+        "#;
+        let config = Config::from_toml(toml, Path::new("")).unwrap();
+        let abort_message = "\
+Can't set nightly options when using stable rustfmt
+    - `reorder_impl_items = true`
+
+Set `abort_on_unrecognised_options = false` to convert this error into a warning
+
+";
+        assert_eq!(
+            abort_message,
+            config.unstable_options().abort_message().unwrap()
+        )
+    }
+
     #[test]
     fn test_dump_default_config() {
         let default_config = format!(
@@ -663,6 +720,7 @@ hide_parse_errors = false
 error_on_line_overflow = false
 error_on_unformatted = false
 ignore = []
+abort_on_unrecognised_options = false
 emit_mode = "Files"
 make_backup = false
 "#,

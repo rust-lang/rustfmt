@@ -46,7 +46,7 @@ use crate::utils::indent_next_line;
 
 pub use crate::config::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName, NewlineStyle,
-    Range, Verbosity,
+    Range, UnstableOptions, Verbosity,
 };
 
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
@@ -133,6 +133,9 @@ pub enum ErrorKind {
     /// Invalid glob pattern in `ignore` configuration option.
     #[error("Invalid glob pattern found in ignore list: {0}")]
     InvalidGlobPattern(ignore::Error),
+    /// Using unstable, nightly only options on stable rustfmt.
+    #[error("{0}")]
+    NightlyOnlyOptions(UnstableOptions),
 }
 
 impl ErrorKind {

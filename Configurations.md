@@ -17,6 +17,15 @@ To enable unstable options, set `unstable_features = true` in `rustfmt.toml` or 
 
 Below you find a detailed visual guide on all the supported configuration options of rustfmt:
 
+## `abort_on_unrecognised_options`
+
+Exit early when using nightly only options on the stable channel
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#5022](https://github.com/rust-lang/rustfmt/issues/5022))
+
+
 ## `array_width`
 
 Maximum width of an array literal before falling back to vertical formatting.

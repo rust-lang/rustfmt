@@ -144,6 +144,7 @@ fn error_kind_to_snippet_annotation_type(error_kind: &ErrorKind) -> AnnotationTy
         | ErrorKind::LostComment
         | ErrorKind::BadAttr
         | ErrorKind::InvalidGlobPattern(_)
+        | ErrorKind::NightlyOnlyOptions(_)
         | ErrorKind::VersionMismatch => AnnotationType::Error,
         ErrorKind::DeprecatedAttr => AnnotationType::Warning,
     }
