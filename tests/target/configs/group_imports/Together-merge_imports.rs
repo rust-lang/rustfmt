@@ -1,4 +1,4 @@
-// rustfmt-group_imports: Together
+// rustfmt-group_imports: One
 // rustfmt-imports_granularity: Crate
 use super::{
     schema::{Context, Payload},

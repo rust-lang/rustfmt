@@ -113,7 +113,7 @@ pub enum GroupImportsTactic {
     ///  3. `self` / `crate` / `super` imports
     StdExternalCrate,
     /// Discard existing groups, and create a single group for everything
-    Together,
+    One,
 }
 
 #[config_type]

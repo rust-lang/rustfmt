@@ -2011,7 +2011,7 @@ use sit;
 Controls the strategy for how imports are grouped together.
 
 - **Default value**: `Preserve`
-- **Possible values**: `Preserve`, `StdExternalCrate`, `Together`
+- **Possible values**: `Preserve`, `StdExternalCrate`, `One`
 - **Stable**: No
 
 #### `Preserve` (default):
@@ -2057,7 +2057,7 @@ use super::update::convert_publish_payload;
 use crate::models::Event;
 ```
 
-#### `Together`:
+#### `One`:
 
 Discard existing import groups, and create a single group for everything
 
