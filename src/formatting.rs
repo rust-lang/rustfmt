@@ -559,7 +559,7 @@ impl<'a> FormatLines<'a> {
     fn char(&mut self, c: char, kind: FullCodeCharKind) {
         self.newline_count = 0;
         self.line_len += if c == '\t' {
-            self.config.tab_spaces()
+            self.config.tab_spaces() - self.line_len % self.config.tab_spaces()
         } else {
             1
         };
