@@ -436,6 +436,9 @@ fn rewrite_match_body(
             };
 
         let block_sep = match context.config.control_brace_style() {
+            ControlBraceStyle::AlwaysNextLine if !context.config.match_arm_blocks() => {
+                format!("{}", body_prefix)
+            }
             ControlBraceStyle::AlwaysNextLine => format!("{}{}", alt_block_sep, body_prefix),
             _ if body_prefix.is_empty() => "".to_owned(),
             _ if forbid_same_line || !arrow_comment.is_empty() => {
