@@ -1,4 +1,5 @@
 use super::*;
+use std::path::PathBuf;
 
 mod message_format;
 mod targets;
@@ -16,6 +17,7 @@ fn default_options() {
     assert_eq!(false, o.format_all);
     assert_eq!(None, o.manifest_path);
     assert_eq!(None, o.message_format);
+    assert_eq!(None, o.src_file);
 }
 
 #[test]
@@ -27,6 +29,8 @@ fn good_options() {
         "p1",
         "-p",
         "p2",
+        "-s",
+        "file.rs",
         "--message-format",
         "short",
         "--check",
@@ -39,6 +43,7 @@ fn good_options() {
     assert_eq!(false, o.version);
     assert_eq!(true, o.check);
     assert_eq!(vec!["p1", "p2"], o.packages);
+    assert_eq!(Some(PathBuf::from("file.rs")), o.src_file);
     assert_eq!(vec!["--edition", "2018"], o.rustfmt_options);
     assert_eq!(false, o.format_all);
     assert_eq!(Some(String::from("short")), o.message_format);
@@ -91,6 +96,25 @@ fn multiple_packages_one_by_one() {
 }
 
 #[test]
+fn cant_list_more_than_one_source_file() {
+    assert!(
+        Opts::command()
+            .try_get_matches_from(&["test", "-s", "src/a.rs", "--src-file", "src/b.rs"])
+            .is_err()
+    );
+    assert!(
+        !Opts::command()
+            .try_get_matches_from(&["test", "-s", "src/a.rs"])
+            .is_err()
+    );
+    assert!(
+        !Opts::command()
+            .try_get_matches_from(&["test", "--src-file", "src/b.rs"])
+            .is_err()
+    );
+}
+
+#[test]
 fn multiple_packages_grouped() {
     let o = Opts::parse_from(&[
         "test",
@@ -136,6 +160,42 @@ fn empty_packages_4() {
     assert!(
         Opts::command()
             .try_get_matches_from(&["test", "-p", "--check"])
+            .is_err()
+    );
+}
+
+#[test]
+fn empty_source_files_1() {
+    assert!(
+        Opts::command()
+            .try_get_matches_from(&["test", "-s"])
+            .is_err()
+    );
+}
+
+#[test]
+fn empty_source_files_2() {
+    assert!(
+        Opts::command()
+            .try_get_matches_from(&["test", "-s", "--", "--check"])
+            .is_err()
+    );
+}
+
+#[test]
+fn empty_source_files_3() {
+    assert!(
+        Opts::command()
+            .try_get_matches_from(&["test", "-s", "--verbose"])
+            .is_err()
+    );
+}
+
+#[test]
+fn empty_source_files_4() {
+    assert!(
+        Opts::command()
+            .try_get_matches_from(&["test", "-s", "--check"])
             .is_err()
     );
 }

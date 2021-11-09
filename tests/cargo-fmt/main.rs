@@ -96,3 +96,42 @@ fn cargo_fmt_out_of_line_test_modules() {
         assert!(stdout.contains(&format!("Diff in {}", path.display())))
     }
 }
+
+#[test]
+fn cannot_pass_rust_files_to_rustfmt_through_caro_fmt() {
+    let (_, stderr) = cargo_fmt(&["--", "src/main.rs"]);
+    assert!(stderr.starts_with(
+        "cannot pass rust files to rustfmt through cargo-fmt. Use '--src-file' instead"
+    ))
+}
+
+#[test]
+fn cannot_pass_edition_to_rustfmt_through_caro_fmt() {
+    let (_, stderr) = cargo_fmt(&["--", "--edition", "2021"]);
+    assert!(stderr.starts_with("cannot pass '--edition' to rustfmt through cargo-fmt"))
+}
+
+#[test]
+fn specify_source_files_when_running_cargo_fmt() {
+    let path = "tests/cargo-fmt/source/workspaces/path-dep-above/e/src/main.rs";
+    // test that we can run cargo-fmt on a single src file
+    assert_that!(&["-v", "--check", "-s", path], contains(path));
+}
+
+#[test]
+fn specify_source_files_in_a_workspace_when_running_cargo_fmt() {
+    let path = "tests/cargo-fmt/source/workspaces/path-dep-above/ws/a/src/main.rs";
+    assert_that!(&["-v", "--check", "-s", path], contains(path));
+}
+
+#[test]
+fn formatting_source_files_and_packages_at_the_same_time_is_not_supported() {
+    let (_, stderr) = cargo_fmt(&["--check", "-s", "src/main.rs", "-p", "p1"]);
+    assert!(stderr.starts_with("cannot format source files and packages at the same time"))
+}
+
+#[test]
+fn formatting_source_files_and_using_package_related_arguments_is_not_supported() {
+    let (_, stderr) = cargo_fmt(&["--check", "--all", "-s", "src/main.rs"]);
+    assert!(stderr.starts_with("cannot format all packages when specifying source files"))
+}
