@@ -282,7 +282,7 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
     // Find the position in input for breaking the string
     if line_end.is_empty()
         && trim_end
-        && !is_whitespace(input[max_width_index_in_input - 1])
+        && !is_whitespace(input[max_width_index_in_input.checked_sub(1).unwrap_or(0)])
         && is_whitespace(input[max_width_index_in_input])
     {
         // At a breaking point already
