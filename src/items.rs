@@ -1521,10 +1521,7 @@ pub(crate) fn rewrite_type_alias<'a, 'b>(
     // https://rustc-dev-guide.rust-lang.org/opaque-types-type-alias-impl-trait.html
     // https://github.com/rust-dev-tools/fmt-rfcs/blob/master/guide/items.md#type-aliases
     match (visitor_kind, ty_opt) {
-        (Item(_), None) => {
-            let op_ty = OpaqueType { bounds };
-            rewrite_ty(rw_info, Some(bounds), Some(&op_ty), vis)
-        }
+        (Item(_), None) => rewrite_ty::<OpaqueType<'_>>(rw_info, Some(bounds), None, vis),
         (Item(_), Some(ty)) => rewrite_ty(rw_info, Some(bounds), Some(&*ty), vis),
         (AssocImplItem(_), _) => {
             let result = if let Some(ast::Ty {
