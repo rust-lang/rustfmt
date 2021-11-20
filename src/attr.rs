@@ -199,16 +199,19 @@ fn format_derive(
 
 /// Returns the first group of attributes that fills the given predicate.
 /// We consider two doc comments are in different group if they are separated by normal comments.
-fn take_while_with_pred<'a, P>(
+fn take_while_with_pred<'a, P, N>(
     context: &RewriteContext<'_>,
     attrs: &'a [ast::Attribute],
     pred: P,
-) -> &'a [ast::Attribute]
+    is_next_significant: N,
+) -> (&'a [ast::Attribute], bool)
 where
     P: Fn(&ast::Attribute) -> bool,
+    N: Fn(&ast::Attribute, &ast::Attribute) -> bool,
 {
     let mut len = 0;
     let mut iter = attrs.iter().peekable();
+    let mut next_attr_significant = false;
 
     while let Some(attr) = iter.next() {
         if pred(attr) {
@@ -217,6 +220,7 @@ where
             break;
         }
         if let Some(next_attr) = iter.peek() {
+            next_attr_significant = is_next_significant(attr, next_attr);
             // Extract comments between two attributes.
             let span_between_attr = mk_sp(attr.span.hi(), next_attr.span.lo());
             let snippet = context.snippet(span_between_attr);
@@ -226,7 +230,7 @@ where
         }
     }
 
-    &attrs[..len]
+    (&attrs[..len], next_attr_significant)
 }
 
 /// Rewrite the any doc comments which come before any other attributes.
@@ -239,7 +243,20 @@ fn rewrite_initial_doc_comments(
         return Some((0, None));
     }
     // Rewrite doc comments
-    let sugared_docs = take_while_with_pred(context, attrs, |a| a.is_doc_comment());
+    // We want to treat trailing empty comments as significant if they precede a doc attribute
+    // see https://github.com/rust-lang/rustfmt/issues/5073
+    let (sugared_docs, keep_empty_trailing_comment) = take_while_with_pred(
+        context,
+        attrs,
+        |a| a.is_doc_comment(),
+        |curr_attr, next_attr| {
+            let is_curr_doc_comment = curr_attr.is_doc_comment();
+            let symbol = next_attr.name_or_empty();
+            let is_next_doc_attr = next_attr.has_name(symbol) && symbol.as_str() == "doc";
+            let next_immediately_after_current = (next_attr.span.lo() - curr_attr.span.hi()).0 == 1;
+            is_curr_doc_comment && is_next_doc_attr && next_immediately_after_current
+        },
+    );
     if !sugared_docs.is_empty() {
         let snippet = sugared_docs
             .iter()
@@ -252,6 +269,7 @@ fn rewrite_initial_doc_comments(
                 &snippet,
                 shape.comment(context.config),
                 context.config,
+                keep_empty_trailing_comment,
             )?),
         ));
     }
@@ -333,7 +351,12 @@ impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let snippet = context.snippet(self.span);
         if self.is_doc_comment() {
-            rewrite_doc_comment(snippet, shape.comment(context.config), context.config)
+            rewrite_doc_comment(
+                snippet,
+                shape.comment(context.config),
+                context.config,
+                false,
+            )
         } else {
             let should_skip = self
                 .ident()
@@ -362,6 +385,7 @@ impl Rewrite for ast::Attribute {
                             &doc_comment,
                             shape.comment(context.config),
                             context.config,
+                            false,
                         );
                     }
                 }
@@ -432,7 +456,7 @@ impl Rewrite for [ast::Attribute] {
 
             // Handle derives if we will merge them.
             if context.config.merge_derives() && is_derive(&attrs[0]) {
-                let derives = take_while_with_pred(context, attrs, is_derive);
+                let (derives, _) = take_while_with_pred(context, attrs, is_derive, |_, _| false);
                 let derive_str = format_derive(derives, shape, context)?;
                 result.push_str(&derive_str);
 
