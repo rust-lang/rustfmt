@@ -1701,7 +1701,7 @@ How imports should be grouped into `use` statements. Imports will be merged or s
 
 - **Default value**: `Preserve`
 - **Possible values**: `Preserve`, `Crate`, `Module`, `Item`, `One`
-- **Stable**: No (tracking issue: [#5082](https://github.com/rust-lang/rustfmt/issues/5082))
+- **Stable**: No (tracking issue: [#4991](https://github.com/rust-lang/rustfmt/issues/4991))
 
 #### `Preserve` (default):
 
