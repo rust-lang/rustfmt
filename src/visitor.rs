@@ -988,6 +988,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             config: self.config,
             inside_macro: Rc::new(Cell::new(false)),
             use_block: Cell::new(false),
+            attrs_end_with_doc_comment: Cell::new(false),
             is_if_else_block: Cell::new(false),
             force_one_line_chain: Cell::new(false),
             snippet_provider: self.snippet_provider,

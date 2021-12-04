@@ -31,6 +31,9 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) inside_macro: Rc<Cell<bool>>,
     // Force block indent style even if we are using visual indent style.
     pub(crate) use_block: Cell<bool>,
+    // When rewriting generic params, an extra newline should be put
+    // if the attributes end with a doc comment
+    pub(crate) attrs_end_with_doc_comment: Cell<bool>,
     // When `is_if_else_block` is true, unindent the comment on top
     // of the `else` or `else if`.
     pub(crate) is_if_else_block: Cell<bool>,

@@ -426,6 +426,9 @@ impl Rewrite for [ast::Attribute] {
                 }
 
                 attrs = &attrs[doc_comment_len..];
+                if attrs.is_empty() {
+                    context.attrs_end_with_doc_comment.set(true);
+                }
 
                 continue;
             }
