@@ -2766,7 +2766,7 @@ fn main() {
 
 ```rust
 fn main() {
-    let lorem = ipsum.map(|dolor| dolor.sit())?;A
+    let lorem = ipsum.map(|dolor| dolor.sit())?;
 }
 ```
 
