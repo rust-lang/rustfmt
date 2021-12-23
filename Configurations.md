@@ -2606,6 +2606,7 @@ fn main() {
     let y = 2;
     let z = 3;
     let a = Foo { x, y, z };
+    let b = Foo { x, y, z };
 }
 ```
 
@@ -2759,7 +2760,7 @@ Replace uses of the try! macro by the ? shorthand
 fn main() {
     let lorem = ipsum.map(|dolor| dolor.sit())?;
 
-    let lorem = try!(ipsum.map(|dolor| dolor.sit()));
+    let try_wrapped = try!(ipsum.map(|dolor| dolor.sit()));
 }
 ```
 
@@ -2768,6 +2769,8 @@ fn main() {
 ```rust
 fn main() {
     let lorem = ipsum.map(|dolor| dolor.sit())?;
+
+    let try_wrapped = ipsum.map(|dolor| dolor.sit())?;
 }
 ```
 
