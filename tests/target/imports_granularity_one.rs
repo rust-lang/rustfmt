@@ -10,7 +10,8 @@ use {
 };
 
 use {
-    a::{self as x, aa, ab},
+    a as x,
+    a::{aa, ab},
     b::ba,
 };
 

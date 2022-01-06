@@ -622,7 +622,7 @@ impl UseTree {
     fn merge(&mut self, other: &UseTree, merge_by: SharedPrefix) {
         let mut prefix = 0;
         for (a, b) in self.path.iter().zip(other.path.iter()) {
-            if a.equal_except_alias(b) {
+            if *a == *b {
                 prefix += 1;
             } else {
                 break;
@@ -700,7 +700,7 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: 
                 tree.path
                     .iter()
                     .zip(&use_tree.path)
-                    .take_while(|(a, b)| a.equal_except_alias(b))
+                    .take_while(|(a, b)| *a == *b)
                     .count()
             } else {
                 0

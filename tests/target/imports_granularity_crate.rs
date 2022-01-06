@@ -24,5 +24,11 @@ use h::a;
 use i::a::{self};
 use j::a::{self};
 
+use a::{c as cc, c};
+
+use a::{c as c1, c as c2};
+
+use a::{c, c as c1, c as c2};
+
 use k::{a, b, c, d};
 use l::{a, b, c, d};

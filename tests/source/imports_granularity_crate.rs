@@ -33,5 +33,11 @@ use h::{a};
 use i::a::{self};
 use j::{a::{self}};
 
+use a::{c as cc, c};
+
+use a::{c as c1, c as c2};
+
+use a::{c, c as c1, c as c2};
+
 use {k::{a, b}, l::{a, b}};
 use {k::{c, d}, l::{c, d}};
