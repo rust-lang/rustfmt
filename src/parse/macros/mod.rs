@@ -1,5 +1,5 @@
 use rustc_ast::token::{DelimToken, TokenKind};
-use rustc_ast::tokenstream::TokenStream;
+use rustc_ast::tokenstream::{TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_parse::parser::{ForceCollect, Parser};
 use rustc_parse::{stream_to_parser, MACRO_ARGUMENTS};
@@ -92,6 +92,15 @@ fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
         }
     }
     None
+}
+
+/// Check if the token stream ends with a trailing comma
+pub(crate) fn token_stream_ends_with_comma(tokens: TokenStream) -> bool {
+    if let Some(TokenTree::Token(token)) = tokens.into_trees().last() {
+        matches!(token.kind, TokenKind::Comma)
+    } else {
+        false
+    }
 }
 
 pub(crate) fn parse_macro_args(
