@@ -1374,7 +1374,10 @@ fn format_empty_struct_or_tuple(
         result.push_str(&offset.to_string_with_newline(context.config))
     }
     result.push_str(opener);
-    match rewrite_missing_comment(span, Shape::indented(offset, context.config), context) {
+
+    // indented shape for proper indenting of multi-line comments
+    let shape = Shape::indented(offset.block_indent(context.config), context.config);
+    match rewrite_missing_comment(span, shape, context) {
         Some(ref s) if s.is_empty() => (),
         Some(ref s) => {
             if !is_single_line(s) || first_line_contains_single_line_comment(s) {
