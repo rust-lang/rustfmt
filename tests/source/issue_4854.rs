@@ -50,6 +50,12 @@ format
 */
 );
 
+struct Struct9 { /* bar */ }
+
+struct Struct10 { /* bar
+baz
+*/ }
+
 mod module {
     struct Struct {
         // Multiline comment
@@ -102,4 +108,6 @@ Invalid
 format
 */
     );
+
+    struct Struct9 { /* bar */ }
 }
