@@ -26,32 +26,37 @@ struct Struct5 {
     /*
     Comment block
     with many lines.
-    */}
+    */
+}
 
 struct Struct6(
     /*
     Comment block
     with many lines.
-    */);
+    */
+);
 
 struct Struct7 {
     /*
     Invalid
     format
-    */}
+    */
+}
 
 struct Struct8(
     /*
     Invalid
     format
-    */);
+    */
+);
 
 struct Struct9 {/* bar */}
 
 struct Struct10 {
     /* bar
     baz
-    */}
+    */
+}
 
 mod module {
     struct Struct {
@@ -82,25 +87,29 @@ mod module {
         /*
         Comment block
         with many lines.
-         */}
+         */
+    }
 
     struct Struct6(
         /*
         Comment block
         with many lines.
-        */);
+        */
+    );
 
     struct Struct7 {
         /*
         Invalid
         format
-        */}
+        */
+    }
 
     struct Struct8(
         /*
         Invalid
         format
-        */);
+        */
+    );
 
     struct Struct9 {/* bar */}
 }
