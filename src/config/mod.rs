@@ -255,10 +255,8 @@ impl Config {
             current = fs::canonicalize(current)?;
 
             loop {
-                match get_toml_path(&current) {
-                    Ok(Some(path)) => return Ok(Some(path)),
-                    Err(e) => return Err(e),
-                    _ => (),
+                if let Ok(Some(path)) = get_toml_path(&current) {
+                    return Ok(Some(path));
                 }
 
                 // If the current directory has no parent, we're done searching.
@@ -269,7 +267,7 @@ impl Config {
 
             // If nothing was found, check in the home directory.
             if let Some(home_dir) = dirs::home_dir() {
-                if let Some(path) = get_toml_path(&home_dir)? {
+                if let Ok(Some(path)) = get_toml_path(&home_dir) {
                     return Ok(Some(path));
                 }
             }
@@ -277,7 +275,7 @@ impl Config {
             // If none was found ther either, check in the user's configuration directory.
             if let Some(mut config_dir) = dirs::config_dir() {
                 config_dir.push("rustfmt");
-                if let Some(path) = get_toml_path(&config_dir)? {
+                if let Ok(Some(path)) = get_toml_path(&config_dir) {
                     return Ok(Some(path));
                 }
             }
