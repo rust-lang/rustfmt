@@ -420,7 +420,10 @@ fn rewrite_match_body(
         let indent_str = shape.indent.to_string_with_newline(context.config);
         let (body_prefix, body_suffix) =
             if context.config.match_arm_blocks() && !context.inside_macro() {
-                let comma = if context.config.match_block_trailing_comma() {
+                let comma_never = context.config.trailing_comma() == SeparatorTactic::Never;
+                let comma = if is_last && comma_never {
+                    ""
+                } else if context.config.match_block_trailing_comma() {
                     ","
                 } else {
                     ""
