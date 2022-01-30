@@ -1,8 +1,7 @@
 // rustfmt-wrap_comments: true
 
 /// A comment to test special unicode characters on boundaries
-/// 是，是，是，是，是，是，是，是，是，是，是，是  it should break right here
-/// this goes to the next line
+/// 是，是，是，是，是，是，是，是，是，是，是，是  it should break right here this goes to the next line
 fn main() {
     if xxx {
         let xxx = xxx
