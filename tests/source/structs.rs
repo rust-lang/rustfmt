@@ -305,3 +305,21 @@ struct MyTuple(
     // TODO note
     u64,
 );
+
+// #5215
+struct MyTuple(
+    #[cfg(unix)] // some comment
+    u64,
+    #[cfg(not(unix))] /*block comment */
+    u32,
+);
+
+// #5215
+struct MyTuple(
+    #[cfg(unix)]
+    // some comment
+    u64,
+    #[cfg(not(unix))]
+    /*block comment */
+    u32,
+);
