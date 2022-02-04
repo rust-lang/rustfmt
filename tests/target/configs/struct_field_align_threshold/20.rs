@@ -43,7 +43,7 @@ pub struct Foo {
     #[AnAttribute]
     g:     SomeOtherType,
     /// A doc comment on a field
-    h:     AThirdType,
+    h: AThirdType,
     pub i: TypeForPublicField,
 }
 

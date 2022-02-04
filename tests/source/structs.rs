@@ -296,3 +296,12 @@ struct Test {
 // #2818
 struct Paren((i32)) where i32: Trait;
 struct Parens((i32, i32)) where i32: Trait;
+
+// #5215
+struct MyTuple(
+    /// Doc Comments
+    /* TODO note to add more to Doc Comments */ u32,
+    /// Doc Comments
+    // TODO note
+    u64,
+);
