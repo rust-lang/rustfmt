@@ -106,3 +106,13 @@ fn inline_config() {
             && contains("format_strings = true")
     );
 }
+
+#[test]
+fn rustfmt_help() {
+    let args = [
+        "--help",
+    ];
+    let (stdout, _) = rustfmt(&args);
+    assert!(stdout.contains(&format!("Format Rust code")));
+    assert!(stdout.contains(&format!("usage: rustfmt [options] <file>...")));
+}
