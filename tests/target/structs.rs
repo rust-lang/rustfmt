@@ -356,31 +356,3 @@ where
 struct Parens((i32, i32))
 where
     i32: Trait;
-
-// #5215
-struct MyTuple(
-    /// Doc Comments
-    // TODO note to add more to Doc Comments
-    u32,
-    /// Doc Comments
-    // TODO note
-    u64,
-);
-
-// #5215
-struct MyTuple(
-    #[cfg(unix)] // some comment
-    u64,
-    #[cfg(not(unix))] // block comment
-    u32,
-);
-
-// #5215
-struct MyTuple(
-    #[cfg(unix)]
-    // some comment
-    u64,
-    #[cfg(not(unix))]
-    // block comment
-    u32,
-);
