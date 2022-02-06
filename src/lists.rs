@@ -5,9 +5,7 @@ use std::iter::Peekable;
 
 use rustc_span::BytePos;
 
-use crate::comment::{
-    comment_style, find_comment_end, rewrite_comment, CommentStyle, FindUncommented,
-};
+use crate::comment::{find_comment_end, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
 use crate::config::{Config, IndentStyle};
 use crate::rewrite::RewriteContext;
@@ -360,15 +358,7 @@ where
         }
 
         // Pre-comments
-        let pre_comment = item.pre_comment.as_ref().and_then(|comment| {
-            match comment_style(comment, false) {
-                // FIXME: the span of a const generic param should not include
-                // its document comments.
-                CommentStyle::DoubleBullet | CommentStyle::TripleSlash | CommentStyle::Doc => None,
-                _ => Some(comment),
-            }
-        });
-        if let Some(ref comment) = pre_comment {
+        if let Some(ref comment) = item.pre_comment {
             // Block style in non-vertical mode.
             let block_mode = tactic == DefinitiveListTactic::Horizontal;
             // Width restriction is only relevant in vertical mode.
