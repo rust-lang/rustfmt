@@ -694,7 +694,7 @@ fn idempotent_check(
 ) -> Result<FormatReport, IdempotentCheckError> {
     let sig_comments = read_significant_comments(filename);
     let config = if let Some(ref config_file_path) = opt_config {
-        Config::from_toml_path(config_file_path).expect("`rustfmt.toml` not found")
+        Config::from_toml_path(Some(config_file_path), None).expect("`rustfmt.toml` not found")
     } else {
         read_config(filename)
     };
@@ -737,7 +737,8 @@ fn get_config(config_file: Option<&Path>) -> Config {
         .read_to_string(&mut def_config)
         .expect("Couldn't read config");
 
-    Config::from_toml(&def_config, Path::new("tests/config/")).expect("invalid TOML")
+    Config::from_toml(Some(&def_config), Some(Path::new("tests/config/")), None)
+        .expect("invalid TOML")
 }
 
 // Reads significant comments of the form: `// rustfmt-key: value` into a hash map.

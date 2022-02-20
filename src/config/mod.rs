@@ -318,7 +318,7 @@ pub fn load_config<O: CliOptions>(
         None => None,
     };
 
-    if let Some(file_path) = file_path {
+    let result = if let Some(file_path) = file_path {
         // Search for matching configs for this path
         let (mut rustfmt_path, cargo_path) = resolve_config_files(file_path)?;
         if let Some(over_ride) = over_ride {
@@ -331,7 +331,14 @@ pub fn load_config<O: CliOptions>(
         Config::from_toml_path(Some(&over_ride), None).map(|p| (p, Some(over_ride), None))
     } else {
         Ok((Config::default(), None, None))
-    }
+    };
+
+    result.map(|(mut c, rustfmt_path, cargo_path)| {
+        if let Some(options) = options {
+            options.apply_to(&mut c);
+        }
+        (c, rustfmt_path, cargo_path)
+    })
 }
 
 // Search for "best" rustfmt config and cargo config files, in that order.
@@ -451,7 +458,8 @@ fn override_edition(cargo_toml: &str, config: &mut Config) -> Result<(), String>
         .as_table()
         .ok_or_else(|| String::from("Parsed config was not table"))?;
     if let Some(package) = table_cargo.get("package") {
-        let table_package = package.as_table()
+        let table_package = package
+            .as_table()
             .ok_or("Warning: Cargo.toml package is not a table")?;
         if let Some(edition) = table_package.get("edition") {
             let edition_str = edition
