@@ -57,7 +57,7 @@ fn get_files(input: &str) -> Vec<&str> {
 }
 
 fn fmt_files(files: &[&str]) -> i32 {
-    let (config, _) =
+    let (config, _, _) =
         load_config::<NullOptions>(Some(Path::new(".")), None).expect("couldn't load config");
 
     let mut exit_code = 0;

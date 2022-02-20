@@ -42,8 +42,12 @@ mod test {
     #[nightly_only_test]
     #[test]
     fn test_ignore_path_set() {
-        let config =
-            Config::from_toml(r#"ignore = ["foo.rs", "bar_dir/*"]"#, Path::new("")).unwrap();
+        let config = Config::from_toml(
+            Some(r#"ignore = ["foo.rs", "bar_dir/*"]"#),
+            Some(Path::new("")),
+            None,
+        )
+        .unwrap();
         let ignore_path_set = IgnorePathSet::from_ignore_list(&config.ignore()).unwrap();
 
         assert!(ignore_path_set.is_match(&FileName::Real(PathBuf::from("src/foo.rs"))));

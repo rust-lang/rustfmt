@@ -232,7 +232,7 @@ fn execute(opts: &Options) -> Result<i32> {
             let file = PathBuf::from(path);
             let file = file.canonicalize().unwrap_or(file);
 
-            let (config, _) = load_config(Some(file.parent().unwrap()), Some(options))?;
+            let (config, _, _) = load_config(Some(file.parent().unwrap()), Some(options))?;
             let toml = config.all_options().to_toml()?;
             io::stdout().write_all(toml.as_bytes())?;
 
@@ -248,7 +248,7 @@ fn execute(opts: &Options) -> Result<i32> {
 
 fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
     // try to read config from local directory
-    let (mut config, _) = load_config(Some(Path::new(".")), Some(options.clone()))?;
+    let (mut config, _, _) = load_config(Some(Path::new(".")), Some(options.clone()))?;
 
     if options.check {
         config.set().emit_mode(EmitMode::Diff);
@@ -294,11 +294,14 @@ fn format(
     options: &GetOptsOptions,
 ) -> Result<i32> {
     options.verify_file_lines(&files);
-    let (config, config_path) = load_config(None, Some(options.clone()))?;
+    let (config, config_path, cargo_path) = load_config(None, Some(options.clone()))?;
 
     if config.verbose() == Verbosity::Verbose {
         if let Some(path) = config_path.as_ref() {
             println!("Using rustfmt config file {}", path.display());
+        }
+        if let Some(path) = cargo_path.as_ref() {
+            println!("Using cargo config file {}", path.display());
         }
     }
 
@@ -315,12 +318,19 @@ fn format(
         } else {
             // Check the file directory if the config-path could not be read or not provided
             if config_path.is_none() {
-                let (local_config, config_path) =
+                let (local_config, config_path, cargo_path) =
                     load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
                 if local_config.verbose() == Verbosity::Verbose {
                     if let Some(path) = config_path {
                         println!(
                             "Using rustfmt config file {} for {}",
+                            path.display(),
+                            file.display()
+                        );
+                    }
+                    if let Some(path) = cargo_path {
+                        println!(
+                            "Using cargo config file {} for {}",
                             path.display(),
                             file.display()
                         );

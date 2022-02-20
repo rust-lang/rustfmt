@@ -344,7 +344,9 @@ mod tests {
         }
 
         fn get_ignore_list(config: &str) -> IgnoreList {
-            Config::from_toml(config, Path::new("")).unwrap().ignore()
+            Config::from_toml(Some(config), Some(Path::new("")), None)
+                .unwrap()
+                .ignore()
         }
 
         #[test]

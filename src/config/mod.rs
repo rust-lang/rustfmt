@@ -217,162 +217,250 @@ impl Config {
         true
     }
 
-    /// Constructs a `Config` from the toml file specified at `file_path`.
-    ///
-    /// This method only looks at the provided path, for a method that
-    /// searches parents for a `rustfmt.toml` see `from_resolved_toml_path`.
+    /// Constructs a `Config` from the provided toml file paths.
     ///
     /// Returns a `Config` if the config could be read and parsed from
-    /// the file, otherwise errors.
-    pub(super) fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
-        let mut file = File::open(&file_path)?;
-        let mut toml = String::new();
-        file.read_to_string(&mut toml)?;
-        Config::from_toml(&toml, file_path.parent().unwrap())
-            .map_err(|err| Error::new(ErrorKind::InvalidData, err))
-    }
-
-    /// Resolves the config for input in `dir`.
-    ///
-    /// Searches for `rustfmt.toml` beginning with `dir`, and
-    /// recursively checking parents of `dir` if no config file is found.
-    /// If no config file exists in `dir` or in any parent, a
-    /// default `Config` will be returned (and the returned path will be empty).
-    ///
-    /// Returns the `Config` to use, and the path of the project file if there was
-    /// one.
-    pub(super) fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<PathBuf>), Error> {
-        /// Try to find a project file in the given directory and its parents.
-        /// Returns the path of a the nearest project file if one exists,
-        /// or `None` if no project file was found.
-        fn resolve_project_file(dir: &Path) -> Result<Option<PathBuf>, Error> {
-            let mut current = if dir.is_relative() {
-                env::current_dir()?.join(dir)
-            } else {
-                dir.to_path_buf()
-            };
-
-            current = fs::canonicalize(current)?;
-
-            loop {
-                match get_toml_path(&current) {
-                    Ok(Some(path)) => return Ok(Some(path)),
-                    Err(e) => return Err(e),
-                    _ => (),
-                }
-
-                // If the current directory has no parent, we're done searching.
-                if !current.pop() {
-                    break;
-                }
-            }
-
-            // If nothing was found, check in the home directory.
-            if let Some(home_dir) = dirs::home_dir() {
-                if let Some(path) = get_toml_path(&home_dir)? {
-                    return Ok(Some(path));
-                }
-            }
-
-            // If none was found ther either, check in the user's configuration directory.
-            if let Some(mut config_dir) = dirs::config_dir() {
-                config_dir.push("rustfmt");
-                if let Some(path) = get_toml_path(&config_dir)? {
-                    return Ok(Some(path));
-                }
-            }
-
-            Ok(None)
+    /// the files, otherwise errors.
+    pub(super) fn from_toml_path(
+        rustfmt_path: Option<&PathBuf>,
+        cargo_path: Option<&PathBuf>,
+    ) -> Result<Config, Error> {
+        let mut rustfmt_toml = None;
+        if let Some(rustfmt_path) = rustfmt_path {
+            let mut file = File::open(&rustfmt_path)?;
+            let mut toml = String::new();
+            file.read_to_string(&mut toml)?;
+            rustfmt_toml = Some(toml);
         }
 
-        match resolve_project_file(dir)? {
-            None => Ok((Config::default(), None)),
-            Some(path) => Config::from_toml_path(&path).map(|config| (config, Some(path))),
+        let mut cargo_toml = None;
+        if let Some(cargo_path) = cargo_path {
+            let mut file = File::open(&cargo_path)?;
+            let mut toml = String::new();
+            file.read_to_string(&mut toml)?;
+            cargo_toml = Some(toml);
         }
+
+        Config::from_toml(
+            rustfmt_toml.as_ref().map(|s| s.as_str()),
+            rustfmt_path.map(|p| p.parent().unwrap()),
+            cargo_toml.as_ref().map(|s| s.as_str()),
+        )
+        .map_err(|err| Error::new(ErrorKind::InvalidData, err))
     }
 
-    pub(crate) fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
-        let parsed: ::toml::Value = toml
-            .parse()
-            .map_err(|e| format!("Could not parse TOML: {}", e))?;
+    pub(crate) fn from_toml(
+        rustfmt_toml: Option<&str>,
+        rustfmt_toml_dir: Option<&Path>,
+        cargo_toml: Option<&str>,
+    ) -> Result<Config, String> {
         let mut err = String::new();
-        let table = parsed
-            .as_table()
-            .ok_or_else(|| String::from("Parsed config was not table"))?;
-        for key in table.keys() {
-            if !Config::is_valid_name(key) {
-                let msg = &format!("Warning: Unknown configuration option `{}`\n", key);
-                err.push_str(msg)
-            }
-        }
-        match parsed.try_into() {
-            Ok(parsed_config) => {
-                if !err.is_empty() {
-                    eprint!("{}", err);
+
+        let mut config = if let Some(toml) = rustfmt_toml {
+            // Parse rustfmt.toml string
+            let parsed: ::toml::Value = toml
+                .parse()
+                .map_err(|e| format!("Could not parse TOML: {}", e))?;
+
+            // Collect warnings for unknown fields
+            let table = parsed
+                .as_table()
+                .ok_or_else(|| String::from("Parsed config was not table"))?;
+            for key in table.keys() {
+                if !Config::is_valid_name(key) {
+                    let msg = &format!("Warning: Unknown configuration option `{}`\n", key);
+                    err.push_str(msg)
                 }
-                Ok(Config::default().fill_from_parsed_config(parsed_config, dir))
             }
-            Err(e) => {
+
+            // Map into config object
+            let parsed_config = parsed.try_into().map_err(|e| {
                 err.push_str("Error: Decoding config file failed:\n");
                 err.push_str(format!("{}\n", e).as_str());
                 err.push_str("Please check your config file.");
-                Err(err)
+                err.to_string()
+            })?;
+
+            Config::default().fill_from_parsed_config(parsed_config, rustfmt_toml_dir.unwrap())
+        } else {
+            Config::default()
+        };
+
+        // Fetch 'edition' from Cargo.toml if not specified by rustfmt.toml
+        if !config.was_set().edition() {
+            if let Some(cargo_toml) = cargo_toml {
+                if let Err(e) = override_edition(cargo_toml, &mut config) {
+                    err.push_str(&e);
+                }
             }
         }
+
+        // Log warnings
+        if !err.is_empty() {
+            eprint!("{}", err);
+        }
+
+        Ok(config)
     }
 }
 
 /// Loads a config by checking the client-supplied options and if appropriate, the
 /// file system (including searching the file system for overrides).
+///
+/// Returns the loaded config along with the paths to the rustfmt and/or cargo config
+/// files that were used to create it, if any.
 pub fn load_config<O: CliOptions>(
     file_path: Option<&Path>,
     options: Option<O>,
-) -> Result<(Config, Option<PathBuf>), Error> {
+) -> Result<(Config, Option<PathBuf>, Option<PathBuf>), Error> {
     let over_ride = match options {
         Some(ref opts) => config_path(opts)?,
         None => None,
     };
 
-    let result = if let Some(over_ride) = over_ride {
-        Config::from_toml_path(over_ride.as_ref()).map(|p| (p, Some(over_ride.to_owned())))
-    } else if let Some(file_path) = file_path {
-        Config::from_resolved_toml_path(file_path)
+    if let Some(file_path) = file_path {
+        // Search for matching configs for this path
+        let (mut rustfmt_path, cargo_path) = resolve_config_files(file_path)?;
+        if let Some(over_ride) = over_ride {
+            // Use specified config
+            rustfmt_path = Some(over_ride);
+        }
+        Config::from_toml_path(rustfmt_path.as_ref(), cargo_path.as_ref())
+            .map(|p| (p, rustfmt_path, cargo_path))
+    } else if let Some(over_ride) = over_ride {
+        Config::from_toml_path(Some(&over_ride), None).map(|p| (p, Some(over_ride), None))
     } else {
-        Ok((Config::default(), None))
+        Ok((Config::default(), None, None))
+    }
+}
+
+// Search for "best" rustfmt config and cargo config files, in that order.
+//
+// Return the best files found, or None if they are not found.
+fn resolve_config_files(dir: &Path) -> Result<(Option<PathBuf>, Option<PathBuf>), Error> {
+    let mut current = if dir.is_relative() {
+        env::current_dir()?.join(dir)
+    } else {
+        dir.to_path_buf()
     };
 
-    result.map(|(mut c, p)| {
-        if let Some(options) = options {
-            options.apply_to(&mut c);
+    current = fs::canonicalize(current)?;
+
+    // Scan up the directory tree for the first rustfmt and cargo configs
+    let mut rustfmt_toml: Option<PathBuf> = None;
+    let mut cargo_toml: Option<PathBuf> = None;
+    loop {
+        if rustfmt_toml.is_none() {
+            match get_rustfmt_toml_path(&current) {
+                Ok(Some(path)) => rustfmt_toml = Some(path),
+                Err(e) => return Err(e),
+                _ => (),
+            }
         }
-        (c, p)
-    })
+
+        if cargo_toml.is_none() {
+            match get_cargo_toml_path(&current) {
+                Ok(Some(path)) => cargo_toml = Some(path),
+                Err(e) => return Err(e),
+                _ => (),
+            }
+        }
+
+        // If we found both files, we're done searching.
+        if rustfmt_toml.is_some() && cargo_toml.is_some() {
+            break;
+        }
+
+        // If the current directory has no parent, we're done searching.
+        if !current.pop() {
+            break;
+        }
+    }
+
+    // If nothing was found, check in the home directory.
+    if rustfmt_toml.is_none() {
+        if let Some(home_dir) = dirs::home_dir() {
+            if let Some(path) = get_rustfmt_toml_path(&home_dir)? {
+                rustfmt_toml = Some(path);
+            }
+        }
+    }
+
+    // If none was found there either, check in the user's configuration directory.
+    if rustfmt_toml.is_none() {
+        if let Some(mut config_dir) = dirs::config_dir() {
+            config_dir.push("rustfmt");
+            if let Some(path) = get_rustfmt_toml_path(&config_dir)? {
+                rustfmt_toml = Some(path);
+            }
+        }
+    }
+
+    Ok((rustfmt_toml, cargo_toml))
 }
 
 // Check for the presence of known config file names (`rustfmt.toml, `.rustfmt.toml`) in `dir`
 //
 // Return the path if a config file exists, empty if no file exists, and Error for IO errors
-fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
+fn get_rustfmt_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
     const CONFIG_FILE_NAMES: [&str; 2] = [".rustfmt.toml", "rustfmt.toml"];
     for config_file_name in &CONFIG_FILE_NAMES {
-        let config_file = dir.join(config_file_name);
-        match fs::metadata(&config_file) {
-            // Only return if it's a file to handle the unlikely situation of a directory named
-            // `rustfmt.toml`.
-            Ok(ref md) if md.is_file() => return Ok(Some(config_file)),
-            // Return the error if it's something other than `NotFound`; otherwise we didn't
-            // find the project file yet, and continue searching.
-            Err(e) => {
-                if e.kind() != ErrorKind::NotFound {
-                    let ctx = format!("Failed to get metadata for config file {:?}", &config_file);
-                    let err = anyhow::Error::new(e).context(ctx);
-                    return Err(Error::new(ErrorKind::Other, err));
-                }
-            }
-            _ => {}
+        if let Some(config_file) = check_config_file(dir, config_file_name)? {
+            return Ok(Some(config_file));
         }
     }
     Ok(None)
+}
+
+// Check for the presence of Cargo.toml in `dir`
+//
+// Return the path if a config file exists, empty if no file exists, and Error for IO errors
+fn get_cargo_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
+    check_config_file(dir, &"Cargo.toml")
+}
+
+// Check for the presence of the specified filename in the specified directory
+//
+// Return the path if a config file exists, empty if no file exists, and Error for IO errors
+fn check_config_file(dir: &Path, file_name: &str) -> Result<Option<PathBuf>, Error> {
+    let config_file = dir.join(file_name);
+    match fs::metadata(&config_file) {
+        // Only return if it's a file to handle the unlikely situation of a directory named
+        // `rustfmt.toml`.
+        Ok(ref md) if md.is_file() => return Ok(Some(config_file)),
+        // Return the error if it's something other than `NotFound`; otherwise we didn't
+        // find the project file yet, and continue searching.
+        Err(e) => {
+            if e.kind() != ErrorKind::NotFound {
+                let ctx = format!("Failed to get metadata for config file {:?}", &config_file);
+                let err = anyhow::Error::new(e).context(ctx);
+                return Err(Error::new(ErrorKind::Other, err));
+            }
+        }
+        _ => {}
+    }
+    Ok(None)
+}
+
+// Assigns the "edition" value provided by the provided Cargo.toml content, if any
+fn override_edition(cargo_toml: &str, config: &mut Config) -> Result<(), String> {
+    let parsed_cargo: ::toml::Value = cargo_toml
+        .parse()
+        .map_err(|e| format!("Could not parse TOML: {}", e))?;
+    let table_cargo = parsed_cargo
+        .as_table()
+        .ok_or_else(|| String::from("Parsed config was not table"))?;
+    if let Some(package) = table_cargo.get("package") {
+        let table_package = package.as_table()
+            .ok_or("Warning: Cargo.toml package is not a table")?;
+        if let Some(edition) = table_package.get("edition") {
+            let edition_str = edition
+                .as_str()
+                .ok_or("Warning: Cargo.toml edition is not a string")?;
+            config.override_value("edition", edition_str);
+        }
+    }
+    Ok(())
 }
 
 fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
@@ -391,7 +479,7 @@ fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
     match options.config_path() {
         Some(path) if !path.exists() => config_path_not_found(path.to_str().unwrap()),
         Some(path) if path.is_dir() => {
-            let config_file_path = get_toml_path(path)?;
+            let config_file_path = get_rustfmt_toml_path(path)?;
             if config_file_path.is_some() {
                 Ok(config_file_path)
             } else {
@@ -408,6 +496,11 @@ mod test {
     use std::str;
 
     use rustfmt_config_proc_macro::{nightly_only_test, stable_only_test};
+
+    // Common case for use by tests
+    fn config_from_toml(rustfmt_toml: &str) -> Result<Config, String> {
+        Config::from_toml(Some(rustfmt_toml), Some(Path::new("")), None)
+    }
 
     #[allow(dead_code)]
     mod mock {
@@ -489,7 +582,7 @@ mod test {
 
     #[test]
     fn test_was_set() {
-        let config = Config::from_toml("hard_tabs = true", Path::new("")).unwrap();
+        let config = config_from_toml("hard_tabs = true").unwrap();
 
         assert_eq!(config.was_set().hard_tabs(), true);
         assert_eq!(config.was_set().verbose(), false);
@@ -525,7 +618,7 @@ mod test {
     #[test]
     fn test_empty_string_license_template_path() {
         let toml = r#"license_template_path = """#;
-        let config = Config::from_toml(toml, Path::new("")).unwrap();
+        let config = config_from_toml(toml).unwrap();
         assert!(config.license_template.is_none());
     }
 
@@ -533,7 +626,7 @@ mod test {
     #[test]
     fn test_valid_license_template_path() {
         let toml = r#"license_template_path = "tests/license-template/lt.txt""#;
-        let config = Config::from_toml(toml, Path::new("")).unwrap();
+        let config = config_from_toml(toml).unwrap();
         assert!(config.license_template.is_some());
     }
 
@@ -541,7 +634,7 @@ mod test {
     #[test]
     fn test_override_existing_license_with_no_license() {
         let toml = r#"license_template_path = "tests/license-template/lt.txt""#;
-        let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+        let mut config = config_from_toml(toml).unwrap();
         assert!(config.license_template.is_some());
         config.override_value("license_template_path", "");
         assert!(config.license_template.is_none());
@@ -658,7 +751,7 @@ make_backup = false
     #[nightly_only_test]
     #[test]
     fn test_unstable_from_toml() {
-        let config = Config::from_toml("unstable_features = true", Path::new("")).unwrap();
+        let config = config_from_toml("unstable_features = true").unwrap();
         assert_eq!(config.was_set().unstable_features(), true);
         assert_eq!(config.unstable_features(), true);
     }
@@ -674,7 +767,7 @@ make_backup = false
                 unstable_features = true
                 merge_imports = true
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.imports_granularity(), ImportGranularity::Crate);
         }
 
@@ -686,7 +779,7 @@ make_backup = false
                 merge_imports = true
                 imports_granularity = "Preserve"
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.imports_granularity(), ImportGranularity::Preserve);
         }
 
@@ -697,7 +790,7 @@ make_backup = false
                 unstable_features = true
                 merge_imports = true
             "#;
-            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            let mut config = config_from_toml(toml).unwrap();
             config.override_value("imports_granularity", "Preserve");
             assert_eq!(config.imports_granularity(), ImportGranularity::Preserve);
         }
@@ -709,7 +802,7 @@ make_backup = false
                 unstable_features = true
                 imports_granularity = "Module"
             "#;
-            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            let mut config = config_from_toml(toml).unwrap();
             config.override_value("merge_imports", "true");
             // no effect: the new option always takes precedence
             assert_eq!(config.imports_granularity(), ImportGranularity::Module);
@@ -726,7 +819,7 @@ make_backup = false
                 use_small_heuristics = "Default"
                 max_width = 200
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.array_width(), 120);
             assert_eq!(config.attr_fn_like_width(), 140);
             assert_eq!(config.chain_width(), 120);
@@ -742,7 +835,7 @@ make_backup = false
                 use_small_heuristics = "Max"
                 max_width = 120
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.array_width(), 120);
             assert_eq!(config.attr_fn_like_width(), 120);
             assert_eq!(config.chain_width(), 120);
@@ -758,7 +851,7 @@ make_backup = false
                 use_small_heuristics = "Off"
                 max_width = 100
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.array_width(), usize::max_value());
             assert_eq!(config.attr_fn_like_width(), usize::max_value());
             assert_eq!(config.chain_width(), usize::max_value());
@@ -780,7 +873,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -802,7 +895,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -824,7 +917,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -840,7 +933,7 @@ make_backup = false
                 max_width = 90
                 fn_call_width = 95
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.fn_call_width(), 90);
         }
 
@@ -850,7 +943,7 @@ make_backup = false
                 max_width = 80
                 attr_fn_like_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.attr_fn_like_width(), 80);
         }
 
@@ -860,7 +953,7 @@ make_backup = false
                 max_width = 78
                 struct_lit_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.struct_lit_width(), 78);
         }
 
@@ -870,7 +963,7 @@ make_backup = false
                 max_width = 80
                 struct_variant_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.struct_variant_width(), 80);
         }
 
@@ -880,7 +973,7 @@ make_backup = false
                 max_width = 60
                 array_width = 80
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.array_width(), 60);
         }
 
@@ -890,7 +983,7 @@ make_backup = false
                 max_width = 80
                 chain_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.chain_width(), 80);
         }
 
@@ -900,7 +993,7 @@ make_backup = false
                 max_width = 70
                 single_line_if_else_max_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = config_from_toml(toml).unwrap();
             assert_eq!(config.single_line_if_else_max_width(), 70);
         }
 
