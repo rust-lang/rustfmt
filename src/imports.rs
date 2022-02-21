@@ -609,7 +609,7 @@ impl UseTree {
                             span: self.span,
                             list_item: None,
                             visibility: self.visibility.clone(),
-                            attrs: None,
+                            attrs: self.attrs.clone(),
                         });
                     }
                 }
