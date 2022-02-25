@@ -18,6 +18,7 @@ use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
 
+mod cargo_toml;
 mod generated;
 mod newline_style;
 
