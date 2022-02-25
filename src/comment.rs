@@ -253,8 +253,20 @@ pub(crate) fn combine_strs_with_missing_comments(
     Some(result)
 }
 
-pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> Option<String> {
-    identify_comment(orig, false, shape, config, true)
+pub(crate) fn rewrite_doc_comment(
+    orig: &str,
+    shape: Shape,
+    config: &Config,
+    keep_empty_trailing_comment: bool,
+) -> Option<String> {
+    identify_comment(
+        orig,
+        false,
+        shape,
+        config,
+        true,
+        keep_empty_trailing_comment,
+    )
 }
 
 pub(crate) fn rewrite_comment(
@@ -263,7 +275,7 @@ pub(crate) fn rewrite_comment(
     shape: Shape,
     config: &Config,
 ) -> Option<String> {
-    identify_comment(orig, block_style, shape, config, false)
+    identify_comment(orig, block_style, shape, config, false, false)
 }
 
 fn identify_comment(
@@ -272,6 +284,7 @@ fn identify_comment(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
+    keep_empty_trailing_comment: bool,
 ) -> Option<String> {
     let style = comment_style(orig, false);
 
@@ -378,6 +391,7 @@ fn identify_comment(
                 shape,
                 config,
                 is_doc_comment || style.is_doc_comment(),
+                keep_empty_trailing_comment,
             )?
         };
     if rest.is_empty() {
@@ -389,6 +403,7 @@ fn identify_comment(
             shape,
             config,
             is_doc_comment,
+            keep_empty_trailing_comment,
         )
         .map(|rest_str| {
             format!(
@@ -683,6 +698,7 @@ impl<'a> CommentRewrite<'a> {
         i: usize,
         line: &'a str,
         has_leading_whitespace: bool,
+        keep_empty_trailing_comment: bool,
     ) -> bool {
         let num_newlines = count_newlines(orig);
         let is_last = i == num_newlines;
@@ -776,8 +792,10 @@ impl<'a> CommentRewrite<'a> {
             }
         } else if self.is_prev_line_multi_line && !line.is_empty() {
             self.result.push(' ')
-        } else if is_last && line.is_empty() {
-            // trailing blank lines are unwanted
+        } else if is_last && line.is_empty() && !keep_empty_trailing_comment {
+            // trailing blank lines are unwanted (in most cases)
+            // see https://github.com/rust-lang/rustfmt/issues/5073 for an example
+            // where empty comment lines are significant
             if !self.closer.is_empty() {
                 self.result.push_str(&self.indent_str);
             }
@@ -853,6 +871,7 @@ fn rewrite_comment_inner(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
+    keep_empty_trailing_comment: bool,
 ) -> Option<String> {
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
@@ -882,7 +901,13 @@ fn rewrite_comment_inner(
         });
 
     for (i, (line, has_leading_whitespace)) in lines.enumerate() {
-        if rewriter.handle_line(orig, i, line, has_leading_whitespace) {
+        if rewriter.handle_line(
+            orig,
+            i,
+            line,
+            has_leading_whitespace,
+            keep_empty_trailing_comment,
+        ) {
             break;
         }
     }
