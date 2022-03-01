@@ -113,9 +113,6 @@ pub enum ErrorKind {
     /// TODO or FIXME item without an issue number.
     #[error("found {0}")]
     BadIssue(Issue),
-    /// License check has failed.
-    #[error("license check failed")]
-    LicenseCheck,
     /// Used deprecated skip attribute.
     #[error("`rustfmt_skip` is deprecated; use `rustfmt::skip`")]
     DeprecatedAttr,
@@ -237,7 +234,6 @@ impl FormatReport {
                     errs.has_unformatted_code_errors = true;
                 }
                 ErrorKind::BadIssue(_)
-                | ErrorKind::LicenseCheck
                 | ErrorKind::DeprecatedAttr
                 | ErrorKind::BadAttr
                 | ErrorKind::VersionMismatch => {
