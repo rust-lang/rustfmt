@@ -69,6 +69,7 @@ const SPECIAL_CASE_ATTR: &[(&str, usize)] = &[
 pub(crate) enum OverflowableItem<'a> {
     Expr(&'a ast::Expr),
     GenericParam(&'a ast::GenericParam),
+    GenericArg(&'a ast::GenericArg),
     MacroArg(&'a MacroArg),
     NestedMetaItem(&'a ast::NestedMetaItem),
     SegmentParam(&'a SegmentParam<'a>),
@@ -108,6 +109,7 @@ impl<'a> OverflowableItem<'a> {
     {
         match self {
             OverflowableItem::Expr(expr) => f(*expr),
+            OverflowableItem::GenericArg(ga) => f(*ga),
             OverflowableItem::GenericParam(gp) => f(*gp),
             OverflowableItem::MacroArg(macro_arg) => f(*macro_arg),
             OverflowableItem::NestedMetaItem(nmi) => f(*nmi),
@@ -232,7 +234,15 @@ macro_rules! impl_into_overflowable_item_for_rustfmt_types {
     }
 }
 
-impl_into_overflowable_item_for_ast_node!(Expr, GenericParam, NestedMetaItem, FieldDef, Ty, Pat);
+impl_into_overflowable_item_for_ast_node!(
+    Expr,
+    GenericArg,
+    GenericParam,
+    NestedMetaItem,
+    FieldDef,
+    Ty,
+    Pat
+);
 impl_into_overflowable_item_for_rustfmt_types!([MacroArg], [SegmentParam, TuplePatField]);
 
 pub(crate) fn into_overflowable_list<'a, T>(

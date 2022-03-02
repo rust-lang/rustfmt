@@ -66,6 +66,7 @@ use crate::config::{IndentStyle, Version};
 use crate::expr::rewrite_call;
 use crate::lists::extract_pre_comment;
 use crate::macros::convert_try_mac;
+use crate::overflow::rewrite_with_angle_brackets;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
@@ -296,19 +297,27 @@ impl ChainItem {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<String> {
+        let callee_str = rewrite_ident(context, method_name);
         let type_str = if types.is_empty() {
             String::new()
         } else {
-            let type_list = types
-                .iter()
-                .map(|ty| ty.rewrite(context, shape))
-                .collect::<Option<Vec<_>>>()?;
-
-            format!("::<{}>", type_list.join(", "))
+            // subtract `{callee_str}::<>()` from the shape. We can only place everything on a
+            // single line if there's enough room for the callee, turbofish, generic args, and ()
+            let shape = shape.sub_width(callee_str.len() + 6)?;
+            rewrite_generic_args(types, span, context, shape)?
         };
-        let callee_str = format!(".{}{}", rewrite_ident(context, method_name), type_str);
+        let callee_str = format!(".{}{}", callee_str, type_str);
         rewrite_call(context, &callee_str, &args[1..], span, shape)
     }
+}
+
+fn rewrite_generic_args(
+    types: &[ast::GenericArg],
+    span: Span,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> Option<String> {
+    rewrite_with_angle_brackets(context, "::", types.iter(), shape, span)
 }
 
 #[derive(Debug)]
