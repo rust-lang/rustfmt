@@ -1,4 +1,5 @@
 #![feature(rustc_private)]
+#![feature(once_cell)]
 #![deny(rust_2018_idioms)]
 #![warn(unreachable_pub)]
 #![recursion_limit = "256"]
@@ -6,9 +7,6 @@
 
 #[macro_use]
 extern crate derive_new;
-#[cfg(test)]
-#[macro_use]
-extern crate lazy_static;
 #[macro_use]
 extern crate log;
 

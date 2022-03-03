@@ -54,7 +54,6 @@ ignore = "0.4.17"
 annotate-snippets = { version = "0.8", features = ["color"] }
 structopt = "0.3"
 rustfmt-config_proc_macro = { version = "0.2", path = "config_proc_macro" }
-lazy_static = "1.0.0"
 anyhow = "1.0"
 thiserror = "1.0"
 
