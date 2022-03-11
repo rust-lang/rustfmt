@@ -149,6 +149,8 @@ create_config! {
     force_explicit_abi: bool, true, true, "Always print the abi for extern items";
     condense_wildcard_suffixes: bool, false, false, "Replace strings of _ wildcards by a single .. \
                                                      in tuple patterns";
+    self_shorthand: bool, false, false,
+        "Convert explicit `self: Self` to `self` in method definitions";
 
     // Control options (changes the operation of rustfmt, rather than the formatting)
     color: Color, Color::Auto, false,
@@ -617,6 +619,7 @@ use_try_shorthand = false
 use_field_init_shorthand = false
 force_explicit_abi = true
 condense_wildcard_suffixes = false
+self_shorthand = false
 color = "Auto"
 required_version = "{}"
 unstable_features = false

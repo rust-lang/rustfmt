@@ -28,7 +28,7 @@ use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt::Stmt;
-use crate::types::{opaque_ty, rewrite_reference_and_mutability};
+use crate::types::{is_self_upper, opaque_ty, rewrite_reference_and_mutability};
 use crate::utils::*;
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
@@ -2124,6 +2124,19 @@ fn rewrite_self_lower(
     Some(format!("{}self", lt_and_mut))
 }
 
+fn recover_comment_before_type(
+    context: &RewriteContext<'_>,
+    prev_str: &str,
+    next_str: &str,
+    ty: &ast::Ty,
+    param_span: Span,
+    shape: Shape,
+) -> Option<String> {
+    let comment_lo = context.snippet_provider.span_after(param_span, ":");
+    let comment_span = mk_sp(comment_lo, ty.span().lo());
+    combine_strs_with_missing_comments(context, prev_str, next_str, comment_span, shape, true)
+}
+
 fn rewrite_explicit_self(
     context: &RewriteContext<'_>,
     explicit_self: &ast::ExplicitSelf,
@@ -2139,6 +2152,27 @@ fn rewrite_explicit_self(
             false,
             true,
         ),
+        ast::SelfKind::Explicit(ref ty, mutability)
+            if context.config.self_shorthand() && is_self_upper(&ty.kind) =>
+        {
+            let (lifetime, mutability, is_mutability_from_ty, has_ref) = match &ty.kind {
+                ast::TyKind::Rptr(lifetime, ty_mutability) => {
+                    (lifetime.clone(), ty_mutability.mutbl.clone(), true, true)
+                }
+                _ => (None, mutability.clone(), false, false),
+            };
+
+            let self_str = rewrite_self_lower(
+                context,
+                shape,
+                explicit_self.span,
+                lifetime.as_ref(),
+                mutability,
+                is_mutability_from_ty,
+                has_ref,
+            )?;
+            recover_comment_before_type(context, "", &self_str, ty, explicit_self.span, shape)
+        }
         ast::SelfKind::Explicit(ref ty, mutability) => {
             let (lt_and_mut, _) = rewrite_reference_and_mutability(
                 context,
@@ -2153,16 +2187,14 @@ fn rewrite_explicit_self(
                 Shape::legacy(context.config.max_width(), Indent::empty()),
             )?;
 
-            let comment_lo = context.snippet_provider.span_after(explicit_self.span, ":");
-            let comment_span = mk_sp(comment_lo, ty.span().lo());
-
-            combine_strs_with_missing_comments(
+            let self_str = format!("{}self:", lt_and_mut);
+            recover_comment_before_type(
                 context,
-                &format!("{}self:", lt_and_mut),
+                &self_str,
                 &type_str,
-                comment_span,
+                ty,
+                explicit_self.span,
                 shape,
-                true,
             )
         }
         ast::SelfKind::Value(mutability) => rewrite_self_lower(

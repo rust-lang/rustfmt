@@ -94,7 +94,6 @@ pub(crate) fn rewrite_path(
 }
 
 /// Determine if the `ast::TyKind` is an explicit `Self`.
-#[allow(dead_code)]
 pub(crate) fn is_self_upper(kind: &ast::TyKind) -> bool {
     match kind {
         ast::TyKind::Path(_, ref path) => {

@@ -2204,6 +2204,44 @@ specific version of rustfmt is used in your CI, use this option.
 - **Possible values**: any published version (e.g. `"0.3.8"`)
 - **Stable**: No (tracking issue: [#3386](https://github.com/rust-lang/rustfmt/issues/3386))
 
+## `self_shorthand`
+
+Convert explicit `self: Self` to `self` in method definitions.
+If the `ty` is something that dereferences to `Self` e.g. `Box<Self>`,
+then the `ty` is left unchanged to preserve the semantics of the code.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [N/A]())
+
+#### `false` (default):
+
+```rust
+struct Foo;
+
+impl Foo {
+    fn by_value(self: Self) {}
+    fn by_ref(self: &Self) {}
+    fn by_ref_mut(self: &mut Self) {}
+    fn with_lifetime<'a>(self: &'a Self) {}
+    fn by_box(self: Box<Self>) {}
+}
+```
+
+#### `true`:
+
+```rust
+struct Foo;
+
+impl Foo {
+    fn by_value(self) {}
+    fn by_ref(&self) {}
+    fn by_ref_mut(&mut self) {}
+    fn with_lifetime<'a>(&'a self) {}
+    fn by_box(self: Box<Self>) {}
+}
+```
+
 ## `short_array_element_width_threshold`
 
 The width threshold for an array element to be considered "short".
