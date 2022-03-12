@@ -90,9 +90,15 @@ where
 }
 
 fn is_file_skip(path: &Path) -> bool {
-    SKIP_FILE_WHITE_LIST
-        .iter()
-        .any(|file_path| is_subpath(path, file_path))
+    let filter_file = std::env::var("TEST_FILE").ok();
+    let skip_file = filter_file
+        .map(|filter_file| !path.to_str().unwrap().contains(&filter_file))
+        .unwrap_or(false);
+
+    skip_file
+        || SKIP_FILE_WHITE_LIST
+            .iter()
+            .any(|file_path| is_subpath(path, file_path))
 }
 
 // Returns a `Vec` containing `PathBuf`s of files with an  `rs` extension in the
