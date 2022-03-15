@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use ignore::{self, gitignore};
 
 use crate::config::{FileName, IgnoreList};
@@ -30,6 +32,33 @@ impl IgnorePathSet {
     }
 }
 
+/// Determine if input from stdin should be ignored by rustfmt.
+/// See the `ignore` configuration options for details on specifying ignore files.
+pub fn is_std_ignored(file_hint: Option<PathBuf>, ignore_list: &IgnoreList) -> bool {
+    // trivially return false, because no files are ignored
+    if ignore_list.is_empty() {
+        return false;
+    }
+
+    // trivially return true, because everything is ignored when "/" is in the ignore list
+    if ignore_list.contains(Path::new("/")) {
+        return true;
+    }
+
+    // See if the hinted stdin input is an ignored file.
+    if let Some(std_file_hint) = file_hint {
+        let file = FileName::Real(std_file_hint);
+        match IgnorePathSet::from_ignore_list(ignore_list) {
+            Ok(ignore_set) if ignore_set.is_match(&file) => {
+                debug!("{:?} is ignored", file);
+                return true;
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod test {
     use rustfmt_config_proc_macro::nightly_only_test;
@@ -48,5 +77,36 @@ mod test {
         assert!(ignore_path_set.is_match(&FileName::Real(PathBuf::from("src/foo.rs"))));
         assert!(ignore_path_set.is_match(&FileName::Real(PathBuf::from("bar_dir/baz.rs"))));
         assert!(!ignore_path_set.is_match(&FileName::Real(PathBuf::from("src/bar.rs"))));
+    }
+
+    #[test]
+    fn test_is_std_ignored() {
+        use serde_json;
+        use std::path::PathBuf;
+
+        use super::is_std_ignored;
+        use crate::config::IgnoreList;
+
+        let ignore_list: IgnoreList = serde_json::from_str(r#"["foo.rs","bar_dir/*"]"#).unwrap();
+        assert!(is_std_ignored(Some(PathBuf::from("foo.rs")), &ignore_list));
+        assert!(is_std_ignored(
+            Some(PathBuf::from("src/foo.rs")),
+            &ignore_list
+        ));
+        assert!(is_std_ignored(
+            Some(PathBuf::from("bar_dir/bar/bar.rs")),
+            &ignore_list
+        ));
+
+        assert!(!is_std_ignored(Some(PathBuf::from("baz.rs")), &ignore_list));
+        assert!(!is_std_ignored(
+            Some(PathBuf::from("src/baz.rs")),
+            &ignore_list
+        ));
+        assert!(!is_std_ignored(
+            Some(PathBuf::from("baz_dir/baz/baz.rs")),
+            &ignore_list
+        ));
+        assert!(!is_std_ignored(None, &ignore_list));
     }
 }
