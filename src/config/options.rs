@@ -399,6 +399,14 @@ impl IgnoreList {
     pub fn rustfmt_toml_path(&self) -> &Path {
         &self.rustfmt_toml_path
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.path_set.is_empty()
+    }
+
+    pub fn contains<P: AsRef<Path>>(&self, path: P) -> bool {
+        self.path_set.contains(path.as_ref())
+    }
 }
 
 impl FromStr for IgnoreList {

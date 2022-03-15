@@ -90,6 +90,22 @@ pub enum OperationError {
     /// supported with standard input.
     #[error("Emit mode {0} not supported with standard output.")]
     StdinBadEmit(EmitMode),
+    /// Using `--std-file-hint` incorrectly
+    #[error("{0}")]
+    StdInFileHint(StdInFileHintError),
+}
+
+#[derive(Error, Debug)]
+pub enum StdInFileHintError {
+    /// The file hint does not exist
+    #[error("`--std-file-hint={0:?}` could not be found")]
+    NotFound(PathBuf),
+    /// The file hint isn't a rust file
+    #[error("`--std-file-hint={0:?}` is not a rust file")]
+    NotRustFile(PathBuf),
+    /// Attempted to pass --std-file-hint without passing input through stdin
+    #[error("Cannot use `--std-file-hint` without formatting input from stdin.")]
+    NotFormttingWithStdIn,
 }
 
 impl From<IoError> for OperationError {
@@ -155,6 +171,14 @@ fn make_opts() -> Options {
         "config",
         "Set options from command line. These settings take priority over .rustfmt.toml",
         "[key1=val1,key2=val2...]",
+    );
+    opts.optopt(
+        "",
+        "stdin-file-hint",
+        "Inform rustfmt that the text passed to stdin is from the given file. \
+        This option can only be passed when formatting text via stdin, \
+        and the file name is used to determine if rustfmt can skip formatting the input.",
+        "[Path to a rust file.]",
     );
 
     if is_nightly {
@@ -261,6 +285,11 @@ fn execute(opts: &Options) -> Result<i32> {
 fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
     // try to read config from local directory
     let (mut config, _) = load_config(Some(Path::new(".")), Some(options.clone()))?;
+
+    if rustfmt::is_std_ignored(options.stdin_file_hint, &config.ignore()) {
+        io::stdout().write_all(input.as_bytes())?;
+        return Ok(0);
+    }
 
     if options.check {
         config.set().emit_mode(EmitMode::Diff);
@@ -494,6 +523,13 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
         return Ok(Operation::Stdin { input: buffer });
     }
 
+    // User's can only pass `--stdin-file-hint` when formating files via stdin.
+    if matches.opt_present("stdin-file-hint") {
+        return Err(OperationError::StdInFileHint(
+            StdInFileHintError::NotFormttingWithStdIn,
+        ));
+    }
+
     Ok(Operation::Format {
         files,
         minimal_config_path,
@@ -519,6 +555,7 @@ struct GetOptsOptions {
     unstable_features: bool,
     error_on_unformatted: Option<bool>,
     print_misformatted_file_names: bool,
+    stdin_file_hint: Option<PathBuf>,
 }
 
 impl GetOptsOptions {
@@ -568,6 +605,20 @@ impl GetOptsOptions {
         }
 
         options.config_path = matches.opt_str("config-path").map(PathBuf::from);
+        options.stdin_file_hint = matches.opt_str("stdin-file-hint").map(PathBuf::from);
+
+        // return early if there are issues with the file hint specified
+        if let Some(file_hint) = &options.stdin_file_hint {
+            if !file_hint.exists() {
+                return Err(StdInFileHintError::NotFound(file_hint.to_owned()))?;
+            }
+
+            if let Some(ext) = file_hint.extension() {
+                if ext != "rs" {
+                    return Err(StdInFileHintError::NotRustFile(file_hint.to_owned()))?;
+                }
+            }
+        }
 
         options.inline_config = matches
             .opt_strs("config")

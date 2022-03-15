@@ -242,18 +242,21 @@ fn rustfmt_emits_error_when_control_brace_style_is_always_next_line() {
 }
 mod rustfmt_stdin_formatting {
     use super::rustfmt_std_input;
+    use rustfmt_config_proc_macro::{nightly_only_test, stable_only_test};
 
     #[rustfmt::skip]
     #[test]
     fn changes_are_output_to_stdout() {
-        let args = [];
+        // line endings are normalized to '\n' to avoid platform differences
+        let args = ["--config", "newline_style=Unix"];
         let source = "fn main     () {    println!(\"hello world!\"); }";
         let (stdout, _stderr) = rustfmt_std_input(&args, source);
         let expected_output =
 r#"fn main() {
     println!("hello world!");
-}"#;
-        assert!(stdout.contains(expected_output))
+}
+"#;
+        assert!(stdout == expected_output);
     }
 
     #[test]
@@ -263,5 +266,100 @@ r#"fn main() {
         let source = "fn main() {}";
         let (stdout, _stderr) = rustfmt_std_input(&args, source);
         assert!(stdout.trim_end() == source)
+    }
+
+    #[nightly_only_test]
+    #[test]
+    fn input_ignored_when_stdin_file_hint_is_ignored() {
+        // NOTE: the source is not properly formatted, but we're giving rustfmt a hint that
+        // the input actually corresponds to `src/lib.rs`, which is ignored in the given config file
+        let args = [
+            "--stdin-file-hint",
+            "src/lib.rs",
+            "--config-path",
+            "tests/config/stdin-file-hint-ignore.toml",
+        ];
+        let source = "fn main     () {    println!(\"hello world!\"); }";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        assert!(stdout.trim_end() == source)
+    }
+
+    #[rustfmt::skip]
+    #[nightly_only_test]
+    #[test]
+    fn input_formatted_when_stdin_file_hint_is_not_ignored() {
+        // NOTE: `src/bin/main.rs` is not ignored in the config file so the input is formatted.
+        // line endings are normalized to '\n' to avoid platform differences
+        let args = [
+            "--stdin-file-hint",
+            "src/bin/main.rs",
+            "--config-path",
+            "tests/config/stdin-file-hint-ignore.toml",
+            "--config",
+            "newline_style=Unix",
+        ];
+        let source = "fn main     () {    println!(\"hello world!\"); }";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        let expected_output =
+r#"fn main() {
+    println!("hello world!");
+}
+"#;
+        assert!(stdout == expected_output);
+    }
+
+    #[rustfmt::skip]
+    #[stable_only_test]
+    #[test]
+    fn ignore_list_is_not_set_on_stable_channel_and_therefore_stdin_file_hint_does_nothing() {
+        // NOTE: the source is not properly formatted, and although the file is `ignored` we
+        // can't set the `ignore` list on the stable channel so the input is formatted
+        // line endings are normalized to '\n' to avoid platform differences
+        let args = [
+            "--stdin-file-hint",
+            "src/lib.rs",
+            "--config-path",
+            "tests/config/stdin-file-hint-ignore.toml",
+            "--config",
+            "newline_style=Unix",
+        ];
+        let source = "fn main     () {    println!(\"hello world!\"); }";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        let expected_output =
+r#"fn main() {
+    println!("hello world!");
+}
+"#;
+        assert!(stdout == expected_output);
+
+    }
+}
+
+mod stdin_file_hint {
+    use super::{rustfmt, rustfmt_std_input};
+
+    #[test]
+    fn error_not_a_rust_file() {
+        let args = ["--stdin-file-hint", "README.md"];
+        let source = "fn main() {}";
+        let (_stdout, stderr) = rustfmt_std_input(&args, source);
+        assert!(stderr.contains("`--std-file-hint=\"README.md\"` is not a rust file"))
+    }
+
+    #[test]
+    fn error_file_not_found() {
+        let args = ["--stdin-file-hint", "does_not_exist.rs"];
+        let source = "fn main() {}";
+        let (_stdout, stderr) = rustfmt_std_input(&args, source);
+        assert!(stderr.contains("`--std-file-hint=\"does_not_exist.rs\"` could not be found"))
+    }
+
+    #[test]
+    fn cant_use_stdin_file_hint_if_input_not_passed_to_rustfmt_via_stdin() {
+        let args = ["--stdin-file-hint", "src/lib.rs", "src/lib.rs"];
+        let (_stdout, stderr) = rustfmt(&args);
+        assert!(
+            stderr.contains("Cannot use `--std-file-hint` without formatting input from stdin.")
+        );
     }
 }
