@@ -2,11 +2,49 @@
 
 use std::env;
 use std::fs::remove_file;
+use std::io::{Result, Write};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
 
 /// Run the rustfmt executable and return its output.
 fn rustfmt(args: &[&str]) -> (String, String) {
+    match rustfm_builder(|rustfmt| rustfmt.args(args).output()) {
+        Ok(output) => (
+            String::from_utf8(output.stdout).expect("utf-8"),
+            String::from_utf8(output.stderr).expect("utf-8"),
+        ),
+        Err(e) => panic!("failed to run `rustfmt {:?}`: {}", args, e),
+    }
+}
+
+/// Run the rustfmt executable and take input from stdin
+fn rustfmt_std_input(args: &[&str], input: &str) -> (String, String) {
+    let output = rustfm_builder(|cmd| {
+        let mut rustfmt = cmd
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+
+        rustfmt
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(input.as_bytes())?;
+        rustfmt.wait_with_output()
+    });
+    match output {
+        Ok(output) => (
+            String::from_utf8(output.stdout).expect("utf-8"),
+            String::from_utf8(output.stderr).expect("utf-8"),
+        ),
+        Err(e) => panic!("failed to run `rustfmt {:?}`: {}", args, e),
+    }
+}
+
+fn rustfm_builder<F: Fn(&mut Command) -> Result<Output>>(f: F) -> Result<Output> {
     let mut bin_dir = env::current_exe().unwrap();
     bin_dir.pop(); // chop off test exe name
     if bin_dir.ends_with("deps") {
@@ -20,13 +58,8 @@ fn rustfmt(args: &[&str]) -> (String, String) {
     paths.insert(0, bin_dir);
     let new_path = env::join_paths(paths).unwrap();
 
-    match Command::new(&cmd).args(args).env("PATH", new_path).output() {
-        Ok(output) => (
-            String::from_utf8(output.stdout).expect("utf-8"),
-            String::from_utf8(output.stderr).expect("utf-8"),
-        ),
-        Err(e) => panic!("failed to run `{:?} {:?}`: {}", cmd, args, e),
-    }
+    let mut rustfmt = Command::new(&cmd);
+    f(rustfmt.env("PATH", new_path))
 }
 
 macro_rules! assert_that {
@@ -156,4 +189,30 @@ fn mod_resolution_error_path_attribute_does_not_exist() {
     let (_stdout, stderr) = rustfmt(&args);
     // The path attribute points to a file that does not exist
     assert!(stderr.contains("does_not_exist.rs does not exist"));
+}
+
+mod rustfmt_stdin_formatting {
+    use super::rustfmt_std_input;
+
+    #[rustfmt::skip]
+    #[test]
+    fn changes_are_output_to_stdout() {
+        let args = [];
+        let source = "fn main     () {    println!(\"hello world!\"); }";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        let expected_output =
+r#"fn main() {
+    println!("hello world!");
+}"#;
+        assert!(stdout.contains(expected_output))
+    }
+
+    #[test]
+    fn properly_formatted_input_is_output_to_stdout_unchanged() {
+        // NOTE: Technicallly a newline is added, but nothing meaningful is changed
+        let args = [];
+        let source = "fn main() {}";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        assert!(stdout.trim_end() == source)
+    }
 }
