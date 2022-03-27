@@ -18,6 +18,8 @@ use crate::parse::parser::{
 use crate::parse::session::ParseSess;
 use crate::utils::{contains_skip, mk_sp};
 
+#[cfg(test)]
+mod test;
 mod visitor;
 
 type FileModMap<'ast> = BTreeMap<FileName, Module<'ast>>;
@@ -71,6 +73,7 @@ pub(crate) struct ModResolver<'ast, 'sess> {
     directory: Directory,
     file_map: FileModMap<'ast>,
     recursive: bool,
+    current_mod_file: Option<PathBuf>,
 }
 
 /// Represents errors while trying to resolve modules.
@@ -108,6 +111,20 @@ enum SubModKind<'a, 'ast> {
     Internal(&'a ast::Item),
 }
 
+impl<'a, 'ast> SubModKind<'a, 'ast> {
+    fn attrs(&self) -> Vec<ast::Attribute> {
+        match self {
+            Self::External(_, _, module) => module.inner_attr.clone(),
+            Self::MultiExternal(modules) => modules
+                .iter()
+                .map(|(_, _, module)| module.inner_attr.clone().into_iter())
+                .flatten()
+                .collect(),
+            Self::Internal(item) => item.attrs.clone(),
+        }
+    }
+}
+
 impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     /// Creates a new `ModResolver`.
     pub(crate) fn new(
@@ -122,6 +139,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             },
             file_map: BTreeMap::new(),
             parse_sess,
+            current_mod_file: None,
             recursive,
         }
     }
@@ -137,10 +155,10 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             _ => PathBuf::new(),
         };
 
-        // Skip visiting sub modules when the input is from stdin.
-        if self.recursive {
-            self.visit_mod_from_ast(&krate.items)?;
-        }
+        self.current_mod_file = match root_filename {
+            FileName::Real(ref p) => Some(p.clone()),
+            _ => None,
+        };
 
         let snippet_provider = self.parse_sess.snippet_provider(krate.spans.inner_span);
 
@@ -153,6 +171,12 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 Cow::Borrowed(&krate.attrs),
             ),
         );
+
+        // Skip visiting sub modules when the input is from stdin.
+        if self.recursive {
+            self.visit_mod_from_ast(&krate.items)?;
+        }
+
         Ok(self.file_map)
     }
 
@@ -235,13 +259,44 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         sub_mod: Module<'ast>,
     ) -> Result<(), ModuleResolutionError> {
         let old_directory = self.directory.clone();
+        let old_mod_file = self.current_mod_file.clone();
+
         let sub_mod_kind = self.peek_sub_mod(item, &sub_mod)?;
         if let Some(sub_mod_kind) = sub_mod_kind {
+            if matches!(
+                sub_mod_kind,
+                SubModKind::External(..) | SubModKind::MultiExternal(_)
+            ) {
+                self.update_mod_item_with_submod_attrs(item, &sub_mod_kind)
+            }
             self.insert_sub_mod(sub_mod_kind.clone())?;
             self.visit_sub_mod_inner(sub_mod, sub_mod_kind)?;
         }
         self.directory = old_directory;
+        self.current_mod_file = old_mod_file;
         Ok(())
+    }
+
+    fn update_mod_item_with_submod_attrs(
+        &mut self,
+        item: &'c ast::Item,
+        sub_mod_kind: &SubModKind<'_, '_>,
+    ) {
+        if let Some(path) = &self.current_mod_file {
+            let entry = self.file_map.entry(FileName::Real(path.clone()));
+
+            entry.and_modify(|module| {
+                if let Some(mod_item) = module
+                    .items
+                    .to_mut()
+                    .iter_mut()
+                    .filter(|i| matches!(i.kind, ast::ItemKind::Mod(..)))
+                    .find(|i| i.ident == item.ident)
+                {
+                    mod_item.attrs.extend(sub_mod_kind.attrs())
+                }
+            });
+        }
     }
 
     /// Inspect the given sub-module which we are about to visit and returns its kind.
@@ -297,6 +352,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     path: mod_path.parent().unwrap().to_path_buf(),
                     ownership: directory_ownership,
                 };
+                self.current_mod_file = Some(mod_path);
                 self.visit_sub_mod_after_directory_update(sub_mod, Some(directory))
             }
             SubModKind::Internal(item) => {
@@ -309,6 +365,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         path: mod_path.parent().unwrap().to_path_buf(),
                         ownership: directory_ownership,
                     };
+                    self.current_mod_file = Some(mod_path);
                     self.visit_sub_mod_after_directory_update(sub_mod, Some(directory))?;
                 }
                 Ok(())

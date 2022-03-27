@@ -2159,7 +2159,7 @@ mod dolor;
 mod sit;
 ```
 
-**Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantics
+**Note** `mod` with `#[macro_export]` or `#![macro_use]` will not be reordered since that could change the semantics
 of the original source code.
 
 ## `report_fixme`
