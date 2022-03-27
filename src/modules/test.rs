@@ -7,6 +7,7 @@ use crate::attr::contains_name;
 use crate::config::{Config, FileName};
 use crate::parse::parser::{DirectoryOwnership, Parser};
 use crate::parse::session::ParseSess;
+use crate::utils::contains_skip;
 use crate::Input;
 
 fn validate_file_mod_map<F: Fn(&FileModMap<'_>)>(mod_path: &PathBuf, recursive: bool, f: F) {
@@ -52,5 +53,15 @@ fn external_sub_module_inner_attrs_are_present_in_mod_item_attrs_list() {
 
         let mod_b = get_submodule(module, "b");
         assert!(contains_name(&mod_b.attrs, sym::macro_use));
+
+        // mod c is annotated with `#[rustfmt::skip]`, but we should still have access to
+        // the inner attributes
+        let mod_c = get_submodule(module, "c");
+        assert!(contains_name(&mod_c.attrs, sym::macro_use));
+        assert!(contains_skip(&mod_c.attrs));
+
+        // mod d is annotated with an inner `#![rustfmt::skip]` attribute.
+        let mod_d = get_submodule(module, "d");
+        assert!(contains_skip(&mod_d.attrs));
     });
 }

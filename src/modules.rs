@@ -109,12 +109,17 @@ enum SubModKind<'a, 'ast> {
     MultiExternal(Vec<(PathBuf, DirectoryOwnership, Module<'ast>)>),
     /// `mod foo {}`
     Internal(&'a ast::Item),
+    /// Just like External, but sub modules of this modules are not resolved,
+    /// and this module is not added to the FileModMap
+    SkippedExternal(PathBuf, DirectoryOwnership, Module<'ast>),
 }
 
 impl<'a, 'ast> SubModKind<'a, 'ast> {
     fn attrs(&self) -> Vec<ast::Attribute> {
         match self {
-            Self::External(_, _, module) => module.inner_attr.clone(),
+            Self::External(_, _, module) | Self::SkippedExternal(_, _, module) => {
+                module.inner_attr.clone()
+            }
             Self::MultiExternal(modules) => modules
                 .iter()
                 .map(|(_, _, module)| module.inner_attr.clone().into_iter())
@@ -263,10 +268,8 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
 
         let sub_mod_kind = self.peek_sub_mod(item, &sub_mod)?;
         if let Some(sub_mod_kind) = sub_mod_kind {
-            if matches!(
-                sub_mod_kind,
-                SubModKind::External(..) | SubModKind::MultiExternal(_)
-            ) {
+            let is_internal_mod = matches!(sub_mod_kind, SubModKind::Internal(_));
+            if !is_internal_mod {
                 self.update_mod_item_with_submod_attrs(item, &sub_mod_kind)
             }
             self.insert_sub_mod(sub_mod_kind.clone())?;
@@ -305,14 +308,12 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         item: &'c ast::Item,
         sub_mod: &Module<'ast>,
     ) -> Result<Option<SubModKind<'c, 'ast>>, ModuleResolutionError> {
-        if contains_skip(&item.attrs) {
-            return Ok(None);
-        }
-
         if is_mod_decl(item) {
             // mod foo;
             // Look for an extern file.
             self.find_external_module(item.ident, &item.attrs, sub_mod)
+        } else if contains_skip(&item.attrs) {
+            return Ok(None);
         } else {
             // An internal module (`mod foo { /* ... */ }`);
             Ok(Some(SubModKind::Internal(item)))
@@ -370,6 +371,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 }
                 Ok(())
             }
+            SubModKind::SkippedExternal(..) => Ok(()),
         }
     }
 
@@ -408,7 +410,18 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 return Ok(None);
             }
             return match Parser::parse_file_as_module(self.parse_sess, &path, sub_mod.span) {
-                Ok((ref attrs, _, _)) if contains_skip(attrs) => Ok(None),
+                Ok((attrs, items, span)) if contains_skip(&attrs) => {
+                    Ok(Some(SubModKind::SkippedExternal(
+                        path,
+                        DirectoryOwnership::Owned { relative: None },
+                        Module::new(
+                            span,
+                            Some(Cow::Owned(ast::ModKind::Unloaded)),
+                            Cow::Owned(items),
+                            Cow::Owned(attrs),
+                        ),
+                    )))
+                }
                 Ok((attrs, items, span)) => Ok(Some(SubModKind::External(
                     path,
                     DirectoryOwnership::Owned { relative: None },
@@ -457,7 +470,18 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     }
                 }
                 match Parser::parse_file_as_module(self.parse_sess, &file_path, sub_mod.span) {
-                    Ok((ref attrs, _, _)) if contains_skip(attrs) => Ok(None),
+                    Ok((attrs, items, span)) if contains_skip(&attrs) => {
+                        Ok(Some(SubModKind::SkippedExternal(
+                            file_path,
+                            dir_ownership,
+                            Module::new(
+                                span,
+                                Some(Cow::Owned(ast::ModKind::Unloaded)),
+                                Cow::Owned(items),
+                                Cow::Owned(attrs),
+                            ),
+                        )))
+                    }
                     Ok((attrs, items, span)) if outside_mods_empty => {
                         Ok(Some(SubModKind::External(
                             file_path,
