@@ -294,7 +294,12 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     .to_mut()
                     .iter_mut()
                     .filter(|i| matches!(i.kind, ast::ItemKind::Mod(..)))
-                    .find(|i| i.ident == item.ident)
+                    .find(|i| {
+                        // The module names need to be the same, and to account for multiple modules
+                        // with the same name (e.g. those annotated with `#[cfg(..)]` we also check
+                        // the spans to make sure we're adding attributes to the correct item.
+                        i.ident == item.ident && i.span == item.span
+                    })
                 {
                     mod_item.attrs.extend(sub_mod_kind.attrs())
                 }

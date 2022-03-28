@@ -29,10 +29,19 @@ fn validate_file_mod_map<F: Fn(&FileModMap<'_>)>(mod_path: &PathBuf, recursive: 
 }
 
 fn get_submodule<'a>(module: &'a Module<'_>, mod_name: &str) -> &'a rustc_ast::ast::Item {
+    get_nth_submodule(module, mod_name, 0)
+}
+
+fn get_nth_submodule<'a>(
+    module: &'a Module<'_>,
+    mod_name: &str,
+    position: usize,
+) -> &'a rustc_ast::ast::Item {
     module
         .items
         .iter()
-        .find(|i| i.ident == Ident::from_str(mod_name))
+        .filter(|i| i.ident == Ident::from_str(mod_name))
+        .nth(position)
         .unwrap()
 }
 
@@ -63,5 +72,15 @@ fn external_sub_module_inner_attrs_are_present_in_mod_item_attrs_list() {
         // mod d is annotated with an inner `#![rustfmt::skip]` attribute.
         let mod_d = get_submodule(module, "d");
         assert!(contains_skip(&mod_d.attrs));
+
+        // mod e is defined in both e1.rs and e2.rs depending on the operating system.
+        // We should ensure that attributes from one path aren't added to the other.
+        let mod_e1 = get_nth_submodule(module, "e", 0);
+        assert!(contains_name(&mod_e1.attrs, sym::no_std));
+        assert!(!contains_name(&mod_e1.attrs, sym::no_implicit_prelude));
+
+        let mod_e2 = get_nth_submodule(module, "e", 1);
+        assert!(contains_name(&mod_e2.attrs, sym::no_implicit_prelude));
+        assert!(!contains_name(&mod_e2.attrs, sym::no_std));
     });
 }
