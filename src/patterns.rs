@@ -478,8 +478,20 @@ fn rewrite_tuple_pat(
         (&pat_vec[..], span)
     };
 
-    let is_last_pat_dotdot = pat_vec.last().map_or(false, |p| p.is_dotdot());
-    let add_comma = path_str.is_none() && pat_vec.len() == 1 && !is_last_pat_dotdot;
+    let is_not_dotdot =
+        path_str.is_none() && pat_vec.len() == 1 && !pat_vec.last().unwrap().is_dotdot();
+    let is_single_or_pattern = path_str.is_some()
+        && pat_vec.len() == 1
+        && matches!(pat_vec.last().unwrap(), TuplePatField::Pat(p) if matches!(p.kind, PatKind::Or(..)));
+
+    let force_separator_tactic = if is_not_dotdot {
+        Some(SeparatorTactic::Always)
+    } else if is_single_or_pattern {
+        Some(SeparatorTactic::Never)
+    } else {
+        None
+    };
+
     let path_str = path_str.unwrap_or_default();
 
     overflow::rewrite_with_parens(
@@ -489,11 +501,7 @@ fn rewrite_tuple_pat(
         shape,
         span,
         context.config.max_width(),
-        if add_comma {
-            Some(SeparatorTactic::Always)
-        } else {
-            None
-        },
+        force_separator_tactic,
     )
 }
 
