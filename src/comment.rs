@@ -1,9 +1,9 @@
 // Formatting and tools for comments.
 
+use std::lazy::SyncLazy;
 use std::{self, borrow::Cow, iter};
 
 use itertools::{multipeek, MultiPeek};
-use lazy_static::lazy_static;
 use regex::Regex;
 use rustc_span::Span;
 
@@ -17,16 +17,14 @@ use crate::utils::{
 };
 use crate::{ErrorKind, FormattingError};
 
-lazy_static! {
-    /// A regex matching reference doc links.
-    ///
-    /// ```markdown
-    /// /// An [example].
-    /// ///
-    /// /// [example]: this::is::a::link
-    /// ```
-    static ref REFERENCE_LINK_URL: Regex = Regex::new(r"^\[.+\]\s?:").unwrap();
-}
+/// A regex matching reference doc links.
+///
+/// ```markdown
+/// /// An [example].
+/// ///
+/// /// [example]: this::is::a::link
+/// ```
+static REFERENCE_LINK_URL: SyncLazy<Regex> = SyncLazy::new(|| Regex::new(r"^\[.+\]\s?:").unwrap());
 
 fn is_custom_comment(comment: &str) -> bool {
     if !comment.starts_with("//") {

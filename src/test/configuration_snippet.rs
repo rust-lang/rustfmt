@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::iter::Enumerate;
+use std::lazy::SyncLazy;
 use std::path::{Path, PathBuf};
 
 use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
@@ -24,13 +25,13 @@ impl ConfigurationSection {
     fn get_section<I: Iterator<Item = String>>(
         file: &mut Enumerate<I>,
     ) -> Option<ConfigurationSection> {
-        lazy_static! {
-            static ref CONFIG_NAME_REGEX: regex::Regex =
-                regex::Regex::new(r"^## `([^`]+)`").expect("failed creating configuration pattern");
-            static ref CONFIG_VALUE_REGEX: regex::Regex =
-                regex::Regex::new(r#"^#### `"?([^`"]+)"?`"#)
-                    .expect("failed creating configuration value pattern");
-        }
+        static CONFIG_NAME_REGEX: SyncLazy<regex::Regex> = SyncLazy::new(|| {
+            regex::Regex::new(r"^## `([^`]+)`").expect("failed creating configuration pattern")
+        });
+        static CONFIG_VALUE_REGEX: SyncLazy<regex::Regex> = SyncLazy::new(|| {
+            regex::Regex::new(r#"^#### `"?([^`"]+)"?`"#)
+                .expect("failed creating configuration value pattern")
+        });
 
         loop {
             match file.next() {
