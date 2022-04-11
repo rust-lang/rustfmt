@@ -865,6 +865,7 @@ fn rewrite_comment_inner(
     is_doc_comment: bool,
 ) -> Option<String> {
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
+    let is_line_comment = rewriter.style.is_line_comment();
 
     let line_breaks = count_newlines(orig.trim_end());
     let lines = orig
@@ -873,7 +874,11 @@ fn rewrite_comment_inner(
         .map(|(i, mut line)| {
             line = trim_end_unless_two_whitespaces(line.trim_start(), is_doc_comment);
             // Drop old closer.
-            if i == line_breaks && line.ends_with("*/") && !line.starts_with("//") {
+            // When converting block comments to line comments always remove block comment closers
+            if (i == line_breaks || is_line_comment)
+                && line.ends_with("*/")
+                && !line.starts_with("//")
+            {
                 line = line[..(line.len() - 2)].trim_end();
             }
 
