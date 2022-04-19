@@ -1,12 +1,13 @@
 use itertools::Itertools;
 use std::cmp::Ordering;
-use toml_edit::{visit_mut::*, Decor, Document, Formatted, Item, KeyMut, Table, TableLike, Value};
+use toml_edit::{
+    visit_mut::*, Decor, Document, Formatted, Item, KeyMut, Table, TableLike, TomlError, Value,
+};
 
-use crate::Config;
+use crate::{Config, ErrorKind};
 
-#[allow(dead_code)]
-fn format_cargo_toml(content: &str, config: &Config) -> String {
-    let mut doc = content.parse::<toml_edit::Document>().unwrap();
+pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<String, ErrorKind> {
+    let mut doc = content.parse::<toml_edit::Document>()?;
     let rules: Vec<Box<dyn VisitMut>> = vec![
         Box::new(SortSection {
             current_position: 0,
@@ -27,7 +28,14 @@ fn format_cargo_toml(content: &str, config: &Config) -> String {
     for mut rule in rules.into_iter() {
         rule.visit_document_mut(&mut doc);
     }
-    return doc.to_string();
+
+    Ok(doc.to_string())
+}
+
+impl From<TomlError> for ErrorKind {
+    fn from(_: TomlError) -> Self {
+        ErrorKind::ParseError
+    }
 }
 
 /// Sort key names alphabetically within each section, with the exception of the
@@ -363,7 +371,7 @@ mod tests {
         d = "git-rustfmt"
         c = "src/git-rustfmt/main.rs""#;
 
-        let formatted = format_cargo_toml(s, &Default::default());
+        let formatted = format_cargo_toml_inner(s, &Default::default()).unwrap();
 
         #[rustfmt::skip]
         let expected = r#"[package]
