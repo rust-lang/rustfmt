@@ -1,6 +1,7 @@
 use ignore::{self, gitignore};
 
 use crate::config::{FileName, IgnoreList};
+use crate::ErrorKind;
 
 pub(crate) struct IgnorePathSet {
     ignore_set: gitignore::Gitignore,
@@ -27,6 +28,12 @@ impl IgnorePathSet {
                 .matched_path_or_any_parents(p, false)
                 .is_ignore(),
         }
+    }
+}
+
+impl From<ignore::Error> for ErrorKind {
+    fn from(error: ignore::Error) -> Self {
+        ErrorKind::InvalidGlobPattern(error)
     }
 }
 
