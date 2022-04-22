@@ -88,6 +88,10 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
     pub(crate) is_macro_def: bool,
+    // Outer attributes are rewritten before their corresponding items.
+    // To better rewrite whitespace between attributes and items, we keep
+    // track of when the last ast node was an outer attribute.
+    pub(crate) was_last_rewrite_outer_attribute: bool,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -785,6 +789,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             macro_rewrite_failure: false,
             report,
             skip_context: Default::default(),
+            was_last_rewrite_outer_attribute: false,
         }
     }
 
@@ -840,6 +845,15 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let rewrite = attrs.rewrite(&self.get_context(), self.shape());
         let span = mk_sp(attrs[0].span.lo(), attrs[attrs.len() - 1].span.hi());
         self.push_rewrite(span, rewrite);
+
+        // This is version gated because version One doesn't remove extra newlines between
+        // outer attributes and their corresponding items.
+        if self.config.version() == Version::Two
+            && !attrs.is_empty()
+            && style == ast::AttrStyle::Outer
+        {
+            self.was_last_rewrite_outer_attribute = true
+        }
 
         false
     }
