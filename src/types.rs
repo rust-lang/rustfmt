@@ -700,23 +700,22 @@ impl Rewrite for ast::Ty {
 
                 let before_ty_span = mk_sp(cmnt_lo, mt.ty.span.lo());
                 if contains_comment(context.snippet(before_ty_span)) {
-                    result = combine_strs_with_missing_comments(
+                    return combine_strs_with_missing_comments(
                         context,
                         result.trim_end(),
                         &mt.ty.rewrite(context, shape)?,
                         before_ty_span,
                         shape,
                         true,
-                    )?;
-                } else {
-                    let used_width = last_line_width(&result);
-                    let budget = shape.width.checked_sub(used_width)?;
-                    let ty_str = mt
-                        .ty
-                        .rewrite(context, Shape::legacy(budget, shape.indent + used_width))?;
-                    result.push_str(&ty_str);
+                    );
                 }
 
+                let used_width = last_line_width(&result);
+                let budget = shape.width.checked_sub(used_width)?;
+                let ty_str = mt
+                    .ty
+                    .rewrite(context, Shape::legacy(budget, shape.indent + used_width))?;
+                result.push_str(&ty_str);
                 Some(result)
             }
             // FIXME: we drop any comments here, even though it's a silly place to put
