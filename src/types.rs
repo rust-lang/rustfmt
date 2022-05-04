@@ -93,6 +93,19 @@ pub(crate) fn rewrite_path(
     )
 }
 
+/// Determine if the `ast::TyKind` is an explicit `Self`.
+#[allow(dead_code)]
+pub(crate) fn is_self_upper(kind: &ast::TyKind) -> bool {
+    match kind {
+        ast::TyKind::Path(_, ref path) => {
+            // The first segment will be `Self` if it's `kw::SelfUpper`
+            path.segments[0].ident.name == kw::SelfUpper
+        }
+        ast::TyKind::Rptr(_, ast::MutTy { ty, .. }) => is_self_upper(&ty.kind),
+        _ => false,
+    }
+}
+
 fn rewrite_path_segments<'a, I>(
     path_context: PathContext,
     mut buffer: String,
