@@ -689,53 +689,14 @@ impl Rewrite for ast::Ty {
                 rewrite_unary_prefix(context, prefix, &*mt.ty, shape)
             }
             ast::TyKind::Rptr(ref lifetime, ref mt) => {
-                let mut_str = format_mutability(mt.mutbl);
-                let mut_len = mut_str.len();
-                let mut result = String::with_capacity(128);
-                result.push('&');
-                let ref_hi = context.snippet_provider.span_after(self.span(), "&");
-                let mut cmnt_lo = ref_hi;
-
-                if let Some(ref lifetime) = *lifetime {
-                    let lt_budget = shape.width.checked_sub(2 + mut_len)?;
-                    let lt_str = lifetime.rewrite(
-                        context,
-                        Shape::legacy(lt_budget, shape.indent + 2 + mut_len),
-                    )?;
-                    let before_lt_span = mk_sp(cmnt_lo, lifetime.ident.span.lo());
-                    if contains_comment(context.snippet(before_lt_span)) {
-                        result = combine_strs_with_missing_comments(
-                            context,
-                            &result,
-                            &lt_str,
-                            before_lt_span,
-                            shape,
-                            true,
-                        )?;
-                    } else {
-                        result.push_str(&lt_str);
-                    }
-                    result.push(' ');
-                    cmnt_lo = lifetime.ident.span.hi();
-                }
-
-                if ast::Mutability::Mut == mt.mutbl {
-                    let mut_hi = context.snippet_provider.span_after(self.span(), "mut");
-                    let before_mut_span = mk_sp(cmnt_lo, mut_hi - BytePos::from_usize(3));
-                    if contains_comment(context.snippet(before_mut_span)) {
-                        result = combine_strs_with_missing_comments(
-                            context,
-                            result.trim_end(),
-                            mut_str,
-                            before_mut_span,
-                            shape,
-                            true,
-                        )?;
-                    } else {
-                        result.push_str(mut_str);
-                    }
-                    cmnt_lo = mut_hi;
-                }
+                let (mut result, cmnt_lo) = rewrite_reference_and_mutability(
+                    context,
+                    shape,
+                    self.span(),
+                    lifetime.as_ref(),
+                    mt.mutbl,
+                    true,
+                )?;
 
                 let before_ty_span = mk_sp(cmnt_lo, mt.ty.span.lo());
                 if contains_comment(context.snippet(before_ty_span)) {
@@ -849,6 +810,74 @@ impl Rewrite for ast::Ty {
             ),
         }
     }
+}
+
+pub(crate) fn rewrite_reference_and_mutability(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    span: Span,
+    lifetime: Option<&ast::Lifetime>,
+    mutability: ast::Mutability,
+    has_ref: bool,
+) -> Option<(String, BytePos)> {
+    let mut result = String::with_capacity(128);
+    let mut_str = format_mutability(mutability);
+    let mut_len = mut_str.len();
+
+    let mut comment_lo = if has_ref {
+        context.snippet_provider.span_after(span, "&")
+    } else if mutability == ast::Mutability::Mut {
+        let lo = context.snippet_provider.span_after(span, "mut");
+        lo - BytePos::from_usize(3)
+    } else {
+        span.lo()
+    };
+
+    if has_ref {
+        result.push('&');
+    }
+
+    if let Some(lifetime) = lifetime {
+        let lt_budget = shape.width.checked_sub(2 + mut_len)?;
+        let lt_str = lifetime.rewrite(
+            context,
+            Shape::legacy(lt_budget, shape.indent + 2 + mut_len),
+        )?;
+        let before_lt_span = mk_sp(comment_lo, lifetime.ident.span.lo());
+        if contains_comment(context.snippet(before_lt_span)) {
+            result = combine_strs_with_missing_comments(
+                context,
+                &result,
+                &lt_str,
+                before_lt_span,
+                shape,
+                true,
+            )?;
+        } else {
+            result.push_str(&lt_str);
+        }
+        result.push(' ');
+        comment_lo = lifetime.ident.span.hi();
+    }
+
+    if mutability == ast::Mutability::Mut {
+        let mut_hi = context.snippet_provider.span_after(span, "mut");
+        let before_mut_span = mk_sp(comment_lo, mut_hi - BytePos::from_usize(3));
+        if contains_comment(context.snippet(before_mut_span)) {
+            result = combine_strs_with_missing_comments(
+                context,
+                result.trim_end(),
+                mut_str,
+                before_mut_span,
+                shape,
+                true,
+            )?;
+        } else {
+            result.push_str(mut_str);
+        }
+        comment_lo = mut_hi;
+    }
+    Some((result, comment_lo))
 }
 
 fn rewrite_bare_fn(
