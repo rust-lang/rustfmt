@@ -309,6 +309,7 @@ impl Rewrite for ast::MetaItem {
                     } else {
                         SeparatorTactic::Never
                     }),
+                    None,
                 )?
             }
             ast::MetaItemKind::NameValue(ref literal) => {

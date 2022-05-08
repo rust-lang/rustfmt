@@ -756,6 +756,75 @@ trait Lorem {
 
 See also [`fn_params_layout`](#fn_params_layout)
 
+## `fn_call_layout`
+
+Control the layout of arguments in function calls
+
+- **Default value**: `"Tall"`
+- **Possible values**: `"Compressed"`, `"Tall"`, `"Vertical"`
+- **Stable**: No (tracking issue: N/A)
+
+#### `"Tall"` (default):
+
+```rust
+fn main() {
+    lorem(ipsum, dolor, sit, amet);
+    ipsum(
+        dolor,
+        sit,
+        amet,
+        consectetur,
+        adipiscing,
+        elit,
+        vivamus,
+        ipsum,
+        orci,
+        rhoncus,
+        vel,
+        imperdiet,
+    );
+}
+```
+
+#### `"Compressed"`:
+
+```rust
+fn main() {
+    lorem(ipsum, dolor, sit, amet);
+    ipsum(
+        dolor, sit, amet, consectetur, adipiscing, elit, vivamus, ipsum, orci, rhoncus, vel,
+        imperdiet,
+    );
+}
+```
+
+#### `"Vertical"`:
+
+```rust
+fn main() {
+    lorem(
+        ipsum,
+        dolor,
+        sit,
+        amet,
+    );
+    ipsum(
+        dolor,
+        sit,
+        amet,
+        consectetur,
+        adipiscing,
+        elit,
+        vivamus,
+        ipsum,
+        orci,
+        rhoncus,
+        vel,
+        imperdiet,
+    );
+}
+```
+
 ## `fn_call_width`
 
 Maximum width of the args of a function call before falling back to vertical formatting.

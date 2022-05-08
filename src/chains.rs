@@ -253,7 +253,7 @@ impl ChainItem {
             format!("::<{}>", type_list.join(", "))
         };
         let callee_str = format!(".{}{}", rewrite_ident(context, method_name), type_str);
-        rewrite_call(context, &callee_str, &args[1..], span, shape)
+        rewrite_call(context, &callee_str, &args[1..], None, span, shape)
     }
 }
 

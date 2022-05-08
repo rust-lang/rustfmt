@@ -8,8 +8,8 @@ use rustc_ast::{ast, ptr};
 use rustc_span::Span;
 
 use crate::closures;
-use crate::config::lists::*;
 use crate::config::Version;
+use crate::config::{lists::*, Density};
 use crate::expr::{
     can_be_overflowed_expr, is_every_expr_simple, is_method_call, is_nested_call, is_simple_expr,
     rewrite_cond,
@@ -252,6 +252,7 @@ pub(crate) fn rewrite_with_parens<'a, T: 'a + IntoOverflowableItem<'a>>(
     span: Span,
     item_max_width: usize,
     force_separator_tactic: Option<SeparatorTactic>,
+    force_list_tactic: Option<Density>,
 ) -> Option<String> {
     Context::new(
         context,
@@ -263,6 +264,7 @@ pub(crate) fn rewrite_with_parens<'a, T: 'a + IntoOverflowableItem<'a>>(
         ")",
         item_max_width,
         force_separator_tactic,
+        force_list_tactic,
         None,
     )
     .rewrite(shape)
@@ -284,6 +286,7 @@ pub(crate) fn rewrite_with_angle_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
         "<",
         ">",
         context.config.max_width(),
+        None,
         None,
         None,
     )
@@ -314,6 +317,7 @@ pub(crate) fn rewrite_with_square_brackets<'a, T: 'a + IntoOverflowableItem<'a>>
         rhs,
         context.config.array_width(),
         force_separator_tactic,
+        None,
         Some(("[", "]")),
     )
     .rewrite(shape)
@@ -331,6 +335,7 @@ struct Context<'a> {
     item_max_width: usize,
     one_line_width: usize,
     force_separator_tactic: Option<SeparatorTactic>,
+    force_list_tactic: Option<Density>,
     custom_delims: Option<(&'a str, &'a str)>,
 }
 
@@ -345,6 +350,7 @@ impl<'a> Context<'a> {
         suffix: &'static str,
         item_max_width: usize,
         force_separator_tactic: Option<SeparatorTactic>,
+        force_list_tactic: Option<Density>,
         custom_delims: Option<(&'a str, &'a str)>,
     ) -> Context<'a> {
         let used_width = extra_offset(ident, shape);
@@ -369,6 +375,7 @@ impl<'a> Context<'a> {
             item_max_width,
             one_line_width,
             force_separator_tactic,
+            force_list_tactic,
             custom_delims,
         }
     }
@@ -583,6 +590,34 @@ impl<'a> Context<'a> {
             }
             _ => (),
         }
+
+        // we only care if the any element but the last has a sigle line comment
+        let any_but_last_contains_line_comment = list_items
+            .iter()
+            .rev()
+            .skip(1)
+            .any(|item| item.has_single_line_comment());
+
+        match self.force_list_tactic {
+            Some(Density::Tall)
+                if tactic == DefinitiveListTactic::Mixed && any_but_last_contains_line_comment =>
+            {
+                // If we determined a `Mixed` layout, but we configured tall then force
+                // the tactic to be vertical only if any of the items contain single line comments.
+                // Otherwise, the tacitc was properly set above.
+                tactic = DefinitiveListTactic::Vertical
+            }
+            Some(Density::Compressed) if tactic != DefinitiveListTactic::Horizontal => {
+                // Only force a mixed layout if we haven't already decided on going horizontal
+                tactic = DefinitiveListTactic::Mixed
+            }
+            // If we need to force a `Vertical` layout, we should only do so if there are
+            // at least 2 items for us to format. Otherwise, use the tactic already determined.
+            Some(Density::Vertical) if self.items.len() > 1 => {
+                tactic = DefinitiveListTactic::Vertical;
+            }
+            _ => {}
+        };
 
         tactic
     }

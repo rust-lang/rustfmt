@@ -844,6 +844,7 @@ impl Rewrite for ast::Ty {
                 context,
                 "typeof",
                 &[anon_const.value.clone()],
+                None,
                 self.span,
                 shape,
             ),

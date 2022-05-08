@@ -127,6 +127,8 @@ create_config! {
         "(deprecated: use fn_params_layout instead)";
     fn_params_layout: Density, Density::Tall, true,
         "Control the layout of parameters in function signatures.";
+    fn_call_layout: Density, Density::Tall, false,
+        "Control the layout of arguments in a function call";
     brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
     control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,
         "Brace style for control flow constructs";
@@ -654,6 +656,7 @@ match_arm_blocks = true
 match_arm_leading_pipes = "Never"
 force_multiline_blocks = false
 fn_params_layout = "Tall"
+fn_call_layout = "Tall"
 brace_style = "SameLineWhere"
 control_brace_style = "AlwaysSameLine"
 trailing_semicolon = true
