@@ -1,5 +1,5 @@
 // rustfmt-group_imports: StdExternalCrate
-// rustfmt-reorder_imports: false
+// rustfmt-reorder_imports: Off
 
 use chrono::Utc;
 use super::update::convert_publish_payload;

@@ -90,7 +90,8 @@ create_config! {
     merge_imports: bool, false, false, "(deprecated: use imports_granularity instead)";
 
     // Ordering
-    reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
+    reorder_imports: ReorderImports, ReorderImports::Alphabetically, false,
+        "Reorder import and extern crate statements";
     reorder_modules: bool, true, true, "Reorder module statements alphabetically in group";
     reorder_impl_items: bool, false, false, "Reorder impl items";
 
@@ -583,7 +584,7 @@ imports_indent = "Block"
 imports_layout = "Mixed"
 imports_granularity = "Preserve"
 group_imports = "Preserve"
-reorder_imports = true
+reorder_imports = "Alphabetically"
 reorder_modules = true
 reorder_impl_items = false
 type_punctuation_density = "Wide"

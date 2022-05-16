@@ -11,7 +11,7 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::ast;
 use rustc_span::{symbol::sym, Span};
 
-use crate::config::{Config, GroupImportsTactic};
+use crate::config::{Config, GroupImportsTactic, ReorderImports};
 use crate::imports::{normalize_use_trees_with_granularity, UseSegment, UseTree};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{itemize_list, write_list, ListFormatting, ListItem};
@@ -119,7 +119,7 @@ fn rewrite_reorderable_or_regroupable_items(
                 GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
             };
 
-            if context.config.reorder_imports() {
+            if context.config.reorder_imports() == ReorderImports::Alphabetically {
                 regrouped_items.iter_mut().for_each(|items| items.sort())
             }
 
@@ -228,9 +228,9 @@ impl ReorderableItemKind {
 
     fn is_reorderable(self, config: &Config) -> bool {
         match self {
-            ReorderableItemKind::ExternCrate => config.reorder_imports(),
+            ReorderableItemKind::ExternCrate => config.reorder_imports() != ReorderImports::Off,
             ReorderableItemKind::Mod => config.reorder_modules(),
-            ReorderableItemKind::Use => config.reorder_imports(),
+            ReorderableItemKind::Use => config.reorder_imports() != ReorderImports::Off,
             ReorderableItemKind::Other => false,
         }
     }

@@ -1,4 +1,4 @@
-// rustfmt-reorder_imports: true
+// rustfmt-reorder_imports: Alphabetically
 // Reorder imports
 
 use lorem;

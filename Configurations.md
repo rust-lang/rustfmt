@@ -6,7 +6,7 @@ A possible content of `rustfmt.toml` or `.rustfmt.toml` might look like this:
 
 ```toml
 indent_style = "Block"
-reorder_imports = false
+reorder_imports = "Off"
 ```
 
 Each configuration option is either stable or unstable.
@@ -2034,14 +2034,14 @@ impl Iterator for Dummy {
 
 ## `reorder_imports`
 
-Reorder import and extern crate statements alphabetically in groups (a group is
+Reorder import and extern crate statements in groups (a group is
 separated by a newline).
 
-- **Default value**: `true`
-- **Possible values**: `true`, `false`
-- **Stable**: Yes
+- **Default value**: `"Alphabetically"`
+- **Possible values**: `"Alphabetically"`, `"Length"`, `"Off"`
+- **Stable**: No
 
-#### `true` (default):
+#### `"Alphabetically"` (default):
 
 ```rust
 use dolor;
@@ -2050,7 +2050,7 @@ use lorem;
 use sit;
 ```
 
-#### `false`:
+#### `"Off"`:
 
 ```rust
 use lorem;

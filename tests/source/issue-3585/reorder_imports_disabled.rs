@@ -1,5 +1,5 @@
 // rustfmt-inline_attribute_width: 100
-// rustfmt-reorder_imports: false
+// rustfmt-reorder_imports: Off
 
 #[cfg(unix)]
 extern crate crateb;

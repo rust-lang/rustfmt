@@ -8,5 +8,5 @@ trailing_comma = "Vertical"
 indent_style = "Block"
 report_todo = "Always"
 report_fixme = "Never"
-reorder_imports = false
+reorder_imports = "Off"
 format_strings = true
