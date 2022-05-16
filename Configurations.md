@@ -2066,7 +2066,7 @@ Controls the strategy for how consecutive imports are grouped together.
 Controls the strategy for grouping sets of consecutive imports. Imports may contain newlines between imports and still be grouped together as a single set, but other statements between imports will result in different grouping sets.
 
 - **Default value**: `Preserve`
-- **Possible values**: `Preserve`, `StdExternalCrate`, `One`
+- **Possible values**: `Preserve`, `StdExternalCrate`, `One`, `ExternalCrate`
 - **Stable**: No (tracking issue: [#5083](https://github.com/rust-lang/rustfmt/issues/5083))
 
 Each set of imports (one or more `use` statements, optionally separated by newlines) will be formatted independently. Other statements such as `mod ...` or `extern crate ...` will cause imports to not be grouped together.
@@ -2129,6 +2129,26 @@ use core::f32;
 use juniper::{FieldError, FieldResult};
 use std::sync::Arc;
 use uuid::Uuid;
+```
+
+#### `ExternalCrate`:
+
+Discard existing import groups, and create two groups for:
+1. `std`, `core`, `alloc`, and external crates,
+2. `self`, `super` and `crate` imports.
+
+```rust
+use alloc::alloc::Layout;
+use broker::database::PooledConnection;
+use chrono::Utc;
+use core::f32;
+use juniper::{FieldError, FieldResult};
+use std::sync::Arc;
+use uuid::Uuid;
+
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
 ```
 
 ## `reorder_modules`

@@ -114,6 +114,10 @@ pub enum GroupImportsTactic {
     StdExternalCrate,
     /// Discard existing groups, and create a single group for everything
     One,
+    /// Discard existing groups, and create new groups for
+    ///  1. imports from other crates
+    ///  2. `self` / `crate` / `super` imports
+    ExternalCrate,
 }
 
 #[config_type]

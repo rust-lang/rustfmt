@@ -116,7 +116,8 @@ fn rewrite_reorderable_or_regroupable_items(
                 GroupImportsTactic::Preserve | GroupImportsTactic::One => {
                     vec![normalized_items]
                 }
-                GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
+                GroupImportsTactic::StdExternalCrate => group_imports(normalized_items, true),
+                GroupImportsTactic::ExternalCrate => group_imports(normalized_items, false),
             };
 
             if context.config.reorder_imports() {
@@ -172,7 +173,7 @@ fn contains_macro_use_attr(item: &ast::Item) -> bool {
 
 /// Divides imports into three groups, corresponding to standard, external
 /// and local imports. Sorts each subgroup.
-fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
+fn group_imports(uts: Vec<UseTree>, separate_std: bool) -> Vec<Vec<UseTree>> {
     let mut std_imports = Vec::new();
     let mut external_imports = Vec::new();
     let mut local_imports = Vec::new();
@@ -184,7 +185,7 @@ fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
         }
         match &ut.path[0] {
             UseSegment::Ident(id, _) => match id.as_ref() {
-                "std" | "alloc" | "core" => std_imports.push(ut),
+                "std" | "alloc" | "core" if separate_std => std_imports.push(ut),
                 _ => external_imports.push(ut),
             },
             UseSegment::Slf(_) | UseSegment::Super(_) | UseSegment::Crate(_) => {
