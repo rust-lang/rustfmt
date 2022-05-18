@@ -10,8 +10,8 @@ use rustc_span::{
 
 use crate::comment::combine_strs_with_missing_comments;
 use crate::config::lists::*;
-use crate::config::ImportGranularity;
 use crate::config::{Config, Edition, IndentStyle};
+use crate::config::{ImportGranularity, ReorderImports};
 use crate::lists::{
     definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
 };
@@ -19,7 +19,7 @@ use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
-use crate::utils::{is_same_visibility, mk_sp, rewrite_ident};
+use crate::utils::{compare_sliding_order, is_same_visibility, mk_sp, rewrite_ident};
 use crate::visitor::FmtVisitor;
 
 /// Returns a name imported by a `use` declaration.
@@ -547,7 +547,12 @@ impl UseTree {
                 .into_iter()
                 .map(|member| member.normalize(config))
                 .collect::<Vec<_>>();
-            list.sort();
+
+            if config.reorder_imports() == ReorderImports::Alphabetically {
+                list.sort();
+            } else if config.reorder_imports() == ReorderImports::Length {
+                list.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()))
+            }
             last = UseSegment::List(list);
         }
 

@@ -19,7 +19,7 @@ use crate::rewrite::RewriteContext;
 use crate::shape::Shape;
 use crate::source_map::LineRangeUtils;
 use crate::spanned::Spanned;
-use crate::utils::{contains_skip, mk_sp};
+use crate::utils::{compare_sliding_order, contains_skip, mk_sp};
 use crate::visitor::FmtVisitor;
 
 /// Choose the ordering between the given two items.
@@ -121,6 +121,12 @@ fn rewrite_reorderable_or_regroupable_items(
 
             if context.config.reorder_imports() == ReorderImports::Alphabetically {
                 regrouped_items.iter_mut().for_each(|items| items.sort())
+            } else if context.config.reorder_imports() == ReorderImports::Length {
+                regrouped_items.iter_mut().for_each({
+                    |items| {
+                        items.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()))
+                    }
+                })
             }
 
             // 4 = "use ", 1 = ";"
