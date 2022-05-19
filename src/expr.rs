@@ -2110,8 +2110,10 @@ fn shape_from_rhs_tactic(
     shape: Shape,
     rhs_tactic: RhsTactics,
 ) -> Option<Shape> {
+    let using_version_2 = context.config.version() == Version::Two;
+    let no_indent = shape.indent.width() == 0;
     match rhs_tactic {
-        RhsTactics::ForceNextLineWithoutIndent if shape.indent.width() == 0 => shape
+        RhsTactics::ForceNextLineWithoutIndent if no_indent && using_version_2 => shape
             .with_max_width(context.config)
             .sub_width(context.config.tab_spaces()),
         RhsTactics::ForceNextLineWithoutIndent => shape

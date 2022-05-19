@@ -1,3 +1,5 @@
+// rustfmt-version: Two
+
 trait AllTheOthers1: Trait3 + Trait4 + Trait5 + Trait6 + Trait7 + Trait8 + Trait9 + Trait10 + Trait11 + Trait12 + Trait14
 {
 }
