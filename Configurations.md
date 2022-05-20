@@ -1006,6 +1006,38 @@ macro_rules! foo {
 
 See also [`format_macro_matchers`](#format_macro_matchers).
 
+## `format_asm_macro`
+
+Format ``asm!`` macro calls.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#5210](https://github.com/rust-lang/rustfmt/issues/5210))
+
+#### `false` (default):
+
+```rust
+fn main() {
+    let x: u64;
+    unsafe {
+        asm!("mov {}, 5", out(reg) x);
+    }
+}
+```
+
+#### `true`:
+
+```rust
+fn main() {
+    let x: u64;
+    unsafe {
+        asm!(
+            "mov {}, 5",
+            out(reg) x
+        );
+    }
+}
+```
 
 ## `format_strings`
 

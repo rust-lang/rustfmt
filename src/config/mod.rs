@@ -65,6 +65,7 @@ create_config! {
     normalize_doc_attributes: bool, false, false, "Normalize doc attributes as doc comments";
     license_template_path: String, String::default(), false,
         "Beginning of file must match license template";
+    format_asm_macro: bool, false, false, "Format asm! macro calls";
     format_strings: bool, false, false, "Format string literals where necessary";
     format_macro_matchers: bool, false, false,
         "Format the metavariable matching patterns in macros";
@@ -571,6 +572,7 @@ comment_width = 80
 normalize_comments = false
 normalize_doc_attributes = false
 license_template_path = ""
+format_asm_macro = false
 format_strings = false
 format_macro_matchers = false
 format_macro_bodies = true

@@ -1908,11 +1908,9 @@ pub(crate) enum RhsAssignKind<'ast> {
 
 impl<'ast> RhsAssignKind<'ast> {
     // TODO(calebcartwright)
-    // Preemptive addition for handling RHS with chains, not yet utilized.
     // It may make more sense to construct the chain first and then check
     // whether there are actually chain elements.
-    #[allow(dead_code)]
-    fn is_chain(&self) -> bool {
+    pub(crate) fn is_chain(&self) -> bool {
         match self {
             RhsAssignKind::Expr(kind, _) => {
                 matches!(

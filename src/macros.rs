@@ -9,6 +9,8 @@
 // List-like invocations with parentheses will be formatted as function calls,
 // and those with brackets will be formatted as array literals.
 
+use std::borrow::Cow;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -28,15 +30,18 @@ use crate::config::lists::*;
 use crate::expr::{rewrite_array, rewrite_assign_rhs, RhsAssignKind};
 use crate::lists::{itemize_list, write_list, ListFormatting};
 use crate::overflow;
+use crate::parse::macros::asm::{parse_asm, AsmArgs};
 use crate::parse::macros::lazy_static::parse_lazy_static;
-use crate::parse::macros::{parse_expr, parse_macro_args, ParsedMacroArgs};
+use crate::parse::macros::{
+    parse_expr, parse_macro_args, token_stream_ends_with_comma, ParsedMacroArgs,
+};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
-    format_visibility, indent_next_line, is_empty_line, mk_sp, remove_trailing_white_spaces,
-    rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
+    first_line_width, format_visibility, indent_next_line, is_empty_line, mk_sp,
+    remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout, wrap_str, NodeIdExt,
 };
 use crate::visitor::FmtVisitor;
 
@@ -182,6 +187,676 @@ pub(crate) fn rewrite_macro(
     }
 }
 
+/// True if the snippet would fit on the line taking into account indentation and overhead.
+fn fit_on_current_line(snippet: &str, shape: Shape, overhead: usize) -> bool {
+    let one_line_length = snippet.len() + shape.indent.width() + overhead;
+    one_line_length <= shape.width
+}
+
+fn rewrite_asm_templates(
+    asm_args: &AsmArgs<'_>,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    trailing_comma: bool,
+    opener: &str,
+    closer: &str,
+) -> Option<String> {
+    // the terminator and next_span_start are dependant on whether we have operands,
+    // clobber_abis, or options.
+    let (terminator, next_span_start) = if let Some((_, span)) = asm_args.operands().first() {
+        (context.snippet(*span), span.lo())
+    } else if let Some(expr) = asm_args.clobber_abis().first() {
+        (context.snippet(expr.span), expr.span.lo())
+    } else if let Some(expr) = asm_args.options().first() {
+        (context.snippet(expr.span), expr.span.lo())
+    } else {
+        (closer, asm_args.mac().span().hi())
+    };
+
+    // Use a cell::Cell, so we can share and mutate this state in the get_item_string Fn closure
+    let should_indent_after_asm_label = Cell::new(false);
+
+    let templalte_items = itemize_list(
+        context.snippet_provider,
+        asm_args.templates().iter(),
+        terminator,
+        ",",
+        |t| t.span.lo(),
+        |t| t.span.hi(),
+        |t| {
+            // It's a little easier to work with the template strings if we trim
+            // whitespace and the leading and trailing quotation marks.
+            let template = context
+                .snippet(t.span)
+                .trim_matches(|c: char| c == '\"' || c.is_whitespace());
+
+            let is_label = template.ends_with(":") | template.starts_with(".");
+
+            if !is_label && should_indent_after_asm_label.get() {
+                Some(format!("\"    {}\"", template))
+            } else {
+                should_indent_after_asm_label.set(is_label);
+                Some(format!("\"{}\"", template))
+            }
+        },
+        context
+            .snippet_provider
+            .span_after(asm_args.mac().span(), opener),
+        next_span_start,
+        false,
+    )
+    .collect::<Vec<_>>();
+
+    let fmt = ListFormatting::new(shape, context.config)
+        .separator(",")
+        .trailing_separator(if trailing_comma {
+            SeparatorTactic::Always
+        } else {
+            SeparatorTactic::Never
+        });
+
+    write_list(&templalte_items, &fmt)
+}
+
+fn get_asm_operand_named_argument<'a>(
+    span: Span,
+    context: &'a RewriteContext<'_>,
+) -> Option<&'a str> {
+    let snippet = context.snippet(span);
+    let assignment = snippet.find("=");
+    let arrow = snippet.find("=>");
+
+    match (assignment, arrow) {
+        (Some(assignemnt), Some(arrow)) if assignemnt != arrow => {
+            let (argument, _) = snippet.split_once("=")?;
+            Some(argument.trim())
+        }
+        (Some(_), None) => {
+            let (argument, _) = snippet.split_once("=")?;
+            Some(argument.trim())
+        }
+        _ => None,
+    }
+}
+
+fn rewriten_operand_width(
+    named_argument: Option<&str>,
+    operand: &str,
+    in_expr: &str,
+    out_expr: Option<&str>,
+) -> usize {
+    if let Some(named_argument) = named_argument {
+        let arg_len = named_argument.len();
+
+        if let Some(out_expr) = out_expr {
+            // +8 to account for spaces, operators, and comma:
+            //    `argument = operand in_expr => out_expr,`
+            // if there is an out_expr we consider the entire length, becuase if we're too
+            // long we need to break before the =>
+            arg_len + operand.len() + in_expr.len() + out_expr.len() + 8
+        } else {
+            // +5 to account for spaces, operators, and comma: `argument = operand in_expr,`
+            arg_len + operand.len() + first_line_width(in_expr) + 5
+        }
+    } else {
+        if let Some(out_expr) = out_expr {
+            // +6 to account for spaces operator, and comma: `operand in_expr => out_expr,`
+            // if there is an out_expr we consider the entire length, becuase if we're too
+            // long we need to break before the =>
+            operand.len() + in_expr.len() + out_expr.len() + 6
+        } else {
+            // +2 to account for space and comma: `operand expr,`
+            operand.len() + first_line_width(in_expr) + 2
+        }
+    }
+}
+
+/// When the expression is optional, the None variant corresponds to "_"
+fn rewrite_optional_operand_expr<'a>(
+    expr: Option<&ptr::P<ast::Expr>>,
+    context: &'a RewriteContext<'_>,
+    shape: Shape,
+) -> Option<Cow<'a, str>> {
+    if let Some(expr) = expr {
+        Some(Cow::Owned(expr.rewrite(context, shape)?))
+    } else {
+        Some(Cow::Borrowed("_"))
+    }
+}
+
+fn rewrite_asm_split_inout_operand(
+    mut result: String,
+    named_argument: Option<&str>,
+    operand_name: &str,
+    reg: &ast::InlineAsmRegOrRegClass,
+    in_expr: &ptr::P<ast::Expr>,
+    out_expr: Option<&ptr::P<ast::Expr>>,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> Option<String> {
+    let nested_shape = shape.block_indent(context.config.tab_spaces());
+    let operand = rewrite_operand(operand_name, Some(reg));
+    let in_expression = in_expr.rewrite(context, nested_shape)?;
+    let out_expression = rewrite_optional_operand_expr(out_expr, context, nested_shape)?;
+
+    let content_width = rewriten_operand_width(
+        named_argument,
+        &operand,
+        &in_expression,
+        Some(&out_expression),
+    );
+
+    if content_width + shape.indent.width() <= shape.width {
+        if named_argument.is_some() {
+            result.push(' ');
+        }
+        debug!("Result before: {}", &result);
+        debug!("call single_line");
+        single_line_split_inout_operand(&mut result, &operand, &in_expression, &out_expression);
+        debug!("Result after: {}", &result);
+        debug!("return after single_line");
+        return Some(result);
+    }
+
+    // could not rewrite on a single line so decide where to break.
+    if named_argument.is_some() {
+        result.push_str(&nested_shape.to_string_with_newline(context.config));
+
+        let content_width =
+            rewriten_operand_width(None, &operand, &in_expression, Some(&out_expression));
+
+        let fit_on_next_line = content_width + shape.indent.width() <= shape.width;
+
+        if fit_on_next_line {
+            single_line_split_inout_operand(&mut result, &operand, &in_expression, &out_expression);
+            Some(result)
+        } else {
+            rewrite_split_inout_mandatory_break(
+                result,
+                &operand,
+                in_expr,
+                out_expr,
+                context,
+                nested_shape,
+            )
+        }
+    } else {
+        rewrite_split_inout_mandatory_break(result, &operand, in_expr, out_expr, context, shape)
+    }
+}
+
+fn single_line_split_inout_operand(
+    result: &mut String,
+    operand: &str,
+    in_expr: &str,
+    out_expr: &str,
+) {
+    result.push_str(&operand);
+    result.push(' ');
+    result.push_str(&in_expr);
+    result.push_str(" => ");
+    result.push_str(&out_expr);
+}
+
+fn rewrite_split_inout_mandatory_break(
+    mut result: String,
+    operand: &str,
+    in_expr: &ptr::P<ast::Expr>,
+    out_expr: Option<&ptr::P<ast::Expr>>,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> Option<String> {
+    debug!("{:#?}", in_expr.kind);
+    let in_expression = in_expr.rewrite(context, shape)?;
+    let nested_shape = shape.block_indent(context.config.tab_spaces());
+    // Since we know we need to break the out_exp needs to be rewritten with the nested shape.
+    let out_expression = rewrite_optional_operand_expr(out_expr, context, nested_shape)?;
+
+    result.push_str(&operand);
+    result.push(' ');
+    result.push_str(&in_expression);
+    result.push_str(&nested_shape.to_string_with_newline(context.config));
+    result.push_str("=> ");
+    result.push_str(&out_expression);
+    Some(result)
+}
+
+/// Format simple asm operand which are followed by an expression,
+/// and optionally preceded by an assignemnt expression.
+fn rewrite_single_expr_asm_operand(
+    mut result: String,
+    named_argument: Option<&str>,
+    operand_name: &str,
+    reg: Option<&ast::InlineAsmRegOrRegClass>,
+    expr: Option<&ptr::P<ast::Expr>>,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> Option<String> {
+    let expression = rewrite_optional_operand_expr(expr, context, shape)?;
+    let operand = rewrite_operand(operand_name, reg);
+    let content_width = rewriten_operand_width(named_argument, &operand, &expression, None);
+
+    if content_width + shape.indent.width() <= shape.width {
+        // Best case scenario everything fits on one line
+        if named_argument.is_some() {
+            result.push_str(" ");
+        }
+        result.push_str(&operand);
+        result.push_str(" ");
+        result.push_str(&expression);
+        return Some(result);
+    }
+
+    let nested_shape = shape.block_indent(context.config.tab_spaces());
+
+    let is_const = operand_name == "const";
+    let is_sym = operand_name == "sym";
+    if is_const || is_sym {
+        // Although we don't fit on one line there isn't any recoomendation for breaking
+        // const and sym operand
+        if named_argument.is_some() {
+            result.push_str(&nested_shape.to_string_with_newline(context.config));
+            result.push_str(&operand);
+            result.push_str(" ");
+            let expression = rewrite_optional_operand_expr(expr, context, nested_shape)?;
+            result.push_str(&expression);
+        } else {
+            result.push_str(&operand);
+            result.push_str(" ");
+            result.push_str(&expression);
+        }
+        return Some(result);
+    }
+
+    // could not rewrite on a single line so decide where to break.
+    if named_argument.is_none() {
+        // No named argument so we know we have to break after the operand.
+        result.push_str(&operand);
+        result.push_str(&nested_shape.to_string_with_newline(context.config));
+        let expression = rewrite_optional_operand_expr(expr, context, nested_shape)?;
+        result.push_str(&expression);
+    } else {
+        // There is a named argument so move to the next line and check if everything fits then.
+        result.push_str(&nested_shape.to_string_with_newline(context.config));
+        result.push_str(&operand);
+        let content_width = rewriten_operand_width(None, &operand, &expression, None);
+        if content_width + shape.indent.width() <= shape.width {
+            // The operand and the expr fit on the next line!
+            result.push_str(" ");
+            let expression = rewrite_optional_operand_expr(expr, context, nested_shape)?;
+            result.push_str(&expression);
+        } else {
+            // The operand and expr don't fit on the next line either so break after the operand
+            let deeply_nested_shape = nested_shape.block_indent(context.config.tab_spaces());
+            result.push_str(&deeply_nested_shape.to_string_with_newline(context.config));
+            let expression = rewrite_optional_operand_expr(expr, context, deeply_nested_shape)?;
+            result.push_str(&expression);
+        }
+    }
+
+    Some(result)
+}
+
+/// wrapper for ast::InlineAsmOperand, which we can more conveniently implement
+/// rewrite::Rewrite for, since we have access to the entire span for the operand.
+struct InlineAsmOperand<'a> {
+    operand: &'a ast::InlineAsmOperand,
+    span: Span,
+}
+
+fn rewrite_operand<'a>(
+    operand_name: &'a str,
+    reg: Option<&ast::InlineAsmRegOrRegClass>,
+) -> Cow<'a, str> {
+    if let Some(register) = reg {
+        let mut result = String::from(operand_name);
+        result.push('(');
+
+        match register {
+            ast::InlineAsmRegOrRegClass::Reg(symbol) => {
+                result.push('\"');
+                result.push_str(symbol.as_str());
+                result.push('\"');
+            }
+            ast::InlineAsmRegOrRegClass::RegClass(symbol) => result.push_str(symbol.as_str()),
+        }
+
+        result.push(')');
+        Cow::Owned(result)
+    } else {
+        Cow::Borrowed(operand_name)
+    }
+}
+
+impl<'a> Rewrite for InlineAsmOperand<'a> {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        let mut result = String::new();
+        let named_argument = get_asm_operand_named_argument(self.span, context);
+
+        if let Some(argument) = named_argument {
+            result.push_str(argument);
+            result.push_str(" =");
+        }
+
+        use ast::InlineAsmOperand::*;
+        match self.operand {
+            In { reg, expr } => rewrite_single_expr_asm_operand(
+                result,
+                named_argument,
+                "in",
+                Some(reg),
+                Some(expr),
+                context,
+                shape,
+            ),
+            Out { reg, late, expr } => {
+                let operand_name = if *late { "lateout" } else { "out" };
+                rewrite_single_expr_asm_operand(
+                    result,
+                    named_argument,
+                    operand_name,
+                    Some(reg),
+                    expr.as_ref(),
+                    context,
+                    shape,
+                )
+            }
+            InOut { reg, expr, late } => {
+                let operand_name = if *late { "inlateout" } else { "inout" };
+                rewrite_single_expr_asm_operand(
+                    result,
+                    named_argument,
+                    operand_name,
+                    Some(reg),
+                    Some(expr),
+                    context,
+                    shape,
+                )
+            }
+            SplitInOut {
+                reg,
+                late,
+                in_expr,
+                out_expr,
+            } => {
+                let operand_name = if *late { "inlateout" } else { "inout" };
+                rewrite_asm_split_inout_operand(
+                    result,
+                    named_argument,
+                    operand_name,
+                    reg,
+                    in_expr,
+                    out_expr.as_ref(),
+                    context,
+                    shape,
+                )
+            }
+            Const { anon_const } => rewrite_single_expr_asm_operand(
+                result,
+                named_argument,
+                "const",
+                None,
+                Some(&anon_const.value),
+                context,
+                shape,
+            ),
+            Sym { expr } => rewrite_single_expr_asm_operand(
+                result,
+                named_argument,
+                "sym",
+                None,
+                Some(expr),
+                context,
+                shape,
+            ),
+        }
+    }
+}
+
+fn rewrite_asm_operands(
+    asm_args: &AsmArgs<'_>,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    trailing_comma: bool,
+    closer: &str,
+) -> Option<String> {
+    // There should always be at least one proceeding asm template
+    let prev_span_end = asm_args.templates().last()?.span.hi();
+
+    let (terminator, next_span_start) = if let Some(expr) = asm_args.clobber_abis().first() {
+        ("clobber_abi", expr.span.lo())
+    } else if let Some(expr) = asm_args.options().first() {
+        ("options", expr.span.lo())
+    } else {
+        (closer, asm_args.mac().span().hi())
+    };
+
+    let iter = asm_args
+        .operands()
+        .iter()
+        .map(|(operand, span)| InlineAsmOperand {
+            operand,
+            span: span.clone(),
+        });
+
+    let operands = itemize_list(
+        context.snippet_provider,
+        iter,
+        terminator,
+        ",",
+        |operand| operand.span.lo(),
+        |operand| operand.span.hi(),
+        |operand| operand.rewrite(context, shape),
+        prev_span_end,
+        next_span_start,
+        false,
+    )
+    .collect::<Vec<_>>();
+
+    let fmt = ListFormatting::new(shape, context.config)
+        .separator(",")
+        .tactic(DefinitiveListTactic::Vertical)
+        .trailing_separator(if trailing_comma {
+            SeparatorTactic::Always
+        } else {
+            SeparatorTactic::Never
+        });
+
+    write_list(&operands, &fmt)
+}
+
+fn rewrite_asm_clobber_abis(
+    asm_args: &AsmArgs<'_>,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    trailing_comma: bool,
+    closer: &str,
+) -> Option<String> {
+    // previous span is either the operands or the templates.
+    let prev_span_end = if let Some((_, span)) = asm_args.operands().last() {
+        span.hi()
+    } else {
+        // there should alwys be at least one template.
+        asm_args.templates().last()?.span.hi()
+    };
+
+    // terminator and next_span_start are dependant on whether there are asm options or not.
+    let (terminator, next_span_start) = if let Some(expr) = asm_args.options().first() {
+        ("options", expr.span.lo())
+    } else {
+        (closer, asm_args.mac().span().hi())
+    };
+
+    let clobber_abis = itemize_list(
+        context.snippet_provider,
+        asm_args.clobber_abis().iter(),
+        terminator,
+        ",",
+        |expr| expr.span.lo(),
+        |expr| expr.span.hi(),
+        |expr| {
+            // There isn't any guidance on how to break clobber_abis.
+            Some(context.snippet(expr.span).trim().to_owned())
+        },
+        prev_span_end,
+        next_span_start,
+        false,
+    )
+    .collect::<Vec<_>>();
+
+    let fmt = ListFormatting::new(shape, context.config)
+        .separator(",")
+        .tactic(DefinitiveListTactic::Vertical)
+        .trailing_separator(if trailing_comma {
+            SeparatorTactic::Always
+        } else {
+            SeparatorTactic::Never
+        });
+
+    write_list(&clobber_abis, &fmt)
+}
+
+fn rewrite_asm_options(
+    asm_args: &AsmArgs<'_>,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    trailing_comma: bool,
+    closer: &str,
+) -> Option<String> {
+    // previous span is either the clober_abis, operands, or the templates.
+    let prev_span_end = if let Some(expr) = asm_args.clobber_abis().last() {
+        expr.span.hi()
+    } else if let Some((_, span)) = asm_args.operands().last() {
+        span.hi()
+    } else {
+        // there should alwys be at least one template.
+        asm_args.templates().last()?.span.hi()
+    };
+
+    let items = itemize_list(
+        context.snippet_provider,
+        asm_args.options().iter(),
+        closer,
+        ",",
+        |expr| expr.span.lo(),
+        |expr| expr.span.hi(),
+        |expr| expr.rewrite(context, shape),
+        prev_span_end,
+        asm_args.mac().span().hi(),
+        false,
+    )
+    .collect::<Vec<_>>();
+
+    let fmt = ListFormatting::new(shape, context.config)
+        .separator(",")
+        .tactic(DefinitiveListTactic::Vertical)
+        .trailing_separator(if trailing_comma {
+            SeparatorTactic::Always
+        } else {
+            SeparatorTactic::Never
+        });
+
+    write_list(&items, &fmt)
+}
+
+/// There is a special style guide for rewriting the ``asm!()`` macro.
+/// See <https://github.com/rust-dev-tools/fmt-rfcs/issues/152#issuecomment-995004152>
+fn rewrite_asm_macro(
+    mac: &ast::MacCall,
+    extra_ident: Option<symbol::Ident>,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    style: DelimToken,
+    position: MacroPosition,
+    trailing_comma: bool,
+) -> Option<String> {
+    let asm_args = parse_asm(context, mac)?;
+
+    let mut result = String::with_capacity(1024);
+    let macro_name = rewrite_macro_name(context, &mac.path, extra_ident);
+    result.push_str(&macro_name);
+
+    let (opener, closer) = match style {
+        DelimToken::Paren => {
+            result.push_str("(");
+            ("(", ")")
+        }
+        DelimToken::Brace => {
+            result.push_str(" {");
+            ("{", "}")
+        }
+        DelimToken::Bracket => {
+            result.push_str("[");
+            ("[", "]")
+        }
+        _ => unreachable!(),
+    };
+
+    let nested_shape = shape
+        .block_indent(context.config.tab_spaces())
+        .with_max_width(context.config);
+
+    let snippet = context.snippet(mac.span());
+    let macro_is_too_long = !fit_on_current_line(snippet, shape, 0);
+    let mutiple_templates = asm_args.templates().len() > 1;
+    let has_operands = !asm_args.operands().is_empty();
+    let has_clobber_abis = !asm_args.clobber_abis().is_empty();
+    let has_options = !asm_args.options().is_empty();
+    let must_add_newline =
+        macro_is_too_long || mutiple_templates || has_operands || has_clobber_abis || has_options;
+
+    let templates = rewrite_asm_templates(
+        &asm_args,
+        context,
+        nested_shape,
+        trailing_comma || has_operands || has_clobber_abis || has_options,
+        opener,
+        closer,
+    )?;
+
+    if must_add_newline {
+        result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
+        result.push_str(&templates);
+    } else {
+        result.push_str(&templates);
+    }
+
+    if has_operands {
+        result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
+        let trailing_comma = trailing_comma || has_clobber_abis || has_options;
+        let operands =
+            rewrite_asm_operands(&asm_args, context, nested_shape, trailing_comma, closer)?;
+        result.push_str(&operands);
+    }
+
+    if has_clobber_abis {
+        result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
+        let trailing_comma = trailing_comma || has_options;
+        let clobber_abis =
+            rewrite_asm_clobber_abis(&asm_args, context, nested_shape, trailing_comma, closer)?;
+        result.push_str(&clobber_abis);
+    }
+
+    if has_options {
+        result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
+        let options =
+            rewrite_asm_options(&asm_args, context, nested_shape, trailing_comma, closer)?;
+        result.push_str(&options);
+    }
+
+    if must_add_newline {
+        result.push_str(&shape.indent.to_string_with_newline(context.config));
+    }
+
+    result.push_str(closer);
+
+    if matches!(position, MacroPosition::Item) && mac.args.need_semicolon() {
+        result.push(';')
+    }
+
+    Some(result)
+}
+
 fn rewrite_macro_inner(
     mac: &ast::MacCall,
     extra_ident: Option<symbol::Ident>,
@@ -224,6 +899,21 @@ fn rewrite_macro_inner(
             _ => unreachable!(),
         };
     }
+
+    // Format well-known asm! macro
+    if context.config.format_asm_macro() && macro_name.ends_with("asm!") {
+        let trailing_comma = token_stream_ends_with_comma(mac.args.inner_tokens());
+        return rewrite_asm_macro(
+            mac,
+            extra_ident,
+            context,
+            shape,
+            style,
+            position,
+            trailing_comma,
+        );
+    }
+
     // Format well-known macros which cannot be parsed as a valid AST.
     if macro_name == "lazy_static!" && !has_comment {
         if let success @ Some(..) = format_lazy_static(context, shape, ts.trees().collect()) {
