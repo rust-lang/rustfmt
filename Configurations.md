@@ -1014,6 +1014,39 @@ macro_rules! foo {
 
 See also [`format_macro_matchers`](#format_macro_matchers).
 
+## `skip_macro_names`
+
+Skip formatting the bodies of macros invoked with the following names.
+
+- **Default value**: `[]`
+- **Possible values**: a list of macro name idents, `["name_0", "name_1", ...]`
+- **Stable**: No (tracking issue: [#5346](https://github.com/rust-lang/rustfmt/issues/5346))
+
+#### `[]` (default):
+
+```rust
+macro_rules! foo {
+    ($a: ident : $b: ty) => {
+        $a(42): $b;
+    };
+    ($a: ident $b: ident $c: ident) => {
+        $a = $b + $c;
+    };
+}
+```
+
+#### `["foo"]`:
+
+```rust
+#![rustfmt::skip]
+
+macro_rules! foo {
+    ($a: ident : $b: ty) => { $a(42): $b; };
+    ($a: ident $b: ident $c: ident) => { $a=$b+$c; };
+}
+```
+
+See also [`format_macro_bodies`](#format_macro_bodies).
 
 ## `format_strings`
 

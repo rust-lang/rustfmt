@@ -770,6 +770,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         snippet_provider: &'a SnippetProvider,
         report: FormatReport,
     ) -> FmtVisitor<'a> {
+        let mut skip_context = SkipContext::default();
+        skip_context.update_macros(config.skip_macro_names().into_name_strings());
         FmtVisitor {
             parent_context: None,
             parse_sess: parse_session,
@@ -784,7 +786,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             is_macro_def: false,
             macro_rewrite_failure: false,
             report,
-            skip_context: Default::default(),
+            skip_context,
         }
     }
 

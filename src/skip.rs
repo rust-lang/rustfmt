@@ -23,6 +23,13 @@ impl SkipContext {
         self.attributes.append(&mut other.attributes);
     }
 
+    pub(crate) fn update_macros<T>(&mut self, other: T)
+    where
+        T: IntoIterator<Item = String>,
+    {
+        self.macros.extend(other.into_iter());
+    }
+
     pub(crate) fn skip_macro(&self, name: &str) -> bool {
         self.macros.iter().any(|n| n == name)
     }

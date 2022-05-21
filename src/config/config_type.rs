@@ -1,4 +1,5 @@
 use crate::config::file_lines::FileLines;
+use crate::config::macro_names::MacroNames;
 use crate::config::options::{IgnoreList, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
@@ -43,6 +44,12 @@ impl ConfigType for String {
 impl ConfigType for FileLines {
     fn doc_hint() -> String {
         String::from("<json>")
+    }
+}
+
+impl ConfigType for MacroNames {
+    fn doc_hint() -> String {
+        String::from("[<string>, ...]")
     }
 }
 

@@ -13,6 +13,8 @@ pub use crate::config::file_lines::{FileLines, FileName, Range};
 #[allow(unreachable_pub)]
 pub use crate::config::lists::*;
 #[allow(unreachable_pub)]
+pub use crate::config::macro_names::MacroNames;
+#[allow(unreachable_pub)]
 pub use crate::config::options::*;
 
 #[macro_use]
@@ -22,6 +24,7 @@ pub(crate) mod options;
 
 pub(crate) mod file_lines;
 pub(crate) mod lists;
+pub(crate) mod macro_names;
 
 // This macro defines configuration options used in rustfmt. Each option
 // is defined as follows:
@@ -67,6 +70,8 @@ create_config! {
     format_macro_matchers: bool, false, false,
         "Format the metavariable matching patterns in macros";
     format_macro_bodies: bool, true, false, "Format the bodies of macros";
+    skip_macro_names: MacroNames, MacroNames::default(), false,
+        "Skip formatting the bodies of macros invoked with the following names.";
     hex_literal_case: HexLiteralCase, HexLiteralCase::Preserve, false,
         "Format hexadecimal integer literals";
 
@@ -611,6 +616,7 @@ normalize_doc_attributes = false
 format_strings = false
 format_macro_matchers = false
 format_macro_bodies = true
+skip_macro_names = []
 hex_literal_case = "Preserve"
 empty_item_single_line = true
 struct_lit_single_line = true
