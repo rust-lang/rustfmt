@@ -12,7 +12,7 @@ use rustc_ast::ast;
 use rustc_span::{symbol::sym, Span};
 
 use crate::config::{Config, GroupImportsTactic, ReorderImports};
-use crate::imports::{normalize_use_trees_with_granularity, UseSegment, UseTree};
+use crate::imports::{normalize_use_trees_with_granularity, UseSegment, UseTree, ImportsVector};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{itemize_list, write_list, ListFormatting, ListItem};
 use crate::rewrite::RewriteContext;
@@ -90,6 +90,7 @@ fn rewrite_reorderable_or_regroupable_items(
                 .iter()
                 .filter_map(|item| UseTree::from_ast_with_normalization(context, item))
                 .collect();
+            let mut normalized_items = ImportsVector::new(normalized_items, context.config.reorder_imports());
             let cloned = normalized_items.clone();
             // Add comments before merging.
             let list_items = itemize_list(
@@ -124,7 +125,7 @@ fn rewrite_reorderable_or_regroupable_items(
             } else if context.config.reorder_imports() == ReorderImports::Length {
                 regrouped_items.iter_mut().for_each({
                     |items| {
-                        items.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()))
+                        items.sort_by(|a, b| {println!("list a: {:?}", a); println!("list b: {:?}", b); compare_sliding_order(&a.to_string(), &b.to_string())})
                     }
                 })
             }
@@ -135,17 +136,18 @@ fn rewrite_reorderable_or_regroupable_items(
                 .into_iter()
                 .filter(|use_group| !use_group.is_empty())
                 .map(|use_group| {
+                    println!("use_group: {:?}", use_group);
                     let item_vec: Vec<_> = use_group
                         .into_iter()
-                        .map(|use_tree| ListItem {
+                        .map(|use_tree| {println!("use_tree: {:?}", use_tree); ListItem {
                             item: use_tree.rewrite_top_level(context, nested_shape),
                             ..use_tree.list_item.unwrap_or_else(ListItem::empty)
-                        })
+                        }})
                         .collect();
                     wrap_reorderable_items(context, &item_vec, nested_shape)
                 })
                 .collect::<Option<Vec<_>>>()?;
-
+            println!("item_vec: {:?}", item_vec);
             let join_string = format!("\n\n{}", shape.indent.to_string(context.config));
             Some(item_vec.join(&join_string))
         }

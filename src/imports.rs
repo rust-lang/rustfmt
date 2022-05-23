@@ -109,6 +109,12 @@ pub(crate) struct UseTree {
     attrs: Option<Vec<ast::Attribute>>,
 }
 
+#[derive(Clone)]
+pub(crate) struct ImportsVector {
+    pub(crate) list: Vec<UseTree>,
+    reorder_config: ReorderImports,
+}
+
 impl PartialEq for UseTree {
     fn eq(&self, other: &UseTree) -> bool {
         self.path == other.path
@@ -198,6 +204,7 @@ pub(crate) fn normalize_use_trees_with_granularity(
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
         if use_tree.has_comment() || use_tree.attrs.is_some() {
+            println!("use_tree normalize: {:?}", use_tree);
             result.push(use_tree);
             continue;
         }
@@ -205,7 +212,7 @@ pub(crate) fn normalize_use_trees_with_granularity(
         for mut flattened in use_tree.flatten(import_granularity) {
             if let Some(tree) = result
                 .iter_mut()
-                .find(|tree| tree.share_prefix(&flattened, merge_by))
+                .find(|tree| {println!("tree normalize: {:?}", tree); tree.share_prefix(&flattened, merge_by)})
             {
                 tree.merge(&flattened, merge_by);
             } else {
@@ -213,10 +220,12 @@ pub(crate) fn normalize_use_trees_with_granularity(
                 if merge_by == SharedPrefix::Module {
                     flattened = flattened.nest_trailing_self();
                 }
+                println!("flattened normalize: {:?}", flattened);
                 result.push(flattened);
             }
         }
     }
+    println!("result: {:?}", result);
     result
 }
 
@@ -553,6 +562,7 @@ impl UseTree {
             } else if config.reorder_imports() == ReorderImports::Length {
                 list.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()))
             }
+            println!("list: {:?}", list);
             last = UseSegment::List(list);
         }
 
@@ -667,6 +677,67 @@ impl UseTree {
             )]));
         }
         self
+    }
+}
+
+impl ImportsVector {
+    pub(crate) fn new(list: Vec<UseTree>, reorder_config: ReorderImports) -> Self {
+        ImportsVector{list, reorder_config}
+    }
+
+    pub(crate) fn sort(&mut self) {
+        if self.reorder_config == ReorderImports::Alphabetically {
+            self.list.sort();
+        } else if self.reorder_config == ReorderImports::Length {
+            self.list.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()));
+        }
+    }
+
+    pub(crate) fn iter(self: &Self) -> impl Iterator<Item=&UseTree> {
+        self.list.iter()
+    }
+
+    pub(crate) fn into_iter(self: Self) -> impl Iterator<Item=UseTree> {
+        self.list.into_iter()
+    }
+
+    pub(crate) fn iter_mut(self: &mut Self) -> impl Iterator<Item=UseTree> {
+        let mut_iterator = ImportsVectorIterator::new(self.list);
+        mut_iterator.iter_mut()
+
+    }
+}
+
+/*impl IntoIterator for ImportsVector {
+    type Item = UseTree;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.list.into_iter()
+    }
+}*/
+
+struct ImportsVectorIterator {
+    list: Vec<UseTree>,
+    index: usize,
+}
+
+impl ImportsVectorIterator {
+    fn new(list: Vec<UseTree>) -> Self {
+        ImportsVectorIterator {
+            list: list,
+            index: 0,
+        }
+    }
+}
+
+impl Iterator for ImportsVectorIterator {
+    type Item = UseTree;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = self.list[self.index];
+        self.index += 1;
+        result
     }
 }
 
