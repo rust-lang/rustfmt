@@ -190,11 +190,11 @@ impl UseSegment {
 }
 
 pub(crate) fn normalize_use_trees_with_granularity(
-    use_trees: Vec<UseTree>,
+    use_trees: ImportsVector,
     import_granularity: ImportGranularity,
-) -> Vec<UseTree> {
+) -> ImportsVector {
     let merge_by = match import_granularity {
-        ImportGranularity::Item => return flatten_use_trees(use_trees, ImportGranularity::Item),
+        ImportGranularity::Item => return ImportsVector::from(flatten_use_trees(use_trees, ImportGranularity::Item), use_trees.reorder_config()),
         ImportGranularity::Preserve => return use_trees,
         ImportGranularity::Crate => SharedPrefix::Crate,
         ImportGranularity::Module => SharedPrefix::Module,
@@ -225,12 +225,13 @@ pub(crate) fn normalize_use_trees_with_granularity(
             }
         }
     }
-    println!("result: {:?}", result);
+
+    let result = ImportsVector::from(use_trees.list, use_trees.reorder_config());
     result
 }
 
 fn flatten_use_trees(
-    use_trees: Vec<UseTree>,
+    use_trees: ImportsVector,
     import_granularity: ImportGranularity,
 ) -> Vec<UseTree> {
     use_trees
@@ -681,8 +682,20 @@ impl UseTree {
 }
 
 impl ImportsVector {
-    pub(crate) fn new(list: Vec<UseTree>, reorder_config: ReorderImports) -> Self {
+    pub(crate) fn new(reorder_config: ReorderImports) -> Self {
+        let list: Vec::<UseTree> = Vec::<UseTree>::new();
+        ImportsVector {
+            list,
+            reorder_config,
+        }
+    }
+
+    pub(crate) fn from(list: Vec<UseTree>, reorder_config: ReorderImports) -> Self {
         ImportsVector{list, reorder_config}
+    }
+
+    pub(crate) fn reorder_config(&self) -> ReorderImports {
+        self.reorder_config
     }
 
     pub(crate) fn sort(&mut self) {
@@ -693,6 +706,18 @@ impl ImportsVector {
         }
     }
 
+    pub(crate) fn is_empty(&mut self) -> bool {
+        self.is_empty()
+    }
+
+    pub(crate) fn push(self: &mut Self, item: UseTree) {
+        self.list.push(item);
+    }
+
+    pub(crate) fn len(self: &Self) -> usize {
+        self.list.len()
+    }
+
     pub(crate) fn iter(self: &Self) -> impl Iterator<Item=&UseTree> {
         self.list.iter()
     }
@@ -701,43 +726,18 @@ impl ImportsVector {
         self.list.into_iter()
     }
 
-    pub(crate) fn iter_mut(self: &mut Self) -> impl Iterator<Item=UseTree> {
-        let mut_iterator = ImportsVectorIterator::new(self.list);
-        mut_iterator.iter_mut()
+    pub(crate) fn iter_mut(self: &mut Self) -> std::slice::IterMut<'_, UseTree> {
+        self.list.iter_mut()
 
     }
 }
 
-/*impl IntoIterator for ImportsVector {
+impl IntoIterator for ImportsVector {
     type Item = UseTree;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = Box<dyn Iterator<Item=UseTree>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.list.into_iter()
-    }
-}*/
-
-struct ImportsVectorIterator {
-    list: Vec<UseTree>,
-    index: usize,
-}
-
-impl ImportsVectorIterator {
-    fn new(list: Vec<UseTree>) -> Self {
-        ImportsVectorIterator {
-            list: list,
-            index: 0,
-        }
-    }
-}
-
-impl Iterator for ImportsVectorIterator {
-    type Item = UseTree;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let result = self.list[self.index];
-        self.index += 1;
-        result
+        Box::new(self.list.into_iter())
     }
 }
 
