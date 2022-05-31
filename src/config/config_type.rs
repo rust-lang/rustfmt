@@ -296,7 +296,6 @@ macro_rules! create_config {
                     }
                 )+
             }
-            
             /*#[allow(unreachable_pub)]
             pub fn reorder_imports(&self) -> ReorderImports {
                 self.reorder_imports

@@ -10,7 +10,7 @@ use rustc_span::{
 
 use crate::comment::combine_strs_with_missing_comments;
 use crate::config::lists::*;
-use crate::config::{Config, Edition, IndentStyle};
+use crate::config::{Edition, IndentStyle};
 use crate::config::{ImportGranularity, ReorderImports};
 use crate::lists::{
     definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
@@ -107,12 +107,6 @@ pub(crate) struct UseTree {
     // Should we have another struct for top-level use items rather than reusing this?
     visibility: Option<ast::Visibility>,
     attrs: Option<Vec<ast::Attribute>>,
-}
-
-#[derive(Clone)]
-pub(crate) struct ImportsVector {
-    pub(crate) list: Vec<UseTree>,
-    reorder_config: ReorderImports,
 }
 
 impl PartialEq for UseTree {
@@ -658,7 +652,9 @@ impl UseTree {
                 break;
             }
         }
-        if let Some(new_path) = merge_rest(&self.path, &other.path, prefix, merge_by, reorder_imports) {
+        if let Some(new_path) =
+            merge_rest(&self.path, &other.path, prefix, merge_by, reorder_imports)
+        {
             self.path = new_path;
             self.span = self.span.to(other.span);
         }
@@ -722,13 +718,22 @@ fn merge_rest(
         UseTree::from_path(a[len..].to_vec(), DUMMY_SP),
         UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
     ];
-    list.sort();
+    if reorder_imports == ReorderImports::Alphabetically {
+        list.sort();
+    } else if reorder_imports == ReorderImports::Length {
+        list.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()));
+    }
     let mut new_path = b[..len].to_vec();
     new_path.push(UseSegment::List(list));
     Some(new_path)
 }
 
-fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: SharedPrefix, reorder_imports: ReorderImports) {
+fn merge_use_trees_inner(
+    trees: &mut Vec<UseTree>,
+    use_tree: UseTree,
+    merge_by: SharedPrefix,
+    reorder_imports: ReorderImports,
+) {
     struct SimilarTree<'a> {
         similarity: usize,
         path_len: usize,
@@ -783,6 +788,8 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: 
     trees.push(use_tree);
     if reorder_imports == ReorderImports::Alphabetically {
         trees.sort();
+    } else if reorder_imports == ReorderImports::Length {
+        trees.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()));
     }
 }
 
@@ -1147,6 +1154,7 @@ mod test {
                 normalize_use_trees_with_granularity(
                     parse_use_trees!($($input,)*),
                     ImportGranularity::$by,
+                    ReorderImports::Alphabetically,
                 ),
                 parse_use_trees!($($output,)*),
             );
@@ -1302,67 +1310,102 @@ mod test {
 
     #[test]
     fn test_use_tree_normalize() {
-        assert_eq!(parse_use_tree("a::self").normalize(), parse_use_tree("a"));
         assert_eq!(
-            parse_use_tree("a::self as foo").normalize(),
+            parse_use_tree("a::self").normalize(ReorderImports::Alphabetically),
+            parse_use_tree("a")
+        );
+        assert_eq!(
+            parse_use_tree("a::self as foo").normalize(ReorderImports::Alphabetically),
             parse_use_tree("a as foo")
         );
         assert_eq!(
-            parse_use_tree("a::{self}").normalize(),
+            parse_use_tree("a::{self}").normalize(ReorderImports::Alphabetically),
             parse_use_tree("a::{self}")
         );
-        assert_eq!(parse_use_tree("a::{b}").normalize(), parse_use_tree("a::b"));
         assert_eq!(
-            parse_use_tree("a::{b, c::self}").normalize(),
+            parse_use_tree("a::{b}").normalize(ReorderImports::Alphabetically),
+            parse_use_tree("a::b")
+        );
+        assert_eq!(
+            parse_use_tree("a::{b, c::self}").normalize(ReorderImports::Alphabetically),
             parse_use_tree("a::{b, c}")
         );
         assert_eq!(
-            parse_use_tree("a::{b as bar, c::self}").normalize(),
+            parse_use_tree("a::{b as bar, c::self}").normalize(ReorderImports::Alphabetically),
             parse_use_tree("a::{b as bar, c}")
         );
     }
 
     #[test]
     fn test_use_tree_ord() {
-        assert!(parse_use_tree("a").normalize() < parse_use_tree("aa").normalize());
-        assert!(parse_use_tree("a").normalize() < parse_use_tree("a::a").normalize());
-        assert!(parse_use_tree("a").normalize() < parse_use_tree("*").normalize());
-        assert!(parse_use_tree("a").normalize() < parse_use_tree("{a, b}").normalize());
-        assert!(parse_use_tree("*").normalize() < parse_use_tree("{a, b}").normalize());
-
         assert!(
-            parse_use_tree("aaaaaaaaaaaaaaa::{bb, cc, dddddddd}").normalize()
-                < parse_use_tree("aaaaaaaaaaaaaaa::{bb, cc, ddddddddd}").normalize()
+            parse_use_tree("a").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("aa").normalize(ReorderImports::Alphabetically)
         );
         assert!(
-            parse_use_tree("serde::de::{Deserialize}").normalize()
-                < parse_use_tree("serde_json").normalize()
-        );
-        assert!(parse_use_tree("a::b::c").normalize() < parse_use_tree("a::b::*").normalize());
-        assert!(
-            parse_use_tree("foo::{Bar, Baz}").normalize()
-                < parse_use_tree("{Bar, Baz}").normalize()
-        );
-
-        assert!(
-            parse_use_tree("foo::{qux as bar}").normalize()
-                < parse_use_tree("foo::{self as bar}").normalize()
+            parse_use_tree("a").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("a::a").normalize(ReorderImports::Alphabetically)
         );
         assert!(
-            parse_use_tree("foo::{qux as bar}").normalize()
-                < parse_use_tree("foo::{baz, qux as bar}").normalize()
+            parse_use_tree("a").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("*").normalize(ReorderImports::Alphabetically)
         );
         assert!(
-            parse_use_tree("foo::{self as bar, baz}").normalize()
-                < parse_use_tree("foo::{baz, qux as bar}").normalize()
+            parse_use_tree("a").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("{a, b}").normalize(ReorderImports::Alphabetically)
+        );
+        assert!(
+            parse_use_tree("*").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("{a, b}").normalize(ReorderImports::Alphabetically)
         );
 
-        assert!(parse_use_tree("foo").normalize() < parse_use_tree("Foo").normalize());
-        assert!(parse_use_tree("foo").normalize() < parse_use_tree("foo::Bar").normalize());
+        assert!(
+            parse_use_tree("aaaaaaaaaaaaaaa::{bb, cc, dddddddd}")
+                .normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("aaaaaaaaaaaaaaa::{bb, cc, ddddddddd}")
+                    .normalize(ReorderImports::Alphabetically)
+        );
+        assert!(
+            parse_use_tree("serde::de::{Deserialize}").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("serde_json").normalize(ReorderImports::Alphabetically)
+        );
+        assert!(
+            parse_use_tree("a::b::c").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("a::b::*").normalize(ReorderImports::Alphabetically)
+        );
+        assert!(
+            parse_use_tree("foo::{Bar, Baz}").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("{Bar, Baz}").normalize(ReorderImports::Alphabetically)
+        );
 
         assert!(
-            parse_use_tree("std::cmp::{d, c, b, a}").normalize()
-                < parse_use_tree("std::cmp::{b, e, g, f}").normalize()
+            parse_use_tree("foo::{qux as bar}").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("foo::{self as bar}").normalize(ReorderImports::Alphabetically)
+        );
+        assert!(
+            parse_use_tree("foo::{qux as bar}").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("foo::{baz, qux as bar}")
+                    .normalize(ReorderImports::Alphabetically)
+        );
+        assert!(
+            parse_use_tree("foo::{self as bar, baz}").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("foo::{baz, qux as bar}")
+                    .normalize(ReorderImports::Alphabetically)
+        );
+
+        assert!(
+            parse_use_tree("foo").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("Foo").normalize(ReorderImports::Alphabetically)
+        );
+        assert!(
+            parse_use_tree("foo").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("foo::Bar").normalize(ReorderImports::Alphabetically)
+        );
+
+        assert!(
+            parse_use_tree("std::cmp::{d, c, b, a}").normalize(ReorderImports::Alphabetically)
+                < parse_use_tree("std::cmp::{b, e, g, f}")
+                    .normalize(ReorderImports::Alphabetically)
         );
     }
 

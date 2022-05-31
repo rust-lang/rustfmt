@@ -12,7 +12,7 @@ use rustc_ast::ast;
 use rustc_span::{symbol::sym, Span};
 
 use crate::config::{Config, GroupImportsTactic, ReorderImports};
-use crate::imports::{normalize_use_trees_with_granularity, UseSegment, UseTree, ImportsVector};
+use crate::imports::{normalize_use_trees_with_granularity, UseSegment, UseTree};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{itemize_list, write_list, ListFormatting, ListItem};
 use crate::rewrite::RewriteContext;
@@ -138,10 +138,10 @@ fn rewrite_reorderable_or_regroupable_items(
                 .map(|use_group| {
                     let item_vec: Vec<_> = use_group
                         .into_iter()
-                        .map(|use_tree| {println!("use_tree: {:?}", use_tree); ListItem {
+                        .map(|use_tree| ListItem {
                             item: use_tree.rewrite_top_level(context, nested_shape),
                             ..use_tree.list_item.unwrap_or_else(ListItem::empty)
-                        }})
+                        })
                         .collect();
                     wrap_reorderable_items(context, &item_vec, nested_shape)
                 })
