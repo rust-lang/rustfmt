@@ -190,11 +190,12 @@ impl UseSegment {
 }
 
 pub(crate) fn normalize_use_trees_with_granularity(
-    use_trees: ImportsVector,
+    use_trees: Vec<UseTree>,
     import_granularity: ImportGranularity,
-) -> ImportsVector {
+    reorder_imports: ReorderImports,
+) -> Vec<UseTree> {
     let merge_by = match import_granularity {
-        ImportGranularity::Item => return ImportsVector::from(flatten_use_trees(use_trees, ImportGranularity::Item), use_trees.reorder_config()),
+        ImportGranularity::Item => return flatten_use_trees(use_trees, ImportGranularity::Item),
         ImportGranularity::Preserve => return use_trees,
         ImportGranularity::Crate => SharedPrefix::Crate,
         ImportGranularity::Module => SharedPrefix::Module,
@@ -204,7 +205,6 @@ pub(crate) fn normalize_use_trees_with_granularity(
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
         if use_tree.has_comment() || use_tree.attrs.is_some() {
-            println!("use_tree normalize: {:?}", use_tree);
             result.push(use_tree);
             continue;
         }
@@ -212,26 +212,23 @@ pub(crate) fn normalize_use_trees_with_granularity(
         for mut flattened in use_tree.flatten(import_granularity) {
             if let Some(tree) = result
                 .iter_mut()
-                .find(|tree| {println!("tree normalize: {:?}", tree); tree.share_prefix(&flattened, merge_by)})
+                .find(|tree| tree.share_prefix(&flattened, merge_by))
             {
-                tree.merge(&flattened, merge_by);
+                tree.merge(&flattened, merge_by, reorder_imports);
             } else {
                 // If this is the first tree with this prefix, handle potential trailing ::self
                 if merge_by == SharedPrefix::Module {
                     flattened = flattened.nest_trailing_self();
                 }
-                println!("flattened normalize: {:?}", flattened);
                 result.push(flattened);
             }
         }
     }
-
-    let result = ImportsVector::from(use_trees.list, use_trees.reorder_config());
     result
 }
 
 fn flatten_use_trees(
-    use_trees: ImportsVector,
+    use_trees: Vec<UseTree>,
     import_granularity: ImportGranularity,
 ) -> Vec<UseTree> {
     use_trees
@@ -367,7 +364,7 @@ impl UseTree {
                         Some(item.attrs.clone())
                     },
                 )
-                .normalize(),
+                .normalize(context.config.reorder_imports()),
             ),
             _ => None,
         }
@@ -480,7 +477,7 @@ impl UseTree {
     }
 
     // Do the adjustments that rustfmt does elsewhere to use paths.
-    pub(crate) fn normalize(mut self) -> UseTree {
+    pub(crate) fn normalize(mut self, reorder_imports: ReorderImports) -> UseTree {
         let mut last = self.path.pop().expect("Empty use tree?");
         // Hack around borrow checker.
         let mut normalize_sole_list = false;
@@ -545,7 +542,7 @@ impl UseTree {
                     for seg in &list[0].path {
                         self.path.push(seg.clone());
                     }
-                    return self.normalize();
+                    return self.normalize(reorder_imports);
                 }
                 _ => unreachable!(),
             }
@@ -555,12 +552,12 @@ impl UseTree {
         if let UseSegment::List(list) = last {
             let mut list = list
                 .into_iter()
-                .map(|member| member.normalize(config))
+                .map(|member| member.normalize(reorder_imports))
                 .collect::<Vec<_>>();
 
-            if config.reorder_imports() == ReorderImports::Alphabetically {
+            if reorder_imports == ReorderImports::Alphabetically {
                 list.sort();
-            } else if config.reorder_imports() == ReorderImports::Length {
+            } else if reorder_imports == ReorderImports::Length {
                 list.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()))
             }
             last = UseSegment::List(list);
@@ -651,7 +648,7 @@ impl UseTree {
         }
     }
 
-    fn merge(&mut self, other: &UseTree, merge_by: SharedPrefix) {
+    fn merge(&mut self, other: &UseTree, merge_by: SharedPrefix, reorder_imports: ReorderImports) {
         let mut prefix = 0;
         for (a, b) in self.path.iter().zip(other.path.iter()) {
             // only discard the alias at the root of the tree
@@ -661,7 +658,7 @@ impl UseTree {
                 break;
             }
         }
-        if let Some(new_path) = merge_rest(&self.path, &other.path, prefix, merge_by) {
+        if let Some(new_path) = merge_rest(&self.path, &other.path, prefix, merge_by, reorder_imports) {
             self.path = new_path;
             self.span = self.span.to(other.span);
         }
@@ -680,71 +677,12 @@ impl UseTree {
     }
 }
 
-impl ImportsVector {
-    pub(crate) fn new(reorder_config: ReorderImports) -> Self {
-        let list: Vec::<UseTree> = Vec::<UseTree>::new();
-        ImportsVector {
-            list,
-            reorder_config,
-        }
-    }
-
-    pub(crate) fn from(list: Vec<UseTree>, reorder_config: ReorderImports) -> Self {
-        ImportsVector{list, reorder_config}
-    }
-
-    pub(crate) fn reorder_config(&self) -> ReorderImports {
-        self.reorder_config
-    }
-
-    pub(crate) fn sort(&mut self) {
-        if self.reorder_config == ReorderImports::Alphabetically {
-            self.list.sort();
-        } else if self.reorder_config == ReorderImports::Length {
-            self.list.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()));
-        }
-    }
-
-    pub(crate) fn is_empty(&mut self) -> bool {
-        self.is_empty()
-    }
-
-    pub(crate) fn push(self: &mut Self, item: UseTree) {
-        self.list.push(item);
-    }
-
-    pub(crate) fn len(self: &Self) -> usize {
-        self.list.len()
-    }
-
-    pub(crate) fn iter(self: &Self) -> impl Iterator<Item=&UseTree> {
-        self.list.iter()
-    }
-
-    pub(crate) fn into_iter(self: Self) -> impl Iterator<Item=UseTree> {
-        self.list.into_iter()
-    }
-
-    pub(crate) fn iter_mut(self: &mut Self) -> std::slice::IterMut<'_, UseTree> {
-        self.list.iter_mut()
-
-    }
-}
-
-impl IntoIterator for ImportsVector {
-    type Item = UseTree;
-    type IntoIter = Box<dyn Iterator<Item=UseTree>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Box::new(self.list.into_iter())
-    }
-}
-
 fn merge_rest(
     a: &[UseSegment],
     b: &[UseSegment],
     mut len: usize,
     merge_by: SharedPrefix,
+    reorder_imports: ReorderImports,
 ) -> Option<Vec<UseSegment>> {
     if a.len() == len && b.len() == len {
         return None;
@@ -756,6 +694,7 @@ fn merge_rest(
                 &mut list,
                 UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
                 merge_by,
+                reorder_imports,
             );
             let mut new_path = b[..len].to_vec();
             new_path.push(UseSegment::List(list));
@@ -789,7 +728,7 @@ fn merge_rest(
     Some(new_path)
 }
 
-fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: SharedPrefix) {
+fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: SharedPrefix, reorder_imports: ReorderImports) {
     struct SimilarTree<'a> {
         similarity: usize,
         path_len: usize,
@@ -831,18 +770,20 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: 
     } else if merge_by == SharedPrefix::One {
         if let Some(sim_tree) = similar_trees.max_by_key(|tree| tree.similarity) {
             if sim_tree.similarity > 0 {
-                sim_tree.tree.merge(&use_tree, merge_by);
+                sim_tree.tree.merge(&use_tree, merge_by, reorder_imports);
                 return;
             }
         }
     } else if let Some(sim_tree) = similar_trees.max_by_key(|tree| tree.path_len) {
         if sim_tree.path_len > 1 {
-            sim_tree.tree.merge(&use_tree, merge_by);
+            sim_tree.tree.merge(&use_tree, merge_by, reorder_imports);
             return;
         }
     }
     trees.push(use_tree);
-    trees.sort();
+    if reorder_imports == ReorderImports::Alphabetically {
+        trees.sort();
+    }
 }
 
 impl PartialOrd for UseSegment {

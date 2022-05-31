@@ -90,7 +90,6 @@ fn rewrite_reorderable_or_regroupable_items(
                 .iter()
                 .filter_map(|item| UseTree::from_ast_with_normalization(context, item))
                 .collect();
-            let mut normalized_items = ImportsVector::from(normalized_items, context.config.reorder_imports());
             let cloned = normalized_items.clone();
             // Add comments before merging.
             let list_items = itemize_list(
@@ -111,6 +110,7 @@ fn rewrite_reorderable_or_regroupable_items(
             normalized_items = normalize_use_trees_with_granularity(
                 normalized_items,
                 context.config.imports_granularity(),
+                context.config.reorder_imports(),
             );
 
             let mut regrouped_items = match context.config.group_imports() {
@@ -119,18 +119,16 @@ fn rewrite_reorderable_or_regroupable_items(
                 }
                 GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
             };
-            for regrouped_item in regrouped_items {
-                regrouped_item.sort();
-            }
-            /*if context.config.reorder_imports() == ReorderImports::Alphabetically {
+
+            if context.config.reorder_imports() == ReorderImports::Alphabetically {
                 regrouped_items.iter_mut().for_each(|items| items.sort())
             } else if context.config.reorder_imports() == ReorderImports::Length {
                 regrouped_items.iter_mut().for_each({
                     |items| {
-                        items.sort(|a, b| {println!("list a: {:?}", a); println!("list b: {:?}", b); compare_sliding_order(&a.to_string(), &b.to_string())})
+                        items.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()))
                     }
                 })
-            }*/
+            }
 
             // 4 = "use ", 1 = ";"
             let nested_shape = shape.offset_left(4)?.sub_width(1)?;
@@ -181,10 +179,10 @@ fn contains_macro_use_attr(item: &ast::Item) -> bool {
 
 /// Divides imports into three groups, corresponding to standard, external
 /// and local imports. Sorts each subgroup.
-fn group_imports(uts: ImportsVector) -> Vec<ImportsVector> {
-    let mut std_imports = ImportsVector::new(uts.reorder_config());
-    let mut external_imports = ImportsVector::new(uts.reorder_config());
-    let mut local_imports = ImportsVector::new(uts.reorder_config());
+fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
+    let mut std_imports = Vec::new();
+    let mut external_imports = Vec::new();
+    let mut local_imports = Vec::new();
 
     for ut in uts.into_iter() {
         if ut.path.is_empty() {
