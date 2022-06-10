@@ -1016,7 +1016,7 @@ See also [`format_macro_matchers`](#format_macro_matchers).
 
 ## `skip_macro_names`
 
-Skip formatting the bodies of macros invoked with the following names.
+Skip formatting the bodies of macro invocations with the following names.
 
 - **Default value**: `[]`
 - **Possible values**: a list of macro name idents, `["name_0", "name_1", ...]`
@@ -1024,29 +1024,31 @@ Skip formatting the bodies of macros invoked with the following names.
 
 #### `[]` (default):
 
-```rust
-macro_rules! foo {
-    ($a: ident : $b: ty) => {
-        $a(42): $b;
-    };
-    ($a: ident $b: ident $c: ident) => {
-        $a = $b + $c;
-    };
-}
-```
-
-#### `["foo"]`:
+The input:
 
 ```rust
-#![rustfmt::skip]
-
-macro_rules! foo {
-    ($a: ident : $b: ty) => { $a(42): $b; };
-    ($a: ident $b: ident $c: ident) => { $a=$b+$c; };
-}
+items!(
+        const _: u8 = 0;
+);
 ```
 
-See also [`format_macro_bodies`](#format_macro_bodies).
+Is reformatted to:
+
+```rust
+items!(
+    const _: u8 = 0;
+);
+```
+
+#### `["items"]`:
+
+The input is preserved:
+
+```rust
+items!(
+        const _: u8 = 0;
+);
+```
 
 ## `format_strings`
 
