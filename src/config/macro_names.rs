@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json as json;
 use thiserror::Error;
 
-/// Defines the name of an input - either a file or stdin.
+/// Defines the name of a macro.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Deserialize, Serialize)]
 pub struct MacroName(String);
 
