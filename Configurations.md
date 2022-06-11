@@ -1019,33 +1019,47 @@ See also [`format_macro_matchers`](#format_macro_matchers).
 Skip formatting the bodies of macro invocations with the following names.
 
 - **Default value**: `[]`
-- **Possible values**: a list of macro name idents, `["name_0", "name_1", ...]`
+- **Possible values**: a list of macro name idents, `["name_0", "name_1", ..., "*"]`
 - **Stable**: No (tracking issue: [#5346](https://github.com/rust-lang/rustfmt/issues/5346))
 
 #### `[]` (default):
 
-The input:
+All macro invocations will be formatted.
 
 ```rust
-items!(
-        const _: u8 = 0;
+lorem!(
+    const _: u8 = 0;
 );
-```
 
-Is reformatted to:
-
-```rust
-items!(
+ipsum!(
     const _: u8 = 0;
 );
 ```
 
-#### `["items"]`:
+#### `["lorem"]`:
 
-The input is preserved:
+The named macro invocations will be skipped.
 
 ```rust
-items!(
+lorem!(
+        const _: u8 = 0;
+);
+
+ipsum!(
+    const _: u8 = 0;
+);
+```
+
+#### `["*"]`:
+
+The special selector `*` will skip all macro invocations.
+
+```rust
+lorem!(
+        const _: u8 = 0;
+);
+
+ipsum!(
         const _: u8 = 0;
 );
 ```

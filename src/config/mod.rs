@@ -13,7 +13,7 @@ pub use crate::config::file_lines::{FileLines, FileName, Range};
 #[allow(unreachable_pub)]
 pub use crate::config::lists::*;
 #[allow(unreachable_pub)]
-pub use crate::config::macro_names::MacroNames;
+pub use crate::config::macro_names::{MacroSelector, MacroSelectors};
 #[allow(unreachable_pub)]
 pub use crate::config::options::*;
 
@@ -70,7 +70,7 @@ create_config! {
     format_macro_matchers: bool, false, false,
         "Format the metavariable matching patterns in macros";
     format_macro_bodies: bool, true, false, "Format the bodies of macros";
-    skip_macro_names: MacroNames, MacroNames::default(), false,
+    skip_macro_names: MacroSelectors, MacroSelectors::default(), false,
         "Skip formatting the bodies of macros invoked with the following names.";
     hex_literal_case: HexLiteralCase, HexLiteralCase::Preserve, false,
         "Format hexadecimal integer literals";

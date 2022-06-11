@@ -8,7 +8,7 @@ use rustc_span::{symbol, BytePos, Pos, Span};
 use crate::attr::*;
 use crate::comment::{contains_comment, rewrite_comment, CodeCharKind, CommentCodeSlices};
 use crate::config::Version;
-use crate::config::{BraceStyle, Config};
+use crate::config::{BraceStyle, Config, MacroSelector};
 use crate::coverage::transform_missing_snippet;
 use crate::items::{
     format_impl, format_trait, format_trait_alias, is_mod_decl, is_use_item, rewrite_extern_crate,
@@ -771,7 +771,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         report: FormatReport,
     ) -> FmtVisitor<'a> {
         let mut skip_context = SkipContext::default();
-        skip_context.update_macros(config.skip_macro_names().into_name_strings());
+        let mut macro_names = Vec::new();
+        for macro_selector in config.skip_macro_names().into_inner() {
+            match macro_selector {
+                MacroSelector::Name(name) => macro_names.push(name.to_string()),
+                MacroSelector::All => skip_context.all_macros = true,
+            }
+        }
+        skip_context.update_macros(macro_names);
         FmtVisitor {
             parent_context: None,
             parse_sess: parse_session,

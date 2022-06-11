@@ -1,5 +1,5 @@
 use crate::config::file_lines::FileLines;
-use crate::config::macro_names::MacroNames;
+use crate::config::macro_names::MacroSelectors;
 use crate::config::options::{IgnoreList, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
@@ -47,7 +47,7 @@ impl ConfigType for FileLines {
     }
 }
 
-impl ConfigType for MacroNames {
+impl ConfigType for MacroSelectors {
     fn doc_hint() -> String {
         String::from("[<string>, ...]")
     }
