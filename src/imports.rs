@@ -1133,7 +1133,6 @@ mod test {
                 }
             }
         }
-
         let mut parser = Parser {
             input: s.chars().peekable(),
         };
@@ -1159,6 +1158,32 @@ mod test {
                 parse_use_trees!($($output,)*),
             );
         }
+    }
+
+    macro_rules! test_normalize_eq {
+        ($first:expr, $second:expr) => {
+            assert_eq!(
+                parse_use_tree($first).normalize(ReorderImports::Alphabetically),
+                parse_use_tree($second)
+            );
+            assert_eq!(
+                parse_use_tree($first).normalize(ReorderImports::Length),
+                parse_use_tree($second)
+            );
+        };
+    }
+
+    macro_rules! test_normalize_smaller {
+        ($first:expr, $second:expr) => {
+            assert!(
+                parse_use_tree($first).normalize(ReorderImports::Alphabetically)
+                    < parse_use_tree($second).normalize(ReorderImports::Alphabetically)
+            );
+            assert!(
+                parse_use_tree($first).normalize(ReorderImports::Length)
+                    < parse_use_tree($second).normalize(ReorderImports::Length)
+            );
+        };
     }
 
     #[test]
@@ -1310,22 +1335,10 @@ mod test {
 
     #[test]
     fn test_use_tree_normalize() {
-        assert_eq!(
-            parse_use_tree("a::self").normalize(ReorderImports::Alphabetically),
-            parse_use_tree("a")
-        );
-        assert_eq!(
-            parse_use_tree("a::self as foo").normalize(ReorderImports::Alphabetically),
-            parse_use_tree("a as foo")
-        );
-        assert_eq!(
-            parse_use_tree("a::{self}").normalize(ReorderImports::Alphabetically),
-            parse_use_tree("a::{self}")
-        );
-        assert_eq!(
-            parse_use_tree("a::{b}").normalize(ReorderImports::Alphabetically),
-            parse_use_tree("a::b")
-        );
+        test_normalize_eq!("a::self", "a");
+        test_normalize_eq!("a::self as foo", "a as foo");
+        test_normalize_eq!("a::{self}", "a::{self}");
+        test_normalize_eq!("a::{b}", "a::b");
         assert_eq!(
             parse_use_tree("a::{b, c::self}").normalize(ReorderImports::Alphabetically),
             parse_use_tree("a::{b, c}")
@@ -1338,74 +1351,43 @@ mod test {
 
     #[test]
     fn test_use_tree_ord() {
-        assert!(
-            parse_use_tree("a").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("aa").normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("a").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("a::a").normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("a").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("*").normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("a").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("{a, b}").normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("*").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("{a, b}").normalize(ReorderImports::Alphabetically)
-        );
+        test_normalize_smaller!("a", "aa");
+        test_normalize_smaller!("a", "a::a");
+        test_normalize_smaller!("a", "*");
+        test_normalize_smaller!("a", "{a, b}");
+        test_normalize_smaller!("*", "{a, b}");
 
-        assert!(
-            parse_use_tree("aaaaaaaaaaaaaaa::{bb, cc, dddddddd}")
-                .normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("aaaaaaaaaaaaaaa::{bb, cc, ddddddddd}")
-                    .normalize(ReorderImports::Alphabetically)
+        test_normalize_smaller!(
+            "aaaaaaaaaaaaaaa::{bb, cc, dddddddd}",
+            "aaaaaaaaaaaaaaa::{bb, cc, ddddddddd}"
         );
-        assert!(
-            parse_use_tree("serde::de::{Deserialize}").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("serde_json").normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("a::b::c").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("a::b::*").normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("foo::{Bar, Baz}").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("{Bar, Baz}").normalize(ReorderImports::Alphabetically)
-        );
+        test_normalize_smaller!("serde::de::{Deserialize}", "serde_json");
+        test_normalize_smaller!("a::b::c", "a::b::*");
+        test_normalize_smaller!("foo::{Bar, Baz}", "{Bar, Baz}");
 
-        assert!(
-            parse_use_tree("foo::{qux as bar}").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("foo::{self as bar}").normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("foo::{qux as bar}").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("foo::{baz, qux as bar}")
-                    .normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("foo::{self as bar, baz}").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("foo::{baz, qux as bar}")
-                    .normalize(ReorderImports::Alphabetically)
-        );
+        test_normalize_smaller!("foo::{qux as bar}", "foo::{self as bar}");
+        test_normalize_smaller!("foo::{qux as bar}", "foo::{baz, qux as bar}");
+        test_normalize_smaller!("foo::{self as bar, baz}", "foo::{baz, qux as bar}");
 
-        assert!(
-            parse_use_tree("foo").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("Foo").normalize(ReorderImports::Alphabetically)
-        );
-        assert!(
-            parse_use_tree("foo").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("foo::Bar").normalize(ReorderImports::Alphabetically)
-        );
+        test_normalize_smaller!("foo", "Foo");
+        test_normalize_smaller!("foo", "foo::Bar");
 
-        assert!(
-            parse_use_tree("std::cmp::{d, c, b, a}").normalize(ReorderImports::Alphabetically)
-                < parse_use_tree("std::cmp::{b, e, g, f}")
-                    .normalize(ReorderImports::Alphabetically)
+        test_normalize_smaller!("std::cmp::{d, c, b, a}", "std::cmp::{b, e, g, f}");
+    }
+
+    #[test]
+    fn test_use_tree_length() {
+        assert_eq!(
+            parse_use_tree("aaaaa::{aa, bbbb, cc, d}").normalize(ReorderImports::Length),
+            parse_use_tree("aaaaa::{d, aa, cc, bbbb}")
+        );
+        assert_eq!(
+            parse_use_tree("a::{b, c::self}").normalize(ReorderImports::Length),
+            parse_use_tree("a::{b, c}")
+        );
+        assert_eq!(
+            parse_use_tree("a::{b as bar, c::self}").normalize(ReorderImports::Length),
+            parse_use_tree("a::{c, b as bar}")
         );
     }
 
