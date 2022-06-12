@@ -146,7 +146,7 @@ fn rewrite_reorderable_or_regroupable_items(
                     wrap_reorderable_items(context, &item_vec, nested_shape)
                 })
                 .collect::<Option<Vec<_>>>()?;
-            println!("item_vec: {:?}", item_vec);
+
             let join_string = format!("\n\n{}", shape.indent.to_string(context.config));
             Some(item_vec.join(&join_string))
         }
