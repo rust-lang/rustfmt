@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cmp::Ordering;
 
 use rustc_ast::ast::{
     self, Attribute, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
@@ -683,6 +684,15 @@ impl NodeIdExt for NodeId {
 
 pub(crate) fn unicode_str_width(s: &str) -> usize {
     s.width()
+}
+
+pub(crate) fn compare_sliding_order(s1: &str, s2: &str) -> Ordering {
+    let mut is_equal = s1.len().cmp(&s2.len());
+    if Ordering::is_eq(is_equal) {
+        is_equal = s1.cmp(&s2);
+    }
+
+    is_equal
 }
 
 #[cfg(test)]

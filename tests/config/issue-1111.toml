@@ -1,1 +1,1 @@
-reorder_imports = true
+reorder_imports = "Alphabetically"

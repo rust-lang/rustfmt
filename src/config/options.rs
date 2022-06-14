@@ -462,3 +462,13 @@ pub enum MatchArmLeadingPipe {
     /// Preserve any existing leading pipes
     Preserve,
 }
+
+/// Reorder imports
+#[config_type]
+pub enum ReorderImports {
+    Alphabetically,
+
+    Length,
+
+    Off,
+}

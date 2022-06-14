@@ -9,7 +9,7 @@
 // rustfmt-newline_style: Unix
 // rustfmt-normalize_doc_attributes: true
 // rustfmt-overflow_delimited_expr: true
-// rustfmt-reorder_imports: false
+// rustfmt-reorder_imports: Off
 // rustfmt-reorder_modules: true
 // rustfmt-struct_field_align_threshold: 20
 // rustfmt-tab_spaces: 4

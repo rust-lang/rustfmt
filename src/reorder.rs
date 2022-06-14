@@ -11,7 +11,7 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::ast;
 use rustc_span::{symbol::sym, Span};
 
-use crate::config::{Config, GroupImportsTactic};
+use crate::config::{Config, GroupImportsTactic, ReorderImports};
 use crate::imports::{normalize_use_trees_with_granularity, UseSegment, UseTree};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{itemize_list, write_list, ListFormatting, ListItem};
@@ -19,7 +19,7 @@ use crate::rewrite::RewriteContext;
 use crate::shape::Shape;
 use crate::source_map::LineRangeUtils;
 use crate::spanned::Spanned;
-use crate::utils::{contains_skip, mk_sp};
+use crate::utils::{compare_sliding_order, contains_skip, mk_sp};
 use crate::visitor::FmtVisitor;
 
 /// Choose the ordering between the given two items.
@@ -110,6 +110,7 @@ fn rewrite_reorderable_or_regroupable_items(
             normalized_items = normalize_use_trees_with_granularity(
                 normalized_items,
                 context.config.imports_granularity(),
+                context.config.reorder_imports(),
             );
 
             let mut regrouped_items = match context.config.group_imports() {
@@ -119,8 +120,14 @@ fn rewrite_reorderable_or_regroupable_items(
                 GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
             };
 
-            if context.config.reorder_imports() {
+            if context.config.reorder_imports() == ReorderImports::Alphabetically {
                 regrouped_items.iter_mut().for_each(|items| items.sort())
+            } else if context.config.reorder_imports() == ReorderImports::Length {
+                regrouped_items.iter_mut().for_each({
+                    |items| {
+                        items.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()))
+                    }
+                })
             }
 
             // 4 = "use ", 1 = ";"
@@ -228,9 +235,9 @@ impl ReorderableItemKind {
 
     fn is_reorderable(self, config: &Config) -> bool {
         match self {
-            ReorderableItemKind::ExternCrate => config.reorder_imports(),
+            ReorderableItemKind::ExternCrate => config.reorder_imports() != ReorderImports::Off,
             ReorderableItemKind::Mod => config.reorder_modules(),
-            ReorderableItemKind::Use => config.reorder_imports(),
+            ReorderableItemKind::Use => config.reorder_imports() != ReorderImports::Off,
             ReorderableItemKind::Other => false,
         }
     }
