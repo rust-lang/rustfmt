@@ -2,6 +2,7 @@ use rustc_ast::ast;
 
 use crate::config::lists::*;
 use crate::config::IndentStyle;
+use crate::expr::lhs_needs_parens;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::utils::{
@@ -157,6 +158,7 @@ pub(crate) fn rewrite_pair<LHS, RHS>(
     context: &RewriteContext<'_>,
     shape: Shape,
     separator_place: SeparatorPlace,
+    wrap_lhs_in_parens: bool,
 ) -> Option<String>
 where
     LHS: Rewrite,
@@ -164,6 +166,9 @@ where
 {
     let tab_spaces = context.config.tab_spaces();
     let lhs_overhead = match separator_place {
+        SeparatorPlace::Back if wrap_lhs_in_parens => {
+            shape.used_width() + pp.prefix.len() + pp.infix.trim_end().len() + 2
+        }
         SeparatorPlace::Back => shape.used_width() + pp.prefix.len() + pp.infix.trim_end().len(),
         SeparatorPlace::Front => shape.used_width(),
     };
@@ -171,9 +176,13 @@ where
         width: context.budget(lhs_overhead),
         ..shape
     };
-    let lhs_result = lhs
-        .rewrite(context, lhs_shape)
-        .map(|lhs_str| format!("{}{}", pp.prefix, lhs_str))?;
+    let lhs_result = lhs.rewrite(context, lhs_shape).map(|lhs_str| {
+        if wrap_lhs_in_parens {
+            format!("{}({})", pp.prefix, lhs_str)
+        } else {
+            format!("{}{}", pp.prefix, lhs_str)
+        }
+    })?;
 
     // Try to put both lhs and rhs on the same line.
     let rhs_orig_result = shape
@@ -298,6 +307,12 @@ impl FlattenPair for ast::Expr {
                         match pop.kind {
                             ast::ExprKind::Binary(op, _, ref rhs) => {
                                 separators.push(op.node.to_string());
+                                if lhs_needs_parens(&op, node) {
+                                    // safe to unwrap since we just pushed onto the list
+                                    let (lhs, rw) = list.pop().unwrap();
+                                    let rw = rw.and_then(|s| Some(format!("({})", s)));
+                                    list.push((lhs, rw));
+                                }
                                 node = rhs;
                             }
                             _ => unreachable!(),

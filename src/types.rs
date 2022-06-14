@@ -809,6 +809,7 @@ impl Rewrite for ast::Ty {
                 context,
                 shape,
                 SeparatorPlace::Back,
+                false,
             ),
             ast::TyKind::Infer => {
                 if shape.width >= 1 {
