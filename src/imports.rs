@@ -2,6 +2,10 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 
+use core::hash::{Hash, Hasher};
+
+use itertools::Itertools;
+
 use rustc_ast::ast::{self, UseTreeKind};
 use rustc_span::{
     symbol::{self, sym},
@@ -87,7 +91,7 @@ impl<'a> FmtVisitor<'a> {
 // sorting.
 
 // FIXME we do a lot of allocation to make our own representation.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub(crate) enum UseSegment {
     Ident(String, Option<String>),
     Slf(Option<String>),
@@ -181,6 +185,14 @@ impl UseSegment {
             }
         })
     }
+
+    fn contains_comment(&self) -> bool {
+        if let UseSegment::List(list) = self {
+            list.iter().any(|subtree| subtree.contains_comment())
+        } else {
+            false
+        }
+    }
 }
 
 pub(crate) fn normalize_use_trees_with_granularity(
@@ -198,7 +210,7 @@ pub(crate) fn normalize_use_trees_with_granularity(
 
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
-        if use_tree.has_comment() || use_tree.attrs.is_some() {
+        if use_tree.contains_comment() || use_tree.attrs.is_some() {
             result.push(use_tree);
             continue;
         }
@@ -225,10 +237,13 @@ fn flatten_use_trees(
     use_trees: Vec<UseTree>,
     import_granularity: ImportGranularity,
 ) -> Vec<UseTree> {
+    // Return non-sorted single occurance of the use-trees text string;
+    // order is by first occurance of the use-tree.
     use_trees
         .into_iter()
         .flat_map(|tree| tree.flatten(import_granularity))
         .map(UseTree::nest_trailing_self)
+        .unique()
         .collect()
 }
 
@@ -565,6 +580,10 @@ impl UseTree {
         self.list_item.as_ref().map_or(false, ListItem::has_comment)
     }
 
+    fn contains_comment(&self) -> bool {
+        self.has_comment() || self.path.iter().any(|path| path.contains_comment())
+    }
+
     fn same_visibility(&self, other: &UseTree) -> bool {
         match (&self.visibility, &other.visibility) {
             (
@@ -591,6 +610,7 @@ impl UseTree {
         if self.path.is_empty()
             || other.path.is_empty()
             || self.attrs.is_some()
+            || self.contains_comment()
             || !self.same_visibility(other)
         {
             false
@@ -606,7 +626,7 @@ impl UseTree {
     }
 
     fn flatten(self, import_granularity: ImportGranularity) -> Vec<UseTree> {
-        if self.path.is_empty() {
+        if self.path.is_empty() || self.contains_comment() {
             return vec![self];
         }
         match self.path.clone().last().unwrap() {
@@ -790,6 +810,12 @@ fn merge_use_trees_inner(
         trees.sort();
     } else if reorder_imports == ReorderImports::Length {
         trees.sort_by(|a, b| compare_sliding_order(&a.to_string(), &b.to_string()));
+    }
+}
+
+impl Hash for UseTree {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.path.hash(state);
     }
 }
 
