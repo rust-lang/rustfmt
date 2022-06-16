@@ -928,7 +928,7 @@ fn add_one(x: i32) -> i32 {
 
 ## `doc_comment_code_block_width`
 
-Max width for code snippets included in doc comments. Only used if `format_code_in_doc_comments` is true.
+Max width for code snippets included in doc comments. Only used if [`format_code_in_doc_comments`](#format_code_in_doc_comments) is true.
 
 - **Default value**: `100`
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
