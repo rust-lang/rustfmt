@@ -772,7 +772,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     ) -> FmtVisitor<'a> {
         let mut skip_context = SkipContext::default();
         let mut macro_names = Vec::new();
-        for macro_selector in config.skip_macro_names().into_inner() {
+        for macro_selector in config.skip_macro_names().0 {
             match macro_selector {
                 MacroSelector::Name(name) => macro_names.push(name.to_string()),
                 MacroSelector::All => skip_context.all_macros = true,

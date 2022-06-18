@@ -408,6 +408,7 @@ mod test {
     use super::*;
     use std::str;
 
+    use crate::config::macro_names::MacroName;
     use rustfmt_config_proc_macro::{nightly_only_test, stable_only_test};
 
     #[allow(dead_code)]
@@ -1024,5 +1025,18 @@ make_backup = false
                 PartiallyUnstableOption::V3
             );
         }
+    }
+
+    #[test]
+    fn test_override_skip_macro_names() {
+        let mut config = Config::default();
+        config.override_value("skip_macro_names", r#"["*", "println"]"#);
+        assert_eq!(
+            config.skip_macro_names(),
+            MacroSelectors(vec![
+                MacroSelector::All,
+                MacroSelector::Name(MacroName::new("println".to_owned()))
+            ])
+        );
     }
 }
