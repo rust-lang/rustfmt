@@ -1018,6 +1018,11 @@ See also [`format_macro_matchers`](#format_macro_matchers).
 
 Skip formatting the bodies of macro invocations with the following names.
 
+rustfmt will not format any macro invocation for macros with names set in this list.
+Including the special value "*" will prevent any macro invocations from being formatted.
+
+Note: This option does not have any impact on how rustfmt formats macro definitions.
+
 - **Default value**: `[]`
 - **Possible values**: a list of macro name idents, `["name_0", "name_1", ..., "*"]`
 - **Stable**: No (tracking issue: [#5346](https://github.com/rust-lang/rustfmt/issues/5346))
