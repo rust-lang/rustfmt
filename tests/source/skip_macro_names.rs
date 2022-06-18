@@ -1,4 +1,4 @@
-// rustfmt-skip_macro_names: ["items"]
+// rustfmt-skip_macro_invocations: ["items"]
 
 macro_rules! items {
     ($($arg:item)*) => { $($arg)* };

@@ -70,7 +70,7 @@ create_config! {
     format_macro_matchers: bool, false, false,
         "Format the metavariable matching patterns in macros";
     format_macro_bodies: bool, true, false, "Format the bodies of macros";
-    skip_macro_names: MacroSelectors, MacroSelectors::default(), false,
+    skip_macro_invocations: MacroSelectors, MacroSelectors::default(), false,
         "Skip formatting the bodies of macros invoked with the following names.";
     hex_literal_case: HexLiteralCase, HexLiteralCase::Preserve, false,
         "Format hexadecimal integer literals";
@@ -617,7 +617,7 @@ normalize_doc_attributes = false
 format_strings = false
 format_macro_matchers = false
 format_macro_bodies = true
-skip_macro_names = []
+skip_macro_invocations = []
 hex_literal_case = "Preserve"
 empty_item_single_line = true
 struct_lit_single_line = true
@@ -1028,11 +1028,11 @@ make_backup = false
     }
 
     #[test]
-    fn test_override_skip_macro_names() {
+    fn test_override_skip_macro_invocations() {
         let mut config = Config::default();
-        config.override_value("skip_macro_names", r#"["*", "println"]"#);
+        config.override_value("skip_macro_invocations", r#"["*", "println"]"#);
         assert_eq!(
-            config.skip_macro_names(),
+            config.skip_macro_invocations(),
             MacroSelectors(vec![
                 MacroSelector::All,
                 MacroSelector::Name(MacroName::new("println".to_owned()))

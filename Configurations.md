@@ -1014,7 +1014,7 @@ macro_rules! foo {
 
 See also [`format_macro_matchers`](#format_macro_matchers).
 
-## `skip_macro_names`
+## `skip_macro_invocations`
 
 Skip formatting the bodies of macro invocations with the following names.
 
