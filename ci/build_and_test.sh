@@ -9,10 +9,10 @@ rustc -Vv
 cargo -V
 
 # Build and test main crate
-cargo build
+cargo build --locked
 cargo test
 
 # Build and test other crates
 cd config_proc_macro
-cargo build
+cargo build --locked
 cargo test
