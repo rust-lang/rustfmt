@@ -58,5 +58,5 @@ jobs:
       shell: bash
 
     - name: Build and Test
-      run: ./ci/build_and_test.sh
-      shell: bash
+      shell: cmd
+      run: ci\build_and_test.bat
