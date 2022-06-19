@@ -1,4 +1,4 @@
-set RUSTFLAGS="-D warnings"
+set "RUSTFLAGS=-D warnings"
 
 :: Print version information
 rustc -Vv || exit /b 1
