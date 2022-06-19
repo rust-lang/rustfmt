@@ -1,3 +1,5 @@
+// rustfmt-version: One
+
 // Based on the issue description
 pub trait PrettyPrinter<'tcx>:
     Printer<
@@ -125,6 +127,15 @@ where
             tyyyyyyyyyyyyyyyyyyyyy::AssociatedItem,
         ) + fmt::Write,
 {
+}
+
+fn build_sorted_static_get_entry_names(
+    mut entries: entryyyyyyyy,
+) -> (impl Fn(
+    AlphabeticalTraversal,
+    Seconddddddddddddddddddddddddddddddddddd,
+) -> Parammmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+        + Sendddddddddddddddddddddddddddddddddddddddddddd) {
 }
 
 pub trait SomeTrait:
