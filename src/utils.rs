@@ -295,9 +295,7 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
 pub(crate) fn semicolon_for_stmt(context: &RewriteContext<'_>, stmt: &ast::Stmt) -> bool {
     match stmt.kind {
         ast::StmtKind::Semi(ref expr) => match expr.kind {
-            ast::ExprKind::While(..) | ast::ExprKind::Loop(..) | ast::ExprKind::ForLoop(..) => {
-                false
-            }
+            ast::ExprKind::While(..) | ast::ExprKind::ForLoop(..) => false,
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
                 context.config.trailing_semicolon()
             }
