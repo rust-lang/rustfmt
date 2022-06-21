@@ -944,16 +944,10 @@ fn join_bounds_inner(
     // Whether a PathSegment segment includes internal array containing more than one item
     let is_segment_with_multi_items_array = |seg: &ast::PathSegment| {
         if let Some(args_in) = &seg.args {
-            match &**args_in {
-                ast::AngleBracketed(args) => {
-                    if args.args.len() > 1 {
-                        true
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            }
+            matches!(
+                args_in.deref(),
+                ast::GenericArgs::AngleBracketed(bracket_args) if bracket_args.args.len() > 1
+            )
         } else {
             false
         }
