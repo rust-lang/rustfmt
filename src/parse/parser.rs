@@ -81,7 +81,7 @@ impl<'a> ParserBuilder<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum ParserError {
     NoParseSess,
     NoInput,

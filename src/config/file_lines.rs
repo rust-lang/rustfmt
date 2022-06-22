@@ -153,7 +153,7 @@ impl Range {
 /// It is represented as a multimap keyed on file names, with values a collection of
 /// non-overlapping ranges sorted by their start point. An inner `None` is interpreted to mean all
 /// lines in all files.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FileLines(Option<HashMap<FileName, Vec<Range>>>);
 
 impl fmt::Display for FileLines {

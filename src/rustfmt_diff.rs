@@ -5,14 +5,14 @@ use std::io::Write;
 
 use crate::config::{Color, Config, Verbosity};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum DiffLine {
     Context(String),
     Expected(String),
     Resulting(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Mismatch {
     /// The line number in the formatted version.
     pub(crate) line_number: u32,

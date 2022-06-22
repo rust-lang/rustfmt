@@ -216,7 +216,7 @@ pub enum Verbosity {
     Quiet,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct WidthHeuristics {
     // Maximum width of the args of a function call before falling back
     // to vertical formatting.
@@ -315,7 +315,7 @@ impl Default for EmitMode {
 }
 
 /// A set of directories, files and modules that rustfmt should ignore.
-#[derive(Default, Clone, Debug, PartialEq)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct IgnoreList {
     /// A set of path specified in rustfmt.toml.
     path_set: HashSet<PathBuf>,

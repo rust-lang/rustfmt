@@ -101,7 +101,7 @@ pub(crate) enum UseSegmentKind {
     List(Vec<UseTree>),
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq)]
 pub(crate) struct UseSegment {
     pub(crate) kind: UseSegmentKind,
     pub(crate) version: Version,
@@ -276,6 +276,12 @@ impl fmt::Debug for UseSegment {
 impl fmt::Display for UseSegment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.kind, f)
+    }
+}
+
+impl PartialEq for UseSegment {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
     }
 }
 

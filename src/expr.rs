@@ -43,7 +43,7 @@ impl Rewrite for ast::Expr {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ExprType {
     Statement,
     SubExpression,

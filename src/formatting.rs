@@ -376,7 +376,7 @@ impl FormattingError {
 
 pub(crate) type FormatErrorMap = HashMap<FileName, Vec<FormattingError>>;
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub(crate) struct ReportedErrors {
     // Encountered e.g., an IO error.
     pub(crate) has_operational_errors: bool,

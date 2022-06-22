@@ -193,7 +193,7 @@ fn trim_end_but_line_feed(trim_end: bool, result: String) -> String {
 
 /// Result of breaking a string so it fits in a line and the state it ended in.
 /// The state informs about what to do with the snippet and how to continue the breaking process.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 enum SnippetState {
     /// The input could not be broken and so rewriting the string is finished.
     EndOfInput(String),

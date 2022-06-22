@@ -67,7 +67,7 @@ impl str::FromStr for MacroSelector {
 }
 
 /// A set of macro selectors.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct MacroSelectors(pub Vec<MacroSelector>);
 
 impl fmt::Display for MacroSelectors {

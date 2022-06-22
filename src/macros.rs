@@ -1034,7 +1034,7 @@ fn span_for_token_stream(token_stream: &TokenStream) -> Option<Span> {
 }
 
 // We should insert a space if the next token is a:
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum SpaceState {
     Never,
     Punctuation,
