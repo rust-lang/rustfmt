@@ -124,7 +124,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     ) -> Result<FileModMap<'ast>, ModuleResolutionError> {
         let root_filename = self.parse_sess.span_to_filename(krate.spans.inner_span);
         self.directory.path = match root_filename {
-            FileName::Real(ref p) => p.parent().unwrap_or(Path::new("")).to_path_buf(),
+            FileName::Real(ref p) => p.parent().map_or_else(PathBuf::new, Path::to_owned),
             _ => PathBuf::new(),
         };
 

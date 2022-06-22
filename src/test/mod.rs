@@ -101,10 +101,9 @@ fn is_file_skip(path: &Path) -> bool {
 fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
     let mut files = vec![];
     if path.is_dir() {
-        for entry in fs::read_dir(path).expect(&format!(
-            "couldn't read directory {}",
-            path.to_str().unwrap()
-        )) {
+        for entry in fs::read_dir(path)
+            .unwrap_or_else(|_| panic!("couldn't read directory {}", path.to_str().unwrap()))
+        {
             let entry = entry.expect("couldn't get `DirEntry`");
             let path = entry.path();
             if path.is_dir() && recursive {
@@ -118,10 +117,9 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
 }
 
 fn verify_config_used(path: &Path, config_name: &str) {
-    for entry in fs::read_dir(path).expect(&format!(
-        "couldn't read {} directory",
-        path.to_str().unwrap()
-    )) {
+    for entry in fs::read_dir(path)
+        .unwrap_or_else(|_| panic!("couldn't read {} directory", path.to_str().unwrap()))
+    {
         let entry = entry.expect("couldn't get directory entry");
         let path = entry.path();
         if path.extension().map_or(false, |f| f == "rs") {
