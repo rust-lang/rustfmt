@@ -338,14 +338,12 @@ fn rewrite_struct_pat(
             }
             fields_str.push('\n');
             fields_str.push_str(&nested_shape.indent.to_string(context.config));
-        } else {
-            if !fields_str.is_empty() {
-                // there are preceding struct fields being matched on
-                if has_trailing_comma {
-                    fields_str.push(' ');
-                } else {
-                    fields_str.push_str(", ");
-                }
+        } else if !fields_str.is_empty() {
+            // there are preceding struct fields being matched on
+            if has_trailing_comma {
+                fields_str.push(' ');
+            } else {
+                fields_str.push_str(", ");
             }
         }
         fields_str.push_str("..");

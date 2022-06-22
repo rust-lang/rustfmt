@@ -429,26 +429,24 @@ fn rewrite_match_body(
         }
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
-        let (body_prefix, body_suffix) =
-            if context.config.match_arm_blocks() && !context.inside_macro() {
-                let comma = if context.config.match_block_trailing_comma() {
-                    ","
-                } else {
-                    ""
-                };
-                let semicolon = if context.config.version() == Version::One {
-                    ""
-                } else {
-                    if semicolon_for_expr(context, body) {
-                        ";"
-                    } else {
-                        ""
-                    }
-                };
-                ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
+        let (body_prefix, body_suffix) = if context.config.match_arm_blocks()
+            && !context.inside_macro()
+        {
+            let comma = if context.config.match_block_trailing_comma() {
+                ","
             } else {
-                ("", String::from(","))
+                ""
             };
+            let semicolon =
+                if context.config.version() != Version::One && semicolon_for_expr(context, body) {
+                    ";"
+                } else {
+                    ""
+                };
+            ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
+        } else {
+            ("", String::from(","))
+        };
 
         let block_sep = match context.config.control_brace_style() {
             _ if body_prefix.is_empty() => "".to_owned(),
