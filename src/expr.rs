@@ -55,6 +55,11 @@ pub(crate) fn format_expr(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
+    // Memoizing method calls lead to cases where rustfmt's stability guarantees are violated.
+    // See https://github.com/rust-lang/rustfmt/issues/5399
+    if matches!(expr.kind, ast::ExprKind::MethodCall(..)) {
+        return format_expr_inner(expr, expr_type, context, shape);
+    }
     // when max_width is tight, we should check all possible formattings, in order to find
     // if we can fit expression in the limit. Doing it recursively takes exponential time
     // relative to input size, and people hit it with rustfmt takes minutes in #4476 #4867 #5128
