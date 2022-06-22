@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 use std::cmp::{max, min, Ordering};
+use std::fmt::Write;
 
 use regex::Regex;
 use rustc_ast::visit;
@@ -848,7 +849,7 @@ pub(crate) fn format_impl(
             }
         }
         if where_clause_str.contains('\n') || last_line_contains_single_line_comment(&result) {
-            result.push_str(&format!("{sep}{{{sep}}}"));
+            write!(result, "{sep}{{{sep}}}").unwrap();
         } else {
             result.push_str(" {}");
         }
@@ -1745,7 +1746,7 @@ fn rewrite_ty<R: Rewrite>(
     if !after_where_predicates.is_empty() {
         return None;
     }
-    result.push_str(&format!("{}type ", format_visibility(context, vis)));
+    write!(result, "{}type ", format_visibility(context, vis)).unwrap();
     let ident_str = rewrite_ident(context, ident);
 
     if generics.params.is_empty() {

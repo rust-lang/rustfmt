@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, iter};
 
-use itertools::{multipeek, MultiPeek};
+use itertools::{multipeek, Itertools, MultiPeek};
 use lazy_static::lazy_static;
 use regex::Regex;
 use rustc_span::Span;
@@ -548,8 +548,9 @@ impl ItemizedBlock {
     fn trimmed_block_as_string(&self) -> String {
         self.lines
             .iter()
-            .map(|line| format!("{} ", line.trim_start()))
-            .collect::<String>()
+            .map(|line| line.trim_start())
+            .format(" ")
+            .to_string()
     }
 
     /// Returns the block as a string under its original form.

@@ -1370,13 +1370,12 @@ fn format_lazy_static(
     for (i, (vis, id, ty, expr)) in parsed_elems.iter().enumerate() {
         // Rewrite as a static item.
         let vis = crate::utils::format_visibility(context, vis);
-        let mut stmt = String::with_capacity(128);
-        stmt.push_str(&format!(
+        let stmt = format!(
             "{}static ref {}: {} =",
             vis,
             id,
             ty.rewrite(context, nested_shape)?
-        ));
+        );
         result.push_str(&rewrite_assign_rhs(
             context,
             stmt,
