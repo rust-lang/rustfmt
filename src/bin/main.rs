@@ -99,8 +99,10 @@ fn make_opts() -> Options {
     opts.optflag(
         "",
         "check",
-        "Run in 'check' mode. Exits with 0 if input is formatted correctly. Exits \
-         with 1 and prints a diff if formatting is required.",
+        "Run in 'check' mode. Exits with 0 if input is formatted correctly. Exits  \
+         with 1 and prints a diff if formatting is required. When reading a diff,  \
+         lines that start with '-' are poorly formatted, lines that start with '+' \
+         are after formatting, and all other lines are properly formatted.",
     );
     let is_nightly = is_nightly();
     let emit_opts = if is_nightly {

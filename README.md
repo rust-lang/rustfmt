@@ -114,7 +114,7 @@ To format individual files or arbitrary codes from stdin, the `rustfmt` binary s
 examples follow:
 
 - `rustfmt lib.rs main.rs` will format "lib.rs" and "main.rs" in place
-- `rustfmt` will read a code from stdin and write formatting to stdout
+- `rustfmt` will read a code from stdin and write formatting to stdout. When reading from stdin, `rustfmt` will not exit with an error code unless there were parsing errors or interal `rustfmt` errors.
   - `echo "fn     main() {}" | rustfmt` would emit "fn main() {}".
 
 For more information, including arguments and emit options, see `rustfmt --help`.
@@ -126,6 +126,11 @@ make any formatting changes to the input, and `1` if Rustfmt would make changes.
 In other modes, Rustfmt will exit with `1` if there was some error during
 formatting (for example a parsing or internal error) and `0` if formatting
 completed without error (whether or not changes were made).
+If Rustfmt decides formatting is required, a diff will be printed. The diff has
+the following format:
+ - Lines that start with `-` are poorly formatted.
+ - Lines that start with `+` are after formatting.
+ - All other lines are properly formated.
 
 
 
