@@ -2418,29 +2418,47 @@ fn rewrite_fn_base(
             result.push_str(&ret_str);
         }
 
-        // Comment between return type and the end of the decl.
-        let snippet_lo = fd.output.span().hi();
-        if where_clause.predicates.is_empty() {
-            let snippet_hi = span.hi();
-            let snippet = context.snippet(mk_sp(snippet_lo, snippet_hi));
+        // Clusure to handle a comment in a snippet
+        let mut snippet_comment_handling = |span_lo, span_hi, consider_force_new_line_for_brace| {
+            let snippet = context.snippet(mk_sp(span_lo, span_hi));
             // Try to preserve the layout of the original snippet.
-            let original_starts_with_newline = snippet
-                .find(|c| c != ' ')
-                .map_or(false, |i| starts_with_newline(&snippet[i..]));
+            let original_starts_with_newline = (consider_force_new_line_for_brace
+                && force_new_line_for_brace)
+                || snippet
+                    .find(|c| c != ' ')
+                    .map_or(false, |i| starts_with_newline(&snippet[i..]));
             let original_ends_with_newline = snippet
                 .rfind(|c| c != ' ')
-                .map_or(false, |i| snippet[i..].ends_with('\n'));
+                .map_or(false, |i| snippet[..i + 1].ends_with('\n'));
             let snippet = snippet.trim();
             if !snippet.is_empty() {
-                result.push(if original_starts_with_newline {
-                    '\n'
+                if original_starts_with_newline {
+                    result.push_str(&indent.to_string_with_newline(context.config));
                 } else {
-                    ' '
-                });
+                    result.push(' ');
+                }
                 result.push_str(snippet);
                 if original_ends_with_newline {
                     force_new_line_for_brace = true;
+                } else {
+                    force_new_line_for_brace = false;
                 }
+            }
+        };
+
+        // Comments between return type and the end of the decl.
+        if where_clause.predicates.is_empty() {
+            // Comment up to empty-where is exist or up to end of declaration
+            let snippet_hi = if where_clause.has_where_token {
+                where_clause.span.lo()
+            } else {
+                span.hi()
+            };
+            snippet_comment_handling(fd.output.span().hi(), snippet_hi, false);
+
+            // Comment post empty-where to end of declaration
+            if where_clause.has_where_token {
+                snippet_comment_handling(where_clause.span.hi(), span.hi(), true);
             }
         }
     }
@@ -2473,21 +2491,36 @@ fn rewrite_fn_base(
         pos_before_where,
         option,
     )?;
+
+    // Closure for recovering empty where clause
+    let mut recover_empty_where_span_comment = |lo, hi| match recover_missing_comment_in_span(
+        mk_sp(lo, hi),
+        shape,
+        context,
+        last_line_width(&result),
+    ) {
+        Some(ref missing_comment) if !missing_comment.is_empty() => {
+            result.push_str(missing_comment);
+            force_new_line_for_brace = true;
+        }
+        _ => (),
+    };
+
     // If there are neither where-clause nor return type, we may be missing comments between
     // params and `{`.
     if where_clause_str.is_empty() {
         if let ast::FnRetTy::Default(ret_span) = fd.output {
-            match recover_missing_comment_in_span(
-                mk_sp(params_span.hi(), ret_span.hi()),
-                shape,
-                context,
-                last_line_width(&result),
-            ) {
-                Some(ref missing_comment) if !missing_comment.is_empty() => {
-                    result.push_str(missing_comment);
-                    force_new_line_for_brace = true;
-                }
-                _ => (),
+            // Pre where clause comment
+            let (span_lo, span_hi) = if where_clause.has_where_token {
+                (params_span.hi(), where_clause.span.lo())
+            } else {
+                (params_span.hi(), ret_span.hi())
+            };
+            recover_empty_where_span_comment(span_lo, span_hi);
+
+            // Post where clause comment
+            if where_clause.has_where_token {
+                recover_empty_where_span_comment(where_clause.span.hi(), span.hi());
             }
         }
     }
