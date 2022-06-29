@@ -20,7 +20,7 @@ use crate::visitor::FmtVisitor;
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
 
 mod generated;
-mod newline_style;
+pub(crate) mod newline_style;
 
 // A map of the files of a crate, with their new content
 pub(crate) type SourceFile = Vec<FileRecord>;

@@ -101,5 +101,5 @@ where
         formatted_text,
     };
 
-    emitter.emit_formatted_file(out, formatted_file)
+    emitter.emit_formatted_file_with_line_style(out, formatted_file, newline_style)
 }

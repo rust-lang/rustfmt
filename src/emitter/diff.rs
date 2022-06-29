@@ -1,6 +1,7 @@
 use super::*;
 use crate::config::Config;
 use crate::rustfmt_diff::{make_diff, print_diff};
+use crate::NewlineStyle;
 
 pub(crate) struct DiffEmitter {
     config: Config,
@@ -13,7 +14,7 @@ impl DiffEmitter {
 }
 
 impl Emitter for DiffEmitter {
-    fn emit_formatted_file(
+    fn emit_formatted_file_with_line_style(
         &mut self,
         output: &mut dyn Write,
         FormattedFile {
@@ -21,6 +22,7 @@ impl Emitter for DiffEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
+        _: NewlineStyle,
     ) -> Result<EmitterResult, io::Error> {
         const CONTEXT_SIZE: usize = 3;
         let mismatch = make_diff(original_text, formatted_text, CONTEXT_SIZE);

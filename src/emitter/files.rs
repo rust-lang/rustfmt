@@ -1,4 +1,5 @@
 use super::*;
+use crate::NewlineStyle;
 use std::fs;
 
 #[derive(Debug, Default)]
@@ -15,7 +16,7 @@ impl FilesEmitter {
 }
 
 impl Emitter for FilesEmitter {
-    fn emit_formatted_file(
+    fn emit_formatted_file_with_line_style(
         &mut self,
         output: &mut dyn Write,
         FormattedFile {
@@ -23,6 +24,7 @@ impl Emitter for FilesEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
+        _: NewlineStyle,
     ) -> Result<EmitterResult, io::Error> {
         // Write text directly over original file if there is a diff.
         let filename = ensure_real_path(filename);
