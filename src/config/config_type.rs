@@ -120,6 +120,7 @@ macro_rules! create_config {
                     | "array_width"
                     | "chain_width" => self.0.set_heuristics(),
                     "merge_imports" => self.0.set_merge_imports(),
+                    "match_arm_blocks" => self.0.set_match_arm_blocks(),
                     &_ => (),
                 }
             }
@@ -174,6 +175,7 @@ macro_rules! create_config {
                 self.set_heuristics();
                 self.set_ignore(dir);
                 self.set_merge_imports();
+                self.set_match_arm_blocks();
                 self
             }
 
@@ -266,14 +268,16 @@ macro_rules! create_config {
                     | "array_width"
                     | "chain_width" => self.set_heuristics(),
                     "merge_imports" => self.set_merge_imports(),
+                    "match_arm_blocks" => self.set_match_arm_blocks(),
                     &_ => (),
                 }
             }
 
             #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
-                const HIDE_OPTIONS: [&str; 5] =
-                    ["verbose", "verbose_diff", "file_lines", "width_heuristics", "merge_imports"];
+                const HIDE_OPTIONS: [&str; 6] =
+                    ["verbose", "verbose_diff", "file_lines", "width_heuristics", "merge_imports",
+                    "match_arm_blocks"];
                 HIDE_OPTIONS.contains(&name)
             }
 
@@ -418,6 +422,22 @@ macro_rules! create_config {
                             ImportGranularity::Crate
                         } else {
                             ImportGranularity::Preserve
+                        };
+                    }
+                }
+            }
+
+            fn set_match_arm_blocks(&mut self) {
+                if self.was_set().match_arm_blocks() {
+                    eprintln!(
+                        "Warning: the `match_arm_blocks` option is deprecated. \
+                        Use `match_arm_wrapping` instead"
+                    );
+                    if !self.was_set().match_arm_wrapping() {
+                        self.match_arm_wrapping.2 = if self.match_arm_blocks() {
+                            MatchArmWrapping::Default
+                        } else {
+                            MatchArmWrapping::FitFirstLine
                         };
                     }
                 }

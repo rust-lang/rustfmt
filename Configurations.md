@@ -1612,6 +1612,185 @@ fn foo() {
 }
 ```
 
+## `match_arm_wrapping`
+
+Controls when to block wrap match arm bodies.
+
+- **Default value**: `"Default"`
+- **Possible values**: `"Default"`, `"FitFirstLine"`, `"FitEntireBody"`, `"Always"`, `"Preserve`
+- **Stable**: No (tracking issue: #4896)
+
+### Example
+
+#### Original code
+
+```rust
+#![rustfmt::skip]
+
+fn main() {
+    match lorem {
+        1000 => foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x),
+        2000 => {
+            println!("{}", sit)
+        }
+        3000 => panic!(),
+        4000 => {
+            ()
+        }
+        5000 => this.a_very_long_function_name(foo, bar, bazz, fizz, another_argument, some_more_arguments, which_dont_fit),
+    }
+}
+```
+
+#### `"Default"` (default):
+
+The default block wrapping settings, as described in the Style Guide.
+
+```rust
+fn main() {
+    match lorem {
+        1000 => {
+            foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x)
+        }
+        2000 => {
+            println!("{}", sit)
+        }
+        3000 => panic!(),
+        4000 => (),
+        5000 => this.a_very_long_function_name(
+            foo,
+            bar,
+            bazz,
+            fizz,
+            another_argument,
+            some_more_arguments,
+            which_dont_fit,
+        ),
+    }
+}
+```
+
+#### `"FitFirstLine"`:
+
+Same as the default, except don't block wrap match arms when the opening line of its body can't fit on the same line as the `=>`.
+
+```rust
+fn main() {
+    match lorem {
+        1000 =>
+            foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x),
+        2000 => {
+            println!("{}", sit)
+        }
+        3000 => panic!(),
+        4000 => (),
+        5000 => this.a_very_long_function_name(
+            foo,
+            bar,
+            bazz,
+            fizz,
+            another_argument,
+            some_more_arguments,
+            which_dont_fit,
+        ),
+    }
+}
+```
+
+#### `"Always"`:
+
+Always block wrap match arm bodies.
+
+```rust
+fn main() {
+    match lorem {
+        1000 => {
+            foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x)
+        }
+        2000 => {
+            println!("{}", sit)
+        }
+        3000 => {
+            panic!()
+        }
+        4000 => {
+            ()
+        }
+        5000 => {
+            this.a_very_long_function_name(
+                foo,
+                bar,
+                bazz,
+                fizz,
+                another_argument,
+                some_more_arguments,
+                which_dont_fit,
+            )
+        }
+    }
+}
+```
+
+#### `"Preserve"`:
+
+Preserve block wrapping on match arm bodies if the developer originally had the body wrapped.
+
+```rust
+fn main() {
+    match lorem {
+        1000 => {
+            foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x)
+        }
+        2000 => {
+            println!("{}", sit)
+        }
+        3000 => panic!(),
+        4000 => {
+            ()
+        }
+        5000 => this.a_very_long_function_name(
+            foo,
+            bar,
+            bazz,
+            fizz,
+            another_argument,
+            some_more_arguments,
+            which_dont_fit,
+        ),
+    }
+}
+```
+
+#### `"FitEntireBody"`:
+
+Same as default, except block wrap the match arm if the entire body cannot fit on the same line as the `=>`.
+
+```rust
+fn main() {
+    match lorem {
+        1000 => {
+            foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo(x)
+        }
+        2000 => {
+            println!("{}", sit)
+        }
+        3000 => panic!(),
+        4000 => (),
+        5000 => {
+            this.a_very_long_function_name(
+                foo,
+                bar,
+                bazz,
+                fizz,
+                another_argument,
+                some_more_arguments,
+                which_dont_fit,
+            )
+        }
+    }
+}
+```
+
 ## `match_block_trailing_comma`
 
 Put a trailing comma after a block based match arm (non-block arms are not affected)
