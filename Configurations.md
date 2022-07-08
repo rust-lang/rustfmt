@@ -1052,6 +1052,48 @@ Controls the strategy for grouping sets of consecutive imports. Imports may cont
 
 Each set of imports (one or more `use` statements, optionally separated by newlines) will be formatted independently. Other statements such as `mod ...` or `extern crate ...` will cause imports to not be grouped together.
 
+**Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantics
+of the original source code.
+
+#### `StdExternalCrate`:
+
+Discard existing import groups, and create three groups for:
+1. `std`, `core` and `alloc`,
+2. external crates,
+3. `self`, `super` and `crate` imports.
+
+```rust
+use alloc::alloc::Layout;
+use core::f32;
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+use chrono::Utc;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+```
+
+#### `One`:
+
+Discard existing import groups, and create a single group for everything
+
+```rust
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+use alloc::alloc::Layout;
+use broker::database::PooledConnection;
+use chrono::Utc;
+use core::f32;
+use juniper::{FieldError, FieldResult};
+use std::sync::Arc;
+use uuid::Uuid;
+```
+
 #### `Preserve` (default):
 
 Preserve the source file's import groups.
@@ -2088,48 +2130,6 @@ mod lorem;
 mod ipsum;
 mod dolor;
 mod sit;
-```
-
-**Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantics
-of the original source code.
-
-#### `StdExternalCrate`:
-
-Discard existing import groups, and create three groups for:
-1. `std`, `core` and `alloc`,
-2. external crates,
-3. `self`, `super` and `crate` imports.
-
-```rust
-use alloc::alloc::Layout;
-use core::f32;
-use std::sync::Arc;
-
-use broker::database::PooledConnection;
-use chrono::Utc;
-use juniper::{FieldError, FieldResult};
-use uuid::Uuid;
-
-use super::schema::{Context, Payload};
-use super::update::convert_publish_payload;
-use crate::models::Event;
-```
-
-#### `One`:
-
-Discard existing import groups, and create a single group for everything
-
-```rust
-use super::schema::{Context, Payload};
-use super::update::convert_publish_payload;
-use crate::models::Event;
-use alloc::alloc::Layout;
-use broker::database::PooledConnection;
-use chrono::Utc;
-use core::f32;
-use juniper::{FieldError, FieldResult};
-use std::sync::Arc;
-use uuid::Uuid;
 ```
 
 ## `required_version`
