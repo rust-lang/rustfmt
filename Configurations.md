@@ -1073,6 +1073,45 @@ use crate::models::Event;
 use core::f32;
 ```
 
+#### `StdExternalCrate`:
+
+Discard existing import groups, and create three groups for:
+1. `std`, `core` and `alloc`,
+2. external crates,
+3. `self`, `super` and `crate` imports.
+
+```rust
+use alloc::alloc::Layout;
+use core::f32;
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+use chrono::Utc;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+```
+
+#### `One`:
+
+Discard existing import groups, and create a single group for everything
+
+```rust
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+use alloc::alloc::Layout;
+use broker::database::PooledConnection;
+use chrono::Utc;
+use core::f32;
+use juniper::{FieldError, FieldResult};
+use std::sync::Arc;
+use uuid::Uuid;
+```
+
 ## `hard_tabs`
 
 Use tab characters for indentation, spaces for alignment
@@ -2092,45 +2131,6 @@ mod sit;
 
 **Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantics
 of the original source code.
-
-#### `StdExternalCrate`:
-
-Discard existing import groups, and create three groups for:
-1. `std`, `core` and `alloc`,
-2. external crates,
-3. `self`, `super` and `crate` imports.
-
-```rust
-use alloc::alloc::Layout;
-use core::f32;
-use std::sync::Arc;
-
-use broker::database::PooledConnection;
-use chrono::Utc;
-use juniper::{FieldError, FieldResult};
-use uuid::Uuid;
-
-use super::schema::{Context, Payload};
-use super::update::convert_publish_payload;
-use crate::models::Event;
-```
-
-#### `One`:
-
-Discard existing import groups, and create a single group for everything
-
-```rust
-use super::schema::{Context, Payload};
-use super::update::convert_publish_payload;
-use crate::models::Event;
-use alloc::alloc::Layout;
-use broker::database::PooledConnection;
-use chrono::Utc;
-use core::f32;
-use juniper::{FieldError, FieldResult};
-use std::sync::Arc;
-use uuid::Uuid;
-```
 
 ## `required_version`
 
