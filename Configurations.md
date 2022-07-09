@@ -2283,6 +2283,61 @@ fn lorem<T : Eq>(t : T) {
 
 See also: [`space_after_colon`](#space_after_colon).
 
+## `spaces_within_parenthesized_items`
+
+Put one space after '(' and before ')' on parenthesized items.
+Note that spaces are not added within grouping parentheses.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+#[cfg(test)]
+fn lorem() {}
+
+fn lorem(ipsum: usize, dolor: usize) -> i32 {
+    println!("ipsum!");
+    bar();
+    foo(1, 2, 3);
+    let (x, y) = (1, 2);
+    (1 * ((2 + 3) * 4)) // grouping parentheses
+}
+
+pub(crate) type Bar = fn(i32, i32) -> ();
+
+struct Dummy;
+
+impl Foo for Dummy {
+    fn lorem(self, ipsum: usize, dolor: usize) {}
+}
+```
+
+#### `true`:
+
+```rust
+#[cfg( test )]
+fn lorem() {}
+
+fn lorem( ipsum: usize, dolor: usize ) -> i32 {
+    println!( "ipsum!" );
+    bar();
+    foo( 1, 2, 3 );
+    let ( x, y ) = ( 1, 2 );
+    (1 * ((2 + 3) * 4)) // grouping parentheses
+}
+
+pub(crate) type Bar = fn( i32, i32 ) -> ();
+
+struct Dummy;
+
+impl Foo for Dummy {
+    fn lorem( self, ipsum: usize, dolor: usize ) {}
+}
+```
+
 ## `spaces_around_ranges`
 
 Put spaces around the .., ..=, and ... range operators

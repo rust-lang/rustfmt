@@ -654,22 +654,49 @@ impl<'a> Context<'a> {
             .block()
             .indent
             .to_string_with_newline(self.context.config);
+
+        let can_have_spaces_within_parenthesis = !items_str.is_empty()
+            && self.context.config.spaces_within_parenthesized_items()
+            && prefix == "("
+            && suffix == ")";
+
         let mut result = String::with_capacity(
-            self.ident.len() + items_str.len() + 2 + indent_str.len() + nested_indent_str.len(),
+            self.ident.len()
+                + items_str.len()
+                + 2
+                + indent_str.len()
+                + nested_indent_str.len()
+                + if can_have_spaces_within_parenthesis {
+                    2
+                } else {
+                    0
+                },
         );
+
         result.push_str(self.ident);
         result.push_str(prefix);
         let force_single_line = if self.context.config.version() == Version::Two {
             !self.context.use_block_indent() || (is_extendable && extend_width <= shape.width)
         } else {
+            let fits_one_line = if can_have_spaces_within_parenthesis {
+                items_str.len() + 4 <= shape.width
             // 2 = `()`
-            let fits_one_line = items_str.len() + 2 <= shape.width;
+            } else {
+                items_str.len() + 2 <= shape.width
+            };
+
             !self.context.use_block_indent()
                 || (self.context.inside_macro() && !items_str.contains('\n') && fits_one_line)
                 || (is_extendable && extend_width <= shape.width)
         };
         if force_single_line {
+            if can_have_spaces_within_parenthesis {
+                result.push(' ');
+            };
             result.push_str(items_str);
+            if can_have_spaces_within_parenthesis {
+                result.push(' ');
+            }
         } else {
             if !items_str.is_empty() {
                 result.push_str(&nested_indent_str);
