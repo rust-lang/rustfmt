@@ -70,7 +70,8 @@ impl<'a> FmtVisitor<'a> {
                 let indent = this.block_indent.to_string(config);
                 this.push_str(&indent);
             }
-        })
+        });
+        self.was_last_rewrite_outer_attribute = false;
     }
 
     fn format_missing_inner<F: Fn(&mut FmtVisitor<'_>, &str, &str)>(
@@ -104,8 +105,14 @@ impl<'a> FmtVisitor<'a> {
         }
 
         if snippet.trim().is_empty() && !out_of_file_lines_range!(self, span) {
-            // Keep vertical spaces within range.
-            self.push_vertical_spaces(count_newlines(snippet));
+            // Typically we'll want to retain all vertical space, however in some cases e.g.
+            // whitespace between items and attributes, we'll want to remove extra newlines.
+            let newline_count = if self.was_last_rewrite_outer_attribute {
+                1
+            } else {
+                count_newlines(snippet)
+            };
+            self.push_vertical_spaces(newline_count);
             process_last_snippet(self, "", snippet);
         } else {
             self.write_snippet(span, &process_last_snippet);
@@ -186,9 +193,10 @@ impl<'a> FmtVisitor<'a> {
                 );
                 (lf_count, crlf_count, within_file_lines_range)
             };
-        for (kind, offset, subslice) in CommentCodeSlices::new(snippet) {
-            debug!("{:?}: {:?}", kind, subslice);
-
+        let mut comment_slices = CommentCodeSlices::new(snippet).peekable();
+        let mut prev_ends_with_newline = false;
+        while let Some((kind, offset, subslice)) = comment_slices.next() {
+            let last_subslice = comment_slices.peek().is_none();
             let (lf_count, crlf_count, within_file_lines_range) =
                 slice_within_file_lines_range(self.config.file_lines(), status.cur_line, subslice);
             let newline_count = lf_count + crlf_count;
@@ -203,13 +211,19 @@ impl<'a> FmtVisitor<'a> {
                 );
             } else if subslice.trim().is_empty() && newline_count > 0 && within_file_lines_range {
                 // 2: blank lines.
-                self.push_vertical_spaces(newline_count);
+                if !last_subslice || !self.was_last_rewrite_outer_attribute {
+                    self.push_vertical_spaces(newline_count);
+                } else if !prev_ends_with_newline {
+                    self.push_vertical_spaces(1);
+                }
+
                 status.cur_line += newline_count;
                 status.line_start = offset + lf_count + crlf_count * 2;
             } else {
                 // 3: code which we failed to format or which is not within file-lines range.
                 self.process_missing_code(&mut status, snippet, subslice, offset, file_name);
             }
+            prev_ends_with_newline = subslice.ends_with('\n');
         }
 
         let last_snippet = &snippet[status.line_start..];
