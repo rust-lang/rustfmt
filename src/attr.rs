@@ -8,8 +8,10 @@ use self::doc_comment::DocCommentFormatter;
 use crate::comment::{contains_comment, rewrite_doc_comment, CommentStyle};
 use crate::config::lists::*;
 use crate::config::IndentStyle;
+use crate::config::Version;
 use crate::expr::rewrite_literal;
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
+use crate::missed_spans::push_vertical_spaces;
 use crate::overflow;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
@@ -478,13 +480,25 @@ impl Rewrite for [ast::Attribute] {
             let missing_span = attrs
                 .get(1)
                 .map(|next| mk_sp(attrs[0].span.hi(), next.span.lo()));
+
+            let mut vertical_lines_pushed = 0;
             if let Some(missing_span) = missing_span {
+                let snippet = context.snippet(missing_span);
+                if let Some((whitespace, _)) = snippet.split_once(|c: char| !c.is_whitespace()) {
+                    let newlines = count_newlines(whitespace);
+                    // Version gate this change as it leads to breaking changes with Version::One
+                    if newlines > 0 && context.config.version() == Version::Two {
+                        vertical_lines_pushed =
+                            push_vertical_spaces(&mut result, context.config, newlines);
+                    }
+                }
+                // remove leading newlines if we already pushed vertical space into the result
                 let comment = crate::comment::recover_missing_comment_in_span(
                     missing_span,
                     shape.with_max_width(context.config),
                     context,
                     0,
-                    false,
+                    vertical_lines_pushed > 0,
                 )?;
                 result.push_str(&comment);
                 if let Some(next) = attrs.get(1) {
