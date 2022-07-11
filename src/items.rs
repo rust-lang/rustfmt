@@ -713,6 +713,7 @@ pub(crate) fn format_impl(
                 Shape::indented(offset, context.config),
                 context,
                 last_line_width(&result),
+                false,
             ) {
                 Some(ref missing_comment) if !missing_comment.is_empty() => {
                     result.push_str(missing_comment);
@@ -1092,6 +1093,7 @@ pub(crate) fn format_trait(
                         Shape::indented(offset, context.config),
                         context,
                         last_line_width(&result),
+                        false,
                     ) {
                         Some(ref missing_comment) if !missing_comment.is_empty() => {
                             result.push_str(missing_comment);
@@ -2482,6 +2484,7 @@ fn rewrite_fn_base(
                 shape,
                 context,
                 last_line_width(&result),
+                false,
             ) {
                 Some(ref missing_comment) if !missing_comment.is_empty() => {
                     result.push_str(missing_comment);

@@ -419,6 +419,7 @@ impl Rewrite for [ast::Attribute] {
                         shape.with_max_width(context.config),
                         context,
                         0,
+                        false,
                     )?;
                     let comment = if comment.is_empty() {
                         format!("\n{}", mlb)
@@ -449,6 +450,7 @@ impl Rewrite for [ast::Attribute] {
                         shape.with_max_width(context.config),
                         context,
                         0,
+                        false,
                     )?;
                     result.push_str(&comment);
                     if let Some(next) = attrs.get(derives.len()) {
@@ -482,6 +484,7 @@ impl Rewrite for [ast::Attribute] {
                     shape.with_max_width(context.config),
                     context,
                     0,
+                    false,
                 )?;
                 result.push_str(&comment);
                 if let Some(next) = attrs.get(1) {
