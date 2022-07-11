@@ -1029,7 +1029,9 @@ Note: This option does not have any impact on how rustfmt formats macro definiti
 
 #### `[]` (default):
 
-All macro invocations will be formatted.
+rustfmt will follow its standard approach to formatting macro invocations.
+
+No macro invocations will be skipped based on their name. More information about rustfmt's standard macro invocation formatting behavior can be found in [#5437](https://github.com/rust-lang/rustfmt/discussions/5437).
 
 ```rust
 lorem!(
