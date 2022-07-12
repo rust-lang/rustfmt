@@ -230,6 +230,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
 
         apply_newline_style(
             self.config.newline_style(),
+            &path,
             &mut visitor.buffer,
             snippet_provider.entire_snippet(),
         );

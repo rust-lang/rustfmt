@@ -1,17 +1,21 @@
-use crate::NewlineStyle;
+use crate::{FileName, NewlineStyle};
+use std::borrow::Cow;
+use std::fs;
 
 /// Apply this newline style to the formatted text. When the style is set
-/// to `Auto`, the `raw_input_text` is used to detect the existing line
-/// endings.
+/// to `Auto`, the `path` and `raw_input_text` are used to detect the existing line
+/// endings. The `path` is prefered when present, and the `raw_input_text` is used
+/// when the input was passed from stdin, or we fail to read the file content from the `path`.
 ///
-/// If the style is set to `Auto` and `raw_input_text` contains no
+/// If the style is set to `Auto` and `path` or `raw_input_text` contain no
 /// newlines, the `Native` style will be used.
 pub(crate) fn apply_newline_style(
     newline_style: NewlineStyle,
+    path: &FileName,
     formatted_text: &mut String,
     raw_input_text: &str,
 ) {
-    *formatted_text = match effective_newline_style(newline_style, raw_input_text) {
+    *formatted_text = match effective_newline_style(newline_style, path, raw_input_text) {
         EffectiveNewlineStyle::Windows => convert_to_windows_newlines(formatted_text),
         EffectiveNewlineStyle::Unix => convert_to_unix_newlines(formatted_text),
     }
@@ -25,10 +29,19 @@ enum EffectiveNewlineStyle {
 
 fn effective_newline_style(
     newline_style: NewlineStyle,
+    path: &FileName,
     raw_input_text: &str,
 ) -> EffectiveNewlineStyle {
     match newline_style {
-        NewlineStyle::Auto => auto_detect_newline_style(raw_input_text),
+        NewlineStyle::Auto => match path.as_path() {
+            Some(path) => auto_detect_newline_style(
+                &fs::read_to_string(path)
+                    .map(|s| Cow::Owned(s))
+                    .unwrap_or_else(|_| Cow::Borrowed(raw_input_text)),
+            ),
+            None => auto_detect_newline_style(raw_input_text),
+        },
+
         NewlineStyle::Native => native_newline_style(),
         NewlineStyle::Windows => EffectiveNewlineStyle::Windows,
         NewlineStyle::Unix => EffectiveNewlineStyle::Unix,
@@ -84,6 +97,8 @@ fn convert_to_unix_newlines(formatted_text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempdir::TempDir;
 
     #[test]
     fn auto_detects_unix_newlines() {
@@ -128,7 +143,28 @@ mod tests {
         let raw_input_text = "One\nTwo\nThree";
 
         let mut out = String::from(formatted_text);
-        apply_newline_style(NewlineStyle::Auto, &mut out, raw_input_text);
+        apply_newline_style(
+            NewlineStyle::Auto,
+            &FileName::Stdin,
+            &mut out,
+            raw_input_text,
+        );
+        assert_eq!("One\nTwo\nThree", &out, "auto should detect 'lf'");
+    }
+
+    #[test]
+    fn auto_detects_and_applies_unix_newlines_from_real_file() {
+        let formatted_text = "One\nTwo\nThree";
+        let raw_input_text = "One\nTwo\nThree";
+
+        let tmpdir = TempDir::new("unix_newlines_from_real_file").unwrap();
+        let path = tmpdir.path().join("test.rs");
+        fs::write(&path, raw_input_text).unwrap();
+
+        let path = FileName::Real(path);
+
+        let mut out = String::from(formatted_text);
+        apply_newline_style(NewlineStyle::Auto, &path, &mut out, raw_input_text);
         assert_eq!("One\nTwo\nThree", &out, "auto should detect 'lf'");
     }
 
@@ -138,8 +174,67 @@ mod tests {
         let raw_input_text = "One\r\nTwo\r\nThree";
 
         let mut out = String::from(formatted_text);
-        apply_newline_style(NewlineStyle::Auto, &mut out, raw_input_text);
+        apply_newline_style(
+            NewlineStyle::Auto,
+            &FileName::Stdin,
+            &mut out,
+            raw_input_text,
+        );
         assert_eq!("One\r\nTwo\r\nThree", &out, "auto should detect 'crlf'");
+    }
+
+    #[test]
+    fn auto_detects_and_applies_windows_newlines_from_real_file() {
+        let formatted_text = "One\nTwo\nThree";
+        let raw_input_text = "One\r\nTwo\r\nThree";
+
+        let tmpdir = TempDir::new("windows_newlines_from_real_file").unwrap();
+        let path = tmpdir.path().join("test.rs");
+        fs::write(&path, raw_input_text).unwrap();
+
+        let path = FileName::Real(path);
+
+        let mut out = String::from(formatted_text);
+        apply_newline_style(NewlineStyle::Auto, &path, &mut out, raw_input_text);
+        assert_eq!("One\r\nTwo\r\nThree", &out, "auto should detect 'crlf'");
+    }
+
+    #[test]
+    fn auto_detect_and_applies_windows_newlines_if_windows_newlines_read_from_file() {
+        // Even if the `raw_input_text` does not contain crlf chars, we should still apply
+        // Them if we can read crlf from the input `FileName::Real(path)`.
+        // see issue https://github.com/rust-lang/rustfmt/issues/4097
+        let text = "One\nTwo\nThree";
+
+        let tmpdir = TempDir::new("windows_newlines_if_windows_newlines_read_from_file").unwrap();
+        let path = tmpdir.path().join("test.rs");
+        fs::write(&path, "One\r\nTwo\r\nThree").unwrap();
+
+        let path = FileName::Real(path);
+
+        let mut out = String::from(text);
+        // Note that the source file contains `crlf`, while the `raw_input_text` contains `lf`
+        apply_newline_style(NewlineStyle::Auto, &path, &mut out, text);
+        assert_eq!("One\r\nTwo\r\nThree", &out, "auto should detect 'crlf'");
+    }
+
+    #[test]
+    fn auto_detect_and_applies_unix_newlines_if_unix_newlines_read_from_file() {
+        // This following test is unlikely to happen in practice, but it is meant to illustrate
+        // that line endings found in the source files take precedence over the `raw_input_text`
+        // passed to apply_newline_style.
+        let text = "One\r\nTwo\r\nThree";
+
+        let tmpdir = TempDir::new("unix_newlines_if_unix_newlines_read_from_file").unwrap();
+        let path = tmpdir.path().join("test.rs");
+        fs::write(&path, "One\nTwo\nThree").unwrap();
+
+        let path = FileName::Real(path);
+
+        let mut out = String::from(text);
+        // Note that the source file contains `lf`, while the `raw_input_text` contains `crlf`
+        apply_newline_style(NewlineStyle::Auto, &path, &mut out, text);
+        assert_eq!("One\nTwo\nThree", &out, "auto should detect 'crlf'");
     }
 
     #[test]
@@ -148,7 +243,12 @@ mod tests {
         let raw_input_text = "One Two Three";
 
         let mut out = String::from(formatted_text);
-        apply_newline_style(NewlineStyle::Auto, &mut out, raw_input_text);
+        apply_newline_style(
+            NewlineStyle::Auto,
+            &FileName::Stdin,
+            &mut out,
+            raw_input_text,
+        );
 
         if cfg!(windows) {
             assert_eq!(
@@ -244,7 +344,7 @@ mod tests {
         newline_style: NewlineStyle,
     ) {
         let mut out = String::from(input);
-        apply_newline_style(newline_style, &mut out, input);
+        apply_newline_style(newline_style, &FileName::Stdin, &mut out, input);
         assert_eq!(expected, &out);
     }
 }
