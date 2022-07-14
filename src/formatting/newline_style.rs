@@ -23,18 +23,21 @@ pub(crate) fn apply_newline_style(
 }
 
 /// Get the newline string based on the requested style and the original text
-pub(crate) fn get_newline_string(newline_style: NewlineStyle, raw_input_text: &str) -> String {
+pub(crate) fn get_newline_string(
+    newline_style: NewlineStyle,
+    raw_input_text: &str,
+) -> &'static str {
     match effective_newline_style(newline_style, raw_input_text) {
-        EffectiveNewlineStyle::Windows => WINDOWS_NEWLINE.to_string(),
-        _ => UNIX_NEWLINE.to_string(),
+        EffectiveNewlineStyle::Windows => WINDOWS_NEWLINE,
+        _ => UNIX_NEWLINE,
     }
 }
 
 /// Get the newline string based on input original text
-pub(crate) fn get_newline_string_of_text(raw_input_text: &str) -> String {
+pub(crate) fn get_newline_string_of_text(raw_input_text: &str) -> &'static str {
     match auto_detect_newline_style(raw_input_text) {
-        EffectiveNewlineStyle::Windows => WINDOWS_NEWLINE.to_string(),
-        _ => UNIX_NEWLINE.to_string(),
+        EffectiveNewlineStyle::Windows => WINDOWS_NEWLINE,
+        _ => UNIX_NEWLINE,
     }
 }
 
