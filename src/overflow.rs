@@ -423,6 +423,56 @@ impl<'a> Context<'a> {
                         }
                     }
 
+                    // A nested call e.g a(b(...))
+                    // In this case we're trying to figure out how to overflow function `b`.
+                    ast::ExprKind::Call(ref callee, ref args) if self.items.len() == 1 => {
+                        callee.rewrite(self.context, shape).and_then(|callee_str| {
+                            if !callee_str.contains('\n') {
+                                // if the rewritten callee does not contains a newline then return
+                                // the rewritten expression
+                                return expr.rewrite(self.context, shape);
+                            }
+
+                            // If the callee string contains a newline (likely because of generics),
+                            // then we'll update how we'll overflow the argument.
+
+                            let items = itemize_list(
+                                self.context.snippet_provider,
+                                args.iter(),
+                                self.suffix,
+                                ",",
+                                |item| item.span().lo(),
+                                |item| item.span().hi(),
+                                |item| item.rewrite(self.context, self.nested_shape),
+                                callee.span.hi(),
+                                expr.span.hi(),
+                                true,
+                            );
+                            let items: Vec<_> = items.collect();
+                            let tactic = self.default_tactic(&items);
+
+                            let shape = if tactic == DefinitiveListTactic::Horizontal {
+                                // if the argument list could be written horizontally, then unindent
+                                // the shape before rewriting.
+                                Shape::legacy(
+                                    self.item_max_width,
+                                    shape.indent.block_unindent(self.context.config),
+                                )
+                            } else {
+                                // If the arguments need any other type of list tactic then
+                                // indent the shape before rewriting.
+                                shape.block_indent(self.item_max_width)
+                            };
+
+                            let rewrite = expr.rewrite(self.context, shape)?;
+                            let indentation = shape
+                                .indent
+                                .to_string_with_newline(self.context.config)
+                                .to_string();
+                            Some(indentation + &rewrite)
+                        })
+                    }
+
                     _ => expr.rewrite(self.context, shape),
                 }
             }
