@@ -941,16 +941,26 @@ fn join_bounds_inner(
         ast::GenericBound::Trait(..) => last_line_extendable(s),
     };
 
-    // Whether a PathSegment segment includes internal array containing more than one item
-    let is_segment_with_multi_items_array = |seg: &ast::PathSegment| {
-        if let Some(args_in) = &seg.args {
-            matches!(
-                args_in.deref(),
-                ast::GenericArgs::AngleBracketed(bracket_args) if bracket_args.args.len() > 1
-            )
-        } else {
-            false
+    // Whether a GenericBound item is a PathSegment segment that includes internal array
+    // that contains more than one item
+    let is_item_with_multi_items_array = |item: &ast::GenericBound| match item {
+        ast::GenericBound::Trait(ref poly_trait_ref, ..) => {
+            let segments = &poly_trait_ref.trait_ref.path.segments;
+            if segments.len() > 1 {
+                true
+            } else {
+                if let Some(args_in) = &segments[0].args {
+                    matches!(
+                        args_in.deref(),
+                        ast::GenericArgs::AngleBracketed(bracket_args)
+                            if bracket_args.args.len() > 1
+                    )
+                } else {
+                    false
+                }
+            }
         }
+        _ => false,
     };
 
     let result = items.iter().enumerate().try_fold(
@@ -1059,17 +1069,7 @@ fn join_bounds_inner(
             if items.len() > 1 {
                 true
             } else {
-                match items[0] {
-                    ast::GenericBound::Trait(ref poly_trait_ref, ..) => {
-                        let segments = &poly_trait_ref.trait_ref.path.segments;
-                        if segments.len() > 1 {
-                            true
-                        } else {
-                            is_segment_with_multi_items_array(&segments[0])
-                        }
-                    }
-                    _ => false,
-                }
+                is_item_with_multi_items_array(&items[0])
             }
         };
 
