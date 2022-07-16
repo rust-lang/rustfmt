@@ -25,7 +25,7 @@ pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<
             current_section: String::new(),
         },
     ];
-    for mut rule in rules.into_iter() {
+    for rule in rules.into_iter() {
         rule.visit_document_mut(&mut doc);
     }
 
