@@ -296,7 +296,6 @@ impl VisitMut for FormatInlineTable {
         let mut long_tables = vec![];
         std::mem::swap(&mut self.long_tables, &mut long_tables);
 
-        println!("\n\n long tables\n {:?}\n\n", long_tables);
         long_tables.into_iter().for_each(|(section, key, table)| {
             match table {
                 Item::Value(Value::InlineTable(table)) => {
@@ -324,7 +323,6 @@ impl VisitMut for FormatInlineTable {
 
         long_table_keys.into_iter().for_each(|key| {
             let item = table.remove(&key).unwrap();
-            println!("removed long item {:?}", item);
             self.long_tables
                 .push((self.current_section.clone(), key, item));
         });
@@ -406,7 +404,6 @@ path = "extremely_long_path_name_goes_right_here"
 version = "4.5.6"
 "#;
 
-        println!("{}", formatted);
         assert_eq!(formatted, expected);
     }
 }
