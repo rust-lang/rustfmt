@@ -296,15 +296,14 @@ impl VisitMut for FormatInlineTable {
         let mut long_tables = vec![];
         std::mem::swap(&mut self.long_tables, &mut long_tables);
 
-        long_tables.into_iter().for_each(|(section, key, table)| {
-            match table {
+        long_tables
+            .into_iter()
+            .for_each(|(section, key, table)| match table {
                 Item::Value(Value::InlineTable(table)) => {
-                    // let table = format!("[{}]\n{}",key,table).parse::<Table>().unwrap();
                     doc[&section][&key] = Item::Table(table.into_table());
                 }
                 _ => unreachable!(),
-            }
-        });
+            });
     }
 
     fn visit_table_like_mut(&mut self, table: &mut dyn TableLike) {
