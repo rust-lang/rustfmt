@@ -1085,7 +1085,7 @@ pub(crate) fn format_trait(
             if let Some(lo) = item_snippet.find('/') {
                 // 1 = `{`
                 let comment_hi = if generics.params.len() > 0 {
-                    generics.span.lo() - BytePos(5)
+                    generics.span.lo() - BytePos(1)
                 } else {
                     body_lo - BytePos(1)
                 };
