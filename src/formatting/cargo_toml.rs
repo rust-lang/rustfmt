@@ -8,22 +8,22 @@ use crate::{Config, ErrorKind};
 
 pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<String, ErrorKind> {
     let mut doc = content.parse::<toml_edit::Document>()?;
-    let rules: Vec<Box<dyn VisitMut>> = vec![
-        Box::new(SortSection {
+    let rules = [
+        &mut SortSection {
             current_position: 0,
-        }),
-        Box::new(SortKey),
-        Box::new(BlankLine { trimming: true }),
-        Box::new(KeyValue),
-        Box::new(MultiLine),
-        Box::new(WrapArray {
+        } as &mut dyn VisitMut,
+        &mut SortKey,
+        &mut BlankLine { trimming: true },
+        &mut KeyValue,
+        &mut MultiLine,
+        &mut WrapArray {
             max_width: config.max_width(),
-        }),
-        Box::new(FormatInlineTable {
+        },
+        &mut FormatInlineTable {
             max_width: config.max_width(),
             long_tables: vec![],
             current_section: String::new(),
-        }),
+        },
     ];
     for mut rule in rules.into_iter() {
         rule.visit_document_mut(&mut doc);
