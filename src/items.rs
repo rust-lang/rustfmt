@@ -2418,7 +2418,7 @@ fn rewrite_fn_base(
             result.push_str(&ret_str);
         }
 
-        // Clusure to handle a comment in a snippet
+        // Closure to handle a comment in a snippet
         let mut snippet_comment_handling = |span_lo, span_hi, consider_force_new_line_for_brace| {
             let snippet = context.snippet(mk_sp(span_lo, span_hi));
             // Try to preserve the layout of the original snippet.
