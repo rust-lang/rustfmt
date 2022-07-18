@@ -13,21 +13,6 @@ mod inner {
     }
 }
 
-// Original from #4649
-trait Foo {
-    fn bar(&self)
-    //     Self: Bar
-    // Some comment
-    ;
-}
-
-fn foo<T>()
-//     T: Bar,
-// Some comment
-{
-    println!("foo");
-}
-
 // Return-type with no "where" - one comment
 fn main() {
     fn foo1() -> String /* same-line with ret-type and brace comment */ {}

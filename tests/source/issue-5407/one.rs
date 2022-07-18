@@ -15,23 +15,6 @@ String::new()
 }
 }
 
-// Original from #4649
-trait Foo {
-    fn bar(&self)
-    where
-    //     Self: Bar
-    // Some comment
-    ;
-}
-
-fn foo<T>()
-where
-//     T: Bar,
-// Some comment
-{
-    println!("foo");
-}
-
 // Return-type with no "where" - one comment
 fn main () {
 fn foo1() -> String /* same-line with ret-type and brace comment */ {
