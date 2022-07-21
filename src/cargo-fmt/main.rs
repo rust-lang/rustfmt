@@ -49,6 +49,10 @@ pub struct Opts {
     )]
     packages: Vec<String>,
 
+    /// Specify a source file to format
+    #[clap(short = 's', long = "src-file", value_name = "src-file")]
+    src_file: Option<PathBuf>,
+
     /// Specify path to Cargo.toml
     #[clap(long = "manifest-path", value_name = "manifest-path")]
     manifest_path: Option<String>,
@@ -93,6 +97,28 @@ fn execute() -> i32 {
     });
 
     let opts = Opts::parse_from(args);
+
+    if opts.src_file.is_some() & !opts.packages.is_empty() {
+        print_usage_to_stderr("cannot format source files and packages at the same time");
+        return FAILURE;
+    }
+
+    if opts.src_file.is_some() & opts.format_all {
+        print_usage_to_stderr("cannot format all packages when specifying source files");
+        return FAILURE;
+    }
+
+    if opts.rustfmt_options.iter().any(|s| s.ends_with(".rs")) {
+        print_usage_to_stderr(
+            "cannot pass rust files to rustfmt through cargo-fmt. Use '--src-file' instead",
+        );
+        return FAILURE;
+    }
+
+    if opts.rustfmt_options.iter().any(|s| s.contains("--edition")) {
+        print_usage_to_stderr("cannot pass '--edition' to rustfmt through cargo-fmt");
+        return FAILURE;
+    }
 
     let verbosity = match (opts.verbose, opts.quiet) {
         (false, false) => Verbosity::Normal,
@@ -319,17 +345,23 @@ pub enum CargoFmtStrategy {
     /// Format every packages and dependencies.
     All,
     /// Format packages that are specified by the command line argument.
-    Some(Vec<String>),
+    Packages(Vec<String>),
     /// Format the root packages only.
     Root,
+    /// Format individual source files specified by the command line arguments.
+    SourceFile(PathBuf),
 }
 
 impl CargoFmtStrategy {
     pub fn from_opts(opts: &Opts) -> CargoFmtStrategy {
+        if let Some(ref src_file) = opts.src_file {
+            return CargoFmtStrategy::SourceFile(src_file.clone());
+        }
+
         match (opts.format_all, opts.packages.is_empty()) {
             (false, true) => CargoFmtStrategy::Root,
             (true, _) => CargoFmtStrategy::All,
-            (false, false) => CargoFmtStrategy::Some(opts.packages.clone()),
+            (false, false) => CargoFmtStrategy::Packages(opts.packages.clone()),
         }
     }
 }
@@ -346,8 +378,11 @@ fn get_targets(
         CargoFmtStrategy::All => {
             get_targets_recursive(manifest_path, &mut targets, &mut BTreeSet::new())?
         }
-        CargoFmtStrategy::Some(ref hitlist) => {
+        CargoFmtStrategy::Packages(ref hitlist) => {
             get_targets_with_hitlist(manifest_path, hitlist, &mut targets)?
+        }
+        CargoFmtStrategy::SourceFile(ref src_file) => {
+            get_target_from_src_file(manifest_path, &src_file, &mut targets)?
         }
     }
 
@@ -359,6 +394,57 @@ fn get_targets(
     } else {
         Ok(targets)
     }
+}
+
+fn get_target_from_src_file(
+    manifest_path: Option<&Path>,
+    src_file: &PathBuf,
+    targets: &mut BTreeSet<Target>,
+) -> Result<(), io::Error> {
+    let metadata = get_cargo_metadata(manifest_path)?;
+
+    let get_target = |src_path: &Path| {
+        metadata
+            .packages
+            .iter()
+            .map(|p| p.targets.iter())
+            .flatten()
+            .filter(|t| {
+                let kind = &t.kind[0];
+                // to prevent formatting any arbitrary file within the root of our
+                // project we special case the build.rs script, becuase it's parent
+                // is the root of the project and we would always select the custom-build
+                // target in the event that we couldn't find a better target to associate
+                // with our file.
+                if kind == "custom-build" && !src_path.ends_with("build.rs") {
+                    return false;
+                }
+
+                if let Ok(target_path) = fs::canonicalize(&t.src_path) {
+                    let target_dir = target_path
+                        .parent()
+                        .expect("Target src_path should have a parent directory");
+                    src_path.starts_with(target_dir)
+                } else {
+                    false
+                }
+            })
+            .max_by(|t1, t2| {
+                let t1_len = t1.src_path.components().count();
+                let t2_len = t2.src_path.components().count();
+                t1_len.cmp(&t2_len)
+            })
+    };
+
+    let canonicalize = fs::canonicalize(&src_file)?;
+    if let Some(target) = get_target(&canonicalize) {
+        targets.insert(Target {
+            path: src_file.to_owned(),
+            kind: target.kind[0].clone(),
+            edition: target.edition.clone(),
+        });
+    }
+    Ok(())
 }
 
 fn get_targets_root_only(
