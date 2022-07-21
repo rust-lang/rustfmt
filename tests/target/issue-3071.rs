@@ -11,3 +11,17 @@ impl<T> A<T>
 {
     fn foo() {}
 }
+
+struct B<T, K>
+    where T: Send,
+          K: Eq
+{
+    y: u32,
+}
+
+impl<T, K> B<T, K>
+    where T: Send,
+          K: Eq
+{
+    fn bar() {}
+}
