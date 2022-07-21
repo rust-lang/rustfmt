@@ -1,4 +1,4 @@
-// indent_style=Visual
+// rustfmt-indent_style: Visual
 
 struct A<T>
     where T: Send

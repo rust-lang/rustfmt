@@ -1,15 +1,13 @@
-// indent_style=Visual
+// rustfmt-indent_style: Visual
 
 struct A<T>
-where
-    T: Send,
+    where T: Send
 {
     x: u32,
 }
 
 impl<T> A<T>
-where
-    T: Send,
+    where T: Send
 {
     fn foo() {}
 }
