@@ -697,7 +697,7 @@ pub(crate) fn format_impl(
         generics.where_clause.span,
         context.config.brace_style(),
         Shape::legacy(where_budget, offset.block_only()),
-        false,
+        true,
         "{",
         where_span_end,
         self_ty.span.hi(),
