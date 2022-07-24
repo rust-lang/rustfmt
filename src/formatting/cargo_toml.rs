@@ -6,6 +6,9 @@ use toml_edit::{
 
 use crate::{Config, ErrorKind};
 
+/// Format `Cargo.toml` according to [the Style Guide]
+///
+/// [the Style Guide]: https://github.com/rust-dev-tools/fmt-rfcs/blob/master/guide/cargo.md).
 pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<String, ErrorKind> {
     let mut doc = content.parse::<toml_edit::Document>()?;
     let rules = [

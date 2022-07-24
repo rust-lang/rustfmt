@@ -1,11 +1,11 @@
 [package]
 name = "rustfmt-config_proc_macro"
 version = "0.3.0"
-edition = "2018"
-description = "A collection of procedural macros for rustfmt"
-license = "Apache-2.0/MIT"
 categories = ["development-tools::procedural-macro-helpers"]
+edition = "2018"
+license = "Apache-2.0/MIT"
 repository = "https://github.com/rust-lang/rustfmt"
+description = "A collection of procedural macros for rustfmt"
 
 [lib]
 proc-macro = true
@@ -19,5 +19,5 @@ syn = { version = "1.0", features = ["full", "visit"] }
 serde = { version = "1.0", features = ["derive"] }
 
 [features]
-default = []
 debug-with-rustfmt = []
+default = []
