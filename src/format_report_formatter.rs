@@ -146,5 +146,8 @@ fn error_kind_to_snippet_annotation_type(error_kind: &ErrorKind) -> AnnotationTy
         | ErrorKind::InvalidGlobPattern(_)
         | ErrorKind::VersionMismatch => AnnotationType::Error,
         ErrorKind::DeprecatedAttr => AnnotationType::Warning,
+        ErrorKind::CargoTomlError(_) => {
+            unreachable!("Cargo.toml formatting error is not contained in FormatReport.")
+        }
     }
 }

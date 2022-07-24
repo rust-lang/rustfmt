@@ -15,7 +15,6 @@ pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<
         &mut SortSection {
             current_position: 0,
         } as &mut dyn VisitMut,
-        &mut SortKey,
         &mut BlankLine { trimming: true },
         &mut KeyValue,
         &mut MultiLine,
@@ -31,13 +30,19 @@ pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<
     for rule in rules.into_iter() {
         rule.visit_document_mut(&mut doc);
     }
+    // Special handling for falliable rules.
+    let mut rule = SortKey { error: None };
+    rule.visit_document_mut(&mut doc);
+    if let Some(e) = rule.error {
+        return Err(e);
+    }
 
     Ok(doc.to_string())
 }
 
 impl From<TomlError> for ErrorKind {
-    fn from(_: TomlError) -> Self {
-        ErrorKind::ParseError
+    fn from(e: TomlError) -> Self {
+        ErrorKind::CargoTomlError(format!("{e}"))
     }
 }
 
@@ -48,7 +53,9 @@ impl From<TomlError> for ErrorKind {
 /// put the `name` and `version` keys in that order at the top of that section,
 /// followed by the remaining keys other than `description` in alphabetical order,
 /// followed by the `description` at the end of that section.
-struct SortKey;
+struct SortKey {
+    error: Option<ErrorKind>,
+}
 
 /// Put the `[package]` section at the top of the file
 struct SortSection {
@@ -119,7 +126,15 @@ impl VisitMut for SortKey {
     fn visit_document_mut(&mut self, doc: &mut Document) {
         doc.as_table_mut().iter_mut().for_each(|(key, section)| {
             if key == "package" {
-                let table = section.as_table_mut().expect("package should be a table");
+                let table = match section.as_table_mut() {
+                    Some(table) => table,
+                    None => {
+                        self.error = Some(ErrorKind::CargoTomlError(
+                            "package should be a table".into(),
+                        ));
+                        return;
+                    }
+                };
                 // "name" is the first, "version" is the second, "description" is the last
                 // everything else is sorted alphabetically
                 table.sort_values_by(|k1, _, k2, _| match (k1.get(), k2.get()) {
