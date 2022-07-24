@@ -95,8 +95,8 @@ fn is_file_skip(path: &Path) -> bool {
         .any(|file_path| is_subpath(path, file_path))
 }
 
-// Returns a `Vec` containing `PathBuf`s of files with an  `rs` extension in the
-// given path. The `recursive` argument controls if files from subdirectories
+// Returns a `Vec` containing `PathBuf`s of files with an `rs` extension or a `Cargo.toml` filename
+// in the given path. The `recursive` argument controls if files from subdirectories
 // are also returned.
 fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
     let mut files = vec![];
@@ -109,7 +109,10 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
             let path = entry.path();
             if path.is_dir() && recursive {
                 files.append(&mut get_test_files(&path, recursive));
-            } else if path.extension().map_or(false, |f| f == "rs") && !is_file_skip(&path) {
+            } else if (path.extension().map_or(false, |f| f == "rs")
+                || path.file_name().map_or(false, |f| f == "Cargo.toml"))
+                && !is_file_skip(&path)
+            {
                 files.push(path);
             }
         }

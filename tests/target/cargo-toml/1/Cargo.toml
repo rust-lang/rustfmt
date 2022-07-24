@@ -1,0 +1,30 @@
+[package]
+name = 3
+version = 1
+# comment 1
+arr1 = [1, 2, 3]
+# comment 2
+arr2 = [
+    "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
+    "1111111111111111111111111111111111111111111111111111111111111111111111111111111"
+]
+description = """
+a
+b
+haha"""
+
+[[bin]]
+aa = 1
+bb = 2
+"啊" = 1
+
+[[bin]]
+c = "src/git-rustfmt/main.rs"
+d = "git-rustfmt"
+
+[dependencies]
+crate1 = { path = "crate1", version = "1.2.3" }
+
+[dependencies.extremely_long_crate_name_goes_here]
+path = "extremely_long_path_name_goes_right_here"
+version = "4.5.6"
