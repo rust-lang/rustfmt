@@ -9,6 +9,7 @@
 // List-like invocations with parentheses will be formatted as function calls,
 // and those with brackets will be formatted as array literals.
 
+use std::cmp::min;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -472,34 +473,81 @@ fn register_metavariable(
     let mut new_name = "$".repeat(dollar_count - 1);
     let mut old_name = "$".repeat(dollar_count);
 
-    new_name.push('z');
-    new_name.push_str(name);
+    // Make sure one new name will not be a subset of another new name
+    const DOLLAR_SUBS_CHARS: &str = "zZyYxXwWvVuUtTsSrRqQpPoOmMlLkKjJiIhHgGfFeEdDcCbBaA";
+    let identifies_count = min(
+        name.chars().filter(|c| *c == ' ').count(),
+        DOLLAR_SUBS_CHARS.len() - 1,
+    );
+    let dollar_replacement = &DOLLAR_SUBS_CHARS[identifies_count..identifies_count + 1];
+
+    new_name.push_str(dollar_replacement);
+    // Replace internal `$` and ` `
+    new_name.push_str(&name.replace("$", &dollar_replacement).replace(" ", "_"));
+
     old_name.push_str(name);
 
     result.push_str(&new_name);
     map.insert(old_name, new_name);
 }
 
-// Replaces `$foo` with `zfoo`. We must check for name overlap to ensure we
-// aren't causing problems.
-// This should also work for escaped `$` variables, where we leave earlier `$`s.
+// Replaces `$foo` with `zfoo`.
+//   Allows the `$foo` to be handled as one item during formatting.
+//   We must check for name overlap to ensure we aren't causing problems.
+//   This should also work for escaped `$` variables, where we leave earlier `$`s.
+// Also replaces `$foo bar` or `$foo $bar` with `zfoo_bar` or `zfoo_zbar`.
+//   Allows the two identities to be handled as one identity during formatting.
+//   Otherwise formatting fails as a BinOp, etc. is expected between the two identities.
+//   Consecutive spaces between the identities are replaced with one space.
 fn replace_names(input: &str) -> Option<(String, HashMap<String, String>)> {
     // Each substitution will require five or six extra bytes.
     let mut result = String::with_capacity(input.len() + 64);
     let mut substs = HashMap::new();
     let mut dollar_count = 0;
     let mut cur_name = String::new();
+    let mut cur_spaces = String::new();
+    let white_space: &[_] = &[' ', '\t'];
 
     for (kind, c) in CharClasses::new(input.chars()) {
+        // Handle the `$foo bar`/`$foo $bar` cases
+        let mut follows_spaces = false;
+        if dollar_count > 0 && white_space.contains(&c) {
+            cur_spaces.push(c);
+            continue;
+        } else if dollar_count > 0 && !white_space.contains(&c) {
+            if !cur_spaces.is_empty() {
+                if c == '$' || c.is_alphanumeric() {
+                    // Keep `$foo` and a following `bar`/`$bar` as one name
+                    cur_name.push(' ');
+                    cur_spaces.clear();
+                    follows_spaces = true;
+                }
+            }
+        }
+
+        // Handle the `$foo` name replacement
         if kind != FullCodeCharKind::Normal {
             result.push(c);
         } else if c == '$' {
-            dollar_count += 1;
+            if dollar_count == 0 {
+                dollar_count += 1;
+            } else {
+                if !follows_spaces {
+                    dollar_count += 1;
+                } else {
+                    cur_name.push(c);
+                }
+            }
         } else if dollar_count == 0 {
             result.push(c);
         } else if !c.is_alphanumeric() && !cur_name.is_empty() {
             // Terminates a name following one or more dollars.
             register_metavariable(&mut substs, &mut result, &cur_name, dollar_count);
+
+            if !cur_spaces.is_empty() {
+                result.push_str(&cur_spaces);
+                cur_spaces.clear();
+            }
 
             result.push(c);
             dollar_count = 0;
@@ -514,6 +562,11 @@ fn replace_names(input: &str) -> Option<(String, HashMap<String, String>)> {
 
     if !cur_name.is_empty() {
         register_metavariable(&mut substs, &mut result, &cur_name, dollar_count);
+    }
+
+    // Reserving trailing spaces at the end (following `$foo`)
+    if !cur_spaces.is_empty() {
+        result.push_str(&cur_spaces)
     }
 
     debug!("replace_names `{}` {:?}", result, substs);
