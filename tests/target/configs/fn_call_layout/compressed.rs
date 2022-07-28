@@ -27,6 +27,13 @@ fn main() {
         e, channel_state, chan, order, commitment_update.is_some(), revoke_and_ack.is_some(),
     );
 
+    // line comment in the middle of the args
+    CastCheck::new(
+        &fn_ctxt, e, from_ty, to_ty,
+        // We won't show any error to the user, so we don't care what the span is here.
+        DUMMY_SP, DUMMY_SP,
+    );
+
     // other examples with more complex args
     more_complex_args(
         |a, b, c| {

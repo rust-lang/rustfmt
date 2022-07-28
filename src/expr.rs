@@ -12,7 +12,7 @@ use crate::comment::{
     combine_strs_with_missing_comments, contains_comment, recover_comment_removed, rewrite_comment,
     rewrite_missing_comment, CharClasses, FindUncommented,
 };
-use crate::config::{lists::*, Density};
+use crate::config::{lists::*, OverflowDensity};
 use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, Version};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
@@ -1272,7 +1272,7 @@ pub(crate) fn rewrite_call(
     context: &RewriteContext<'_>,
     callee: &str,
     args: &[ptr::P<ast::Expr>],
-    force_list_tactic: Option<Density>,
+    force_list_tactic: Option<OverflowDensity>,
     span: Span,
     shape: Shape,
 ) -> Option<String> {

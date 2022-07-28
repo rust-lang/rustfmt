@@ -1,31 +1,16 @@
-// rustfmt-fn_call_layout:Vertical
+// rustfmt-fn_call_layout: Foo
 
 fn main() {
     empty_args();
     single_arg(ipsum);
-    two_args(
-        ipsum,
-        dolor,
-    );
+    two_args(ipsum, dolor);
 
-    lorem(
-        ipsum,
-        dolor,
-        sit,
-        amet,
-    );
+    lorem(ipsum, dolor, sit, amet);
     lorem(
         ipsum, // some inine comment
-        dolor,
-        sit,
-        amet,
+        dolor, sit, amet,
     );
-    lorem(
-        ipsum, /* some inine comment */
-        dolor,
-        sit,
-        amet,
-    );
+    lorem(ipsum /* some inine comment */, dolor, sit, amet);
     ipsum(
         dolor,
         sit,
@@ -89,13 +74,9 @@ fn main() {
 
     // line comment in the middle of the args
     CastCheck::new(
-        &fn_ctxt,
-        e,
-        from_ty,
-        to_ty,
+        &fn_ctxt, e, from_ty, to_ty,
         // We won't show any error to the user, so we don't care what the span is here.
-        DUMMY_SP,
-        DUMMY_SP,
+        DUMMY_SP, DUMMY_SP,
     );
 
     // other examples with more complex args
@@ -148,10 +129,7 @@ fn main() {
     aaaaaaaaaaaaaaaaaa::bbbbbbbbbbbbbb::cccccccccc(
         ipsum(),
         dolor(
-            sit::amet(
-                consectetur,
-                adipiscing,
-            ),
+            sit::amet(consectetur, adipiscing),
             elit(vivamus::ipsum::orci(rhoncus())),
         ),
     );

@@ -1,4 +1,4 @@
-// rustfmt-fn_call_layout:Vertical
+// rustfmt-fn_call_layout: Foo
 
 fn main() {
     empty_args();

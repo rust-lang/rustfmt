@@ -760,11 +760,33 @@ See also [`fn_params_layout`](#fn_params_layout)
 
 Control the layout of arguments in function calls
 
-- **Default value**: `"Tall"`
-- **Possible values**: `"Compressed"`, `"Tall"`, `"Vertical"`
+- **Default value**: `"Foo"`
+- **Possible values**: `"Foo"` `"Compressed"`, `"Tall"`, `"Vertical"`
 - **Stable**: No (tracking issue: N/A)
 
-#### `"Tall"` (default):
+#### `"Foo"` (default):
+
+```rust
+fn main() {
+    lorem(ipsum, dolor, sit, amet);
+    ipsum(
+        dolor,
+        sit,
+        amet,
+        consectetur,
+        adipiscing,
+        elit,
+        vivamus,
+        ipsum,
+        orci,
+        rhoncus,
+        vel,
+        imperdiet,
+    );
+}
+```
+
+#### `"Tall"`:
 
 ```rust
 fn main() {
