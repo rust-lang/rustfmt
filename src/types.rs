@@ -427,7 +427,7 @@ impl Rewrite for ast::WherePredicate {
                 let type_str = bounded_ty.rewrite(context, shape)?;
                 let colon = type_bound_colon(context).trim_end();
                 let lhs = if let Some(lifetime_str) =
-                    rewrite_lifetime_param(context, shape, bound_generic_params)
+                    rewrite_generic_params(context, shape, bound_generic_params)
                 {
                     format!("for<{}> {}{}", lifetime_str, type_str, colon)
                 } else {
@@ -638,7 +638,7 @@ impl Rewrite for ast::GenericParam {
 impl Rewrite for ast::PolyTraitRef {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         if let Some(lifetime_str) =
-            rewrite_lifetime_param(context, shape, &self.bound_generic_params)
+            rewrite_generic_params(context, shape, &self.bound_generic_params)
         {
             // 6 is "for<> ".len()
             let extra_offset = lifetime_str.len() + 6;
@@ -861,7 +861,7 @@ fn rewrite_bare_fn(
 
     let mut result = String::with_capacity(128);
 
-    if let Some(ref lifetime_str) = rewrite_lifetime_param(context, shape, &bare_fn.generic_params)
+    if let Some(ref lifetime_str) = rewrite_generic_params(context, shape, &bare_fn.generic_params)
     {
         result.push_str("for<");
         // 6 = "for<> ".len(), 4 = "for<".
@@ -1066,21 +1066,20 @@ pub(crate) fn can_be_overflowed_type(
     }
 }
 
-/// Returns `None` if there is no `LifetimeDef` in the given generic parameters.
-fn rewrite_lifetime_param(
+/// Returns rewritten params separated by commas, or `None` if there are no params or a param
+/// failed to be rewritten.
+fn rewrite_generic_params(
     context: &RewriteContext<'_>,
     shape: Shape,
     generic_params: &[ast::GenericParam],
 ) -> Option<String> {
+    if generic_params.is_empty() {
+        return None;
+    }
     let result = generic_params
         .iter()
-        .filter(|p| matches!(p.kind, ast::GenericParamKind::Lifetime))
         .map(|lt| lt.rewrite(context, shape))
         .collect::<Option<Vec<_>>>()?
         .join(", ");
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
+    Some(result)
 }
