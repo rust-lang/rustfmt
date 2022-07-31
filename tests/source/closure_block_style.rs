@@ -1,3 +1,4 @@
+// rustfmt-indent_style: Block
 // rustfmt-normalize_comments: true
 // Closures
 
@@ -210,4 +211,16 @@ fn issue2262() {
         factory,
         slave: None,
     })?;
+}
+
+fn issue_3865() {
+    {
+let write_status = |status: &mut Vec<ansi_term::ANSIString>,
+                        diff: &Diff,
+                        heading: &str,
+                        color: &Style,
+                        show_hints: bool,
+                        hints: &[&str]|-> Option<bool> { Some(true) };}
+                let baz = |foo: bool| -> Option<bool> { Some(true) };
+        let write_status = |status: &mut Vec<ansi_term::ANSIString>,diff: &Diff,heading: &str,color: &Style,| -> Option<bool> { Some(true) };
 }
