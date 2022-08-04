@@ -71,9 +71,10 @@ pub(crate) fn rewrite_string<'a>(
     let indent_with_newline = fmt.shape.indent.to_string_with_newline(fmt.config);
     let indent_without_newline = fmt.shape.indent.to_string(fmt.config);
 
-    // Strip line breaks.
+    // Strip line breaks for lines that ends with continuation `\` forlowwed by a `new line`.
+    // In this case, the indentation spaces at the beginning of the nex line are also stripped.
     // With this regex applied, all remaining whitespaces are significant
-    let strip_line_breaks_re = Regex::new(r"([^\\](\\\\)*)\\[\n\r][[:space:]]*").unwrap();
+    let strip_line_breaks_re = Regex::new(r"(([^\\]|(\\\\))(\\\\)*)\\[\n\r][[:space:]]*").unwrap();
     let stripped_str = strip_line_breaks_re.replace_all(orig, "$1");
 
     let graphemes = UnicodeSegmentation::graphemes(&*stripped_str, false).collect::<Vec<&str>>();
@@ -223,6 +224,24 @@ fn not_whitespace_except_line_feed(g: &str) -> bool {
 /// FIXME(issue#3281): We must follow UAX#14 algorithm instead of this.
 fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]) -> SnippetState {
     let break_at = |index /* grapheme at index is included */| {
+        // Ensure break is not after an escape '\' as it will "escape" the `\` that is added
+        // for concatenating the two parts of the broken line.
+        let index = if input[index] != "\\" {
+            index
+        } else {
+            let index_offset = match input[0..index]
+                .iter()
+                .rposition(|grapheme| grapheme.ne(&"\\"))
+            {
+                // There is a non-`\` to the left
+                Some(non_backslash_index) => (index - non_backslash_index) % 2,
+                // Only `\` to the left
+                None => (index + 1) % 2,
+            };
+            // Make sure break is after even number (including zero) of `\`
+            index - index_offset
+        };
+
         // Take in any whitespaces to the left/right of `input[index]` while
         // preserving line feeds
         let index_minus_ws = input[0..=index]
