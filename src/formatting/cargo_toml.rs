@@ -26,6 +26,7 @@ pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<
             long_tables: vec![],
             current_section: String::new(),
         },
+        &mut TrimSpaces,
     ];
     for rule in rules.into_iter() {
         rule.visit_document_mut(&mut doc);
@@ -74,6 +75,11 @@ struct SortSection {
 struct BlankLine {
     trimming: bool,
 }
+
+/// Trim unnecessary spaces.
+///
+/// Note: this is not included in the Style Guide.
+struct TrimSpaces;
 
 /// Don't use quotes around any standard key names; use bare keys. Only use quoted
 /// keys for non-standard keys whose names require them, and avoid introducing such
@@ -347,5 +353,98 @@ impl VisitMut for FormatInlineTable {
         table.iter_mut().for_each(|(_, node)| {
             self.visit_item_mut(node);
         });
+    }
+}
+
+impl TrimSpaces {
+    fn trim_block(s: &str) -> String {
+        let s = s.trim();
+        if s.is_empty() {
+            return String::new();
+        }
+
+        let s: String = s
+            .lines()
+            .into_iter()
+            .filter_map(|line| {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(format!("{trimmed}"))
+                }
+            })
+            .join("\n");
+
+        format!("{}\n", s)
+    }
+
+    fn trim_suffix(s: &str) -> String {
+        let s = s.trim();
+        if s.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", s)
+        }
+    }
+}
+
+impl VisitMut for TrimSpaces {
+    fn visit_document_mut(&mut self, node: &mut Document) {
+        self.visit_table_mut(node);
+
+        let set_prefix = |decor: &mut Decor, i: usize| {
+            let prefix = format!(
+                "{}{}",
+                if i == 0 { "" } else { "\n" },
+                Self::trim_block(decor.prefix().unwrap_or_default())
+            );
+            decor.set_prefix(prefix);
+        };
+        let table = node.as_table_mut();
+        for (i, (_, item)) in table.iter_mut().enumerate() {
+            if let Some(table) = item.as_table_mut() {
+                set_prefix(table.decor_mut(), i);
+            } else if let Some(arr) = item.as_array_of_tables_mut() {
+                for table in arr.iter_mut() {
+                    set_prefix(table.decor_mut(), i);
+                }
+            }
+        }
+
+        if !node.trailing().trim().is_empty() {
+            let trailing: String = Self::trim_block(node.trailing());
+            node.set_trailing(&format!("\n{trailing}"));
+        } else {
+            node.set_trailing("");
+        }
+    }
+
+    fn visit_table_mut(&mut self, node: &mut Table) {
+        let decor = node.decor_mut();
+        if let Some(prefix) = decor.prefix() {
+            decor.set_prefix(format!("\n{}", Self::trim_block(prefix)));
+        }
+        if let Some(suffix) = decor.suffix() {
+            decor.set_suffix(Self::trim_suffix(suffix));
+        }
+
+        self.visit_table_like_mut(node);
+    }
+
+    fn visit_table_like_kv_mut(&mut self, mut key: KeyMut<'_>, value: &mut Item) {
+        let decor = key.decor_mut();
+        if let Some(prefix) = decor.prefix() {
+            decor.set_prefix(format!("{}", Self::trim_block(prefix)));
+        }
+
+        if let Some(value) = value.as_value_mut() {
+            let decor = value.decor_mut();
+            if let Some(suffix) = decor.suffix() {
+                decor.set_suffix(Self::trim_suffix(suffix));
+            }
+        }
+
+        self.visit_item_mut(value);
     }
 }

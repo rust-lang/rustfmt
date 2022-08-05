@@ -1,0 +1,23 @@
+# Works correctly for Cargo.toml without [package]
+[workspace]
+exclude = ["crates/proc-macro-test/imp"]
+members = ["xtask/", "lib/*", "crates/*"]
+
+[profile.dev]
+# Disabling debug info speeds up builds a bunch,
+# and we don't rely on it for debugging that much.
+debug1 = 0
+
+[profile.dev.package]
+# These speed up local tests.
+rowan.opt-level = 3
+rustc-hash.opt-level = 3
+smol_str.opt-level = 3
+text-size.opt-level = 3
+# This speeds up `cargo xtask dist`.
+miniz_oxide.opt-level = 3
+
+[profile.release]
+incremental = true
+# Set this to 1 or 2 to get more useful backtraces in debugger.
+debug2 = 0
