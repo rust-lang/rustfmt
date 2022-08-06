@@ -1,0 +1,33 @@
+[a]
+# comment for [a.b], not [a.b.b]
+b.a = 2
+# comment for [a.b], not [a.b.b]
+b.b = 1
+# comment for cc
+cc = 3
+
+# comment for [a.a]
+[a.a] # also comment for [a.a]
+aa = 1
+
+[a.a.b]
+aab = 1
+
+[a.a.b.veryveryveryveryveryveryveryverylong-table-name]
+veryveryveryveryveryveryveryverylong-key-name = 1
+
+[a.a.b.veryveryveryveryveryveryveryverylong-table-name2]
+veryveryveryveryveryveryveryverylong-key-name = 2
+
+[a.a.c]
+aac = 1
+
+# comment for [a.a.c.d]
+[a.a.c.d]
+aacd = 1
+
+[a.c]
+ac = 1
+
+[a.z]
+az = 1

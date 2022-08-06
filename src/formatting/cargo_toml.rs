@@ -24,7 +24,7 @@ pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<
         &mut FormatInlineTable {
             max_width: config.max_width(),
             long_tables: vec![],
-            current_section: String::new(),
+            current_section: vec![],
         },
         &mut TrimSpaces,
     ];
@@ -124,8 +124,8 @@ struct WrapArray {
 struct FormatInlineTable {
     max_width: usize,
     /// Must be `InlineTable`
-    long_tables: Vec<(String, String, Item)>,
-    current_section: String,
+    long_tables: Vec<(Vec<String>, String, Item)>,
+    current_section: Vec<String>,
 }
 
 impl VisitMut for SortKey {
@@ -279,6 +279,9 @@ impl VisitMut for SortSection {
     fn visit_table_mut(&mut self, table: &mut Table) {
         table.set_position(self.current_position);
         self.current_position += 1;
+        for (_, v) in table.iter_mut().sorted_by_key(|(k, _)| k.to_string()) {
+            self.visit_item_mut(v);
+        }
     }
 }
 
@@ -313,7 +316,7 @@ impl VisitMut for WrapArray {
 impl VisitMut for FormatInlineTable {
     fn visit_document_mut(&mut self, doc: &mut Document) {
         doc.as_table_mut().iter_mut().for_each(|(key, section)| {
-            self.current_section = key.to_owned();
+            self.current_section = vec![key.to_owned()];
             self.visit_table_like_kv_mut(key, section);
         });
 
@@ -322,9 +325,13 @@ impl VisitMut for FormatInlineTable {
 
         long_tables
             .into_iter()
-            .for_each(|(section, key, table)| match table {
+            .for_each(|(sections, key, table)| match table {
                 Item::Value(Value::InlineTable(table)) => {
-                    doc[&section][&key] = Item::Table(table.into_table());
+                    let mut section = doc.as_item_mut();
+                    for key in sections {
+                        section = &mut section[&key]
+                    }
+                    section[&key] = Item::Table(table.into_table());
                 }
                 _ => unreachable!(),
             });
@@ -344,14 +351,16 @@ impl VisitMut for FormatInlineTable {
             }
         });
 
-        long_table_keys.into_iter().for_each(|key| {
+        long_table_keys.into_iter().sorted().for_each(|key| {
             let item = table.remove(&key).unwrap();
             self.long_tables
                 .push((self.current_section.clone(), key, item));
         });
 
-        table.iter_mut().for_each(|(_, node)| {
+        table.iter_mut().for_each(|(key, node)| {
+            self.current_section.push(key.to_owned());
             self.visit_item_mut(node);
+            self.current_section.pop();
         });
     }
 }
