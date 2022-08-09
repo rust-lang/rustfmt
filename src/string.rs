@@ -71,8 +71,8 @@ pub(crate) fn rewrite_string<'a>(
     let indent_with_newline = fmt.shape.indent.to_string_with_newline(fmt.config);
     let indent_without_newline = fmt.shape.indent.to_string(fmt.config);
 
-    // Strip line breaks for lines that ends with continuation `\` forlowwed by a `new line`.
-    // In this case, the indentation spaces at the beginning of the nex line are also stripped.
+    // Strip line breaks for lines that ends with continuation `\` followed by a `new line`.
+    // In this case, the indentation spaces at the beginning of the next line are also stripped.
     // With this regex applied, all remaining whitespaces are significant
     let strip_line_breaks_re = Regex::new(r"(([^\\]|(\\\\))(\\\\)*)\\[\n\r][[:space:]]*").unwrap();
     let stripped_str = strip_line_breaks_re.replace_all(orig, "$1");
@@ -224,21 +224,23 @@ fn not_whitespace_except_line_feed(g: &str) -> bool {
 /// FIXME(issue#3281): We must follow UAX#14 algorithm instead of this.
 fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]) -> SnippetState {
     let break_at = |index /* grapheme at index is included */| {
-        // Ensure break is not after an escape '\' as it will "escape" the `\` that is added
-        // for concatenating the two parts of the broken line.
         let index = if input[index] != "\\" {
-            index
+            index // Break after the non-`\`
         } else {
+            // Ensure that the line break is not after an escape '\', as breaking at such point
+            // will transform  the escape `\` to a line continuation `\`.  I.e., the `\` will be
+            // used for concatenating the two parts of the broken line instead of escaping the
+            // next char.
             let index_offset = match input[0..index]
                 .iter()
                 .rposition(|grapheme| grapheme.ne(&"\\"))
             {
-                // There is a non-`\` to the left
+                // There is a non-`\` to the left - break after that char.
                 Some(non_backslash_index) => (index - non_backslash_index) % 2,
-                // Only `\` to the left
+                // Only `\` chars to the left - make sure the line break is after even number
+                // of `\` (including zero), so break will not be after an escape `\`.
                 None => (index + 1) % 2,
             };
-            // Make sure break is after even number (including zero) of `\`
             index - index_offset
         };
 
