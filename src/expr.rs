@@ -127,7 +127,26 @@ pub(crate) fn format_expr(
         ast::ExprKind::Tup(ref items) => {
             rewrite_tuple(context, items.iter(), expr.span, shape, items.len() == 1)
         }
-        ast::ExprKind::Let(..) => None,
+        ast::ExprKind::Let(ref pat, ref expr, ref _span) => {
+            let kw = "let ";
+            let equals = " =";
+            let pat_shape = shape.offset_left(kw.len())?.sub_width(equals.len())?;
+            let pat_string = pat.rewrite(context, pat_shape)?;
+            let comments_lo = context
+                .snippet_provider
+                .span_after(expr.span.with_lo(pat.span.hi()), "=");
+            let comments_span = mk_sp(comments_lo, expr.span.lo());
+            rewrite_assign_rhs_with_comments(
+                context,
+                &format!("{}{}{}", kw, pat_string, equals),
+                expr,
+                shape,
+                &RhsAssignKind::Expr(&expr.kind, expr.span),
+                RhsTactics::Default,
+                comments_span,
+                true,
+            )
+        }
         ast::ExprKind::If(..)
         | ast::ExprKind::ForLoop(..)
         | ast::ExprKind::Loop(..)
