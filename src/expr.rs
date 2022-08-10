@@ -643,9 +643,10 @@ struct ControlFlow<'a> {
     block: &'a ast::Block,
     else_block: Option<&'a ast::Expr>,
     label: Option<ast::Label>,
+    /// the `<pat>` in a `for <pat> in <expr>`; in that case, `cond` refers to only the `<expr>`
     pat: Option<&'a ast::Pat>,
     keyword: &'a str,
-    matcher: &'a str,
+    /// the text between `pat` and `cond` (i.e. " in" `for`)
     connector: &'a str,
     allow_single_line: bool,
     // HACK: `true` if this is an `if` expression in an `else if`.
@@ -653,28 +654,17 @@ struct ControlFlow<'a> {
     span: Span,
 }
 
-fn extract_pats_and_cond(expr: &ast::Expr) -> (Option<&ast::Pat>, &ast::Expr) {
-    match expr.kind {
-        ast::ExprKind::Let(ref pat, ref cond, _) => (Some(pat), cond),
-        _ => (None, expr),
-    }
-}
-
 // FIXME: Refactor this.
 fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow<'_>> {
     match expr.kind {
-        ast::ExprKind::If(ref cond, ref if_block, ref else_block) => {
-            let (pat, cond) = extract_pats_and_cond(cond);
-            Some(ControlFlow::new_if(
-                cond,
-                pat,
-                if_block,
-                else_block.as_ref().map(|e| &**e),
-                expr_type == ExprType::SubExpression,
-                false,
-                expr.span,
-            ))
-        }
+        ast::ExprKind::If(ref cond, ref if_block, ref else_block) => Some(ControlFlow::new_if(
+            cond,
+            if_block,
+            else_block.as_ref().map(|e| &**e),
+            expr_type == ExprType::SubExpression,
+            false,
+            expr.span,
+        )),
         ast::ExprKind::ForLoop(ref pat, ref cond, ref block, label) => {
             Some(ControlFlow::new_for(pat, cond, block, label, expr.span))
         }
@@ -682,37 +672,29 @@ fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow<
             Some(ControlFlow::new_loop(block, label, expr.span))
         }
         ast::ExprKind::While(ref cond, ref block, label) => {
-            let (pat, cond) = extract_pats_and_cond(cond);
-            Some(ControlFlow::new_while(pat, cond, block, label, expr.span))
+            Some(ControlFlow::new_while(cond, block, label, expr.span))
         }
         _ => None,
     }
 }
 
-fn choose_matcher(pat: Option<&ast::Pat>) -> &'static str {
-    pat.map_or("", |_| "let")
-}
-
 impl<'a> ControlFlow<'a> {
     fn new_if(
         cond: &'a ast::Expr,
-        pat: Option<&'a ast::Pat>,
         block: &'a ast::Block,
         else_block: Option<&'a ast::Expr>,
         allow_single_line: bool,
         nested_if: bool,
         span: Span,
     ) -> ControlFlow<'a> {
-        let matcher = choose_matcher(pat);
         ControlFlow {
             cond: Some(cond),
             block,
             else_block,
             label: None,
-            pat,
+            pat: None,
             keyword: "if",
-            matcher,
-            connector: " =",
+            connector: "",
             allow_single_line,
             nested_if,
             span,
@@ -727,7 +709,6 @@ impl<'a> ControlFlow<'a> {
             label,
             pat: None,
             keyword: "loop",
-            matcher: "",
             connector: "",
             allow_single_line: false,
             nested_if: false,
@@ -736,22 +717,19 @@ impl<'a> ControlFlow<'a> {
     }
 
     fn new_while(
-        pat: Option<&'a ast::Pat>,
         cond: &'a ast::Expr,
         block: &'a ast::Block,
         label: Option<ast::Label>,
         span: Span,
     ) -> ControlFlow<'a> {
-        let matcher = choose_matcher(pat);
         ControlFlow {
             cond: Some(cond),
             block,
             else_block: None,
             label,
-            pat,
+            pat: None,
             keyword: "while",
-            matcher,
-            connector: " =",
+            connector: "",
             allow_single_line: false,
             nested_if: false,
             span,
@@ -772,7 +750,6 @@ impl<'a> ControlFlow<'a> {
             label,
             pat: Some(pat),
             keyword: "for",
-            matcher: "",
             connector: " in",
             allow_single_line: false,
             nested_if: false,
@@ -850,14 +827,8 @@ impl<'a> ControlFlow<'a> {
 
         let cond_shape = shape.offset_left(offset)?;
         if let Some(pat) = self.pat {
-            let matcher = if self.matcher.is_empty() {
-                self.matcher.to_owned()
-            } else {
-                format!("{} ", self.matcher)
-            };
-            let pat_shape = cond_shape
-                .offset_left(matcher.len())?
-                .sub_width(self.connector.len())?;
+            // `for <pat> in <expr>`
+            let pat_shape = cond_shape.sub_width(self.connector.len())?;
             let pat_string = pat.rewrite(context, pat_shape)?;
             let comments_lo = context
                 .snippet_provider
@@ -865,7 +836,7 @@ impl<'a> ControlFlow<'a> {
             let comments_span = mk_sp(comments_lo, expr.span.lo());
             return rewrite_assign_rhs_with_comments(
                 context,
-                &format!("{}{}{}", matcher, pat_string, self.connector),
+                &format!("{}{}", pat_string, self.connector),
                 expr,
                 cond_shape,
                 &RhsAssignKind::Expr(&expr.kind, expr.span),
@@ -965,12 +936,8 @@ impl<'a> ControlFlow<'a> {
                 .span_after(mk_sp(lo, self.span.hi()), self.keyword.trim()),
             if self.pat.is_none() {
                 cond_span.lo()
-            } else if self.matcher.is_empty() {
-                self.pat.unwrap().span.lo()
             } else {
-                context
-                    .snippet_provider
-                    .span_before(self.span, self.matcher.trim())
+                self.pat.unwrap().span.lo()
             },
         );
 
@@ -1059,10 +1026,8 @@ impl<'a> Rewrite for ControlFlow<'a> {
                 // Note how we're passing the original shape, as the
                 // cost of "else" should not cascade.
                 ast::ExprKind::If(ref cond, ref if_block, ref next_else_block) => {
-                    let (pats, cond) = extract_pats_and_cond(cond);
                     ControlFlow::new_if(
                         cond,
-                        pats,
                         if_block,
                         next_else_block.as_ref().map(|e| &**e),
                         false,
