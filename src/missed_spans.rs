@@ -278,11 +278,10 @@ impl<'a> FmtVisitor<'a> {
                     let first_line = &subslice[..offset];
                     self.push_str(first_line);
                     self.push_str(&comment_indent.to_string_with_newline(self.config));
-
-                    let other_lines = &subslice[offset + 1..];
+                    let other_lines = &subslice[offset + 1..].trim_start();
                     let comment_str =
                         rewrite_comment(other_lines, false, comment_shape, self.config)
-                            .unwrap_or_else(|| String::from(other_lines));
+                            .unwrap_or_else(|| other_lines.to_string());
                     self.push_str(&comment_str);
                 }
             }
