@@ -1618,14 +1618,14 @@ where
 
 struct Foo<T>
 where
-    T: PartialEq,
+    T: Eq,
 { 
     // body
 }
 
 impl<T> Foo<T>
 where
-    T: PartialEq,
+    T: Eq,
 { 
     // body
 }
@@ -1644,13 +1644,13 @@ fn lorem<Ipsum, Dolor, Sit, Amet>() -> T
 }
 
 struct Foo<T>
-    where T: PartialEq
+    where T: Eq
 {
     // body
 }
 
 impl<T> Foo<T>
-    where T: PartialEq
+    where T: Eq
 {
     // body
 }
