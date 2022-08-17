@@ -1615,6 +1615,20 @@ where
 {
     // body
 }
+
+struct Foo<T>
+where
+    T: PartialEq,
+{ 
+    // body
+}
+
+impl<T> Foo<T>
+where
+    T: PartialEq,
+{ 
+    // body
+}
 ```
 
 #### `"Visual"`:
@@ -1625,6 +1639,18 @@ fn lorem<Ipsum, Dolor, Sit, Amet>() -> T
           Dolor: Eq,
           Sit: Eq,
           Amet: Eq
+{
+    // body
+}
+
+struct Foo<T>
+    where T: PartialEq
+{
+    // body
+}
+
+impl<T> Foo<T>
+    where T: PartialEq
 {
     // body
 }
