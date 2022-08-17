@@ -2,7 +2,7 @@
 source: src/test/mod.rs
 ---
 error[internal]: line formatted, but exceeded maximum width (maximum: 40 (see `max_width` option), found: 61)
- --> tests/warning/source/issue_4968.rs:7:7:32
+ --> tests/warning/source/issue_4968.rs:7:32
   |
 7 |             println!("0123456789abcdefghijklmnopqrstuvwxyz");
   |                                         ^^^^^^^^^^^^^^^^^^^^^
