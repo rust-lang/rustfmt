@@ -1,12 +1,3 @@
-fn main() {}
-
-pub struct WhitespaceCharacters {
-    pub space: char,
-    pub nbsp: char,
-    pub tab: char,
-    pub newline: char,
-}
-
 impl Default for WhitespaceCharacters {
     fn default() -> Self {
         Self {
