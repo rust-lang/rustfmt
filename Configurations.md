@@ -1615,20 +1615,6 @@ where
 {
     // body
 }
-
-struct Foo<T>
-where
-    T: Eq,
-{ 
-    // body
-}
-
-impl<T> Foo<T>
-where
-    T: Eq,
-{ 
-    // body
-}
 ```
 
 #### `"Visual"`:
@@ -1639,18 +1625,6 @@ fn lorem<Ipsum, Dolor, Sit, Amet>() -> T
           Dolor: Eq,
           Sit: Eq,
           Amet: Eq
-{
-    // body
-}
-
-struct Foo<T>
-    where T: Eq
-{
-    // body
-}
-
-impl<T> Foo<T>
-    where T: Eq
 {
     // body
 }
