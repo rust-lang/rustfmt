@@ -2379,13 +2379,47 @@ Don't reformat out of line modules
 
 ## `single_line_if_else_max_width`
 
-Maximum line length for single line if-else expressions. A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
+Maximum line length for single line if-else expressions. A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`. If one of the if-else blocks contain a statement, a comment, an attribute, or is empty, the if-else expression will be broken into multiple lines. When using `version = "Two"` the if-else expression at the end of a block will be formatted on a single line. The last if-else expression in the last example snippet of this section would be formatted on a single line with `version = "Two"`.
 
 - **Default value**: `50`
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `single_line_if_else_max_width` will take precedence.
+
+#### `50` (default):
+
+```rust
+fn foo() -> usize {
+    let some_long_name = true;
+    let some_other_long_name = false;
+    let bar = if some_long_name && some_other_long_name {
+        baz()
+    } else {
+        buzz()
+    };
+    if some_long_name && some_other_long_name {
+        1
+    } else {
+        2
+    }
+}
+```
+
+#### `70`:
+
+```rust
+fn foo() -> usize {
+    let some_long_name = true;
+    let some_other_long_name = false;
+    let bar = if some_long_name && some_other_long_name { baz() } else { buzz() };
+    if some_long_name && some_other_long_name {
+        1
+    } else {
+        2
+    }
+}
+```
 
 See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
