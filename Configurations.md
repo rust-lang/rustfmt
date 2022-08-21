@@ -307,6 +307,58 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 
 See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
+## `chain_count`
+
+Maximum number of chained function calls to fit on one line.
+
+- **Default value**: `0`
+- **Possible values**: any positive integer less than `4294967296`, although anything larger than one quarter the value of [`chain_width`](#chain_width) will have no effect as the minimum size of a function chain is 4 (e.g. `.a()`).
+- **Stable**: No (tracking issue: [#2263](https://github.com/rust-lang/rustfmt/issues/2263))
+
+This option co-exists with [`chain_width`](#chain_width) and chained
+method calls will be wrapped if either option is triggered. Any line
+with more method chains than defined in this option will have every
+chained call put on a new line.
+
+Setting this option to `0` disables this rule, and `1` puts every single
+chained call onto a newline.
+
+#### `0` (default):
+
+```rust
+fn main() {
+    a.foo().bar().baz();
+}
+```
+
+#### `1`:
+
+```rust
+fn main() {
+    a.foo()
+        .bar()
+        .baz();
+}
+```
+
+#### `2`:
+
+```rust
+fn main() {
+    a.foo()
+        .bar()
+        .baz();
+}
+```
+
+#### `3`:
+
+```rust
+fn main() {
+    a.foo().bar().baz();
+}
+```
+
 ## `color`
 
 Whether to use colored output or not.

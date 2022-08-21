@@ -717,7 +717,10 @@ impl<'a> ChainFormatterShared<'a> {
     }
 
     fn join_rewrites(&self, context: &RewriteContext<'_>, child_shape: Shape) -> Option<String> {
-        let connector = if self.fits_single_line {
+        let force_multiline =
+            self.child_count > context.config.chain_count() && context.config.chain_count() != 0;
+
+        let connector = if self.fits_single_line && !force_multiline {
             // Yay, we can put everything on one line.
             Cow::from("")
         } else {

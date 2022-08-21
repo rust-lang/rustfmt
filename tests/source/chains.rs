@@ -214,6 +214,14 @@ impl Foo {
     }
 }
 
+// #2263
+// Limit chain functions per line.
+fn issue2263() {
+    let a = "test";
+
+    a.to_string().to_string().to_string();
+}
+
 // #2415
 // Avoid orphan in chain
 fn issue2415() {

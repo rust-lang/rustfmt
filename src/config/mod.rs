@@ -56,6 +56,7 @@ create_config! {
     array_width: usize, 60, true,  "Maximum width of an array literal before falling \
         back to vertical formatting.";
     chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
+    chain_count: usize, 0, false, "Maximum number of chained method calls to fit on a single line.";
     single_line_if_else_max_width: usize, 50, true, "Maximum line length for single line if-else \
         expressions. A value of zero means always break if-else expressions.";
 
@@ -618,6 +619,7 @@ struct_lit_width = 18
 struct_variant_width = 35
 array_width = 60
 chain_width = 60
+chain_count = 0
 single_line_if_else_max_width = 50
 wrap_comments = false
 format_code_in_doc_comments = false
