@@ -1334,11 +1334,6 @@ pub(crate) fn format_struct_struct(
             }
         }
     };
-    let test = mk_sp(body_lo, span.hi());
-    //println!("/// Span locations ///");
-    //dbg!(test);
-    //dbg!(body_lo + BytePos(1));
-    //println!("/// Span locations ///");
     // 1 = `}`
     let overhead = if fields.is_empty() { 1 } else { 0 };
     let total_width = result.len() + generics_str.len() + overhead;
