@@ -5,6 +5,8 @@ use std::fs::remove_file;
 use std::path::Path;
 use std::process::Command;
 
+use serial_test::parallel;
+
 use rustfmt_config_proc_macro::rustfmt_only_ci_test;
 
 /// Run the rustfmt executable and return its output.
@@ -50,6 +52,7 @@ macro_rules! assert_that {
 }
 
 #[rustfmt_only_ci_test]
+#[parallel]
 #[test]
 fn print_config() {
     assert_that!(
@@ -79,6 +82,7 @@ fn print_config() {
 }
 
 #[rustfmt_only_ci_test]
+#[parallel]
 #[test]
 fn inline_config() {
     // single invocation
@@ -110,6 +114,7 @@ fn inline_config() {
 }
 
 #[test]
+#[parallel]
 fn rustfmt_usage_text() {
     let args = ["--help"];
     let (stdout, _) = rustfmt(&args);
@@ -117,6 +122,7 @@ fn rustfmt_usage_text() {
 }
 
 #[test]
+#[parallel]
 fn mod_resolution_error_multiple_candidate_files() {
     // See also https://github.com/rust-lang/rustfmt/issues/5167
     let default_path = Path::new("tests/mod-resolver/issue-5167/src/a.rs");
@@ -133,6 +139,7 @@ fn mod_resolution_error_multiple_candidate_files() {
 }
 
 #[test]
+#[parallel]
 fn mod_resolution_error_sibling_module_not_found() {
     let args = ["tests/mod-resolver/module-not-found/sibling_module/lib.rs"];
     let (_stdout, stderr) = rustfmt(&args);
@@ -141,6 +148,7 @@ fn mod_resolution_error_sibling_module_not_found() {
 }
 
 #[test]
+#[parallel]
 fn mod_resolution_error_relative_module_not_found() {
     let args = ["tests/mod-resolver/module-not-found/relative_module/lib.rs"];
     let (_stdout, stderr) = rustfmt(&args);
@@ -153,6 +161,7 @@ fn mod_resolution_error_relative_module_not_found() {
 }
 
 #[test]
+#[parallel]
 fn mod_resolution_error_path_attribute_does_not_exist() {
     let args = ["tests/mod-resolver/module-not-found/bad_path_attribute/lib.rs"];
     let (_stdout, stderr) = rustfmt(&args);
@@ -161,6 +170,7 @@ fn mod_resolution_error_path_attribute_does_not_exist() {
 }
 
 #[test]
+#[parallel]
 fn rustfmt_emits_error_on_line_overflow_true() {
     // See also https://github.com/rust-lang/rustfmt/issues/3164
     let args = [
@@ -179,6 +189,7 @@ fn rustfmt_emits_error_on_line_overflow_true() {
 mod load_config {
     use super::rustfmt;
     use std::path::Path;
+    use serial_test::serial;
 
     /// helper function to write a new rustfmt.toml to a file
     fn write_rustfmt_toml<P: AsRef<Path>>(path: P) {
@@ -234,6 +245,7 @@ mod load_config {
     ///
     /// When no configs are found rustfmt is run with just the default options.
     #[test]
+    #[serial]
     fn test_load_config_logic() {
         // Create a temporary directory and set it as the new $HOME.
         // This sets up a clean environment that we'll use to test the config loading logic

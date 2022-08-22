@@ -67,6 +67,7 @@ rustc-workspace-hack = "1.0.0"
 # Rustc dependencies are loaded from the sysroot, Cargo doesn't know about them.
 
 [dev-dependencies]
+serial_test = "0.9.0"
 tempfile = "3.3.0"
 tmp_env = "0.1.1"
 
