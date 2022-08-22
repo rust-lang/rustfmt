@@ -1262,6 +1262,29 @@ fn format_unit_struct(
     Some(format!("{}{};", header_str, generics_str))
 }
 
+fn set_brace_pos(has_fields: bool, has_content: bool, version: Version) -> BracePos {
+    return match version {
+        Version::One => {
+            if has_fields {
+                return BracePos::Auto;
+            }
+            BracePos::ForceSameLine
+        }
+        Version::Two => {
+            match (has_fields, has_content) {
+                // Doesn't have fields, there is nothing between {}, has generics.
+                (true, true) => BracePos::ForceSameLine,
+
+                // Doesn't have fields, has something between { }, has generics.
+                (true, false) => BracePos::Auto,
+
+                // Has fields, has generics.
+                (false, _) => BracePos::Auto,
+            }
+        }
+    };
+}
+
 pub(crate) fn format_struct_struct(
     context: &RewriteContext<'_>,
     struct_parts: &StructParts<'_>,
@@ -1289,11 +1312,11 @@ pub(crate) fn format_struct_struct(
             context,
             g,
             context.config.brace_style(),
-            if fields.is_empty() {
-                BracePos::ForceSameLine
-            } else {
-                BracePos::Auto
-            },
+            set_brace_pos(
+                !fields.is_empty(),
+                span.hi() <= body_lo + BytePos(5),
+                context.config.version(),
+            ),
             offset,
             // make a span that starts right after `struct Foo`
             mk_sp(header_hi, body_lo),
@@ -1311,6 +1334,11 @@ pub(crate) fn format_struct_struct(
             }
         }
     };
+    let test = mk_sp(body_lo, span.hi());
+    //println!("/// Span locations ///");
+    //dbg!(test);
+    //dbg!(body_lo + BytePos(1));
+    //println!("/// Span locations ///");
     // 1 = `}`
     let overhead = if fields.is_empty() { 1 } else { 0 };
     let total_width = result.len() + generics_str.len() + overhead;

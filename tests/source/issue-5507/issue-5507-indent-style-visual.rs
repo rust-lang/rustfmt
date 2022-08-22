@@ -1,3 +1,4 @@
+// rustfmt-indent_style: Visual
 // rustfmt-version: Two
 
 struct EmptyBody<T>
