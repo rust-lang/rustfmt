@@ -1262,24 +1262,6 @@ fn format_unit_struct(
     Some(format!("{}{};", header_str, generics_str))
 }
 
-//fn set_brace_pos(has_no_fields: bool, has_content: bool, version: Version) -> BracePos {
-//    match version {
-//        Version::One => {
-//            if has_no_fields {
-//                return BracePos::ForceSameLine;
-//            }
-//            BracePos::Auto
-//        }
-//        Version::Two => {
-//            match (has_no_fields, has_content) {
-//                (true, true) => BracePos::ForceSameLine,
-//                (true, false) => BracePos::Auto,
-//                (false, _) => BracePos::Auto,
-//            }
-//        },
-//    }
-//}
-
 fn set_brace_pos(
     context: &RewriteContext<'_>,
     struct_parts: &StructParts<'_>,
