@@ -1262,27 +1262,50 @@ fn format_unit_struct(
     Some(format!("{}{};", header_str, generics_str))
 }
 
-fn set_brace_pos(has_fields: bool, has_content: bool, version: Version) -> BracePos {
-    return match version {
-        Version::One => {
-            if has_fields {
-                return BracePos::Auto;
-            }
-            BracePos::ForceSameLine
-        }
-        Version::Two => {
-            match (has_fields, has_content) {
-                // Doesn't have fields, there is nothing between {}, has generics.
-                (true, true) => BracePos::ForceSameLine,
+//fn set_brace_pos(has_no_fields: bool, has_content: bool, version: Version) -> BracePos {
+//    match version {
+//        Version::One => {
+//            if has_no_fields {
+//                return BracePos::ForceSameLine;
+//            }
+//            BracePos::Auto
+//        }
+//        Version::Two => {
+//            match (has_no_fields, has_content) {
+//                (true, true) => BracePos::ForceSameLine,
+//                (true, false) => BracePos::Auto,
+//                (false, _) => BracePos::Auto,
+//            }
+//        },
+//    }
+//}
 
-                // Doesn't have fields, has something between { }, has generics.
-                (true, false) => BracePos::Auto,
-
-                // Has fields, has generics.
+fn set_brace_pos(
+    context: &RewriteContext<'_>,
+    struct_parts: &StructParts<'_>,
+    fields: &[ast::FieldDef],
+    body_lo: BytePos,
+) -> BracePos {
+    if fields.is_empty() {
+        let span = struct_parts.span;
+        let generics_lo = if let Some(generics) = struct_parts.generics {
+            generics.span.lo()
+        } else {
+            body_lo
+        };
+        let snippet = context.snippet(mk_sp(generics_lo, span.hi()));
+        let body_contains_comments = contains_comment(snippet);
+        if context.config.version() == Version::Two {
+            return match (fields.is_empty(), body_contains_comments) {
+                (true, true) => BracePos::Auto,
+                (true, false) if struct_parts.generics.is_some() => BracePos::Auto,
+                (true, false) => BracePos::ForceSameLine,
                 (false, _) => BracePos::Auto,
-            }
+            };
         }
-    };
+        return BracePos::ForceSameLine;
+    }
+    BracePos::Auto
 }
 
 pub(crate) fn format_struct_struct(
@@ -1312,11 +1335,7 @@ pub(crate) fn format_struct_struct(
             context,
             g,
             context.config.brace_style(),
-            set_brace_pos(
-                !fields.is_empty(),
-                span.hi() <= body_lo + BytePos(5),
-                context.config.version(),
-            ),
+            set_brace_pos(&context, &struct_parts, &fields, body_lo),
             offset,
             // make a span that starts right after `struct Foo`
             mk_sp(header_hi, body_lo),

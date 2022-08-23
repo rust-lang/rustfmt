@@ -1,5 +1,4 @@
-// rustfmt-indent_style: Visual
-// rustfmt-version: Two
+// rustfmt-version: One
 
 struct EmptyBody<T>
     where T: Eq {
@@ -8,6 +7,15 @@ struct EmptyBody<T>
 struct LineComment<T>
     where T: Eq {
     // body
+}
+
+
+struct MultiLineComment<T>
+    where T: Eq {
+    /*
+    Multiline
+    comment.
+    */
 }
 
 struct BlockComment<T>

@@ -9,6 +9,14 @@ struct LineComment<T>
     // body
 }
 
+struct MultiLineComment<T>
+    where T: Eq {
+    /*
+    Multiline
+    comment.
+    */
+}
+
 struct BlockComment<T>
     where T: Eq {
     /* block comment */
