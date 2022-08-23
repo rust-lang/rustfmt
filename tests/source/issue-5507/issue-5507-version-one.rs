@@ -9,7 +9,6 @@ struct LineComment<T>
     // body
 }
 
-
 struct MultiLineComment<T>
     where T: Eq {
     /*
