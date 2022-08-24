@@ -2379,7 +2379,9 @@ Don't reformat out of line modules
 
 ## `single_line_if_else_max_width`
 
-Maximum line length for single line if-else expressions. A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`. If one of the if-else blocks contain a statement, a comment, an attribute, or is empty, the if-else expression will be broken into multiple lines. When using `version = "Two"` the if-else expression at the end of a block will be formatted on a single line. The last if-else expression in the last example snippet of this section would be formatted on a single line with `version = "Two"`.
+Maximum line length for single line if-else expressions. A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
+
+Common if-else expressions that may be formatted on a single line are expressions on the right hand side of the equals (`=`) sign in a let statement, expressions inside a function call, and expressions inside a closure. If one of the if-else blocks contain a statement, a comment, an attribute, or is empty, the if-else expression will be broken into multiple lines. For backwards compatability reasons, an if-else expression at the end of a block is treated as a statement when using `version = "One"` and may not be formatted on a single line. When using `version = "Two"` an if-else expression at the end of a block may be formatted on a single line if it is a simple if-else expression as described earlier. As an example, the last if-else expression in the last snippet of this section would be formatted on a single line with `version = "Two"`.
 
 - **Default value**: `50`
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
@@ -2393,6 +2395,18 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 fn foo() -> usize {
     let some_long_name = true;
     let some_other_long_name = false;
+    fun(if some_long_name && some_other_long_name {
+        0
+    } else {
+        10
+    });
+    closure(|super_long_closure_variable| {
+        if super_long_closure_variable == 0 {
+            0
+        } else {
+            10
+        }
+    });
     let bar = if some_long_name && some_other_long_name {
         baz()
     } else {
@@ -2412,6 +2426,8 @@ fn foo() -> usize {
 fn foo() -> usize {
     let some_long_name = true;
     let some_other_long_name = false;
+    fun(if some_long_name && some_other_long_name { 0 } else { 10 });
+    closure(|super_long_closure_variable| if super_long_closure_variable == 0 { 0 } else { 10 });
     let bar = if some_long_name && some_other_long_name { baz() } else { buzz() };
     if some_long_name && some_other_long_name {
         1
