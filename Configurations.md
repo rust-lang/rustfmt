@@ -2408,7 +2408,7 @@ fn foo() -> usize {
     } else {
         10
     });
-    
+
     closure(|super_long_closure_variable| {
         if super_long_closure_variable == 0 {
             0
@@ -2416,13 +2416,13 @@ fn foo() -> usize {
             10
         }
     });
-    
+
     let bar = if some_long_name && some_other_long_name {
         baz()
     } else {
         buzz()
     };
-    
+
     if some_long_name && some_other_long_name {
         1
     } else {
@@ -2435,11 +2435,12 @@ fn foo() -> usize {
 
 ```rust
 fn foo() -> usize {
-    let some_long_name = true;
-    let some_other_long_name = false;
     fun(if some_long_name && some_other_long_name { 0 } else { 10 });
+
     closure(|super_long_closure_variable| if super_long_closure_variable == 0 { 0 } else { 10 });
+
     let bar = if some_long_name && some_other_long_name { baz() } else { buzz() };
+
     if some_long_name && some_other_long_name {
         1
     } else {
