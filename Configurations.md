@@ -2381,7 +2381,17 @@ Don't reformat out of line modules
 
 Maximum line length for single line if-else expressions. A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
 
-Common if-else expressions that may be formatted on a single line are expressions on the right hand side of the equals (`=`) sign in a let statement, expressions inside a function call, and expressions inside a closure. If one of the if-else blocks contain a statement, a comment, an attribute, or is empty, the if-else expression will be broken into multiple lines. For backwards compatability reasons, an if-else expression at the end of a block is treated as a statement when using `version = "One"` and may not be formatted on a single line. When using `version = "Two"` an if-else expression at the end of a block may be formatted on a single line if it is a simple if-else expression as described earlier. As an example, the last if-else expression in the last snippet of this section would be formatted on a single line with `version = "Two"`.
+Common if-else expressions that may be formatted on a single line are:
+* Expressions on the right hand side of an equals (`=`) sign. e.g. `let x = if y == 1 { 0 } else { 1 };`
+* Conditional expression in function calls `f(if x== 0 { 10 } else { 0 })`
+* Single expression closures. e.g. `let x = |y| if y == 0 { 0 } else { 10 };` 
+
+In the following scenarios the if-else expression will be formatted over multiple lines.
+* Empty if-else blocks.
+* An outer if-else expression when if-else expression are nested.
+* if-else blocks that contain statements e.g. `let x = a;`, comments,  or attributes `let _ = if true { #[must_use] 1 } else { 2 };`.
+
+When `version=One` is set (the default) if-else expression at the end of a block are treated as statements and are not formatted on a single line. When using `version=Two` the if-else expression may be formatted on a single line if it meets the criteria described above.
 
 - **Default value**: `50`
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
