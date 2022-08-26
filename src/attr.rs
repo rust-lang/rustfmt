@@ -1,7 +1,18 @@
 //! Format attributes and meta items.
 
 use rustc_ast::ast;
+use rustc_ast::ast::{AttrKind, Lit, MetaItem, MetaItemKind, StrStyle};
+use rustc_ast::token;
+use rustc_ast::token::{Token, TokenKind};
+use rustc_ast::tokenstream::TokenStream;
+use rustc_ast::tokenstream::TokenTree;
+use rustc_ast::AttrItem;
 use rustc_ast::HasAttrs;
+use rustc_ast::MacArgs;
+use rustc_ast::MacArgsEq;
+use rustc_ast::MacArgsEq::{Ast, Hir};
+use rustc_ast::NestedMetaItem;
+use rustc_ast::Path;
 use rustc_span::{symbol::sym, Span, Symbol};
 
 use self::doc_comment::DocCommentFormatter;
@@ -329,6 +340,137 @@ impl Rewrite for ast::MetaItem {
     }
 }
 
+// A simple workaround for `ast::Attribute::meta()` for generating MetaItem from AttrItem that
+// includes constants (`CONST`) or macro metavariables (`$name`) as attribute value (issue #5489).
+fn meta_from_attr_item(
+    item: &AttrItem,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> Option<MetaItem> {
+    let meta = match &item.args {
+        MacArgs::Delimited(_, _, token_stream) => meta_from_delimited_attr(token_stream.clone()),
+        MacArgs::Eq(_, mac_args_eq) => meta_from_eq_attr(mac_args_eq, context, shape),
+        MacArgs::Empty => None, // Should not get here - properly handled by `Attribute::meta()`
+    };
+
+    match meta {
+        Some(meta) => Some(MetaItem {
+            path: item.clone().path,
+            kind: meta,
+            span: item.span(),
+        }),
+        None => None,
+    }
+} // meta_from_item()
+
+// Generating `MetaItemKind` from attribute `MacArgsEq`.
+fn meta_from_eq_attr(
+    mac_args_eq: &MacArgsEq,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+) -> Option<rustc_ast::MetaItemKind> {
+    let lit = match mac_args_eq {
+        Hir(lit) => lit.clone(),
+        Ast(expr) => {
+            let lit_symbol = Symbol::intern(&expr.rewrite(context, shape)?);
+            Lit {
+                token: token::Lit::new(token::Str, lit_symbol, None),
+                kind: rustc_ast::LitKind::Str(lit_symbol, StrStyle::Cooked),
+                span: expr.span,
+            }
+        }
+    };
+
+    Some(MetaItemKind::NameValue(lit.clone()))
+} // meta_from_eq_attr()
+
+// Generating `MetaItemKind` from `Delimited` attribute `TokenStream``, assiming the tokens are
+// gouped into 3-tokens groups, followed by an optional `,`.  The 3 grop tokens are assumed to be:
+//     Ident `=` Ident or Lit
+fn meta_from_delimited_attr(token_stream: TokenStream) -> Option<rustc_ast::MetaItemKind> {
+    let mut token_count = token_stream.len();
+    if token_count < 3 {
+        return None;
+    }
+    let mut trees = token_stream.into_trees();
+    let mut meta_items_list: Vec<NestedMetaItem> = Vec::new();
+
+    // Closure t get the next token from a TokenTree
+    let mut next_token = || -> Option<Token> {
+        if let TokenTree::Token(token, _) = trees.next()? {
+            Some(token)
+        } else {
+            None
+        }
+    }; // next_token() = ||
+
+    // Loop over the 3-tokens groups of the ToekenTree
+    while token_count >= 3 {
+        // 1st token is the lhs Ident
+        let attr_name_token = next_token()?;
+        if let TokenKind::Ident(attr_name_sym, _) = attr_name_token.kind {
+            // 2nd token is the "="
+            if !matches!(next_token()?.kind, TokenKind::Eq) {
+                return None;
+            } else {
+                // 3rd token is the rhs Ident/Lit
+                let token = next_token()?;
+                token_count -= 3;
+                if token_count % 4 == 1 {
+                    // Only comma or next 3-tokens group can follow
+                    if !matches!(next_token()?.kind, TokenKind::Comma) {
+                        return None;
+                    }
+                    token_count -= 1;
+                }
+
+                // rhs can be either Lit or Ident
+                let lit = match token.kind {
+                    TokenKind::Literal(lit) => {
+                        let lit_symbol = Symbol::intern(&lit.to_string());
+                        Lit {
+                            token: lit,
+                            kind: rustc_ast::LitKind::Str(lit_symbol, StrStyle::Cooked),
+                            span: token.span,
+                        }
+                    }
+                    TokenKind::Ident(_, _) => {
+                        let ident_name = if let TokenKind::Ident(name, _) = token.kind {
+                            name.to_ident_string()
+                        } else {
+                            "".to_string()
+                        };
+                        let lit_symbol = Symbol::intern(&ident_name);
+                        Lit {
+                            token: token::Lit::new(token::Str, lit_symbol, None),
+                            kind: rustc_ast::LitKind::Str(lit_symbol, StrStyle::Cooked),
+                            span: token.span,
+                        }
+                    }
+                    _ => return None,
+                };
+
+                let attr_name_ident = rustc_span::symbol::Ident {
+                    name: attr_name_sym,
+                    span: attr_name_token.span,
+                };
+
+                let meta_item = MetaItem {
+                    path: Path::from_ident(attr_name_ident),
+                    kind: MetaItemKind::NameValue(lit.clone()),
+                    span: lit.span,
+                };
+
+                meta_items_list.push(NestedMetaItem::MetaItem(meta_item));
+            }
+        } else {
+            return None;
+        }
+    } // while
+
+    return Some(MetaItemKind::List(meta_items_list));
+} // meta_from_delimited_attr()
+
 impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let snippet = context.snippet(self.span);
@@ -345,35 +487,49 @@ impl Rewrite for ast::Attribute {
                 return Some(snippet.to_owned());
             }
 
-            if let Some(ref meta) = self.meta() {
-                // This attribute is possibly a doc attribute needing normalization to a doc comment
-                if context.config.normalize_doc_attributes() && meta.has_name(sym::doc) {
-                    if let Some(ref literal) = meta.value_str() {
-                        let comment_style = match self.style {
-                            ast::AttrStyle::Inner => CommentStyle::Doc,
-                            ast::AttrStyle::Outer => CommentStyle::TripleSlash,
-                        };
+            let meta = match self.meta() {
+                Some(meta) => Some(meta),
+                None => match self.kind {
+                    // FIXME: `ast::Attribute::meta()` should be fixed to allow CONST and
+                    // macro metavariables (`$name`) as valid attributes values.
+                    //
+                    // A simplified workaround for `ast::Attribute::meta()`that does not
+                    // allows CONST and macro metavariables (`$name`) as attributes values.
+                    AttrKind::Normal(ref item, _) => meta_from_attr_item(&item, context, shape),
+                    _ => None,
+                },
+            };
 
-                        let literal_str = literal.as_str();
-                        let doc_comment_formatter =
-                            DocCommentFormatter::new(literal_str, comment_style);
-                        let doc_comment = format!("{}", doc_comment_formatter);
-                        return rewrite_doc_comment(
-                            &doc_comment,
-                            shape.comment(context.config),
-                            context.config,
-                        );
+            match meta {
+                Some(ref meta) => {
+                    // This attribute is possibly a doc attr needing normalization to a doc comment
+                    if context.config.normalize_doc_attributes() && meta.has_name(sym::doc) {
+                        if let Some(ref literal) = meta.value_str() {
+                            let comment_style = match self.style {
+                                ast::AttrStyle::Inner => CommentStyle::Doc,
+                                ast::AttrStyle::Outer => CommentStyle::TripleSlash,
+                            };
+
+                            let literal_str = literal.as_str();
+                            let doc_comment_formatter =
+                                DocCommentFormatter::new(literal_str, comment_style);
+                            let doc_comment = format!("{}", doc_comment_formatter);
+                            return rewrite_doc_comment(
+                                &doc_comment,
+                                shape.comment(context.config),
+                                context.config,
+                            );
+                        }
                     }
-                }
 
-                // 1 = `[`
-                let shape = shape.offset_left(prefix.len() + 1)?;
-                Some(
-                    meta.rewrite(context, shape)
-                        .map_or_else(|| snippet.to_owned(), |rw| format!("{}[{}]", prefix, rw)),
-                )
-            } else {
-                Some(snippet.to_owned())
+                    // 1 = `[`
+                    let shape = shape.offset_left(prefix.len() + 1)?;
+                    Some(
+                        meta.rewrite(context, shape)
+                            .map_or_else(|| snippet.to_owned(), |rw| format!("{}[{}]", prefix, rw)),
+                    )
+                }
+                None => Some(snippet.to_owned()),
             }
         }
     }
