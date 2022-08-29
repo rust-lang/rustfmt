@@ -2777,6 +2777,7 @@ fn main() {
     let y = 2;
     let z = 3;
     let a = Foo { x, y, z };
+    let b = Foo { x, y, z };
 }
 ```
 
