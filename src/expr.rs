@@ -1984,6 +1984,12 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
 ) -> Option<String> {
     let lhs = lhs.into();
     let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_kind, rhs_tactics)?;
+    let mut complete_str = String::new();
+    complete_str.push_str(&lhs);
+    complete_str.push_str(&rhs);
+    println!("Right hand side");
+    dbg!(complete_str);
+    println!("Right hand side");
     Some(lhs + &rhs)
 }
 
