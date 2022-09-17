@@ -1283,7 +1283,7 @@ fn set_brace_pos(
                 None => 0,
             };
             let comment_snippet = &snippet[comment_start..];
-            let comment = comment_style(&snippet[comment_start..], false);
+            let comment = comment_style(comment_snippet, false);
             let is_block_comment = comment.is_block_comment();
             let is_single_line_comment = if is_block_comment {
                 let comment_end = match find_comment_end(comment_snippet) {
