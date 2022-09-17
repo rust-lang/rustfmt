@@ -10,9 +10,9 @@ use rustc_span::{symbol, BytePos, Span, DUMMY_SP};
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
-    combine_strs_with_missing_comments, contains_comment, is_last_comment_block,
-    recover_comment_removed, recover_missing_comment_in_span, rewrite_missing_comment,
-    FindUncommented,
+    combine_strs_with_missing_comments, comment_style, contains_comment, find_comment_end,
+    is_last_comment_block, recover_comment_removed, recover_missing_comment_in_span,
+    rewrite_missing_comment, FindUncommented,
 };
 use crate::config::lists::*;
 use crate::config::{BraceStyle, Config, IndentStyle, Version};
@@ -1277,10 +1277,32 @@ fn set_brace_pos(
         };
         let snippet = context.snippet(mk_sp(generics_lo, span.hi()));
         let body_contains_comments = contains_comment(snippet);
+        let has_single_line_block_comment = if body_contains_comments {
+            let comment_start = match snippet.find('/') {
+                Some(i) => i,
+                None => 0,
+            };
+            let comment_snippet = &snippet[comment_start..];
+            let comment = comment_style(&snippet[comment_start..], false);
+            let is_block_comment = comment.is_block_comment();
+            let is_single_line_comment = if is_block_comment {
+                let comment_end = match find_comment_end(comment_snippet) {
+                    Some(i) => i,
+                    None => comment_start,
+                };
+                is_single_line(&comment_snippet[..=comment_end - 1])
+            } else {
+                false
+            };
+            is_single_line_comment
+        } else {
+            false
+        };
+
         if context.config.version() == Version::Two {
             return match (fields.is_empty(), body_contains_comments) {
+                (true, true) if has_single_line_block_comment => BracePos::ForceSameLine,
                 (true, true) => BracePos::Auto,
-                (true, false) if struct_parts.generics.is_some() => BracePos::Auto,
                 (true, false) => BracePos::ForceSameLine,
                 (false, _) => BracePos::Auto,
             };
