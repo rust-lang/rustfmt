@@ -1,3 +1,5 @@
+// rustfmt-version: Two
+
 pub struct SomeCallback(
     pub extern "C" fn(
         long_argument_name_to_avoid_wrap: u32,
