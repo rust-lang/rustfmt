@@ -112,7 +112,7 @@ create_config! {
     space_after_colon: SpaceAfterColon, false, "Leave a space after the colon";
     spaces_around_ranges: SpacesAroundRanges, false, "Put spaces around the  .. and ..= range \
         operators";
-    binop_separator: BinopSeparator, false,
+    binop_separator: BinopSeparator, true,
         "Where to put a binary operator when a binary expression goes multiline";
 
     // Misc.
