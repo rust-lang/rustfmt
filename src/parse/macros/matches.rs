@@ -5,7 +5,7 @@ use rustc_parse::exp;
 use rustc_parse::parser::{CommaRecoveryMode, RecoverColon, RecoverComma};
 
 use super::is_token_tree_comma;
-use crate::rewrite::RewriteContext;
+use crate::rewrite::{RewriteContext, RewriteError};
 
 #[derive(Debug)]
 pub(crate) struct Matches {
@@ -15,7 +15,10 @@ pub(crate) struct Matches {
 }
 
 /// Parse matches! from <https://doc.rust-lang.org/std/macro.matches.html>
-pub(crate) fn parse_matches(context: &RewriteContext<'_>, ts: TokenStream) -> Option<Matches> {
+pub(crate) fn parse_matches(
+    context: &RewriteContext<'_>,
+    ts: TokenStream,
+) -> Result<Matches, RewriteError> {
     let mut cursor = ts.iter().peekable();
     // remove trailing commmas from the TokenStream since they lead to errors when parsing ast::Pat
     // using parse_pat_allow_top_alt below since the parser isn't expecting a trailing comma.
@@ -31,7 +34,7 @@ pub(crate) fn parse_matches(context: &RewriteContext<'_>, ts: TokenStream) -> Op
 
     let ts = token_trees.into_iter().collect();
     let mut parser = super::build_parser(context, ts);
-    let expr = parser.parse_expr().ok()?;
+    let expr = parser.parse_expr().map_err(|_| RewriteError::Unknown)?;
 
     let _ = parser.eat(exp!(Comma));
 
@@ -42,14 +45,14 @@ pub(crate) fn parse_matches(context: &RewriteContext<'_>, ts: TokenStream) -> Op
             RecoverColon::Yes,
             CommaRecoveryMode::EitherTupleOrPipe,
         )
-        .ok()?;
+        .map_err(|_| RewriteError::Unknown)?;
 
     let guard = if parser.eat_keyword(exp!(If)) {
-        Some(parser.parse_expr().ok()?)
+        Some(parser.parse_expr().map_err(|_| RewriteError::Unknown)?)
     } else {
         None
     };
-    Some(Matches { expr, pat, guard })
+    Ok(Matches { expr, pat, guard })
 }
 
 impl Matches {
