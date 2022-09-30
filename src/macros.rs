@@ -24,12 +24,12 @@ use crate::comment::{
 };
 use crate::config::StyleEdition;
 use crate::config::lists::*;
-use crate::expr::{RhsAssignKind, rewrite_array, rewrite_assign_rhs};
+use crate::expr::{RhsAssignKind, choose_separator_tactic, rewrite_array, rewrite_assign_rhs};
 use crate::lists::{ListFormatting, itemize_list, write_list};
 use crate::matches::rewrite_guard;
 use crate::overflow;
 use crate::parse::macros::lazy_static::parse_lazy_static;
-use crate::parse::macros::matches::MatchesMacroItem;
+use crate::parse::macros::matches::{MatchesMacroItem, parse_matches};
 use crate::parse::macros::{ParsedMacroArgs, parse_expr, parse_macro_args};
 use crate::rewrite::{
     MacroErrorKind, Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult,
@@ -243,6 +243,12 @@ fn rewrite_macro_inner(
                 // If formatting fails even though parsing succeeds, return the err early
                 _ => return Err(err),
             },
+        }
+    } else if macro_name == "matches!"
+        && context.config.style_edition() >= StyleEdition::Edition2027
+    {
+        if let success @ Ok(..) = format_matches(context, shape, &macro_name, mac) {
+            return success;
         }
     }
 
@@ -1418,6 +1424,46 @@ impl Rewrite for MatchesMacroItem {
                 Ok(pats_str + &guard_str)
             }
         }
+    }
+}
+
+/// Format `matches!` from <https://doc.rust-lang.org/std/macro.matches.html>
+///
+/// # Expected syntax
+///
+/// ```text
+/// matches!(expr, pat)
+/// matches!(expr, pat if expr)
+/// ```
+fn format_matches(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    name: &str,
+    mac: &ast::MacCall,
+) -> RewriteResult {
+    let span = mac.span();
+    let matches = parse_matches(context, mac.args.tokens.clone())?.items();
+    let force_separator_tactic = choose_separator_tactic(context, span);
+    match mac.args.delim {
+        Delimiter::Parenthesis => overflow::rewrite_with_parens(
+            context,
+            name,
+            matches.iter(),
+            shape,
+            span,
+            shape.width,
+            force_separator_tactic,
+        ),
+        Delimiter::Bracket => overflow::rewrite_with_square_brackets(
+            context,
+            name,
+            matches.iter(),
+            shape,
+            span,
+            force_separator_tactic,
+            None,
+        ),
+        Delimiter::Brace | Delimiter::Invisible(_) => Err(RewriteError::Unknown),
     }
 }
 
