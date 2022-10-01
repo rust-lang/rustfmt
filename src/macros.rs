@@ -26,8 +26,10 @@ use crate::config::StyleEdition;
 use crate::config::lists::*;
 use crate::expr::{RhsAssignKind, rewrite_array, rewrite_assign_rhs};
 use crate::lists::{ListFormatting, itemize_list, write_list};
+use crate::matches::rewrite_guard;
 use crate::overflow;
 use crate::parse::macros::lazy_static::parse_lazy_static;
+use crate::parse::macros::matches::MatchesMacroItem;
 use crate::parse::macros::{ParsedMacroArgs, parse_expr, parse_macro_args};
 use crate::rewrite::{
     MacroErrorKind, Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult,
@@ -1395,6 +1397,27 @@ impl MacroBranch {
         result += "}";
 
         Ok(result)
+    }
+}
+
+impl Rewrite for MatchesMacroItem {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        self.rewrite_result(context, shape).ok()
+    }
+
+    fn rewrite_result(
+        &self,
+        context: &RewriteContext<'_>,
+        shape: crate::shape::Shape,
+    ) -> RewriteResult {
+        match self {
+            Self::Expr(expr) => expr.rewrite_result(context, shape),
+            Self::Arm(pat, guard) => {
+                let pats_str = pat.rewrite_result(context, shape)?;
+                let guard_str = rewrite_guard(context, guard, shape, &pats_str)?;
+                Ok(pats_str + &guard_str)
+            }
+        }
     }
 }
 

@@ -1,9 +1,8 @@
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use rustc_ast::token::TokenKind;
 use rustc_ast::tokenstream::TokenStream;
+use rustc_parse::exp;
 use rustc_parse::parser::{CommaRecoveryMode, RecoverColon, RecoverComma};
-use rustc_span::symbol::kw;
 
 use super::is_token_tree_comma;
 use crate::rewrite::RewriteContext;
@@ -17,7 +16,7 @@ pub(crate) struct Matches {
 
 /// Parse matches! from <https://doc.rust-lang.org/std/macro.matches.html>
 pub(crate) fn parse_matches(context: &RewriteContext<'_>, ts: TokenStream) -> Option<Matches> {
-    let mut cursor = ts.trees().peekable();
+    let mut cursor = ts.iter().peekable();
     // remove trailing commmas from the TokenStream since they lead to errors when parsing ast::Pat
     // using parse_pat_allow_top_alt below since the parser isn't expecting a trailing comma.
     // This is only an issue when the `ast::Pat` is not followed by a guard. In either case it's ok
@@ -34,10 +33,10 @@ pub(crate) fn parse_matches(context: &RewriteContext<'_>, ts: TokenStream) -> Op
     let mut parser = super::build_parser(context, ts);
     let expr = parser.parse_expr().ok()?;
 
-    parser.eat(&TokenKind::Comma);
+    let _ = parser.eat(exp!(Comma));
 
     let pat = parser
-        .parse_pat_allow_top_alt(
+        .parse_pat_allow_top_guard(
             None,
             RecoverComma::Yes,
             RecoverColon::Yes,
@@ -45,10 +44,25 @@ pub(crate) fn parse_matches(context: &RewriteContext<'_>, ts: TokenStream) -> Op
         )
         .ok()?;
 
-    let guard = if parser.eat_keyword(kw::If) {
+    let guard = if parser.eat_keyword(exp!(If)) {
         Some(parser.parse_expr().ok()?)
     } else {
         None
     };
     Some(Matches { expr, pat, guard })
+}
+
+impl Matches {
+    pub(crate) fn items(self) -> [MatchesMacroItem; 2] {
+        [
+            MatchesMacroItem::Expr(self.expr),
+            MatchesMacroItem::Arm(self.pat, self.guard),
+        ]
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum MatchesMacroItem {
+    Expr(P<ast::Expr>),
+    Arm(P<ast::Pat>, Option<P<ast::Expr>>),
 }
