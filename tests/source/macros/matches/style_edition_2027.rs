@@ -1,4 +1,4 @@
-//rustfmt-version: Two
+//rustfmt-style_edition: 2027
 
 // To visually verify the special case handling of `matches!` we include the equivalent match expr
 
