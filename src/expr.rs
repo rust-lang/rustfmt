@@ -1446,7 +1446,10 @@ fn rewrite_float_lit(
     .max_width_error(shape.width, span)
 }
 
-fn choose_separator_tactic(context: &RewriteContext<'_>, span: Span) -> Option<SeparatorTactic> {
+pub(crate) fn choose_separator_tactic(
+    context: &RewriteContext<'_>,
+    span: Span,
+) -> Option<SeparatorTactic> {
     if context.inside_macro() {
         if span_ends_with_comma(context, span) {
             Some(SeparatorTactic::Always)
