@@ -1,5 +1,5 @@
 use rustc_ast::token::{Delimiter, NonterminalKind, NtExprKind::*, NtPatKind::*, TokenKind};
-use rustc_ast::tokenstream::TokenStream;
+use rustc_ast::tokenstream::{TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_parse::MACRO_ARGUMENTS;
 use rustc_parse::parser::{ForceCollect, Parser, Recovery};
@@ -93,6 +93,11 @@ fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
     } else {
         None
     }
+}
+
+/// Helper function to determine if a tokentree is a comma
+pub(crate) fn is_token_tree_comma(tt: &TokenTree) -> bool {
+    matches!(tt, TokenTree::Token(token, _) if token.kind == TokenKind::Comma)
 }
 
 pub(crate) fn parse_macro_args(
