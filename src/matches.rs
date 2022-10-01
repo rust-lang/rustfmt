@@ -565,7 +565,7 @@ pub(crate) fn rewrite_guard(
     guard: &Option<ptr::P<ast::Expr>>,
     shape: Shape,
     pattern_str: &str,
-) -> Option<String> {
+) -> RewriteResult {
     let last_line_pattern_width = trimmed_last_line_width(pattern_str);
     let block_like_pat = last_line_pattern_width <= context.config.tab_spaces();
     let new_line_guard = pattern_str.contains('\n') && !block_like_pat;

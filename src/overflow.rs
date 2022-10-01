@@ -19,6 +19,7 @@ use crate::lists::{
     ListFormatting, ListItem, Separator, definitive_tactic, itemize_list, write_list,
 };
 use crate::macros::MacroArg;
+use crate::parse::macros::matches::MatchesMacroItem;
 use crate::patterns::{TuplePatField, can_be_overflowed_pat};
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::Shape;
@@ -85,6 +86,7 @@ pub(crate) enum OverflowableItem<'a> {
     Ty(&'a ast::Ty),
     Pat(&'a ast::Pat),
     PreciseCapturingArg(&'a ast::PreciseCapturingArg),
+    MatchesMacroItem(&'a MatchesMacroItem),
 }
 
 impl<'a> Rewrite for OverflowableItem<'a> {
@@ -130,6 +132,7 @@ impl<'a> OverflowableItem<'a> {
             OverflowableItem::Ty(ty) => f(*ty),
             OverflowableItem::Pat(pat) => f(*pat),
             OverflowableItem::PreciseCapturingArg(arg) => f(*arg),
+            OverflowableItem::MatchesMacroItem(item) => f(*item),
         }
     }
 
@@ -154,7 +157,9 @@ impl<'a> OverflowableItem<'a> {
     pub(crate) fn is_expr(&self) -> bool {
         matches!(
             self,
-            OverflowableItem::Expr(..) | OverflowableItem::MacroArg(MacroArg::Expr(..))
+            OverflowableItem::Expr(..)
+                | OverflowableItem::MacroArg(MacroArg::Expr(..))
+                | OverflowableItem::MatchesMacroItem(MatchesMacroItem::Expr(..))
         )
     }
 
@@ -170,6 +175,7 @@ impl<'a> OverflowableItem<'a> {
         match self {
             OverflowableItem::Expr(expr) => Some(expr),
             OverflowableItem::MacroArg(MacroArg::Expr(ref expr)) => Some(expr),
+            OverflowableItem::MatchesMacroItem(MatchesMacroItem::Expr(expr)) => Some(expr),
             _ => None,
         }
     }
@@ -265,7 +271,10 @@ impl_into_overflowable_item_for_ast_node!(
     Pat,
     PreciseCapturingArg
 );
-impl_into_overflowable_item_for_rustfmt_types!([MacroArg], [SegmentParam, TuplePatField]);
+impl_into_overflowable_item_for_rustfmt_types!(
+    [MacroArg, MatchesMacroItem],
+    [SegmentParam, TuplePatField]
+);
 
 pub(crate) fn into_overflowable_list<'a, T>(
     iter: impl Iterator<Item = &'a T>,
