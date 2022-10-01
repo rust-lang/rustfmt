@@ -1,4 +1,4 @@
-//rustfmt-version: Two
+//rustfmt-style_edition: 2027
 
 // To visually verify the special case handling of `matches!` we include the equivalent match expr
 
@@ -69,14 +69,7 @@ fn other_scenarios() {
     // short expr and pattern, but guard is long.
     matches!(
         something,
-        Some(_)
-            if method(
-                very_long_input_1,
-                very_long_input_2,
-                very_long_input_3,
-                very_long_input_4,
-                very_long_input_5
-            ),
+        Some(_) if method(very_long_input_1, very_long_input_2, very_long_input_3, very_long_input_4, very_long_input_5),
     );
     match something {
         Some(_)
@@ -122,8 +115,8 @@ impl Mystruct {
         matches!(
             self,
             OverflowableItem::Expr(..)
-            | OverflowableItem::MacroArg(MacroArg::Expr(..))
-            | OverflowableItem::MatchMacroItem(MatchMacroItem::Expr(..))
+                | OverflowableItem::MacroArg(MacroArg::Expr(..))
+                | OverflowableItem::MatchMacroItem(MatchMacroItem::Expr(..))
                 if self.condition()
         );
 
@@ -140,7 +133,9 @@ fn multi_line_struct_pattern_with_guard() {
     matches!(
         token,
         Token::Dimension {
-            value, ref unit, ..
+            value,
+            ref unit,
+            ..
         } if num_context.is_ok(context.parsing_mode, value)
     );
 

@@ -1,4 +1,4 @@
-// rustfmt-version: Two
+// rustfmt-style_edition: 2027
 
 fn is_something(foo: Foo, bar: Bar) -> bool {
     matches!(
