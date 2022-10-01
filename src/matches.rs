@@ -296,15 +296,7 @@ fn rewrite_match_arm(
     let pats_str = arm.pat.rewrite_result(context, pat_shape)?;
 
     // Guard
-    let block_like_pat = trimmed_last_line_width(&pats_str) <= context.config.tab_spaces();
-    let new_line_guard = pats_str.contains('\n') && !block_like_pat;
-    let guard_str = rewrite_guard(
-        context,
-        &arm.guard,
-        shape,
-        trimmed_last_line_width(&pats_str),
-        new_line_guard,
-    )?;
+    let guard_str = rewrite_guard(context, &arm.guard, shape, &pats_str)?;
 
     let lhs_str = combine_strs_with_missing_comments(
         context,
@@ -568,8 +560,26 @@ fn rewrite_match_body(
     }
 }
 
+pub(crate) fn rewrite_guard(
+    context: &RewriteContext<'_>,
+    guard: &Option<ptr::P<ast::Expr>>,
+    shape: Shape,
+    pattern_str: &str,
+) -> Option<String> {
+    let last_line_pattern_width = trimmed_last_line_width(pattern_str);
+    let block_like_pat = last_line_pattern_width <= context.config.tab_spaces();
+    let new_line_guard = pattern_str.contains('\n') && !block_like_pat;
+    rewrite_guard_inner(
+        context,
+        guard,
+        shape,
+        last_line_pattern_width,
+        new_line_guard,
+    )
+}
+
 // The `if ...` guard on a match arm.
-fn rewrite_guard(
+fn rewrite_guard_inner(
     context: &RewriteContext<'_>,
     guard: &Option<ptr::P<ast::Expr>>,
     shape: Shape,
