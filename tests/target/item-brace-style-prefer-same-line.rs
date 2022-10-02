@@ -15,21 +15,21 @@ mod M {
 
     enum A<T>
     where
-        T: Copy, {
+        T: Copy {
         A,
     }
 
     struct B<T>
     where
-        T: Copy, {
+        T: Copy {
         b: i32,
     }
 
     enum C<T>
     where
-        T: Copy, {}
+        T: Copy {}
 
     struct D<T>
     where
-        T: Copy, {}
+        T: Copy {}
 }
