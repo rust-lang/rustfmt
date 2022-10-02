@@ -6,8 +6,13 @@ on:
     types: [created]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-release:
+    permissions:
+      contents: write  # for actions/upload-release-asset to upload release asset
     name: build-release
     strategy:
       matrix:
