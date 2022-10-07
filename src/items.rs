@@ -1300,11 +1300,10 @@ fn set_brace_pos(
         };
 
         if context.config.version() == Version::Two {
-            return match (fields.is_empty(), body_contains_comments) {
-                (true, true) if has_single_line_block_comment => BracePos::ForceSameLine,
-                (true, true) => BracePos::Auto,
-                (true, false) => BracePos::ForceSameLine,
-                (false, _) => BracePos::Auto,
+            return match body_contains_comments {
+                true if has_single_line_block_comment => BracePos::ForceSameLine,
+                true => BracePos::Auto,
+                false => BracePos::ForceSameLine,
             };
         }
         return BracePos::ForceSameLine;
