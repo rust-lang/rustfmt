@@ -92,7 +92,7 @@ fn format_project<T: FormatHandler>(
     let mut context = FormatContext::new(&krate, report, parse_session, config, handler);
     let files = modules::ModResolver::new(
         &context.parse_session,
-        directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaMod),
+        directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaBlock),
         !input_is_stdin && !config.skip_children(),
     )
     .visit_crate(&krate)?;
@@ -145,7 +145,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         module: &Module<'_>,
         is_macro_def: bool,
     ) -> Result<(), ErrorKind> {
-        let snippet_provider = self.parse_session.snippet_provider(module.as_ref().inner);
+        let snippet_provider = self.parse_session.snippet_provider(module.span);
         let mut visitor = FmtVisitor::from_parse_sess(
             &self.parse_session,
             &self.config,

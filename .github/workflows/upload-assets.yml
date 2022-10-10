@@ -1,6 +1,8 @@
 name: upload
 
 on:
+  push:
+  workflow_dispatch:
   release:
     types: [created]
 
@@ -32,24 +34,21 @@ jobs:
         with:
           profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
+          override: false
 
       - name: Add mingw64 to path for x86_64-gnu
         run: echo "C:\msys64\mingw64\bin" >> $GITHUB_PATH
         if: matrix.rust == 'nightly-x86_64-gnu'
         shell: bash
 
-      - name: Install cargo-make
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: --force cargo-make
-
       - name: Build release binaries
         uses: actions-rs/cargo@v1
         with:
-          command: make
-          args: release
+          command: build
+          args: --release
+        env:
+          CFG_RELEASE: nightly
+          CFG_RELEASE_CHANNEL: nightly
 
       - name: Build archive
         shell: bash
@@ -70,6 +69,7 @@ jobs:
           fi
 
       - name: Upload Release Asset
+        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
