@@ -449,7 +449,8 @@ impl ItemizedBlock {
     /// Returns `true` if the line is formatted as an item
     fn is_itemized_line(line: &str) -> bool {
         let trimmed = line.trim_start();
-        trimmed.starts_with("* ") || trimmed.starts_with("- ") || trimmed.starts_with("> ")
+        let itemized_start = ["* ", "- ", "> ", "+ "]; 
+        itemized_start.iter().any(|s| trimmed.starts_with(s))
     }
 
     /// Creates a new ItemizedBlock described with the given line.
