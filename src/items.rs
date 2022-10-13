@@ -1308,12 +1308,13 @@ pub(crate) fn format_struct_struct(
         context.snippet_provider.span_after(span, "{")
     };
 
+    let inner_span = mk_sp(body_lo, span.hi() - BytePos(1));
     let generics_str = match struct_parts.generics {
         Some(g) => format_generics(
             context,
             g,
             context.config.brace_style(),
-            set_struct_brace_pos(&context, &fields, mk_sp(body_lo, span.hi() - BytePos(1))),
+            set_struct_brace_pos(&context, &fields, inner_span),
             offset,
             // make a span that starts right after `struct Foo`
             mk_sp(header_hi, body_lo),
@@ -1346,7 +1347,6 @@ pub(crate) fn format_struct_struct(
     }
 
     if fields.is_empty() {
-        let inner_span = mk_sp(body_lo, span.hi() - BytePos(1));
         format_empty_struct_or_tuple(context, inner_span, offset, &mut result, "", "}");
         return Some(result);
     }
