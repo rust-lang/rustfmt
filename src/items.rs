@@ -10,9 +10,9 @@ use rustc_span::{symbol, BytePos, Span, DUMMY_SP};
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
-    combine_strs_with_missing_comments, comment_style, contains_comment, find_comment_end,
-    is_last_comment_block, recover_comment_removed, recover_missing_comment_in_span,
-    rewrite_missing_comment, FindUncommented,
+    combine_strs_with_missing_comments, comment_style, contains_comment, is_last_comment_block,
+    recover_comment_removed, recover_missing_comment_in_span, rewrite_missing_comment,
+    FindUncommented,
 };
 use crate::config::lists::*;
 use crate::config::{BraceStyle, Config, IndentStyle, Version};
@@ -1262,53 +1262,28 @@ fn format_unit_struct(
     Some(format!("{}{};", header_str, generics_str))
 }
 
-fn set_brace_pos(
+fn set_struct_brace_pos(
     context: &RewriteContext<'_>,
-    struct_parts: &StructParts<'_>,
     fields: &[ast::FieldDef],
-    body_lo: BytePos,
+    span: Span,
 ) -> BracePos {
-    if fields.is_empty() {
-        let span = struct_parts.span;
-        let generics_lo = if let Some(generics) = struct_parts.generics {
-            generics.span.lo()
-        } else {
-            body_lo
-        };
-        let snippet = context.snippet(mk_sp(generics_lo, span.hi()));
-        let body_contains_comments = contains_comment(snippet);
-        let has_single_line_block_comment = if body_contains_comments {
-            let comment_start = match snippet.find('/') {
-                Some(i) => i,
-                None => 0,
-            };
-            let comment_snippet = &snippet[comment_start..];
-            let comment = comment_style(comment_snippet, false);
-            let is_block_comment = comment.is_block_comment();
-            let is_single_line_comment = if is_block_comment {
-                let comment_end = match find_comment_end(comment_snippet) {
-                    Some(i) => i,
-                    None => comment_start,
-                };
-                is_single_line(&comment_snippet[..=comment_end - 1])
-            } else {
-                false
-            };
-            is_single_line_comment
-        } else {
-            false
-        };
+    if !fields.is_empty() {
+        return BracePos::Auto;
+    }
+    let snippet = context.snippet(span).trim();
 
-        if context.config.version() == Version::Two {
-            return match body_contains_comments {
-                true if has_single_line_block_comment => BracePos::ForceSameLine,
-                true => BracePos::Auto,
-                false => BracePos::ForceSameLine,
-            };
-        }
+    if snippet.is_empty() || context.config.version() == Version::One {
         return BracePos::ForceSameLine;
     }
-    BracePos::Auto
+
+    let is_single_line = is_single_line(snippet);
+    let is_block_comment = comment_style(snippet, false).is_block_comment();
+
+    if is_single_line && is_block_comment {
+        BracePos::ForceSameLine
+    } else {
+        BracePos::Auto
+    }
 }
 
 pub(crate) fn format_struct_struct(
@@ -1338,7 +1313,7 @@ pub(crate) fn format_struct_struct(
             context,
             g,
             context.config.brace_style(),
-            set_brace_pos(&context, &struct_parts, &fields, body_lo),
+            set_struct_brace_pos(&context, &fields, mk_sp(body_lo, span.hi() - BytePos(1))),
             offset,
             // make a span that starts right after `struct Foo`
             mk_sp(header_hi, body_lo),
