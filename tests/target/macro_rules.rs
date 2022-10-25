@@ -43,7 +43,7 @@ macro_rules! impl_a_method {
             $body
         }
         macro_rules! $n {
-            ($va: expr,$vb: expr) => {
+            ($va: expr, $vb: expr) => {
                 $n($va, $vb)
             };
         }
@@ -55,7 +55,7 @@ macro_rules! impl_a_method {
             $body
         }
         macro_rules! $n {
-            ($va: expr,$vb: expr,$vc: expr) => {
+            ($va: expr, $vb: expr, $vc: expr) => {
                 $n($va, $vb, $vc)
             };
         }
@@ -68,7 +68,7 @@ macro_rules! impl_a_method {
             $body
         }
         macro_rules! $n {
-            ($va: expr,$vb: expr,$vc: expr,$vd: expr) => {
+            ($va: expr, $vb: expr, $vc: expr, $vd: expr) => {
                 $n($va, $vb, $vc, $vd)
             };
         }
