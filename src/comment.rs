@@ -1,8 +1,11 @@
 // Formatting and tools for comments.
 
-use std::{self, borrow::Cow, iter};
+use std::{
+    self,
+    borrow::Cow,
+    iter::{self, Peekable},
+};
 
-use itertools::{multipeek, MultiPeek};
 use lazy_static::lazy_static;
 use regex::Regex;
 use rustc_span::Span;
@@ -1135,7 +1138,7 @@ where
     T: Iterator,
     T::Item: RichChar,
 {
-    base: MultiPeek<T>,
+    base: Peekable<T>,
     status: CharClassesStatus,
 }
 
@@ -1267,13 +1270,13 @@ where
 {
     pub(crate) fn new(base: T) -> CharClasses<T> {
         CharClasses {
-            base: multipeek(base),
+            base: base.peekable(),
             status: CharClassesStatus::Normal,
         }
     }
 }
 
-fn is_raw_string_suffix<T>(iter: &mut MultiPeek<T>, count: u32) -> bool
+fn is_raw_string_suffix<T>(iter: &mut Peekable<T>, count: u32) -> bool
 where
     T: Iterator,
     T::Item: RichChar,
