@@ -603,8 +603,9 @@ mod test {
         assert_eq!(s.contains(PRINT_DOCS_PARTIALLY_UNSTABLE_OPTION), true);
     }
 
+    #[nightly_only_test]
     #[test]
-    fn test_dump_default_config() {
+    fn test_dump_all_default_config() {
         let default_config = format!(
             r#"max_width = 100
 hard_tabs = false
@@ -687,6 +688,39 @@ make_backup = false
             env!("CARGO_PKG_VERSION")
         );
         let toml = Config::default().all_options().to_toml().unwrap();
+        assert_eq!(&toml, &default_config);
+    }
+
+    #[stable_only_test]
+    #[test]
+    fn test_dump_stable_default_config() {
+        let default_config = r#"max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Auto"
+use_small_heuristics = "Default"
+fn_call_width = 60
+attr_fn_like_width = 70
+struct_lit_width = 18
+struct_variant_width = 35
+array_width = 60
+chain_width = 60
+single_line_if_else_max_width = 50
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+short_array_element_width_threshold = 10
+match_arm_leading_pipes = "Never"
+fn_params_layout = "Tall"
+match_block_trailing_comma = false
+edition = "2015"
+merge_derives = true
+use_try_shorthand = false
+use_field_init_shorthand = false
+force_explicit_abi = true
+disable_all_formatting = false
+"#;
+        let toml = Config::default().stable_options().to_toml().unwrap();
         assert_eq!(&toml, &default_config);
     }
 

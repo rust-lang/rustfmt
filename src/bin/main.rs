@@ -214,7 +214,12 @@ fn execute(opts: &Options) -> Result<i32> {
             Ok(0)
         }
         Operation::ConfigOutputDefault { path } => {
-            let toml = Config::default().all_options().to_toml()?;
+            let toml = if is_nightly() {
+                Config::default().all_options().to_toml()?
+            } else {
+                Config::default().stable_options().to_toml()?
+            };
+
             if let Some(path) = path {
                 let mut file = File::create(path)?;
                 file.write_all(toml.as_bytes())?;

@@ -237,6 +237,22 @@ macro_rules! create_config {
                 }
             }
 
+
+            #[allow(unreachable_pub)]
+            pub fn stable_options(&self) -> PartialConfig {
+                PartialConfig {
+                    $(
+                        $i: if $stb {
+                                Some(self.$i.2.clone())
+                            } else {
+                                None
+                            },
+                    )+
+                }
+            }
+
+
+
             #[allow(unreachable_pub)]
             pub fn override_value(&mut self, key: &str, val: &str)
             {
