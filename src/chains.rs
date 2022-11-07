@@ -62,7 +62,7 @@ use rustc_ast::{ast, ptr};
 use rustc_span::{symbol, BytePos, Span};
 
 use crate::comment::{rewrite_comment, CharClasses, FullCodeCharKind, RichChar};
-use crate::config::{IndentStyle, Version};
+use crate::config::{IndentStyle, TryOpDensity, Version};
 use crate::expr::rewrite_call;
 use crate::lists::extract_pre_comment;
 use crate::macros::convert_try_mac;
@@ -245,7 +245,10 @@ impl ChainItemKind {
 
 impl Rewrite for ChainItem {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        let shape = shape.sub_width(self.tries)?;
+        let shape = shape.sub_width(match context.config.try_op_density() {
+            TryOpDensity::Compressed => 1 * self.tries,
+            TryOpDensity::Wide => 2 * self.tries,
+        })?;
         let rewrite = match self.kind {
             ChainItemKind::Parent(ref expr) => expr.rewrite(context, shape)?,
             ChainItemKind::MethodCall(ref segment, ref types, ref exprs) => {
@@ -266,7 +269,11 @@ impl Rewrite for ChainItem {
                 rewrite_comment(comment, false, shape, context.config)?
             }
         };
-        Some(format!("{}{}", rewrite, "?".repeat(self.tries)))
+        let try_text: &str = match context.config.try_op_density() {
+            TryOpDensity::Compressed => "?",
+            TryOpDensity::Wide => " ?",
+        };
+        Some(format!("{}{}", rewrite, try_text.repeat(self.tries)))
     }
 }
 

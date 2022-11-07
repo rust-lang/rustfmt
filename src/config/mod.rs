@@ -107,6 +107,8 @@ create_config! {
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
     binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
         "Where to put a binary operator when a binary expression goes multiline";
+    try_op_density: TryOpDensity, TryOpDensity::Compressed, true,
+        "Deterimines if the try (`?`) operator is prefixed by a space";
 
     // Misc.
     remove_nested_parens: bool, true, true, "Remove nested parens";
@@ -646,6 +648,7 @@ space_before_colon = false
 space_after_colon = true
 spaces_around_ranges = false
 binop_separator = "Front"
+try_op_density = "Compressed"
 remove_nested_parens = true
 combine_control_expr = true
 short_array_element_width_threshold = 10
