@@ -1256,7 +1256,7 @@ fn rewrite_int_lit(context: &RewriteContext<'_>, lit: &ast::Lit, shape: Shape) -
 
 fn choose_separator_tactic(context: &RewriteContext<'_>, span: Span) -> Option<SeparatorTactic> {
     if context.inside_macro() {
-        if span_ends_with_comma(context, span) {
+        if span_ends_with_comma(context, span, false) {
             Some(SeparatorTactic::Always)
         } else {
             Some(SeparatorTactic::Never)
@@ -1374,16 +1374,27 @@ pub(crate) fn is_nested_call(expr: &ast::Expr) -> bool {
 /// Returns `true` if a function call or a method call represented by the given span ends with a
 /// trailing comma. This function is used when rewriting macro, as adding or removing a trailing
 /// comma from macro can potentially break the code.
-pub(crate) fn span_ends_with_comma(context: &RewriteContext<'_>, span: Span) -> bool {
+pub(crate) fn span_ends_with_comma(
+    context: &RewriteContext<'_>,
+    span: Span,
+    is_attributes: bool,
+) -> bool {
     let mut result: bool = Default::default();
     let mut prev_char: char = Default::default();
     let closing_delimiters = &[')', '}', ']'];
 
-    for (kind, c) in CharClasses::new(context.snippet(span).chars()) {
+    let snippet = context.snippet(span);
+    let mut len = snippet.len();
+    for (kind, c) in CharClasses::new(snippet.chars()) {
+        len -= 1;
         match c {
             _ if kind.is_comment() || c.is_whitespace() => continue,
             c if closing_delimiters.contains(&c) => {
-                result &= !closing_delimiters.contains(&prev_char);
+                // #3277 fix - for Attributes, ignore the closing ']', as in case of attributes
+                // list, the last AST item includes both the list ')' and attributes ']' closings.
+                if !is_attributes || len != 0 || c != ']' {
+                    result &= !closing_delimiters.contains(&prev_char);
+                }
             }
             ',' => result = true,
             _ => result = false,
@@ -1629,7 +1640,7 @@ fn rewrite_struct_lit<'a>(
         let tactic = struct_lit_tactic(h_shape, context, &item_vec);
         let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
 
-        let ends_with_comma = span_ends_with_comma(context, span);
+        let ends_with_comma = span_ends_with_comma(context, span, false);
         let force_no_trailing_comma = context.inside_macro() && !ends_with_comma;
 
         let fmt = struct_lit_formatting(
@@ -1800,7 +1811,7 @@ pub(crate) fn rewrite_tuple<'a, T: 'a + IntoOverflowableItem<'a>>(
     if context.use_block_indent() {
         // We use the same rule as function calls for rewriting tuples.
         let force_tactic = if context.inside_macro() {
-            if span_ends_with_comma(context, span) {
+            if span_ends_with_comma(context, span, false) {
                 Some(SeparatorTactic::Always)
             } else {
                 Some(SeparatorTactic::Never)

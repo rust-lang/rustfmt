@@ -295,7 +295,8 @@ impl Rewrite for ast::MetaItem {
             }
             ast::MetaItemKind::List(ref list) => {
                 let path = rewrite_path(context, PathContext::Type, None, &self.path, shape)?;
-                let has_trailing_comma = crate::expr::span_ends_with_comma(context, self.span);
+                let has_trailing_comma =
+                    crate::expr::span_ends_with_comma(context, self.span, true);
                 overflow::rewrite_with_parens(
                     context,
                     &path,
