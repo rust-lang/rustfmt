@@ -284,6 +284,15 @@ impl Target {
             edition: target.edition.clone(),
         }
     }
+
+    /// `Cargo.toml` file to format.
+    pub fn manifest_target(manifest_path: PathBuf) -> Self {
+        Target {
+            path: manifest_path,
+            kind: String::from("manifest"),
+            edition: String::from("2021"), // The value doesn't matter for formatting Cargo.toml.
+        }
+    }
 }
 
 impl PartialEq for Target {
@@ -365,6 +374,9 @@ fn get_targets_root_only(
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path)?;
     let workspace_root_path = PathBuf::from(&metadata.workspace_root).canonicalize()?;
+    targets.insert(Target::manifest_target(
+        workspace_root_path.join("Cargo.toml"),
+    ));
     let (in_workspace_root, current_dir_manifest) = if let Some(target_manifest) = manifest_path {
         (
             workspace_root_path == target_manifest,
@@ -379,7 +391,15 @@ fn get_targets_root_only(
     };
 
     let package_targets = match metadata.packages.len() {
-        1 => metadata.packages.into_iter().next().unwrap().targets,
+        1 => {
+            let p = metadata.packages.into_iter().next().unwrap();
+            targets.insert(Target::manifest_target(
+                PathBuf::from(&p.manifest_path)
+                    .canonicalize()
+                    .unwrap_or_default(),
+            ));
+            p.targets
+        }
         _ => metadata
             .packages
             .into_iter()
@@ -390,13 +410,18 @@ fn get_targets_root_only(
                         .unwrap_or_default()
                         == current_dir_manifest
             })
-            .flat_map(|p| p.targets)
+            .flat_map(|p| {
+                targets.insert(Target::manifest_target(
+                    PathBuf::from(&p.manifest_path)
+                        .canonicalize()
+                        .unwrap_or_default(),
+                ));
+                p.targets
+            })
             .collect(),
     };
 
-    for target in package_targets {
-        targets.insert(Target::from_target(&target));
-    }
+    add_targets(&package_targets, targets);
 
     Ok(())
 }
@@ -408,6 +433,11 @@ fn get_targets_recursive(
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path)?;
     for package in &metadata.packages {
+        targets.insert(Target::manifest_target(
+            PathBuf::from(&package.manifest_path)
+                .canonicalize()
+                .unwrap_or_default(),
+        ));
         add_targets(&package.targets, targets);
 
         // Look for local dependencies using information available since cargo v1.51
@@ -447,6 +477,11 @@ fn get_targets_with_hitlist(
 
     for package in metadata.packages {
         if workspace_hitlist.remove(&package.name) {
+            targets.insert(Target::manifest_target(
+                PathBuf::from(&package.manifest_path)
+                    .canonicalize()
+                    .unwrap_or_default(),
+            ));
             for target in package.targets {
                 targets.insert(Target::from_target(&target));
             }

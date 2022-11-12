@@ -173,6 +173,7 @@ create_config! {
          or they are left with trailing whitespaces";
     ignore: IgnoreList, IgnoreList::default(), false,
         "Skip formatting the specified files and directories";
+    format_cargo_toml: bool, false, false, "Format Cargo.toml files";
 
     // Not user-facing
     verbose: Verbosity, Verbosity::Normal, false, "How much to information to emit to the user";
@@ -681,6 +682,7 @@ hide_parse_errors = false
 error_on_line_overflow = false
 error_on_unformatted = false
 ignore = []
+format_cargo_toml = false
 emit_mode = "Files"
 make_backup = false
 "#,

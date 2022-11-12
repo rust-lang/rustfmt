@@ -196,7 +196,7 @@ fn format_cargo_toml<T: FormatHandler>(
 
     let ignore_path_set = IgnorePathSet::from_ignore_list(&config.ignore())?;
     let file_name = FileName::Real(path.clone());
-    if ignore_path_set.is_match(&file_name) {
+    if !config.format_cargo_toml() || ignore_path_set.is_match(&file_name) {
         return Ok(report);
     }
 

@@ -1040,6 +1040,14 @@ fn add_one(x: i32) -> i32 {
 }
 ```
 
+## `format_cargo_toml`
+
+Format `Cargo.toml` files.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#4091](https://github.com/rust-lang/rustfmt/issues/4091))
+
 ## `doc_comment_code_block_width`
 
 Max width for code snippets included in doc comments. Only used if [`format_code_in_doc_comments`](#format_code_in_doc_comments) is true.

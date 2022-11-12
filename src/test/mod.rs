@@ -696,6 +696,12 @@ fn print_mismatches<T: Fn(u32) -> String>(
 }
 
 fn read_config(filename: &Path) -> Config {
+    if filename.file_name().map_or(false, |f| f == "Cargo.toml") {
+        let mut config = Config::default();
+        config.set().format_cargo_toml(true);
+        return config;
+    }
+
     let sig_comments = read_significant_comments(filename);
     // Look for a config file. If there is a 'config' property in the significant comments, use
     // that. Otherwise, if there are no significant comments at all, look for a config file with
