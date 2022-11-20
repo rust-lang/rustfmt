@@ -1,3 +1,4 @@
+# rustfmt-format_cargo_toml: true
 # Works correctly for Cargo.toml without [package]
 [workspace]
 exclude = ["crates/proc-macro-test/imp"]

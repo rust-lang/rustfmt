@@ -15,6 +15,7 @@ a
 b
 haha"""
 
+# rustfmt-format_cargo_toml: true
 # comment before [[bin]], not necessarily at the beginning
 [[bin]] # comment  after [[bin]]
 aa = 1 # comment for "aa"

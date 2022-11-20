@@ -26,6 +26,7 @@ aac = 1
 [a.a.c.d]
 aacd = 1
 
+# rustfmt-format_cargo_toml: true
 [a.c]
 ac = 1
 

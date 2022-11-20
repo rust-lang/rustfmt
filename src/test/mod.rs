@@ -696,12 +696,6 @@ fn print_mismatches<T: Fn(u32) -> String>(
 }
 
 fn read_config(filename: &Path) -> Config {
-    if filename.file_name().map_or(false, |f| f == "Cargo.toml") {
-        let mut config = Config::default();
-        config.set().format_cargo_toml(true);
-        return config;
-    }
-
     let sig_comments = read_significant_comments(filename);
     // Look for a config file. If there is a 'config' property in the significant comments, use
     // that. Otherwise, if there are no significant comments at all, look for a config file with
@@ -794,15 +788,24 @@ fn get_config(config_file: Option<&Path>) -> Config {
 
 // Reads significant comments of the form: `// rustfmt-key: value` into a hash map.
 fn read_significant_comments(file_name: &Path) -> HashMap<String, String> {
+    let is_cargo_toml = file_name.file_name().map_or(false, |f| f == "Cargo.toml");
     let file = fs::File::open(file_name)
         .unwrap_or_else(|_| panic!("couldn't read file {}", file_name.display()));
     let reader = BufReader::new(file);
-    let pattern = r"^\s*//\s*rustfmt-([^:]+):\s*(\S+)";
+    let pattern = if is_cargo_toml {
+        r"^\s*#\s*rustfmt-([^:]+):\s*(\S+)"
+    } else {
+        r"^\s*//\s*rustfmt-([^:]+):\s*(\S+)"
+    };
     let regex = regex::Regex::new(pattern).expect("failed creating pattern 1");
 
     // Matches lines containing significant comments or whitespace.
-    let line_regex = regex::Regex::new(r"(^\s*$)|(^\s*//\s*rustfmt-[^:]+:\s*\S+)")
-        .expect("failed creating pattern 2");
+    let line_regex = regex::Regex::new(if is_cargo_toml {
+        r"(^\s*$)|(^\s*#\s*rustfmt-[^:]+:\s*\S+)"
+    } else {
+        r"(^\s*$)|(^\s*//\s*rustfmt-[^:]+:\s*\S+)"
+    })
+    .expect("failed creating pattern 2");
 
     reader
         .lines()

@@ -1,3 +1,4 @@
+# rustfmt-format_cargo_toml: true
 
  [a.c]
  ac =1

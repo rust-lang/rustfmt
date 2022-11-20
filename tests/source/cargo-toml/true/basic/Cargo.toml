@@ -1,4 +1,4 @@
-
+# rustfmt-format_cargo_toml: true
 
   # comment before [[bin]], not necessarily at the beginning
 
