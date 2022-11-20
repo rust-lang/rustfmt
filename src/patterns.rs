@@ -494,6 +494,7 @@ fn rewrite_tuple_pat(
         } else {
             None
         },
+        None,
     )
 }
 

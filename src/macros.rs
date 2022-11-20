@@ -280,6 +280,7 @@ fn rewrite_macro_inner(
                     } else {
                         Some(SeparatorTactic::Never)
                     },
+                    None,
                 )
                 .map(|rw| match position {
                     MacroPosition::Item => format!("{};", rw),

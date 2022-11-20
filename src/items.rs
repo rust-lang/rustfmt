@@ -1488,6 +1488,7 @@ fn format_tuple_struct(
             mk_sp(lo, span.hi()),
             context.config.fn_call_width(),
             None,
+            None,
         )?;
     }
 

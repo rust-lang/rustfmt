@@ -70,6 +70,22 @@ pub enum Density {
 }
 
 #[config_type]
+/// allows users to specify a density for list-like items.
+/// Currently only supports function arguments.
+pub enum OverflowDensity {
+    /// To prevent breaking formatting changes, this option follows the default behavior for
+    /// list-like items that can overflow.
+    Foo,
+    /// Fit as much on one line as possible before wrapping to the next line.
+    Compressed,
+    /// Items are placed horizontally as long as there is sufficient space and there aren't
+    /// any line comments that would force a Vertical layout.
+    Tall,
+    /// Place every item on a separate line. There must be at least two items in the list.
+    Vertical,
+}
+
+#[config_type]
 /// Spacing around type combinators.
 pub enum TypeDensity {
     /// No spaces around "=" and "+"

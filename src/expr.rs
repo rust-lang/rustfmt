@@ -12,7 +12,7 @@ use crate::comment::{
     combine_strs_with_missing_comments, contains_comment, recover_comment_removed, rewrite_comment,
     rewrite_missing_comment, CharClasses, FindUncommented,
 };
-use crate::config::lists::*;
+use crate::config::{lists::*, OverflowDensity};
 use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, Version};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
@@ -89,7 +89,15 @@ pub(crate) fn format_expr(
         ast::ExprKind::Call(ref callee, ref args) => {
             let inner_span = mk_sp(callee.span.hi(), expr.span.hi());
             let callee_str = callee.rewrite(context, shape)?;
-            rewrite_call(context, &callee_str, args, inner_span, shape)
+            let force_list_tactic = Some(context.config.fn_call_layout());
+            rewrite_call(
+                context,
+                &callee_str,
+                args,
+                force_list_tactic,
+                inner_span,
+                shape,
+            )
         }
         ast::ExprKind::Paren(ref subexpr) => rewrite_paren(context, subexpr, shape, expr.span),
         ast::ExprKind::Binary(op, ref lhs, ref rhs) => {
@@ -1270,6 +1278,7 @@ pub(crate) fn rewrite_call(
     context: &RewriteContext<'_>,
     callee: &str,
     args: &[ptr::P<ast::Expr>],
+    force_list_tactic: Option<OverflowDensity>,
     span: Span,
     shape: Shape,
 ) -> Option<String> {
@@ -1281,6 +1290,7 @@ pub(crate) fn rewrite_call(
         span,
         context.config.fn_call_width(),
         choose_separator_tactic(context, span),
+        force_list_tactic,
     )
 }
 
@@ -1818,6 +1828,7 @@ pub(crate) fn rewrite_tuple<'a, T: 'a + IntoOverflowableItem<'a>>(
             span,
             context.config.fn_call_width(),
             force_tactic,
+            None,
         )
     } else {
         rewrite_tuple_in_visual_indent_style(context, items, span, shape, is_singleton_tuple)
