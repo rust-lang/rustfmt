@@ -42,8 +42,8 @@ pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<
 }
 
 impl From<TomlError> for ErrorKind {
-    fn from(e: TomlError) -> Self {
-        ErrorKind::CargoTomlError(format!("{e}"))
+    fn from(_: TomlError) -> Self {
+        ErrorKind::ParseError
     }
 }
 
@@ -135,9 +135,8 @@ impl VisitMut for SortKey {
                 let table = match section.as_table_mut() {
                     Some(table) => table,
                     None => {
-                        self.error = Some(ErrorKind::CargoTomlError(
-                            "package should be a table".into(),
-                        ));
+                        // package should be a table
+                        self.error = Some(ErrorKind::ParseError);
                         return;
                     }
                 };
