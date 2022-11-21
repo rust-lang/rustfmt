@@ -1306,6 +1306,14 @@ If you want to ignore every file under the directory where you put your rustfmt.
 ignore = ["/"]
 ```
 
+## `ignore_missing_submod`
+
+Ignore missing submodule error.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: Yes
+
 ## `imports_indent`
 
 Indent style of imports

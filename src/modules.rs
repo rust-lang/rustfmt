@@ -62,6 +62,7 @@ pub(crate) struct ModResolver<'ast, 'sess> {
     directory: Directory,
     file_map: FileModMap<'ast>,
     recursive: bool,
+    ignore_missing_submod: bool,
 }
 
 /// Represents errors while trying to resolve modules.
@@ -105,6 +106,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         parse_sess: &'sess ParseSess,
         directory_ownership: DirectoryOwnership,
         recursive: bool,
+        ignore_missing_submod: bool,
     ) -> Self {
         ModResolver {
             directory: Directory {
@@ -114,6 +116,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             file_map: BTreeMap::new(),
             parse_sess,
             recursive,
+            ignore_missing_submod,
         }
     }
 
@@ -249,6 +252,14 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             // mod foo;
             // Look for an extern file.
             self.find_external_module(item.ident, &item.attrs, sub_mod)
+                .or_else(|err| match err.kind {
+                    ModuleResolutionErrorKind::NotFound { file: _ }
+                        if self.ignore_missing_submod =>
+                    {
+                        Ok(None)
+                    }
+                    _ => Err(err),
+                })
         } else {
             // An internal module (`mod foo { /* ... */ }`);
             Ok(Some(SubModKind::Internal(item)))

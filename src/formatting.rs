@@ -135,6 +135,7 @@ fn format_project<T: FormatHandler>(
         &context.parse_session,
         directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaBlock),
         !input_is_stdin && !config.skip_children(),
+        config.ignore_missing_submod(),
     )
     .visit_crate(&krate)?
     .into_iter()
