@@ -23,7 +23,7 @@ use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
-use crate::utils::{is_same_visibility, mk_sp, rewrite_ident};
+use crate::utils::{first_line_width, is_same_visibility, mk_sp, rewrite_ident};
 use crate::visitor::FmtVisitor;
 
 /// Returns a name imported by a `use` declaration.
@@ -1077,8 +1077,19 @@ impl Rewrite for UseTree {
     fn rewrite(&self, context: &RewriteContext<'_>, mut shape: Shape) -> Option<String> {
         let mut result = String::with_capacity(256);
         let mut iter = self.path.iter().peekable();
+        let start_shape = shape;
+
         while let Some(segment) = iter.next() {
             let segment_str = segment.rewrite(context, shape)?;
+            let mut added_len = first_line_width(&segment_str);
+            if iter.peek().is_some() {
+                added_len += 2; // 3 == "::"
+            }
+            if added_len > shape.width {
+                result.push_str(&start_shape.to_string_with_newline(context.config));
+                shape = start_shape;
+            }
+
             result.push_str(&segment_str);
             if iter.peek().is_some() {
                 result.push_str("::");
@@ -1086,6 +1097,7 @@ impl Rewrite for UseTree {
                 shape = shape.offset_left(2 + segment_str.len())?;
             }
         }
+
         Some(result)
     }
 }
