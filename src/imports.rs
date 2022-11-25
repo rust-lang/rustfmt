@@ -1030,22 +1030,7 @@ fn rewrite_nested_use_tree(
         .preserve_newline(true)
         .nested(has_nested_list);
 
-    let list_str = write_list(&list_items, &fmt)?;
-
-    let result = if (list_str.contains('\n') || list_str.len() > remaining_width)
-        && context.config.imports_indent() == IndentStyle::Block
-    {
-        format!(
-            "{{\n{}{}\n{}}}",
-            nested_shape.indent.to_string(context.config),
-            list_str,
-            shape.indent.to_string(context.config)
-        )
-    } else {
-        format!("{{{}}}", list_str)
-    };
-
-    Some(result)
+    Some(write_list(&list_items, &fmt)?)
 }
 
 impl Rewrite for UseSegment {
@@ -1072,22 +1057,76 @@ impl Rewrite for UseSegment {
     }
 }
 
+fn rewrite_use_segment_for_path(
+    segment: &UseSegment,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    newline_in_path: bool,
+) -> Option<String> {
+    let nested_shape = match context.config.imports_indent() {
+        IndentStyle::Block => shape
+            .block_indent(context.config.tab_spaces())
+            .with_max_width(context.config)
+            .sub_width(1)?,
+        IndentStyle::Visual => shape.visual_indent(0),
+    };
+
+    let segment_str = segment.rewrite(context, shape)?;
+    let remaining_width = shape.width.saturating_sub(2);
+    let result = match segment.kind {
+        UseSegmentKind::List(_) => {
+            if (segment_str.contains('\n')
+                || newline_in_path
+                || segment_str.len() > remaining_width)
+                && context.config.imports_indent() == IndentStyle::Block
+            {
+                format!(
+                    "{{\n{}{}\n{}}}",
+                    nested_shape.indent.to_string(context.config),
+                    segment_str,
+                    shape.indent.to_string(context.config)
+                )
+            } else {
+                format!("{{{}}}", segment_str)
+            }
+        }
+        _ => segment_str,
+    };
+
+    Some(result)
+}
+
 impl Rewrite for UseTree {
     // This does NOT format attributes and visibility or add a trailing `;`.
     fn rewrite(&self, context: &RewriteContext<'_>, mut shape: Shape) -> Option<String> {
         let mut result = String::with_capacity(256);
         let mut iter = self.path.iter().peekable();
         let start_shape = shape;
+        //let mut indented_shape = shape;
+        let mut newline_in_path = false;
+        let tab_spaces = context.config.tab_spaces();
 
         while let Some(segment) = iter.next() {
-            let segment_str = segment.rewrite(context, shape)?;
+            let new_shape = if !newline_in_path {
+                shape
+            } else {
+                match context.config.imports_indent() {
+                    IndentStyle::Block => {
+                        start_shape.block_indent(tab_spaces).sub_width(tab_spaces)?
+                    }
+                    IndentStyle::Visual => start_shape.visual_indent(0),
+                }
+            };
+            let segment_str =
+                rewrite_use_segment_for_path(segment, context, new_shape, newline_in_path)?;
             let mut added_len = first_line_width(&segment_str);
             if iter.peek().is_some() {
-                added_len += 2; // 3 == "::"
+                added_len += 2; // 2 == "::"
             }
             if added_len > shape.width {
                 result.push_str(&start_shape.to_string_with_newline(context.config));
                 shape = start_shape;
+                newline_in_path = true;
             }
 
             result.push_str(&segment_str);
