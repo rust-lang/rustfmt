@@ -1,4 +1,4 @@
-// rustfmt-config: issue-5609.toml
+// rustfmt-ignore_missing_submod: true
 
 mod missing_submod;
 
