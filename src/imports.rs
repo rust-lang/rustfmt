@@ -1102,7 +1102,6 @@ impl Rewrite for UseTree {
         let mut result = String::with_capacity(256);
         let mut iter = self.path.iter().peekable();
         let start_shape = shape;
-        //let mut indented_shape = shape;
         let mut newline_in_path = false;
         let tab_spaces = context.config.tab_spaces();
 
