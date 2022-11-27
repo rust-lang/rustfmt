@@ -1309,6 +1309,7 @@ ignore = ["/"]
 ## `ignore_missing_submod`
 
 Ignore missing submodule error.
+By default, missing modules will lead to module not found errors and rustfmt won't format anything.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
