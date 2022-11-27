@@ -1312,7 +1312,7 @@ Ignore missing submodule error.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: Yes
+- **Stable**: No
 
 ## `imports_indent`
 
