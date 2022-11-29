@@ -1,4 +1,4 @@
-
+// rustfmt-version: Two 
 fn main() {
 
     // first sample
