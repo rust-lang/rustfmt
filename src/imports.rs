@@ -36,6 +36,12 @@ impl<'a> FmtVisitor<'a> {
     pub(crate) fn format_import(&mut self, item: &ast::Item, tree: &ast::UseTree) {
         let span = item.span();
         let shape = self.shape();
+        // 4 = "use ", 1 = ";"
+        let nested_shape = shape
+            .offset_left(4)
+            .unwrap_or(shape)
+            .sub_width(1)
+            .unwrap_or(shape);
         let rw = UseTree::from_ast(
             &self.get_context(),
             tree,
@@ -44,7 +50,7 @@ impl<'a> FmtVisitor<'a> {
             Some(item.span.lo()),
             Some(item.attrs.clone()),
         )
-        .rewrite_top_level(&self.get_context(), shape);
+        .rewrite_top_level(&self.get_context(), nested_shape);
         match rw {
             Some(ref s) if s.is_empty() => {
                 // Format up to last newline

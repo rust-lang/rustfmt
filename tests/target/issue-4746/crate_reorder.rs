@@ -1,4 +1,5 @@
 // rustfmt-imports_granularity: Crate
+// rustfmt-reorder_imports: true
 
 // Long imports with reordering - from original issue
 use abaadfsasdfdsfdfas::aasdffjsioejr::abc::sdsdf::sdfsdfsdf::sdfsdfdsf::

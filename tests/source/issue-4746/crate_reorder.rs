@@ -1,16 +1,17 @@
 // rustfmt-imports_granularity: Crate
+// rustfmt-reorder_imports: true
 
 // Long imports with reordering - from original issue
 use foo::bar;
 use foo::{foo, baz};
 use abaadfsasdfdsfdfas::aasdffjsioejr::abc::sdsdf::sdfsdfsdf::sdfsdfdsf::{
-    asdfasdefasdasdfsdfdfasdf::asdfasdasedfafasdfasdf,
+asdfasdefasdasdfsdfdfasdf::asdfasdasedfafasdfasdf,
 };
 
 use foo::bar;
 use foo::{foo, baz};
 use abaadfsasdfdsfdfas::aasdffjsioejr::abc::sdsdf::sdfsdfsdf::sdfsdfds::{
-    asdfasdefasdasdfsdfdfasdf::asdfasdasedfafasdfasdf,
+asdfasdefasdasdfsdfdfasdf::asdfasdasedfafasdfasdf,
 };
 
 // Long imports with different sizes - based on original issue
