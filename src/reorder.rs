@@ -11,7 +11,7 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::ast;
 use rustc_span::{symbol::sym, Span};
 
-use crate::config::{Config, GroupImportsTactic};
+use crate::config::{Config, GroupImportsTactic, ImportGranularity};
 use crate::imports::{normalize_use_trees_with_granularity, UseSegmentKind, UseTree};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{itemize_list, write_list, ListFormatting, ListItem};
@@ -110,6 +110,7 @@ fn rewrite_reorderable_or_regroupable_items(
             normalized_items = normalize_use_trees_with_granularity(
                 normalized_items,
                 context.config.imports_granularity(),
+                context.config.reorder_imports(),
             );
 
             let mut regrouped_items = match context.config.group_imports() {
@@ -240,7 +241,10 @@ impl ReorderableItemKind {
             ReorderableItemKind::ExternCrate
             | ReorderableItemKind::Mod
             | ReorderableItemKind::Other => false,
-            ReorderableItemKind::Use => config.group_imports() != GroupImportsTactic::Preserve,
+            ReorderableItemKind::Use => {
+                config.group_imports() != GroupImportsTactic::Preserve
+                    || config.imports_granularity() != ImportGranularity::Preserve
+            }
         }
     }
 
