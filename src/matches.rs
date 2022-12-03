@@ -204,6 +204,7 @@ fn rewrite_match_arms(
         open_brace_pos,
         span.hi(),
         false,
+        context.config.version(),
     );
     let arms_vec: Vec<_> = items.collect();
     // We will add/remove commas inside `arm.rewrite()`, and hence no separator here.

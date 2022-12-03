@@ -283,6 +283,7 @@ fn rewrite_closure_fn_decl(
         context.snippet_provider.span_after(span, "|"),
         body.span.lo(),
         false,
+        context.config.version(),
     );
     let item_vec = param_items.collect::<Vec<_>>();
     // 1 = space between parameters and return type.

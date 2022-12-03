@@ -587,7 +587,7 @@ impl<'a> Context<'a> {
         tactic
     }
 
-    fn rewrite_items(&self) -> Option<(bool, String)> {
+    fn rewrite_items(&self, version: Version) -> Option<(bool, String)> {
         let span = self.items_span();
         let items = itemize_list(
             self.context.snippet_provider,
@@ -600,6 +600,7 @@ impl<'a> Context<'a> {
             span.lo(),
             span.hi(),
             true,
+            version,
         );
         let mut list_items: Vec<_> = items.collect();
 
@@ -682,7 +683,7 @@ impl<'a> Context<'a> {
     }
 
     fn rewrite(&self, shape: Shape) -> Option<String> {
-        let (extendable, items_str) = self.rewrite_items()?;
+        let (extendable, items_str) = self.rewrite_items(self.context.config.version())?;
 
         // If we are using visual indent style and failed to format, retry with block indent.
         if !self.context.use_block_indent()

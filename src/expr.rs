@@ -1623,6 +1623,7 @@ fn rewrite_struct_lit<'a>(
             body_lo,
             span.hi(),
             false,
+            context.config.version(),
         );
         let item_vec = items.collect::<Vec<_>>();
 
@@ -1773,6 +1774,7 @@ fn rewrite_tuple_in_visual_indent_style<'a, T: 'a + IntoOverflowableItem<'a>>(
         list_lo,
         span.hi() - BytePos(1),
         false,
+        context.config.version(),
     );
     let item_vec: Vec<_> = items.collect();
     let tactic = definitive_tactic(
