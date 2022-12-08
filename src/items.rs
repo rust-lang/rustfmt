@@ -6,7 +6,7 @@ use std::cmp::{max, min, Ordering};
 use regex::Regex;
 use rustc_ast::visit;
 use rustc_ast::{ast, ptr};
-use rustc_span::{symbol, BytePos, Span, DUMMY_SP};
+use rustc_span::{symbol, BytePos, Pos, Span, DUMMY_SP};
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
@@ -28,7 +28,7 @@ use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt::Stmt;
-use crate::types::opaque_ty;
+use crate::types::{is_self_upper, opaque_ty, rewrite_reference_and_mutability};
 use crate::utils::*;
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
@@ -2024,13 +2024,14 @@ impl Rewrite for ast::Param {
         };
 
         if let Some(ref explicit_self) = self.to_self() {
-            rewrite_explicit_self(
+            let param = rewrite_explicit_self(context, explicit_self, shape)?;
+            combine_strs_with_missing_comments(
                 context,
-                explicit_self,
                 &param_attrs_result,
+                &param,
                 span,
                 shape,
-                has_multiple_attr_lines,
+                !has_multiple_attr_lines,
             )
         } else if is_named_param(self) {
             let param_name = &self
@@ -2092,65 +2093,122 @@ impl Rewrite for ast::Param {
     }
 }
 
+fn rewrite_self_lower(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    span: Span,
+    lifetime: Option<&ast::Lifetime>,
+    mutability: ast::Mutability,
+    is_mutability_from_ty: bool,
+    has_ref: bool,
+) -> Option<String> {
+    let (lt_and_mut, comment_lo) =
+        rewrite_reference_and_mutability(context, shape, span, lifetime, mutability, has_ref)?;
+
+    if mutability == ast::Mutability::Mut || lifetime.is_some() {
+        let needle = if is_mutability_from_ty {
+            "Self"
+        } else {
+            "self"
+        };
+        let hi = context.snippet_provider.span_after(span, needle);
+        let comment_span = mk_sp(comment_lo, hi - BytePos::from_usize(4));
+        if contains_comment(context.snippet(comment_span)) {
+            return combine_strs_with_missing_comments(
+                context,
+                &lt_and_mut.trim_end(),
+                "self",
+                comment_span,
+                shape,
+                true,
+            );
+        }
+    }
+    Some(format!("{}self", lt_and_mut))
+}
+
+fn recover_comment_before_type(
+    context: &RewriteContext<'_>,
+    prev_str: &str,
+    next_str: &str,
+    ty: &ast::Ty,
+    param_span: Span,
+    shape: Shape,
+) -> Option<String> {
+    let comment_lo = context.snippet_provider.span_after(param_span, ":");
+    let comment_span = mk_sp(comment_lo, ty.span().lo());
+    combine_strs_with_missing_comments(context, prev_str, next_str, comment_span, shape, true)
+}
+
 fn rewrite_explicit_self(
     context: &RewriteContext<'_>,
     explicit_self: &ast::ExplicitSelf,
-    param_attrs: &str,
-    span: Span,
     shape: Shape,
-    has_multiple_attr_lines: bool,
 ) -> Option<String> {
     match explicit_self.node {
-        ast::SelfKind::Region(lt, m) => {
-            let mut_str = format_mutability(m);
-            match lt {
-                Some(ref l) => {
-                    let lifetime_str = l.rewrite(
-                        context,
-                        Shape::legacy(context.config.max_width(), Indent::empty()),
-                    )?;
-                    Some(combine_strs_with_missing_comments(
-                        context,
-                        param_attrs,
-                        &format!("&{} {}self", lifetime_str, mut_str),
-                        span,
-                        shape,
-                        !has_multiple_attr_lines,
-                    )?)
+        ast::SelfKind::Region(lifetime, mutability) => rewrite_self_lower(
+            context,
+            shape,
+            explicit_self.span,
+            lifetime.as_ref(),
+            mutability,
+            false,
+            true,
+        ),
+        ast::SelfKind::Explicit(ref ty, mutability)
+            if context.config.self_shorthand() && is_self_upper(&ty.kind) =>
+        {
+            let (lifetime, mutability, is_mutability_from_ty, has_ref) = match &ty.kind {
+                ast::TyKind::Rptr(lifetime, ty_mutability) => {
+                    (lifetime.clone(), ty_mutability.mutbl.clone(), true, true)
                 }
-                None => Some(combine_strs_with_missing_comments(
-                    context,
-                    param_attrs,
-                    &format!("&{}self", mut_str),
-                    span,
-                    shape,
-                    !has_multiple_attr_lines,
-                )?),
-            }
+                _ => (None, mutability.clone(), false, false),
+            };
+
+            let self_str = rewrite_self_lower(
+                context,
+                shape,
+                explicit_self.span,
+                lifetime.as_ref(),
+                mutability,
+                is_mutability_from_ty,
+                has_ref,
+            )?;
+            recover_comment_before_type(context, "", &self_str, ty, explicit_self.span, shape)
         }
         ast::SelfKind::Explicit(ref ty, mutability) => {
+            let (lt_and_mut, _) = rewrite_reference_and_mutability(
+                context,
+                shape,
+                explicit_self.span,
+                None,
+                mutability,
+                false,
+            )?;
             let type_str = ty.rewrite(
                 context,
                 Shape::legacy(context.config.max_width(), Indent::empty()),
             )?;
 
-            Some(combine_strs_with_missing_comments(
+            let self_str = format!("{}self:", lt_and_mut);
+            recover_comment_before_type(
                 context,
-                param_attrs,
-                &format!("{}self: {}", format_mutability(mutability), type_str),
-                span,
+                &self_str,
+                &type_str,
+                ty,
+                explicit_self.span,
                 shape,
-                !has_multiple_attr_lines,
-            )?)
+            )
         }
-        ast::SelfKind::Value(mutability) => Some(combine_strs_with_missing_comments(
+        ast::SelfKind::Value(mutability) => rewrite_self_lower(
             context,
-            param_attrs,
-            &format!("{}self", format_mutability(mutability)),
-            span,
             shape,
-            !has_multiple_attr_lines,
-        )?),
+            explicit_self.span,
+            None,
+            mutability,
+            false,
+            false,
+        ),
     }
 }
 
