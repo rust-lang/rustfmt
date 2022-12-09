@@ -18,4 +18,9 @@ mod tests {
         FooBar,
         FooFoo(i32),
     }
+
+    #[config_type(skip_derive(Copy, Serialize))]
+    enum X {
+        Abc(String),
+    }
 }

@@ -2,13 +2,14 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
+use crate::args::Args;
 use crate::attrs::*;
 use crate::utils::*;
 
 type Variants = syn::punctuated::Punctuated<syn::Variant, syn::Token![,]>;
 
 /// Defines and implements `config_type` enum.
-pub fn define_config_type_on_enum(em: &syn::ItemEnum) -> syn::Result<TokenStream> {
+pub fn define_config_type_on_enum(args: &Args, em: &syn::ItemEnum) -> syn::Result<TokenStream> {
     let syn::ItemEnum {
         vis,
         enum_token,
@@ -21,22 +22,46 @@ pub fn define_config_type_on_enum(em: &syn::ItemEnum) -> syn::Result<TokenStream
     let mod_name_str = format!("__define_config_type_on_enum_{}", ident);
     let mod_name = syn::Ident::new(&mod_name_str, ident.span());
     let variants = fold_quote(variants.iter().map(process_variant), |meta| quote!(#meta,));
+    let derives = [
+        "std::fmt::Debug",
+        "std::clone::Clone",
+        "std::marker::Copy",
+        "std::cmp::Eq",
+        "std::cmp::PartialEq",
+    ]
+    .iter()
+    .filter(|d| args.skip_derives().all(|s| !d.ends_with(s)))
+    .map(|d| syn::parse_str(d).unwrap())
+    .collect::<Vec<syn::Path>>();
+    let derives = if derives.is_empty() {
+        quote!()
+    } else {
+        quote! { #[derive( #( #derives ),* )] }
+    };
 
     let impl_doc_hint = impl_doc_hint(&em.ident, &em.variants);
     let impl_from_str = impl_from_str(&em.ident, &em.variants);
     let impl_display = impl_display(&em.ident, &em.variants);
-    let impl_serde = impl_serde(&em.ident, &em.variants);
-    let impl_deserialize = impl_deserialize(&em.ident, &em.variants);
+    let impl_serialize = if args.skip_derives().any(|s| s == "Serialize") {
+        quote!()
+    } else {
+        impl_serialize(&em.ident, &em.variants)
+    };
+    let impl_deserialize = if args.skip_derives().any(|s| s == "Deserialize") {
+        quote!()
+    } else {
+        impl_deserialize(&em.ident, &em.variants)
+    };
 
     Ok(quote! {
         #[allow(non_snake_case)]
         mod #mod_name {
-            #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+            #derives
             pub #enum_token #ident #generics { #variants }
             #impl_display
             #impl_doc_hint
             #impl_from_str
-            #impl_serde
+            #impl_serialize
             #impl_deserialize
         }
         #vis use #mod_name::#ident;
@@ -164,7 +189,7 @@ fn unstable_of_variant(variant: &syn::Variant) -> bool {
     any_unstable_variant(&variant.attrs)
 }
 
-fn impl_serde(ident: &syn::Ident, variants: &Variants) -> TokenStream {
+fn impl_serialize(ident: &syn::Ident, variants: &Variants) -> TokenStream {
     let arms = fold_quote(variants.iter(), |v| {
         let v_ident = &v.ident;
         let pattern = match v.fields {
