@@ -22,47 +22,42 @@ pub fn define_config_type_on_enum(args: &Args, em: &syn::ItemEnum) -> syn::Resul
     let mod_name_str = format!("__define_config_type_on_enum_{}", ident);
     let mod_name = syn::Ident::new(&mod_name_str, ident.span());
     let variants = fold_quote(variants.iter().map(process_variant), |meta| quote!(#meta,));
+    let mut has_serde = false;
     let derives = [
         "std::fmt::Debug",
         "std::clone::Clone",
         "std::marker::Copy",
         "std::cmp::Eq",
         "std::cmp::PartialEq",
+        "serde::Serialize",
+        "serde::Deserialize",
     ]
     .iter()
     .filter(|d| args.skip_derives().all(|s| !d.ends_with(s)))
+    .inspect(|d| has_serde |= d.contains("serde::"))
     .map(|d| syn::parse_str(d).unwrap())
     .collect::<Vec<syn::Path>>();
-    let derives = if derives.is_empty() {
-        quote!()
-    } else {
-        quote! { #[derive( #( #derives ),* )] }
-    };
+    let derives = derives
+        .is_empty()
+        .then(|| quote!())
+        .unwrap_or_else(|| quote! { #[derive( #( #derives ),* )] });
+    let serde_attr = has_serde
+        .then(|| quote!(#[serde(rename_all = "PascalCase")]))
+        .unwrap_or_default();
 
     let impl_doc_hint = impl_doc_hint(&em.ident, &em.variants);
     let impl_from_str = impl_from_str(&em.ident, &em.variants);
     let impl_display = impl_display(&em.ident, &em.variants);
-    let impl_serialize = if args.skip_derives().any(|s| s == "Serialize") {
-        quote!()
-    } else {
-        impl_serialize(&em.ident, &em.variants)
-    };
-    let impl_deserialize = if args.skip_derives().any(|s| s == "Deserialize") {
-        quote!()
-    } else {
-        impl_deserialize(&em.ident, &em.variants)
-    };
 
     Ok(quote! {
         #[allow(non_snake_case)]
         mod #mod_name {
             #derives
+            #serde_attr
             pub #enum_token #ident #generics { #variants }
             #impl_display
             #impl_doc_hint
             #impl_from_str
-            #impl_serialize
-            #impl_deserialize
         }
         #vis use #mod_name::#ident;
     })
@@ -73,8 +68,14 @@ fn process_variant(variant: &syn::Variant) -> TokenStream {
     let metas = variant
         .attrs
         .iter()
-        .filter(|attr| !is_doc_hint(attr) && !is_config_value(attr) && !is_unstable_variant(attr));
-    let attrs = fold_quote(metas, |meta| quote!(#meta));
+        .filter(|attr| !is_doc_hint(attr) && !is_unstable_variant(attr));
+    let attrs = fold_quote(metas, |meta| {
+        if let Some(rename) = config_value(meta) {
+            quote!(#[serde(rename = #rename)])
+        } else {
+            quote!(#meta)
+        }
+    });
     let syn::Variant { ident, fields, .. } = variant;
     quote!(#attrs #ident #fields)
 }
@@ -187,81 +188,4 @@ fn config_value_of_variant(variant: &syn::Variant) -> String {
 
 fn unstable_of_variant(variant: &syn::Variant) -> bool {
     any_unstable_variant(&variant.attrs)
-}
-
-fn impl_serialize(ident: &syn::Ident, variants: &Variants) -> TokenStream {
-    let arms = fold_quote(variants.iter(), |v| {
-        let v_ident = &v.ident;
-        let pattern = match v.fields {
-            syn::Fields::Named(..) => quote!(#ident::v_ident{..}),
-            syn::Fields::Unnamed(..) => quote!(#ident::#v_ident(..)),
-            syn::Fields::Unit => quote!(#ident::#v_ident),
-        };
-        let option_value = config_value_of_variant(v);
-        quote! {
-            #pattern => serializer.serialize_str(&#option_value),
-        }
-    });
-
-    quote! {
-        impl ::serde::ser::Serialize for #ident {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: ::serde::ser::Serializer,
-            {
-                use serde::ser::Error;
-                match self {
-                    #arms
-                    _ => Err(S::Error::custom(format!("Cannot serialize {:?}", self))),
-                }
-            }
-        }
-    }
-}
-
-// Currently only unit variants are supported.
-fn impl_deserialize(ident: &syn::Ident, variants: &Variants) -> TokenStream {
-    let supported_vs = variants.iter().filter(|v| is_unit(v));
-    let if_patterns = fold_quote(supported_vs, |v| {
-        let config_value = config_value_of_variant(v);
-        let variant_ident = &v.ident;
-        quote! {
-            if #config_value.eq_ignore_ascii_case(s) {
-                return Ok(#ident::#variant_ident);
-            }
-        }
-    });
-
-    let supported_vs = variants.iter().filter(|v| is_unit(v));
-    let allowed = fold_quote(supported_vs.map(config_value_of_variant), |s| quote!(#s,));
-
-    quote! {
-        impl<'de> serde::de::Deserialize<'de> for #ident {
-            fn deserialize<D>(d: D) -> Result<Self, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                use serde::de::{Error, Visitor};
-                use std::marker::PhantomData;
-                use std::fmt;
-                struct StringOnly<T>(PhantomData<T>);
-                impl<'de, T> Visitor<'de> for StringOnly<T>
-                where T: serde::Deserializer<'de> {
-                    type Value = String;
-                    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                        formatter.write_str("string")
-                    }
-                    fn visit_str<E>(self, value: &str) -> Result<String, E> {
-                        Ok(String::from(value))
-                    }
-                }
-                let s = &d.deserialize_string(StringOnly::<D>(PhantomData))?;
-
-                #if_patterns
-
-                static ALLOWED: &'static[&str] = &[#allowed];
-                Err(D::Error::unknown_variant(&s, ALLOWED))
-            }
-        }
-    }
 }
