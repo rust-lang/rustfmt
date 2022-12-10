@@ -68,6 +68,7 @@
 ### Added
 
 - Users can now set `skip_macro_invocations` in `rustfmt.toml` [#5816](https://github.com/rust-lang/rustfmt/issues/5816)
+- Supported custom wildcarded groups for [group_imports](https://rust-lang.github.io/rustfmt/?version=v1.4.38&search=#group_imports).
 
 ### Misc
 

@@ -11,7 +11,7 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::{ast, attr};
 use rustc_span::{symbol::sym, Span};
 
-use crate::config::{Config, GroupImportsTactic};
+use crate::config::{Config, GroupImportsTactic, WildcardGroups};
 use crate::imports::{normalize_use_trees_with_granularity, UseSegmentKind, UseTree};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{itemize_list, write_list, ListFormatting, ListItem};
@@ -117,6 +117,7 @@ fn rewrite_reorderable_or_regroupable_items(
                     vec![normalized_items]
                 }
                 GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
+                GroupImportsTactic::Wildcards(w) => group_imports_custom(w, normalized_items),
             };
 
             if context.config.reorder_imports() {
@@ -168,6 +169,28 @@ fn rewrite_reorderable_or_regroupable_items(
 
 fn contains_macro_use_attr(item: &ast::Item) -> bool {
     attr::contains_name(&item.attrs, sym::macro_use)
+}
+
+fn group_imports_custom(wildcards: WildcardGroups, uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
+    let mut groups = vec![vec![]; wildcards.len() + 1];
+    let fallback_group = groups.len() - 1;
+
+    for ut in uts.into_iter() {
+        let ut_path_str = ut.to_string();
+        if ut.path.is_empty() {
+            groups[fallback_group].push(ut);
+            continue;
+        }
+
+        if let Some(idx) = wildcards.iter().position(|w| w.matches(&ut_path_str)) {
+            groups[idx].push(ut);
+            continue;
+        }
+
+        groups[fallback_group].push(ut);
+    }
+
+    groups
 }
 
 /// Divides imports into three groups, corresponding to standard, external

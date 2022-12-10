@@ -2229,7 +2229,7 @@ Controls the strategy for how consecutive imports are grouped together.
 Controls the strategy for grouping sets of consecutive imports. Imports may contain newlines between imports and still be grouped together as a single set, but other statements between imports will result in different grouping sets.
 
 - **Default value**: `Preserve`
-- **Possible values**: `Preserve`, `StdExternalCrate`, `One`
+- **Possible values**: `Preserve`, `StdExternalCrate`, `One`, custom wildcard groups
 - **Stable**: No (tracking issue: [#5083](https://github.com/rust-lang/rustfmt/issues/5083))
 
 Each set of imports (one or more `use` statements, optionally separated by newlines) will be formatted independently. Other statements such as `mod ...` or `extern crate ...` will cause imports to not be grouped together.
@@ -2292,6 +2292,39 @@ use core::f32;
 use juniper::{FieldError, FieldResult};
 use std::sync::Arc;
 use uuid::Uuid;
+```
+
+#### Example for custom groups:
+
+Discard existing import groups, and create groups as specified by the wildcarded list.
+Handy aliases are supported:
+
+- `$std` prefix is an alias for standard library (i.e `std`, `core`, `alloc`);
+- `$crate` prefix is an alias for crate-local modules (i.e `self`, `crate`, `super`).
+
+For a given config:
+
+```toml
+group_imports = [
+    ["$std::*", "proc_macro::*"],
+    ["my_crate::*", "crate::*::xyz"],
+    ["$crate::*"],
+]
+```
+
+The following order would be set:
+
+```rust
+use proc_macro::Span;
+use std::rc::Rc;
+
+use crate::abc::xyz;
+use my_crate::a::B;
+use my_crate::A;
+
+use self::X;
+use super::Y;
+use crate::Z;
 ```
 
 ## `reorder_modules`
