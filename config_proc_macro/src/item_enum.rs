@@ -123,13 +123,36 @@ fn impl_doc_hint(ident: &syn::Ident, variants: &Variants) -> TokenStream {
 }
 
 fn impl_display(ident: &syn::Ident, variants: &Variants) -> TokenStream {
-    let vs = variants
-        .iter()
-        .filter(|v| is_unit(v))
-        .map(|v| (config_value_of_variant(v), &v.ident));
-    let match_patterns = fold_quote(vs, |(s, v)| {
-        quote! {
-            #ident::#v => write!(f, "{}", #s),
+    let match_patterns = fold_quote(variants, |v| {
+        let variant = &v.ident;
+        match &v.fields {
+            syn::Fields::Unit => {
+                let s = config_value_of_variant(v);
+                quote! {
+                    #ident::#variant => write!(f, "{}", #s),
+                }
+            }
+            syn::Fields::Named(x) if x.named.len() == 1 => {
+                let x = &x.named[0];
+                quote! {
+                    #ident::#variant { #x } => write!(f, "{}", #x),
+                }
+            }
+            syn::Fields::Named(x) => unimplemented!(
+                "cannot implement display for variant with {} named fileds",
+                x.named.len()
+            ),
+            syn::Fields::Unnamed(x) if x.unnamed.len() == 1 => {
+                quote! {
+                    #ident::#variant(x) => write!(f, "{}", x),
+                }
+            }
+            syn::Fields::Unnamed(x) => {
+                unimplemented!(
+                    "cannot implement display for variant with {} named fileds",
+                    x.unnamed.len()
+                )
+            }
         }
     });
     quote! {
