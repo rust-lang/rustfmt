@@ -3001,6 +3001,10 @@ Break comments to fit on the line
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#3347](https://github.com/rust-lang/rustfmt/issues/3347))
 
+Note that no wrapping will happen if:
+1. The comment is the start of a markdown header doc comment
+2. An URL was found in the comment
+
 #### `false` (default):
 
 ```rust
