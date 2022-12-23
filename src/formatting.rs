@@ -256,7 +256,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             .add_non_formatted_ranges(visitor.skipped_range.borrow().clone());
 
         self.handler.handle_formatted_file(
-            &self.parse_session,
+            Some(&self.parse_session),
             path,
             visitor.buffer.to_owned(),
             &mut self.report,
@@ -268,7 +268,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
 trait FormatHandler {
     fn handle_formatted_file(
         &mut self,
-        parse_session: &ParseSess,
+        parse_session: Option<&ParseSess>,
         path: FileName,
         result: String,
         report: &mut FormatReport,
@@ -279,14 +279,14 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
     // Called for each formatted file.
     fn handle_formatted_file(
         &mut self,
-        parse_session: &ParseSess,
+        parse_session: Option<&ParseSess>,
         path: FileName,
         result: String,
         report: &mut FormatReport,
     ) -> Result<(), ErrorKind> {
         if let Some(ref mut out) = self.out {
             match source_file::write_file(
-                Some(parse_session),
+                parse_session,
                 &path,
                 &result,
                 out,
