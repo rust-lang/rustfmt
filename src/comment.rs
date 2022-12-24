@@ -430,6 +430,12 @@ impl CodeBlockAttribute {
         }
         CodeBlockAttribute::Rust
     }
+
+    /// Check if the code block was annotated with rust attributes that indicate
+    /// the code block contains rust code that rustfmt should format.
+    pub(crate) fn is_formattable_rust(&self) -> bool {
+        matches!(self, Self::Rust)
+    }
 }
 
 /// Block that is formatted as an item.
