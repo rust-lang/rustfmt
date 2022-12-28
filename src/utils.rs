@@ -9,7 +9,9 @@ use rustc_ast_pretty::pprust;
 use rustc_span::{sym, symbol, BytePos, LocalExpnId, Span, Symbol, SyntaxContext};
 use unicode_width::UnicodeWidthStr;
 
-use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
+use crate::comment::{
+    filter_normal_code, trim_end_unless_two_whitespaces, CharClasses, FullCodeCharKind, LineClasses,
+};
 use crate::config::{Config, Version};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
@@ -572,6 +574,7 @@ pub(crate) fn trim_left_preserve_layout(
     orig: &str,
     indent: Indent,
     config: &Config,
+    is_doc_comment: bool,
 ) -> Option<String> {
     let mut lines = LineClasses::new(orig);
     let first_line = lines.next().map(|(_, s)| s.trim_end().to_owned())?;
@@ -597,7 +600,8 @@ pub(crate) fn trim_left_preserve_layout(
                 trimmed = false;
                 line
             } else {
-                line.trim().to_owned()
+                // Preserve markdown's double-space line break syntax in doc comment.
+                trim_end_unless_two_whitespaces(line.trim_start(), is_doc_comment).to_owned()
             };
             trimmed_lines.push((trimmed, line, prefix_space_width));
 
@@ -702,7 +706,7 @@ mod test {
         let config = Config::default();
         let indent = Indent::new(4, 0);
         assert_eq!(
-            trim_left_preserve_layout(s, indent, &config),
+            trim_left_preserve_layout(s, indent, &config, false),
             Some("aaa\n    bbb\n    ccc".to_string())
         );
     }
