@@ -597,7 +597,10 @@ pub(crate) fn trim_left_preserve_layout(
                 trimmed = false;
                 line
             } else {
-                line.trim().to_owned()
+                // use `is_ascii_whitespace` so we don't remove Non-breaking spaces
+                line.trim_start_matches(|c: char| c.is_ascii_whitespace())
+                    .trim_end()
+                    .to_owned()
             };
             trimmed_lines.push((trimmed, line, prefix_space_width));
 
