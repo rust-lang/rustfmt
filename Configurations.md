@@ -10,8 +10,7 @@ reorder_imports = false
 ```
 
 Each configuration option is either stable or unstable.
-Stable options can always be used, while unstable options are only available on a nightly toolchain and must be opted into.
-To enable unstable options, set `unstable_features = true` in `rustfmt.toml` or pass `--unstable-features` to rustfmt.
+Stable options can always be used, while unstable options are only available on a nightly toolchain.
 
 # Configuration Options
 
@@ -2734,7 +2733,7 @@ fn lorem<Ipsum: Dolor+Sit=Amet>() {
 
 ## `unstable_features`
 
-Enable unstable features on the unstable channel.
+**Deperacted and ignored.** Formerly used to enable unstable features on the unstable channel. Unstable features are now activated regardless of whether this option is present or not.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
