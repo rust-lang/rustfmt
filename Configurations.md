@@ -3016,9 +3016,10 @@ Note that no wrapping will happen if:
 
 // Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 
-// # This comment is a very long header (it starts with a '#'). Had it not been a header it would have been wrapped. But because it is a header, it will not be. That is because wrapping a markdown header breaks it.
-
 // Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+/// # This doc comment is a very long header (it starts with a '#'). Had it not been a header it would have been wrapped. But because it is a header, it will not be. That is because wrapping a markdown header breaks it.
+struct Foo {}
 ```
 
 #### `true`:
@@ -3036,9 +3037,10 @@ Note that no wrapping will happen if:
 // exercitation ullamco laboris nisi ut aliquip ex ea
 // commodo consequat.
 
-// # This comment is a very long header (it starts with a '#'). Had it not been a header it would have been wrapped. But because it is a header, it will not be. That is because wrapping a markdown header breaks it.
-
 // Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+/// # This doc comment is a very long header (it starts with a '#'). Had it not been a header it would have been wrapped. But because it is a header, it will not be. That is because wrapping a markdown header breaks it.
+struct Foo {}
 ```
 
 # Internal Options
