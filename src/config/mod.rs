@@ -7,7 +7,7 @@ use std::{env, fs};
 
 use thiserror::Error;
 
-use crate::config::config_type::ConfigType;
+use crate::config::config_type::{ConfigType, StyleEditionDefault};
 #[allow(unreachable_pub)]
 pub use crate::config::file_lines::{FileLines, FileName, Range};
 #[allow(unreachable_pub)]
@@ -34,155 +34,166 @@ pub(crate) mod macro_names;
 // `name: value type, default value, is stable, description;`
 create_config! {
     // Fundamental stuff
-    max_width: usize, 100, true, "Maximum width of each line";
-    hard_tabs: bool, false, true, "Use tab characters for indentation, spaces for alignment";
-    tab_spaces: usize, 4, true, "Number of spaces per tab";
-    newline_style: NewlineStyle, NewlineStyle::Auto, true, "Unix or Windows line endings";
-    indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items";
+    style_edition: StyleEdition, StyleEdition, true, "The style edition being used";
+    max_width: usize, MaxWidth, true, "Maximum width of each line";
+    hard_tabs: bool, HardTabs, true, "Use tab characters for indentation, spaces for alignment";
+    tab_spaces: usize, TabSpaces, true, "Number of spaces per tab";
+    newline_style: NewlineStyle, NewlineStyle, true, "Unix or Windows line endings";
+    indent_style: IndentStyle, IndentStyle, false, "How do we indent expressions or items";
 
     // Width Heuristics
-    use_small_heuristics: Heuristics, Heuristics::Default, true, "Whether to use different \
+    use_small_heuristics: Heuristics, Heuristics, true, "Whether to use different \
         formatting for items and expressions if they satisfy a heuristic notion of 'small'";
-    width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
+    width_heuristics: WidthHeuristics, WidthHeuristics, false,
         "'small' heuristic values";
-    fn_call_width: usize, 60, true, "Maximum width of the args of a function call before \
+    fn_call_width: usize, FnCallWidth, true, "Maximum width of the args of a function call before \
         falling back to vertical formatting.";
-    attr_fn_like_width: usize, 70, true, "Maximum width of the args of a function-like \
-        attributes before falling back to vertical formatting.";
-    struct_lit_width: usize, 18, true, "Maximum width in the body of a struct lit before \
-        falling back to vertical formatting.";
-    struct_variant_width: usize, 35, true, "Maximum width in the body of a struct variant before \
-        falling back to vertical formatting.";
-    array_width: usize, 60, true,  "Maximum width of an array literal before falling \
+    attr_fn_like_width: usize, AttrFnLikeWidth, true, "Maximum width of the args of a \
+        function-like attributes before falling back to vertical formatting.";
+    struct_lit_width: usize, StructLitWidth, true, "Maximum width in the body of a struct lit \
+        before falling back to vertical formatting.";
+    struct_variant_width: usize, StructVariantWidth, true, "Maximum width in the body of a struct \
+        variant before falling back to vertical formatting.";
+    array_width: usize, ArrayWidth, true,  "Maximum width of an array literal before falling \
         back to vertical formatting.";
-    chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
-    single_line_if_else_max_width: usize, 50, true, "Maximum line length for single line if-else \
-        expressions. A value of zero means always break if-else expressions.";
+    chain_width: usize, ChainWidth, true, "Maximum length of a chain to fit on a single line.";
+    single_line_if_else_max_width: usize, SingleLineIfElseMaxWidth, true, "Maximum line length for \
+         single line if-else expressions. A value of zero means always break if-else expressions.";
 
     // Comments. macros, and strings
-    wrap_comments: bool, false, false, "Break comments to fit on the line";
-    format_code_in_doc_comments: bool, false, false, "Format the code snippet in doc comments.";
-    doc_comment_code_block_width: usize, 100, false, "Maximum width for code snippets in doc \
-        comments. No effect unless format_code_in_doc_comments = true";
-    comment_width: usize, 80, false,
+    wrap_comments: bool, WrapComments, false, "Break comments to fit on the line";
+    format_code_in_doc_comments: bool, FormatCodeInDocComments, false,
+        "Format the code snippet in doc comments.";
+    doc_comment_code_block_width: usize, DocCommentCodeBlockWidth, false, "Maximum width for code \
+        snippets in doc comments. No effect unless format_code_in_doc_comments = true";
+    comment_width: usize, CommentWidth, false,
         "Maximum length of comments. No effect unless wrap_comments = true";
-    normalize_comments: bool, false, false, "Convert /* */ comments to // comments where possible";
-    normalize_doc_attributes: bool, false, false, "Normalize doc attributes as doc comments";
-    format_strings: bool, false, false, "Format string literals where necessary";
-    format_macro_matchers: bool, false, false,
+    normalize_comments: bool, NormalizeComments, false,
+        "Convert /* */ comments to // comments here possible";
+    normalize_doc_attributes: bool, NormalizeDocAttributes, false,
+        "Normalize doc attributes as doc comments";
+    format_strings: bool, FormatStrings, false, "Format string literals where necessary";
+    format_macro_matchers: bool, FormatMacroMatchers, false,
         "Format the metavariable matching patterns in macros";
-    format_macro_bodies: bool, true, false, "Format the bodies of macros";
-    skip_macro_invocations: MacroSelectors, MacroSelectors::default(), false,
+    format_macro_bodies: bool, FormatMacroBodies, false, "Format the bodies of macros";
+    skip_macro_invocations: MacroSelectors, MacroSelectors, false,
         "Skip formatting the bodies of macros invoked with the following names.";
-    hex_literal_case: HexLiteralCase, HexLiteralCase::Preserve, false,
+    hex_literal_case: HexLiteralCase, HexLiteralCase, false,
         "Format hexadecimal integer literals";
 
     // Single line expressions and items
-    empty_item_single_line: bool, true, false,
+    empty_item_single_line: bool, EmptyItemSingleLine, false,
         "Put empty-body functions and impls on a single line";
-    struct_lit_single_line: bool, true, false,
+    struct_lit_single_line: bool, StructLitSingleLine, false,
         "Put small struct literals on a single line";
-    fn_single_line: bool, false, false, "Put single-expression functions on a single line";
-    where_single_line: bool, false, false, "Force where-clauses to be on a single line";
+    fn_single_line: bool, FnSingleLine, false, "Put single-expression functions on a single line";
+    where_single_line: bool, WhereSingleLine, false, "Force where-clauses to be on a single line";
 
     // Imports
-    imports_indent: IndentStyle, IndentStyle::Block, false, "Indent of imports";
-    imports_layout: ListTactic, ListTactic::Mixed, false, "Item layout inside a import block";
-    imports_granularity: ImportGranularity, ImportGranularity::Preserve, false,
+    imports_indent: IndentStyle, IndentStyle, false, "Indent of imports";
+    imports_layout: ListTactic, ListTactic, false, "Item layout inside a import block";
+    imports_granularity: ImportGranularity, ImportGranularity, false,
         "Merge or split imports to the provided granularity";
-    group_imports: GroupImportsTactic, GroupImportsTactic::Preserve, false,
+    group_imports: GroupImportsTactic, GroupImportsTactic, false,
         "Controls the strategy for how imports are grouped together";
-    merge_imports: bool, false, false, "(deprecated: use imports_granularity instead)";
+    merge_imports: bool, MergeImports, false, "(deprecated: use imports_granularity instead)";
 
     // Ordering
-    reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
-    reorder_modules: bool, true, true, "Reorder module statements alphabetically in group";
-    reorder_impl_items: bool, false, false, "Reorder impl items";
+    reorder_imports: bool, ReorderImports, true, "Reorder import and extern crate statements \
+        alphabetically";
+    reorder_modules: bool, ReorderModules, true,
+        "Reorder module statements alphabetically in group";
+    reorder_impl_items: bool, ReorderImplItems, false, "Reorder impl items";
 
     // Spaces around punctuation
-    type_punctuation_density: TypeDensity, TypeDensity::Wide, false,
+    type_punctuation_density: TypeDensity, TypeDensity, false,
         "Determines if '+' or '=' are wrapped in spaces in the punctuation of types";
-    space_before_colon: bool, false, false, "Leave a space before the colon";
-    space_after_colon: bool, true, false, "Leave a space after the colon";
-    spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
-    binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
+    space_before_colon: bool, SpaceBeforeColon, false, "Leave a space before the colon";
+    space_after_colon: bool, SpaceAfterColon, false, "Leave a space after the colon";
+    spaces_around_ranges: bool, SpacesAroundRanges, false,
+        "Put spaces around the  .. and ..= range operators";
+    binop_separator: SeparatorPlace, SeparatorPlace, false,
         "Where to put a binary operator when a binary expression goes multiline";
 
     // Misc.
-    remove_nested_parens: bool, true, true, "Remove nested parens";
-    combine_control_expr: bool, true, false, "Combine control expressions with function calls";
-    short_array_element_width_threshold: usize, 10, true,
+    remove_nested_parens: bool, RemoveNestedParens, true, "Remove nested parens";
+    combine_control_expr: bool, CombineControlExpr, false,
+        "Combine control expressions with function calls";
+    short_array_element_width_threshold: usize, ShortArrayElementWidthThreshold, true,
         "Width threshold for an array element to be considered short";
-    overflow_delimited_expr: bool, false, false,
+    overflow_delimited_expr: bool, OverflowDelimitedExpr, false,
         "Allow trailing bracket/brace delimited expressions to overflow";
-    struct_field_align_threshold: usize, 0, false,
+    struct_field_align_threshold: usize, StructFieldAlignThreshold, false,
         "Align struct fields if their diffs fits within threshold";
-    enum_discrim_align_threshold: usize, 0, false,
+    enum_discrim_align_threshold: usize, EnumDiscrimAlignThreshold, false,
         "Align enum variants discrims, if their diffs fit within threshold";
-    match_arm_blocks: bool, true, false, "Wrap the body of arms in blocks when it does not fit on \
-        the same line with the pattern of arms";
-    match_arm_leading_pipes: MatchArmLeadingPipe, MatchArmLeadingPipe::Never, true,
+    match_arm_blocks: bool, MatchArmBlocks, false, "Wrap the body of arms in blocks when it does \
+        not fit on the same line with the pattern of arms";
+    match_arm_leading_pipes: MatchArmLeadingPipe, MatchArmLeadingPipe, true,
         "Determines whether leading pipes are emitted on match arms";
-    force_multiline_blocks: bool, false, false,
+    force_multiline_blocks: bool, ForceMultilineBlocks, false,
         "Force multiline closure bodies and match arms to be wrapped in a block";
-    fn_args_layout: Density, Density::Tall, true,
+    fn_args_layout: Density, Density, true,
         "(deprecated: use fn_params_layout instead)";
-    fn_params_layout: Density, Density::Tall, true,
+    fn_params_layout: Density, Density, true,
         "Control the layout of parameters in function signatures.";
-    brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
-    control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,
+    brace_style: BraceStyle, BraceStyle, false, "Brace style for items";
+    control_brace_style: ControlBraceStyle, ControlBraceStyle, false,
         "Brace style for control flow constructs";
-    trailing_semicolon: bool, true, false,
+    trailing_semicolon: bool, TrailingSemicolon, false,
         "Add trailing semicolon after break, continue and return";
-    trailing_comma: SeparatorTactic, SeparatorTactic::Vertical, false,
+    trailing_comma: SeparatorTactic, SeparatorTactic, false,
         "How to handle trailing commas for lists";
-    match_block_trailing_comma: bool, false, true,
+    match_block_trailing_comma: bool, MatchBlockTrailingComma, true,
         "Put a trailing comma after a block based match arm (non-block arms are not affected)";
-    blank_lines_upper_bound: usize, 1, false,
+    blank_lines_upper_bound: usize, BlankLinesUpperBound, false,
         "Maximum number of blank lines which can be put between items";
-    blank_lines_lower_bound: usize, 0, false,
+    blank_lines_lower_bound: usize, BlankLinesLowerBound, false,
         "Minimum number of blank lines which must be put between items";
-    edition: Edition, Edition::Edition2015, true, "The edition of the parser (RFC 2052)";
-    version: Version, Version::One, false, "Version of formatting rules";
-    inline_attribute_width: usize, 0, false,
+    edition: Edition, Edition, true, "The edition of the parser (RFC 2052)";
+    version: Version, Version, false, "Version of formatting rules";
+    inline_attribute_width: usize, InlineAttributeWidth, false,
         "Write an item and its attribute on the same line \
         if their combined width is below a threshold";
-    format_generated_files: bool, true, false, "Format generated files";
+    format_generated_files: bool, FormatGeneratedFiles, false, "Format generated files";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
-    merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
-    use_try_shorthand: bool, false, true, "Replace uses of the try! macro by the ? shorthand";
-    use_field_init_shorthand: bool, false, true, "Use field initialization shorthand if possible";
-    force_explicit_abi: bool, true, true, "Always print the abi for extern items";
-    condense_wildcard_suffixes: bool, false, false, "Replace strings of _ wildcards by a single .. \
-                                                     in tuple patterns";
+    merge_derives: bool, MergeDerives, true, "Merge multiple `#[derive(...)]` into a single one";
+    use_try_shorthand: bool, UseTryShorthand, true,
+        "Replace uses of the try! macro by the ? shorthand";
+    use_field_init_shorthand: bool, UseFieldInitShorthand, true,
+        "Use field initialization shorthand if possible";
+    force_explicit_abi: bool, ForceExplicitAbi, true, "Always print the abi for extern items";
+    condense_wildcard_suffixes: bool, CondenseWildcardSuffixes, false,
+        "Replace strings of _ wildcards by a single .. in tuple patterns";
 
     // Control options (changes the operation of rustfmt, rather than the formatting)
-    color: Color, Color::Auto, false,
+    color: Color, Color, false,
         "What Color option to use when none is supplied: Always, Never, Auto";
-    required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
+    required_version: String, RequiredVersion, false,
         "Require a specific version of rustfmt";
-    unstable_features: bool, false, false,
+    unstable_features: bool, UnstableFeatures, false,
             "Enables unstable features. Only available on nightly channel";
-    disable_all_formatting: bool, false, true, "Don't reformat anything";
-    skip_children: bool, false, false, "Don't reformat out of line modules";
-    hide_parse_errors: bool, false, false, "Hide errors from the parser";
-    error_on_line_overflow: bool, false, false, "Error if unable to get all lines within max_width";
-    error_on_unformatted: bool, false, false,
+    disable_all_formatting: bool, DisableAllFormatting, true, "Don't reformat anything";
+    skip_children: bool, SkipChildren, false, "Don't reformat out of line modules";
+    hide_parse_errors: bool, HideParseErrors, false, "Hide errors from the parser";
+    error_on_line_overflow: bool, ErrorOnLineOverflow, false,
+        "Error if unable to get all lines within max_width";
+    error_on_unformatted: bool, ErrorOnUnformatted, false,
         "Error if unable to get comments or string literals within max_width, \
          or they are left with trailing whitespaces";
-    ignore: IgnoreList, IgnoreList::default(), false,
+    ignore: IgnoreList, IgnoreList, false,
         "Skip formatting the specified files and directories";
 
     // Not user-facing
-    verbose: Verbosity, Verbosity::Normal, false, "How much to information to emit to the user";
-    file_lines: FileLines, FileLines::all(), false,
+    verbose: Verbosity, Verbosity, false, "How much to information to emit to the user";
+    file_lines: FileLines, FileLines, false,
         "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
          via the --file-lines option";
-    emit_mode: EmitMode, EmitMode::Files, false,
+    emit_mode: EmitMode, EmitMode, false,
         "What emit Mode to use when none is supplied";
-    make_backup: bool, false, false, "Backup changed files";
-    print_misformatted_file_names: bool, false, true,
+    make_backup: bool, MakeBackup, false, "Backup changed files";
+    print_misformatted_file_names: bool, PrintMisformattedFileNames, true,
         "Prints the names of mismatched files that were formatted. Prints the names of \
          files that would be formatted when used with `--check` mode. ";
 }
@@ -230,11 +241,14 @@ impl Config {
     ///
     /// Returns a `Config` if the config could be read and parsed from
     /// the file, otherwise errors.
-    pub(super) fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
+    pub(super) fn from_toml_path(
+        style_edtion: Option<StyleEdition>,
+        file_path: &Path,
+    ) -> Result<Config, Error> {
         let mut file = File::open(&file_path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
-        Config::from_toml(&toml, file_path.parent().unwrap())
+        Config::from_toml(style_edtion, &toml, file_path.parent().unwrap())
             .map_err(|err| Error::new(ErrorKind::InvalidData, err))
     }
 
@@ -247,7 +261,10 @@ impl Config {
     ///
     /// Returns the `Config` to use, and the path of the project file if there was
     /// one.
-    pub(super) fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<PathBuf>), Error> {
+    pub(super) fn from_resolved_toml_path(
+        style_edition: Option<StyleEdition>,
+        dir: &Path,
+    ) -> Result<(Config, Option<PathBuf>), Error> {
         /// Try to find a project file in the given directory and its parents.
         /// Returns the path of a the nearest project file if one exists,
         /// or `None` if no project file was found.
@@ -293,11 +310,17 @@ impl Config {
 
         match resolve_project_file(dir)? {
             None => Ok((Config::default(), None)),
-            Some(path) => Config::from_toml_path(&path).map(|config| (config, Some(path))),
+            Some(path) => {
+                Config::from_toml_path(style_edition, &path).map(|config| (config, Some(path)))
+            }
         }
     }
 
-    pub(crate) fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
+    pub(crate) fn from_toml(
+        style_edition: Option<StyleEdition>,
+        toml: &str,
+        dir: &Path,
+    ) -> Result<Config, String> {
         let parsed: ::toml::Value = toml
             .parse()
             .map_err(|e| format!("Could not parse TOML: {}", e))?;
@@ -311,12 +334,22 @@ impl Config {
                 err.push_str(msg)
             }
         }
-        match parsed.try_into() {
-            Ok(parsed_config) => {
+
+        match parsed.try_into::<PartialConfig>() {
+            Ok(mut parsed_config) => {
                 if !err.is_empty() {
                     eprint!("{}", err);
                 }
-                Ok(Config::default().fill_from_parsed_config(parsed_config, dir))
+                let style_edition_from_config = parsed_config.style_edition.take();
+                // Set the default config based on the style edition if provided as an argument,
+                // otherwise use the style_edition specified in the toml file. If no style edition
+                // was found fallback to the default.
+                let style_edition = style_edition
+                    .or(style_edition_from_config)
+                    .unwrap_or_default();
+                Ok(style_edition
+                    .config()
+                    .fill_from_parsed_config(parsed_config, dir))
             }
             Err(e) => {
                 err.push_str("Error: Decoding config file failed:\n");
@@ -331,6 +364,7 @@ impl Config {
 /// Loads a config by checking the client-supplied options and if appropriate, the
 /// file system (including searching the file system for overrides).
 pub fn load_config<O: CliOptions>(
+    style_edtion: Option<StyleEdition>,
     file_path: Option<&Path>,
     options: Option<O>,
 ) -> Result<(Config, Option<PathBuf>), Error> {
@@ -340,11 +374,15 @@ pub fn load_config<O: CliOptions>(
     };
 
     let result = if let Some(over_ride) = over_ride {
-        Config::from_toml_path(over_ride.as_ref()).map(|p| (p, Some(over_ride.to_owned())))
+        Config::from_toml_path(style_edtion, over_ride.as_ref())
+            .map(|p| (p, Some(over_ride.to_owned())))
     } else if let Some(file_path) = file_path {
-        Config::from_resolved_toml_path(file_path)
+        Config::from_resolved_toml_path(style_edtion, file_path)
     } else {
-        Ok((Config::default(), None))
+        Ok((
+            Config::deafult_with_style_edition(style_edtion.unwrap_or_default()),
+            None,
+        ))
     };
 
     result.map(|(mut c, p)| {
@@ -419,8 +457,9 @@ mod test {
     #[allow(dead_code)]
     mod mock {
         use super::super::*;
-        use rustfmt_config_proc_macro::config_type;
+        use rustfmt_config_proc_macro::{config_type, style_edition};
 
+        #[style_edition(PartiallyUnstableOption::V1)]
         #[config_type]
         pub(crate) enum PartiallyUnstableOption {
             V1,
@@ -429,55 +468,65 @@ mod test {
             V3,
         }
 
+        #[style_edition(false)]
+        pub(crate) struct StableOption;
+
+        #[style_edition(false)]
+        pub(crate) struct UnstableOption;
+
         create_config! {
             // Options that are used by the generated functions
-            max_width: usize, 100, true, "Maximum width of each line";
-            required_version: String, env!("CARGO_PKG_VERSION").to_owned(), false,
+            style_edition: StyleEdition, StyleEdition, true, "The style edition being used";
+            max_width: usize, MaxWidth, true, "Maximum width of each line";
+            required_version: String, RequiredVersion, false,
                 "Require a specific version of rustfmt.";
-            ignore: IgnoreList, IgnoreList::default(), false,
+            ignore: IgnoreList, IgnoreList, false,
                 "Skip formatting the specified files and directories.";
-            verbose: Verbosity, Verbosity::Normal, false,
+            verbose: Verbosity, Verbosity, false,
                 "How much to information to emit to the user";
-            file_lines: FileLines, FileLines::all(), false,
+            file_lines: FileLines, FileLines, false,
                 "Lines to format; this is not supported in rustfmt.toml, and can only be specified \
                     via the --file-lines option";
 
             // merge_imports deprecation
-            imports_granularity: ImportGranularity, ImportGranularity::Preserve, false,
+            imports_granularity: ImportGranularity, ImportGranularity, false,
                 "Merge imports";
-            merge_imports: bool, false, false, "(deprecated: use imports_granularity instead)";
+            merge_imports: bool, MergeImports, false,
+                "(deprecated: use imports_granularity instead)";
 
             // fn_args_layout renamed to fn_params_layout
-            fn_args_layout: Density, Density::Tall, true,
+            fn_args_layout: Density, Density, true,
                 "(deprecated: use fn_params_layout instead)";
-            fn_params_layout: Density, Density::Tall, true,
+            fn_params_layout: Density, Density, true,
                 "Control the layout of parameters in a function signatures.";
 
             // Width Heuristics
-            use_small_heuristics: Heuristics, Heuristics::Default, true,
+            use_small_heuristics: Heuristics, Heuristics, true,
                 "Whether to use different formatting for items and \
                  expressions if they satisfy a heuristic notion of 'small'.";
-            width_heuristics: WidthHeuristics, WidthHeuristics::scaled(100), false,
+            width_heuristics: WidthHeuristics, WidthHeuristics, false,
                 "'small' heuristic values";
 
-            fn_call_width: usize, 60, true, "Maximum width of the args of a function call before \
+            fn_call_width: usize, FnCallWidth, true, "Maximum width of the args of a function call \
+                before falling back to vertical formatting.";
+            attr_fn_like_width: usize, AttrFnLikeWidth, true, "Maximum width of the args of a \
+                function-like attributes before falling back to vertical formatting.";
+            struct_lit_width: usize, StructLitWidth, true, "Maximum width in the body of a struct \
+                lit before falling back to vertical formatting.";
+            struct_variant_width: usize, StructVariantWidth, true, "Maximum width in the body of a \
+                struct variant before falling back to vertical formatting.";
+            array_width: usize, ArrayWidth, true,  "Maximum width of an array literal before \
                 falling back to vertical formatting.";
-            attr_fn_like_width: usize, 70, true, "Maximum width of the args of a function-like \
-                attributes before falling back to vertical formatting.";
-            struct_lit_width: usize, 18, true, "Maximum width in the body of a struct lit before \
-                falling back to vertical formatting.";
-            struct_variant_width: usize, 35, true, "Maximum width in the body of a struct \
-                variant before falling back to vertical formatting.";
-            array_width: usize, 60, true,  "Maximum width of an array literal before falling \
-                back to vertical formatting.";
-            chain_width: usize, 60, true, "Maximum length of a chain to fit on a single line.";
-            single_line_if_else_max_width: usize, 50, true, "Maximum line length for single \
-                line if-else expressions. A value of zero means always break if-else expressions.";
+            chain_width: usize, ChainWidth, true,
+                "Maximum length of a chain to fit on a single line.";
+            single_line_if_else_max_width: usize, SingleLineIfElseMaxWidth, true,
+                "Maximum line length for single line if-else expressions. A value of zero means \
+                always break if-else expressions.";
 
             // Options that are used by the tests
-            stable_option: bool, false, true, "A stable option";
-            unstable_option: bool, false, false, "An unstable option";
-            partially_unstable_option: PartiallyUnstableOption, PartiallyUnstableOption::V1, true,
+            stable_option: bool, StableOption, true, "A stable option";
+            unstable_option: bool, UnstableOption, false, "An unstable option";
+            partially_unstable_option: PartiallyUnstableOption, PartiallyUnstableOption, true,
                 "A partially unstable option";
         }
 
@@ -537,6 +586,161 @@ mod test {
         }
     }
 
+    #[allow(unreachable_pub)]
+    mod style_edition_configs {
+        use crate::config::StyleEdition;
+        use crate::config::{ConfigType, StyleEditionDefault};
+        use rustfmt_config_proc_macro::style_edition;
+
+        #[test]
+        fn test_impl_default_style_edition_struct_for_all_editions() {
+            #[style_edition(100)]
+            #[derive(Debug, PartialEq)]
+            struct Unit;
+
+            // regardless of the style edition used the value will always return 100
+            assert_eq!(Unit::style_edition_default(StyleEdition::Edition2015), 100);
+            assert_eq!(Unit::style_edition_default(StyleEdition::Edition2018), 100);
+            assert_eq!(Unit::style_edition_default(StyleEdition::Edition2021), 100);
+            assert_eq!(Unit::style_edition_default(StyleEdition::Edition2024), 100);
+        }
+
+        #[test]
+        fn test_impl_style_edition_struct_for_multiple_editions() {
+            #[style_edition(100, se_2015 = 99, se_2024 = 115)]
+            struct Unit2;
+
+            impl ConfigType for Unit2 {
+                fn doc_hint() -> String {
+                    String::new()
+                }
+            }
+            // regardless of the style edition used the value will always return 100
+            assert_eq!(Unit2::style_edition_default(StyleEdition::Edition2015), 99);
+            assert_eq!(Unit2::style_edition_default(StyleEdition::Edition2018), 100);
+            assert_eq!(Unit2::style_edition_default(StyleEdition::Edition2021), 100);
+            assert_eq!(Unit2::style_edition_default(StyleEdition::Edition2024), 115);
+        }
+
+        #[test]
+        #[allow(dead_code)]
+        fn test_impl_style_edition_enum_for_all_editions() {
+            #[style_edition(Color::Blue)]
+            #[derive(PartialEq, Debug)]
+            enum Color {
+                Red,
+                Gree,
+                Blue,
+            }
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2015),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2018),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2021),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2024),
+                Color::Blue
+            );
+        }
+
+        #[test]
+        #[allow(dead_code)]
+        fn test_impl_style_edition_enum_for_multiple_editions() {
+            #[style_edition(Color::Blue, se_2024=Color::Red, se_2021=Color::Green)]
+            #[derive(Debug, PartialEq)]
+            enum Color {
+                Red,
+                Green,
+                Blue,
+            }
+
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2015),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2018),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2021),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2024),
+                Color::Red
+            );
+        }
+
+        #[test]
+        #[ignore]
+        #[allow(dead_code)]
+        fn test_impl_style_edition_enum_for_all_editions_using_variant_attribute() {
+            #[style_edition]
+            #[derive(Debug, PartialEq)]
+            enum Color {
+                Red,
+                #[se_default]
+                Green,
+                Blue,
+            }
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2015),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2018),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2021),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2024),
+                Color::Green
+            );
+        }
+
+        #[test]
+        #[allow(dead_code)]
+        fn test_impl_style_edition_enum_for_multiple_editions_using_variant_attribute() {
+            #[style_edition]
+            #[derive(Debug, PartialEq)]
+            enum Color {
+                #[se_2024]
+                Red,
+                #[se_default]
+                Green,
+                #[se_2018]
+                Blue,
+            }
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2015),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2018),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2021),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2024),
+                Color::Red
+            );
+        }
+    }
+
     #[test]
     fn test_config_set() {
         let mut config = Config::default();
@@ -566,7 +770,7 @@ mod test {
 
     #[test]
     fn test_was_set() {
-        let config = Config::from_toml("hard_tabs = true", Path::new("")).unwrap();
+        let config = Config::from_toml(None, "hard_tabs = true", Path::new("")).unwrap();
 
         assert_eq!(config.was_set().hard_tabs(), true);
         assert_eq!(config.was_set().verbose(), false);
@@ -582,7 +786,8 @@ mod test {
         use self::mock::Config;
 
         let mut output = Vec::new();
-        Config::print_docs(&mut output, false);
+        let config = Config::default();
+        config.print_docs(&mut output, false);
 
         let s = str::from_utf8(&output).unwrap();
         assert_eq!(s.contains(PRINT_DOCS_STABLE_OPTION), true);
@@ -595,7 +800,8 @@ mod test {
         use self::mock::Config;
 
         let mut output = Vec::new();
-        Config::print_docs(&mut output, true);
+        let config = Config::default();
+        config.print_docs(&mut output, true);
 
         let s = str::from_utf8(&output).unwrap();
         assert_eq!(s.contains(PRINT_DOCS_STABLE_OPTION), true);
@@ -603,10 +809,10 @@ mod test {
         assert_eq!(s.contains(PRINT_DOCS_PARTIALLY_UNSTABLE_OPTION), true);
     }
 
-    #[test]
-    fn test_dump_default_config() {
-        let default_config = format!(
-            r#"max_width = 100
+    fn se_2015_through_se_2021_default_config(style_edition: StyleEdition) -> String {
+        format!(
+            r#"style_edition = "{}"
+max_width = 100
 hard_tabs = false
 tab_spaces = 4
 newline_style = "Auto"
@@ -684,9 +890,42 @@ ignore = []
 emit_mode = "Files"
 make_backup = false
 "#,
+            style_edition,
             env!("CARGO_PKG_VERSION")
-        );
+        )
+    }
+
+    #[test]
+    fn test_dump_default_config() {
+        let style_edition = StyleEdition::Edition2015;
+        let default_config = se_2015_through_se_2021_default_config(style_edition);
         let toml = Config::default().all_options().to_toml().unwrap();
+        // ensure that Config::default() uses StyleEdition::Edition2015
+        assert_eq!(&toml, &default_config);
+    }
+
+    #[test]
+    fn test_dump_default_config_se_2015_through_2021() {
+        use StyleEdition::*;
+        for style_edtion in [Edition2015, Edition2018, Edition2021] {
+            let default_config = se_2015_through_se_2021_default_config(style_edtion);
+            let toml = Config::deafult_with_style_edition(style_edtion)
+                .all_options()
+                .to_toml()
+                .unwrap();
+            assert_eq!(&toml, &default_config);
+        }
+    }
+
+    #[test]
+    fn test_dump_default_config_se_2024() {
+        // TODO(ytmimi): Once we start altering the defaults for se_2024 update the string
+        let style_ediition = StyleEdition::Edition2024;
+        let default_config = se_2015_through_se_2021_default_config(style_ediition);
+        let toml = Config::deafult_with_style_edition(StyleEdition::Edition2024)
+            .all_options()
+            .to_toml()
+            .unwrap();
         assert_eq!(&toml, &default_config);
     }
 
@@ -714,7 +953,7 @@ make_backup = false
     #[nightly_only_test]
     #[test]
     fn test_unstable_from_toml() {
-        let config = Config::from_toml("unstable_features = true", Path::new("")).unwrap();
+        let config = Config::from_toml(None, "unstable_features = true", Path::new("")).unwrap();
         assert_eq!(config.was_set().unstable_features(), true);
         assert_eq!(config.unstable_features(), true);
     }
@@ -730,7 +969,7 @@ make_backup = false
                 unstable_features = true
                 merge_imports = true
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.imports_granularity(), ImportGranularity::Crate);
         }
 
@@ -742,7 +981,7 @@ make_backup = false
                 merge_imports = true
                 imports_granularity = "Preserve"
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.imports_granularity(), ImportGranularity::Preserve);
         }
 
@@ -753,7 +992,7 @@ make_backup = false
                 unstable_features = true
                 merge_imports = true
             "#;
-            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            let mut config = Config::from_toml(None, toml, Path::new("")).unwrap();
             config.override_value("imports_granularity", "Preserve");
             assert_eq!(config.imports_granularity(), ImportGranularity::Preserve);
         }
@@ -765,7 +1004,7 @@ make_backup = false
                 unstable_features = true
                 imports_granularity = "Module"
             "#;
-            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            let mut config = Config::from_toml(None, toml, Path::new("")).unwrap();
             config.override_value("merge_imports", "true");
             // no effect: the new option always takes precedence
             assert_eq!(config.imports_granularity(), ImportGranularity::Module);
@@ -782,7 +1021,7 @@ make_backup = false
                 use_small_heuristics = "Default"
                 max_width = 200
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.array_width(), 120);
             assert_eq!(config.attr_fn_like_width(), 140);
             assert_eq!(config.chain_width(), 120);
@@ -798,7 +1037,7 @@ make_backup = false
                 use_small_heuristics = "Max"
                 max_width = 120
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.array_width(), 120);
             assert_eq!(config.attr_fn_like_width(), 120);
             assert_eq!(config.chain_width(), 120);
@@ -814,7 +1053,7 @@ make_backup = false
                 use_small_heuristics = "Off"
                 max_width = 100
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.array_width(), usize::max_value());
             assert_eq!(config.attr_fn_like_width(), usize::max_value());
             assert_eq!(config.chain_width(), usize::max_value());
@@ -836,7 +1075,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -858,7 +1097,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -880,7 +1119,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -896,7 +1135,7 @@ make_backup = false
                 max_width = 90
                 fn_call_width = 95
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.fn_call_width(), 90);
         }
 
@@ -906,7 +1145,7 @@ make_backup = false
                 max_width = 80
                 attr_fn_like_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.attr_fn_like_width(), 80);
         }
 
@@ -916,7 +1155,7 @@ make_backup = false
                 max_width = 78
                 struct_lit_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.struct_lit_width(), 78);
         }
 
@@ -926,7 +1165,7 @@ make_backup = false
                 max_width = 80
                 struct_variant_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.struct_variant_width(), 80);
         }
 
@@ -936,7 +1175,7 @@ make_backup = false
                 max_width = 60
                 array_width = 80
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.array_width(), 60);
         }
 
@@ -946,7 +1185,7 @@ make_backup = false
                 max_width = 80
                 chain_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.chain_width(), 80);
         }
 
@@ -956,7 +1195,7 @@ make_backup = false
                 max_width = 70
                 single_line_if_else_max_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(None, toml, Path::new("")).unwrap();
             assert_eq!(config.single_line_if_else_max_width(), 70);
         }
 

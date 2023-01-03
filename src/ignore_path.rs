@@ -42,7 +42,7 @@ mod test {
         use std::path::{Path, PathBuf};
 
         let config =
-            Config::from_toml(r#"ignore = ["foo.rs", "bar_dir/*"]"#, Path::new("")).unwrap();
+            Config::from_toml(None, r#"ignore = ["foo.rs", "bar_dir/*"]"#, Path::new("")).unwrap();
         let ignore_path_set = IgnorePathSet::from_ignore_list(&config.ignore()).unwrap();
 
         assert!(ignore_path_set.is_match(&FileName::Real(PathBuf::from("src/foo.rs"))));

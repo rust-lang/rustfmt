@@ -16,7 +16,7 @@ use getopts::{Matches, Options};
 
 use crate::rustfmt::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
-    FormatReportFormatterBuilder, Input, Session, Verbosity,
+    FormatReportFormatterBuilder, Input, Session, StyleEdition, Verbosity,
 };
 
 fn main() {
@@ -117,6 +117,14 @@ fn make_opts() -> Options {
          found reverts to the input file path",
         "[Path for the configuration file]",
     );
+    opts.optopt(
+        "",
+        "style-edition",
+        "Rustfmt style edition used to format your code. If specified, this style edition will \
+        take precedence over the value configured in any `rustfmt.toml`. rustfmt output may \
+        differ between style editions.",
+        "[2015|2018|2021|2024]",
+    );
     opts.optopt("", "edition", "Rust edition to use", "[2015|2018|2021]");
     opts.optopt(
         "",
@@ -195,6 +203,7 @@ fn is_nightly() -> bool {
 fn execute(opts: &Options) -> Result<i32> {
     let matches = opts.parse(env::args().skip(1))?;
     let options = GetOptsOptions::from_matches(&matches)?;
+    let style_edition = options.style_edition;
 
     match determine_operation(&matches)? {
         Operation::Help(HelpOp::None) => {
@@ -202,7 +211,8 @@ fn execute(opts: &Options) -> Result<i32> {
             Ok(0)
         }
         Operation::Help(HelpOp::Config) => {
-            Config::print_docs(&mut stdout(), options.unstable_features);
+            let config = style_edition.unwrap_or_default().config();
+            config.print_docs(&mut stdout(), options.unstable_features);
             Ok(0)
         }
         Operation::Help(HelpOp::FileLines) => {
@@ -214,7 +224,11 @@ fn execute(opts: &Options) -> Result<i32> {
             Ok(0)
         }
         Operation::ConfigOutputDefault { path } => {
-            let toml = Config::default().all_options().to_toml()?;
+            let toml = style_edition
+                .unwrap_or_default()
+                .config()
+                .all_options()
+                .to_toml()?;
             if let Some(path) = path {
                 let mut file = File::create(path)?;
                 file.write_all(toml.as_bytes())?;
@@ -232,7 +246,8 @@ fn execute(opts: &Options) -> Result<i32> {
             let file = PathBuf::from(path);
             let file = file.canonicalize().unwrap_or(file);
 
-            let (config, _) = load_config(Some(file.parent().unwrap()), Some(options))?;
+            let (config, _) =
+                load_config(style_edition, Some(file.parent().unwrap()), Some(options))?;
             let toml = config.all_options().to_toml()?;
             io::stdout().write_all(toml.as_bytes())?;
 
@@ -247,8 +262,9 @@ fn execute(opts: &Options) -> Result<i32> {
 }
 
 fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
+    let style_edition = options.style_edition;
     // try to read config from local directory
-    let (mut config, _) = load_config(Some(Path::new(".")), Some(options.clone()))?;
+    let (mut config, _) = load_config(style_edition, Some(Path::new(".")), Some(options.clone()))?;
 
     if options.check {
         config.set().emit_mode(EmitMode::Diff);
@@ -294,7 +310,8 @@ fn format(
     options: &GetOptsOptions,
 ) -> Result<i32> {
     options.verify_file_lines(&files);
-    let (config, config_path) = load_config(None, Some(options.clone()))?;
+    let style_edition = options.style_edition;
+    let (config, config_path) = load_config(style_edition, None, Some(options.clone()))?;
 
     if config.verbose() == Verbosity::Verbose {
         if let Some(path) = config_path.as_ref() {
@@ -315,8 +332,11 @@ fn format(
         } else {
             // Check the file directory if the config-path could not be read or not provided
             if config_path.is_none() {
-                let (local_config, config_path) =
-                    load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
+                let (local_config, config_path) = load_config(
+                    style_edition,
+                    Some(file.parent().unwrap()),
+                    Some(options.clone()),
+                )?;
                 if local_config.verbose() == Verbosity::Verbose {
                     if let Some(path) = config_path {
                         println!(
@@ -510,6 +530,7 @@ struct GetOptsOptions {
     backup: bool,
     check: bool,
     edition: Option<Edition>,
+    style_edition: Option<StyleEdition>,
     color: Option<Color>,
     file_lines: FileLines, // Default is all lines in all files.
     unstable_features: bool,
@@ -599,6 +620,10 @@ impl GetOptsOptions {
 
         if let Some(ref edition_str) = matches.opt_str("edition") {
             options.edition = Some(edition_from_edition_str(edition_str)?);
+        }
+
+        if let Some(ref style_edition) = matches.opt_str("style-edition") {
+            options.style_edition = Some(style_edition_from_edition_str(style_edition)?);
         }
 
         if matches.opt_present("backup") {
@@ -695,6 +720,16 @@ fn edition_from_edition_str(edition_str: &str) -> Result<Edition> {
         "2021" => Ok(Edition::Edition2021),
         "2024" => Ok(Edition::Edition2024),
         _ => Err(format_err!("Invalid value for `--edition`")),
+    }
+}
+
+fn style_edition_from_edition_str(edition_str: &str) -> Result<StyleEdition> {
+    match edition_str {
+        "2015" => Ok(StyleEdition::Edition2015),
+        "2018" => Ok(StyleEdition::Edition2018),
+        "2021" => Ok(StyleEdition::Edition2021),
+        "2024" => Ok(StyleEdition::Edition2024),
+        _ => Err(format_err!("Invalid value for `--style-edition`")),
     }
 }
 

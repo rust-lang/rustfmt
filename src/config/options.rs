@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use itertools::Itertools;
-use rustfmt_config_proc_macro::config_type;
+use rustfmt_config_proc_macro::{config_type, style_edition};
 use serde::de::{SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -12,6 +12,82 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::config::lists::*;
 use crate::config::Config;
 
+use super::config_type::StyleEditionDefault;
+
+macro_rules! style_edition_default {
+    ($name:ident, $value:tt) => {
+        #[style_edition($value)]
+        pub struct $name;
+    };
+    ($($name:ident, $value:tt);* $(;)*) => {
+        $(
+            style_edition_default!($name, $value);
+        )*
+    };
+}
+
+macro_rules! style_edition_always_false {
+    ($($name:ident),* $(,)*) => {
+        $(
+            style_edition_default!($name, false);
+        )*
+    };
+}
+
+macro_rules! style_edition_always_true {
+    ($($name:ident),* $(,)*) => {
+        $(
+            style_edition_default!($name, true);
+        )*
+    };
+}
+
+style_edition_default! {
+    MaxWidth, 100;
+    TabSpaces, 4;
+    FnCallWidth, 60;
+    AttrFnLikeWidth, 70;
+    StructLitWidth, 18;
+    StructVariantWidth, 35;
+    ArrayWidth, 60;
+    ChainWidth, 60;
+    SingleLineIfElseMaxWidth, 50;
+    DocCommentCodeBlockWidth, 100;
+    CommentWidth, 80;
+    ShortArrayElementWidthThreshold, 10;
+    StructFieldAlignThreshold, 0;
+    EnumDiscrimAlignThreshold, 0;
+    BlankLinesUpperBound, 1;
+    BlankLinesLowerBound, 0;
+    InlineAttributeWidth, 0;
+}
+
+style_edition_always_false! {
+    HardTabs, WrapComments, FormatCodeInDocComments, NormalizeComments, NormalizeDocAttributes,
+    FormatStrings, FormatMacroMatchers, FnSingleLine, WhereSingleLine, MergeImports,
+    ReorderImplItems, SpaceBeforeColon, SpacesAroundRanges, OverflowDelimitedExpr,
+    ForceMultilineBlocks, MatchBlockTrailingComma, UseTryShorthand, UseFieldInitShorthand,
+    CondenseWildcardSuffixes, UnstableFeatures, DisableAllFormatting, SkipChildren,
+    HideParseErrors, ErrorOnLineOverflow, ErrorOnUnformatted, MakeBackup,
+    PrintMisformattedFileNames,
+}
+
+style_edition_always_true! {
+    FormatMacroBodies, EmptyItemSingleLine, StructLitSingleLine, ReorderImports, ReorderModules,
+    SpaceAfterColon, RemoveNestedParens, CombineControlExpr, MatchArmBlocks, TrailingSemicolon,
+    FormatGeneratedFiles, MergeDerives, ForceExplicitAbi,
+}
+
+pub struct RequiredVersion;
+
+impl StyleEditionDefault for RequiredVersion {
+    type ConfigType = String;
+    fn style_edition_default(_style_edition: StyleEdition) -> Self::ConfigType {
+        env!("CARGO_PKG_VERSION").to_owned()
+    }
+}
+
+#[style_edition(NewlineStyle::Auto)]
 #[config_type]
 pub enum NewlineStyle {
     /// Auto-detect based on the raw source input.
@@ -24,6 +100,7 @@ pub enum NewlineStyle {
     Native,
 }
 
+#[style_edition(BraceStyle::SameLineWhere)]
 #[config_type]
 /// Where to put the opening brace of items (`fn`, `impl`, etc.).
 pub enum BraceStyle {
@@ -36,6 +113,7 @@ pub enum BraceStyle {
     SameLineWhere,
 }
 
+#[style_edition(ControlBraceStyle::AlwaysSameLine)]
 #[config_type]
 /// Where to put the opening brace of conditional expressions (`if`, `match`, etc.).
 pub enum ControlBraceStyle {
@@ -47,6 +125,7 @@ pub enum ControlBraceStyle {
     AlwaysNextLine,
 }
 
+#[style_edition]
 #[config_type]
 /// How to indent.
 pub enum IndentStyle {
@@ -54,9 +133,11 @@ pub enum IndentStyle {
     /// the first line.
     Visual,
     /// First line is on a new line and all lines align with **block** indent.
+    #[se_default]
     Block,
 }
 
+#[style_edition(Density::Tall)]
 #[config_type]
 /// How to place a list-like items.
 /// FIXME: Issue-3581: this should be renamed to ItemsLayout when publishing 2.0
@@ -69,6 +150,7 @@ pub enum Density {
     Vertical,
 }
 
+#[style_edition(TypeDensity::Wide)]
 #[config_type]
 /// Spacing around type combinators.
 pub enum TypeDensity {
@@ -78,6 +160,7 @@ pub enum TypeDensity {
     Wide,
 }
 
+#[style_edition(Heuristics::Default)]
 #[config_type]
 /// Heuristic settings that can be used to simply
 /// the configuration of the granular width configurations
@@ -102,6 +185,7 @@ impl Density {
     }
 }
 
+#[style_edition(GroupImportsTactic::Preserve)]
 #[config_type]
 /// Configuration for import groups, i.e. sets of imports separated by newlines.
 pub enum GroupImportsTactic {
@@ -116,6 +200,7 @@ pub enum GroupImportsTactic {
     One,
 }
 
+#[style_edition(ImportGranularity::Preserve)]
 #[config_type]
 /// How to merge imports.
 pub enum ImportGranularity {
@@ -132,6 +217,7 @@ pub enum ImportGranularity {
 }
 
 /// Controls how rustfmt should handle case in hexadecimal literals.
+#[style_edition(HexLiteralCase::Preserve)]
 #[config_type]
 pub enum HexLiteralCase {
     /// Leave the literal as-is
@@ -151,6 +237,7 @@ pub enum ReportTactic {
 
 /// What Rustfmt should emit. Mostly corresponds to the `--emit` command line
 /// option.
+#[style_edition(EmitMode::Files)]
 #[config_type]
 pub enum EmitMode {
     /// Emits to files.
@@ -174,6 +261,7 @@ pub enum EmitMode {
 }
 
 /// Client-preference for coloured output.
+#[style_edition(Color::Auto)]
 #[config_type]
 pub enum Color {
     /// Always use color, whether it is a piped or terminal output
@@ -184,6 +272,7 @@ pub enum Color {
     Auto,
 }
 
+#[style_edition(Version::One)]
 #[config_type]
 /// rustfmt format style version.
 pub enum Version {
@@ -204,6 +293,7 @@ impl Color {
 }
 
 /// How chatty should Rustfmt be?
+#[style_edition(Verbosity::Normal)]
 #[config_type]
 pub enum Verbosity {
     /// Emit more.
@@ -292,6 +382,13 @@ impl WidthHeuristics {
     }
 }
 
+impl StyleEditionDefault for WidthHeuristics {
+    type ConfigType = Self;
+    fn style_edition_default(_style_edition: StyleEdition) -> Self::ConfigType {
+        WidthHeuristics::scaled(100)
+    }
+}
+
 impl ::std::str::FromStr for WidthHeuristics {
     type Err = &'static str;
 
@@ -313,6 +410,13 @@ pub struct IgnoreList {
     path_set: HashSet<PathBuf>,
     /// A path to rustfmt.toml.
     rustfmt_toml_path: PathBuf,
+}
+
+impl StyleEditionDefault for IgnoreList {
+    type ConfigType = Self;
+    fn style_edition_default(_style_edition: StyleEdition) -> Self::ConfigType {
+        IgnoreList::default()
+    }
 }
 
 impl fmt::Display for IgnoreList {
@@ -409,6 +513,7 @@ pub trait CliOptions {
 }
 
 /// The edition of the syntax and semntics of code (RFC 2052).
+#[style_edition(Edition::Edition2015)]
 #[config_type]
 pub enum Edition {
     #[value = "2015"]
@@ -453,6 +558,7 @@ impl PartialOrd for Edition {
 }
 
 /// Controls how rustfmt should handle leading pipes on match arms.
+#[style_edition(MatchArmLeadingPipe::Never)]
 #[config_type]
 pub enum MatchArmLeadingPipe {
     /// Place leading pipes on all match arms
@@ -461,4 +567,51 @@ pub enum MatchArmLeadingPipe {
     Never,
     /// Preserve any existing leading pipes
     Preserve,
+}
+
+/// Defines the default values for each config according to [the style guide].
+/// rustfmt output may differ between style editions.
+///
+/// [the style guide]: link TBD
+#[config_type]
+pub enum StyleEdition {
+    #[value = "2015"]
+    #[doc_hint = "2015"]
+    /// [Edition 2015].
+    /// [Edition 2015]: link TBD
+    Edition2015,
+    #[value = "2018"]
+    #[doc_hint = "2018"]
+    /// [Edition 2018].
+    /// [Edition 2018]: link TBD
+    Edition2018,
+    #[value = "2021"]
+    #[doc_hint = "2021"]
+    /// [Edition 2021].
+    /// [Edition 2021]: link TBD
+    Edition2021,
+    #[value = "2024"]
+    #[doc_hint = "2024"]
+    /// [Edition 2024].
+    /// [Edition 2024]: link TBD
+    Edition2024,
+}
+
+impl StyleEditionDefault for StyleEdition {
+    type ConfigType = Self;
+    fn style_edition_default(style_edition: StyleEdition) -> Self::ConfigType {
+        style_edition
+    }
+}
+
+impl Default for StyleEdition {
+    fn default() -> Self {
+        Self::Edition2015
+    }
+}
+
+impl StyleEdition {
+    pub fn config(self) -> Config {
+        Config::deafult_with_style_edition(self)
+    }
 }

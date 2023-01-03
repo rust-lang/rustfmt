@@ -1,6 +1,6 @@
 //! Configuration options related to rewriting a list.
 
-use rustfmt_config_proc_macro::config_type;
+use rustfmt_config_proc_macro::{config_type, style_edition};
 
 use crate::config::IndentStyle;
 
@@ -26,6 +26,7 @@ impl DefinitiveListTactic {
 /// Formatting tactic for lists. This will be cast down to a
 /// `DefinitiveListTactic` depending on the number and length of the items and
 /// their comments.
+#[style_edition(ListTactic::Mixed)]
 #[config_type]
 pub enum ListTactic {
     /// One item per row.
@@ -40,6 +41,7 @@ pub enum ListTactic {
     Mixed,
 }
 
+#[style_edition(SeparatorTactic::Vertical)]
 #[config_type]
 pub enum SeparatorTactic {
     Always,
@@ -58,6 +60,7 @@ impl SeparatorTactic {
 }
 
 /// Where to put separator.
+#[style_edition(SeparatorPlace::Front)]
 #[config_type]
 pub enum SeparatorPlace {
     Front,

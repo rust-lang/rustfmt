@@ -2593,6 +2593,20 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 
 See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
+## `style_edition`
+
+The style edition used to format your code. rustfmt output may differ between style editions.
+
+- **Default value**: `"2015"`
+- **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"`
+- **Stable**: Yes
+
+The `style_edition` can be specified using the `--style-edition` CLI option or via your `rustfmt.toml`
+
+```toml
+style_edition = "2021"
+```
+
 ## `tab_spaces`
 
 Number of spaces per tab

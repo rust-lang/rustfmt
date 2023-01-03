@@ -80,6 +80,17 @@ fn print_config() {
 
 #[rustfmt_only_ci_test]
 #[test]
+fn print_default_config_with_style_edition() {
+    for edition in ["2015", "2018", "2021", "2024"] {
+        assert_that!(
+            &["--print-config", "default", "--style-edition", edition],
+            contains(&format!("style_edition = {:?}", edition))
+        );
+    }
+}
+
+#[rustfmt_only_ci_test]
+#[test]
 fn inline_config() {
     // single invocation
     assert_that!(

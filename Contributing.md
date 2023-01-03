@@ -259,3 +259,73 @@ the config struct and parse a config file, etc. Checking an option is done by
 accessing the correct field on the config struct, e.g., `config.max_width()`. Most
 functions have a `Config`, or one can be accessed via a visitor or context of
 some kind.
+
+###### Adding `style_edition` support for your new config
+
+`style_edition` is the mechanism used by rustfmt to maintain backwards compatability, while allowing
+room to change formatting over time. All configuration options must implement the `StyleEditionDefault` triat.
+If you're definig a new config you can use the `#[style_edition]` attribute to help you automatically define the trait.
+
+When defining a new configuration option it should be sufficient to only define the default value which applies to
+all `style_edtions`.
+
+For simple cases you can define a new unit struct that defines the `style_edition` defaults for your new
+configuration option.
+
+```rust
+#[style_edition(100)]
+struct MaxWidth;
+```
+
+If your new config is an enum you can set the defulats similarly to how you'd set it for a unit struct.
+
+```rust
+/// Controls how rustfmt should handle case in hexadecimal literals.
+#[style_edition(HexLiteralCase::Preserve)]
+#[config_type]
+pub enum HexLiteralCase {
+    /// Leave the literal as-is
+    Preserve,
+    /// Ensure all literals use uppercase lettering
+    Upper,
+    /// Ensure all literals use lowercase lettering
+    Lower,
+}
+```
+
+You can alternatively set the default directly on the enum variant itself.
+
+```rust
+/// Client-preference for coloured output.
+#[style_edition]
+#[config_type]
+pub enum Color {
+    /// Always use color, whether it is a piped or terminal output
+    Always,
+    /// Never use color
+    Never,
+    #[se_default]
+    /// Automatically use color, if supported by terminal
+    Auto,
+}
+```
+
+In cases where your default value is a more complex type you'll have to implement `StyleEditionDefault` by hand.
+
+```rust
+/// A set of directories, files and modules that rustfmt should ignore.
+#[derive(Default, Clone, Debug, PartialEq)]
+pub struct IgnoreList {
+    /// A set of path specified in rustfmt.toml.
+    path_set: HashSet<PathBuf>,
+    /// A path to rustfmt.toml.
+    rustfmt_toml_path: PathBuf,
+}
+
+impl StyleEditionDefault for IgnoreList {
+    type ConfigType = Self;
+    fn style_edition_default(_style_edition: StyleEdition) -> Self::ConfigType {
+        IgnoreList::default()
+    }
+}
+```
