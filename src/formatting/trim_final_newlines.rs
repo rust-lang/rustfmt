@@ -24,6 +24,7 @@ pub(crate) fn apply_trim_final_newlines(
         }
         TrimFinalNewlines::Never => {
             *formatted_text = formatted_text.trim_end().to_string();
+            // FIXME: We perform some extra work here to trying to get the original because `formatted_text` is already modified, but sadly even `raw_input_text` doesn't seem to be the original actually. This might be related to [#887](https://github.com/rust-lang/rustfmt/issues/887). Once we've got a new option for it, then we might be able to remove the body of this match arm.
             formatted_text.push_str(
                 raw_input_text
                     .chars()
