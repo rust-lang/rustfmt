@@ -2003,7 +2003,7 @@ Final newlines will be trimmed completely.
 
 #### `Never`
 
-Final newlines will be left as is (actually preserving spaces and tabs is not possible for now due to a known problem [#887](https://github.com/rust-lang/rustfmt/issues/887)).
+Final newlines will be left as is.
 
 ## `normalize_comments`
 
