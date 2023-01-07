@@ -1985,6 +1985,26 @@ Line endings will be converted to `\n`.
 
 Line endings will be converted to `\r\n`.
 
+## `trim_final_newlines`
+
+Whether to trim final newlines, which may include any kind of whitespace characters.
+
+- **Default value**: `"Single"`
+- **Possible values**: `"Always"`, `"Single"`, `"Never"`
+- **Stable**: No
+
+#### `Single` (default):
+
+Final newlines will be trimmed, leaving a single newline. The newline style conforms to the preference of `newline_style`.
+
+#### `Always`
+
+Final newlines will be trimmed completely.
+
+#### `Never`
+
+Final newlines will be left as is (actually preserving spaces and tabs is not possible for now due to a known problem [#887](https://github.com/rust-lang/rustfmt/issues/887)).
+
 ## `normalize_comments`
 
 Convert /* */ comments to // comments where possible

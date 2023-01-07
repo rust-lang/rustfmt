@@ -8,6 +8,7 @@ use rustc_ast::ast;
 use rustc_span::Span;
 
 use self::newline_style::apply_newline_style;
+use self::trim_final_newlines::apply_trim_final_newlines;
 use crate::comment::{CharClasses, FullCodeCharKind};
 use crate::config::{Config, FileName, Verbosity};
 use crate::formatting::generated::is_generated_file;
@@ -20,6 +21,7 @@ use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
 
 mod generated;
 mod newline_style;
+mod trim_final_newlines;
 
 // A map of the files of a crate, with their new content
 pub(crate) type SourceFile = Vec<FileRecord>;
@@ -244,6 +246,13 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         );
 
         apply_newline_style(
+            self.config.newline_style(),
+            &mut visitor.buffer,
+            snippet_provider.entire_snippet(),
+        );
+
+        apply_trim_final_newlines(
+            self.config.trim_final_newlines(),
             self.config.newline_style(),
             &mut visitor.buffer,
             snippet_provider.entire_snippet(),

@@ -39,6 +39,8 @@ create_config! {
     tab_spaces: usize, 4, true, "Number of spaces per tab";
     newline_style: NewlineStyle, NewlineStyle::Auto, true, "Unix or Windows line endings";
     indent_style: IndentStyle, IndentStyle::Block, false, "How do we indent expressions or items";
+    trim_final_newlines: TrimFinalNewlines, TrimFinalNewlines::Single, false,
+        "How to handle final newlines";
 
     // Width Heuristics
     use_small_heuristics: Heuristics, Heuristics::Default, true, "Whether to use different \
