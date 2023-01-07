@@ -619,6 +619,7 @@ hard_tabs = false
 tab_spaces = 4
 newline_style = "Auto"
 indent_style = "Block"
+trim_final_newlines = "Single"
 use_small_heuristics = "Default"
 fn_call_width = 60
 attr_fn_like_width = 70
