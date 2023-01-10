@@ -1,7 +1,9 @@
 // rustfmt-unstable: true
-// rustfmt-config: wildcard-example.rs
+// rustfmt-config: wildcard-example.toml
 use proc_macro::Span;
 use std::rc::Rc;
+
+use rand;
 
 use crate::abc::xyz;
 use my_crate::a::B;

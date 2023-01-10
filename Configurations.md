@@ -2307,6 +2307,7 @@ For a given config:
 ```toml
 group_imports = [
     ["$std::*", "proc_macro::*"],
+    ["*"],
     ["my_crate::*", "crate::*::xyz"],
     ["$crate::*"],
 ]
@@ -2317,6 +2318,8 @@ The following order would be set:
 ```rust
 use proc_macro::Span;
 use std::rc::Rc;
+
+use rand;
 
 use crate::abc::xyz;
 use my_crate::a::B;
@@ -2375,7 +2378,7 @@ specific version of rustfmt is used in your CI, use this option.
 
 The width threshold for an array element to be considered "short".
 
-The layout of an array is dependent on the length of each of its elements. 
+The layout of an array is dependent on the length of each of its elements.
 If the length of every element in an array is below this threshold (all elements are "short") then the array can be formatted in the mixed/compressed style, but if any one element has a length that exceeds this threshold then the array elements will have to be formatted vertically.
 
 - **Default value**: `10`

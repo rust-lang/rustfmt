@@ -11,7 +11,7 @@ use std::cmp::{Ord, Ordering};
 use rustc_ast::{ast, attr};
 use rustc_span::{symbol::sym, Span};
 
-use crate::config::{Config, GroupImportsTactic, WildcardGroups};
+use crate::config::{Config, GroupImportsTactic, WildcardGroup, WildcardGroups};
 use crate::imports::{normalize_use_trees_with_granularity, UseSegmentKind, UseTree};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{itemize_list, write_list, ListFormatting, ListItem};
@@ -173,7 +173,10 @@ fn contains_macro_use_attr(item: &ast::Item) -> bool {
 
 fn group_imports_custom(wildcards: WildcardGroups, uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
     let mut groups = vec![vec![]; wildcards.len() + 1];
-    let fallback_group = groups.len() - 1;
+    let fallback_group = wildcards
+        .iter()
+        .position(WildcardGroup::is_fallback)
+        .unwrap_or(groups.len() - 1);
 
     for ut in uts.into_iter() {
         let ut_path_str = ut.to_string();

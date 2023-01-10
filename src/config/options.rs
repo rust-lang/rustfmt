@@ -145,7 +145,12 @@ impl Serialize for GroupImportsTactic {
             GroupImportsTactic::One => Simple::One.serialize(serializer),
             GroupImportsTactic::Wildcards(w) => WildcardHelper(
                 w.iter()
-                    .map(|w| w.0.iter().map(|l| l.as_str().to_string()).collect())
+                    .map(|w| match w {
+                        WildcardGroup::Group(res) => {
+                            res.iter().map(|l| l.as_str().to_string()).collect()
+                        }
+                        WildcardGroup::Fallback => vec!["*".to_owned()],
+                    })
                     .collect(),
             )
             .serialize(serializer),
@@ -222,11 +227,21 @@ impl fmt::Display for WildcardGroups {
 }
 
 #[derive(Debug, Clone)]
-pub struct WildcardGroup(Vec<regex::Regex>);
+pub enum WildcardGroup {
+    Group(Vec<regex::Regex>),
+    Fallback,
+}
 
 impl WildcardGroup {
+    pub(crate) fn is_fallback(&self) -> bool {
+        self == &Self::Fallback
+    }
+
     pub(crate) fn matches(&self, path: &str) -> bool {
-        self.0.iter().any(|w| w.is_match(path))
+        match self {
+            Self::Group(res) => res.iter().any(|w| w.is_match(path)),
+            Self::Fallback => false,
+        }
     }
 }
 
@@ -237,6 +252,10 @@ impl TryFrom<Vec<String>> for WildcardGroup {
         enum Kind {
             Std,
             Crate,
+        }
+
+        if i == vec!["*"] {
+            return Ok(Self::Fallback);
         }
 
         i.into_iter()
@@ -260,7 +279,7 @@ impl TryFrom<Vec<String>> for WildcardGroup {
                 regex::Regex::new(&format!("^{wildcard}$"))
             })
             .collect::<Result<_, _>>()
-            .map(Self)
+            .map(Self::Group)
     }
 }
 
@@ -268,14 +287,19 @@ impl Eq for WildcardGroup {}
 
 impl std::cmp::PartialEq for WildcardGroup {
     fn eq(&self, other: &Self) -> bool {
-        if self.0.len() != other.0.len() {
-            return false;
-        }
+        match (self, other) {
+            (Self::Fallback, Self::Fallback) => true,
+            (Self::Group(left), Self::Group(right)) => {
+                if left.len() != right.len() {
+                    return false;
+                }
 
-        self.0
-            .iter()
-            .zip(other.0.iter())
-            .all(|(a, b)| a.as_str() == b.as_str())
+                left.iter()
+                    .zip(right.iter())
+                    .all(|(a, b)| a.as_str() == b.as_str())
+            }
+            (_, _) => false,
+        }
     }
 }
 
