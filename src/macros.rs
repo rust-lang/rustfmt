@@ -799,7 +799,7 @@ impl MacroArgParser {
 
         // Parse '*', '+' or '?.
         for tok in iter {
-            self.set_last_tok(&tok);
+            self.set_last_tok(tok);
             if first {
                 first = false;
             }
@@ -947,7 +947,7 @@ impl MacroArgParser {
                 }
             }
 
-            self.set_last_tok(&tok);
+            self.set_last_tok(tok);
         }
 
         // We are left with some stuff in the buffer. Since there is nothing
@@ -1379,7 +1379,7 @@ fn format_lazy_static(
         result.push_str(&rewrite_assign_rhs(
             context,
             stmt,
-            &*expr,
+            expr,
             &RhsAssignKind::Expr(&expr.kind, expr.span),
             nested_shape.sub_width(1)?,
         )?);

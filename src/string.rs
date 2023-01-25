@@ -390,7 +390,7 @@ mod test {
     #[test]
     fn line_break_at_valid_points_test() {
         let string = "[TheName](Dont::break::my::type::That::would::be::very::nice) break here";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd(
@@ -403,7 +403,7 @@ mod test {
     #[test]
     fn should_break_on_whitespace() {
         let string = "Placerat felis. Mauris porta ante sagittis purus.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd("Placerat felis. ".to_string(), 16)
@@ -417,7 +417,7 @@ mod test {
     #[test]
     fn should_break_on_punctuation() {
         let string = "Placerat_felis._Mauris_porta_ante_sagittis_purus.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd("Placerat_felis.".to_string(), 15)
@@ -427,7 +427,7 @@ mod test {
     #[test]
     fn should_break_forward() {
         let string = "Venenatis_tellus_vel_tellus. Aliquam aliquam dolor at justo.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd("Venenatis_tellus_vel_tellus. ".to_string(), 29)
@@ -441,7 +441,7 @@ mod test {
     #[test]
     fn nothing_to_break() {
         let string = "Venenatis_tellus_vel_tellus";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::EndOfInput("Venenatis_tellus_vel_tellus".to_string())
@@ -451,7 +451,7 @@ mod test {
     #[test]
     fn significant_whitespaces() {
         let string = "Neque in sem.      \n      Pellentesque tellus augue.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(15, false, "", &graphemes[..]),
             SnippetState::EndWithLineFeed("Neque in sem.      \n".to_string(), 20)
@@ -474,7 +474,7 @@ mod test {
     #[test]
     fn big_whitespace() {
         let string = "Neque in sem.            Pellentesque tellus augue.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd("Neque in sem.            ".to_string(), 25)
@@ -489,7 +489,7 @@ mod test {
     fn newline_in_candidate_line() {
         let string = "Nulla\nconsequat erat at massa. Vivamus id mi.";
 
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(25, false, "", &graphemes[..]),
             SnippetState::EndWithLineFeed("Nulla\n".to_string(), 6)
@@ -699,27 +699,27 @@ mod test {
     #[test]
     fn detect_urls() {
         let string = "aaa http://example.org something";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(21));
 
         let string = "https://example.org something";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 0), Some(18));
 
         let string = "aaa ftp://example.org something";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(20));
 
         let string = "aaa file://example.org something";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(21));
 
         let string = "aaa http not an url";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 6), None);
 
         let string = "aaa file://example.org";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(21));
     }
 }

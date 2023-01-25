@@ -54,7 +54,7 @@ fn is_short_pattern_inner(pat: &ast::Pat) -> bool {
             path.segments.len() <= 1 && subpats.len() <= 1
         }
         ast::PatKind::Box(ref p) | ast::PatKind::Ref(ref p, _) | ast::PatKind::Paren(ref p) => {
-            is_short_pattern_inner(&*p)
+            is_short_pattern_inner(p)
         }
         PatKind::Or(ref pats) => pats.iter().all(|p| is_short_pattern_inner(p)),
     }

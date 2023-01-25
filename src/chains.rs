@@ -273,7 +273,7 @@ impl Rewrite for ChainItem {
             ChainItemKind::Parent {
                 ref expr,
                 parens: true,
-            } => crate::expr::rewrite_paren(context, &expr, shape, expr.span)?,
+            } => crate::expr::rewrite_paren(context, expr, shape, expr.span)?,
             ChainItemKind::Parent {
                 ref expr,
                 parens: false,
@@ -338,7 +338,7 @@ impl ChainItem {
             format!("::<{}>", type_list.join(", "))
         };
         let callee_str = format!(".{}{}", rewrite_ident(context, method_name), type_str);
-        rewrite_call(context, &callee_str, &args, span, shape)
+        rewrite_call(context, &callee_str, args, span, shape)
     }
 }
 

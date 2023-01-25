@@ -61,7 +61,7 @@ pub(crate) fn format_expr(
 ) -> Option<String> {
     skip_out_of_file_lines_range!(context, expr.span);
 
-    if contains_skip(&*expr.attrs) {
+    if contains_skip(&expr.attrs) {
         return Some(context.snippet(expr.span()).to_owned());
     }
     let shape = if expr_type == ExprType::Statement && semicolon_for_expr(context, expr) {
@@ -259,9 +259,7 @@ pub(crate) fn format_expr(
             shape,
             SeparatorPlace::Back,
         ),
-        ast::ExprKind::Index(ref expr, ref index, _) => {
-            rewrite_index(&**expr, &**index, context, shape)
-        }
+        ast::ExprKind::Index(ref expr, ref index, _) => rewrite_index(expr, index, context, shape),
         ast::ExprKind::Repeat(ref expr, ref repeats) => rewrite_pair(
             &**expr,
             &*repeats.value,
@@ -312,8 +310,8 @@ pub(crate) fn format_expr(
                         default_sp_delim(Some(lhs), Some(rhs))
                     };
                     rewrite_pair(
-                        &*lhs,
-                        &*rhs,
+                        lhs,
+                        rhs,
                         PairParts::infix(&sp_delim),
                         context,
                         shape,
@@ -326,7 +324,7 @@ pub(crate) fn format_expr(
                     } else {
                         default_sp_delim(None, Some(rhs))
                     };
-                    rewrite_unary_prefix(context, &sp_delim, &*rhs, shape)
+                    rewrite_unary_prefix(context, &sp_delim, rhs, shape)
                 }
                 (Some(lhs), None) => {
                     let sp_delim = if context.config.spaces_around_ranges() {
@@ -334,7 +332,7 @@ pub(crate) fn format_expr(
                     } else {
                         default_sp_delim(Some(lhs), None)
                     };
-                    rewrite_unary_suffix(context, &sp_delim, &*lhs, shape)
+                    rewrite_unary_suffix(context, &sp_delim, lhs, shape)
                 }
                 (None, None) => Some(delim.to_owned()),
             }
@@ -880,7 +878,7 @@ impl<'a> ControlFlow<'a> {
             let comments_span = mk_sp(comments_lo, expr.span.lo());
             return rewrite_assign_rhs_with_comments(
                 context,
-                &format!("{}{}{}", matcher, pat_string, self.connector),
+                format!("{}{}{}", matcher, pat_string, self.connector),
                 expr,
                 cond_shape,
                 &RhsAssignKind::Expr(&expr.kind, expr.span),
@@ -1349,7 +1347,7 @@ pub(crate) fn is_simple_expr(expr: &ast::Expr) -> bool {
         | ast::ExprKind::Unary(_, ref expr) => is_simple_expr(expr),
         ast::ExprKind::Index(ref lhs, ref rhs, _) => is_simple_expr(lhs) && is_simple_expr(rhs),
         ast::ExprKind::Repeat(ref lhs, ref rhs) => {
-            is_simple_expr(lhs) && is_simple_expr(&*rhs.value)
+            is_simple_expr(lhs) && is_simple_expr(&rhs.value)
         }
         _ => false,
     }
@@ -1624,7 +1622,7 @@ fn rewrite_struct_lit<'a>(
     } else {
         let field_iter = fields.iter().map(StructLitField::Regular).chain(
             match struct_rest {
-                ast::StructRest::Base(expr) => Some(StructLitField::Base(&**expr)),
+                ast::StructRest::Base(expr) => Some(StructLitField::Base(expr)),
                 ast::StructRest::Rest(span) => Some(StructLitField::Rest(*span)),
                 ast::StructRest::None => None,
             }
@@ -2126,7 +2124,7 @@ fn choose_rhs<R: Rewrite>(
 
             match (orig_rhs, new_rhs) {
                 (Some(ref orig_rhs), Some(ref new_rhs))
-                    if !filtered_str_fits(&new_rhs, context.config.max_width(), new_shape) =>
+                    if !filtered_str_fits(new_rhs, context.config.max_width(), new_shape) =>
                 {
                     Some(format!("{before_space_str}{orig_rhs}"))
                 }

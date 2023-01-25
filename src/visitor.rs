@@ -921,7 +921,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         attrs: &[ast::Attribute],
     ) {
         let vis_str = utils::format_visibility(&self.get_context(), vis);
-        self.push_str(&*vis_str);
+        self.push_str(&vis_str);
         self.push_str(format_unsafety(unsafety));
         self.push_str("mod ");
         // Calling `to_owned()` to work around borrow checker.
