@@ -2886,7 +2886,7 @@ fn rewrite_bounds_on_where_clause(
     let fmt = ListFormatting::new(shape, context.config)
         .tactic(shape_tactic)
         .trailing_separator(comma_tactic)
-        .preserve_newline(true);
+        .preserve_newline(context.config.keep_newline_in_where_clause());
     write_list(&items.collect::<Vec<_>>(), &fmt)
 }
 

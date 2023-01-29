@@ -1059,6 +1059,35 @@ This option is currently ignored for stdin (`@generated` in stdin is ignored.)
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#5080](https://github.com/rust-lang/rustfmt/issues/5080))
 
+## `keep_newline_in_where_clause`
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#5655](https://github.com/rust-lang/rustfmt/issues/5655))
+
+#### `true` (default):
+
+```rust
+fn foo<T>(_: T)
+where
+    T: std::fmt::Debug,
+
+    T: std::fmt::Display,
+{
+}
+```
+
+#### `false` 
+
+```rust
+fn foo<T>(_: T)
+where
+    T: std::fmt::Debug,
+    T: std::fmt::Display,
+{
+}
+```
+
 ## `format_macro_matchers`
 
 Format the metavariable matching patterns in macros.
