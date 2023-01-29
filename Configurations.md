@@ -2294,27 +2294,16 @@ use std::sync::Arc;
 use uuid::Uuid;
 ```
 
-#### Example for custom groups:
+#### `[ ["$std::*", "proc_macro::*"], ["*"], ["my_crate::*", "crate::*::xyz"], ["$crate::*"] ]`:
 
-Discard existing import groups, and create groups as specified by the wildcarded list.
+Discards existing import groups, and create groups as specified by the wildcarded list.
 Handy aliases are supported:
 
 - `$std` prefix is an alias for standard library (i.e `std`, `core`, `alloc`);
 - `$crate` prefix is an alias for crate-local modules (i.e `self`, `crate`, `super`).
 - `*` is a special fallback group (i.e used if no other group matches), could only be specified once.
 
-For a given config:
-
-```toml
-group_imports = [
-    ["$std::*", "proc_macro::*"],
-    ["*"],
-    ["my_crate::*", "crate::*::xyz"],
-    ["$crate::*"],
-]
-```
-
-The following order would be set:
+With the provided config the following order would be set:
 
 ```rust
 use proc_macro::Span;

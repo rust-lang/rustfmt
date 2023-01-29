@@ -46,8 +46,22 @@ pub fn define_config_type_on_enum(args: &Args, em: &syn::ItemEnum) -> syn::Resul
         .unwrap_or_default();
 
     let impl_doc_hint = impl_doc_hint(&em.ident, &em.variants);
-    let impl_from_str = impl_from_str(&em.ident, &em.variants);
-    let impl_display = impl_display(&em.ident, &em.variants);
+    let impl_from_str = if args
+        .skip_derives()
+        .all(|s| !"std::str::FromStr".ends_with(s))
+    {
+        impl_from_str(&em.ident, &em.variants)
+    } else {
+        Default::default()
+    };
+    let impl_display = if args
+        .skip_derives()
+        .all(|s| !"std::str::Display".ends_with(s))
+    {
+        impl_display(&em.ident, &em.variants)
+    } else {
+        Default::default()
+    };
 
     Ok(quote! {
         #[allow(non_snake_case)]

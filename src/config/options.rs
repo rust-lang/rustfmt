@@ -104,7 +104,7 @@ impl Density {
     }
 }
 
-#[config_type(skip_derive(Copy, Serialize, Deserialize))]
+#[config_type(skip_derive(Copy, Serialize, Deserialize, FromStr))]
 /// Configuration for import groups, i.e. sets of imports separated by newlines.
 pub enum GroupImportsTactic {
     /// Keep groups as they are.
@@ -216,6 +216,24 @@ impl<'de> Deserialize<'de> for GroupImportsTactic {
 
         let imports: Self = deserializer.deserialize_any(Vis)?;
         Ok(imports)
+    }
+}
+
+impl std::str::FromStr for GroupImportsTactic {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "Preserve" => GroupImportsTactic::Preserve,
+            "StdExternalCrate" => GroupImportsTactic::StdExternalCrate,
+            "One" => GroupImportsTactic::One,
+            line => serde_json::from_str::<Vec<Vec<String>>>(&line)?
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<Vec<WildcardGroup>, _>>()
+                .map(WildcardGroups)
+                .map(GroupImportsTactic::Wildcards)?,
+        })
     }
 }
 
