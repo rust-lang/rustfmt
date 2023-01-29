@@ -190,13 +190,27 @@ impl<'de> Deserialize<'de> for GroupImportsTactic {
                     lines.push(elem);
                 }
 
-                lines
+                let value = lines
                     .into_iter()
                     .map(TryFrom::try_from)
                     .collect::<Result<Vec<_>, _>>()
                     .map(WildcardGroups)
-                    .map(GroupImportsTactic::Wildcards)
-                    .map_err(serde::de::Error::custom)
+                    .map_err(serde::de::Error::custom)?;
+
+                if value
+                    .0
+                    .iter()
+                    .filter(|g| matches!(g, WildcardGroup::Fallback))
+                    .count()
+                    > 1
+                {
+                    return Err(serde::de::Error::custom(concat!(
+                        "Wildcard format group must include at ",
+                        "most one fallback (i.e \"*\") group."
+                    )));
+                }
+
+                Ok(GroupImportsTactic::Wildcards(value))
             }
         }
 
@@ -246,7 +260,7 @@ impl WildcardGroup {
 }
 
 impl TryFrom<Vec<String>> for WildcardGroup {
-    type Error = regex::Error;
+    type Error = anyhow::Error;
 
     fn try_from(i: Vec<String>) -> Result<Self, Self::Error> {
         enum Kind {
@@ -258,7 +272,14 @@ impl TryFrom<Vec<String>> for WildcardGroup {
             return Ok(Self::Fallback);
         }
 
-        i.into_iter()
+        if i.iter().any(|x| x == "*") {
+            return Err(anyhow::anyhow!(concat!(
+                "'*' is a special wildcard for a fallback group ",
+                "and could only be a single item within this group"
+            )));
+        }
+
+        Ok(i.into_iter()
             .map(|s| {
                 let (s, kind) = if let Some(tail) = s.strip_prefix("$std") {
                     (tail, Some(Kind::Std))
@@ -279,7 +300,7 @@ impl TryFrom<Vec<String>> for WildcardGroup {
                 regex::Regex::new(&format!("^{wildcard}$"))
             })
             .collect::<Result<_, _>>()
-            .map(Self::Group)
+            .map(Self::Group)?)
     }
 }
 

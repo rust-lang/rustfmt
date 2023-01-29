@@ -2301,6 +2301,7 @@ Handy aliases are supported:
 
 - `$std` prefix is an alias for standard library (i.e `std`, `core`, `alloc`);
 - `$crate` prefix is an alias for crate-local modules (i.e `self`, `crate`, `super`).
+- `*` is a special fallback group (i.e used if no other group matches), could only be specified once.
 
 For a given config:
 
