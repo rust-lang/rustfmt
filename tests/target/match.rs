@@ -627,3 +627,15 @@ fn issue_4109() {
         }
     }
 }
+
+// #5680
+macro_rules! foo {
+    ($v:expr, $s:stmt) => {
+        match $v {
+            Some(v) => v,
+            None => {
+                $s
+            }
+        }
+    };
+}

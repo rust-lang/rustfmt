@@ -316,6 +316,9 @@ fn flatten_arm_body<'a>(
     body: &'a ast::Expr,
     opt_shape: Option<Shape>,
 ) -> (bool, &'a ast::Expr) {
+    if context.is_macro_def {
+        return (false, body);
+    }
     let can_extend =
         |expr| !context.config.force_multiline_blocks() && can_flatten_block_around_this(expr);
 
