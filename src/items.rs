@@ -112,18 +112,45 @@ impl Rewrite for ast::Local {
 
         result.push_str(&infix);
 
-        if let Some((init, _els)) = self.kind.init_else_opt() {
-            // 1 = trailing semicolon;
-            let nested_shape = shape.sub_width(1)?;
+        if context.config.version() == Version::One {
+            if let Some((init, _els)) = self.kind.init_else_opt() {
+                // 1 = trailing semicolon;
+                let nested_shape = shape.sub_width(1)?;
 
-            result = rewrite_assign_rhs(
-                context,
-                result,
-                init,
-                &RhsAssignKind::Expr(&init.kind, init.span),
-                nested_shape,
-            )?;
-            // todo else
+                result = rewrite_assign_rhs(
+                    context,
+                    result,
+                    init,
+                    &RhsAssignKind::Expr(&init.kind, init.span),
+                    nested_shape,
+                )?;
+                // todo else
+            }
+        } else {
+            // Version:Two+
+            if let Some(expr) = self.kind.init() {
+                let base_span = if let Some(ref ty) = self.ty {
+                    mk_sp(ty.span.hi(), self.span.hi())
+                } else {
+                    mk_sp(self.pat.span.hi(), self.span.hi())
+                };
+
+                let comment_lo = context.snippet_provider.span_after(base_span, "=");
+                let comment_span = mk_sp(comment_lo, expr.span.lo());
+
+                // 1 = trailing semicolon;
+                let nested_shape = shape.sub_width(1)?;
+                result = rewrite_assign_rhs_with_comments(
+                    context,
+                    result,
+                    expr,
+                    nested_shape,
+                    &RhsAssignKind::Expr(&expr.kind, expr.span),
+                    RhsTactics::Default,
+                    comment_span,
+                    true,
+                )?;
+            }
         }
 
         result.push(';');
