@@ -2,7 +2,7 @@
 use chrono::Utc;
 use super::update::convert_publish_payload;
 
-use juniper::{FieldError, FieldResult};
+pub use juniper::{FieldError, FieldResult};
 use uuid::Uuid;
 use alloc::alloc::Layout;
 

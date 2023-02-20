@@ -9,7 +9,7 @@
 use std::cmp::{Ord, Ordering};
 
 use rustc_ast::ast;
-use rustc_span::{symbol::sym, Span};
+use rustc_span::{symbol::sym, Span, Symbol};
 
 use crate::config::{Config, GroupImportsTactic};
 use crate::imports::{normalize_use_trees_with_granularity, UseSegmentKind, UseTree};
@@ -117,6 +117,7 @@ fn rewrite_reorderable_or_regroupable_items(
                     vec![normalized_items]
                 }
                 GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
+                GroupImportsTactic::Visibility => group_imports_by_visibility(normalized_items),
             };
 
             if context.config.reorder_imports() {
@@ -196,6 +197,51 @@ fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
     }
 
     vec![std_imports, external_imports, local_imports]
+}
+
+fn group_imports_by_visibility(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
+    let mut inherited = Vec::new();
+    let mut pub_self = Vec::new();
+    let mut pub_super = Vec::new();
+    let mut pub_crate = Vec::new();
+    let mut pub_in_path = Vec::new();
+    let mut pub_other = Vec::new();
+    let mut public = Vec::new();
+
+    for ut in uts.into_iter() {
+        match ut
+            .visibility
+            .as_ref()
+            .map(|x| &x.kind)
+            .unwrap_or(&ast::VisibilityKind::Inherited)
+        {
+            ast::VisibilityKind::Inherited => inherited.push(ut),
+            ast::VisibilityKind::Restricted { path, .. } => {
+                let segments = &path.segments;
+                if segments.len() > 1 {
+                    pub_in_path.push(ut)
+                } else {
+                    match &segments[0].ident.name {
+                        scope if scope == &Symbol::intern("self") => pub_self.push(ut),
+                        scope if scope == &Symbol::intern("super") => pub_super.push(ut),
+                        scope if scope == &Symbol::intern("crate") => pub_crate.push(ut),
+                        _ => pub_other.push(ut),
+                    }
+                }
+            }
+            ast::VisibilityKind::Public => public.push(ut),
+        }
+    }
+
+    vec![
+        inherited,
+        pub_self,
+        pub_super,
+        pub_crate,
+        pub_in_path,
+        pub_other,
+        public,
+    ]
 }
 
 /// A simplified version of `ast::ItemKind`.

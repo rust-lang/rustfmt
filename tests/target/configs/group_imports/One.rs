@@ -6,6 +6,6 @@ use alloc::alloc::Layout;
 use broker::database::PooledConnection;
 use chrono::Utc;
 use core::f32;
-use juniper::{FieldError, FieldResult};
+pub use juniper::{FieldError, FieldResult};
 use std::sync::Arc;
 use uuid::Uuid;
