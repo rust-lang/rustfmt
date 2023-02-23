@@ -113,13 +113,13 @@ impl Rewrite for ast::Local {
         result.push_str(&infix);
 
         if let Some((init, _els)) = self.kind.init_else_opt() {
-            let base_span = if let Some(ref ty) = self.ty {
-                mk_sp(ty.span.hi(), self.span.hi())
+            let lhs_to_expr_span = if let Some(ref ty) = self.ty {
+                ty.span.between(init.span)
             } else {
-                mk_sp(self.pat.span.hi(), self.span.hi())
+                self.pat.span.between(init.span)
             };
 
-            result = rewrite_initializer_expr(context, init, result, base_span, shape)?;
+            result = rewrite_initializer_expr(context, init, result, lhs_to_expr_span, shape)?;
         }
         // todo else of kind.init_else_opt
 
@@ -132,7 +132,7 @@ fn rewrite_initializer_expr(
     context: &RewriteContext<'_>,
     init: &ast::Expr,
     lhs: String,
-    base_span: Span,
+    lhs_to_rhs_span: Span,
     shape: Shape,
 ) -> Option<String> {
     if context.config.version() == Version::One {
@@ -148,7 +148,7 @@ fn rewrite_initializer_expr(
         )
     } else {
         // Version:Two+
-        let comment_lo = context.snippet_provider.span_after(base_span, "=");
+        let comment_lo = context.snippet_provider.span_after(lhs_to_rhs_span, "=");
         let comment_span = mk_sp(comment_lo, init.span.lo());
 
         // 1 = trailing semicolon;
