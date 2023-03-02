@@ -174,3 +174,18 @@ fn rustfmt_emits_error_on_line_overflow_true() {
         "line formatted, but exceeded maximum width (maximum: 100 (see `max_width` option)"
     ))
 }
+
+#[test]
+fn rustfmt_emits_error_on_line_overflow_true_when_macro_formatting_fails() {
+    // See also https://github.com/rust-lang/rustfmt/issues/5700
+    let args = [
+        "--config",
+        "max_width=120,error_on_line_overflow=true",
+        "tests/target/issue_5700.rs",
+    ];
+
+    let (_stdout, stderr) = rustfmt(&args);
+    assert!(stderr.contains(
+        "line formatted, but exceeded maximum width (maximum: 120 (see `max_width` option)"
+    ))
+}
