@@ -135,11 +135,6 @@ fn return_macro_parse_failure_fallback(
         return trim_left_preserve_layout(context.snippet(span), indent, context.config);
     }
 
-    context.skipped_range.borrow_mut().push((
-        context.parse_sess.line_of_byte_pos(span.lo()),
-        context.parse_sess.line_of_byte_pos(span.hi()),
-    ));
-
     // Return the snippet unmodified if the macro is not block-like
     let mut snippet = context.snippet(span).to_owned();
     if position == MacroPosition::Item {
