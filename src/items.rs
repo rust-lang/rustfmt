@@ -1867,7 +1867,7 @@ pub(crate) fn rewrite_struct_field(
     }
 
     let type_annotation_spacing = type_annotation_spacing(context.config);
-    let prefix = rewrite_struct_field_prefix(context, field)?;
+    let mut prefix = rewrite_struct_field_prefix(context, field)?;
 
     let attrs_str = field.attrs.rewrite(context, shape)?;
     let attrs_extendable = field.ident.is_none() && is_attributes_extendable(&attrs_str);
@@ -1910,6 +1910,11 @@ pub(crate) fn rewrite_struct_field(
 
     let is_prefix_empty = prefix.is_empty();
     // We must use multiline. We are going to put attributes and a field on different lines.
+    if context.config.version() == Version::Two {
+        // Remove any additional whitespace at the end of the prefix.
+        // For example if there is a space after a visibility modifier.
+        prefix.truncate(prefix.trim_end().len());
+    }
     let field_str = rewrite_assign_rhs(context, prefix, &*field.ty, &RhsAssignKind::Ty, shape)?;
     // Remove a leading white-space from `rewrite_assign_rhs()` when rewriting a tuple struct.
     let field_str = if is_prefix_empty {
