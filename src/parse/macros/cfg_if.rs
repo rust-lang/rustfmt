@@ -44,7 +44,11 @@ fn parse_cfg_if_inner<'a>(
             // See also https://github.com/rust-lang/rust/pull/79433
             parser
                 .parse_attribute(rustc_parse::parser::attr::InnerAttrPolicy::Permitted)
-                .map_err(|_| "Failed to parse attributes")?;
+                .map_err(|err| {
+                    err.cancel();
+                    parser.sess.span_diagnostic.reset_err_count();
+                    "Failed to parse attributes"
+                })?;
         }
 
         if !parser.eat(&TokenKind::OpenDelim(Delimiter::Brace)) {
