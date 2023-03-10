@@ -248,7 +248,9 @@ where
 }
 ```
 
-### Structs and enums
+## item_brace_style
+
+Brace style for structs and enums
 
 #### `"SameLineWhere"` (default):
 
