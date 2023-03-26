@@ -573,7 +573,6 @@ impl Lorem {
 
 See also [`brace_style`](#brace_style), [`control_brace_style`](#control_brace_style).
 
-
 ## `enum_discrim_align_threshold`
 
 The maximum length of enum variant having discriminant, that gets vertically aligned with others.
@@ -620,6 +619,74 @@ enum Bar {
 }
 ```
 
+## `enum_variant_layout`
+
+Control the layout of enum variants.
+
+- **Default value**: `"Tall"`
+- **Possible values**: `"Compressed"`, `"Tall"`, `"Vertical"`
+- **Stable**: No
+
+#### `"Tall"` (default):
+
+```rust
+enum MyType {
+    A {
+        field1: bool,
+        field2: bool,
+    },
+    #[something]
+    B {
+        field1: bool,
+        field2: bool,
+    },
+}
+
+enum T {
+    A { fieldA: T },
+    B { fieldB: U },
+}
+```
+
+#### `"Compressed"`
+
+```rust
+enum MyType {
+    A { field1: bool, field2: bool },
+    #[something]
+    B { field1: bool, field2: bool },
+}
+
+enum T {
+    A { fieldA: T },
+    B { fieldB: U },
+}
+```
+
+#### `"Vertical"`
+
+```rust
+enum MyType {
+    A {
+        field1: bool,
+        field2: bool,
+    },
+    #[something]
+    B {
+        field1: bool,
+        field2: bool,
+    },
+}
+
+enum T {
+    A {
+        fieldA: T,
+    },
+    B {
+        fieldB: U,
+    },
+}
+```
 
 ## `error_on_line_overflow`
 
