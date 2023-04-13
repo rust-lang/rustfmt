@@ -62,7 +62,7 @@ struct SilentOnIgnoredFilesEmitter {
 }
 
 impl SilentOnIgnoredFilesEmitter {
-    fn handle_non_ignoreable_error(&mut self, db: &Diagnostic) {
+    fn handle_non_ignorable_error(&mut self, db: &Diagnostic) {
         self.has_non_ignorable_parser_errors = true;
         self.can_reset.store(false, Ordering::Release);
         self.emitter.emit_diagnostic(db);
@@ -86,7 +86,7 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
 
     fn emit_diagnostic(&mut self, db: &Diagnostic) {
         if db.level() == DiagnosticLevel::Fatal {
-            return self.handle_non_ignoreable_error(db);
+            return self.handle_non_ignorable_error(db);
         }
         if let Some(primary_span) = &db.span.primary_span() {
             let file_name = self.source_map.span_to_filename(*primary_span);
@@ -104,7 +104,7 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
                 }
             };
         }
-        self.handle_non_ignoreable_error(db);
+        self.handle_non_ignorable_error(db);
     }
 }
 
