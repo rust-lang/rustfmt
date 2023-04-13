@@ -1031,7 +1031,7 @@ from formatting an attribute #3665
 
 ### Changed
 
-- Replace '--conifig-help' with '--config=help' cb10e06
+- Replace '--config-help' with '--config=help' cb10e06
 - Improve formatting of slice patterns #2912
 
 ### Fixed
