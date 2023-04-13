@@ -942,7 +942,7 @@ from formatting an attribute #3665
 
 ### Fixed
 
-- Do not remove path disambiugator inside macro #3142
+- Do not remove path disambiguator inside macro #3142
 - Improve handling of Windows newlines #3141
 - Fix alignment of a struct's fields (`struct_field_align_threshold` option) with the Visual `indent_style` #3165
 - Fix a bug in formatting markdown lists within comments #3172
