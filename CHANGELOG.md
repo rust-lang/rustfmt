@@ -1075,7 +1075,7 @@ from formatting an attribute #3665
 - Add max_width option for all heuristics c2ae39e
 - Add config option `format_macro_matchers` to format the metavariable matching patterns in macros 79c5ee8
 - Add config option `format_macro_bodies` to format the bodies of macros 79c5ee8
-- Format exitential type fc307ff
+- Format existential type fc307ff
 - Support raw identifiers in struct expressions f121b1a
 - Format Async block and async function 0b25f60
 
