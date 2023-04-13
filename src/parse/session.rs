@@ -190,7 +190,7 @@ impl ParseSess {
     ) -> Result<ModulePathSuccess, ModError<'_>> {
         rustc_expand::module::default_submod_path(&self.parse_sess, id, relative, dir_path).or_else(
             |e| {
-                // If resloving a module relative to {dir_path}/{symbol} fails because a file
+                // If resolving a module relative to {dir_path}/{symbol} fails because a file
                 // could not be found, then try to resolve the module relative to {dir_path}.
                 // If we still can't find the module after searching for it in {dir_path},
                 // surface the original error.
