@@ -205,7 +205,7 @@ pub(crate) fn combine_strs_with_missing_comments(
 
     // We have a missing comment between the first expression and the second expression.
 
-    // Peek the the original source code and find out whether there is a newline between the first
+    // Peek the original source code and find out whether there is a newline between the first
     // expression and the second expression or the missing comment. We will preserve the original
     // layout whenever possible.
     let original_snippet = context.snippet(span);
