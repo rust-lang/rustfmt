@@ -28,7 +28,7 @@ function clone_repo() {
     GIT_TERMINAL_PROMPT=0 git clone --quiet $1 --depth 1 $2 && cd $2
 }
 
-# Initialize Git submoduels for the repo.
+# Initialize Git submodules for the repo.
 #
 # Parameters
 # $1: list of directories to initialize
