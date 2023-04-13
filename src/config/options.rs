@@ -416,7 +416,7 @@ pub trait CliOptions {
     fn config_path(&self) -> Option<&Path>;
 }
 
-/// The edition of the syntax and semntics of code (RFC 2052).
+/// The edition of the syntax and semantics of code (RFC 2052).
 #[config_type]
 pub enum Edition {
     #[value = "2015"]
