@@ -663,7 +663,7 @@ impl<'a> CommentRewrite<'a> {
     }
 
     /// Check if any characters were written to the result buffer after the start of the comment.
-    /// when calling [`CommentRewrite::new()`] the result buffer is initiazlied with the opening
+    /// when calling [`CommentRewrite::new()`] the result buffer is initialized with the opening
     /// characters for the comment.
     fn buffer_contains_comment(&self) -> bool {
         // if self.result.len() < self.opener.len() then an empty comment is in the buffer
