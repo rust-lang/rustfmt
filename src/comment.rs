@@ -1260,15 +1260,15 @@ pub(crate) enum FullCodeCharKind {
     InComment,
     /// Last character of a comment, '\n' for a line comment, '/' for a block comment.
     EndComment,
-    /// Start of a mutlitine string inside a comment
+    /// Start of a multiline string inside a comment
     StartStringCommented,
-    /// End of a mutlitine string inside a comment
+    /// End of a multiline string inside a comment
     EndStringCommented,
     /// Inside a commented string
     InStringCommented,
-    /// Start of a mutlitine string
+    /// Start of a multiline string
     StartString,
-    /// End of a mutlitine string
+    /// End of a multiline string
     EndString,
     /// Inside a string.
     InString,
