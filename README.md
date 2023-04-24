@@ -79,14 +79,47 @@ rustup component add rustfmt
 
 ## Installing from source
 
-To install from source (nightly required), first checkout to the tag or branch you want to install, then issue
+If you are hacking on Rustfmt and want to install it from source, do the
+following:
 
-```sh
-cargo install --path .
+First, take note of the toolchain
+[override](https://rust-lang.github.io/rustup/overrides.html) in
+`/rust-toolchain`. We will use this override to install Rustfmt into the right
+toolchain.
+
+> Tip: You can view the active toolchain for the current directory with `rustup
+> show active-toolchain`.
+
+From the Rustfmt project root, run the following command to build the Rustfmt
+binaries and copy them into the toolchain directory. This will override the
+currently installed Rustfmt component.
+
+```terminal
+cargo build --release --bin rustfmt --bin cargo-fmt -Zunstable-options --out-dir "$(rustc --print=sysroot)/bin"
 ```
 
-This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add `~/.cargo/bin` directory to
-your PATH variable.
+Now you may run `cargo fmt` in any project, using the toolchain where you
+just installed Rustfmt.
+
+```terminal
+cd my-project
+cargo +nightly-2023-01-24 fmt
+```
+
+If you need to restore the default Rustfmt installation, run the following (from
+the Rustfmt project root).
+
+```terminal
+rustup component remove rustfmt
+rustup component add rustfmt
+```
+
+> **DO NOT** install using `cargo install --path . --force` since this will
+> overwrite rustup
+> [proxies](https://rust-lang.github.io/rustup/concepts/proxies.html). That is,
+> `~/.cargo/bin/cargo-fmt` and `~/.cargo/bin/rustfmt` should be hard or
+> soft links to `~/.cargo/bin/rustup`. You can repair these by running `rustup
+> update`.
 
 
 ## Running
