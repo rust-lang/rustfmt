@@ -432,7 +432,7 @@ impl CodeBlockAttribute {
 
 /// Block that is formatted as an item.
 ///
-/// An item starts with either a star `*` a dash `-` or a greater-than `>`.
+/// An item starts with either a star `*` a dash `-` a greater-than `>` or a plus '+'.
 /// Different level of indentation are handled by shrinking the shape accordingly.
 struct ItemizedBlock {
     /// the lines that are identified as part of an itemized block
@@ -449,7 +449,8 @@ impl ItemizedBlock {
     /// Returns `true` if the line is formatted as an item
     fn is_itemized_line(line: &str) -> bool {
         let trimmed = line.trim_start();
-        trimmed.starts_with("* ") || trimmed.starts_with("- ") || trimmed.starts_with("> ")
+        let itemized_start = ["* ", "- ", "> ", "+ "];
+        itemized_start.iter().any(|s| trimmed.starts_with(s))
     }
 
     /// Creates a new ItemizedBlock described with the given line.
@@ -726,7 +727,7 @@ impl<'a> CommentRewrite<'a> {
                 let code_block = match self.code_block_attr.as_ref().unwrap() {
                     CodeBlockAttribute::Rust
                         if self.fmt.config.format_code_in_doc_comments()
-                            && !self.code_block_buffer.is_empty() =>
+                            && !self.code_block_buffer.trim().is_empty() =>
                     {
                         let mut config = self.fmt.config.clone();
                         config.set().wrap_comments(false);
@@ -801,10 +802,13 @@ impl<'a> CommentRewrite<'a> {
         // 2) The comment is not the start of a markdown header doc comment
         // 3) The comment width exceeds the shape's width
         // 4) No URLS were found in the comment
+        // If this changes, the documentation in ../Configurations.md#wrap_comments
+        // should be changed accordingly.
         let should_wrap_comment = self.fmt.config.wrap_comments()
             && !is_markdown_header_doc_comment
             && unicode_str_width(line) > self.fmt.shape.width
-            && !has_url(line);
+            && !has_url(line)
+            && !is_table_item(line);
 
         if should_wrap_comment {
             match rewrite_string(line, &self.fmt, self.max_width) {
@@ -937,6 +941,18 @@ fn has_url(s: &str) -> bool {
         || s.contains("ftp://")
         || s.contains("file://")
         || REFERENCE_LINK_URL.is_match(s)
+}
+
+/// Returns true if the given string may be part of a Markdown table.
+fn is_table_item(mut s: &str) -> bool {
+    // This function may return false positive, but should get its job done in most cases (i.e.
+    // markdown tables with two column delimiters).
+    s = s.trim_start();
+    return s.starts_with('|')
+        && match s.rfind('|') {
+            Some(0) | None => false,
+            _ => true,
+        };
 }
 
 /// Given the span, rewrite the missing comment inside it if available.

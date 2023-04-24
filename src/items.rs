@@ -594,7 +594,7 @@ impl<'a> FmtVisitor<'a> {
             let both_type = |l: &TyOpt, r: &TyOpt| is_type(l) && is_type(r);
             let both_opaque = |l: &TyOpt, r: &TyOpt| is_opaque(l) && is_opaque(r);
             let need_empty_line = |a: &ast::AssocItemKind, b: &ast::AssocItemKind| match (a, b) {
-                (TyAlias(lty), TyAlias(rty))
+                (Type(lty), Type(rty))
                     if both_type(&lty.ty, &rty.ty) || both_opaque(&lty.ty, &rty.ty) =>
                 {
                     false
@@ -612,7 +612,7 @@ impl<'a> FmtVisitor<'a> {
             }
 
             buffer.sort_by(|(_, a), (_, b)| match (&a.kind, &b.kind) {
-                (TyAlias(lty), TyAlias(rty))
+                (Type(lty), Type(rty))
                     if both_type(&lty.ty, &rty.ty) || both_opaque(&lty.ty, &rty.ty) =>
                 {
                     a.ident.as_str().cmp(b.ident.as_str())
@@ -621,10 +621,10 @@ impl<'a> FmtVisitor<'a> {
                     a.ident.as_str().cmp(b.ident.as_str())
                 }
                 (Fn(..), Fn(..)) => a.span.lo().cmp(&b.span.lo()),
-                (TyAlias(ty), _) if is_type(&ty.ty) => Ordering::Less,
-                (_, TyAlias(ty)) if is_type(&ty.ty) => Ordering::Greater,
-                (TyAlias(..), _) => Ordering::Less,
-                (_, TyAlias(..)) => Ordering::Greater,
+                (Type(ty), _) if is_type(&ty.ty) => Ordering::Less,
+                (_, Type(ty)) if is_type(&ty.ty) => Ordering::Greater,
+                (Type(..), _) => Ordering::Less,
+                (_, Type(..)) => Ordering::Greater,
                 (Const(..), _) => Ordering::Less,
                 (_, Const(..)) => Ordering::Greater,
                 (MacCall(..), _) => Ordering::Less,
@@ -1245,7 +1245,7 @@ fn format_unit_struct(
 ) -> Option<String> {
     let header_str = format_header(context, p.prefix, p.ident, p.vis, offset);
     let generics_str = if let Some(generics) = p.generics {
-        let hi = context.snippet_provider.span_before(p.span, ";");
+        let hi = context.snippet_provider.span_before_last(p.span, ";");
         format_generics(
             context,
             generics,
@@ -1278,7 +1278,7 @@ pub(crate) fn format_struct_struct(
     let header_hi = struct_parts.ident.span.hi();
     let body_lo = if let Some(generics) = struct_parts.generics {
         // Adjust the span to start at the end of the generic arguments before searching for the '{'
-        let span = span.with_lo(generics.span.hi());
+        let span = span.with_lo(generics.where_clause.span.hi());
         context.snippet_provider.span_after(span, "{")
     } else {
         context.snippet_provider.span_after(span, "{")

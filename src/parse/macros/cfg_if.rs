@@ -23,7 +23,7 @@ fn parse_cfg_if_inner<'a>(
     sess: &'a ParseSess,
     mac: &'a ast::MacCall,
 ) -> Result<Vec<ast::Item>, &'static str> {
-    let ts = mac.args.inner_tokens();
+    let ts = mac.args.tokens.clone();
     let mut parser = build_stream_parser(sess.inner(), ts);
 
     let mut items = vec![];
@@ -44,7 +44,10 @@ fn parse_cfg_if_inner<'a>(
             // See also https://github.com/rust-lang/rust/pull/79433
             parser
                 .parse_attribute(rustc_parse::parser::attr::InnerAttrPolicy::Permitted)
-                .map_err(|_| "Failed to parse attributes")?;
+                .map_err(|e| {
+                    e.cancel();
+                    "Failed to parse attributes"
+                })?;
         }
 
         if !parser.eat(&TokenKind::OpenDelim(Delimiter::Brace)) {

@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use rustc_data_structures::sync::{Lrc, Send};
 use rustc_errors::emitter::{Emitter, EmitterWriter};
+use rustc_errors::translation::Translate;
 use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
 use rustc_session::parse::ParseSess as RawParseSess;
 use rustc_span::{
@@ -11,6 +12,7 @@ use rustc_span::{
 };
 
 use crate::config::file_lines::LineRange;
+use crate::config::options::Color;
 use crate::ignore_path::IgnorePathSet;
 use crate::parse::parser::{ModError, ModulePathSuccess};
 use crate::source_map::LineRangeUtils;
@@ -28,17 +30,22 @@ pub(crate) struct ParseSess {
 /// Emitter which discards every error.
 struct SilentEmitter;
 
+impl Translate for SilentEmitter {
+    fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
+        None
+    }
+
+    fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
+        panic!("silent emitter attempted to translate a diagnostic");
+    }
+}
+
 impl Emitter for SilentEmitter {
     fn source_map(&self) -> Option<&Lrc<SourceMap>> {
         None
     }
+
     fn emit_diagnostic(&mut self, _db: &Diagnostic) {}
-    fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
-        None
-    }
-    fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
-        panic!("silent emitter attempted to translate a diagnostic");
-    }
 }
 
 fn silent_emitter() -> Box<dyn Emitter + Send> {
@@ -62,10 +69,21 @@ impl SilentOnIgnoredFilesEmitter {
     }
 }
 
+impl Translate for SilentOnIgnoredFilesEmitter {
+    fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
+        self.emitter.fluent_bundle()
+    }
+
+    fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
+        self.emitter.fallback_fluent_bundle()
+    }
+}
+
 impl Emitter for SilentOnIgnoredFilesEmitter {
     fn source_map(&self) -> Option<&Lrc<SourceMap>> {
         None
     }
+
     fn emit_diagnostic(&mut self, db: &Diagnostic) {
         if db.level() == DiagnosticLevel::Fatal {
             return self.handle_non_ignoreable_error(db);
@@ -88,13 +106,15 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
         }
         self.handle_non_ignoreable_error(db);
     }
+}
 
-    fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
-        self.emitter.fluent_bundle()
-    }
-
-    fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
-        self.emitter.fallback_fluent_bundle()
+impl From<Color> for ColorConfig {
+    fn from(color: Color) -> Self {
+        match color {
+            Color::Auto => ColorConfig::Auto,
+            Color::Always => ColorConfig::Always,
+            Color::Never => ColorConfig::Never,
+        }
     }
 }
 
@@ -103,10 +123,11 @@ fn default_handler(
     ignore_path_set: Lrc<IgnorePathSet>,
     can_reset: Lrc<AtomicBool>,
     hide_parse_errors: bool,
+    color: Color,
 ) -> Handler {
     let supports_color = term::stderr().map_or(false, |term| term.supports_color());
-    let color_cfg = if supports_color {
-        ColorConfig::Auto
+    let emit_color = if supports_color {
+        ColorConfig::from(color)
     } else {
         ColorConfig::Never
     };
@@ -117,13 +138,14 @@ fn default_handler(
         let fallback_bundle =
             rustc_errors::fallback_fluent_bundle(rustc_errors::DEFAULT_LOCALE_RESOURCES, false);
         Box::new(EmitterWriter::stderr(
-            color_cfg,
+            emit_color,
             Some(source_map.clone()),
             None,
             fallback_bundle,
             false,
             false,
             None,
+            false,
             false,
         ))
     };
@@ -151,6 +173,7 @@ impl ParseSess {
             Lrc::clone(&ignore_path_set),
             Lrc::clone(&can_reset_errors),
             config.hide_parse_errors(),
+            config.color(),
         );
         let parse_sess = RawParseSess::with_span_handler(handler, source_map);
 
@@ -337,18 +360,23 @@ mod tests {
             num_emitted_errors: Lrc<AtomicU32>,
         }
 
+        impl Translate for TestEmitter {
+            fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
+                None
+            }
+
+            fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
+                panic!("test emitter attempted to translate a diagnostic");
+            }
+        }
+
         impl Emitter for TestEmitter {
             fn source_map(&self) -> Option<&Lrc<SourceMap>> {
                 None
             }
+
             fn emit_diagnostic(&mut self, _db: &Diagnostic) {
                 self.num_emitted_errors.fetch_add(1, Ordering::Release);
-            }
-            fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
-                None
-            }
-            fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
-                panic!("test emitter attempted to translate a diagnostic");
             }
         }
 
