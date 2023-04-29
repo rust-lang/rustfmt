@@ -42,7 +42,7 @@ impl Rewrite for ast::Expr {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub(crate) enum ExprType {
     Statement,
     SubExpression,
@@ -171,11 +171,19 @@ pub(crate) fn format_expr(
         ast::ExprKind::Path(ref qself, ref path) => {
             rewrite_path(context, PathContext::Expr, qself, path, shape)
         }
-        ast::ExprKind::Assign(ref lhs, ref rhs, _) => {
-            rewrite_assignment(context, lhs, rhs, None, shape)
+        ast::ExprKind::Assign(ref lhs, ref rhs, op_span) => {
+            if context.config.version() == Version::One {
+                rewrite_assignment_for_op(context, lhs, rhs, None, shape)
+            } else {
+                rewrite_assignment_for_op_span(context, lhs, rhs, op_span, shape)
+            }
         }
         ast::ExprKind::AssignOp(ref op, ref lhs, ref rhs) => {
-            rewrite_assignment(context, lhs, rhs, Some(op), shape)
+            if context.config.version() == Version::One {
+                rewrite_assignment_for_op(context, lhs, rhs, Some(op), shape)
+            } else {
+                rewrite_assignment_for_op_span(context, lhs, rhs, op.span, shape)
+            }
         }
         ast::ExprKind::Continue(ref opt_label) => {
             let id_str = match *opt_label {
@@ -1898,7 +1906,7 @@ impl<'ast> RhsAssignKind<'ast> {
     }
 }
 
-fn rewrite_assignment(
+fn rewrite_assignment_for_op(
     context: &RewriteContext<'_>,
     lhs: &ast::Expr,
     rhs: &ast::Expr,
@@ -1910,17 +1918,58 @@ fn rewrite_assignment(
         None => "=",
     };
 
+    rewrite_assignment(context, lhs, rhs, operator_str, None, shape)
+}
+
+fn rewrite_assignment_for_op_span(
+    context: &RewriteContext<'_>,
+    lhs: &ast::Expr,
+    rhs: &ast::Expr,
+    op_span: Span,
+    shape: Shape,
+) -> Option<String> {
+    rewrite_assignment(
+        context,
+        lhs,
+        rhs,
+        context.snippet(op_span),
+        Some(mk_sp(op_span.hi(), rhs.span.lo())),
+        shape,
+    )
+}
+
+fn rewrite_assignment(
+    context: &RewriteContext<'_>,
+    lhs: &ast::Expr,
+    rhs: &ast::Expr,
+    operator_str: &str,
+    comment_span: Option<Span>,
+    shape: Shape,
+) -> Option<String> {
     // 1 = space between lhs and operator.
     let lhs_shape = shape.sub_width(operator_str.len() + 1)?;
     let lhs_str = format!("{} {}", lhs.rewrite(context, lhs_shape)?, operator_str);
 
-    rewrite_assign_rhs(
-        context,
-        lhs_str,
-        rhs,
-        &RhsAssignKind::Expr(&rhs.kind, rhs.span),
-        shape,
-    )
+    if context.config.version() == Version::One {
+        rewrite_assign_rhs(
+            context,
+            lhs_str,
+            rhs,
+            &RhsAssignKind::Expr(&rhs.kind, rhs.span),
+            shape,
+        )
+    } else {
+        rewrite_assign_rhs_with_comments(
+            context,
+            lhs_str,
+            rhs,
+            shape,
+            &RhsAssignKind::Expr(&rhs.kind, rhs.span),
+            RhsTactics::Default,
+            comment_span?,
+            true,
+        )
+    }
 }
 
 /// Controls where to put the rhs.

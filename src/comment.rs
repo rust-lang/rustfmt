@@ -7,12 +7,12 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use rustc_span::Span;
 
-use crate::config::Config;
+use crate::config::{Config, Version};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::string::{rewrite_string, StringFormat};
 use crate::utils::{
-    count_newlines, first_line_width, last_line_width, trim_left_preserve_layout,
+    count_newlines, first_line_width, is_single_line, last_line_width, trim_left_preserve_layout,
     trimmed_last_line_width, unicode_str_width,
 };
 use crate::{ErrorKind, FormattingError};
@@ -160,6 +160,20 @@ pub(crate) fn is_last_comment_block(s: &str) -> bool {
     s.trim_end().ends_with("*/")
 }
 
+/// Returns true if the last comment in the first line of the passed comments block
+/// ends on that line.
+fn is_first_comment_line_ends_comment(s: &str) -> bool {
+    if s.starts_with("/*") {
+        // FIXME: mixed block and line comments on the same line are not properly formatted,
+        // e.g. "/* Block comment /* // Line comment" at the end of the line.
+        s.lines().next().map_or(false, |l| l.ends_with("*/"))
+    } else if s.starts_with("//") {
+        true // Comment is "// comment"
+    } else {
+        false
+    }
+}
+
 /// Combine `prev_str` and `next_str` into a single `String`. `span` may contain
 /// comments between two strings. If there are such comments, then that will be
 /// recovered. If `allow_extend` is true and there is no comment between the two
@@ -226,7 +240,15 @@ pub(crate) fn combine_strs_with_missing_comments(
     } else {
         let one_line_width = last_line_width(prev_str) + first_line_width(&missing_comment) + 1;
         if prefer_same_line && one_line_width <= shape.width {
-            Cow::from(" ")
+            // First comment in the comments block can be in same line if it ends in the first line.
+            if context.config.version() == Version::One
+                || is_single_line(&missing_comment)
+                || is_first_comment_line_ends_comment(&missing_comment)
+            {
+                Cow::from(" ")
+            } else {
+                indent.to_string_with_newline(config)
+            }
         } else {
             indent.to_string_with_newline(config)
         }
@@ -240,7 +262,11 @@ pub(crate) fn combine_strs_with_missing_comments(
         indent.to_string_with_newline(config)
     } else {
         one_line_width += missing_comment.len() + first_sep.len() + 1;
-        allow_one_line &= !missing_comment.starts_with("//") && !missing_comment.contains('\n');
+        if context.config.version() == Version::One {
+            allow_one_line &= !missing_comment.starts_with("//") && !missing_comment.contains('\n');
+        } else {
+            allow_one_line &= !missing_comment.contains('\n');
+        }
         if prefer_same_line && allow_one_line && one_line_width <= shape.width {
             Cow::from(" ")
         } else {
@@ -1017,27 +1043,57 @@ fn light_rewrite_comment(
     config: &Config,
     is_doc_comment: bool,
 ) -> String {
-    let lines: Vec<&str> = orig
-        .lines()
-        .map(|l| {
-            // This is basically just l.trim(), but in the case that a line starts
-            // with `*` we want to leave one space before it, so it aligns with the
-            // `*` in `/*`.
-            let first_non_whitespace = l.find(|c| !char::is_whitespace(c));
-            let left_trimmed = if let Some(fnw) = first_non_whitespace {
-                if l.as_bytes()[fnw] == b'*' && fnw > 0 {
-                    &l[fnw - 1..]
+    if config.version() == Version::One {
+        let lines: Vec<&str> = orig
+            .lines()
+            .map(|l| {
+                // This is basically just l.trim(), but in the case that a line starts
+                // with `*` we want to leave one space before it, so it aligns with the
+                // `*` in `/*`.
+                let first_non_whitespace = l.find(|c| !char::is_whitespace(c));
+                let left_trimmed = if let Some(fnw) = first_non_whitespace {
+                    if l.as_bytes()[fnw] == b'*' && fnw > 0 {
+                        &l[fnw - 1..]
+                    } else {
+                        &l[fnw..]
+                    }
                 } else {
-                    &l[fnw..]
-                }
-            } else {
-                ""
-            };
+                    ""
+                };
+                // Preserve markdown's double-space line break syntax in doc comment.
+                trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment)
+            })
+            .collect();
+        lines.join(&format!("\n{}", offset.to_string(config)))
+    } else {
+        // Version::Two
+        let mut result = String::with_capacity(orig.len() * 2);
+        let mut lines = orig.lines().peekable();
+
+        // This is basically just l.trim(), but in the case that a line starts with `*`
+        // we want to leave one space before it, so it aligns with the `*` in `/*`.
+        while let Some(full_line) = lines.next() {
+            let line = full_line.trim_start();
+
+            if line.is_empty() {
+                continue;
+            }
+
+            if line.starts_with('*') {
+                result.push(' ');
+            }
+
             // Preserve markdown's double-space line break syntax in doc comment.
-            trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment)
-        })
-        .collect();
-    lines.join(&format!("\n{}", offset.to_string(config)))
+            let trimmed = trim_end_unless_two_whitespaces(line, is_doc_comment);
+            result.push_str(trimmed);
+
+            let is_last = lines.peek().is_none();
+            if !is_last {
+                result.push_str(&offset.to_string_with_newline(config))
+            }
+        }
+        result
+    }
 }
 
 /// Trims comment characters and possibly a single space from the left of a string.
