@@ -1065,7 +1065,7 @@ from formatting an attribute #3665
 - Do not collapse block around expr with condition on match arm 5b9b7d5
 - Use vertical layout for complex attributes c77708f
 - Format array using heuristics for function calls 98c6f7b
-- Implement stable ordering for impl items with the the following item priority: type, const, macro, then method fa80ddf
+- Implement stable ordering for impl items with the following item priority: type, const, macro, then method fa80ddf
 - Reorder imports by default 164cf7d
 - Group `extern crate` by default 3a138a2
 - Make `error_on_line_overflow` false by default f146711
