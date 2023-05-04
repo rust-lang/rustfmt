@@ -11,13 +11,13 @@ jobs:
     name: build-release
     strategy:
       matrix:
-        build: [linux-x86_64, linux-arm64, macos-x86_64, windows-x86_64-gnu, windows-x86_64-msvc]
+        build: [linux-x86_64, linux-aarch64, macos-x86_64, macos-aarch64, windows-x86_64-gnu, windows-x86_64-msvc]
         include:
           - build: linux-x86_64
             os: ubuntu-latest
             rust: nightly
             target: x86_64-unknown-linux-gnu
-          - build: linux-arm64
+          - build: linux-aarch64
             os: ubuntu-latest
             rust: nightly
             target: aarch64-unknown-linux-gnu
@@ -25,6 +25,10 @@ jobs:
             os: macos-latest
             rust: nightly
             target: x86_64-apple-darwin
+          - build: macos-aarch64
+            os: macos-latest
+            rust: nightly
+            target: aarch64-apple-darwin
           - build: windows-x86_64-gnu
             os: windows-latest
             rust: nightly-x86_64-gnu
