@@ -21,6 +21,7 @@ jobs:
       matrix:
         target: [
           x86_64-unknown-linux-gnu,
+          aarch64-unknown-linux-gnu,
         ]
         cfg_release_channel: [nightly, stable]
 
