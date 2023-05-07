@@ -2,7 +2,7 @@
 
 use itertools::Itertools;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{cmp, fmt, iter, str};
 
 use rustc_data_structures::sync::Lrc;
@@ -23,6 +23,15 @@ pub struct LineRange {
 pub enum FileName {
     Real(PathBuf),
     Stdin,
+}
+
+impl FileName {
+    pub(crate) fn as_path(&self) -> Option<&Path> {
+        match self {
+            FileName::Real(ref path) => Some(path),
+            _ => None,
+        }
+    }
 }
 
 impl From<rustc_span::FileName> for FileName {
