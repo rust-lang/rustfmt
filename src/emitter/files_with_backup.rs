@@ -1,11 +1,12 @@
 use super::*;
+use crate::NewlineStyle;
 use std::fs;
 
 #[derive(Debug, Default)]
 pub(crate) struct FilesWithBackupEmitter;
 
 impl Emitter for FilesWithBackupEmitter {
-    fn emit_formatted_file(
+    fn emit_formatted_file_with_line_style(
         &mut self,
         _output: &mut dyn Write,
         FormattedFile {
@@ -13,6 +14,7 @@ impl Emitter for FilesWithBackupEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
+        _: NewlineStyle,
     ) -> Result<EmitterResult, io::Error> {
         let filename = ensure_real_path(filename);
         if original_text != formatted_text {

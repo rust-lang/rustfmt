@@ -1,8 +1,13 @@
 use super::*;
 use crate::rustfmt_diff::{make_diff, DiffLine, Mismatch};
+use crate::NewlineStyle;
 use serde::Serialize;
 use serde_json::to_string as to_json_string;
 use std::io::{self, Write};
+
+use crate::formatting::newline_style::{
+    apply_newline_style, get_newline_string, get_newline_string_of_text,
+};
 
 #[derive(Debug, Default)]
 pub(crate) struct JsonEmitter {
@@ -30,7 +35,7 @@ impl Emitter for JsonEmitter {
         writeln!(output, "{}", &to_json_string(&self.mismatched_files)?)
     }
 
-    fn emit_formatted_file(
+    fn emit_formatted_file_with_line_style(
         &mut self,
         _output: &mut dyn Write,
         FormattedFile {
@@ -38,13 +43,17 @@ impl Emitter for JsonEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
+        newline_style: NewlineStyle,
     ) -> Result<EmitterResult, io::Error> {
         const CONTEXT_SIZE: usize = 0;
         let diff = make_diff(original_text, formatted_text, CONTEXT_SIZE);
         let has_diff = !diff.is_empty();
 
+        let mut formatted_text_string = String::from(formatted_text);
+        apply_newline_style(newline_style, &mut formatted_text_string, &original_text);
+
         if has_diff {
-            self.add_misformatted_file(filename, diff)?;
+            self.add_misformatted_file(filename, diff, newline_style, &original_text)?;
         }
 
         Ok(EmitterResult { has_diff })
@@ -56,8 +65,13 @@ impl JsonEmitter {
         &mut self,
         filename: &FileName,
         diff: Vec<Mismatch>,
+        newline_style: NewlineStyle,
+        raw_input_text: &str,
     ) -> Result<(), io::Error> {
         let mut mismatches = vec![];
+        let expected_newline = get_newline_string(newline_style, raw_input_text);
+        let origin_newline = get_newline_string_of_text(raw_input_text);
+
         for mismatch in diff {
             let original_begin_line = mismatch.line_number_orig;
             let expected_begin_line = mismatch.line_number;
@@ -74,13 +88,13 @@ impl JsonEmitter {
                         expected_end_line = expected_begin_line + expected_line_counter;
                         expected_line_counter += 1;
                         expected.push_str(&msg);
-                        expected.push('\n');
+                        expected.push_str(&expected_newline);
                     }
                     DiffLine::Resulting(msg) => {
                         original_end_line = original_begin_line + original_line_counter;
                         original_line_counter += 1;
                         original.push_str(&msg);
-                        original.push('\n');
+                        original.push_str(&origin_newline);
                     }
                     DiffLine::Context(_) => continue,
                 }
@@ -139,7 +153,12 @@ mod tests {
         };
 
         let _ = emitter
-            .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
+            .add_misformatted_file(
+                &FileName::Real(PathBuf::from(file)),
+                vec![mismatch],
+                NewlineStyle::Auto,
+                &mismatched_file.mismatches[0].original,
+            )
             .unwrap();
 
         assert_eq!(emitter.mismatched_files.len(), 1);
@@ -184,7 +203,12 @@ mod tests {
         };
 
         let _ = emitter
-            .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
+            .add_misformatted_file(
+                &FileName::Real(PathBuf::from(file)),
+                vec![mismatch],
+                NewlineStyle::Auto,
+                &mismatched_file.mismatches[0].original,
+            )
             .unwrap();
 
         assert_eq!(emitter.mismatched_files.len(), 1);

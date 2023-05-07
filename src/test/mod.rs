@@ -1047,3 +1047,20 @@ fn verify_check_l_works_with_stdin() {
     assert!(output.status.success());
     assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "<stdin>\n");
 }
+
+// Test proper Json output Line-style
+#[test]
+fn emits_json_with_newline_type_unix() {
+    init_log();
+    let filename = "tests/writemode/source/json-newline-style-unix.rs";
+    let expected_filename = "tests/writemode/target/json-newline-style-unix.json";
+    assert_output(Path::new(filename), Path::new(expected_filename));
+}
+
+#[test]
+fn emits_json_with_newline_type_windows() {
+    init_log();
+    let filename = "tests/writemode/source/json-newline-style-windows.rs";
+    let expected_filename = "tests/writemode/target/json-newline-style-windows.json";
+    assert_output(Path::new(filename), Path::new(expected_filename));
+}

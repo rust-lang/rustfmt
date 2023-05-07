@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::Verbosity;
+use crate::NewlineStyle;
 use std::io::Write;
 
 #[derive(Debug)]
@@ -14,7 +15,7 @@ impl StdoutEmitter {
 }
 
 impl Emitter for StdoutEmitter {
-    fn emit_formatted_file(
+    fn emit_formatted_file_with_line_style(
         &mut self,
         output: &mut dyn Write,
         FormattedFile {
@@ -22,6 +23,7 @@ impl Emitter for StdoutEmitter {
             formatted_text,
             ..
         }: FormattedFile<'_>,
+        _: NewlineStyle,
     ) -> Result<EmitterResult, io::Error> {
         if self.verbosity != Verbosity::Quiet {
             writeln!(output, "{}:\n", filename)?;

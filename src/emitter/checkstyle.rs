@@ -1,6 +1,7 @@
 use self::xml::XmlEscaped;
 use super::*;
 use crate::rustfmt_diff::{make_diff, DiffLine, Mismatch};
+use crate::NewlineStyle;
 use std::io::{self, Write};
 
 mod xml;
@@ -19,7 +20,7 @@ impl Emitter for CheckstyleEmitter {
         writeln!(output, "</checkstyle>")
     }
 
-    fn emit_formatted_file(
+    fn emit_formatted_file_with_line_style(
         &mut self,
         output: &mut dyn Write,
         FormattedFile {
@@ -27,6 +28,7 @@ impl Emitter for CheckstyleEmitter {
             original_text,
             formatted_text,
         }: FormattedFile<'_>,
+        _: NewlineStyle,
     ) -> Result<EmitterResult, io::Error> {
         const CONTEXT_SIZE: usize = 0;
         let diff = make_diff(original_text, formatted_text, CONTEXT_SIZE);

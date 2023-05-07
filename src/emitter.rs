@@ -6,6 +6,7 @@ pub(crate) use self::json::*;
 pub(crate) use self::modified_lines::*;
 pub(crate) use self::stdout::*;
 use crate::FileName;
+use crate::NewlineStyle;
 use std::io::{self, Write};
 use std::path::Path;
 
@@ -33,6 +34,15 @@ pub(crate) trait Emitter {
         &mut self,
         output: &mut dyn Write,
         formatted_file: FormattedFile<'_>,
+    ) -> Result<EmitterResult, io::Error> {
+        self.emit_formatted_file_with_line_style(output, formatted_file, NewlineStyle::Auto)
+    }
+
+    fn emit_formatted_file_with_line_style(
+        &mut self,
+        output: &mut dyn Write,
+        formatted_file: FormattedFile<'_>,
+        newline_style: NewlineStyle,
     ) -> Result<EmitterResult, io::Error>;
 
     fn emit_header(&self, _output: &mut dyn Write) -> Result<(), io::Error> {
