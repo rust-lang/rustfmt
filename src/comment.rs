@@ -765,7 +765,17 @@ impl<'a> CommentRewrite<'a> {
         self.code_block_attr = None;
         self.item_block = None;
         if let Some(stripped) = line.strip_prefix("```") {
-            self.code_block_attr = Some(CodeBlockAttribute::new(stripped))
+            // The current line is the start of a code fence, and we want to make sure that
+            // code fences always start on their own line.
+            if self.buffer_contains_comment() && !self.result.ends_with('\n') {
+                self.result.push_str(&self.comment_line_separator);
+                self.result.push_str(line)
+            } else {
+                // the comment buffer is empty, so we can just write the line
+                self.result.push_str(line)
+            }
+            self.code_block_attr = Some(CodeBlockAttribute::new(stripped));
+            return false;
         } else if self.fmt.config.wrap_comments() && ItemizedBlock::is_itemized_line(line) {
             let ib = ItemizedBlock::new(line);
             self.item_block = Some(ib);
