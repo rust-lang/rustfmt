@@ -2005,6 +2005,16 @@ mod test {
     }
 
     #[test]
+    fn test_find_last_uncommented() {
+        fn check(haystack: &str, needle: &str, expected: Option<usize>) {
+            assert_eq!(expected, haystack.find_last_uncommented(needle));
+        }
+        check("foo test bar test", "test", Some(13));
+        check("test,", "test", Some(0));
+        check("nothing", "test", None);
+    }
+
+    #[test]
     fn test_filter_normal_code() {
         let s = r#"
 fn main() {
