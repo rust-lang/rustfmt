@@ -115,7 +115,7 @@ pub(crate) struct UseTree {
     pub(crate) list_item: Option<ListItem>,
     // Additional fields for top level use items.
     // Should we have another struct for top-level use items rather than reusing this?
-    visibility: Option<ast::Visibility>,
+    pub(crate) visibility: Option<ast::Visibility>,
     attrs: Option<ast::AttrVec>,
 }
 

@@ -114,6 +114,15 @@ pub enum GroupImportsTactic {
     StdExternalCrate,
     /// Discard existing groups, and create a single group for everything
     One,
+    /// Discard existing groups, and create new groups for each visibility modifiers
+    /// from the least visible to the most visible, i.e.:
+    /// 1. unexported imports
+    /// 2. `pub (self)`
+    /// 3. `pub (super)` imports
+    /// 4. `pub (crate)` imports
+    /// 5. `pub (in path)` imports
+    /// 6. `pub` imports
+    Visibility,
 }
 
 #[config_type]
