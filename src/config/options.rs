@@ -125,6 +125,10 @@ pub enum ImportGranularity {
     Crate,
     /// Use one `use` statement per module.
     Module,
+    /// Use one `use` statement per module, but merge singleton imports into
+    /// parent modules' `use` statements where it doesn't introduce nested
+    /// braces.
+    ModuleCondensed,
     /// Use one `use` statement per imported item.
     Item,
     /// Use one `use` statement including all items.

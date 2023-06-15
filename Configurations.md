@@ -1864,7 +1864,7 @@ Similar to other `import` related configuration options, this option operates wi
 Note that rustfmt will not modify the granularity of imports containing comments if doing so could potentially lose or misplace said comments.
 
 - **Default value**: `Preserve`
-- **Possible values**: `Preserve`, `Crate`, `Module`, `Item`, `One`
+- **Possible values**: `Preserve`, `Crate`, `Module`, `ModuleCondensed`, `Item`, `One`
 - **Stable**: No (tracking issue: [#4991](https://github.com/rust-lang/rustfmt/issues/4991))
 
 
@@ -1901,6 +1901,16 @@ Merge imports from the same module into a single `use` statement. Conversely, im
 use foo::b::{f, g};
 use foo::d::e;
 use foo::{a, b, c};
+use qux::{h, i};
+```
+
+#### `ModuleCondensed`:
+
+Like `Module`, but singleton imports are included in parent modules' `use` statements where it doesn't introduce nested braces.
+
+```rust
+use foo::b::{f, g};
+use foo::{a, b, c, d::e};
 use qux::{h, i};
 ```
 

@@ -218,7 +218,7 @@ pub(crate) fn normalize_use_trees_with_granularity(
         ImportGranularity::Item => return flatten_use_trees(use_trees, ImportGranularity::Item),
         ImportGranularity::Preserve => return use_trees,
         ImportGranularity::Crate => SharedPrefix::Crate,
-        ImportGranularity::Module => SharedPrefix::Module,
+        ImportGranularity::Module | ImportGranularity::ModuleCondensed => SharedPrefix::Module,
         ImportGranularity::One => SharedPrefix::One,
     };
 
@@ -244,7 +244,63 @@ pub(crate) fn normalize_use_trees_with_granularity(
             }
         }
     }
+
+    if import_granularity == ImportGranularity::ModuleCondensed {
+        condense_use_trees(&mut result);
+    }
+
     result
+}
+
+/// Merge singleton imports into parent modules' use-trees where it does't
+/// introduce nested braces.
+fn condense_use_trees(use_trees: &mut Vec<UseTree>) {
+    // Sort by path length to put singletons after the trees into which they
+    // may be absorbed.
+    use_trees.sort_unstable_by_key(|tree| tree.path.len());
+
+    // Search for singletons back-to-front to preserve the just mentioned
+    // relative order between absorbing trees and singletons. Note that a
+    // singleton that is found and merged into _some_ tree is `swap_remove`d
+    // from the `use_trees` vector.
+    for n in (0..use_trees.len()).rev() {
+        let singleton = &use_trees[n];
+
+        if !singleton.is_singleton() || singleton.attrs.is_some() || singleton.contains_comment() {
+            continue;
+        }
+
+        let mut best_index_and_len = None;
+
+        // Search front-to-back for a tree to merge the singleton into. If
+        // multiple trees are equally good candidates, prefer the earliest one.
+        // Like above, these precautions help preserve the relative order
+        // between absorbing trees and singletons.
+        for curr_index in 0..n {
+            let curr_tree = &use_trees[curr_index];
+            let curr_len = curr_tree.shared_prefix_len(singleton);
+            if best_index_and_len.map_or(false, |(_, best_len)| best_len >= curr_len) {
+                continue;
+            }
+            if curr_len < 1
+                || !(curr_tree.is_singleton() || curr_len + 1 == curr_tree.path.len())
+                || curr_tree.attrs.is_some()
+                || curr_tree.contains_comment()
+                || !curr_tree.same_visibility(singleton)
+            {
+                continue;
+            }
+            best_index_and_len = Some((curr_index, curr_len));
+        }
+
+        if let Some((best_index, _)) = best_index_and_len {
+            let singleton = use_trees.swap_remove(n);
+            use_trees[best_index].merge(&singleton, SharedPrefix::Crate);
+        }
+    }
+
+    // Put the trees back in their preferred order.
+    use_trees.sort();
 }
 
 fn flatten_use_trees(
@@ -667,6 +723,18 @@ impl UseTree {
                 SharedPrefix::One => true,
             }
         }
+    }
+
+    fn shared_prefix_len(&self, other: &UseTree) -> usize {
+        let mut n = 0;
+        while n < self.path.len() && n < other.path.len() && self.path[n] == other.path[n] {
+            n += 1;
+        }
+        n
+    }
+
+    fn is_singleton(&self) -> bool {
+        !matches!(self.path.last().unwrap().kind, UseSegmentKind::List(_))
     }
 
     fn flatten(self, import_granularity: ImportGranularity) -> Vec<UseTree> {
