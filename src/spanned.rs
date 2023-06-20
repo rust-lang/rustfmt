@@ -4,6 +4,7 @@ use rustc_ast::{ast, ptr};
 use rustc_span::{source_map, Span};
 
 use crate::macros::MacroArg;
+use crate::parse::macros::matches::MatchesMacroItem;
 use crate::utils::{mk_sp, outer_attributes};
 
 /// Spanned returns a span including attributes, if available.
@@ -195,5 +196,15 @@ impl Spanned for MacroArg {
 impl Spanned for ast::NestedMetaItem {
     fn span(&self) -> Span {
         self.span()
+    }
+}
+
+impl Spanned for MatchesMacroItem {
+    fn span(&self) -> rustc_span::Span {
+        match self {
+            Self::Expr(expr) => expr.span,
+            Self::Arm(pat, None) => pat.span,
+            Self::Arm(pat, Some(guard)) => mk_sp(pat.span.lo(), guard.span.hi()),
+        }
     }
 }

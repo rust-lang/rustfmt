@@ -1261,7 +1261,10 @@ fn rewrite_int_lit(
     )
 }
 
-fn choose_separator_tactic(context: &RewriteContext<'_>, span: Span) -> Option<SeparatorTactic> {
+pub(crate) fn choose_separator_tactic(
+    context: &RewriteContext<'_>,
+    span: Span,
+) -> Option<SeparatorTactic> {
     if context.inside_macro() {
         if span_ends_with_comma(context, span) {
             Some(SeparatorTactic::Always)
@@ -1888,9 +1891,9 @@ impl<'ast> RhsAssignKind<'ast> {
                 matches!(
                     kind,
                     ast::ExprKind::Try(..)
-                        | ast::ExprKind::Field(..)
-                        | ast::ExprKind::MethodCall(..)
-                        | ast::ExprKind::Await(_)
+                    | ast::ExprKind::Field(..)
+                    | ast::ExprKind::MethodCall(..)
+                    | ast::ExprKind::Await(_)
                 )
             }
             _ => false,
