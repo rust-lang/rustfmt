@@ -57,7 +57,7 @@ fn is_attr_name_value(attr: &syn::Attribute, name: &str) -> bool {
     }
 }
 
-fn is_attr_path(attr: &syn::Attribute, name: &str) -> bool {
+pub fn is_attr_path(attr: &syn::Attribute, name: &str) -> bool {
     match &attr.meta {
         syn::Meta::Path(path) if path.is_ident(name) => true,
         _ => false,

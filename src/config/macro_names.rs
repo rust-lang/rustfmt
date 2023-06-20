@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json as json;
 use thiserror::Error;
 
+use super::config_type::StyleEditionDefault;
+
 /// Defines the name of a macro.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Deserialize, Serialize)]
 pub struct MacroName(String);
@@ -59,6 +61,13 @@ impl str::FromStr for MacroSelector {
 /// A set of macro selectors.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct MacroSelectors(pub Vec<MacroSelector>);
+
+impl StyleEditionDefault for MacroSelectors {
+    type ConfigType = Self;
+    fn style_edition_default(_style_edition: crate::StyleEdition) -> Self::ConfigType {
+        Self::default()
+    }
+}
 
 impl fmt::Display for MacroSelectors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

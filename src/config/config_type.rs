@@ -1,6 +1,6 @@
 use crate::config::file_lines::FileLines;
 use crate::config::macro_names::MacroSelectors;
-use crate::config::options::{IgnoreList, WidthHeuristics};
+use crate::config::options::{IgnoreList, StyleEdition, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
 pub(crate) trait ConfigType: Sized {
@@ -15,6 +15,12 @@ pub(crate) trait ConfigType: Sized {
     fn stable_variant(&self) -> bool {
         true
     }
+}
+
+/// Defines the default value for the given style edition
+pub(crate) trait StyleEditionDefault {
+    type ConfigType;
+    fn style_edition_default(style_edition: StyleEdition) -> Self::ConfigType;
 }
 
 impl ConfigType for bool {
@@ -73,7 +79,7 @@ macro_rules! create_config {
     // - $def: the default value of the option
     // - $stb: true if the option is stable
     // - $dstring: description of the option
-    ($($i:ident: $ty:ty, $def:expr, $stb:expr, $( $dstring:expr ),+ );+ $(;)*) => (
+    ($($i:ident: $ty:ty, $def:ty, $stb:expr, $( $dstring:expr ),+ );+ $(;)*) => (
         #[cfg(test)]
         use std::collections::HashSet;
         use std::io::Write;
@@ -149,6 +155,23 @@ macro_rules! create_config {
         }
 
         impl Config {
+            #[allow(unreachable_pub)]
+            pub fn deafult_with_style_edition(style_edition: StyleEdition) -> Config {
+
+                Config {
+                    $(
+                        $i: (
+                                Cell::new(false),
+                                false,
+                                <$def as StyleEditionDefault>::style_edition_default(
+                                    style_edition
+                                ),
+                                $stb
+                            ),
+                    )+
+                }
+            }
+
             $(
             #[allow(unreachable_pub)]
             pub fn $i(&self) -> $ty {
@@ -294,7 +317,7 @@ macro_rules! create_config {
             }
 
             #[allow(unreachable_pub)]
-            pub fn print_docs(out: &mut dyn Write, include_unstable: bool) {
+            pub fn print_docs(&self, out: &mut dyn Write, include_unstable: bool) {
                 use std::cmp;
                 let max = 0;
                 $( let max = cmp::max(max, stringify!($i).len()+1); )+
@@ -311,7 +334,10 @@ macro_rules! create_config {
                             }
                             name_out.push_str(name_raw);
                             name_out.push(' ');
-                            let mut default_str = format!("{}", $def);
+                            let default = <$def as StyleEditionDefault>::style_edition_default(
+                                self.style_edition.2
+                            );
+                            let mut default_str = format!("{}", default);
                             if default_str.is_empty() {
                                 default_str = String::from("\"\"");
                             }
@@ -456,7 +482,10 @@ macro_rules! create_config {
             pub fn is_default(&self, key: &str) -> bool {
                 $(
                     if let stringify!($i) = key {
-                        return self.$i.1 && self.$i.2 == $def;
+                        let default = <$def as StyleEditionDefault>::style_edition_default(
+                            self.style_edition.2
+                        );
+                        return self.$i.1 && self.$i.2 == default;
                     }
                  )+
                 false
@@ -466,11 +495,7 @@ macro_rules! create_config {
         // Template for the default configuration
         impl Default for Config {
             fn default() -> Config {
-                Config {
-                    $(
-                        $i: (Cell::new(false), false, $def, $stb),
-                    )+
-                }
+                Config::deafult_with_style_edition(StyleEdition::default())
             }
         }
     )

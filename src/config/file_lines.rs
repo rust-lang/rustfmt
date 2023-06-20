@@ -11,6 +11,8 @@ use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json as json;
 use thiserror::Error;
 
+use crate::config::StyleEditionDefault;
+
 /// A range of lines in a file, inclusive of both ends.
 pub struct LineRange {
     pub(crate) file: Lrc<SourceFile>,
@@ -155,6 +157,13 @@ impl Range {
 /// lines in all files.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FileLines(Option<HashMap<FileName, Vec<Range>>>);
+
+impl StyleEditionDefault for FileLines {
+    type ConfigType = Self;
+    fn style_edition_default(_style_edition: crate::StyleEdition) -> Self::ConfigType {
+        FileLines::all()
+    }
+}
 
 impl fmt::Display for FileLines {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
