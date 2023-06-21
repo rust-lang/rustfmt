@@ -644,13 +644,30 @@ pub(crate) fn extract_post_comment(
     } else {
         post_snippet
     };
+
+    // If there is comma in the post comment, we remove that comma since
+    // it gets inserted before the post comment. Note that this only happens
+    // for the last item in a list, since items that are not the last feed
+    // comments after the comma to the next item as a pre comment.
+    let comma = find_comment_end(post_snippet_trimmed).map(|idx| {
+        (
+            &post_snippet_trimmed[..idx],
+            post_snippet_trimmed[idx..].trim_start(),
+        )
+    });
+    let post_snippet_trimmed =
+        if let Some((before, after)) = comma.filter(|(_before, after)| after.starts_with(',')) {
+            format!("{}{}", before.trim_end(), &after[1..])
+        } else {
+            post_snippet_trimmed.to_owned()
+        };
     // FIXME(#3441): post_snippet includes 'const' now
     // it should not include here
     let removed_newline_snippet = post_snippet_trimmed.trim();
     if !post_snippet_trimmed.is_empty()
         && (removed_newline_snippet.starts_with("//") || removed_newline_snippet.starts_with("/*"))
     {
-        Some(post_snippet_trimmed.to_owned())
+        Some(post_snippet_trimmed)
     } else {
         None
     }
@@ -679,6 +696,13 @@ pub(crate) fn get_comment_end(
     }
     let newline_index = post_snippet.find('\n');
     if let Some(separator_index) = post_snippet.find_uncommented(separator) {
+        trace!(
+            "post_snippet: {post_snippet:?}\n\
+             newline: {newline_index:?}\n\
+             block: {block_open_index:?}\n\
+             sep: {separator_index} ({:?})",
+            &post_snippet[separator_index..]
+        );
         match (block_open_index, newline_index) {
             // Separator before comment, with the next item on same line.
             // Comment belongs to next item.
@@ -688,14 +712,19 @@ pub(crate) fn get_comment_end(
                 find_comment_end(&post_snippet[i..]).unwrap() + i,
                 separator_index + 1,
             ),
-            // Block-style post-comment. Either before or after the separator.
-            (Some(i), Some(j)) if i < j => cmp::max(
-                find_comment_end(&post_snippet[i..]).unwrap() + i,
+            // Block-style post-comment. Either before or after the separator, but before the
+            // newline.
+            (Some(block), Some(newline)) if block < newline => cmp::max(
+                find_comment_end(&post_snippet[block..]).unwrap() + block,
                 separator_index + 1,
             ),
             // Potential *single* line comment.
-            (_, Some(j)) if j > separator_index => j + 1,
-            _ => post_snippet.len(),
+            // e.g. `1 => something(), // comment is before newline`
+            (_, Some(newline)) if newline > separator_index => newline + 1,
+            // Any potential comment in this branch would be after a newline, but *before* the
+            // separator, so conservatively don't consider comments after the separator as
+            // belonging to this item.
+            _ => separator_index + 1,
         }
     } else if let Some(newline_index) = newline_index {
         // Match arms may not have trailing comma. In any case, for match arms,
@@ -769,6 +798,13 @@ where
             let new_lines = has_extra_newline(post_snippet, comment_end);
             let post_comment =
                 extract_post_comment(post_snippet, comment_end, self.separator, is_last);
+
+            trace!(
+                "pre_snippet: {pre_snippet:?}\n\
+                    pre_comment: {pre_comment:?}\n\
+                    post_snippet: {post_snippet:?}\n\
+                    post_comment: {post_comment:?}"
+            );
 
             self.prev_span_end = (self.get_hi)(&item) + BytePos(comment_end as u32);
 
