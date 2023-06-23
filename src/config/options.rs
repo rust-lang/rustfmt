@@ -128,6 +128,7 @@ pub enum ImportGranularity {
     /// Use one `use` statement per module, but merge singleton imports into
     /// parent modules' `use` statements where it doesn't introduce nested
     /// braces.
+    #[unstable_variant]
     ModuleCondensed,
     /// Use one `use` statement per imported item.
     Item,
