@@ -283,7 +283,7 @@ fn condense_use_trees(use_trees: &mut Vec<UseTree>) {
                 continue;
             }
             if curr_len < 1
-                || !(curr_tree.is_singleton() || curr_len + 1 == curr_tree.path.len())
+                || !curr_tree.is_singleton() && curr_len + 1 != curr_tree.path.len()
                 || curr_tree.attrs.is_some()
                 || curr_tree.contains_comment()
                 || !curr_tree.same_visibility(singleton)
@@ -726,11 +726,11 @@ impl UseTree {
     }
 
     fn shared_prefix_len(&self, other: &UseTree) -> usize {
-        let mut n = 0;
-        while n < self.path.len() && n < other.path.len() && self.path[n] == other.path[n] {
-            n += 1;
-        }
-        n
+        self.path
+            .iter()
+            .zip(other.path.iter())
+            .take_while(|(a, b)| a == b)
+            .count()
     }
 
     fn is_singleton(&self) -> bool {
@@ -1393,6 +1393,62 @@ mod test {
             Module,
             ["foo::{a::b, a::c, d::e, d::f}"],
             ["foo::a::{b, c}", "foo::d::{e, f}"]
+        );
+    }
+
+    #[test]
+    fn test_use_tree_merge_module_condensed() {
+        test_merge!(
+            ModuleCondensed,
+            ["foo::b", "foo::{a, c, d::e}"],
+            ["foo::{a, b, c, d::e}"]
+        );
+
+        test_merge!(
+            ModuleCondensed,
+            ["foo::{a::b, a::c, d::e, d::f}"],
+            ["foo::a::{b, c}", "foo::d::{e, f}"]
+        );
+    }
+
+    /// This test exercises the "prefer the earliest one" logic in [`condense_use_trees`]. In
+    /// particular, if this line:
+    /// ```
+    ///         for curr_index in 0..n {
+    /// ```
+    /// were changed to this line:
+    /// ```
+    ///         for curr_index in (0..n).rev() {
+    /// ```
+    /// the test would fail. An explanation follows.
+    ///
+    /// Note that [`condense_use_trees`]'s outer loop visits the trees back-to-front. So in this
+    /// test, `foo::e::f` will be the first singleton considered for merging.
+    ///
+    /// Next note that `foo::a::b` and `foo::c::d` are equally good candidates to absorb
+    /// `foo::e::f`. Because the earliest candidate (i.e., `foo::a::b`) is selected, we get the
+    /// following intermediate state:
+    /// ```
+    /// foo::{a::b, e::f};
+    /// foo::c::d;
+    /// ```
+    /// Then, when `foo::c::d` is visited by the outer loop, it will notice that this singleton can
+    /// be merged into `foo::{a::b, e::f}`, and we get the desired output.
+    ///
+    /// On the other hand, if `foo::c::d` were selected, we would get the following intermediate
+    /// state:
+    /// ```
+    /// foo::a::b;
+    /// foo::{c::d, e::f};
+    /// ```
+    /// From this state, no progress could be made, because the only singleton (`foo::a::b`) appears
+    /// before all trees that could absorb it.
+    #[test]
+    fn test_use_tree_merge_module_condensed_relative_order() {
+        test_merge!(
+            ModuleCondensed,
+            ["foo::a::b", "foo::c::d", "foo::e::f"],
+            ["foo::{a::b, c::d, e::f}"]
         );
     }
 
