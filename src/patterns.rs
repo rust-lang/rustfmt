@@ -361,8 +361,8 @@ impl Rewrite for PatField {
             self.attrs.rewrite(context, shape)?
         };
 
-        let pat_str = self.pat.rewrite(context, shape)?;
         if self.is_shorthand {
+            let pat_str = self.pat.rewrite(context, shape)?;
             combine_strs_with_missing_comments(
                 context,
                 &attrs_str,
@@ -372,18 +372,31 @@ impl Rewrite for PatField {
                 false,
             )
         } else {
-            let nested_shape = shape.block_indent(context.config.tab_spaces());
             let id_str = rewrite_ident(context, self.ident);
-            let one_line_width = id_str.len() + 2 + pat_str.len();
-            let pat_and_id_str = if one_line_width <= shape.width {
-                format!("{}: {}", id_str, pat_str)
+            let offset_pat = if context.config.version() == Version::One {
+                None
             } else {
-                format!(
-                    "{}:\n{}{}",
-                    id_str,
-                    nested_shape.indent.to_string(context.config),
-                    self.pat.rewrite(context, nested_shape)?
-                )
+                shape
+                    .offset_left(id_str.len() + ": ".len())
+                    .and_then(|pat_shape| self.pat.rewrite(context, pat_shape))
+            };
+            let nested_shape = shape.block_indent(context.config.tab_spaces());
+            let pat_and_id_str = match offset_pat {
+                Some(pat) => format!("{}: {}", id_str, pat),
+                None => {
+                    let pat_str = self.pat.rewrite(context, shape)?;
+                    let one_line_width = id_str.len() + 2 + pat_str.len();
+                    if one_line_width <= shape.width {
+                        format!("{}: {}", id_str, pat_str)
+                    } else {
+                        format!(
+                            "{}:\n{}{}",
+                            id_str,
+                            nested_shape.indent.to_string(context.config),
+                            self.pat.rewrite(context, nested_shape)?
+                        )
+                    }
+                }
             };
             combine_strs_with_missing_comments(
                 context,
