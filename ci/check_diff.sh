@@ -71,6 +71,7 @@ function create_diff() {
 # $RUSFMT_BIN: Path to the rustfmt master binary. Created when running `compile_rustfmt`
 # $FEATURE_BIN: Path to the rustfmt feature binary. Created when running `compile_rustfmt`
 # $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script from $4
+# $OUTPUT_DIR: Path to an output directory for storing the diff files. Set in `main`
 function check_diff() {
     echo "running rustfmt (master) on $1"
     create_diff $RUSFMT_BIN rustfmt_diff.txt
@@ -89,10 +90,18 @@ function check_diff() {
         --unified=0 --no-index rustfmt_diff.txt feature_diff.txt 2>&1 | tail -n +6 | cut -c 2-
     )
 
+    # COPY diffs into output dir
+    mkdir $OUTPUT_DIR/$1
+    echo "Copying diffs to $OUTPUT_DIR/$1"
+    cp rustfmt_diff.txt $OUTPUT_DIR/$1/rustfmt_diff.txt
+    cp feature_diff.txt $OUTPUT_DIR/$1/feature_diff.txt
+
     if [ -z "$diff" ]; then
         echo "no diff detected between rustfmt and the feture branch"
         return 0
     else
+        echo "Copying diffs between rustfmt and feature branch to $OUTPUT_DIR/$1/diff.txt"
+        echo "$diff" >> $OUTPUT_DIR/$1/diff.txt
         echo "$diff"
         return 1
     fi
@@ -160,11 +169,27 @@ function check_repo() {
     cd $WORKDIR
 }
 
+# Zip up all the diff changes detected by the script
+#
+# Globlas:
+# $OUTPUT_DIR: Output directory where all `*diif.txt` files are written to. Set in `main`.
+# $CURRENT_DIR: The directory where the script was run from. Set in `main`.
+function zip_up_diffs() {
+    cd $OUTPUT_DIR
+
+    # Just to clean things up we'll make sure to remove empty files and directories
+    find . -type f -empty -delete
+    find . -type d -empty -delete
+    zip -q -r $CURRENT_DIR/diff-check .
+}
+
 function main() {
+    CURRENT_DIR=$(pwd)
     tmp_dir=$(mktemp -d -t rustfmt-XXXXXXXX)
     echo Created tmp_dir $tmp_dir
 
     compile_rustfmt $tmp_dir
+    OUTPUT_DIR=$(mktemp -d -t diff-output-XXX)
 
     # run checks
     check_repo "https://github.com/rust-lang/rust.git" rust-lang-rust
@@ -191,9 +216,12 @@ function main() {
     check_repo "https://github.com/actix/actix.git" actix
     check_repo "https://github.com/denoland/deno.git" denoland_deno
 
+    zip_up_diffs
+
     # cleanup temp dir
-    echo removing tmp_dir $tmp_dir
+    echo removing tmp_dir $tmp_dir and $OUTPUT_DIR
     rm -rf $tmp_dir
+    rm -rf $OUTPUT_DIR
 
     # figure out the exit code
     for status in ${STATUSES[@]}
