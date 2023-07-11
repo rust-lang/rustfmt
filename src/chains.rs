@@ -534,8 +534,8 @@ impl Rewrite for Chain {
         };
 
         formatter.format_root(&self.parent, context, shape)?;
-        if let Some(result) = formatter.pure_root() {
-            return wrap_str(result, context.config.max_width(), shape);
+        if let result @ Some(_) = formatter.pure_root() {
+            return result;
         }
 
         // Decide how to layout the rest of the chain.
