@@ -182,6 +182,80 @@ function check_repo() {
     cd $WORKDIR
 }
 
+function write_readme() {
+    rustfmt_diff=\`rustfmt_diff.txt\`
+    feature_diff=\`feature_diff.txt\`
+    diff_file=\`diff.txt\`
+    diff_files=\`*_diff.txt\`
+
+    if [ -n "$OPTIONAL_RUSTFMT_CONFIGS" ]; then
+        OPTIONAL_CONFIG_DETAILS="* diff check optional configs: \`$OPTIONAL_RUSTFMT_CONFIGS\`"
+    fi
+
+    cat > README.md << EOL
+# Diff Check
+
+## Summary
+
+The Diff Check Job is used to validate rustfmts backwards compatability guarantees
+by running the latest rustfmt from [rust-lang/rustfmt](https://github.com/rust-lang/rustfmt) and
+comparing the formatting results against a fork or feature branch of rustfmt --
+often before deciding to merge those changes into rustfmt via a pull request.
+
+**cargo details**
+* version: \`$CARGO_VERSON\`
+
+**rustfmt details**
+* version: \`$RUSTFMT_VERSION\`
+
+**fork details**
+* repo url: $REMOTE_REPO
+* feature branch: \`$FEATURE_BRANCH\`
+* version: \`$FEATURE_VERSION\`
+$OPTIONAL_CONFIG_DETAILS
+
+## How to interpret results
+
+Diffs created by running the rustfmt binary are reported in $rustfmt_diff, and
+diffs created by running the forked rustfmt binary are stored in $feature_diff.
+The presence of $rustfmt_diff and $feature_diff are not indicative of any errors.
+Some of the real world projects that rustfmt is tested against may not use rustfmt at all.
+All the $diff_files files show is that using rustfmt on a given project would change some formatting.
+
+If a $diff_file file is present for a given project then that indicates a failure to
+uphold rustfmts backwards compatability guarantees. Given the same input both binaries produced different outputs.
+The $diff_file shows the difference in formatting output between both binaries.
+
+## How to inspect diff-check results
+
+First unzip the the diff-check archive
+
+\`\`\`
+unzip diff-check.zip -d diff-check
+\`\`\`
+
+If the diff-check job completes successfully that means that both the rustfmt binary and the forked rustfmt binary
+agree upon formatting changes. However, if the job fails because both binaries produced different formatting, you
+can inspect the differences by running:
+
+\`\`\`
+for file in \$(find diff-check -type f -name diff.txt); cat \$file
+\`\`\`
+
+If you're curious you can inspect formatting changes produced when running rustfmt by running:
+
+\`\`\`
+for file in \$(find diff-check -type f -name rustfmt_diff.txt); cat \$file
+\`\`\`
+
+Similarly, you can inspect formatting changes produced when running the forked rustfmt binary by running:
+
+\`\`\`
+for file in \$(find diff-check -type f -name feature_diff.txt); cat \$file
+\`\`\`
+EOL
+}
+
 # Zip up all the diff changes detected by the script
 #
 # Globlas:
@@ -189,6 +263,7 @@ function check_repo() {
 # $CURRENT_DIR: The directory where the script was run from. Set in `main`.
 function zip_up_diffs() {
     cd $OUTPUT_DIR
+    write_readme
 
     # Just to clean things up we'll make sure to remove empty files and directories
     find . -type f -empty -delete
