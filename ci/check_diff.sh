@@ -123,13 +123,13 @@ function compile_rustfmt() {
     git remote add feature $REMOTE_REPO
     git fetch feature $FEATURE_BRANCH
 
-    cargo build --release --bin rustfmt && cp target/release/rustfmt $1/rustfmt
+    cargo build -q --release --bin rustfmt && cp target/release/rustfmt $1/rustfmt
     if [ -z "$OPTIONAL_COMMIT_HASH" ] || [ "$FEATURE_BRANCH" = "$OPTIONAL_COMMIT_HASH" ]; then
         git switch $FEATURE_BRANCH
     else
         git switch $OPTIONAL_COMMIT_HASH --detach
     fi
-    cargo build --release --bin rustfmt && cp target/release/rustfmt $1/feature_rustfmt
+    cargo build -q --release --bin rustfmt && cp target/release/rustfmt $1/feature_rustfmt
     RUSFMT_BIN=$1/rustfmt
     FEATURE_BIN=$1/feature_rustfmt
 }
