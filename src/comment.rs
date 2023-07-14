@@ -58,7 +58,7 @@ fn custom_opener(s: &str) -> &str {
 }
 
 impl<'a> CommentStyle<'a> {
-    /// Returns `true` if the commenting style is a single line comment.
+    /// Returns `true` if the commenting style cannot span multiple lines.
     pub(crate) fn is_line_comment(&self) -> bool {
         matches!(
             self,
