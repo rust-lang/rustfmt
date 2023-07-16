@@ -79,6 +79,8 @@ create_config! {
     skip_macro_invocations: SkipMacroInvocations, false,
         "Skip formatting the bodies of macros invoked with the following names.";
     hex_literal_case: HexLiteralCaseConfig, false, "Format hexadecimal integer literals";
+    float_literal_trailing_zero: FloatLiteralTrailingZeroConfig, false,
+        "Add or remove trailing zero in floating-point literals";
 
     // Single line expressions and items
     empty_item_single_line: EmptyItemSingleLine, false,
@@ -739,6 +741,7 @@ format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
+float_literal_trailing_zero = "Preserve"
 empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false
@@ -829,6 +832,7 @@ format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
+float_literal_trailing_zero = "Preserve"
 empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false

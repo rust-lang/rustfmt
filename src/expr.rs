@@ -13,8 +13,8 @@ use crate::comment::{
     CharClasses, FindUncommented, combine_strs_with_missing_comments, contains_comment,
     recover_comment_removed, rewrite_comment, rewrite_missing_comment,
 };
-use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, StyleEdition};
+use crate::config::{FloatLiteralTrailingZero, lists::*};
 use crate::lists::{
     ListFormatting, Separator, definitive_tactic, itemize_list, shape_for_tactic,
     struct_lit_formatting, struct_lit_shape, struct_lit_tactic, write_list,
@@ -1276,6 +1276,7 @@ pub(crate) fn rewrite_literal(
     match token_lit.kind {
         token::LitKind::Str => rewrite_string_lit(context, span, shape),
         token::LitKind::Integer => rewrite_int_lit(context, token_lit, span, shape),
+        token::LitKind::Float => rewrite_float_lit(context, token_lit, span, shape),
         _ => wrap_str(
             context.snippet(span).to_owned(),
             context.config.max_width(),
@@ -1320,6 +1321,11 @@ fn rewrite_int_lit(
     shape: Shape,
 ) -> RewriteResult {
     let symbol = token_lit.symbol.as_str();
+    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
+
+    if suffix == Some("f32") || suffix == Some("f64") {
+        return rewrite_float_lit(context, token_lit, span, shape);
+    }
 
     if let Some(symbol_stripped) = symbol.strip_prefix("0x") {
         let hex_lit = match context.config.hex_literal_case() {
@@ -1329,11 +1335,7 @@ fn rewrite_int_lit(
         };
         if let Some(hex_lit) = hex_lit {
             return wrap_str(
-                format!(
-                    "0x{}{}",
-                    hex_lit,
-                    token_lit.suffix.as_ref().map_or("", |s| s.as_str())
-                ),
+                format!("0x{}{}", hex_lit, suffix.unwrap_or("")),
                 context.config.max_width(),
                 shape,
             )
@@ -1343,6 +1345,76 @@ fn rewrite_int_lit(
 
     wrap_str(
         context.snippet(span).to_owned(),
+        context.config.max_width(),
+        shape,
+    )
+    .max_width_error(shape.width, span)
+}
+
+fn rewrite_float_lit(
+    context: &RewriteContext<'_>,
+    token_lit: token::Lit,
+    span: Span,
+    shape: Shape,
+) -> RewriteResult {
+    // This regex may accept invalid float literals (such as `1`, `_` or `2.e3`). That's ok.
+    // We only use it to parse literals whose validity has already been established.
+    let float_literal_regex = static_regex!(r"^([0-9_]+)(?:\.([0-9_]+)?)?([eE][+-]?[0-9_]+)?$");
+    let zero_literal_regex = static_regex!(r"^[0_]+$");
+
+    if matches!(
+        context.config.float_literal_trailing_zero(),
+        FloatLiteralTrailingZero::Preserve
+    ) {
+        return wrap_str(
+            context.snippet(span).to_owned(),
+            context.config.max_width(),
+            shape,
+        )
+        .max_width_error(shape.width, span);
+    }
+
+    let symbol = token_lit.symbol.as_str();
+    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
+
+    let caps = float_literal_regex.captures(symbol).unwrap();
+    let integer_part = caps.get(1).unwrap().as_str();
+    let fractional_part = caps.get(2).map(|s| s.as_str());
+    let exponent = caps.get(3).map(|s| s.as_str());
+
+    let has_postfix = exponent.is_some() || suffix.is_some();
+    let fractional_part_nonzero =
+        fractional_part.map_or(false, |s| !zero_literal_regex.is_match(s));
+
+    let (include_period, include_fractional_part) =
+        match context.config.float_literal_trailing_zero() {
+            FloatLiteralTrailingZero::Preserve => unreachable!("handled above"),
+            FloatLiteralTrailingZero::Always => (true, true),
+            FloatLiteralTrailingZero::IfNoPostfix => (
+                fractional_part_nonzero || !has_postfix,
+                fractional_part_nonzero || !has_postfix,
+            ),
+            FloatLiteralTrailingZero::Never => (
+                fractional_part_nonzero || !has_postfix,
+                fractional_part_nonzero,
+            ),
+        };
+
+    let period = if include_period { "." } else { "" };
+    let fractional_part = if include_fractional_part {
+        fractional_part.unwrap_or("0")
+    } else {
+        ""
+    };
+    wrap_str(
+        format!(
+            "{}{}{}{}{}",
+            integer_part,
+            period,
+            fractional_part,
+            exponent.unwrap_or(""),
+            suffix.unwrap_or(""),
+        ),
         context.config.max_width(),
         shape,
     )

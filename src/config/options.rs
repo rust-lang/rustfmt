@@ -146,6 +146,21 @@ pub enum HexLiteralCase {
     Lower,
 }
 
+/// How to treat trailing zeros in floating-point literals.
+#[config_type]
+pub enum FloatLiteralTrailingZero {
+    /// Leave the literal as-is.
+    Preserve,
+    /// Add a trailing zero to the literal.
+    Always,
+    /// Add a trailing zero by default. If the literal contains an exponent or a suffix, the zero
+    /// and the preceding period are removed.
+    IfNoPostfix,
+    /// Remove the trailing zero. If the literal contains an exponent or a suffix, the preceding
+    /// period is also removed.
+    Never,
+}
+
 #[config_type]
 pub enum ReportTactic {
     Always,
@@ -613,6 +628,8 @@ config_option_with_style_edition_default!(
     FormatMacroBodies, bool, _ => true;
     SkipMacroInvocations, MacroSelectors, _ => MacroSelectors::default();
     HexLiteralCaseConfig, HexLiteralCase, _ => HexLiteralCase::Preserve;
+    FloatLiteralTrailingZeroConfig, FloatLiteralTrailingZero, _ =>
+        FloatLiteralTrailingZero::Preserve;
 
     // Single line expressions and items
     EmptyItemSingleLine, bool, _ => true;
