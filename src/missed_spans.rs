@@ -9,6 +9,7 @@ use crate::shape::{Indent, Shape};
 use crate::source_map::LineRangeUtils;
 use crate::utils::{count_lf_crlf, count_newlines, last_line_width, mk_sp};
 use crate::visitor::FmtVisitor;
+use crate::Config;
 
 struct SnippetStatus {
     /// An offset to the current line from the beginning of the original snippet.
@@ -112,27 +113,9 @@ impl<'a> FmtVisitor<'a> {
         }
     }
 
-    fn push_vertical_spaces(&mut self, mut newline_count: usize) {
-        let offset = self.buffer.chars().rev().take_while(|c| *c == '\n').count();
-        let newline_upper_bound = self.config.blank_lines_upper_bound() + 1;
-        let newline_lower_bound = self.config.blank_lines_lower_bound() + 1;
-
-        if newline_count + offset > newline_upper_bound {
-            if offset >= newline_upper_bound {
-                newline_count = 0;
-            } else {
-                newline_count = newline_upper_bound - offset;
-            }
-        } else if newline_count + offset < newline_lower_bound {
-            if offset >= newline_lower_bound {
-                newline_count = 0;
-            } else {
-                newline_count = newline_lower_bound - offset;
-            }
-        }
-
-        let blank_lines = "\n".repeat(newline_count);
-        self.push_str(&blank_lines);
+    fn push_vertical_spaces(&mut self, newline_count: usize) {
+        let newlines_pushed = push_vertical_spaces(&mut self.buffer, self.config, newline_count);
+        self.line_number += newlines_pushed;
     }
 
     fn write_snippet<F>(&mut self, span: Span, process_last_snippet: F)
@@ -360,4 +343,32 @@ impl<'a> FmtVisitor<'a> {
             status.line_start = subslice.len() + offset;
         }
     }
+}
+
+pub(crate) fn push_vertical_spaces(
+    buffer: &mut String,
+    config: &Config,
+    mut newline_count: usize,
+) -> usize {
+    let offset = buffer.chars().rev().take_while(|c| *c == '\n').count();
+    let newline_upper_bound = config.blank_lines_upper_bound() + 1;
+    let newline_lower_bound = config.blank_lines_lower_bound() + 1;
+
+    if newline_count + offset > newline_upper_bound {
+        if offset >= newline_upper_bound {
+            newline_count = 0;
+        } else {
+            newline_count = newline_upper_bound - offset;
+        }
+    } else if newline_count + offset < newline_lower_bound {
+        if offset >= newline_lower_bound {
+            newline_count = 0;
+        } else {
+            newline_count = newline_lower_bound - offset;
+        }
+    }
+
+    let blank_lines = "\n".repeat(newline_count);
+    buffer.push_str(&blank_lines);
+    newline_count
 }

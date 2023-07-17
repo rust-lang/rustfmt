@@ -1021,6 +1021,7 @@ pub(crate) fn recover_missing_comment_in_span(
     shape: Shape,
     context: &RewriteContext<'_>,
     used_width: usize,
+    remove_leading_newlines: bool,
 ) -> Option<String> {
     let missing_comment = rewrite_missing_comment(span, shape, context)?;
     if missing_comment.is_empty() {
@@ -1032,7 +1033,9 @@ pub(crate) fn recover_missing_comment_in_span(
         let total_width = missing_comment.len() + used_width + 1;
         let force_new_line_before_comment =
             missing_snippet[..pos].contains('\n') || total_width > context.config.max_width();
-        let sep = if force_new_line_before_comment {
+        let sep = if remove_leading_newlines && force_new_line_before_comment {
+            shape.indent.to_string(context.config)
+        } else if force_new_line_before_comment {
             shape.indent.to_string_with_newline(context.config)
         } else {
             Cow::from(" ")
