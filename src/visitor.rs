@@ -296,7 +296,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
                     let mut comment_shape =
                         Shape::indented(self.block_indent, config).comment(config);
-                    if self.config.version() == Version::Two && comment_on_same_line {
+                    if self.config.version() == Version::Two
+                        && comment_on_same_line
+                        && !sub_slice.starts_with("/*")
+                    {
                         self.push_str(" ");
                         // put the first line of the comment on the same line as the
                         // block's last line
