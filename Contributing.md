@@ -98,7 +98,7 @@ hacking on the rustfmt codebase. It's strongly discouraged to install a version
 of rustfmt from source. Instead, run it using `cargo run`, and `--manifest-path`.
 
 ```
-cargo run --bin cargo-fmt -- --manifest-path path/to/project/you/want2test/Cargo.toml
+RUSTFMT="./target/debug/rustfmt" cargo run --bin cargo-fmt -- --manifest-path path/to/project/you/want2test/Cargo.toml
 ```
 
 ### Version-gate formatting changes
