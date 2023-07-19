@@ -1,12 +1,12 @@
 // rustfmt-force_explicit_abi: false
 
-extern "C" {
+extern {
     fn some_fn() -> ();
 }
 
-extern "C" fn sup() {}
+extern fn sup() {}
 
-type funky_func = extern "C" fn(
+type funky_func = extern fn(
     unsafe extern "rust-call" fn(
         *const JSJitInfo,
         *mut JSContext,
