@@ -426,7 +426,7 @@ rustfmt --file-lines '[
     {{\"file\":\"src/lib.rs\",\"range\":[7,13]}},
     {{\"file\":\"src/lib.rs\",\"range\":[21,29]}},
     {{\"file\":\"src/foo.rs\",\"range\":[10,11]}},
-    {{\"file\":\"src/foo.rs\",\"range\":[15,15]}}]'
+    {{\"file\":\"src/foo.rs\",\"range\":[15,15]}}]' src/lib.rs src/foo.rs
 ```
 
 would format lines `7-13` and `21-29` of `src/lib.rs`, and lines `10-11`,
