@@ -103,10 +103,10 @@ To run `rustfmt` on a file:
 cargo run --bin rustfmt -- path/to/file.rs
 ```
 
-If you want to test modified `cargo-fmt`, or run `rustfmt` on the whole project:
+If you want to test modified `cargo-fmt`, or run `rustfmt` on the whole project (You may need to build rustfmt first):
 
 ```
-cargo build --bin rustfmt && RUSTFMT="./target/debug/rustfmt" cargo run --bin cargo-fmt -- --manifest-path path/to/project/you/want2test/Cargo.toml
+RUSTFMT="./target/debug/rustfmt" cargo run --bin cargo-fmt -- --manifest-path path/to/project/you/want2test/Cargo.toml
 ```
 
 ### Version-gate formatting changes
