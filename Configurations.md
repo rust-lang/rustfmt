@@ -529,6 +529,14 @@ Note that this option may be soft-deprecated in the future once the [ignore](#ig
 - **Possible values**: `true`, `false`
 - **Stable**: Yes
 
+## `doc_comment_code_block_width`
+
+Max width for code snippets included in doc comments. Only used if [`format_code_in_doc_comments`](#format_code_in_doc_comments) is true.
+
+- **Default value**: `100`
+- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Stable**: No (tracking issue: [#5359](https://github.com/rust-lang/rustfmt/issues/5359))
+
 ## `edition`
 
 Specifies which edition is used by the parser.
@@ -1040,14 +1048,6 @@ fn add_one(x: i32) -> i32 {
 }
 ```
 
-## `doc_comment_code_block_width`
-
-Max width for code snippets included in doc comments. Only used if [`format_code_in_doc_comments`](#format_code_in_doc_comments) is true.
-
-- **Default value**: `100`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
-- **Stable**: No (tracking issue: [#5359](https://github.com/rust-lang/rustfmt/issues/5359))
-
 ## `format_generated_files`
 
 Format generated files. A file is considered generated
@@ -1058,6 +1058,38 @@ This option is currently ignored for stdin (`@generated` in stdin is ignored.)
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#5080](https://github.com/rust-lang/rustfmt/issues/5080))
+
+## `format_macro_bodies`
+
+Format the bodies of macros.
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#3355](https://github.com/rust-lang/rustfmt/issues/3355))
+
+#### `true` (default):
+
+```rust
+macro_rules! foo {
+    ($a: ident : $b: ty) => {
+        $a(42): $b;
+    };
+    ($a: ident $b: ident $c: ident) => {
+        $a = $b + $c;
+    };
+}
+```
+
+#### `false`:
+
+```rust
+macro_rules! foo {
+    ($a: ident : $b: ty) => { $a(42): $b; };
+    ($a: ident $b: ident $c: ident) => { $a=$b+$c; };
+}
+```
+
+See also [`format_macro_matchers`](#format_macro_matchers).
 
 ## `format_macro_matchers`
 
@@ -1095,96 +1127,6 @@ macro_rules! foo {
 
 See also [`format_macro_bodies`](#format_macro_bodies).
 
-
-## `format_macro_bodies`
-
-Format the bodies of macros.
-
-- **Default value**: `true`
-- **Possible values**: `true`, `false`
-- **Stable**: No (tracking issue: [#3355](https://github.com/rust-lang/rustfmt/issues/3355))
-
-#### `true` (default):
-
-```rust
-macro_rules! foo {
-    ($a: ident : $b: ty) => {
-        $a(42): $b;
-    };
-    ($a: ident $b: ident $c: ident) => {
-        $a = $b + $c;
-    };
-}
-```
-
-#### `false`:
-
-```rust
-macro_rules! foo {
-    ($a: ident : $b: ty) => { $a(42): $b; };
-    ($a: ident $b: ident $c: ident) => { $a=$b+$c; };
-}
-```
-
-See also [`format_macro_matchers`](#format_macro_matchers).
-
-## `skip_macro_invocations`
-
-Skip formatting the bodies of macro invocations with the following names.
-
-rustfmt will not format any macro invocation for macros with names set in this list.
-Including the special value "*" will prevent any macro invocations from being formatted.
-
-Note: This option does not have any impact on how rustfmt formats macro definitions.
-
-- **Default value**: `[]`
-- **Possible values**: a list of macro name idents, `["name_0", "name_1", ..., "*"]`
-- **Stable**: No (tracking issue: [#5346](https://github.com/rust-lang/rustfmt/issues/5346))
-
-#### `[]` (default):
-
-rustfmt will follow its standard approach to formatting macro invocations.
-
-No macro invocations will be skipped based on their name. More information about rustfmt's standard macro invocation formatting behavior can be found in [#5437](https://github.com/rust-lang/rustfmt/discussions/5437).
-
-```rust
-lorem!(
-    const _: u8 = 0;
-);
-
-ipsum!(
-    const _: u8 = 0;
-);
-```
-
-#### `["lorem"]`:
-
-The named macro invocations will be skipped.
-
-```rust
-lorem!(
-        const _: u8 = 0;
-);
-
-ipsum!(
-    const _: u8 = 0;
-);
-```
-
-#### `["*"]`:
-
-The special selector `*` will skip all macro invocations.
-
-```rust
-lorem!(
-        const _: u8 = 0;
-);
-
-ipsum!(
-        const _: u8 = 0;
-);
-```
-
 ## `format_strings`
 
 Format string literals where necessary
@@ -1211,6 +1153,78 @@ fn main() {
 ```
 
 See also [`max_width`](#max_width).
+
+## `group_imports`
+
+Controls the strategy for how consecutive imports are grouped together.
+
+Controls the strategy for grouping sets of consecutive imports. Imports may contain newlines between imports and still be grouped together as a single set, but other statements between imports will result in different grouping sets.
+
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `StdExternalCrate`, `One`
+- **Stable**: No (tracking issue: [#5083](https://github.com/rust-lang/rustfmt/issues/5083))
+
+Each set of imports (one or more `use` statements, optionally separated by newlines) will be formatted independently. Other statements such as `mod ...` or `extern crate ...` will cause imports to not be grouped together.
+
+#### `Preserve` (default):
+
+Preserve the source file's import groups.
+
+```rust
+use super::update::convert_publish_payload;
+use chrono::Utc;
+
+use alloc::alloc::Layout;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+
+use super::schema::{Context, Payload};
+use crate::models::Event;
+use core::f32;
+```
+
+#### `StdExternalCrate`:
+
+Discard existing import groups, and create three groups for:
+1. `std`, `core` and `alloc`,
+2. external crates,
+3. `self`, `super` and `crate` imports.
+
+```rust
+use alloc::alloc::Layout;
+use core::f32;
+use std::sync::Arc;
+
+use broker::database::PooledConnection;
+use chrono::Utc;
+use juniper::{FieldError, FieldResult};
+use uuid::Uuid;
+
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+```
+
+#### `One`:
+
+Discard existing import groups, and create a single group for everything
+
+```rust
+use super::schema::{Context, Payload};
+use super::update::convert_publish_payload;
+use crate::models::Event;
+use alloc::alloc::Layout;
+use broker::database::PooledConnection;
+use chrono::Utc;
+use core::f32;
+use juniper::{FieldError, FieldResult};
+use std::sync::Arc;
+use uuid::Uuid;
+```
 
 ## `hard_tabs`
 
@@ -1286,6 +1300,87 @@ If you want to ignore every file under the directory where you put your rustfmt.
 
 ```toml
 ignore = ["/"]
+```
+
+## `imports_granularity`
+
+Controls how imports are structured in `use` statements. Imports will be merged or split to the configured level of granularity.
+
+Similar to other `import` related configuration options, this option operates within the bounds of user-defined groups of imports. See [`group_imports`](#group_imports) for more information on import groups.
+
+Note that rustfmt will not modify the granularity of imports containing comments if doing so could potentially lose or misplace said comments.
+
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `Crate`, `Module`, `Item`, `One`
+- **Stable**: No (tracking issue: [#4991](https://github.com/rust-lang/rustfmt/issues/4991))
+
+
+#### `Preserve` (default):
+
+Do not change the granularity of any imports and preserve the original structure written by the developer.
+
+```rust
+use foo::b;
+use foo::b::{f, g};
+use foo::{a, c, d::e};
+use qux::{h, i};
+```
+
+#### `Crate`:
+
+Merge imports from the same crate into a single `use` statement. Conversely, imports from different crates are split into separate statements.
+
+```rust
+use foo::{
+    a, b,
+    b::{f, g},
+    c,
+    d::e,
+};
+use qux::{h, i};
+```
+
+#### `Module`:
+
+Merge imports from the same module into a single `use` statement. Conversely, imports from different modules are split into separate statements.
+
+```rust
+use foo::b::{f, g};
+use foo::d::e;
+use foo::{a, b, c};
+use qux::{h, i};
+```
+
+#### `Item`:
+
+Flatten imports so that each has its own `use` statement.
+
+```rust
+use foo::a;
+use foo::b;
+use foo::b::f;
+use foo::b::g;
+use foo::c;
+use foo::d::e;
+use qux::h;
+use qux::i;
+```
+
+#### `One`:
+
+Merge all imports into a single `use` statement as long as they have the same visibility.
+
+```rust
+pub use foo::{x, y};
+use {
+    bar::{
+        a,
+        b::{self, f, g},
+        c,
+        d::e,
+    },
+    qux::{h, i},
+};
 ```
 
 ## `imports_indent`
@@ -1855,87 +1950,6 @@ pub enum Bar {}
 pub enum Foo {}
 ```
 
-## `imports_granularity`
-
-Controls how imports are structured in `use` statements. Imports will be merged or split to the configured level of granularity.
-
-Similar to other `import` related configuration options, this option operates within the bounds of user-defined groups of imports. See [`group_imports`](#group_imports) for more information on import groups.
-
-Note that rustfmt will not modify the granularity of imports containing comments if doing so could potentially lose or misplace said comments.
-
-- **Default value**: `Preserve`
-- **Possible values**: `Preserve`, `Crate`, `Module`, `Item`, `One`
-- **Stable**: No (tracking issue: [#4991](https://github.com/rust-lang/rustfmt/issues/4991))
-
-
-#### `Preserve` (default):
-
-Do not change the granularity of any imports and preserve the original structure written by the developer.
-
-```rust
-use foo::b;
-use foo::b::{f, g};
-use foo::{a, c, d::e};
-use qux::{h, i};
-```
-
-#### `Crate`:
-
-Merge imports from the same crate into a single `use` statement. Conversely, imports from different crates are split into separate statements.
-
-```rust
-use foo::{
-    a, b,
-    b::{f, g},
-    c,
-    d::e,
-};
-use qux::{h, i};
-```
-
-#### `Module`:
-
-Merge imports from the same module into a single `use` statement. Conversely, imports from different modules are split into separate statements.
-
-```rust
-use foo::b::{f, g};
-use foo::d::e;
-use foo::{a, b, c};
-use qux::{h, i};
-```
-
-#### `Item`:
-
-Flatten imports so that each has its own `use` statement.
-
-```rust
-use foo::a;
-use foo::b;
-use foo::b::f;
-use foo::b::g;
-use foo::c;
-use foo::d::e;
-use qux::h;
-use qux::i;
-```
-
-#### `One`:
-
-Merge all imports into a single `use` statement as long as they have the same visibility.
-
-```rust
-pub use foo::{x, y};
-use {
-    bar::{
-        a,
-        b::{self, f, g},
-        c,
-        d::e,
-    },
-    qux::{h, i},
-};
-```
-
 ## `merge_imports`
 
 This option is deprecated. Use `imports_granularity = "Crate"` instead.
@@ -2222,78 +2236,6 @@ use dolor;
 use sit;
 ```
 
-## `group_imports`
-
-Controls the strategy for how consecutive imports are grouped together.
-
-Controls the strategy for grouping sets of consecutive imports. Imports may contain newlines between imports and still be grouped together as a single set, but other statements between imports will result in different grouping sets.
-
-- **Default value**: `Preserve`
-- **Possible values**: `Preserve`, `StdExternalCrate`, `One`
-- **Stable**: No (tracking issue: [#5083](https://github.com/rust-lang/rustfmt/issues/5083))
-
-Each set of imports (one or more `use` statements, optionally separated by newlines) will be formatted independently. Other statements such as `mod ...` or `extern crate ...` will cause imports to not be grouped together.
-
-#### `Preserve` (default):
-
-Preserve the source file's import groups.
-
-```rust
-use super::update::convert_publish_payload;
-use chrono::Utc;
-
-use alloc::alloc::Layout;
-use juniper::{FieldError, FieldResult};
-use uuid::Uuid;
-
-use std::sync::Arc;
-
-use broker::database::PooledConnection;
-
-use super::schema::{Context, Payload};
-use crate::models::Event;
-use core::f32;
-```
-
-#### `StdExternalCrate`:
-
-Discard existing import groups, and create three groups for:
-1. `std`, `core` and `alloc`,
-2. external crates,
-3. `self`, `super` and `crate` imports.
-
-```rust
-use alloc::alloc::Layout;
-use core::f32;
-use std::sync::Arc;
-
-use broker::database::PooledConnection;
-use chrono::Utc;
-use juniper::{FieldError, FieldResult};
-use uuid::Uuid;
-
-use super::schema::{Context, Payload};
-use super::update::convert_publish_payload;
-use crate::models::Event;
-```
-
-#### `One`:
-
-Discard existing import groups, and create a single group for everything
-
-```rust
-use super::schema::{Context, Payload};
-use super::update::convert_publish_payload;
-use crate::models::Event;
-use alloc::alloc::Layout;
-use broker::database::PooledConnection;
-use chrono::Utc;
-use core::f32;
-use juniper::{FieldError, FieldResult};
-use std::sync::Arc;
-use uuid::Uuid;
-```
-
 ## `reorder_modules`
 
 Reorder `mod` declarations alphabetically in group.
@@ -2379,6 +2321,63 @@ Don't reformat out of line modules
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#3389](https://github.com/rust-lang/rustfmt/issues/3389))
+
+## `skip_macro_invocations`
+
+Skip formatting the bodies of macro invocations with the following names.
+
+rustfmt will not format any macro invocation for macros with names set in this list.
+Including the special value "*" will prevent any macro invocations from being formatted.
+
+Note: This option does not have any impact on how rustfmt formats macro definitions.
+
+- **Default value**: `[]`
+- **Possible values**: a list of macro name idents, `["name_0", "name_1", ..., "*"]`
+- **Stable**: No (tracking issue: [#5346](https://github.com/rust-lang/rustfmt/issues/5346))
+
+#### `[]` (default):
+
+rustfmt will follow its standard approach to formatting macro invocations.
+
+No macro invocations will be skipped based on their name. More information about rustfmt's standard macro invocation formatting behavior can be found in [#5437](https://github.com/rust-lang/rustfmt/discussions/5437).
+
+```rust
+lorem!(
+    const _: u8 = 0;
+);
+
+ipsum!(
+    const _: u8 = 0;
+);
+```
+
+#### `["lorem"]`:
+
+The named macro invocations will be skipped.
+
+```rust
+lorem!(
+        const _: u8 = 0;
+);
+
+ipsum!(
+    const _: u8 = 0;
+);
+```
+
+#### `["*"]`:
+
+The special selector `*` will skip all macro invocations.
+
+```rust
+lorem!(
+        const _: u8 = 0;
+);
+
+ipsum!(
+        const _: u8 = 0;
+);
+```
 
 ## `single_line_if_else_max_width`
 
