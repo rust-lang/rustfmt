@@ -543,6 +543,161 @@ mod test {
         }
     }
 
+    #[allow(unreachable_pub)]
+    mod style_edition_configs {
+        use crate::config::config_type::{ConfigType, StyleEditionDefault};
+        use crate::config::StyleEdition;
+        use rustfmt_config_proc_macro::style_edition;
+
+        #[test]
+        fn test_impl_default_style_edition_struct_for_all_editions() {
+            #[style_edition(100)]
+            #[derive(Debug, PartialEq)]
+            struct Unit;
+
+            // regardless of the style edition used the value will always return 100
+            assert_eq!(Unit::style_edition_default(StyleEdition::Edition2015), 100);
+            assert_eq!(Unit::style_edition_default(StyleEdition::Edition2018), 100);
+            assert_eq!(Unit::style_edition_default(StyleEdition::Edition2021), 100);
+            assert_eq!(Unit::style_edition_default(StyleEdition::Edition2024), 100);
+        }
+
+        #[test]
+        fn test_impl_style_edition_struct_for_multiple_editions() {
+            #[style_edition(100, se_2015 = 99, se_2024 = 115)]
+            struct Unit2;
+
+            impl ConfigType for Unit2 {
+                fn doc_hint() -> String {
+                    String::new()
+                }
+            }
+            // regardless of the style edition used the value will always return 100
+            assert_eq!(Unit2::style_edition_default(StyleEdition::Edition2015), 99);
+            assert_eq!(Unit2::style_edition_default(StyleEdition::Edition2018), 100);
+            assert_eq!(Unit2::style_edition_default(StyleEdition::Edition2021), 100);
+            assert_eq!(Unit2::style_edition_default(StyleEdition::Edition2024), 115);
+        }
+
+        #[test]
+        #[allow(dead_code)]
+        fn test_impl_style_edition_enum_for_all_editions() {
+            #[style_edition(Color::Blue)]
+            #[derive(PartialEq, Debug)]
+            enum Color {
+                Red,
+                Gree,
+                Blue,
+            }
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2015),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2018),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2021),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2024),
+                Color::Blue
+            );
+        }
+
+        #[test]
+        #[allow(dead_code)]
+        fn test_impl_style_edition_enum_for_multiple_editions() {
+            #[style_edition(Color::Blue, se_2024=Color::Red, se_2021=Color::Green)]
+            #[derive(Debug, PartialEq)]
+            enum Color {
+                Red,
+                Green,
+                Blue,
+            }
+
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2015),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2018),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2021),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2024),
+                Color::Red
+            );
+        }
+
+        #[test]
+        #[ignore]
+        #[allow(dead_code)]
+        fn test_impl_style_edition_enum_for_all_editions_using_variant_attribute() {
+            #[style_edition]
+            #[derive(Debug, PartialEq)]
+            enum Color {
+                Red,
+                #[se_default]
+                Green,
+                Blue,
+            }
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2015),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2018),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2021),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2024),
+                Color::Green
+            );
+        }
+
+        #[test]
+        #[allow(dead_code)]
+        fn test_impl_style_edition_enum_for_multiple_editions_using_variant_attribute() {
+            #[style_edition]
+            #[derive(Debug, PartialEq)]
+            enum Color {
+                #[se_2024]
+                Red,
+                #[se_default]
+                Green,
+                #[se_2018]
+                Blue,
+            }
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2015),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2018),
+                Color::Blue
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2021),
+                Color::Green
+            );
+            assert_eq!(
+                Color::style_edition_default(StyleEdition::Edition2024),
+                Color::Red
+            );
+        }
+    }
+
     #[test]
     fn test_config_set() {
         let mut config = Config::default();

@@ -1,6 +1,6 @@
 use crate::config::file_lines::FileLines;
 use crate::config::macro_names::MacroSelectors;
-use crate::config::options::{IgnoreList, WidthHeuristics};
+use crate::config::options::{IgnoreList, StyleEdition, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
 pub(crate) trait ConfigType: Sized {
@@ -15,6 +15,12 @@ pub(crate) trait ConfigType: Sized {
     fn stable_variant(&self) -> bool {
         true
     }
+}
+
+/// Defines the default value for the given style edition
+pub(crate) trait StyleEditionDefault {
+    type ConfigType;
+    fn style_edition_default(style_edition: StyleEdition) -> Self::ConfigType;
 }
 
 impl ConfigType for bool {

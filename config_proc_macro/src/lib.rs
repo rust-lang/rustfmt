@@ -6,6 +6,7 @@ mod attrs;
 mod config_type;
 mod item_enum;
 mod item_struct;
+mod style_edition;
 mod utils;
 
 use std::str::FromStr;
@@ -81,4 +82,15 @@ pub fn rustfmt_only_ci_test(_args: TokenStream, input: TokenStream) -> TokenStre
         token_stream.extend(input);
         token_stream
     }
+}
+
+/// Implement the StyleEditionDefault trait for the given item;
+#[proc_macro_attribute]
+pub fn style_edition(args: TokenStream, input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as syn::Item);
+    let args = parse_macro_input!(args as style_edition::StyleEditionDefault);
+
+    let output = style_edition::define_style_edition(args, input).unwrap();
+    let result = TokenStream::from(output);
+    result
 }
