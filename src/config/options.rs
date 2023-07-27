@@ -79,6 +79,15 @@ pub enum TypeDensity {
 }
 
 #[config_type]
+/// Spacing before try operator
+pub enum TryOpDensity {
+    /// No space before "?"
+    Compressed,
+    /// A space before " ?"
+    Wide,
+}
+
+#[config_type]
 /// Heuristic settings that can be used to simply
 /// the configuration of the granular width configurations
 /// like `struct_lit_width`, `array_width`, etc.

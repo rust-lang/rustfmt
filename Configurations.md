@@ -2804,6 +2804,31 @@ fn lorem<Ipsum: Dolor+Sit=Amet>() {
 }
 ```
 
+## `try_op_density`
+
+Determines if the try operator (`?`) is prefixed by a space
+
+- **Default value**: `"Compressed"`
+- **Possible values**: `"Compressed"`, `"Wide"`
+
+#### `"Compressed"`:
+
+```rust
+fn foo() {
+    bar()?;
+    baz()?.buzz()?;
+}
+```
+
+#### `"Wide"` (default):
+
+```rust
+fn foo() {
+    bar() ?;
+    baz() ?.buzz() ?;
+}
+```
+
 ## `unstable_features`
 
 Enable unstable features on the unstable channel.
