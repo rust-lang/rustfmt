@@ -47,7 +47,7 @@ const FILE_SKIP_LIST: &[&str] = &[
 ];
 
 fn init_log() {
-    let _ = env_logger::builder().is_test(true).try_init();
+    let _ = tracing_subscriber::fmt().with_test_writer().try_init();
 }
 
 struct TestSetting {
@@ -982,11 +982,7 @@ fn rustfmt() -> PathBuf {
     assert!(
         me.is_file() || me.with_extension("exe").is_file(),
         "{}",
-        if cfg!(release) {
-            "no rustfmt bin, try running `cargo build --release` before testing"
-        } else {
-            "no rustfmt bin, try running `cargo build` before testing"
-        }
+        "no rustfmt bin, try running `cargo build` or `cargo build --release` before testing"
     );
     me
 }

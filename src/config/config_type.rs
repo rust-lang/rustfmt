@@ -1,10 +1,11 @@
 use crate::config::file_lines::FileLines;
+use crate::config::macro_names::MacroSelectors;
 use crate::config::options::{IgnoreList, WidthHeuristics};
 
 /// Trait for types that can be used in `Config`.
 pub(crate) trait ConfigType: Sized {
     /// Returns hint text for use in `Config::print_docs()`. For enum types, this is a
-    /// pipe-separated list of variants; for other types it returns "<type>".
+    /// pipe-separated list of variants; for other types it returns `<type>`.
     fn doc_hint() -> String;
 
     /// Return `true` if the variant (i.e. value of this type) is stable.
@@ -43,6 +44,12 @@ impl ConfigType for String {
 impl ConfigType for FileLines {
     fn doc_hint() -> String {
         String::from("<json>")
+    }
+}
+
+impl ConfigType for MacroSelectors {
+    fn doc_hint() -> String {
+        String::from("[<string>, ...]")
     }
 }
 
@@ -114,12 +121,14 @@ macro_rules! create_config {
                     | "use_small_heuristics"
                     | "fn_call_width"
                     | "single_line_if_else_max_width"
+                    | "single_line_let_else_max_width"
                     | "attr_fn_like_width"
                     | "struct_lit_width"
                     | "struct_variant_width"
                     | "array_width"
                     | "chain_width" => self.0.set_heuristics(),
                     "merge_imports" => self.0.set_merge_imports(),
+                    "fn_args_layout" => self.0.set_fn_args_layout(),
                     &_ => (),
                 }
             }
@@ -174,6 +183,7 @@ macro_rules! create_config {
                 self.set_heuristics();
                 self.set_ignore(dir);
                 self.set_merge_imports();
+                self.set_fn_args_layout();
                 self
             }
 
@@ -260,20 +270,28 @@ macro_rules! create_config {
                     | "use_small_heuristics"
                     | "fn_call_width"
                     | "single_line_if_else_max_width"
+                    | "single_line_let_else_max_width"
                     | "attr_fn_like_width"
                     | "struct_lit_width"
                     | "struct_variant_width"
                     | "array_width"
                     | "chain_width" => self.set_heuristics(),
                     "merge_imports" => self.set_merge_imports(),
+                    "fn_args_layout" => self.set_fn_args_layout(),
                     &_ => (),
                 }
             }
 
             #[allow(unreachable_pub)]
             pub fn is_hidden_option(name: &str) -> bool {
-                const HIDE_OPTIONS: [&str; 5] =
-                    ["verbose", "verbose_diff", "file_lines", "width_heuristics", "merge_imports"];
+                const HIDE_OPTIONS: [&str; 6] = [
+                    "verbose",
+                    "verbose_diff",
+                    "file_lines",
+                    "width_heuristics",
+                    "merge_imports",
+                    "fn_args_layout"
+                ];
                 HIDE_OPTIONS.contains(&name)
             }
 
@@ -391,6 +409,14 @@ macro_rules! create_config {
                     "single_line_if_else_max_width",
                 );
                 self.single_line_if_else_max_width.2 = single_line_if_else_max_width;
+
+                let single_line_let_else_max_width = get_width_value(
+                    self.was_set().single_line_let_else_max_width(),
+                    self.single_line_let_else_max_width.2,
+                    heuristics.single_line_let_else_max_width,
+                    "single_line_let_else_max_width",
+                );
+                self.single_line_let_else_max_width.2 = single_line_let_else_max_width;
             }
 
             fn set_heuristics(&mut self) {
@@ -419,6 +445,18 @@ macro_rules! create_config {
                         } else {
                             ImportGranularity::Preserve
                         };
+                    }
+                }
+            }
+
+            fn set_fn_args_layout(&mut self) {
+                if self.was_set().fn_args_layout() {
+                    eprintln!(
+                        "Warning: the `fn_args_layout` option is deprecated. \
+                        Use `fn_params_layout`. instead"
+                    );
+                    if !self.was_set().fn_params_layout() {
+                        self.fn_params_layout.2 = self.fn_args_layout();
                     }
                 }
             }

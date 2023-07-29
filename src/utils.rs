@@ -138,8 +138,8 @@ pub(crate) fn format_extern(
 ) -> Cow<'static, str> {
     let abi = match ext {
         ast::Extern::None => "Rust".to_owned(),
-        ast::Extern::Implicit => "C".to_owned(),
-        ast::Extern::Explicit(abi) => abi.symbol_unescaped.to_string(),
+        ast::Extern::Implicit(_) => "C".to_owned(),
+        ast::Extern::Explicit(abi, _) => abi.symbol_unescaped.to_string(),
     };
 
     if abi == "Rust" && !is_mod {
@@ -263,7 +263,7 @@ fn is_skip(meta_item: &MetaItem) -> bool {
 fn is_skip_nested(meta_item: &NestedMetaItem) -> bool {
     match meta_item {
         NestedMetaItem::MetaItem(ref mi) => is_skip(mi),
-        NestedMetaItem::Literal(_) => false,
+        NestedMetaItem::Lit(_) => false,
     }
 }
 
@@ -292,14 +292,20 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
 }
 
 #[inline]
-pub(crate) fn semicolon_for_stmt(context: &RewriteContext<'_>, stmt: &ast::Stmt) -> bool {
+pub(crate) fn semicolon_for_stmt(
+    context: &RewriteContext<'_>,
+    stmt: &ast::Stmt,
+    is_last_expr: bool,
+) -> bool {
     match stmt.kind {
         ast::StmtKind::Semi(ref expr) => match expr.kind {
             ast::ExprKind::While(..) | ast::ExprKind::Loop(..) | ast::ExprKind::ForLoop(..) => {
                 false
             }
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
-                context.config.trailing_semicolon()
+                // The only time we can skip the semi-colon is if the config option is set to false
+                // **and** this is the last expr (even though any following exprs are unreachable)
+                context.config.trailing_semicolon() || !is_last_expr
             }
             _ => true,
         },
@@ -463,6 +469,7 @@ pub(crate) fn first_line_ends_with(s: &str, c: char) -> bool {
 pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr: &str) -> bool {
     match expr.kind {
         ast::ExprKind::MacCall(..)
+        | ast::ExprKind::FormatArgs(..)
         | ast::ExprKind::Call(..)
         | ast::ExprKind::MethodCall(..)
         | ast::ExprKind::Array(..)
@@ -480,9 +487,9 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Binary(_, _, ref expr)
         | ast::ExprKind::Index(_, ref expr)
         | ast::ExprKind::Unary(_, ref expr)
-        | ast::ExprKind::Closure(_, _, _, _, ref expr, _)
         | ast::ExprKind::Try(ref expr)
         | ast::ExprKind::Yield(Some(ref expr)) => is_block_expr(context, expr, repr),
+        ast::ExprKind::Closure(ref closure) => is_block_expr(context, &closure.body, repr),
         // This can only be a string lit
         ast::ExprKind::Lit(_) => {
             repr.contains('\n') && trimmed_last_line_width(repr) <= context.config.tab_spaces()
@@ -491,18 +498,20 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Assign(..)
         | ast::ExprKind::AssignOp(..)
         | ast::ExprKind::Await(..)
-        | ast::ExprKind::Box(..)
         | ast::ExprKind::Break(..)
         | ast::ExprKind::Cast(..)
         | ast::ExprKind::Continue(..)
         | ast::ExprKind::Err
         | ast::ExprKind::Field(..)
+        | ast::ExprKind::IncludedBytes(..)
         | ast::ExprKind::InlineAsm(..)
+        | ast::ExprKind::OffsetOf(..)
         | ast::ExprKind::Let(..)
         | ast::ExprKind::Path(..)
         | ast::ExprKind::Range(..)
         | ast::ExprKind::Repeat(..)
         | ast::ExprKind::Ret(..)
+        | ast::ExprKind::Become(..)
         | ast::ExprKind::Yeet(..)
         | ast::ExprKind::Tup(..)
         | ast::ExprKind::Type(..)

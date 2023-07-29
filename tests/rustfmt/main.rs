@@ -159,3 +159,30 @@ fn mod_resolution_error_path_attribute_does_not_exist() {
     // The path attribute points to a file that does not exist
     assert!(stderr.contains("does_not_exist.rs does not exist"));
 }
+
+#[test]
+fn rustfmt_emits_error_on_line_overflow_true() {
+    // See also https://github.com/rust-lang/rustfmt/issues/3164
+    let args = [
+        "--config",
+        "error_on_line_overflow=true",
+        "tests/cargo-fmt/source/issue_3164/src/main.rs",
+    ];
+
+    let (_stdout, stderr) = rustfmt(&args);
+    assert!(stderr.contains(
+        "line formatted, but exceeded maximum width (maximum: 100 (see `max_width` option)"
+    ))
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn dont_emit_ICE() {
+    let files = ["tests/target/issue_5728.rs", "tests/target/issue_5729.rs"];
+
+    for file in files {
+        let args = [file];
+        let (_stdout, stderr) = rustfmt(&args);
+        assert!(!stderr.contains("thread 'main' panicked"));
+    }
+}
