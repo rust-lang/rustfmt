@@ -664,17 +664,19 @@ impl<'a> Context<'a> {
             && prefix == "("
             && suffix == ")";
 
+        let num_spaces_within_parenthesis = if can_have_spaces_within_parenthesis {
+            2
+        } else {
+            0
+        };
+
         let mut result = String::with_capacity(
             self.ident.len()
                 + items_str.len()
                 + 2
                 + indent_str.len()
                 + nested_indent_str.len()
-                + if can_have_spaces_within_parenthesis {
-                    2
-                } else {
-                    0
-                },
+                + num_spaces_within_parenthesis,
         );
 
         result.push_str(self.ident);
@@ -693,14 +695,12 @@ impl<'a> Context<'a> {
                 || (self.context.inside_macro() && !items_str.contains('\n') && fits_one_line)
                 || (is_extendable && extend_width <= shape.width)
         };
-        if force_single_line {
-            if can_have_spaces_within_parenthesis {
-                result.push(' ');
-            };
+        if force_single_line && can_have_spaces_within_parenthesis {
+            result.push(' ');
             result.push_str(items_str);
-            if can_have_spaces_within_parenthesis {
-                result.push(' ');
-            }
+            result.push(' ');
+        } else if force_single_line {
+            result.push_str(items_str);
         } else {
             if !items_str.is_empty() {
                 result.push_str(&nested_indent_str);
