@@ -2324,12 +2324,21 @@ fn rewrite_fn_base(
     result.push_str("fn ");
 
     // Generics.
-    let overhead = if let FnBraceStyle::SameLine = fn_brace_style {
+    let mut overhead = if let FnBraceStyle::SameLine = fn_brace_style {
         // 4 = `() {`
         4
     } else {
         // 2 = `()`
         2
+    };
+
+    let can_have_spaces_within_parentheses =
+        context.config.spaces_within_parenthesized_items() && !fn_sig.decl.inputs.is_empty();
+
+    overhead += if can_have_spaces_within_parentheses {
+        2
+    } else {
+        0
     };
     let used_width = last_line_used_width(&result, indent.width());
     let one_line_budget = context.budget(used_width + overhead);
@@ -2425,6 +2434,9 @@ fn rewrite_fn_base(
         result.push_str(&indent.to_string_with_newline(context.config));
         result.push(')');
     } else {
+        if can_have_spaces_within_parentheses {
+            result.push(' ');
+        }
         result.push_str(&param_str);
         let used_width = last_line_used_width(&result, indent.width()) + first_line_width(&ret_str);
         // Put the closing brace on the next line if it overflows the max width.
@@ -2448,11 +2460,16 @@ fn rewrite_fn_base(
                 result.push(')');
                 no_params_and_over_max_width = true;
             } else {
+                if can_have_spaces_within_parentheses {
+                    result.push(' ');
+                }
                 result.push(')');
             }
         } else {
             if closing_paren_overflow_max_width || params_last_line_contains_comment {
                 result.push_str(&indent.to_string_with_newline(context.config));
+            } else if can_have_spaces_within_parentheses {
+                result.push(' ');
             }
             result.push(')');
         }

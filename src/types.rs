@@ -369,11 +369,14 @@ where
         (write_list(&item_vec, &fmt)?, tactic)
     };
 
-    let args = if tactic == DefinitiveListTactic::Horizontal
-        || !context.use_block_indent()
-        || is_inputs_empty
-    {
+    let args = if is_inputs_empty {
         format!("({})", list_str)
+    } else if tactic == DefinitiveListTactic::Horizontal || !context.use_block_indent() {
+        if context.config.spaces_within_parenthesized_items() {
+            format!("( {} )", list_str)
+        } else {
+            format!("({})", list_str)
+        }
     } else {
         format!(
             "({}{}{})",
