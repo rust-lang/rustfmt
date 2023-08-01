@@ -362,7 +362,7 @@ fn identify_comment(
     let (first_group, rest) = orig.split_at(first_group_ending);
     let rewritten_first_group =
         if !config.normalize_comments() && has_bare_lines && style.is_block_comment() {
-            trim_left_preserve_layout(first_group, shape.indent, config)?
+            trim_left_preserve_layout(first_group, shape.indent, config, is_doc_comment)?
         } else if !config.normalize_comments()
             && !config.wrap_comments()
             && !config.format_code_in_doc_comments()
@@ -1040,7 +1040,7 @@ pub(crate) fn recover_missing_comment_in_span(
 }
 
 /// Trim trailing whitespaces unless they consist of two or more whitespaces.
-fn trim_end_unless_two_whitespaces(s: &str, is_doc_comment: bool) -> &str {
+pub(crate) fn trim_end_unless_two_whitespaces(s: &str, is_doc_comment: bool) -> &str {
     if is_doc_comment && s.ends_with("  ") {
         s
     } else {
