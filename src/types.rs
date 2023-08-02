@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::iter::ExactSizeIterator;
 use std::ops::Deref;
 
@@ -5,7 +6,9 @@ use rustc_ast::ast::{self, FnRetTy, Mutability, Term};
 use rustc_ast::ptr;
 use rustc_span::{symbol::kw, BytePos, Pos, Span};
 
-use crate::comment::{combine_strs_with_missing_comments, contains_comment};
+use crate::comment::{
+    combine_strs_with_missing_comments, contains_comment, rewrite_missing_comment,
+};
 use crate::config::lists::*;
 use crate::config::{IndentStyle, TypeDensity, Version};
 use crate::expr::{
@@ -775,38 +778,57 @@ impl Rewrite for ast::Ty {
 
                 Some(result)
             }
-            // FIXME: we drop any comments here, even though it's a silly place to put
-            // comments.
             ast::TyKind::Paren(ref ty) => {
-                if context.config.version() == Version::One
+                let inner_ty = if context.config.version() == Version::One
                     || context.config.indent_style() == IndentStyle::Visual
                 {
                     let budget = shape.width.checked_sub(2)?;
-                    return ty
-                        .rewrite(context, Shape::legacy(budget, shape.indent + 1))
-                        .map(|ty_str| format!("({})", ty_str));
-                }
-
+                    ty.rewrite(context, Shape::legacy(budget, shape.indent + 1))?
                 // 2 = ()
-                if let Some(sh) = shape.sub_width(2) {
-                    if let Some(ref s) = ty.rewrite(context, sh) {
-                        if !s.contains('\n') {
-                            return Some(format!("({})", s));
-                        }
-                    }
-                }
+                } else if let Some(s) = shape
+                    .sub_width(2)
+                    .and_then(|sh| ty.rewrite(context, sh))
+                    .and_then(|s| if s.contains('\n') { None } else { Some(s) })
+                {
+                    s
+                } else {
+                    let indent_str = shape.indent.to_string_with_newline(context.config);
+                    let shape = shape
+                        .block_indent(context.config.tab_spaces())
+                        .with_max_width(context.config);
+                    let rw = ty.rewrite(context, shape)?;
+                    format!(
+                        "{}{}{}",
+                        shape.to_string_with_newline(context.config),
+                        rw,
+                        indent_str
+                    )
+                };
 
-                let indent_str = shape.indent.to_string_with_newline(context.config);
-                let shape = shape
-                    .block_indent(context.config.tab_spaces())
-                    .with_max_width(context.config);
-                let rw = ty.rewrite(context, shape)?;
-                Some(format!(
-                    "({}{}{})",
-                    shape.to_string_with_newline(context.config),
-                    rw,
-                    indent_str
-                ))
+                let leading_comment_sp =
+                    Span::with_root_ctxt(self.span.lo() + BytePos::from_u32(1), ty.span.lo());
+                let trailing_comment_sp =
+                    Span::with_root_ctxt(ty.span.hi(), self.span.hi() - BytePos::from_u32(1));
+                let leading_comment = if contains_comment(context.snippet(leading_comment_sp)) {
+                    format!(
+                        "{} ",
+                        rewrite_missing_comment(leading_comment_sp, shape, context)?
+                    )
+                    .into()
+                } else {
+                    Cow::Borrowed("")
+                };
+                let trailing_comment = if contains_comment(context.snippet(trailing_comment_sp)) {
+                    format!(
+                        " {}",
+                        rewrite_missing_comment(trailing_comment_sp, shape, context)?
+                    )
+                    .into()
+                } else {
+                    Cow::Borrowed("")
+                };
+
+                Some(format!("({leading_comment}{inner_ty}{trailing_comment})",))
             }
             ast::TyKind::Slice(ref ty) => {
                 let budget = shape.width.checked_sub(4)?;

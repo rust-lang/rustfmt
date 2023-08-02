@@ -2061,17 +2061,34 @@ impl Rewrite for ast::FnRetTy {
         match *self {
             ast::FnRetTy::Default(_) => Some(String::new()),
             ast::FnRetTy::Ty(ref ty) => {
-                if context.config.version() == Version::One
+                let ty_s = if context.config.version() == Version::One
                     || context.config.indent_style() == IndentStyle::Visual
                 {
                     let inner_width = shape.width.checked_sub(3)?;
-                    return ty
-                        .rewrite(context, Shape::legacy(inner_width, shape.indent + 3))
-                        .map(|r| format!("-> {}", r));
+                    ty.rewrite(context, Shape::legacy(inner_width, shape.indent + 3))
+                        .map(|r| format!("{}", r))
+                } else {
+                    ty.rewrite(context, shape.offset_left(3)?)
+                        .map(|s| format!("{}", s))
+                }?;
+
+                if let Some(span) = context
+                    .parse_sess
+                    .inner()
+                    .source_map()
+                    .span_extend_to_prev_str(ty.span, "->", true, true)
+                {
+                    let span = span.with_hi(ty.span.lo());
+
+                    if contains_comment(context.snippet(span)) {
+                        return Some(format!(
+                            "-> {} {ty_s}",
+                            rewrite_missing_comment(span, shape, context)?
+                        ));
+                    }
                 }
 
-                ty.rewrite(context, shape.offset_left(3)?)
-                    .map(|s| format!("-> {}", s))
+                Some(format!("-> {ty_s}"))
             }
         }
     }
