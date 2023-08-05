@@ -296,20 +296,19 @@ fn rewrite_macro_inner(
                 // If we are rewriting `vec!` macro or other special macros,
                 // then we can rewrite this as a usual array literal.
                 // Otherwise, we must preserve the original existence of trailing comma.
-                let macro_name = &macro_name.as_str();
                 let mut force_trailing_comma = if trailing_comma {
                     Some(SeparatorTactic::Always)
                 } else {
                     Some(SeparatorTactic::Never)
                 };
-                if FORCED_BRACKET_MACROS.contains(macro_name) && !is_nested_macro {
+                if is_forced_bracket && !is_nested_macro {
                     context.leave_macro();
                     if context.use_block_indent() {
                         force_trailing_comma = Some(SeparatorTactic::Vertical);
                     };
                 }
                 let rewrite = rewrite_array(
-                    macro_name,
+                    &macro_name,
                     arg_vec.iter(),
                     mac.span(),
                     context,
