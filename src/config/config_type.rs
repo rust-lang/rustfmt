@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::config::file_lines::FileLines;
 use crate::config::macro_names::MacroSelectors;
 use crate::config::options::{IgnoreList, WidthHeuristics};
@@ -65,6 +67,82 @@ impl ConfigType for IgnoreList {
     }
 }
 
+/// Store a map of all Unstable options used in in the configuration.
+#[derive(Clone, Debug)]
+pub struct UnstableOptions {
+    pub(crate) options: HashMap<&'static str, String>,
+}
+
+impl std::fmt::Display for UnstableOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(message) = self.abort_message() {
+            write!(f, "{}", message)
+        } else {
+            write!(f, "No unstable options were used.")
+        }
+    }
+}
+
+impl UnstableOptions {
+    /// Create a new UnstableOptions struct
+    pub(crate) fn new() -> Self {
+        Self {
+            options: HashMap::new(),
+        }
+    }
+
+    /// Insert an unstable option and a user supplied value for that unstable option
+    pub(crate) fn insert(&mut self, option: &'static str, user_supplied_value: String) {
+        self.options.insert(option, user_supplied_value);
+    }
+
+    /// Check if any unstable options have been set
+    pub(crate) fn has_unstable_options(&self) -> bool {
+        !self.options.is_empty()
+    }
+
+    /// Generate the Warning message
+    pub(crate) fn warning_message(&self) -> Option<String> {
+        if self.options.is_empty() {
+            return None;
+        }
+        let mut result = String::new();
+
+        for (k, v) in self.options.iter() {
+            result.push_str(&format!(
+                "Warning: can't set `{} = {}`, unstable features are only \
+                    available in nightly channel.\n",
+                k, v,
+            ));
+        }
+
+        let upgrade_to_abort_message = "\nSet `abort_on_unrecognised_options = true` \
+        to convert this warning into an error\n\n";
+
+        result.push_str(upgrade_to_abort_message);
+
+        Some(result)
+    }
+
+    /// Generate the Abort message
+    pub(crate) fn abort_message(&self) -> Option<String> {
+        if self.options.is_empty() {
+            return None;
+        }
+
+        let mut result = String::new();
+        result.push_str("Can't set nightly options when using stable rustfmt\n");
+
+        for (k, v) in self.options.iter() {
+            result.push_str(&format!("    - `{} = {}`\n", k, v));
+        }
+        let to_warning_message = "\nSet `abort_on_unrecognised_options = false` \
+        to convert this error into a warning\n\n";
+        result.push_str(to_warning_message);
+        Some(result)
+    }
+}
+
 macro_rules! create_config {
     // Options passed in to the macro.
     //
@@ -83,6 +161,8 @@ macro_rules! create_config {
         #[derive(Clone)]
         #[allow(unreachable_pub)]
         pub struct Config {
+            // Unstable Options specified on the stable channel
+            configured_unstable_options: UnstableOptions,
             // For each config item, we store:
             //
             // - 0: true if the value has been access
@@ -168,12 +248,41 @@ macro_rules! create_config {
                 ConfigWasSet(self)
             }
 
+            /// Insert all unstable options and their values into the UnstableOptions struct.
+            /// The only exception is the "abort_on_unrecognised_options", which helps
+            /// determine if we should abort or warn when using unstable options on stable rustfmt
+            #[allow(unreachable_pub)]
+            pub fn insert_unstable_options(&mut self, option: &'static str, value: String) {
+                if option == "abort_on_unrecognised_options" {
+                   return
+                }
+
+                match option {
+                $(
+                    stringify!($i) => {
+                        // If its an unstable option then add it to the unstable list
+                        if !self.$i.3 {
+                            self.configured_unstable_options.insert(option, value);
+                        }
+                    }
+                )+
+                    _ => panic!("Unknown config key in override: {}", option)
+                }
+
+            }
+
             fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Config {
             $(
                 if let Some(option_value) = parsed.$i {
                     let option_stable = self.$i.3;
+                    if !option_stable || !option_value.stable_variant() {
+                        self.insert_unstable_options(
+                            stringify!($i), format!("{:?}", &option_value)
+                        );
+                    }
+
                     if $crate::config::config_type::is_stable_option_and_value(
-                        stringify!($i), option_stable, &option_value
+                        option_stable, &option_value
                     ) {
                         self.$i.1 = true;
                         self.$i.2 = option_value;
@@ -236,6 +345,12 @@ macro_rules! create_config {
                         $i: Some(self.$i.2.clone()),
                     )+
                 }
+            }
+
+            /// Get a reference to the UnstableOptions set on the configuration.
+            #[allow(unreachable_pub)]
+            pub fn unstable_options(&self) -> &UnstableOptions {
+                &self.configured_unstable_options
             }
 
             #[allow(unreachable_pub)]
@@ -477,6 +592,7 @@ macro_rules! create_config {
         impl Default for Config {
             fn default() -> Config {
                 Config {
+                    configured_unstable_options: UnstableOptions::new(),
                     $(
                         $i: (Cell::new(false), false, $def, $stb),
                     )+
@@ -486,11 +602,7 @@ macro_rules! create_config {
     )
 }
 
-pub(crate) fn is_stable_option_and_value<T>(
-    option_name: &str,
-    option_stable: bool,
-    option_value: &T,
-) -> bool
+pub(crate) fn is_stable_option_and_value<T>(option_stable: bool, option_value: &T) -> bool
 where
     T: PartialEq + std::fmt::Debug + ConfigType,
 {
@@ -498,23 +610,9 @@ where
     let variant_stable = option_value.stable_variant();
     match (nightly, option_stable, variant_stable) {
         // Stable with an unstable option
-        (false, false, _) => {
-            eprintln!(
-                "Warning: can't set `{} = {:?}`, unstable features are only \
-                       available in nightly channel.",
-                option_name, option_value
-            );
-            false
-        }
+        (false, false, _) => false,
         // Stable with a stable option, but an unstable variant
-        (false, true, false) => {
-            eprintln!(
-                "Warning: can't set `{} = {:?}`, unstable variants are only \
-                       available in nightly channel.",
-                option_name, option_value
-            );
-            false
-        }
+        (false, true, false) => false,
         // Nightly: everything allowed
         // Stable with stable option and variant: allowed
         (true, _, _) | (false, true, true) => true,
