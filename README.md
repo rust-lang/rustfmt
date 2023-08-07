@@ -71,24 +71,6 @@ because in the future Rustfmt might work on code where it currently does not):
   fixes to break our stability guarantees).
 
 
-## Installation
-
-```sh
-rustup component add rustfmt
-```
-
-## Installing from source
-
-To install from source (nightly required), first checkout to the tag or branch you want to install, then issue
-
-```sh
-cargo install --path .
-```
-
-This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add `~/.cargo/bin` directory to
-your PATH variable.
-
-
 ## Running
 
 You can run Rustfmt by just typing `rustfmt filename` if you used `cargo
@@ -247,4 +229,4 @@ See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for details.
 
 [rust]: https://github.com/rust-lang/rust
 [fmt rfcs]: https://github.com/rust-dev-tools/fmt-rfcs
-[style guide]: https://github.com/rust-dev-tools/fmt-rfcs/blob/master/guide/guide.md
+[style guide]: https://doc.rust-lang.org/nightly/style-guide/

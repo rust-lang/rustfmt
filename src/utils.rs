@@ -292,14 +292,20 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
 }
 
 #[inline]
-pub(crate) fn semicolon_for_stmt(context: &RewriteContext<'_>, stmt: &ast::Stmt) -> bool {
+pub(crate) fn semicolon_for_stmt(
+    context: &RewriteContext<'_>,
+    stmt: &ast::Stmt,
+    is_last_expr: bool,
+) -> bool {
     match stmt.kind {
         ast::StmtKind::Semi(ref expr) => match expr.kind {
             ast::ExprKind::While(..) | ast::ExprKind::Loop(..) | ast::ExprKind::ForLoop(..) => {
                 false
             }
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
-                context.config.trailing_semicolon()
+                // The only time we can skip the semi-colon is if the config option is set to false
+                // **and** this is the last expr (even though any following exprs are unreachable)
+                context.config.trailing_semicolon() || !is_last_expr
             }
             _ => true,
         },
@@ -463,6 +469,7 @@ pub(crate) fn first_line_ends_with(s: &str, c: char) -> bool {
 pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr: &str) -> bool {
     match expr.kind {
         ast::ExprKind::MacCall(..)
+        | ast::ExprKind::FormatArgs(..)
         | ast::ExprKind::Call(..)
         | ast::ExprKind::MethodCall(..)
         | ast::ExprKind::Array(..)
@@ -491,7 +498,6 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Assign(..)
         | ast::ExprKind::AssignOp(..)
         | ast::ExprKind::Await(..)
-        | ast::ExprKind::Box(..)
         | ast::ExprKind::Break(..)
         | ast::ExprKind::Cast(..)
         | ast::ExprKind::Continue(..)
@@ -499,11 +505,13 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Field(..)
         | ast::ExprKind::IncludedBytes(..)
         | ast::ExprKind::InlineAsm(..)
+        | ast::ExprKind::OffsetOf(..)
         | ast::ExprKind::Let(..)
         | ast::ExprKind::Path(..)
         | ast::ExprKind::Range(..)
         | ast::ExprKind::Repeat(..)
         | ast::ExprKind::Ret(..)
+        | ast::ExprKind::Become(..)
         | ast::ExprKind::Yeet(..)
         | ast::ExprKind::Tup(..)
         | ast::ExprKind::Type(..)

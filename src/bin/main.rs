@@ -1,9 +1,12 @@
+#![feature(rustc_private)]
+
 use anyhow::{format_err, Result};
 
 use io::Error as IoError;
 use thiserror::Error;
 
 use rustfmt_nightly as rustfmt;
+use tracing_subscriber::EnvFilter;
 
 use std::collections::HashMap;
 use std::env;
@@ -19,8 +22,17 @@ use crate::rustfmt::{
     FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
 
+const BUG_REPORT_URL: &str = "https://github.com/rust-lang/rustfmt/issues/new?labels=bug";
+
+// N.B. these crates are loaded from the sysroot, so they need extern crate.
+extern crate rustc_driver;
+
 fn main() {
-    env_logger::Builder::from_env("RUSTFMT_LOG").init();
+    rustc_driver::install_ice_hook(BUG_REPORT_URL, |_| ());
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_env("RUSTFMT_LOG"))
+        .init();
     let opts = make_opts();
 
     let exit_code = match execute(&opts) {
