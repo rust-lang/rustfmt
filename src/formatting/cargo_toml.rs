@@ -10,7 +10,7 @@ use crate::{Config, ErrorKind};
 ///
 /// [the Style Guide]: https://github.com/rust-dev-tools/fmt-rfcs/blob/master/guide/cargo.md
 pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<String, ErrorKind> {
-    let mut doc = content.parse::<toml_edit::Document>()?;
+    let mut doc = content.parse::<Document>()?;
     let rules = [
         &mut SortSection {
             current_position: 0,
@@ -31,7 +31,7 @@ pub(crate) fn format_cargo_toml_inner(content: &str, config: &Config) -> Result<
     for rule in rules.into_iter() {
         rule.visit_document_mut(&mut doc);
     }
-    // Special handling for falliable rules.
+    // Special handling for fallible rules.
     let mut rule = SortKey { error: None };
     rule.visit_document_mut(&mut doc);
     if let Some(e) = rule.error {
@@ -190,10 +190,10 @@ impl BlankLine {
     }
 
     fn trim_decor_blank_lines(decor: &mut Decor) {
-        let prefix = decor.prefix().unwrap_or("").to_owned();
-        let suffix = decor.suffix().unwrap_or("").to_owned();
-        decor.set_prefix(Self::trim_blank_lines(prefix.as_str()));
-        decor.set_suffix(Self::trim_blank_lines(suffix.as_str()));
+        let prefix = decor.prefix().cloned().unwrap_or_default();
+        let suffix = decor.suffix().cloned().unwrap_or_default();
+        decor.set_prefix(Self::trim_blank_lines(prefix.as_str().unwrap_or_default()));
+        decor.set_suffix(Self::trim_blank_lines(suffix.as_str().unwrap_or_default()));
     }
 }
 
@@ -221,8 +221,8 @@ impl VisitMut for BlankLine {
             });
         } else {
             let decor = table.decor_mut();
-            let prefix = decor.prefix().unwrap_or("").to_owned();
-            decor.set_prefix("\n".to_owned() + &prefix);
+            let prefix = decor.prefix().cloned().unwrap_or_default();
+            decor.set_prefix(format!("\n{}", prefix.as_str().unwrap_or_default()));
         }
     }
 }
@@ -237,7 +237,7 @@ impl KeyValue {
 
 impl VisitMut for KeyValue {
     fn visit_table_like_kv_mut(&mut self, mut key: KeyMut<'_>, value: &mut Item) {
-        let prefix = key.decor().prefix().unwrap_or("").to_owned();
+        let prefix = key.decor().prefix().cloned().unwrap_or_default();
         if Self::can_be_bare_key(key.get()) {
             // will remove decors and set the key to the bare key
             key.fmt();
@@ -246,8 +246,10 @@ impl VisitMut for KeyValue {
             key.decor_mut().set_suffix(" ");
         }
         // start all key names at the start of a line, but preserve comments
-        key.decor_mut()
-            .set_prefix(prefix.trim_end_matches(|c: char| c.is_whitespace() && c != '\n'));
+        if let Some(prefix) = prefix.as_str() {
+            key.decor_mut()
+                .set_prefix(prefix.trim_end_matches(|c: char| c.is_whitespace() && c != '\n'));
+        }
 
         if let Some(v) = value.as_value_mut() {
             v.decor_mut().set_prefix(" ");
@@ -405,7 +407,14 @@ impl VisitMut for TrimSpaces {
             let prefix = format!(
                 "{}{}",
                 if i == 0 { "" } else { "\n" },
-                Self::trim_block(decor.prefix().unwrap_or_default())
+                Self::trim_block(
+                    decor
+                        .prefix()
+                        .cloned()
+                        .unwrap_or_default()
+                        .as_str()
+                        .unwrap_or_default()
+                )
             );
             decor.set_prefix(prefix);
         };
@@ -420,8 +429,9 @@ impl VisitMut for TrimSpaces {
             }
         }
 
-        if !node.trailing().trim().is_empty() {
-            let trailing: String = Self::trim_block(node.trailing());
+        let trailing = node.trailing().as_str().unwrap_or_default();
+        if !trailing.trim().is_empty() {
+            let trailing: String = Self::trim_block(trailing);
             node.set_trailing(&format!("\n{trailing}"));
         } else {
             node.set_trailing("");
@@ -431,28 +441,32 @@ impl VisitMut for TrimSpaces {
     fn visit_table_mut(&mut self, node: &mut Table) {
         let decor = node.decor_mut();
         if let Some(prefix) = decor.prefix() {
-            decor.set_prefix(format!("\n{}", Self::trim_block(prefix)));
+            if let Some(prefix) = prefix.as_str() {
+                decor.set_prefix(format!("\n{}", Self::trim_block(prefix)));
+            }
         }
-        if let Some(suffix) = decor.suffix() {
-            decor.set_suffix(Self::trim_suffix(suffix));
-        }
-
+        trim_suffix(decor);
         self.visit_table_like_mut(node);
     }
 
     fn visit_table_like_kv_mut(&mut self, mut key: KeyMut<'_>, value: &mut Item) {
         let decor = key.decor_mut();
         if let Some(prefix) = decor.prefix() {
-            decor.set_prefix(format!("{}", Self::trim_block(prefix)));
-        }
-
-        if let Some(value) = value.as_value_mut() {
-            let decor = value.decor_mut();
-            if let Some(suffix) = decor.suffix() {
-                decor.set_suffix(Self::trim_suffix(suffix));
+            if let Some(prefix) = prefix.as_str() {
+                decor.set_prefix(format!("{}", Self::trim_block(prefix)));
             }
         }
-
+        if let Some(value) = value.as_value_mut() {
+            trim_suffix(value.decor_mut());
+        }
         self.visit_item_mut(value);
+    }
+}
+
+fn trim_suffix(decor: &mut Decor) {
+    if let Some(suffix) = decor.suffix() {
+        if let Some(suffix) = suffix.as_str() {
+            decor.set_suffix(TrimSpaces::trim_suffix(suffix));
+        }
     }
 }
