@@ -215,10 +215,9 @@ impl Config {
             let version = env!("CARGO_PKG_VERSION");
             let required_version = self.required_version();
             if version != required_version {
-                // FIXME: when format args are inlined, this line generates error[internal]
                 println!(
-                    "Error: rustfmt version ({}) doesn't match the required version ({})",
-                    version, required_version,
+                    "Error: rustfmt version ({version}) doesn't match the required version \
+({required_version})"
                 );
                 return false;
             }

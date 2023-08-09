@@ -2945,10 +2945,9 @@ fn rewrite_where_keyword(
 
     let newline_before_where = comment_separator(&comment_before, shape);
     let newline_after_where = comment_separator(&comment_after, clause_shape);
-    // FIXME: when format args are inlined, this line generates error[internal]
     let result = format!(
-        "{}{}{}where{}{}",
-        starting_newline, comment_before, newline_before_where, newline_after_where, comment_after
+        "{starting_newline}{comment_before}{newline_before_where}where\
+{newline_after_where}{comment_after}"
     );
     let allow_single_line = where_clause_option.allow_single_line
         && comment_before.is_empty()
