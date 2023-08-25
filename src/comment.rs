@@ -482,9 +482,9 @@ impl ItemizedBlock {
         // allowed.
         for suffix in [". ", ") "] {
             if let Some((prefix, _)) = trimmed.split_once(suffix) {
-                if (1..=2).contains(&prefix.len())
-                    && prefix.chars().all(|c| char::is_ascii_digit(&c))
-                {
+                let has_leading_digits = (1..=2).contains(&prefix.len())
+                    && prefix.chars().all(|c| char::is_ascii_digit(&c));
+                if has_leading_digits {
                     return Some(prefix.len() + suffix.len());
                 }
             }
