@@ -9,7 +9,7 @@ use crate::utils::{
 };
 
 /// Sigils that decorate a binop pair.
-#[derive(new, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub(crate) struct PairParts<'a> {
     prefix: &'a str,
     infix: &'a str,
@@ -17,6 +17,13 @@ pub(crate) struct PairParts<'a> {
 }
 
 impl<'a> PairParts<'a> {
+    pub(crate) const fn new(prefix: &'a str, infix: &'a str, suffix: &'a str) -> Self {
+        Self {
+            prefix,
+            infix,
+            suffix,
+        }
+    }
     pub(crate) fn infix(infix: &'a str) -> PairParts<'a> {
         PairParts {
             prefix: "",
@@ -227,8 +234,8 @@ where
     let rhs_result = rhs.rewrite(context, rhs_shape)?;
     let indent_str = rhs_shape.indent.to_string_with_newline(context.config);
     let infix_with_sep = match separator_place {
-        SeparatorPlace::Back => format!("{}{}", infix, indent_str),
-        SeparatorPlace::Front => format!("{}{}", indent_str, infix),
+        SeparatorPlace::Back => format!("{infix}{indent_str}"),
+        SeparatorPlace::Front => format!("{indent_str}{infix}"),
     };
     Some(format!(
         "{}{}{}{}",

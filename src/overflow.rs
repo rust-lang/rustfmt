@@ -125,7 +125,7 @@ impl<'a> OverflowableItem<'a> {
             OverflowableItem::MacroArg(MacroArg::Keyword(..)) => true,
             OverflowableItem::MacroArg(MacroArg::Expr(expr)) => is_simple_expr(expr),
             OverflowableItem::NestedMetaItem(nested_meta_item) => match nested_meta_item {
-                ast::NestedMetaItem::Literal(..) => true,
+                ast::NestedMetaItem::Lit(..) => true,
                 ast::NestedMetaItem::MetaItem(ref meta_item) => {
                     matches!(meta_item.kind, ast::MetaItemKind::Word)
                 }
@@ -169,7 +169,7 @@ impl<'a> OverflowableItem<'a> {
             },
             OverflowableItem::NestedMetaItem(nested_meta_item) if len == 1 => {
                 match nested_meta_item {
-                    ast::NestedMetaItem::Literal(..) => false,
+                    ast::NestedMetaItem::Lit(..) => false,
                     ast::NestedMetaItem::MetaItem(..) => true,
                 }
             }
@@ -589,6 +589,8 @@ impl<'a> Context<'a> {
 
     fn rewrite_items(&self) -> Option<(bool, String)> {
         let span = self.items_span();
+        debug!("items: {:?}", self.items);
+
         let items = itemize_list(
             self.context.snippet_provider,
             self.items.iter(),
@@ -602,6 +604,8 @@ impl<'a> Context<'a> {
             true,
         );
         let mut list_items: Vec<_> = items.collect();
+
+        debug!("items: {list_items:?}");
 
         // Try letting the last argument overflow to the next line with block
         // indentation. If its first line fits on one line with the other arguments,

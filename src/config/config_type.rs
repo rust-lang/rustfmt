@@ -5,7 +5,7 @@ use crate::config::options::{IgnoreList, WidthHeuristics};
 /// Trait for types that can be used in `Config`.
 pub(crate) trait ConfigType: Sized {
     /// Returns hint text for use in `Config::print_docs()`. For enum types, this is a
-    /// pipe-separated list of variants; for other types it returns "<type>".
+    /// pipe-separated list of variants; for other types it returns `<type>`.
     fn doc_hint() -> String;
 
     /// Return `true` if the variant (i.e. value of this type) is stable.
@@ -121,6 +121,7 @@ macro_rules! create_config {
                     | "use_small_heuristics"
                     | "fn_call_width"
                     | "single_line_if_else_max_width"
+                    | "single_line_let_else_max_width"
                     | "attr_fn_like_width"
                     | "struct_lit_width"
                     | "struct_variant_width"
@@ -269,6 +270,7 @@ macro_rules! create_config {
                     | "use_small_heuristics"
                     | "fn_call_width"
                     | "single_line_if_else_max_width"
+                    | "single_line_let_else_max_width"
                     | "attr_fn_like_width"
                     | "struct_lit_width"
                     | "struct_variant_width"
@@ -407,6 +409,14 @@ macro_rules! create_config {
                     "single_line_if_else_max_width",
                 );
                 self.single_line_if_else_max_width.2 = single_line_if_else_max_width;
+
+                let single_line_let_else_max_width = get_width_value(
+                    self.was_set().single_line_let_else_max_width(),
+                    self.single_line_let_else_max_width.2,
+                    heuristics.single_line_let_else_max_width,
+                    "single_line_let_else_max_width",
+                );
+                self.single_line_let_else_max_width.2 = single_line_let_else_max_width;
             }
 
             fn set_heuristics(&mut self) {
@@ -490,18 +500,16 @@ where
         // Stable with an unstable option
         (false, false, _) => {
             eprintln!(
-                "Warning: can't set `{} = {:?}`, unstable features are only \
-                       available in nightly channel.",
-                option_name, option_value
+                "Warning: can't set `{option_name} = {option_value:?}`, unstable features are only \
+                       available in nightly channel."
             );
             false
         }
         // Stable with a stable option, but an unstable variant
         (false, true, false) => {
             eprintln!(
-                "Warning: can't set `{} = {:?}`, unstable variants are only \
-                       available in nightly channel.",
-                option_name, option_value
+                "Warning: can't set `{option_name} = {option_value:?}`, unstable variants are only \
+                       available in nightly channel."
             );
             false
         }
