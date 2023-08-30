@@ -27,7 +27,7 @@ fn rustfmt(args: &[&str]) -> (String, String) {
             String::from_utf8(output.stdout).expect("utf-8"),
             String::from_utf8(output.stderr).expect("utf-8"),
         ),
-        Err(e) => panic!("failed to run `{:?} {:?}`: {}", cmd, args, e),
+        Err(e) => panic!("failed to run `{cmd:?} {args:?}`: {e}"),
     }
 }
 
@@ -71,9 +71,7 @@ fn print_config() {
     ]);
     assert!(
         Path::new("minimal-config").exists(),
-        "stdout:\n{}\nstderr:\n{}",
-        stdout,
-        stderr
+        "stdout:\n{stdout}\nstderr:\n{stderr}"
     );
     remove_file("minimal-config").unwrap();
 }
@@ -173,4 +171,16 @@ fn rustfmt_emits_error_on_line_overflow_true() {
     assert!(stderr.contains(
         "line formatted, but exceeded maximum width (maximum: 100 (see `max_width` option)"
     ))
+}
+
+#[test]
+#[allow(non_snake_case)]
+fn dont_emit_ICE() {
+    let files = ["tests/target/issue_5728.rs", "tests/target/issue_5729.rs"];
+
+    for file in files {
+        let args = [file];
+        let (_stdout, stderr) = rustfmt(&args);
+        assert!(!stderr.contains("thread 'main' panicked"));
+    }
 }
