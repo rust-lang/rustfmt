@@ -25,6 +25,7 @@ use crate::comment::{
     contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses,
 };
 use crate::config::lists::*;
+use crate::config::Version;
 use crate::expr::{rewrite_array, rewrite_assign_rhs, RhsAssignKind};
 use crate::lists::{itemize_list, write_list, ListFormatting};
 use crate::overflow;
@@ -419,6 +420,9 @@ pub(crate) fn rewrite_macro_def(
 
     let mut result = if def.macro_rules {
         String::from("macro_rules!")
+    } else if context.config.version() == Version::Two {
+        // format_visibility doesn't have a trailing space in Version::Two
+        format!("{} macro", format_visibility(context, vis))
     } else {
         format!("{}macro", format_visibility(context, vis))
     };
@@ -1369,7 +1373,11 @@ fn format_lazy_static(
     let last = parsed_elems.len() - 1;
     for (i, (vis, id, ty, expr)) in parsed_elems.iter().enumerate() {
         // Rewrite as a static item.
-        let vis = crate::utils::format_visibility(context, vis);
+        let mut vis = crate::utils::format_visibility(context, vis);
+        if !vis.is_empty() && context.config.version() == Version::Two {
+            // format_visibility doesn't have a trailing space in Version::Two
+            vis += " ";
+        };
         let mut stmt = String::with_capacity(128);
         stmt.push_str(&format!(
             "{}static ref {}: {} =",

@@ -340,7 +340,12 @@ impl<'a> FnSig<'a> {
     fn to_str(&self, context: &RewriteContext<'_>) -> String {
         let mut result = String::with_capacity(128);
         // Vis defaultness constness unsafety abi.
-        result.push_str(&*format_visibility(context, self.visibility));
+        let vis = format_visibility(context, self.visibility);
+        result.push_str(&vis);
+        if !vis.is_empty() && context.config.version() == Version::Two {
+            // format_visibility doesn't have a trailing space in Version::Two
+            result.push(' ');
+        }
         result.push_str(format_defaultness(self.defaultness));
         result.push_str(format_constness(self.constness));
         self.coroutine_kind
@@ -933,7 +938,12 @@ fn format_impl_ref_and_type(
     } = *iimpl;
     let mut result = String::with_capacity(128);
 
-    result.push_str(&format_visibility(context, &item.vis));
+    let vis = format_visibility(context, &item.vis);
+    result.push_str(&vis);
+    if !vis.is_empty() && context.config.version() == Version::Two {
+        // format_visibility doesn't have a trailing space in Version::Two
+        result.push(' ');
+    }
     result.push_str(format_defaultness(defaultness));
     result.push_str(format_unsafety(unsafety));
 
@@ -1142,12 +1152,16 @@ pub(crate) fn format_trait(
     } = **trait_kind;
 
     let mut result = String::with_capacity(128);
-    let header = format!(
-        "{}{}{}trait ",
-        format_visibility(context, &item.vis),
-        format_unsafety(unsafety),
-        format_auto(is_auto),
-    );
+
+    let mut vis = format_visibility(context, &item.vis);
+    if !vis.is_empty() && context.config.version() == Version::Two {
+        // format_visibility doesn't have a trailing space in Version::Two
+        vis += " ";
+    }
+    let unsafety = format_unsafety(unsafety);
+    let auto = format_auto(is_auto);
+
+    let header = format!("{vis}{unsafety}{auto}trait ");
     result.push_str(&header);
 
     let body_lo = context.snippet_provider.span_after(item.span, "{");
@@ -1350,8 +1364,13 @@ pub(crate) fn format_trait_alias(
     // 6 = "trait ", 2 = " ="
     let g_shape = shape.offset_left(6)?.sub_width(2)?;
     let generics_str = rewrite_generics(context, alias, generics, g_shape)?;
-    let vis_str = format_visibility(context, vis);
-    let lhs = format!("{vis_str}trait {generics_str} =");
+    let vis = format_visibility(context, vis);
+    let lhs = if !vis.is_empty() && context.config.version() == Version::Two {
+        // format_visibility doesn't have a trailing space in Version::Two
+        format!("{vis} trait {generics_str} =")
+    } else {
+        format!("{vis}trait {generics_str} =")
+    };
     // 1 = ";"
     let trait_alias_bounds = TraitAliasBounds {
         generic_bounds,
@@ -1738,7 +1757,13 @@ fn rewrite_ty<R: Rewrite>(
     if !after_where_predicates.is_empty() {
         return None;
     }
-    result.push_str(&format!("{}type ", format_visibility(context, vis)));
+    let vis = format_visibility(context, vis);
+    result.push_str(&vis);
+    if !vis.is_empty() && context.config.version() == Version::Two {
+        // format_visibility doesn't have a trailing space in Version::Two
+        result.push(' ');
+    }
+    result.push_str("type ");
     let ident_str = rewrite_ident(context, ident);
 
     if generics.params.is_empty() {
@@ -1836,18 +1861,22 @@ fn type_annotation_spacing(config: &Config) -> (&str, &str) {
 pub(crate) fn rewrite_struct_field_prefix(
     context: &RewriteContext<'_>,
     field: &ast::FieldDef,
-) -> Option<String> {
+) -> Option<Cow<'static, str>> {
     let vis = format_visibility(context, &field.vis);
-    let type_annotation_spacing = type_annotation_spacing(context.config);
-    Some(match field.ident {
-        Some(name) => format!(
-            "{}{}{}:",
-            vis,
-            rewrite_ident(context, name),
-            type_annotation_spacing.0
-        ),
-        None => vis.to_string(),
-    })
+
+    let Some(name) = field.ident else {
+        return Some(vis);
+    };
+
+    let (space_before_colon, _) = type_annotation_spacing(context.config);
+    let ident = rewrite_ident(context, name);
+
+    let prefix = if !vis.is_empty() && context.config.version() == Version::Two {
+        format!("{vis} {ident}{space_before_colon}:")
+    } else {
+        format!("{vis}{ident}{space_before_colon}:")
+    };
+    Some(Cow::from(prefix))
 }
 
 impl Rewrite for ast::FieldDef {
@@ -1867,7 +1896,7 @@ pub(crate) fn rewrite_struct_field(
     }
 
     let type_annotation_spacing = type_annotation_spacing(context.config);
-    let mut prefix = rewrite_struct_field_prefix(context, field)?;
+    let prefix = rewrite_struct_field_prefix(context, field)?;
 
     let attrs_str = field.attrs.rewrite(context, shape)?;
     let attrs_extendable = field.ident.is_none() && is_attributes_extendable(&attrs_str);
@@ -1899,6 +1928,14 @@ pub(crate) fn rewrite_struct_field(
     if prefix.is_empty() && !attrs_str.is_empty() && attrs_extendable && spacing.is_empty() {
         spacing.push(' ');
     }
+
+    if !prefix.is_empty() && field.ident.is_none() && context.config.version() == Version::Two {
+        // For tuple struct fields, which only have a visibility modifier a space is needed
+        // when using Version::Two since rewrite_struct_field_prefix won't add a trailing space
+        // after the visibilty modifier.
+        spacing.push(' ');
+    }
+
     let orig_ty = shape
         .offset_left(overhead + spacing.len())
         .and_then(|ty_shape| field.ty.rewrite(context, ty_shape));
@@ -1910,11 +1947,6 @@ pub(crate) fn rewrite_struct_field(
 
     let is_prefix_empty = prefix.is_empty();
     // We must use multiline. We are going to put attributes and a field on different lines.
-    if context.config.version() == Version::Two {
-        // Remove any additional whitespace at the end of the prefix.
-        // For example if there is a space after a visibility modifier.
-        prefix.truncate(prefix.trim_end().len());
-    }
     let field_str = rewrite_assign_rhs(context, prefix, &*field.ty, &RhsAssignKind::Ty, shape)?;
     // Remove a leading white-space from `rewrite_assign_rhs()` when rewriting a tuple struct.
     let field_str = if is_prefix_empty {
@@ -2002,15 +2034,18 @@ fn rewrite_static(
     offset: Indent,
 ) -> Option<String> {
     let colon = colon_spaces(context.config);
-    let mut prefix = format!(
-        "{}{}{} {}{}{}",
-        format_visibility(context, static_parts.vis),
-        static_parts.defaultness.map_or("", format_defaultness),
-        static_parts.prefix,
-        format_mutability(static_parts.mutability),
-        rewrite_ident(context, static_parts.ident),
-        colon,
-    );
+
+    let vis = format_visibility(context, static_parts.vis);
+    let defaultness = static_parts.defaultness.map_or("", format_defaultness);
+    let static_prefix = static_parts.prefix;
+    let mutability = format_mutability(static_parts.mutability);
+    let ident = rewrite_ident(context, static_parts.ident);
+    let mut prefix = if !vis.is_empty() && context.config.version() == Version::Two {
+        // format_visibility doesn't have a trailing space in Version::Two
+        format!("{vis} {defaultness}{static_prefix} {mutability}{ident}{colon}")
+    } else {
+        format!("{vis}{defaultness}{static_prefix} {mutability}{ident}{colon}")
+    };
     // 2 = " =".len()
     let ty_shape =
         Shape::indented(offset.block_only(), context.config).offset_left(prefix.len() + 2)?;
@@ -3165,7 +3200,13 @@ fn format_header(
     let mut result = String::with_capacity(128);
     let shape = Shape::indented(offset, context.config);
 
-    result.push_str(format_visibility(context, vis).trim());
+    let visibility = format_visibility(context, vis);
+    if context.config.version() == Version::Two {
+        // format_visibility doesn't have a trailing space in Version::Two
+        result.push_str(&visibility);
+    } else {
+        result.push_str(visibility.trim());
+    }
 
     // Check for a missing comment between the visibility and the item name.
     let after_vis = vis.span.hi();
@@ -3351,12 +3392,13 @@ impl Rewrite for ast::ForeignItem {
                 // function kw here.
                 let vis = format_visibility(context, &self.vis);
                 let mut_str = format_mutability(mutability);
-                let prefix = format!(
-                    "{}static {}{}:",
-                    vis,
-                    mut_str,
-                    rewrite_ident(context, self.ident)
-                );
+                let ident = rewrite_ident(context, self.ident);
+                let prefix = if !vis.is_empty() && context.config.version() == Version::Two {
+                    // format_visibility doesn't have a trailing space in Version::Two
+                    format!("{vis} static {mut_str}{ident}:")
+                } else {
+                    format!("{vis}static {mut_str}{ident}:")
+                };
                 // 1 = ;
                 rewrite_assign_rhs(
                     context,
@@ -3434,7 +3476,12 @@ pub(crate) fn rewrite_mod(
     attrs_shape: Shape,
 ) -> Option<String> {
     let mut result = String::with_capacity(32);
-    result.push_str(&*format_visibility(context, &item.vis));
+    let vis = format_visibility(context, &item.vis);
+    result.push_str(&vis);
+    if !vis.is_empty() && context.config.version() == Version::Two {
+        // format_visibility doesn't have a trailing space in Version::Two
+        result.push(' ');
+    }
     result.push_str("mod ");
     result.push_str(rewrite_ident(context, item.ident));
     result.push(';');

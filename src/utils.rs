@@ -55,6 +55,7 @@ pub(crate) fn format_visibility(
     vis: &Visibility,
 ) -> Cow<'static, str> {
     match vis.kind {
+        VisibilityKind::Public if context.config.version() == Version::Two => Cow::from("pub"),
         VisibilityKind::Public => Cow::from("pub "),
         VisibilityKind::Inherited => Cow::from(""),
         VisibilityKind::Restricted { ref path, .. } => {
@@ -69,7 +70,11 @@ pub(crate) fn format_visibility(
             let path = segments_iter.collect::<Vec<_>>().join("::");
             let in_str = if is_keyword(&path) { "" } else { "in " };
 
-            Cow::from(format!("pub({in_str}{path}) "))
+            if context.config.version() == Version::Two {
+                Cow::from(format!("pub({in_str}{path})"))
+            } else {
+                Cow::from(format!("pub({in_str}{path}) "))
+            }
         }
     }
 }
