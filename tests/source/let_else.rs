@@ -160,3 +160,16 @@ fn with_trailing_try_operator() {
     // Maybe this is a workaround?
     let Ok(Some(next_bucket)) = ranking_rules[cur_ranking_rule_index].next_bucket(ctx, logger, &ranking_rule_universes[cur_ranking_rule_index]) else { return };
 }
+
+fn issue5901() {
+    #[cfg(target_os = "linux")]
+    let Some(x) = foo() else { return; };
+
+    #[cfg(target_os = "linux")]
+    // Some comments between attributes and let-else statement
+    let Some(x) = foo() else { return; };
+
+    #[cfg(target_os = "linux")]
+    #[cfg(target_arch = "x86_64")]
+    let Some(x) = foo() else { return; };
+}

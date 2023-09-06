@@ -75,6 +75,7 @@ impl Rewrite for ast::Local {
                 false,
             )?
         };
+        let let_kw_offset = result.len() - "let ".len();
 
         // 4 = "let ".len()
         let pat_shape = shape.offset_left(4)?;
@@ -127,8 +128,15 @@ impl Rewrite for ast::Local {
 
             if let Some(block) = else_block {
                 let else_kw_span = init.span.between(block.span);
+                // Strip attributes and comments to check if newline is needed before the else
+                // keyword from the initializer part. (#5901)
+                let init_str = if context.config.version() == Version::One {
+                    result.as_str()
+                } else {
+                    &result[let_kw_offset..]
+                };
                 let force_newline_else = pat_str.contains('\n')
-                    || !same_line_else_kw_and_brace(&result, context, else_kw_span, nested_shape);
+                    || !same_line_else_kw_and_brace(init_str, context, else_kw_span, nested_shape);
                 let else_kw = rewrite_else_kw_with_comments(
                     force_newline_else,
                     true,
