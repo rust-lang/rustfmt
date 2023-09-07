@@ -199,6 +199,10 @@ fn rewrite_closure_expr(
             | ast::ExprKind::Unary(_, ref expr)
             | ast::ExprKind::Cast(ref expr, _) => allow_multi_line(expr),
 
+            ast::ExprKind::Binary(_, ref expr1, ref expr2) => {
+                allow_multi_line(expr1) && allow_multi_line(expr2)
+            }
+
             _ => false,
         }
     }
