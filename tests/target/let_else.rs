@@ -273,4 +273,13 @@ fn issue5901() {
     else {
         return;
     };
+
+    // The else block will be multi-lined because attributes and comments before `let`
+    // are included when calculating max width
+    #[cfg(target_os = "linux")]
+    #[cfg(target_arch = "x86_64")]
+    // Some comments between attributes and let-else statement
+    let Some(x) = foo() else {
+        todo!()
+    };
 }
