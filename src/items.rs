@@ -130,10 +130,10 @@ impl Rewrite for ast::Local {
                 let else_kw_span = init.span.between(block.span);
                 // Strip attributes and comments to check if newline is needed before the else
                 // keyword from the initializer part. (#5901)
-                let init_str = if context.config.version() == Version::One {
-                    result.as_str()
-                } else {
+                let init_str = if context.config.version() == Version::Two {
                     &result[let_kw_offset..]
+                } else {
+                    result.as_str()
                 };
                 let force_newline_else = pat_str.contains('\n')
                     || !same_line_else_kw_and_brace(init_str, context, else_kw_span, nested_shape);
