@@ -154,21 +154,16 @@ impl Rewrite for ast::Local {
                     std::cmp::min(shape.width, context.config.single_line_let_else_max_width());
 
                 // If available_space hits zero we know for sure this will be a multi-lined block
-                let assign_len = if context.config.version() == Version::Two {
-                    result.len() - let_kw_offset
-                } else {
-                    result.len()
-                };
-                let available_space = max_width.saturating_sub(assign_len);
-
-                let assign_str = if context.config.version() == Version::Two {
+                let assign_str_with_else_kw = if context.config.version() == Version::Two {
                     &result[let_kw_offset..]
                 } else {
                     result.as_str()
                 };
+                let available_space = max_width.saturating_sub(assign_str_with_else_kw.len());
+
                 let allow_single_line = !force_newline_else
                     && available_space > 0
-                    && allow_single_line_let_else_block(assign_str, block);
+                    && allow_single_line_let_else_block(assign_str_with_else_kw, block);
 
                 let mut rw_else_block =
                     rewrite_let_else_block(block, allow_single_line, context, shape)?;
