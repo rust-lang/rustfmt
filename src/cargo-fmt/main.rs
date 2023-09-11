@@ -28,6 +28,7 @@ mod cargo_fmt_tests;
     about = "This utility formats all bin and lib files of \
              the current crate using rustfmt."
 )]
+#[command(styles = clap_cargo::style::CLAP_STYLING)]
 pub struct Opts {
     /// No output printed to stdout
     #[arg(short = 'q', long = "quiet")]
