@@ -1,3 +1,5 @@
+// rustfmt-version: Two
+
 fn func<F: Fn(usize) -> usize>(f: F) -> usize {
     f(0)
 }
