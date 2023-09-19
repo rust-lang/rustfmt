@@ -153,7 +153,7 @@ create_config! {
     format_generated_files: bool, true, false, "Format generated files";
     generated_files_scan_lines_limit: usize, 5, false,
     "How many lines at the beginning of each file to scan for \
-     `// rustfmt-generated` markers indicating generated files";
+     `@generated` markers, to determine if it is generated";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
