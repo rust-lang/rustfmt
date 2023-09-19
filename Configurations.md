@@ -1050,14 +1050,25 @@ Max width for code snippets included in doc comments. Only used if [`format_code
 
 ## `format_generated_files`
 
-Format generated files. A file is considered generated
-if any of the first five lines contain a `@generated` comment marker.
-By default, generated files are reformatted, i. e. `@generated` marker is ignored.
-This option is currently ignored for stdin (`@generated` in stdin is ignored.)
+Format generated files. A file is considered generated if any of
+the first `generated_files_scan_lines_limit` lines contain a
+`@generated` comment marker. By default, generated files are
+reformatted, i. e. `@generated` marker is ignored. This option
+is currently ignored for stdin (`@generated` in stdin is ignored.)
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#5080](https://github.com/rust-lang/rustfmt/issues/5080))
+
+## `generated_files_scan_lines_limit`
+
+Number of lines to scan for `@generated` marker in generated files. If the marker is not found
+within the specified number of lines, the file is considered not generated.
+
+- **Default value**: `5`
+- **Possible values**: any positive integer
+- **Stable**: No (tracking issue: [#5658](https://github.com/rust-lang/rustfmt/issues/5658))
+
 
 ## `format_macro_matchers`
 
@@ -2342,7 +2353,7 @@ specific version of rustfmt is used in your CI, use this option.
 
 The width threshold for an array element to be considered "short".
 
-The layout of an array is dependent on the length of each of its elements. 
+The layout of an array is dependent on the length of each of its elements.
 If the length of every element in an array is below this threshold (all elements are "short") then the array can be formatted in the mixed/compressed style, but if any one element has a length that exceeds this threshold then the array elements will have to be formatted vertically.
 
 - **Default value**: `10`

@@ -151,6 +151,9 @@ create_config! {
         "Write an item and its attribute on the same line \
         if their combined width is below a threshold";
     format_generated_files: bool, true, false, "Format generated files";
+    generated_files_scan_lines_limit: usize, 5, false,
+    "How many lines at the beginning of each file to scan for \
+     `// rustfmt-generated` markers indicating generated files";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -671,6 +674,7 @@ edition = "2015"
 version = "One"
 inline_attribute_width = 0
 format_generated_files = true
+generated_files_scan_lines_limit = 5
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false
