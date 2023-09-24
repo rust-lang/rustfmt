@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![allow(clippy::enum_variant_names)]
 
 use std::collections::{hash_set, HashSet};
 use std::fmt;
@@ -153,9 +154,11 @@ pub enum ReportTactic {
 
 /// What Rustfmt should emit. Mostly corresponds to the `--emit` command line
 /// option.
+#[derive(Default)]
 #[config_type]
 pub enum EmitMode {
     /// Emits to files.
+    #[default]
     Files,
     /// Writes the output to stdout.
     Stdout,
@@ -308,12 +311,6 @@ impl ::std::str::FromStr for WidthHeuristics {
     }
 }
 
-impl Default for EmitMode {
-    fn default() -> EmitMode {
-        EmitMode::Files
-    }
-}
-
 /// A set of directories, files and modules that rustfmt should ignore.
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct IgnoreList {
@@ -417,10 +414,12 @@ pub trait CliOptions {
 }
 
 /// The edition of the syntax and semntics of code (RFC 2052).
+#[derive(Default)]
 #[config_type]
 pub enum Edition {
     #[value = "2015"]
     #[doc_hint = "2015"]
+    #[default]
     /// Edition 2015.
     Edition2015,
     #[value = "2018"]
@@ -435,12 +434,6 @@ pub enum Edition {
     #[doc_hint = "2024"]
     /// Edition 2024.
     Edition2024,
-}
-
-impl Default for Edition {
-    fn default() -> Edition {
-        Edition::Edition2015
-    }
 }
 
 impl From<Edition> for rustc_span::edition::Edition {

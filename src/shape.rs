@@ -65,15 +65,15 @@ impl Indent {
         self.block_indent + self.alignment
     }
 
-    pub(crate) fn to_string(&self, config: &Config) -> Cow<'static, str> {
+    pub(crate) fn to_string(self, config: &Config) -> Cow<'static, str> {
         self.to_string_inner(config, 1)
     }
 
-    pub(crate) fn to_string_with_newline(&self, config: &Config) -> Cow<'static, str> {
+    pub(crate) fn to_string_with_newline(self, config: &Config) -> Cow<'static, str> {
         self.to_string_inner(config, 0)
     }
 
-    fn to_string_inner(&self, config: &Config, offset: usize) -> Cow<'static, str> {
+    fn to_string_inner(self, config: &Config, offset: usize) -> Cow<'static, str> {
         let (num_tabs, num_spaces) = if config.hard_tabs() {
             (self.block_indent / config.tab_spaces(), self.alignment)
         } else {
@@ -272,7 +272,7 @@ impl Shape {
         Shape { width, ..*self }
     }
 
-    pub(crate) fn to_string_with_newline(&self, config: &Config) -> Cow<'static, str> {
+    pub(crate) fn to_string_with_newline(self, config: &Config) -> Cow<'static, str> {
         let mut offset_indent = self.indent;
         offset_indent.alignment = self.offset;
         offset_indent.to_string_inner(config, 0)

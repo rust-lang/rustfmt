@@ -442,8 +442,8 @@ impl<'a> Context<'a> {
         };
 
         if let Some(rewrite) = rewrite {
-            // splitn(2, *).next().unwrap() is always safe.
-            let rewrite_first_line = Some(rewrite.splitn(2, '\n').next().unwrap().to_owned());
+            // split(*).next().unwrap() never panics.
+            let rewrite_first_line = Some(rewrite.split('\n').next().unwrap().to_owned());
             last_list_item.item = rewrite_first_line;
             Some(rewrite)
         } else {
@@ -735,7 +735,7 @@ fn last_item_shape(
     shape: Shape,
     args_max_width: usize,
 ) -> Option<Shape> {
-    if items.len() == 1 && !lists.get(0)?.is_nested_call() {
+    if items.len() == 1 && !lists.first()?.is_nested_call() {
         return Some(shape);
     }
     let offset = items
@@ -786,7 +786,7 @@ pub(crate) fn maybe_get_args_offset(
     config: &Config,
 ) -> Option<(bool, usize)> {
     if let Some(&(_, num_args_before)) = args
-        .get(0)?
+        .first()?
         .special_cases(config)
         .find(|&&(s, _)| s == callee_str)
     {

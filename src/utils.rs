@@ -198,13 +198,13 @@ pub(crate) fn is_attributes_extendable(attrs_str: &str) -> bool {
 /// The width of the first line in s.
 #[inline]
 pub(crate) fn first_line_width(s: &str) -> usize {
-    unicode_str_width(s.splitn(2, '\n').next().unwrap_or(""))
+    unicode_str_width(s.split('\n').next().unwrap_or(""))
 }
 
 /// The width of the last line in s.
 #[inline]
 pub(crate) fn last_line_width(s: &str) -> usize {
-    unicode_str_width(s.rsplitn(2, '\n').next().unwrap_or(""))
+    unicode_str_width(s.rsplit('\n').next().unwrap_or(""))
 }
 
 /// The total used width of the last line.

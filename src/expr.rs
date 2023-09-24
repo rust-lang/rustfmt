@@ -274,10 +274,10 @@ pub(crate) fn format_expr(
                 ast::RangeLimits::Closed => "..=",
             };
 
-            fn needs_space_before_range(context: &RewriteContext<'_>, lhs: &ast::Expr) -> bool {
+            fn needs_space_before_range(lhs: &ast::Expr) -> bool {
                 match lhs.kind {
                     ast::ExprKind::Lit(token_lit) => lit_ends_in_dot(&token_lit),
-                    ast::ExprKind::Unary(_, ref expr) => needs_space_before_range(context, expr),
+                    ast::ExprKind::Unary(_, ref expr) => needs_space_before_range(expr),
                     _ => false,
                 }
             }
@@ -296,7 +296,7 @@ pub(crate) fn format_expr(
 
                 format!(
                     "{}{}{}",
-                    lhs.map_or("", |lhs| space_if(needs_space_before_range(context, lhs))),
+                    lhs.map_or("", |lhs| space_if(needs_space_before_range(lhs))),
                     delim,
                     rhs.map_or("", |rhs| space_if(needs_space_after_range(rhs))),
                 )
@@ -1573,11 +1573,11 @@ fn struct_lit_can_be_aligned(fields: &[ast::ExprField], has_base: bool) -> bool 
     !has_base && fields.iter().all(|field| !field.is_shorthand)
 }
 
-fn rewrite_struct_lit<'a>(
+fn rewrite_struct_lit(
     context: &RewriteContext<'_>,
     path: &ast::Path,
     qself: &Option<ptr::P<ast::QSelf>>,
-    fields: &'a [ast::ExprField],
+    fields: &[ast::ExprField],
     struct_rest: &ast::StructRest,
     attrs: &[ast::Attribute],
     span: Span,
@@ -1620,14 +1620,14 @@ fn rewrite_struct_lit<'a>(
             one_line_width,
         )?
     } else {
-        let field_iter = fields.iter().map(StructLitField::Regular).chain(
-            match struct_rest {
+        let field_iter = fields
+            .iter()
+            .map(StructLitField::Regular)
+            .chain(match struct_rest {
                 ast::StructRest::Base(expr) => Some(StructLitField::Base(expr)),
                 ast::StructRest::Rest(span) => Some(StructLitField::Rest(*span)),
                 ast::StructRest::None => None,
-            }
-            .into_iter(),
-        );
+            });
 
         let span_lo = |item: &StructLitField<'_>| match *item {
             StructLitField::Regular(field) => field.span().lo(),

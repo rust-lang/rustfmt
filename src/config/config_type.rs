@@ -477,7 +477,7 @@ macro_rules! create_config {
                 }
             }
 
-            #[allow(unreachable_pub)]
+            #[allow(unreachable_pub, clippy::cmp_owned)]
             /// Returns `true` if the config key was explicitly set and is the default value.
             pub fn is_default(&self, key: &str) -> bool {
                 $(

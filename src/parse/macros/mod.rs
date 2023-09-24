@@ -14,7 +14,7 @@ pub(crate) mod asm;
 pub(crate) mod cfg_if;
 pub(crate) mod lazy_static;
 
-fn build_stream_parser<'a>(sess: &'a ParseSess, tokens: TokenStream) -> Parser<'a> {
+fn build_stream_parser(sess: &ParseSess, tokens: TokenStream) -> Parser<'_> {
     stream_to_parser(sess, tokens, MACRO_ARGUMENTS)
 }
 
@@ -47,17 +47,17 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
     parse_macro_arg!(
         Expr,
         |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_expr(),
-        |x: ptr::P<ast::Expr>| Some(x)
+        Some
     );
     parse_macro_arg!(
         Ty,
         |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_ty(),
-        |x: ptr::P<ast::Ty>| Some(x)
+        Some
     );
     parse_macro_arg!(
         Pat,
         |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_pat_no_top_alt(None, None),
-        |x: ptr::P<ast::Pat>| Some(x)
+        Some
     );
     // `parse_item` returns `Option<ptr::P<ast::Item>>`.
     parse_macro_arg!(

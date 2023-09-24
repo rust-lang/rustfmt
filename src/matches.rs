@@ -194,7 +194,7 @@ fn rewrite_match_arms(
         context.snippet_provider,
         arms.iter()
             .zip(is_last_iter)
-            .zip(beginning_verts.into_iter())
+            .zip(beginning_verts)
             .map(|((arm, is_last), beginning_vert)| ArmWrapper::new(arm, is_last, beginning_vert)),
         "}",
         "|",

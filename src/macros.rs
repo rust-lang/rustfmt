@@ -436,7 +436,7 @@ pub(crate) fn rewrite_macro_def(
         shape
     };
 
-    if parsed_def.branches.len() == 0 {
+    if parsed_def.branches.is_empty() {
         let lo = context.snippet_provider.span_before(span, "{");
         result += " ";
         result += &rewrite_empty_macro_def_body(context, span.with_lo(lo), shape)?;

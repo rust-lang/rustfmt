@@ -516,7 +516,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
 pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
     match config.emit_mode() {
         EmitMode::Files if config.make_backup() => {
-            Box::new(emitter::FilesWithBackupEmitter::default())
+            <Box<emitter::FilesWithBackupEmitter>>::default()
         }
         EmitMode::Files => Box::new(emitter::FilesEmitter::new(
             config.print_misformatted_file_names(),
@@ -524,9 +524,9 @@ pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
         EmitMode::Stdout | EmitMode::Coverage => {
             Box::new(emitter::StdoutEmitter::new(config.verbose()))
         }
-        EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
-        EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
-        EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
+        EmitMode::Json => <Box<emitter::JsonEmitter>>::default(),
+        EmitMode::ModifiedLines => <Box<emitter::ModifiedLinesEmitter>>::default(),
+        EmitMode::Checkstyle => <Box<emitter::CheckstyleEmitter>>::default(),
         EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
     }
 }

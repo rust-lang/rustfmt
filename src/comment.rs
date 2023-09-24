@@ -118,7 +118,7 @@ impl<'a> CommentStyle<'a> {
         }
     }
 
-    pub(crate) fn to_str_tuplet(&self) -> (&'a str, &'a str, &'a str) {
+    pub(crate) fn to_str_tuplet(self) -> (&'a str, &'a str, &'a str) {
         (self.opener(), self.closer(), self.line_start())
     }
 }
@@ -990,11 +990,12 @@ fn is_table_item(mut s: &str) -> bool {
     // This function may return false positive, but should get its job done in most cases (i.e.
     // markdown tables with two column delimiters).
     s = s.trim_start();
-    return s.starts_with('|')
+
+    s.starts_with('|')
         && match s.rfind('|') {
             Some(0) | None => false,
             _ => true,
-        };
+        }
 }
 
 /// Given the span, rewrite the missing comment inside it if available.
