@@ -186,7 +186,7 @@ fn dont_emit_ICE() {
 }
 
 #[test]
-fn rustfmt_emits_error_when_control_bace_style_is_always_next_line() {
+fn rustfmt_emits_error_when_control_brace_style_is_always_next_line() {
     // See also https://github.com/rust-lang/rustfmt/issues/5912
     let args = [
         "--config=color=Never",
