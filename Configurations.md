@@ -2229,7 +2229,7 @@ Controls the strategy for how consecutive imports are grouped together.
 Controls the strategy for grouping sets of consecutive imports. Imports may contain newlines between imports and still be grouped together as a single set, but other statements between imports will result in different grouping sets.
 
 - **Default value**: `Preserve`
-- **Possible values**: `Preserve`, `StdExternalCrate`, `One`
+- **Possible values**: `Preserve`, `StdExternalCrate`, `One`, custom wildcard groups
 - **Stable**: No (tracking issue: [#5083](https://github.com/rust-lang/rustfmt/issues/5083))
 
 Each set of imports (one or more `use` statements, optionally separated by newlines) will be formatted independently. Other statements such as `mod ...` or `extern crate ...` will cause imports to not be grouped together.
@@ -2294,6 +2294,32 @@ use std::sync::Arc;
 use uuid::Uuid;
 ```
 
+#### `[ ["$std::*", "proc_macro::*"], ["*"], ["my_crate::*", "crate::*::xyz"], ["$crate::*"] ]`:
+
+Discards existing import groups, and create groups as specified by the wildcarded list.
+Handy aliases are supported:
+
+- `$std` prefix is an alias for standard library (i.e `std`, `core`, `alloc`);
+- `$crate` prefix is an alias for crate-local modules (i.e `self`, `crate`, `super`).
+- `*` is a special fallback group (i.e used if no other group matches), could only be specified once.
+
+With the provided config the following order would be set:
+
+```rust
+use proc_macro::Span;
+use std::rc::Rc;
+
+use rand;
+
+use crate::abc::xyz;
+use my_crate::a::B;
+use my_crate::A;
+
+use self::X;
+use super::Y;
+use crate::Z;
+```
+
 ## `reorder_modules`
 
 Reorder `mod` declarations alphabetically in group.
@@ -2342,7 +2368,7 @@ specific version of rustfmt is used in your CI, use this option.
 
 The width threshold for an array element to be considered "short".
 
-The layout of an array is dependent on the length of each of its elements. 
+The layout of an array is dependent on the length of each of its elements.
 If the length of every element in an array is below this threshold (all elements are "short") then the array can be formatted in the mixed/compressed style, but if any one element has a length that exceeds this threshold then the array elements will have to be formatted vertically.
 
 - **Default value**: `10`

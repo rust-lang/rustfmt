@@ -1,5 +1,7 @@
 use std::collections::{hash_set, HashSet};
+use std::convert::TryFrom;
 use std::fmt;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -102,7 +104,7 @@ impl Density {
     }
 }
 
-#[config_type]
+#[config_type(skip_derive(Copy, Serialize, Deserialize, FromStr))]
 /// Configuration for import groups, i.e. sets of imports separated by newlines.
 pub enum GroupImportsTactic {
     /// Keep groups as they are.
@@ -114,6 +116,230 @@ pub enum GroupImportsTactic {
     StdExternalCrate,
     /// Discard existing groups, and create a single group for everything
     One,
+    /// Discard existing groups, and create groups as specified by the wildcarded list.
+    /// Handy aliases are supported:
+    ///
+    /// - `$std` prefix is an alias for standard library (i.e `std`, `core`, `alloc`);
+    /// - `$crate` prefix is an alias for crate-local modules (i.e `self`, `crate`, `super`).
+    Wildcards(super::WildcardGroups),
+}
+
+impl Serialize for GroupImportsTactic {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        enum Simple {
+            Preserve,
+            StdExternalCrate,
+            One,
+        }
+
+        #[derive(Serialize)]
+        struct WildcardHelper(Vec<Vec<String>>);
+
+        match self {
+            GroupImportsTactic::Preserve => Simple::Preserve.serialize(serializer),
+            GroupImportsTactic::StdExternalCrate => Simple::StdExternalCrate.serialize(serializer),
+            GroupImportsTactic::One => Simple::One.serialize(serializer),
+            GroupImportsTactic::Wildcards(w) => WildcardHelper(
+                w.iter()
+                    .map(|w| match w {
+                        WildcardGroup::Group(res) => {
+                            res.iter().map(|l| l.as_str().to_string()).collect()
+                        }
+                        WildcardGroup::Fallback => vec!["*".to_owned()],
+                    })
+                    .collect(),
+            )
+            .serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for GroupImportsTactic {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Vis;
+        impl<'v> Visitor<'v> for Vis {
+            type Value = GroupImportsTactic;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("String or sequence")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Self::Value, E> {
+                static ALLOWED: &[&'static str] = &["Preserve", "StdExternalCrate", "One"];
+                match s {
+                    "Preserve" => Ok(GroupImportsTactic::Preserve),
+                    "StdExternalCrate" => Ok(GroupImportsTactic::StdExternalCrate),
+                    "One" => Ok(GroupImportsTactic::One),
+                    _ => Err(E::unknown_variant(s, ALLOWED)),
+                }
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'v>,
+            {
+                let mut lines = Vec::<Vec<String>>::new();
+                while let Some(elem) = seq.next_element()? {
+                    lines.push(elem);
+                }
+
+                let value = lines
+                    .into_iter()
+                    .map(TryFrom::try_from)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(WildcardGroups)
+                    .map_err(serde::de::Error::custom)?;
+
+                if value
+                    .0
+                    .iter()
+                    .filter(|g| matches!(g, WildcardGroup::Fallback))
+                    .count()
+                    > 1
+                {
+                    return Err(serde::de::Error::custom(concat!(
+                        "Wildcard format group must include at ",
+                        "most one fallback (i.e \"*\") group."
+                    )));
+                }
+
+                Ok(GroupImportsTactic::Wildcards(value))
+            }
+        }
+
+        let imports: Self = deserializer.deserialize_any(Vis)?;
+        Ok(imports)
+    }
+}
+
+impl std::str::FromStr for GroupImportsTactic {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "Preserve" => GroupImportsTactic::Preserve,
+            "StdExternalCrate" => GroupImportsTactic::StdExternalCrate,
+            "One" => GroupImportsTactic::One,
+            line => serde_json::from_str::<Vec<Vec<String>>>(&line)?
+                .into_iter()
+                .map(TryFrom::try_from)
+                .collect::<Result<Vec<WildcardGroup>, _>>()
+                .map(WildcardGroups)
+                .map(GroupImportsTactic::Wildcards)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct WildcardGroups(Vec<WildcardGroup>);
+
+impl Deref for WildcardGroups {
+    type Target = [WildcardGroup];
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_slice()
+    }
+}
+
+impl fmt::Display for WildcardGroups {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[")?;
+        for w in &self.0 {
+            write!(f, "{:?}", w)?;
+        }
+        f.write_str("]")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum WildcardGroup {
+    Group(Vec<regex::Regex>),
+    Fallback,
+}
+
+impl WildcardGroup {
+    pub(crate) fn is_fallback(&self) -> bool {
+        self == &Self::Fallback
+    }
+
+    pub(crate) fn matches(&self, path: &str) -> bool {
+        match self {
+            Self::Group(res) => res.iter().any(|w| w.is_match(path)),
+            Self::Fallback => false,
+        }
+    }
+}
+
+impl TryFrom<Vec<String>> for WildcardGroup {
+    type Error = anyhow::Error;
+
+    fn try_from(i: Vec<String>) -> Result<Self, Self::Error> {
+        enum Kind {
+            Std,
+            Crate,
+        }
+
+        if i == vec!["*"] {
+            return Ok(Self::Fallback);
+        }
+
+        if i.iter().any(|x| x == "*") {
+            return Err(anyhow::anyhow!(concat!(
+                "'*' is a special wildcard for a fallback group ",
+                "and could only be a single item within this group"
+            )));
+        }
+
+        Ok(i.into_iter()
+            .map(|s| {
+                let (s, kind) = if let Some(tail) = s.strip_prefix("$std") {
+                    (tail, Some(Kind::Std))
+                } else if let Some(tail) = s.strip_prefix("$crate") {
+                    (tail, Some(Kind::Crate))
+                } else {
+                    (s.as_str(), None)
+                };
+
+                // poor man's wildcard
+                let mut wildcard = regex::escape(s).replace("\\*", ".*");
+                match kind {
+                    None => {}
+                    Some(Kind::Std) => wildcard.insert_str(0, "(::)?(std|core|alloc)"),
+                    Some(Kind::Crate) => wildcard.insert_str(0, "(::)?(self|crate|super)"),
+                }
+
+                regex::Regex::new(&format!("^{wildcard}$"))
+            })
+            .collect::<Result<_, _>>()
+            .map(Self::Group)?)
+    }
+}
+
+impl Eq for WildcardGroup {}
+
+impl std::cmp::PartialEq for WildcardGroup {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Fallback, Self::Fallback) => true,
+            (Self::Group(left), Self::Group(right)) => {
+                if left.len() != right.len() {
+                    return false;
+                }
+
+                left.iter()
+                    .zip(right.iter())
+                    .all(|(a, b)| a.as_str() == b.as_str())
+            }
+            (_, _) => false,
+        }
+    }
 }
 
 #[config_type]

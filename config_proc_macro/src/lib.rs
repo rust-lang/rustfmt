@@ -2,6 +2,7 @@
 
 #![recursion_limit = "256"]
 
+mod args;
 mod attrs;
 mod config_type;
 mod item_enum;
@@ -14,9 +15,10 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 #[proc_macro_attribute]
-pub fn config_type(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn config_type(args: TokenStream, input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as args::Args);
     let input = parse_macro_input!(input as syn::Item);
-    let output = config_type::define_config_type(&input);
+    let output = config_type::define_config_type(&args, &input);
 
     #[cfg(feature = "debug-with-rustfmt")]
     {

@@ -40,11 +40,6 @@ pub fn config_value(attr: &syn::Attribute) -> Option<String> {
     get_name_value_str_lit(attr, "value")
 }
 
-/// Returns `true` if the given attribute is a `value` attribute.
-pub fn is_config_value(attr: &syn::Attribute) -> bool {
-    is_attr_name_value(attr, "value")
-}
-
 /// Returns `true` if the given attribute is an `unstable` attribute.
 pub fn is_unstable_variant(attr: &syn::Attribute) -> bool {
     is_attr_path(attr, "unstable_variant")
