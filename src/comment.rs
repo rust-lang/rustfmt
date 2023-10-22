@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use rustc_span::Span;
 
-use crate::config::Config;
+use crate::config::{Config, WrapComments};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::string::{rewrite_string, StringFormat};
@@ -361,12 +361,11 @@ fn identify_comment(
         if !config.normalize_comments() && has_bare_lines && style.is_block_comment() {
             trim_left_preserve_layout(first_group, shape.indent, config)?
         } else if !config.normalize_comments()
-            && !config.wrap_comments()
-            && !(
-                // `format_code_in_doc_comments` should only take effect on doc comments,
-                // so we only consider it when this comment block is a doc comment block.
-                is_doc_comment && config.format_code_in_doc_comments()
-            )
+            && (if is_doc_comment {
+                !config.wrap_comments().is_doc() && !config.format_code_in_doc_comments()
+            } else {
+                !config.wrap_comments().is_normal()
+            })
         {
             light_rewrite_comment(first_group, shape.indent, config, is_doc_comment)
         } else {
@@ -770,7 +769,7 @@ impl<'a> CommentRewrite<'a> {
                             && !self.code_block_buffer.trim().is_empty() =>
                     {
                         let mut config = self.fmt.config.clone();
-                        config.set().wrap_comments(false);
+                        config.set().wrap_comments(WrapComments::Off);
                         let comment_max_width = config
                             .doc_comment_code_block_width()
                             .min(config.max_width());
@@ -802,11 +801,17 @@ impl<'a> CommentRewrite<'a> {
             return false;
         }
 
+        let config_wrap_comments = if is_doc_comment {
+            self.fmt.config.wrap_comments().is_doc()
+        } else {
+            self.fmt.config.wrap_comments().is_normal()
+        };
+
         self.code_block_attr = None;
         self.item_block = None;
         if let Some(stripped) = line.strip_prefix("```") {
             self.code_block_attr = Some(CodeBlockAttribute::new(stripped))
-        } else if self.fmt.config.wrap_comments() {
+        } else if config_wrap_comments {
             if let Some(ib) = ItemizedBlock::new(line) {
                 self.item_block = Some(ib);
                 return false;
@@ -845,7 +850,7 @@ impl<'a> CommentRewrite<'a> {
         // 4) No URLS were found in the comment
         // If this changes, the documentation in ../Configurations.md#wrap_comments
         // should be changed accordingly.
-        let should_wrap_comment = self.fmt.config.wrap_comments()
+        let should_wrap_comment = config_wrap_comments
             && !is_markdown_header_doc_comment
             && unicode_str_width(line) > self.fmt.shape.width
             && !has_url(line)
@@ -1903,13 +1908,13 @@ mod test {
 
     #[test]
     #[rustfmt::skip]
-    fn format_doc_comments() {
+    fn format_comments() {
         let mut wrap_normalize_config: crate::config::Config = Default::default();
-        wrap_normalize_config.set().wrap_comments(true);
+        wrap_normalize_config.set().wrap_comments(WrapComments::All);
         wrap_normalize_config.set().normalize_comments(true);
 
         let mut wrap_config: crate::config::Config = Default::default();
-        wrap_config.set().wrap_comments(true);
+        wrap_config.set().wrap_comments(WrapComments::All);
 
         let comment = rewrite_comment(" //test",
                                       true,
