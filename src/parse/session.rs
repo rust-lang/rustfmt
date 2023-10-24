@@ -1,10 +1,10 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use rustc_data_structures::sync::{Lrc, Send};
-use rustc_errors::emitter::{Emitter, EmitterWriter};
+use rustc_data_structures::sync::{IntoDynSyncSend, Lrc};
+use rustc_errors::emitter::{DynEmitter, Emitter, EmitterWriter};
 use rustc_errors::translation::Translate;
-use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel, TerminalUrl};
+use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
 use rustc_session::parse::ParseSess as RawParseSess;
 use rustc_span::{
     source_map::{FilePathMapping, SourceMap},
@@ -48,15 +48,15 @@ impl Emitter for SilentEmitter {
     fn emit_diagnostic(&mut self, _db: &Diagnostic) {}
 }
 
-fn silent_emitter() -> Box<dyn Emitter + Send> {
+fn silent_emitter() -> Box<DynEmitter> {
     Box::new(SilentEmitter {})
 }
 
 /// Emit errors against every files expect ones specified in the `ignore_path_set`.
 struct SilentOnIgnoredFilesEmitter {
-    ignore_path_set: Lrc<IgnorePathSet>,
+    ignore_path_set: IntoDynSyncSend<Lrc<IgnorePathSet>>,
     source_map: Lrc<SourceMap>,
-    emitter: Box<dyn Emitter + Send>,
+    emitter: Box<DynEmitter>,
     has_non_ignorable_parser_errors: bool,
     can_reset: Lrc<AtomicBool>,
 }
@@ -139,30 +139,15 @@ fn default_handler(
             rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
             false,
         );
-        Box::new(EmitterWriter::stderr(
-            emit_color,
-            Some(source_map.clone()),
-            None,
-            fallback_bundle,
-            false,
-            false,
-            None,
-            false,
-            false,
-            TerminalUrl::No,
-        ))
+        Box::new(EmitterWriter::stderr(emit_color, fallback_bundle).sm(Some(source_map.clone())))
     };
-    Handler::with_emitter(
-        true,
-        None,
-        Box::new(SilentOnIgnoredFilesEmitter {
-            has_non_ignorable_parser_errors: false,
-            source_map,
-            emitter,
-            ignore_path_set,
-            can_reset,
-        }),
-    )
+    Handler::with_emitter(Box::new(SilentOnIgnoredFilesEmitter {
+        has_non_ignorable_parser_errors: false,
+        source_map,
+        emitter,
+        ignore_path_set: IntoDynSyncSend(ignore_path_set),
+        can_reset,
+    }))
 }
 
 impl ParseSess {
@@ -230,7 +215,7 @@ impl ParseSess {
     }
 
     pub(crate) fn set_silent_emitter(&mut self) {
-        self.parse_sess.span_diagnostic = Handler::with_emitter(true, None, silent_emitter());
+        self.parse_sess.span_diagnostic = Handler::with_emitter(silent_emitter());
     }
 
     pub(crate) fn span_to_filename(&self, span: Span) -> FileName {
@@ -280,7 +265,7 @@ impl ParseSess {
         let source_file = self.parse_sess.source_map().lookup_char_pos(span.lo()).file;
         SnippetProvider::new(
             source_file.start_pos,
-            source_file.end_pos,
+            source_file.end_position(),
             Lrc::clone(source_file.src.as_ref().unwrap()),
         )
     }
@@ -328,8 +313,7 @@ impl LineRangeUtils for ParseSess {
 
         debug_assert_eq!(
             lo.sf.name, hi.sf.name,
-            "span crossed file boundary: lo: {:?}, hi: {:?}",
-            lo, hi
+            "span crossed file boundary: lo: {lo:?}, hi: {hi:?}"
         );
 
         // in case the span starts with a newline, the line range is off by 1 without the
@@ -408,7 +392,7 @@ mod tests {
                 has_non_ignorable_parser_errors: false,
                 source_map,
                 emitter: Box::new(emitter_writer),
-                ignore_path_set,
+                ignore_path_set: IntoDynSyncSend(ignore_path_set),
                 can_reset,
             }
         }
