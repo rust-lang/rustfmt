@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::min;
+use std::ops::Deref;
 
 use itertools::Itertools;
 use rustc_ast::token::{Delimiter, Lit, LitKind};
@@ -100,6 +101,7 @@ pub(crate) fn format_expr(
         ast::ExprKind::Binary(op, ref lhs, ref rhs) => {
             // FIXME: format comments between operands and operator
             rewrite_all_pairs(expr, shape, context).or_else(|| {
+                let wrap_lhs_in_parns = lhs_needs_parens(&op, lhs);
                 rewrite_pair(
                     &**lhs,
                     &**rhs,
@@ -107,6 +109,7 @@ pub(crate) fn format_expr(
                     context,
                     shape,
                     context.config.binop_separator(),
+                    wrap_lhs_in_parns,
                 )
             })
         }
@@ -252,6 +255,7 @@ pub(crate) fn format_expr(
             context,
             shape,
             SeparatorPlace::Front,
+            false,
         ),
         ast::ExprKind::Type(ref expr, ref ty) => rewrite_pair(
             &**expr,
@@ -260,6 +264,7 @@ pub(crate) fn format_expr(
             context,
             shape,
             SeparatorPlace::Back,
+            false,
         ),
         ast::ExprKind::Index(ref expr, ref index, _) => {
             rewrite_index(&**expr, &**index, context, shape)
@@ -271,6 +276,7 @@ pub(crate) fn format_expr(
             context,
             shape,
             SeparatorPlace::Back,
+            false,
         ),
         ast::ExprKind::Range(ref lhs, ref rhs, limits) => {
             let delim = match limits {
@@ -320,6 +326,7 @@ pub(crate) fn format_expr(
                         context,
                         shape,
                         context.config.binop_separator(),
+                        false,
                     )
                 }
                 (None, Some(rhs)) => {
@@ -418,6 +425,35 @@ pub(crate) fn format_expr(
             );
             combine_strs_with_missing_comments(context, &attrs_str, &expr_str, span, shape, false)
         })
+}
+
+/// Check if we need to wrap the lhs of a binary expression in parens to avoid compilation errors.
+/// See <https://github.com/rust-lang/rustfmt/issues/4621>
+pub(crate) fn lhs_needs_parens(op: &ast::BinOp, lhs: &ast::Expr) -> bool {
+    let is_lt_or_shl = matches!(op.node, ast::BinOpKind::Shl | ast::BinOpKind::Lt);
+    if !is_lt_or_shl {
+        return false;
+    }
+    matches!(
+        lhs.kind,
+        ast::ExprKind::Cast(_, ref ty) if ty_ends_with_empty_angle_brackets(ty)
+    )
+}
+
+/// Check if they type ends with an empty generic argument list e.g. `i32<>`.
+fn ty_ends_with_empty_angle_brackets(ty: &ast::Ty) -> bool {
+    if let ast::TyKind::Path(_, path) = &ty.kind {
+        matches!(
+            path.segments.last(),
+            Some(ast::PathSegment {args: Some(generic_args), ..})
+            if matches!(
+                generic_args.deref(),
+                ast::GenericArgs::AngleBracketed(bracket_args) if bracket_args.args.is_empty()
+            )
+        )
+    } else {
+        false
+    }
 }
 
 pub(crate) fn rewrite_array<'a, T: 'a + IntoOverflowableItem<'a>>(

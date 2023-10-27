@@ -219,6 +219,7 @@ impl Rewrite for Pat {
                     context,
                     shape,
                     SeparatorPlace::Front,
+                    false,
                 )
             }
             PatKind::Ref(ref pat, mutability) => {
