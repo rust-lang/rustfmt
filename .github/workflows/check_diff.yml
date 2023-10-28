@@ -31,3 +31,9 @@ jobs:
 
     - name: check diff
       run: bash ${GITHUB_WORKSPACE}/ci/check_diff.sh ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} ${{ github.event.inputs.commit_hash || github.event.inputs.branch_name }} ${{ github.event.inputs.rustfmt_configs }}
+
+    - name: Archive Diff Check Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: diff-check-report
+        path: diff-check.zip
