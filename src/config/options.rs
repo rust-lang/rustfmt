@@ -468,3 +468,31 @@ pub enum MatchArmLeadingPipe {
     /// Preserve any existing leading pipes
     Preserve,
 }
+
+/// Defines the default values for each config according to [the style guide].
+/// rustfmt output may differ between style editions.
+///
+/// [the style guide]: link TBD
+#[config_type]
+pub enum StyleEdition {
+    #[value = "2015"]
+    #[doc_hint = "2015"]
+    /// [Edition 2015].
+    /// [Edition 2015]: link TBD
+    Edition2015,
+    #[value = "2018"]
+    #[doc_hint = "2018"]
+    /// [Edition 2018].
+    /// [Edition 2018]: link TBD
+    Edition2018,
+    #[value = "2021"]
+    #[doc_hint = "2021"]
+    /// [Edition 2021].
+    /// [Edition 2021]: link TBD
+    Edition2021,
+    #[value = "2024"]
+    #[doc_hint = "2024"]
+    /// [Edition 2024].
+    /// [Edition 2024]: link TBD
+    Edition2024,
+}
