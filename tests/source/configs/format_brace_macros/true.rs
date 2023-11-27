@@ -165,6 +165,11 @@ fn main() {
     identity! { foo("first very very long argument", "second very very long argument") };
 }
 
+fn main() {
+    foo("first very very long argument", "second very very long argument");
+    identity! { foo("first very very long argument", "second very very long argument", ) };
+}
+
 #[tokio::main]
 fn main() {
     // This gets formatted as expected

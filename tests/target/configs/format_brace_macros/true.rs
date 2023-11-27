@@ -165,6 +165,14 @@ fn main() {
         "first very very long argument",
         "second very very long argument",
     );
+    identity! { foo("first very very long argument", "second very very long argument") };
+}
+
+fn main() {
+    foo(
+        "first very very long argument",
+        "second very very long argument",
+    );
     identity! {
         foo(
             "first very very long argument",

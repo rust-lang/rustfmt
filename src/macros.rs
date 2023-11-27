@@ -247,7 +247,7 @@ fn rewrite_macro_inner(
     } = if Delimiter::Brace == style && !context.config.format_brace_macros() {
         ParsedMacroArgs::default()
     } else {
-        match parse_macro_args(context, ts, is_forced_bracket) {
+        match parse_macro_args(context, ts.clone(), is_forced_bracket) {
             Some(args) => args,
             None => {
                 if Delimiter::Brace == style {
@@ -341,7 +341,7 @@ fn rewrite_macro_inner(
             }
         }
         Delimiter::Brace => {
-            let snippet = if arg_vec.is_empty() {
+            let snippet = if arg_vec.is_empty() || !context.config.format_brace_macros() {
                 None
             } else {
                 overflow::rewrite_undelimited(
@@ -356,9 +356,24 @@ fn rewrite_macro_inner(
             }
             .unwrap_or(context.snippet(mac.span()).into());
 
+            let mut snippet = snippet.trim_start_matches(|c| c != '{');
+
+            // Only format if the rewritten TokenStream is the same as the original TokenStream.
+            if context.config.format_brace_macros() {
+                let rewritten_ts = rustc_parse::parse_stream_from_source_str(
+                    rustc_span::FileName::anon_source_code(""),
+                    snippet.to_string(),
+                    &rustc_session::parse::ParseSess::with_silent_emitter(None),
+                    None,
+                );
+
+                if !ts.eq_unspanned(&rewritten_ts) {
+                    snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
+                }
+            }
+
             // For macro invocations with braces, always put a space between
             // the `macro_name!` and `{ /* macro_body */ }`.
-            let snippet = snippet.trim_start_matches(|c| c != '{');
             match trim_left_preserve_layout(snippet, shape.indent, context.config) {
                 Some(macro_body) => Some(format!("{macro_name} {macro_body}")),
                 None => Some(format!("{macro_name} {snippet}")),
