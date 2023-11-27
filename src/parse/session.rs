@@ -1,8 +1,9 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use rustc_data_structures::sync::{Lrc, Send};
-use rustc_errors::emitter::{Emitter, EmitterWriter};
+use rustc_data_structures::sync::{IntoDynSyncSend, Lrc};
+use rustc_errors::emitter::{DynEmitter, Emitter, EmitterWriter};
+use rustc_errors::translation::Translate;
 use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
 use rustc_session::parse::ParseSess as RawParseSess;
 use rustc_span::{
@@ -11,6 +12,7 @@ use rustc_span::{
 };
 
 use crate::config::file_lines::LineRange;
+use crate::config::options::Color;
 use crate::ignore_path::IgnorePathSet;
 use crate::parse::parser::{ModError, ModulePathSuccess};
 use crate::source_map::LineRangeUtils;
@@ -28,28 +30,33 @@ pub(crate) struct ParseSess {
 /// Emitter which discards every error.
 struct SilentEmitter;
 
-impl Emitter for SilentEmitter {
-    fn source_map(&self) -> Option<&Lrc<SourceMap>> {
-        None
-    }
-    fn emit_diagnostic(&mut self, _db: &Diagnostic) {}
+impl Translate for SilentEmitter {
     fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
         None
     }
+
     fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
         panic!("silent emitter attempted to translate a diagnostic");
     }
 }
 
-fn silent_emitter() -> Box<dyn Emitter + Send> {
+impl Emitter for SilentEmitter {
+    fn source_map(&self) -> Option<&Lrc<SourceMap>> {
+        None
+    }
+
+    fn emit_diagnostic(&mut self, _db: &Diagnostic) {}
+}
+
+fn silent_emitter() -> Box<DynEmitter> {
     Box::new(SilentEmitter {})
 }
 
 /// Emit errors against every files expect ones specified in the `ignore_path_set`.
 struct SilentOnIgnoredFilesEmitter {
-    ignore_path_set: Lrc<IgnorePathSet>,
+    ignore_path_set: IntoDynSyncSend<Lrc<IgnorePathSet>>,
     source_map: Lrc<SourceMap>,
-    emitter: Box<dyn Emitter + Send>,
+    emitter: Box<DynEmitter>,
     has_non_ignorable_parser_errors: bool,
     can_reset: Lrc<AtomicBool>,
 }
@@ -62,10 +69,21 @@ impl SilentOnIgnoredFilesEmitter {
     }
 }
 
+impl Translate for SilentOnIgnoredFilesEmitter {
+    fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
+        self.emitter.fluent_bundle()
+    }
+
+    fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
+        self.emitter.fallback_fluent_bundle()
+    }
+}
+
 impl Emitter for SilentOnIgnoredFilesEmitter {
     fn source_map(&self) -> Option<&Lrc<SourceMap>> {
         None
     }
+
     fn emit_diagnostic(&mut self, db: &Diagnostic) {
         if db.level() == DiagnosticLevel::Fatal {
             return self.handle_non_ignoreable_error(db);
@@ -88,13 +106,15 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
         }
         self.handle_non_ignoreable_error(db);
     }
+}
 
-    fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
-        self.emitter.fluent_bundle()
-    }
-
-    fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
-        self.emitter.fallback_fluent_bundle()
+impl From<Color> for ColorConfig {
+    fn from(color: Color) -> Self {
+        match color {
+            Color::Auto => ColorConfig::Auto,
+            Color::Always => ColorConfig::Always,
+            Color::Never => ColorConfig::Never,
+        }
     }
 }
 
@@ -103,10 +123,11 @@ fn default_handler(
     ignore_path_set: Lrc<IgnorePathSet>,
     can_reset: Lrc<AtomicBool>,
     hide_parse_errors: bool,
+    color: Color,
 ) -> Handler {
     let supports_color = term::stderr().map_or(false, |term| term.supports_color());
-    let color_cfg = if supports_color {
-        ColorConfig::Auto
+    let emit_color = if supports_color {
+        ColorConfig::from(color)
     } else {
         ColorConfig::Never
     };
@@ -114,30 +135,19 @@ fn default_handler(
     let emitter = if hide_parse_errors {
         silent_emitter()
     } else {
-        let fallback_bundle =
-            rustc_errors::fallback_fluent_bundle(rustc_errors::DEFAULT_LOCALE_RESOURCES, false);
-        Box::new(EmitterWriter::stderr(
-            color_cfg,
-            Some(source_map.clone()),
-            None,
-            fallback_bundle,
+        let fallback_bundle = rustc_errors::fallback_fluent_bundle(
+            rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
             false,
-            false,
-            None,
-            false,
-        ))
+        );
+        Box::new(EmitterWriter::stderr(emit_color, fallback_bundle).sm(Some(source_map.clone())))
     };
-    Handler::with_emitter(
-        true,
-        None,
-        Box::new(SilentOnIgnoredFilesEmitter {
-            has_non_ignorable_parser_errors: false,
-            source_map,
-            emitter,
-            ignore_path_set,
-            can_reset,
-        }),
-    )
+    Handler::with_emitter(Box::new(SilentOnIgnoredFilesEmitter {
+        has_non_ignorable_parser_errors: false,
+        source_map,
+        emitter,
+        ignore_path_set: IntoDynSyncSend(ignore_path_set),
+        can_reset,
+    }))
 }
 
 impl ParseSess {
@@ -154,6 +164,7 @@ impl ParseSess {
             Lrc::clone(&ignore_path_set),
             Lrc::clone(&can_reset_errors),
             config.hide_parse_errors(),
+            config.color(),
         );
         let parse_sess = RawParseSess::with_span_handler(handler, source_map);
 
@@ -207,7 +218,7 @@ impl ParseSess {
     }
 
     pub(crate) fn set_silent_emitter(&mut self) {
-        self.parse_sess.span_diagnostic = Handler::with_emitter(true, None, silent_emitter());
+        self.parse_sess.span_diagnostic = Handler::with_emitter(silent_emitter());
     }
 
     pub(crate) fn span_to_filename(&self, span: Span) -> FileName {
@@ -257,7 +268,7 @@ impl ParseSess {
         let source_file = self.parse_sess.source_map().lookup_char_pos(span.lo()).file;
         SnippetProvider::new(
             source_file.start_pos,
-            source_file.end_pos,
+            source_file.end_position(),
             Lrc::clone(source_file.src.as_ref().unwrap()),
         )
     }
@@ -305,8 +316,7 @@ impl LineRangeUtils for ParseSess {
 
         debug_assert_eq!(
             lo.sf.name, hi.sf.name,
-            "span crossed file boundary: lo: {:?}, hi: {:?}",
-            lo, hi
+            "span crossed file boundary: lo: {lo:?}, hi: {hi:?}"
         );
 
         // in case the span starts with a newline, the line range is off by 1 without the
@@ -340,18 +350,23 @@ mod tests {
             num_emitted_errors: Lrc<AtomicU32>,
         }
 
+        impl Translate for TestEmitter {
+            fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
+                None
+            }
+
+            fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
+                panic!("test emitter attempted to translate a diagnostic");
+            }
+        }
+
         impl Emitter for TestEmitter {
             fn source_map(&self) -> Option<&Lrc<SourceMap>> {
                 None
             }
+
             fn emit_diagnostic(&mut self, _db: &Diagnostic) {
                 self.num_emitted_errors.fetch_add(1, Ordering::Release);
-            }
-            fn fluent_bundle(&self) -> Option<&Lrc<rustc_errors::FluentBundle>> {
-                None
-            }
-            fn fallback_fluent_bundle(&self) -> &rustc_errors::FluentBundle {
-                panic!("test emitter attempted to translate a diagnostic");
             }
         }
 
@@ -380,7 +395,7 @@ mod tests {
                 has_non_ignorable_parser_errors: false,
                 source_map,
                 emitter: Box::new(emitter_writer),
-                ignore_path_set,
+                ignore_path_set: IntoDynSyncSend(ignore_path_set),
                 can_reset,
             }
         }

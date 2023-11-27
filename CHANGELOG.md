@@ -2,6 +2,160 @@
 
 ## [Unreleased]
 
+
+## [1.7.0] 2023-10-22
+
+### Fixed
+
+- Sometimes when `format_code_in_doc_comments=true` was set some line comments were converted to block comments [#5533](https://github.com/rust-lang/rustfmt/issues/5533)
+- rustfmt will no longer remove the braces in match arms when the block has a labeled [#5676](https://github.com/rust-lang/rustfmt/issues/5676)
+  ```rust
+  fn main() {
+      match true {
+          true => 'a: {
+              break 'a
+          }
+          _ => (),
+      }
+  }
+  ```
+- Calling methods on float literals ending in `.` will now be wrapped in parenthesis. e.g. `0. .to_string()` will be formatted as `(0.).to_string()` [#5791](https://github.com/rust-lang/rustfmt/issues/5791)
+- Prevent ICE when formatting empty `macro_rules!` branch [#5730](https://github.com/rust-lang/rustfmt/issues/5730)
+  ```rust
+  macro_rules! statement {
+      () => {;};
+  }
+  ```
+- Prevent ICE when formatting `vec!{}` [#5735](https://github.com/rust-lang/rustfmt/issues/5735)
+- Prevent internal trailing whitespace error when formatting an empty `macro_rules!` defintion e.g. `macro_rules! foo {}` [#5882](https://github.com/rust-lang/rustfmt/issues/5882)
+- Formatting doc comment lines that start with `.` or `)` won't be treated as ordered markdown lists because `.` or `)` must be preceded by a number to start an ordered markdown list [#5835](https://github.com/rust-lang/rustfmt/pull/5835)
+- Add parenthesis around closures when they're used as method receives, don't have a block body, and end with `.` [#4808](https://github.com/rust-lang/rustfmt/issues/4808)
+  ```rust
+  fn main() {
+      || (10.).method();
+      (|| ..).method();
+      (|| 1..).method();
+  }
+  ```
+- Prevent removing `for<T>` when using the [`#![feature(non_lifetime_binders)]`](https://github.com/rust-lang/rust/issues/108185) [#5721](https://github.com/rust-lang/rustfmt/issues/5721)
+  ```rust
+  #![feature(non_lifetime_binders)]
+  #![allow(incomplete_features)]
+
+  trait Other<U: ?Sized> {}
+
+  trait Trait<U>
+  where
+      for<T> U: Other<T> {}
+  ```
+- Fix various issues with comments in imports [#5852](https://github.com/rust-lang/rustfmt/issues/5852) [#4708](https://github.com/rust-lang/rustfmt/issues/4708) [#3984](https://github.com/rust-lang/rustfmt/issues/3984)
+- When setting `version = Two` newlines between where clause bounds will be removed [#5655](https://github.com/rust-lang/rustfmt/issues/5655)
+  ```rust
+  fn foo<T>(_: T)
+  where
+      T: std::fmt::Debug,
+      T: std::fmt::Display,
+  {
+  }
+  ```
+- Improve formatting of `let-else` statements that have leading attributes When setting `version = Two` [#5901](https://github.com/rust-lang/rustfmt/issues/5901)
+- Prevent comment duplication in expressions wrapped in parenthesis. [#5871](https://github.com/rust-lang/rustfmt/issues/5871)
+- Adjust the span derivation used when rewriting const generics. The incorrect span derivation lead to invalid code after reformatting. [#5935](https://github.com/rust-lang/rustfmt/issues/5935)
+
+
+### Changed
+
+- rustfmt no longer removes explicit `Rust` ABIs. e.g `extern "Rust" fn im_a_rust_fn() {}` [#5701](https://github.com/rust-lang/rustfmt/issues/5701)
+- Setting `trailing_semicolon = false` will only remove trailing `;` on the last expression in a block [#5797](https://github.com/rust-lang/rustfmt/issues/5797)
+- Update the format of `cargo help fmt` to be more consistent with other standard commands [#5908](https://github.com/rust-lang/rustfmt/pull/5908)
+
+### Added
+
+- Users can now set `skip_macro_invocations` in `rustfmt.toml` [#5816](https://github.com/rust-lang/rustfmt/issues/5816)
+- Adds initial support for formatting `let-chains`. **`let-chains` are still a nightly feature and their formatting is subject to change** [#5910](https://github.com/rust-lang/rustfmt/pull/5910). Formatting was implemented following the rules outlined in [rust-lang/rust#110568](https://github.com/rust-lang/rust/pull/110568)
+
+### Misc
+
+- Support the experimental `dyn*` syntax, enabled by `#![feature(dyn_star)]` [#5542](https://github.com/rust-lang/rustfmt/issues/5542)
+- Replace `unicode_categories` dependency with `unicode-properties` [#5864](https://github.com/rust-lang/rustfmt/pull/5864)
+
+## [1.6.0] 2023-07-02
+
+### Added
+
+- Support for formatting let-else statements [#5690]
+- New config option, `single_line_let_else_max_width`, that allows users to configure the maximum length of single line `let-else` statements. `let-else` statements that otherwise meet the requirements to be formatted on a single line will have their divergent`else` block formatted over multiple lines if they exceed this length [#5684]
+
+[#5690]: https://github.com/rust-lang/rustfmt/pull/5690
+[#5684]: https://github.com/rust-lang/rustfmt/issues/5684
+
+## [1.5.3] 2023-06-20
+
+### Fixed
+
+- When formatting doc comments with `wrap_comments = true` rustfmt will no longer wrap markdown tables [#4210](https://github.com/rust-lang/rustfmt/issues/4210)
+- Properly handle wrapping comments that include a numbered list in markdown [#5416](https://github.com/rust-lang/rustfmt/issues/5416)
+- Properly handle markdown sublists that utilize a `+` [#4041](https://github.com/rust-lang/rustfmt/issues/4041)
+- rustfmt will no longer use shorthand initialization when rewriting a tuple struct even when `use_field_init_shorthand = true` as this leads to code that could no longer compile.
+  Take the following struct as an example `struct MyStruct(u64);`. rustfmt will no longer format `MyStruct { 0: 0 }` as `MyStruct { 0 }` [#5488](https://github.com/rust-lang/rustfmt/issues/5488)
+- rustfmt no longer panics when formatting an empty code block in a doc comment with `format_code_in_doc_comments = true` [#5234](https://github.com/rust-lang/rustfmt/issues/5234). For example:
+  ```rust
+  /// ```
+  ///
+  /// ```
+  fn main() {}
+  ```
+- rustfmt no longer incorrectly duplicates the where clause bounds when using const expression in where clause bounds with feature `#![feature(generic_const_exprs)]` [#5691](https://github.com/rust-lang/rustfmt/issues/5691). e.g.:
+  ```rust
+  struct S<const C: usize>
+  where
+      [(); { num_slots!(C) }]:, {
+      // code ...
+  }
+  ```
+- Prevent ICE when parsing invalid attributes in `cfg_if!` macros [#5728](https://github.com/rust-lang/rustfmt/issues/5728), [#5729](https://github.com/rust-lang/rustfmt/issues/5729)
+- rustfmt no longer loses comments placed between a doc comment and generic params [#5320](https://github.com/rust-lang/rustfmt/issues/5320)
+- Handle explicit discriminants in enums with comments present [#5686](https://github.com/rust-lang/rustfmt/issues/5686)
+
+### Changed
+
+- Users can now control whether rustc parser errors are displayed with color using rustfmt's `--color` option. To disable colored errors pass `--color=Never` to rustfmt [#5717](https://github.com/rust-lang/rustfmt/issues/5717)
+
+
+### Added
+
+- rustfmt now recognises `+` as the start of a markdown list, and won't incorrectly wrap sublists that begin with `+` when formatting doc comments with `wrap_comments = true` [#5560](https://github.com/rust-lang/rustfmt/pull/5560)
+
+### Misc
+
+- Update various dependencies, including `syn`, `cargo_metadata`, `env_logger`, and `toml`
+
+## [1.5.2] 2023-01-24
+
+### Fixed
+
+- Resolve issue when comments are found within const generic defaults in unit structs [#5668](https://github.com/rust-lang/rustfmt/issues/5668)
+- Resolve issue when block comments are found within trait generics [#5358](https://github.com/rust-lang/rustfmt/issues/5358)
+- Correctly handle alignment of comments containing unicode characters [#5504](https://github.com/rust-lang/rustfmt/issues/5504)
+- Properly indent a single generic bound that requires being written across multiple lines [#4689](https://github.com/rust-lang/rustfmt/issues/4689) (n.b. this change is version gated and will only appear when the `version` configuration option is set to `Two`)
+
+### Changed
+
+- Renamed `fn_args_layout` configuration option to `fn_params_layout` [#4149](https://github.com/rust-lang/rustfmt/issues/4149). Note that `fn_args_layout` has only been soft deprecated: `fn_args_layout` will continue to work without issue, but rustfmt will display a warning to encourage users to switch to the new name
+
+### Added
+
+- New configuration option (`skip_macro_invocations`)[https://rust-lang.github.io/rustfmt/?version=master&search=#skip_macro_invocations] [#5347](https://github.com/rust-lang/rustfmt/pull/5347) that can be used to globally define a single enumerated list of macro calls that rustfmt should skip formatting. rustfmt [currently also supports this via a custom tool attribute](https://github.com/rust-lang/rustfmt#tips), however, these cannot be used in all contexts because [custom inner attributes are unstable](https://github.com/rust-lang/rust/issues/54726)
+
+### Misc
+
+- rustfmt now internally supports the ability to have both stable and unstable variants of a configuration option [#5378](https://github.com/rust-lang/rustfmt/issues/5378). This ability will allow the rustfmt team to make certain configuration options available on stable toolchains more quickly because we no longer have to wait for _every_ variant to be stable-ready before stabilizing _any_ variant. 
+
+### Install/Download Options
+- **rustup (nightly)** - nightly-2023-01-24
+- **GitHub Release Binaries** - [Release v1.5.2](https://github.com/rust-lang/rustfmt/releases/tag/v1.5.2)
+- **Build from source** - [Tag v1.5.2](https://github.com/rust-lang/rustfmt/tree/v1.5.2), see instructions for how to [install rustfmt from source][install-from-source]
+
 ## [1.5.1] 2022-06-24
 
 **N.B** A bug was introduced in v1.5.0/nightly-2022-06-15 which modified formatting. If you happened to run rustfmt over your code with one of those ~10 nightlies it's possible you may have seen formatting changes, and you may see additional changes after this fix since that bug has now been reverted.
@@ -29,6 +183,8 @@
 ### Changed
 
 - Simplify the rustfmt help text by eliding the full path to the rustfmt binary path from the usage string when running `rustfmt --help` [#5214](https://github.com/rust-lang/rustfmt/issues/5214)
+
+- Bumped the version for serveral dependencies. Most notably `dirs` `v2.0.1` -> `v4.0.0`. This changed the global user config directory on macOS from `$HOME/Library/Preferences` to `$HOME/Library/Application Support` [#5237](https://github.com/rust-lang/rustfmt/pull/5237)
 
 ### Fixed
 

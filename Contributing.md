@@ -91,6 +91,24 @@ Please try to avoid leaving `TODO`s in the code. There are a few around, but I
 wish there weren't. You can leave `FIXME`s, preferably with an issue number.
 
 
+### Run Rustfmt from source code
+
+You may want to run a version of rustfmt from source code as part of a test or
+hacking on the rustfmt codebase. It's strongly discouraged to install a version
+of rustfmt from source.
+
+To run `rustfmt` on a file:
+
+```
+cargo run --bin rustfmt -- path/to/file.rs
+```
+
+If you want to test modified `cargo-fmt`, or run `rustfmt` on the whole project (You may need to build rustfmt first):
+
+```
+RUSTFMT="./target/debug/rustfmt" cargo run --bin cargo-fmt -- --manifest-path path/to/project/you/want2test/Cargo.toml
+```
+
 ### Version-gate formatting changes
 
 A change that introduces a different code-formatting should be gated on the

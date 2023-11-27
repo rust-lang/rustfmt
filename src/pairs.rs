@@ -9,7 +9,7 @@ use crate::utils::{
 };
 
 /// Sigils that decorate a binop pair.
-#[derive(new, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub(crate) struct PairParts<'a> {
     prefix: &'a str,
     infix: &'a str,
@@ -17,6 +17,13 @@ pub(crate) struct PairParts<'a> {
 }
 
 impl<'a> PairParts<'a> {
+    pub(crate) const fn new(prefix: &'a str, infix: &'a str, suffix: &'a str) -> Self {
+        Self {
+            prefix,
+            infix,
+            suffix,
+        }
+    }
     pub(crate) fn infix(infix: &'a str) -> PairParts<'a> {
         PairParts {
             prefix: "",
@@ -35,9 +42,13 @@ pub(crate) fn rewrite_all_pairs(
     context: &RewriteContext<'_>,
 ) -> Option<String> {
     expr.flatten(context, shape).and_then(|list| {
-        // First we try formatting on one line.
-        rewrite_pairs_one_line(&list, shape, context)
-            .or_else(|| rewrite_pairs_multiline(&list, shape, context))
+        if list.let_chain_count() > 0 && !list.can_rewrite_let_chain_single_line() {
+            rewrite_pairs_multiline(&list, shape, context)
+        } else {
+            // First we try formatting on one line.
+            rewrite_pairs_one_line(&list, shape, context)
+                .or_else(|| rewrite_pairs_multiline(&list, shape, context))
+        }
     })
 }
 
@@ -227,8 +238,8 @@ where
     let rhs_result = rhs.rewrite(context, rhs_shape)?;
     let indent_str = rhs_shape.indent.to_string_with_newline(context.config);
     let infix_with_sep = match separator_place {
-        SeparatorPlace::Back => format!("{}{}", infix, indent_str),
-        SeparatorPlace::Front => format!("{}{}", indent_str, infix),
+        SeparatorPlace::Back => format!("{infix}{indent_str}"),
+        SeparatorPlace::Front => format!("{indent_str}{infix}"),
     };
     Some(format!(
         "{}{}{}{}",
@@ -246,6 +257,37 @@ trait FlattenPair: Rewrite + Sized {
 struct PairList<'a, 'b, T: Rewrite> {
     list: Vec<(&'b T, Option<String>)>,
     separators: Vec<&'a str>,
+}
+
+fn is_ident(expr: &ast::Expr) -> bool {
+    match &expr.kind {
+        ast::ExprKind::Path(None, path) if path.segments.len() == 1 => true,
+        ast::ExprKind::Unary(_, expr)
+        | ast::ExprKind::AddrOf(_, _, expr)
+        | ast::ExprKind::Paren(expr)
+        | ast::ExprKind::Try(expr) => is_ident(expr),
+        _ => false,
+    }
+}
+
+impl<'a, 'b> PairList<'a, 'b, ast::Expr> {
+    fn let_chain_count(&self) -> usize {
+        self.list
+            .iter()
+            .filter(|(expr, _)| matches!(expr.kind, ast::ExprKind::Let(..)))
+            .count()
+    }
+
+    fn can_rewrite_let_chain_single_line(&self) -> bool {
+        if self.list.len() != 2 {
+            return false;
+        }
+
+        let fist_item_is_ident = is_ident(self.list[0].0);
+        let second_item_is_let_chain = matches!(self.list[1].0.kind, ast::ExprKind::Let(..));
+
+        fist_item_is_ident && second_item_is_let_chain
+    }
 }
 
 impl FlattenPair for ast::Expr {
