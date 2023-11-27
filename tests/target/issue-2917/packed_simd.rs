@@ -1,5 +1,4 @@
 // rustfmt-wrap_comments: true
-// rustfmt-format_brace_macros: false
 //! Implements `From` and `Into` for vector types.
 
 macro_rules! impl_from_vector {

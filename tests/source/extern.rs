@@ -1,5 +1,4 @@
 // rustfmt-normalize_comments: true
-// rustfmt-format_brace_macros: false
 
  extern crate       foo    ;   
     extern crate       foo       as bar    ;   

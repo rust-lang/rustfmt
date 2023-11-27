@@ -1,5 +1,4 @@
 // rustfmt-version: Two
-// rustfmt-format_brace_macros: false
 
 macro_rules! moo1 {
     () => {

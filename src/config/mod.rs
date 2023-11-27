@@ -75,7 +75,7 @@ create_config! {
     format_macro_matchers: bool, false, false,
         "Format the metavariable matching patterns in macros";
     format_macro_bodies: bool, true, false, "Format the bodies of declarative macro definitions";
-    format_brace_macros: bool, true, false,
+    format_brace_macros: bool, false, false,
         "Format the contents of fn-like macro invocations that use brace delimiters";
     skip_macro_invocations: MacroSelectors, MacroSelectors::default(), false,
         "Skip formatting the bodies of macros invoked with the following names.";
@@ -634,7 +634,7 @@ normalize_doc_attributes = false
 format_strings = false
 format_macro_matchers = false
 format_macro_bodies = true
-format_brace_macros = true
+format_brace_macros = false
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
 empty_item_single_line = true

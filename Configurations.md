@@ -1132,7 +1132,7 @@ See also [`format_macro_matchers`](#format_macro_matchers).
 
 Format the contents of fn-like macro invocations that use brace delimiters.
 
-- **Default value**: `true`
+- **Default value**: `false`
 - **Possible values**: `true`, `false`
 - **Stable**: No
 
