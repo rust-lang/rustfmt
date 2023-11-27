@@ -1136,16 +1136,16 @@ Format the contents of fn-like macro invocations that use brace delimiters.
 - **Possible values**: `true`, `false`
 - **Stable**: No
 
-#### `true` (default):
-
-```rust
-foo! { "bar" }
-```
-
-#### `false`:
+#### `false` (default):
 
 ```rust
 foo! {"bar"}
+```
+
+#### `true`:
+
+```rust
+foo! { "bar" }
 ```
 
 ## `skip_macro_invocations`
