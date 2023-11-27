@@ -233,9 +233,11 @@ fn rewrite_macro_inner(
     }
 
     if Delimiter::Brace == style && context.config.format_brace_macros() {
-        if let ast::MacArgs::Delimited(span, ..) = *mac.args {
-            ts = TokenStream::new(vec![TokenTree::Delimited(span, Delimiter::Brace, ts)]);
-        }
+        ts = TokenStream::new(vec![TokenTree::Delimited(
+            mac.args.dspan,
+            Delimiter::Brace,
+            ts,
+        )]);
     }
 
     let ParsedMacroArgs {
