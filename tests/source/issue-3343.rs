@@ -15,6 +15,31 @@ extern crate len_is_50_;
 #[cfg(feature = "alloc")]
 extern crate len_is_51__;
 
+// https://github.com/rust-lang/rustfmt/issues/3343#issuecomment-589945611
+extern "C" {
+    #[no_mangle]
+    fn foo();
+}
+
+fn main() {
+    #[cfg(feature = "alloc")]
+    foo();
+    #[cfg(feature = "alloc")]
+    {
+        foo();
+    }
+    {
+        #[cfg(feature = "alloc")]
+        foo();
+    }
+}
+
+// https://github.com/rust-lang/rustfmt/pull/5538#issuecomment-1272367684
+struct EventConfigWidget {
+    #[widget]
+    menu_delay: Spinner<u32>,
+}
+
 /// this is a comment to test is_sugared_doc property
 use core::convert;
 

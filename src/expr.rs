@@ -416,7 +416,23 @@ pub(crate) fn format_expr(
                 attrs.last().map_or(expr.span.lo(), |attr| attr.span.hi()),
                 expr.span.lo(),
             );
-            combine_strs_with_missing_comments(context, &attrs_str, &expr_str, span, shape, false)
+
+            let allow_extend = if attrs.len() == 1 {
+                let line_len = attrs_str.len() + 1 + expr_str.len();
+                !attrs.first().unwrap().is_doc_comment()
+                    && context.config.inline_attribute_width() >= line_len
+            } else {
+                false
+            };
+
+            combine_strs_with_missing_comments(
+                context,
+                &attrs_str,
+                &expr_str,
+                span,
+                shape,
+                allow_extend,
+            )
         })
 }
 
