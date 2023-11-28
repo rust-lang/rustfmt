@@ -1203,6 +1203,64 @@ pub(crate) fn is_simple_block(
         && attrs.map_or(true, |a| a.is_empty())
 }
 
+pub(crate) fn contains_curly_block(expr: &ast::Expr) -> bool {
+    match expr.kind {
+        ast::ExprKind::If(..)
+        | ast::ExprKind::While(..)
+        | ast::ExprKind::ForLoop { .. }
+        | ast::ExprKind::Loop(..)
+        | ast::ExprKind::Match(..)
+        | ast::ExprKind::Let(..)
+        | ast::ExprKind::Block(..)
+        | ast::ExprKind::TryBlock(..)
+        | ast::ExprKind::Try(..)
+        | ast::ExprKind::Gen(..) => true,
+        ast::ExprKind::Unary(_, ref expr)
+        | ast::ExprKind::Cast(ref expr, _)
+        | ast::ExprKind::Type(ref expr, _)
+        | ast::ExprKind::Await(ref expr, _)
+        | ast::ExprKind::Field(ref expr, _)
+        | ast::ExprKind::Become(ref expr)
+        | ast::ExprKind::Repeat(ref expr, _)
+        | ast::ExprKind::Paren(ref expr)
+        | ast::ExprKind::AddrOf(_, _, ref expr)
+        | ast::ExprKind::AssignOp(_, ref expr, ..) => contains_curly_block(expr),
+        ast::ExprKind::Closure(ref closure) => contains_curly_block(&closure.body),
+        ast::ExprKind::Binary(_, ref a, ref b)
+        | ast::ExprKind::Assign(ref a, ref b, _)
+        | ast::ExprKind::Index(ref a, ref b, _) => {
+            contains_curly_block(a) || contains_curly_block(b)
+        }
+        ast::ExprKind::Break(_, ref maybe_expr)
+        | ast::ExprKind::Ret(ref maybe_expr)
+        | ast::ExprKind::Yield(ref maybe_expr)
+        | ast::ExprKind::Yeet(ref maybe_expr) => {
+            maybe_expr.as_deref().map_or(false, contains_curly_block)
+        }
+        ast::ExprKind::Range(ref maybe_a, ref maybe_b, _) => maybe_a
+            .as_deref()
+            .or(maybe_b.as_deref())
+            .map_or(false, contains_curly_block),
+        ast::ExprKind::InlineAsm(..)
+        | ast::ExprKind::OffsetOf(..)
+        | ast::ExprKind::MacCall(..)
+        | ast::ExprKind::Struct(..)
+        | ast::ExprKind::Continue(..)
+        | ast::ExprKind::IncludedBytes(..)
+        | ast::ExprKind::FormatArgs(..)
+        | ast::ExprKind::Path(..)
+        | ast::ExprKind::Array(..)
+        | ast::ExprKind::ConstBlock(..)
+        | ast::ExprKind::Call(..)
+        | ast::ExprKind::MethodCall(..)
+        | ast::ExprKind::Tup(..)
+        | ast::ExprKind::Lit(..)
+        | ast::ExprKind::Underscore
+        | ast::ExprKind::Err(_)
+        | ast::ExprKind::Dummy => false,
+    }
+}
+
 /// Checks whether a block contains at most one statement or expression, and no
 /// comments or attributes.
 pub(crate) fn is_simple_block_stmt(

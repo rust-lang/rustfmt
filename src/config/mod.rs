@@ -153,6 +153,9 @@ create_config! {
     format_generated_files: bool, true, false, "Format generated files";
     generated_marker_line_search_limit: usize, 5, false, "Number of lines to check for a \
         `@generated` marker when `format_generated_files` is enabled";
+    surround_blocks_with_empty_lines: bool, false, false,
+        "Surround all block expressions with \
+        empty lines. This option is not stable and could be removed at any time.";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -683,6 +686,7 @@ version = "One"
 inline_attribute_width = 0
 format_generated_files = true
 generated_marker_line_search_limit = 5
+surround_blocks_with_empty_lines = false
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false

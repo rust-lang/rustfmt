@@ -1105,6 +1105,19 @@ macro_rules! foo {
 
 See also [`format_macro_bodies`](#format_macro_bodies).
 
+## `surround_blocks_with_empty_lines`
+
+#### `false` (default):
+
+```rust
+// todo
+```
+
+#### `true`:
+
+```rust
+// todo
+```
 
 ## `format_macro_bodies`
 
