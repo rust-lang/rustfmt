@@ -75,6 +75,7 @@ impl Rewrite for ast::Local {
                 false,
             )?
         };
+        let let_kw_offset = result.len() - "let ".len();
 
         // 4 = "let ".len()
         let pat_shape = shape.offset_left(4)?;
@@ -127,8 +128,15 @@ impl Rewrite for ast::Local {
 
             if let Some(block) = else_block {
                 let else_kw_span = init.span.between(block.span);
+                // Strip attributes and comments to check if newline is needed before the else
+                // keyword from the initializer part. (#5901)
+                let init_str = if context.config.version() == Version::Two {
+                    &result[let_kw_offset..]
+                } else {
+                    result.as_str()
+                };
                 let force_newline_else = pat_str.contains('\n')
-                    || !same_line_else_kw_and_brace(&result, context, else_kw_span, nested_shape);
+                    || !same_line_else_kw_and_brace(init_str, context, else_kw_span, nested_shape);
                 let else_kw = rewrite_else_kw_with_comments(
                     force_newline_else,
                     true,
@@ -146,11 +154,16 @@ impl Rewrite for ast::Local {
                     std::cmp::min(shape.width, context.config.single_line_let_else_max_width());
 
                 // If available_space hits zero we know for sure this will be a multi-lined block
-                let available_space = max_width.saturating_sub(result.len());
+                let assign_str_with_else_kw = if context.config.version() == Version::Two {
+                    &result[let_kw_offset..]
+                } else {
+                    result.as_str()
+                };
+                let available_space = max_width.saturating_sub(assign_str_with_else_kw.len());
 
                 let allow_single_line = !force_newline_else
                     && available_space > 0
-                    && allow_single_line_let_else_block(&result, block);
+                    && allow_single_line_let_else_block(assign_str_with_else_kw, block);
 
                 let mut rw_else_block =
                     rewrite_let_else_block(block, allow_single_line, context, shape)?;
@@ -818,13 +831,15 @@ pub(crate) fn format_impl(
 
     if is_impl_single_line(context, items.as_slice(), &result, &where_clause_str, item)? {
         result.push_str(&where_clause_str);
-        if where_clause_str.contains('\n') || last_line_contains_single_line_comment(&result) {
-            // if the where_clause contains extra comments AND
-            // there is only one where-clause predicate
-            // recover the suppressed comma in single line where_clause formatting
+        if where_clause_str.contains('\n') {
+            // If there is only one where-clause predicate
+            // and the where-clause spans multiple lines,
+            // then recover the suppressed comma in single line where-clause formatting
             if generics.where_clause.predicates.len() == 1 {
                 result.push(',');
             }
+        }
+        if where_clause_str.contains('\n') || last_line_contains_single_line_comment(&result) {
             result.push_str(&format!("{sep}{{{sep}}}"));
         } else {
             result.push_str(" {}");
@@ -2595,7 +2610,8 @@ fn rewrite_fn_base(
     if where_clause_str.is_empty() {
         if let ast::FnRetTy::Default(ret_span) = fd.output {
             match recover_missing_comment_in_span(
-                mk_sp(params_span.hi(), ret_span.hi()),
+                // from after the closing paren to right before block or semicolon
+                mk_sp(ret_span.lo(), span.hi()),
                 shape,
                 context,
                 last_line_width(&result),
@@ -3231,7 +3247,7 @@ fn format_generics(
                     if brace_pos == BracePos::None {
                         span.hi()
                     } else {
-                        context.snippet_provider.span_before(span, "{")
+                        context.snippet_provider.span_before_last(span, "{")
                     },
                 ),
                 shape,

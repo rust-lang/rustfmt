@@ -132,7 +132,7 @@ pub(crate) fn format_expr(
         ast::ExprKind::Tup(ref items) => {
             rewrite_tuple(context, items.iter(), expr.span, shape, items.len() == 1)
         }
-        ast::ExprKind::Let(..) => None,
+        ast::ExprKind::Let(ref pat, ref expr, _span, _) => rewrite_let(context, shape, pat, expr),
         ast::ExprKind::If(..)
         | ast::ExprKind::ForLoop(..)
         | ast::ExprKind::Loop(..)
@@ -261,7 +261,7 @@ pub(crate) fn format_expr(
             shape,
             SeparatorPlace::Back,
         ),
-        ast::ExprKind::Index(ref expr, ref index) => {
+        ast::ExprKind::Index(ref expr, ref index, _) => {
             rewrite_index(&**expr, &**index, context, shape)
         }
         ast::ExprKind::Repeat(ref expr, ref repeats) => rewrite_pair(
@@ -662,7 +662,7 @@ struct ControlFlow<'a> {
 
 fn extract_pats_and_cond(expr: &ast::Expr) -> (Option<&ast::Pat>, &ast::Expr) {
     match expr.kind {
-        ast::ExprKind::Let(ref pat, ref cond, _) => (Some(pat), cond),
+        ast::ExprKind::Let(ref pat, ref cond, _, _) => (Some(pat), cond),
         _ => (None, expr),
     }
 }
@@ -1339,7 +1339,7 @@ pub(crate) fn is_simple_expr(expr: &ast::Expr) -> bool {
         | ast::ExprKind::Field(ref expr, _)
         | ast::ExprKind::Try(ref expr)
         | ast::ExprKind::Unary(_, ref expr) => is_simple_expr(expr),
-        ast::ExprKind::Index(ref lhs, ref rhs) => is_simple_expr(lhs) && is_simple_expr(rhs),
+        ast::ExprKind::Index(ref lhs, ref rhs, _) => is_simple_expr(lhs) && is_simple_expr(rhs),
         ast::ExprKind::Repeat(ref lhs, ref rhs) => {
             is_simple_expr(lhs) && is_simple_expr(&*rhs.value)
         }
@@ -1379,12 +1379,8 @@ pub(crate) fn can_be_overflowed_expr(
                 || (context.use_block_indent() && args_len == 1)
         }
         ast::ExprKind::MacCall(ref mac) => {
-            match (
-                rustc_ast::ast::MacDelimiter::from_token(mac.args.delim.to_token()),
-                context.config.overflow_delimited_expr(),
-            ) {
-                (Some(ast::MacDelimiter::Bracket), true)
-                | (Some(ast::MacDelimiter::Brace), true) => true,
+            match (mac.args.delim, context.config.overflow_delimited_expr()) {
+                (Delimiter::Bracket, true) | (Delimiter::Brace, true) => true,
                 _ => context.use_block_indent() && args_len == 1,
             }
         }
@@ -1453,7 +1449,7 @@ pub(crate) fn rewrite_paren(
     let remove_nested_parens = context.config.remove_nested_parens();
     loop {
         // 1 = "(" or ")"
-        pre_span = mk_sp(span.lo() + BytePos(1), subexpr.span.lo());
+        pre_span = mk_sp(span.lo() + BytePos(1), subexpr.span().lo());
         post_span = mk_sp(subexpr.span.hi(), span.hi() - BytePos(1));
         pre_comment = rewrite_missing_comment(pre_span, shape, context)?;
         post_comment = rewrite_missing_comment(post_span, shape, context)?;
@@ -1832,6 +1828,40 @@ fn rewrite_tuple_in_visual_indent_style<'a, T: 'a + IntoOverflowableItem<'a>>(
     let list_str = write_list(&item_vec, &fmt)?;
 
     Some(format!("({list_str})"))
+}
+
+fn rewrite_let(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    pat: &ast::Pat,
+    expr: &ast::Expr,
+) -> Option<String> {
+    let mut result = "let ".to_owned();
+
+    // TODO(ytmimi) comments could appear between `let` and the `pat`
+
+    // 4 = "let ".len()
+    let pat_shape = shape.offset_left(4)?;
+    let pat_str = pat.rewrite(context, pat_shape)?;
+    result.push_str(&pat_str);
+
+    // TODO(ytmimi) comments could appear between `pat` and `=`
+    result.push_str(" =");
+
+    let comments_lo = context
+        .snippet_provider
+        .span_after(expr.span.with_lo(pat.span.hi()), "=");
+    let comments_span = mk_sp(comments_lo, expr.span.lo());
+    rewrite_assign_rhs_with_comments(
+        context,
+        result,
+        expr,
+        shape,
+        &RhsAssignKind::Expr(&expr.kind, expr.span),
+        RhsTactics::Default,
+        comments_span,
+        true,
+    )
 }
 
 pub(crate) fn rewrite_tuple<'a, T: 'a + IntoOverflowableItem<'a>>(

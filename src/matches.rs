@@ -451,8 +451,8 @@ fn rewrite_match_body(
             };
 
         let block_sep = match context.config.control_brace_style() {
-            ControlBraceStyle::AlwaysNextLine => format!("{}{}", alt_block_sep, body_prefix),
             _ if body_prefix.is_empty() => "".to_owned(),
+            ControlBraceStyle::AlwaysNextLine => format!("{}{}", alt_block_sep, body_prefix),
             _ if forbid_same_line || !arrow_comment.is_empty() => {
                 format!("{}{}", alt_block_sep, body_prefix)
             }
@@ -605,7 +605,7 @@ fn can_flatten_block_around_this(body: &ast::Expr) -> bool {
         ast::ExprKind::AddrOf(_, _, ref expr)
         | ast::ExprKind::Try(ref expr)
         | ast::ExprKind::Unary(_, ref expr)
-        | ast::ExprKind::Index(ref expr, _)
+        | ast::ExprKind::Index(ref expr, _, _)
         | ast::ExprKind::Cast(ref expr, _) => can_flatten_block_around_this(expr),
         _ => false,
     }
