@@ -1,3 +1,5 @@
+// rustfmt-let_chain_style: LegibleBindings
+
 fn main() {
     if let x = x && x {}
 

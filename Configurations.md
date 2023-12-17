@@ -1128,6 +1128,72 @@ macro_rules! foo {
 
 See also [`format_macro_matchers`](#format_macro_matchers).
 
+## `let_chain_style`
+
+Controls how rustfmt treats let-chains
+
+- **Default value**: `LegibleBindings`
+- **Possible values**: `LegibleBindings`, `Tall`
+- **Stability**: No (tracking issue: N/A)
+
+#### `LegibleBindings` (default):
+
+let-chain items are formatted on their own line to disambiguate the new bindings.
+The let-chain may be arranged horizontally when the chain:
+1. Only contains two items
+2. The first item is an identifier
+3. The second item is a let expressions.
+
+```rust
+fn main() {
+    if let Some(x) = y
+        && a
+    {}
+
+    if let Some(x) = y
+        && let Some(a) = b
+    {}
+
+    if let Ok(name) = str::from_utf8(name)
+        && is_dyn_sym(name)
+    {}
+
+    if condition()
+        && let Some(binding) = expr
+        && condition2(binding)
+        && condition3()
+        && let Some(binding2) = expr2
+        && condition4(binding, binding2)
+    {
+        body();
+    }
+}
+```
+
+#### `Tall`:
+
+let-chain items are placed horizontally when there is sufficient space, otherwise the chain is formatted vertically.
+
+```rust
+fn main() {
+    if let Some(x) = y && a {}
+
+    if let Some(x) = y && let Some(a) = b {}
+
+    if let Ok(name) = str::from_utf8(name) && is_dyn_sym(name) {}
+
+    if condition()
+        && let Some(binding) = expr
+        && condition2(binding)
+        && condition3()
+        && let Some(binding2) = expr2
+        && condition4(binding, binding2)
+    {
+        body();
+    }
+}
+```
+
 ## `skip_macro_invocations`
 
 Skip formatting the bodies of macro invocations with the following names.

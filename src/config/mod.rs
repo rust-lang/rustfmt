@@ -151,6 +151,8 @@ create_config! {
         "Write an item and its attribute on the same line \
         if their combined width is below a threshold";
     format_generated_files: bool, true, false, "Format generated files";
+    let_chain_style: LetChainStyle, LetChainStyle::LegibleBindings, false, "Controls how rustfmt \
+        lays out let-chains";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -680,6 +682,7 @@ edition = "2015"
 version = "One"
 inline_attribute_width = 0
 format_generated_files = true
+let_chain_style = "LegibleBindings"
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false
