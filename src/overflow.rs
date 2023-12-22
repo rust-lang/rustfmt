@@ -44,6 +44,7 @@ const SPECIAL_CASE_MACROS: &[(&str, usize)] = &[
     ("panic!", 0),
     ("unreachable!", 0),
     // From the `log` crate.
+    ("trace!", 0),
     ("debug!", 0),
     ("error!", 0),
     ("info!", 0),
