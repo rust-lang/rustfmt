@@ -8,8 +8,8 @@ use rustc_ast::{ast, ptr};
 use rustc_span::Span;
 
 use crate::closures;
-use crate::config::lists::*;
 use crate::config::Version;
+use crate::config::{lists::*, Config};
 use crate::expr::{
     can_be_overflowed_expr, is_every_expr_simple, is_method_call, is_nested_call, is_simple_expr,
     rewrite_cond,
@@ -43,8 +43,7 @@ const SPECIAL_CASE_MACROS: &[(&str, usize)] = &[
     ("println!", 0),
     ("panic!", 0),
     ("unreachable!", 0),
-    // From the `log` crate.
-    ("trace!", 0),
+    // From the `log` crate. trace! is added for v2 - see `special_cases` below
     ("debug!", 0),
     ("error!", 0),
     ("info!", 0),
@@ -183,11 +182,17 @@ impl<'a> OverflowableItem<'a> {
         }
     }
 
-    fn special_cases(&self) -> &'static [(&'static str, usize)] {
+    fn special_cases(&self, config: &Config) -> Vec<(&'static str, usize)> {
         match self {
-            OverflowableItem::MacroArg(..) => SPECIAL_CASE_MACROS,
-            OverflowableItem::NestedMetaItem(..) => SPECIAL_CASE_ATTR,
-            _ => &[],
+            OverflowableItem::MacroArg(..) => {
+                let mut cases = SPECIAL_CASE_MACROS.to_vec();
+                if config.version() == Version::Two {
+                    cases.push(("trace!", 0));
+                }
+                cases
+            }
+            OverflowableItem::NestedMetaItem(..) => SPECIAL_CASE_ATTR.to_vec(),
+            _ => vec![],
         }
     }
 }
@@ -552,7 +557,7 @@ impl<'a> Context<'a> {
 
                     if tactic == DefinitiveListTactic::Vertical {
                         if let Some((all_simple, num_args_before)) =
-                            maybe_get_args_offset(self.ident, &self.items)
+                            maybe_get_args_offset(self.ident, &self.items, &self.context.config)
                         {
                             let one_line = all_simple
                                 && definitive_tactic(
@@ -772,10 +777,11 @@ fn no_long_items(list: &[ListItem], short_array_element_width_threshold: usize) 
 pub(crate) fn maybe_get_args_offset(
     callee_str: &str,
     args: &[OverflowableItem<'_>],
+    config: &Config,
 ) -> Option<(bool, usize)> {
     if let Some(&(_, num_args_before)) = args
         .get(0)?
-        .special_cases()
+        .special_cases(config)
         .iter()
         .find(|&&(s, _)| s == callee_str)
     {
