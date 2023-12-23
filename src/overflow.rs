@@ -182,17 +182,24 @@ impl<'a> OverflowableItem<'a> {
         }
     }
 
-    fn special_cases(&self, config: &Config) -> Vec<(&'static str, usize)> {
+    fn special_cases(&self, config: &Config) -> impl Iterator<Item = &(&'static str, usize)> {
+        let base_cases = match self {
+            OverflowableItem::MacroArg(..) => SPECIAL_CASE_MACROS,
+            OverflowableItem::NestedMetaItem(..) => SPECIAL_CASE_ATTR,
+            _ => &[],
+        };
+        let additional_cases = if config.version() == Version::Two {
+            self.special_cases_v2()
+        } else {
+            &[]
+        };
+        base_cases.iter().chain(additional_cases)
+    }
+
+    fn special_cases_v2(&self) -> &'static [(&'static str, usize)] {
         match self {
-            OverflowableItem::MacroArg(..) => {
-                let mut cases = SPECIAL_CASE_MACROS.to_vec();
-                if config.version() == Version::Two {
-                    cases.push(("trace!", 0));
-                }
-                cases
-            }
-            OverflowableItem::NestedMetaItem(..) => SPECIAL_CASE_ATTR.to_vec(),
-            _ => vec![],
+            OverflowableItem::MacroArg(..) => &[("trace!", 0)],
+            _ => &[],
         }
     }
 }
@@ -782,7 +789,6 @@ pub(crate) fn maybe_get_args_offset(
     if let Some(&(_, num_args_before)) = args
         .get(0)?
         .special_cases(config)
-        .iter()
         .find(|&&(s, _)| s == callee_str)
     {
         let all_simple = args.len() > num_args_before
