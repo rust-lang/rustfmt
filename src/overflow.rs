@@ -195,19 +195,11 @@ impl<'a> OverflowableItem<'a> {
             OverflowableItem::NestedMetaItem(..) => SPECIAL_CASE_ATTR,
             _ => &[],
         };
-        let additional_cases = if config.version() == Version::Two {
-            self.special_cases_v2()
-        } else {
-            &[]
+        let additional_cases = match (self, config.version()) {
+            (OverflowableItem::MacroArg(..), Version::Two) => SPECIAL_CASE_MACROS_V2,
+            _ => &[],
         };
         base_cases.iter().chain(additional_cases)
-    }
-
-    fn special_cases_v2(&self) -> &'static [(&'static str, usize)] {
-        match self {
-            OverflowableItem::MacroArg(..) => SPECIAL_CASE_MACROS_V2,
-            _ => &[],
-        }
     }
 }
 
