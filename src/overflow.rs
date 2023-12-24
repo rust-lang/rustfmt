@@ -43,7 +43,7 @@ const SPECIAL_CASE_MACROS: &[(&str, usize)] = &[
     ("println!", 0),
     ("panic!", 0),
     ("unreachable!", 0),
-    // From the `log` crate. trace! is added for v2 - see `special_cases` below
+    // From the `log` crate.
     ("debug!", 0),
     ("error!", 0),
     ("info!", 0),
@@ -58,6 +58,13 @@ const SPECIAL_CASE_MACROS: &[(&str, usize)] = &[
     ("assert_ne!", 2),
     ("debug_assert_eq!", 2),
     ("debug_assert_ne!", 2),
+];
+
+/// Additional special case macros for version 2; these are separated to avoid breaking changes in
+/// version 1.
+const SPECIAL_CASE_MACROS_V2: &[(&str, usize)] = &[
+    // From the `log` crate.
+    ("trace!", 0),
 ];
 
 const SPECIAL_CASE_ATTR: &[(&str, usize)] = &[
@@ -198,7 +205,7 @@ impl<'a> OverflowableItem<'a> {
 
     fn special_cases_v2(&self) -> &'static [(&'static str, usize)] {
         match self {
-            OverflowableItem::MacroArg(..) => &[("trace!", 0)],
+            OverflowableItem::MacroArg(..) => SPECIAL_CASE_MACROS_V2,
             _ => &[],
         }
     }
