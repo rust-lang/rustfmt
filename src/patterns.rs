@@ -312,6 +312,7 @@ fn rewrite_struct_pat(
         context.snippet_provider.span_after(span, "{"),
         span.hi(),
         false,
+        context.config.version(),
     );
     let item_vec = items.collect::<Vec<_>>();
 
@@ -520,6 +521,7 @@ fn count_wildcard_suffix_len(
         context.snippet_provider.span_after(span, "("),
         span.hi() - BytePos(1),
         false,
+        context.config.version(),
     )
     .collect();
 

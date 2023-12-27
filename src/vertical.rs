@@ -233,6 +233,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         span.lo(),
         span.hi(),
         false,
+        context.config.version(),
     )
     .collect::<Vec<_>>();
 
