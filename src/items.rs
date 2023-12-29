@@ -14,14 +14,16 @@ use crate::comment::{
     recover_comment_removed, recover_missing_comment_in_span, rewrite_missing_comment,
     FindUncommented,
 };
-use crate::config::lists::*;
+use crate::config::{lists::*, Density};
 use crate::config::{BraceStyle, Config, IndentStyle, Version};
 use crate::expr::{
     is_empty_block, is_simple_block_stmt, rewrite_assign_rhs, rewrite_assign_rhs_with,
     rewrite_assign_rhs_with_comments, rewrite_else_kw_with_comments, rewrite_let_else_block,
     RhsAssignKind, RhsTactics,
 };
-use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
+use crate::lists::{
+    definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
+};
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::overflow;
 use crate::rewrite::{Rewrite, RewriteContext};
@@ -623,11 +625,32 @@ impl<'a> FmtVisitor<'a> {
         };
         let mut items: Vec<_> = itemize_list_with(self.config.struct_variant_width());
 
+        let is_multiline_variant = |item: &ListItem| {
+            item.inner_as_ref()
+                .lines()
+                .skip_while(|l| {
+                    if self.config.enum_variant_layout() == Density::Compressed {
+                        l.trim_start().starts_with("#") || l.trim_start().starts_with("///")
+                    } else {
+                        false
+                    }
+                })
+                .count()
+                > 1
+        };
+
         // If one of the variants use multiple lines, use multi-lined formatting for all variants.
-        let has_multiline_variant = items.iter().any(|item| item.inner_as_ref().contains('\n'));
-        let has_single_line_variant = items.iter().any(|item| !item.inner_as_ref().contains('\n'));
-        if has_multiline_variant && has_single_line_variant {
-            items = itemize_list_with(0);
+        let has_multiline_variant = items.iter().any(|item| is_multiline_variant(item));
+        let has_single_line_variant = items
+            .iter()
+            .any(|item| item.inner_as_ref().lines().count() == 1);
+
+        match self.config.enum_variant_layout() {
+            Density::Vertical => items = itemize_list_with(0),
+            Density::Tall if has_multiline_variant && has_single_line_variant => {
+                items = itemize_list_with(0)
+            }
+            _ => {}
         }
 
         let shape = self.shape().sub_width(2)?;
