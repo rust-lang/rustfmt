@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use super::read_config;
 
+use crate::FormatReportFormatterBuilder;
 use crate::modules::{ModuleResolutionError, ModuleResolutionErrorKind};
 use crate::{ErrorKind, Input, Session};
 
@@ -68,4 +69,22 @@ fn crate_parsing_stashed_diag2() {
     // See also https://github.com/rust-lang/rust/issues/121517
     let filename = "tests/parser/stashed-diag2.rs";
     assert_parser_error(filename);
+}
+
+#[test]
+fn indexing_mismatch_with_annotated_snippet() {
+    // See also https://github.com/rust-lang/rustfmt/issues/4968
+    let filename = "tests/parser/issue_4968.rs";
+    let file = PathBuf::from(filename);
+    let config = read_config(&file);
+    let mut session = Session::<io::Stdout>::new(config, None);
+    let report = session.format(Input::File(filename.into())).unwrap();
+    let report = FormatReportFormatterBuilder::new(&report).build();
+    {
+        // Panic can only be triggered if we actually try to write the report
+        // and call into the annotated_snippet dependency.
+        use std::io::Write;
+
+        write!(&mut Vec::new(), "{report}").unwrap();
+    }
 }
