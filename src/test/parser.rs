@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use super::read_config;
 
 use crate::modules::{ModuleResolutionError, ModuleResolutionErrorKind};
+use crate::FormatReportFormatterBuilder;
 use crate::{ErrorKind, Input, Session};
 
 #[test]
@@ -54,4 +55,22 @@ fn crate_parsing_errors_on_unclosed_delims() {
     // See also https://github.com/rust-lang/rustfmt/issues/4466
     let filename = "tests/parser/unclosed-delims/issue_4466.rs";
     assert_parser_error(filename);
+}
+
+#[test]
+fn indexing_mismatch_with_annotated_snippet() {
+    // See also https://github.com/rust-lang/rustfmt/issues/4968
+    let filename = "tests/parser/issue_4968.rs";
+    let file = PathBuf::from(filename);
+    let config = read_config(&file);
+    let mut session = Session::<io::Stdout>::new(config, None);
+    let report = session.format(Input::File(filename.into())).unwrap();
+    let report = FormatReportFormatterBuilder::new(&report).build();
+    {
+        // Panic can only be triggered if we actually try to write the report
+        // and call into the annotated_snippet dependency.
+        use std::io::Write;
+
+        write!(&mut Vec::new(), "{report}").unwrap();
+    }
 }
