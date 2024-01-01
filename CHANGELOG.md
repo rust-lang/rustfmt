@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix an idempotency issue when rewriting where clauses in which rustfmt would continuously add a trailing comma `,` to the end of trailing line comments [#5941](https://github.com/rust-lang/rustfmt/issues/5941).
+- When using `version=Two`, the `trace!` macro from the [log crate] is now formatted similarly to `debug!`, `info!`, `warn!`, and `error!` [#5987](https://github.com/rust-lang/rustfmt/issues/5987).
+- Prevent enum variant attributes from wrapping one character early when using `version=Two` [#5801](https://github.com/rust-lang/rustfmt/issues/5801)
+
+
+[log crate]: https://crates.io/crates/log
+
+
+### Changed
+
+- `hide_parse_errors` has been soft deprecated and it's been renamed to `show_parse_errors` [#5961](https://github.com/rust-lang/rustfmt/pull/5961).
+
+
+### Added
+
+- `generated_marker_line_search_limit` is a new unstable configuration option that allows users to configure how many lines to search for an `@generated` marker when `format_generated_files=false` [#5658](https://github.com/rust-lang/rustfmt/issues/5658)
+
 
 ## [1.7.0] 2023-10-22
 
