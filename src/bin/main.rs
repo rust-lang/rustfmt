@@ -387,16 +387,11 @@ fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) 
 }
 
 fn should_print_with_colors<T: Write>(session: &mut Session<'_, T>) -> bool {
-    match term::stderr() {
-        Some(ref t)
-            if session.config.color().use_colored_tty()
-                && t.supports_color()
-                && t.supports_attr(term::Attr::Bold) =>
-        {
-            true
-        }
-        _ => false,
-    }
+    term::stderr().is_some_and(|t| {
+        session.config.color().use_colored_tty()
+            && t.supports_color()
+            && t.supports_attr(term::Attr::Bold)
+    })
 }
 
 fn print_usage_to_stdout(opts: &Options, reason: &str) {
