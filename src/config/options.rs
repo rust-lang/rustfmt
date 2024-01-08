@@ -494,3 +494,17 @@ pub enum StyleEdition {
     /// [Edition 2024]().
     Edition2024,
 }
+
+/// Controls how rustfmt treats let-chains
+#[config_type]
+pub enum LetChainStyle {
+    /// let-chain items are formatted on their own line to disambiguate the new bindings.
+    /// The let-chain may be arranged horizontally when the chain:
+    /// 1. Only contains two items
+    /// 2. The first item is an identifier
+    /// 3. The second item is a let expressions.
+    LegibleBindings,
+    /// let-chain items are placed horizontally when there is sufficient space, otherwise the chain
+    /// is formatted vertically.
+    Tall,
+}

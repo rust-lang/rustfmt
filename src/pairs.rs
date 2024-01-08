@@ -2,6 +2,7 @@ use rustc_ast::ast;
 
 use crate::config::lists::*;
 use crate::config::IndentStyle;
+use crate::config::LetChainStyle;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::utils::{
@@ -42,7 +43,7 @@ pub(crate) fn rewrite_all_pairs(
     context: &RewriteContext<'_>,
 ) -> Option<String> {
     expr.flatten(context, shape).and_then(|list| {
-        if list.let_chain_count() > 0 && !list.can_rewrite_let_chain_single_line() {
+        if list.let_chain_count() > 0 && !list.can_rewrite_let_chain_single_line(context) {
             rewrite_pairs_multiline(&list, shape, context)
         } else {
             // First we try formatting on one line.
@@ -278,15 +279,20 @@ impl<'a, 'b> PairList<'a, 'b, ast::Expr> {
             .count()
     }
 
-    fn can_rewrite_let_chain_single_line(&self) -> bool {
-        if self.list.len() != 2 {
-            return false;
+    fn can_rewrite_let_chain_single_line(&self, context: &RewriteContext<'_>) -> bool {
+        match context.config.let_chain_style() {
+            LetChainStyle::Tall => true,
+            LetChainStyle::LegibleBindings => {
+                if self.list.len() != 2 {
+                    return false;
+                }
+
+                let fist_is_ident = is_ident(self.list[0].0);
+                let second_is_let_expr = matches!(self.list[1].0.kind, ast::ExprKind::Let(..));
+
+                fist_is_ident && second_is_let_expr
+            }
         }
-
-        let fist_item_is_ident = is_ident(self.list[0].0);
-        let second_item_is_let_chain = matches!(self.list[1].0.kind, ast::ExprKind::Let(..));
-
-        fist_item_is_ident && second_item_is_let_chain
     }
 }
 
