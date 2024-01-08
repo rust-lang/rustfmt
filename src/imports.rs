@@ -734,7 +734,9 @@ impl UseTree {
     }
 
     fn is_singleton(&self) -> bool {
-        !matches!(self.path.last().unwrap().kind, UseSegmentKind::List(_))
+        self.path.last().map_or(false, |use_segment| {
+            !matches!(use_segment.kind, UseSegmentKind::List(_))
+        })
     }
 
     fn flatten(self, import_granularity: ImportGranularity) -> Vec<UseTree> {
