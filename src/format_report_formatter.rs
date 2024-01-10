@@ -1,7 +1,6 @@
 use crate::formatting::FormattingError;
 use crate::{ErrorKind, FormatReport};
-use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
+use annotate_snippets::{Annotation, AnnotationType, Renderer, Slice, Snippet, SourceAnnotation};
 use std::fmt::{self, Display};
 
 /// A builder for [`FormatReportFormatter`].
@@ -49,9 +48,10 @@ impl<'a> Display for FormatReportFormatter<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let errors_by_file = &self.report.internal.borrow().0;
 
-        let opt = FormatOptions {
-            color: self.enable_colors,
-            ..Default::default()
+        let renderer = if self.enable_colors {
+            Renderer::styled()
+        } else {
+            Renderer::plain()
         };
 
         for (file, errors) in errors_by_file {
@@ -91,9 +91,8 @@ impl<'a> Display for FormatReportFormatter<'a> {
                     title,
                     footer: footer.into_iter().collect(),
                     slices: vec![slice],
-                    opt,
                 };
-                writeln!(f, "{}\n", DisplayList::from(snippet))?;
+                writeln!(f, "{}\n", renderer.render(snippet))?;
             }
         }
 
@@ -110,9 +109,8 @@ impl<'a> Display for FormatReportFormatter<'a> {
                 }),
                 footer: Vec::new(),
                 slices: Vec::new(),
-                opt,
             };
-            writeln!(f, "{}", DisplayList::from(snippet))?;
+            writeln!(f, "{}", renderer.render(snippet))?;
         }
 
         Ok(())
