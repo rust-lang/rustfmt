@@ -298,9 +298,6 @@ fn condense_use_trees(use_trees: &mut Vec<UseTree>) {
             use_trees[best_index].merge(&singleton, SharedPrefix::Crate);
         }
     }
-
-    // Put the trees back in their preferred order.
-    use_trees.sort();
 }
 
 fn flatten_use_trees(
