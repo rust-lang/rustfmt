@@ -150,6 +150,18 @@ fn format_derive(
     let item_str = write_list(&all_items, &fmt)?;
 
     debug!("item_str: '{}'", item_str);
+    let item_str = if item_str.len() > argument_shape.width {
+        // Due to write_list subtracting 1 from the separator count sometimes we can get back
+        // a line that exceeds the max_width. So format the line again but with a Vertical tactic.
+        let fmt = ListFormatting::new(argument_shape, context.config)
+            .tactic(DefinitiveListTactic::Vertical)
+            .trailing_separator(trailing_separator)
+            .ends_with_newline(false);
+
+        write_list(&all_items, &fmt)?
+    } else {
+        item_str
+    };
 
     // Determine if the result will be nested, i.e. if we're using the block
     // indent style and either the items are on multiple lines or we've exceeded
