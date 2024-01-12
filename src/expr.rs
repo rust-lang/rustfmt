@@ -225,13 +225,15 @@ pub(crate) fn format_expr(
         | ast::ExprKind::MethodCall(..)
         | ast::ExprKind::Await(_, _) => rewrite_chain(expr, context, shape),
         ast::ExprKind::MacCall(ref mac) => {
-            rewrite_macro(mac, None, context, shape, MacroPosition::Expression).or_else(|| {
-                wrap_str(
-                    context.snippet(expr.span).to_owned(),
-                    context.config.max_width(),
-                    shape,
-                )
-            })
+            rewrite_macro(mac, None, context, shape, MacroPosition::Expression)
+                .0
+                .or_else(|| {
+                    wrap_str(
+                        context.snippet(expr.span).to_owned(),
+                        context.config.max_width(),
+                        shape,
+                    )
+                })
         }
         ast::ExprKind::Ret(None) => Some("return".to_owned()),
         ast::ExprKind::Ret(Some(ref expr)) => {

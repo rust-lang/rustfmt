@@ -87,7 +87,6 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
     pub(crate) is_macro_def: bool,
-    pub(crate) lazy_static_success: bool,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -175,15 +174,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         stmt.span(),
                         get_span_without_attrs(stmt.as_ast_node()),
                     );
-                    self.format_missing(stmt.span().hi());
                 } else {
                     self.visit_mac(&mac_stmt.mac, None, MacroPosition::Statement);
-                    if self.lazy_static_success {
-                        self.format_missing_ignore_semicolon(stmt.span().hi());
-                    } else {
-                        self.format_missing(stmt.span().hi());
-                    }
                 }
+                self.format_missing(stmt.span().hi());
             }
             ast::StmtKind::Empty => (),
         }
@@ -689,7 +683,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
         // 1 = ;
         let shape = self.shape().saturating_sub_width(1);
-        let rewrite = self.with_context(|ctx| rewrite_macro(mac, ident, ctx, shape, pos));
+        let (rewrite, new_delimiter) =
+            self.with_context(|ctx| rewrite_macro(mac, ident, ctx, shape, pos));
         // As of v638 of the rustc-ap-* crates, the associated span no longer includes
         // the trailing semicolon. This determines the correct span to ensure scenarios
         // with whitespace between the delimiters and trailing semi (i.e. `foo!(abc)     ;`)
@@ -711,6 +706,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             _ => (mac.span(), rewrite),
         };
 
+        //we need to ignore semicolon if it is after {} instead of ()
+        let span = if new_delimiter == Some(Delimiter::Brace) && MacroPosition::Statement == pos {
+            let search_span = mk_sp(mac.span().hi(), self.snippet_provider.end_pos());
+            let hi = self.snippet_provider.span_before(search_span, ";");
+            mk_sp(mac.span().lo(), hi + BytePos(1))
+        } else {
+            span
+        };
         self.push_rewrite(span, rewrite);
     }
 
@@ -798,7 +801,6 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             skipped_range: Rc::new(RefCell::new(vec![])),
             is_macro_def: false,
             macro_rewrite_failure: false,
-            lazy_static_success: false,
             report,
             skip_context,
         }
@@ -996,15 +998,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
     }
 
-    pub(crate) fn with_context<F>(&mut self, f: F) -> Option<String>
+    pub(crate) fn with_context<F, RESULT>(&mut self, f: F) -> RESULT
     where
-        F: Fn(&RewriteContext<'_>) -> Option<String>,
+        F: Fn(&RewriteContext<'_>) -> RESULT,
     {
         let context = self.get_context();
         let result = f(&context);
-        let buf = context.lazy_static_success.get();
         self.macro_rewrite_failure |= context.macro_rewrite_failure.get();
-        self.lazy_static_success = buf;
         result
     }
 
@@ -1022,7 +1022,6 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             report: self.report.clone(),
             skip_context: self.skip_context.clone(),
             skipped_range: self.skipped_range.clone(),
-            lazy_static_success: Cell::new(false),
         }
     }
 }

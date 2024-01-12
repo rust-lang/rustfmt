@@ -269,7 +269,7 @@ impl Rewrite for Pat {
                 shape,
             ),
             PatKind::MacCall(ref mac) => {
-                rewrite_macro(mac, None, context, shape, MacroPosition::Pat)
+                rewrite_macro(mac, None, context, shape, MacroPosition::Pat).0
             }
             PatKind::Paren(ref pat) => pat
                 .rewrite(context, shape.offset_left(1)?.sub_width(1)?)
