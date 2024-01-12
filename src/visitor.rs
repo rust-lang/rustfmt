@@ -87,6 +87,7 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
     pub(crate) is_macro_def: bool,
+    pub(crate) lazy_static_success: bool,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -174,10 +175,15 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         stmt.span(),
                         get_span_without_attrs(stmt.as_ast_node()),
                     );
+                    self.format_missing(stmt.span().hi());
                 } else {
                     self.visit_mac(&mac_stmt.mac, None, MacroPosition::Statement);
+                    if self.lazy_static_success {
+                        self.format_missing_ignore_semicolon(stmt.span().hi());
+                    } else {
+                        self.format_missing(stmt.span().hi());
+                    }
                 }
-                self.format_missing(stmt.span().hi());
             }
             ast::StmtKind::Empty => (),
         }
@@ -792,6 +798,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             skipped_range: Rc::new(RefCell::new(vec![])),
             is_macro_def: false,
             macro_rewrite_failure: false,
+            lazy_static_success: false,
             report,
             skip_context,
         }
@@ -995,8 +1002,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     {
         let context = self.get_context();
         let result = f(&context);
-
+        let buf = context.lazy_static_success.get();
         self.macro_rewrite_failure |= context.macro_rewrite_failure.get();
+        self.lazy_static_success = buf;
         result
     }
 
@@ -1014,6 +1022,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             report: self.report.clone(),
             skip_context: self.skip_context.clone(),
             skipped_range: self.skipped_range.clone(),
+            lazy_static_success: Cell::new(false),
         }
     }
 }

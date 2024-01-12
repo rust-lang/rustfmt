@@ -50,6 +50,15 @@ impl<'a> FmtVisitor<'a> {
         self.format_missing_inner(end, |this, last_snippet, _| this.push_str(last_snippet))
     }
 
+    pub(crate) fn format_missing_ignore_semicolon(&mut self, end: BytePos) {
+        let missing_snippet = self.snippet(mk_sp(self.last_pos, end));
+        if missing_snippet.trim() == ";" {
+            self.last_pos = end;
+            return;
+        }
+        self.format_missing_inner(end, |this, last_snippet, _| this.push_str(last_snippet))
+    }
+
     pub(crate) fn format_missing_with_indent(&mut self, end: BytePos) {
         self.format_missing_indent(end, true)
     }
