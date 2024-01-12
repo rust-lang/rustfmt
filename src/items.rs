@@ -3374,7 +3374,7 @@ impl Rewrite for ast::ForeignItem {
                 rewrite_type_alias(ty_alias, context, shape.indent, kind, span)
             }
             ast::ForeignItemKind::MacCall(ref mac) => {
-                rewrite_macro(mac, None, context, shape, MacroPosition::Item)
+                rewrite_macro(mac, None, context, shape, MacroPosition::Item).0
             }
         }?;
 

@@ -154,13 +154,13 @@ pub(crate) fn rewrite_macro(
     context: &RewriteContext<'_>,
     shape: Shape,
     position: MacroPosition,
-) -> Option<String> {
+) -> (Option<String>, Option<Delimiter>) {
     let should_skip = context
         .skip_context
         .macros
         .skip(context.snippet(mac.path.span));
     if should_skip {
-        None
+        (None, None)
     } else {
         let guard = context.enter_macro();
         let result = catch_unwind(AssertUnwindSafe(|| {
@@ -174,15 +174,17 @@ pub(crate) fn rewrite_macro(
             )
         }));
         match result {
-            Err(..) | Ok(None) => {
+            Err(..) | Ok((None, ..)) => {
                 context.macro_rewrite_failure.replace(true);
-                None
+                (None, None)
             }
             Ok(rw) => rw,
         }
     }
 }
 
+//We return not only string but also new delimiter if it changes
+//It needs to remove semicolon if delimiter changes
 fn rewrite_macro_inner(
     mac: &ast::MacCall,
     extra_ident: Option<symbol::Ident>,
@@ -190,11 +192,11 @@ fn rewrite_macro_inner(
     shape: Shape,
     position: MacroPosition,
     is_nested_macro: bool,
-) -> Option<String> {
+) -> (Option<String>, Option<Delimiter>) {
     if context.config.use_try_shorthand() {
         if let Some(expr) = convert_try_mac(mac, context) {
             context.leave_macro();
-            return expr.rewrite(context, shape);
+            return (expr.rewrite(context, shape), None);
         }
     }
 
@@ -212,26 +214,37 @@ fn rewrite_macro_inner(
     let ts = mac.args.tokens.clone();
     let has_comment = contains_comment(context.snippet(mac.span()));
     if ts.is_empty() && !has_comment {
-        return match style {
-            Delimiter::Parenthesis if position == MacroPosition::Item => {
-                Some(format!("{macro_name}();"))
-            }
-            Delimiter::Bracket if position == MacroPosition::Item => {
-                Some(format!("{macro_name}[];"))
-            }
-            Delimiter::Parenthesis => Some(format!("{macro_name}()")),
-            Delimiter::Bracket => Some(format!("{macro_name}[]")),
-            Delimiter::Brace => Some(format!("{macro_name} {{}}")),
-            _ => unreachable!(),
-        };
+        return (
+            match style {
+                Delimiter::Parenthesis if position == MacroPosition::Item => {
+                    Some(format!("{macro_name}();"))
+                }
+                Delimiter::Bracket if position == MacroPosition::Item => {
+                    Some(format!("{macro_name}[];"))
+                }
+                Delimiter::Parenthesis => Some(format!("{macro_name}()")),
+                Delimiter::Bracket => Some(format!("{macro_name}[]")),
+                Delimiter::Brace => Some(format!("{macro_name} {{}}")),
+                _ => unreachable!(),
+            },
+            if original_style != style {
+                Some(style)
+            } else {
+                None
+            },
+        );
     }
     // Format well-known macros which cannot be parsed as a valid AST.
     if macro_name == "lazy_static!" && !has_comment {
         if let success @ Some(..) = format_lazy_static(context, shape, ts.clone()) {
-            if original_style == Delimiter::Parenthesis {
-                context.lazy_static_success.replace(true);
-            }
-            return success;
+            return (
+                success,
+                if original_style != Delimiter::Brace {
+                    Some(Delimiter::Brace)
+                } else {
+                    None
+                },
+            );
         }
     }
 
@@ -242,103 +255,117 @@ fn rewrite_macro_inner(
     } = match parse_macro_args(context, ts, style, is_forced_bracket) {
         Some(args) => args,
         None => {
-            return return_macro_parse_failure_fallback(
-                context,
-                shape.indent,
-                position,
-                mac.span(),
+            return (
+                return_macro_parse_failure_fallback(context, shape.indent, position, mac.span()),
+                None,
             );
         }
     };
 
     if !arg_vec.is_empty() && arg_vec.iter().all(MacroArg::is_item) {
-        return rewrite_macro_with_items(
-            context,
-            &arg_vec,
-            &macro_name,
-            shape,
-            style,
-            original_style,
-            position,
-            mac.span(),
+        return (
+            rewrite_macro_with_items(
+                context,
+                &arg_vec,
+                &macro_name,
+                shape,
+                style,
+                original_style,
+                position,
+                mac.span(),
+            ),
+            if original_style != style {
+                Some(style)
+            } else {
+                None
+            },
         );
     }
 
-    match style {
-        Delimiter::Parenthesis => {
-            // Handle special case: `vec!(expr; expr)`
-            if vec_with_semi {
-                handle_vec_semi(context, shape, arg_vec, macro_name, style)
-            } else {
-                // Format macro invocation as function call, preserve the trailing
-                // comma because not all macros support them.
-                overflow::rewrite_with_parens(
-                    context,
-                    &macro_name,
-                    arg_vec.iter(),
-                    shape,
-                    mac.span(),
-                    context.config.fn_call_width(),
-                    if trailing_comma {
+    (
+        match style {
+            Delimiter::Parenthesis => {
+                // Handle special case: `vec!(expr; expr)`
+                if vec_with_semi {
+                    handle_vec_semi(context, shape, arg_vec, macro_name, style)
+                } else {
+                    // Format macro invocation as function call, preserve the trailing
+                    // comma because not all macros support them.
+                    overflow::rewrite_with_parens(
+                        context,
+                        &macro_name,
+                        arg_vec.iter(),
+                        shape,
+                        mac.span(),
+                        context.config.fn_call_width(),
+                        if trailing_comma {
+                            Some(SeparatorTactic::Always)
+                        } else {
+                            Some(SeparatorTactic::Never)
+                        },
+                    )
+                    .map(|rw| match position {
+                        MacroPosition::Item => format!("{};", rw),
+                        _ => rw,
+                    })
+                }
+            }
+            Delimiter::Bracket => {
+                // Handle special case: `vec![expr; expr]`
+                if vec_with_semi {
+                    handle_vec_semi(context, shape, arg_vec, macro_name, style)
+                } else {
+                    // If we are rewriting `vec!` macro or other special macros,
+                    // then we can rewrite this as a usual array literal.
+                    // Otherwise, we must preserve the original existence of trailing comma.
+                    let mut force_trailing_comma = if trailing_comma {
                         Some(SeparatorTactic::Always)
                     } else {
                         Some(SeparatorTactic::Never)
-                    },
-                )
-                .map(|rw| match position {
-                    MacroPosition::Item => format!("{};", rw),
-                    _ => rw,
-                })
-            }
-        }
-        Delimiter::Bracket => {
-            // Handle special case: `vec![expr; expr]`
-            if vec_with_semi {
-                handle_vec_semi(context, shape, arg_vec, macro_name, style)
-            } else {
-                // If we are rewriting `vec!` macro or other special macros,
-                // then we can rewrite this as a usual array literal.
-                // Otherwise, we must preserve the original existence of trailing comma.
-                let mut force_trailing_comma = if trailing_comma {
-                    Some(SeparatorTactic::Always)
-                } else {
-                    Some(SeparatorTactic::Never)
-                };
-                if is_forced_bracket && !is_nested_macro {
-                    context.leave_macro();
-                    if context.use_block_indent() {
-                        force_trailing_comma = Some(SeparatorTactic::Vertical);
                     };
-                }
-                let rewrite = rewrite_array(
-                    &macro_name,
-                    arg_vec.iter(),
-                    mac.span(),
-                    context,
-                    shape,
-                    force_trailing_comma,
-                    Some(original_style),
-                )?;
-                let comma = match position {
-                    MacroPosition::Item => ";",
-                    _ => "",
-                };
+                    if is_forced_bracket && !is_nested_macro {
+                        context.leave_macro();
+                        if context.use_block_indent() {
+                            force_trailing_comma = Some(SeparatorTactic::Vertical);
+                        };
+                    }
+                    rewrite_array(
+                        &macro_name,
+                        arg_vec.iter(),
+                        mac.span(),
+                        context,
+                        shape,
+                        force_trailing_comma,
+                        Some(original_style),
+                    )
+                    .map(|rewrite| {
+                        let comma = match position {
+                            MacroPosition::Item => ";",
+                            _ => "",
+                        };
 
-                Some(format!("{rewrite}{comma}"))
+                        format!("{rewrite}{comma}")
+                    })
+                }
             }
-        }
-        Delimiter::Brace => {
-            // For macro invocations with braces, always put a space between
-            // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
-            // anything in between the braces (for now).
-            let snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
-            match trim_left_preserve_layout(snippet, shape.indent, context.config) {
-                Some(macro_body) => Some(format!("{macro_name} {macro_body}")),
-                None => Some(format!("{macro_name} {snippet}")),
+            Delimiter::Brace => {
+                // For macro invocations with braces, always put a space between
+                // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
+                // anything in between the braces (for now).
+                let snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
+                match trim_left_preserve_layout(snippet, shape.indent, context.config) {
+                    Some(macro_body) => Some(format!("{macro_name} {macro_body}")),
+                    None => Some(format!("{macro_name} {snippet}")),
+                }
             }
-        }
-        _ => unreachable!(),
-    }
+            _ => unreachable!(),
+        },
+        if original_style != style {
+            Some(style)
+        } else {
+            None
+        },
+    )
 }
 
 fn handle_vec_semi(
