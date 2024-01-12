@@ -43,6 +43,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
     pub(crate) skipped_range: Rc<RefCell<Vec<(usize, usize)>>>,
+    pub(crate) lazy_static_success: Cell<bool>,
 }
 
 pub(crate) struct InsideMacroGuard {
