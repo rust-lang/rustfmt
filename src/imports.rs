@@ -845,9 +845,18 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: 
             // tree `use_tree` should be merge.
             // In other cases `similarity` won't be used, so set it to `0` as a dummy value.
             let similarity = if merge_by == SharedPrefix::One {
+                let tree_depth = tree.path.len();
+
+                // Only merge prefixes, not leaves,
+                //   e.g. `foo::i` with `foo::i as j`.
+                let max_depth = (tree_depth == use_tree.path.len())
+                    .then_some(tree_depth - 1)
+                    .unwrap_or(usize::MAX);
+
                 tree.path
                     .iter()
                     .zip(&use_tree.path)
+                    .take(max_depth)
                     .take_while(|(a, b)| a.equal_except_alias(b))
                     .count()
             } else {
