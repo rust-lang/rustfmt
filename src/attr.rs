@@ -318,7 +318,6 @@ impl Rewrite for ast::MetaItem {
 impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let snippet = context.snippet(self.span);
-        dbg!(snippet);
         if self.is_doc_comment() {
             rewrite_doc_comment(snippet, shape.comment(context.config), context.config)
         } else {
