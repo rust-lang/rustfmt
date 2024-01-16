@@ -1000,6 +1000,17 @@ fn join_bounds_inner(
                 _ => false,
             };
 
+            // We have to restore round brackets inside macro calls
+            let surrounded_round_brackets = match trailing_span {
+                Some(ts) => context
+                    .snippet(ts)
+                    .trim_start()
+                    .chars()
+                    .next()
+                    .is_some_and(|x| x == ')'),
+                _ => false,
+            };
+
             let shape = if need_indent && force_newline {
                 shape
                     .block_indent(context.config.tab_spaces())
@@ -1031,11 +1042,16 @@ fn join_bounds_inner(
                 joiner
             };
 
+            let bound_str = item.rewrite(context, shape)?;
+            let bound_str = if context.inside_macro() && surrounded_round_brackets {
+                "(".to_owned() + &bound_str + ")"
+            } else {
+                bound_str
+            };
             let (extendable, trailing_str) = if i == 0 {
-                let bound_str = item.rewrite(context, shape)?;
                 (is_bound_extendable(&bound_str, item), bound_str)
             } else {
-                let bound_str = &item.rewrite(context, shape)?;
+                let bound_str = &bound_str;
                 match leading_span {
                     Some(ls) if has_leading_comment => (
                         is_bound_extendable(bound_str, item),
