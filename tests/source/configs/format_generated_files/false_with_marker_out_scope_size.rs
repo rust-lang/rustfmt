@@ -1,5 +1,5 @@
 // rustfmt-format_generated_files: false
-// rustfmt-generated_file_header_size: 15
+// rustfmt-generated_marker_line_search_limit: 1
 
 fn main()
 {

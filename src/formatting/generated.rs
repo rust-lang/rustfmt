@@ -1,7 +1,10 @@
+use crate::Config;
+
 /// Returns `true` if the given span is a part of generated files.
-pub(super) fn is_generated_file(original_snippet: &str, header_size: usize) -> bool {
+pub(super) fn is_generated_file(original_snippet: &str, config: &Config) -> bool {
     original_snippet
         .lines()
-        .take(header_size) // looking for marker only in the beginning of the file
+        // looking for marker only in the beginning of the file
+        .take(config.generated_marker_line_search_limit())
         .any(|line| line.contains("@generated"))
 }
