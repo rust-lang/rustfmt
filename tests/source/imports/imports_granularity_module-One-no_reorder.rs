@@ -1,4 +1,5 @@
-// rustfmt-imports_granularity: ModuleCondensed
+// rustfmt-imports_granularity: Module
+// rustfmt-group_imports: One
 // rustfmt-reorder_imports: false
 
 use a::{b::c, d::e};

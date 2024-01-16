@@ -1,19 +1,10 @@
-// rustfmt-imports_granularity: Module
+// rustfmt-imports_granularity: ModuleCondensed
+// rustfmt-group_imports: One
 // rustfmt-reorder_imports: false
 
 use a::{b::c, d::e};
-use a::{
-    f,
-    g::{h, i},
-};
-use a::{
-    j::{
-        self,
-        k::{self, l},
-        m,
-    },
-    n::{o::p, q},
-};
+use a::{f, g::{h, i}};
+use a::{j::{self, k::{self, l}, m}, n::{o::p, q}};
 pub use a::{r::s, t};
 use b::{c::d, self};
 
@@ -29,19 +20,16 @@ use bar::{
     e::f,
 };
 
-use b::{
-    f::g,
-    h::{i, j}, /* After b::h group */
-};
+use b::{f::g, h::{i, j} /* After b::h group */};
 use b::e;
-use b::{
-    /* Before b::l group */ l::{self, m, n::o, p::*},
-    q,
-};
+use b::{/* Before b::l group */ l::{self, m, n::o, p::*}, q};
 use b::d;
 use b::r; // After b::r
 use b::q::{self /* After b::q::self */};
-use b::u::{a, b};
+use b::u::{
+    a,
+    b,
+};
 use b::t::{
     // Before b::t::a
     a,
