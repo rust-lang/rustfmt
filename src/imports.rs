@@ -255,31 +255,39 @@ pub(crate) fn normalize_use_trees_with_granularity(
 /// Merge singleton imports into parent modules' use-trees where it does't
 /// introduce nested braces.
 fn condense_use_trees(use_trees: &mut Vec<UseTree>) {
+    // The implementation uses a layer of indirection to avoid reordering the
+    // `use_trees` vector. Specifically, `use_trees_sorted` is a permutation of
+    // `0..use_trees.len()`. The elements of `use_trees_sorted` can be thought
+    // of as indices into the `use_trees` vector.
+    let mut use_trees_sorted = (0..use_trees.len()).collect::<Vec<_>>();
+
     // Sort by path length to put singletons after the trees into which they
     // may be absorbed.
-    use_trees.sort_unstable_by_key(|tree| tree.path.len());
+    use_trees_sorted.sort_by_key(|&index| use_trees[index].path.len());
 
     // Search for singletons back-to-front to preserve the just mentioned
     // relative order between absorbing trees and singletons. Note that a
     // singleton that is found and merged into _some_ tree is `swap_remove`d
-    // from the `use_trees` vector.
-    for n in (0..use_trees.len()).rev() {
-        let singleton = &use_trees[n];
+    // from the `use_trees_sorted` vector.
+    for n in (0..use_trees_sorted.len()).rev() {
+        let index = use_trees_sorted[n];
+        let singleton = &use_trees[index];
 
         if !singleton.is_singleton() || singleton.attrs.is_some() || singleton.contains_comment() {
             continue;
         }
 
-        let mut best_index_and_len = None;
+        let mut best_indirect_index_and_len = None;
 
         // Search front-to-back for a tree to merge the singleton into. If
         // multiple trees are equally good candidates, prefer the earliest one.
         // Like above, these precautions help preserve the relative order
         // between absorbing trees and singletons.
-        for curr_index in 0..n {
+        for curr_indirect_index in 0..n {
+            let curr_index = use_trees_sorted[curr_indirect_index];
             let curr_tree = &use_trees[curr_index];
             let curr_len = curr_tree.shared_prefix_len(singleton);
-            if best_index_and_len.map_or(false, |(_, best_len)| best_len >= curr_len) {
+            if best_indirect_index_and_len.map_or(false, |(_, best_len)| best_len >= curr_len) {
                 continue;
             }
             if curr_len < 1
@@ -290,11 +298,24 @@ fn condense_use_trees(use_trees: &mut Vec<UseTree>) {
             {
                 continue;
             }
-            best_index_and_len = Some((curr_index, curr_len));
+            best_indirect_index_and_len = Some((curr_indirect_index, curr_len));
         }
 
-        if let Some((best_index, _)) = best_index_and_len {
-            let singleton = use_trees.swap_remove(n);
+        if let Some((best_indirect_index, _)) = best_indirect_index_and_len {
+            let singleton_index = use_trees_sorted.swap_remove(n);
+            let singleton = use_trees.remove(singleton_index);
+
+            // `singleton` was removed from `use_trees`. So any indices larger
+            // than `singleton_index` must be decremented. Note that this could
+            // affect `best_index`. So the decrementing must occur before
+            // `best_index` is fetched from `use_trees_sorted`.
+            for index_ref in &mut use_trees_sorted {
+                if *index_ref >= singleton_index {
+                    *index_ref -= 1;
+                }
+            }
+
+            let best_index = use_trees_sorted[best_indirect_index];
             use_trees[best_index].merge(&singleton, SharedPrefix::Crate);
         }
     }
