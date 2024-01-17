@@ -520,6 +520,13 @@ fn replace_names(input: &str) -> Option<(String, HashMap<String, String>)> {
         if kind != FullCodeCharKind::Normal {
             result.push(c);
         } else if c == '$' {
+            // the name can end by starting new name with $
+            if !cur_name.is_empty() {
+                dbg!(&cur_name);
+                register_metavariable(&mut substs, &mut result, &cur_name, dollar_count);
+                dollar_count = 0;
+                cur_name.clear();
+            }
             dollar_count += 1;
         } else if dollar_count == 0 {
             result.push(c);
