@@ -1102,8 +1102,14 @@ impl<'a> Rewrite for ControlFlow<'a> {
         };
         let block_str = {
             let old_val = context.is_if_else_block.replace(self.else_block.is_some());
-            let result =
-                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true);
+            let allow_single_line =
+                allow_single_line_if(&cond_str, self.block) && self.keyword == "if";
+
+            let result = if allow_single_line {
+                rewrite_block_inner(self.block, None, None, true, context, block_shape)
+            } else {
+                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true)
+            };
             context.is_if_else_block.replace(old_val);
             result?
         };
@@ -1155,6 +1161,30 @@ impl<'a> Rewrite for ControlFlow<'a> {
         }
 
         Some(result)
+    }
+}
+
+fn allow_single_line_if(result: &str, block: &ast::Block) -> bool {
+    if result.contains('\n') {
+        return false;
+    }
+
+    if block.stmts.len() == 0 {
+        return true;
+    }
+    if block.stmts.len() == 1 {
+        return is_simple_stmt(&block.stmts[0]);
+    }
+    false
+}
+
+fn is_simple_stmt(stmt: &ast::Stmt) -> bool {
+    match stmt.kind {
+        ast::StmtKind::Expr(ref expr) => match expr.kind {
+            ast::ExprKind::Ret(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Break(..) => true,
+            _ => false,
+        },
+        _ => false,
     }
 }
 

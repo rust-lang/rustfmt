@@ -42,6 +42,27 @@ fn main() {
         do_something()
     }
 
+    let a = if x { 1 } else { 3 };
+
+    // if may be formatted on a single line if it is "short"
+    // and only contain a single expression
+    if true { return }
+
+    if true { return }
+
+    if true {
+        return;
+    }
+
+    if a {
+        let y = 1;
+        return y;
+    }
+
+    for i in 0..2 {
+        if g == true { continue }
+    }
+
     let x = if veeeeeeeeery_loooooong_condition() {
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     } else {
