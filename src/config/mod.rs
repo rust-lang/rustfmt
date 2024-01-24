@@ -61,6 +61,8 @@ create_config! {
     single_line_let_else_max_width: usize, 50, true, "Maximum line length for single line \
         let-else statements. A value of zero means always format the divergent `else` block \
         over multiple lines.";
+    single_line_simple_if_max_width: usize, 50, false, "Maximum line length for single line \
+        if statement. A value of zero means always format to multiple lines.";
 
     // Comments. macros, and strings
     wrap_comments: bool, false, false, "Break comments to fit on the line";
@@ -81,6 +83,7 @@ create_config! {
         "Format hexadecimal integer literals";
 
     // Single line expressions and items
+    single_line_simple_if: bool, false, false, "Simple if statements can format to a single line";
     empty_item_single_line: bool, true, false,
         "Put empty-body functions and impls on a single line";
     struct_lit_single_line: bool, true, false,
@@ -490,6 +493,8 @@ mod test {
             single_line_let_else_max_width: usize, 50, false, "Maximum line length for single \
                 line let-else statements. A value of zero means always format the divergent \
                 `else` block over multiple lines.";
+            single_line_simple_if_max_width: usize, 50, false, "Maximum line length for \
+                single line if statement. A value of zero means always format to multiple lines.";
 
             // Options that are used by the tests
             stable_option: bool, false, true, "A stable option";
@@ -634,6 +639,7 @@ array_width = 60
 chain_width = 60
 single_line_if_else_max_width = 50
 single_line_let_else_max_width = 50
+single_line_simple_if_max_width = 50
 wrap_comments = false
 format_code_in_doc_comments = false
 doc_comment_code_block_width = 100
@@ -645,6 +651,7 @@ format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
+single_line_simple_if = false
 empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false

@@ -1102,16 +1102,31 @@ impl<'a> Rewrite for ControlFlow<'a> {
         };
         let block_str = {
             let old_val = context.is_if_else_block.replace(self.else_block.is_some());
-            let allow_single_line =
-                allow_single_line_if(&cond_str, self.block) && self.keyword == "if";
-
-            let result = if allow_single_line {
-                rewrite_block_inner(self.block, None, None, true, context, block_shape)
+            let max_width = if context.config.single_line_simple_if() {
+                std::cmp::min(
+                    shape.width,
+                    context.config.single_line_simple_if_max_width(),
+                )
             } else {
-                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true)
+                shape.width
             };
+            let available_space = max_width.saturating_sub(used_width);
+            let allow_single_line = allow_single_line_if(&cond_str, self.block)
+                && self.keyword == "if"
+                && available_space > 0;
+
+            let mut result = if allow_single_line && context.config.single_line_simple_if() {
+                rewrite_block_inner(self.block, None, None, true, context, block_shape)?
+            } else {
+                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true)?
+            };
+
+            let block_exceeds_width = result.len() > available_space;
+            if allow_single_line && !result.contains('\n') && block_exceeds_width {
+                result = rewrite_block_inner(self.block, None, None, false, context, block_shape)?;
+            }
             context.is_if_else_block.replace(old_val);
-            result?
+            result
         };
 
         let mut result = format!("{cond_str}{block_str}");
@@ -1168,20 +1183,26 @@ fn allow_single_line_if(result: &str, block: &ast::Block) -> bool {
     if result.contains('\n') {
         return false;
     }
-
     if block.stmts.len() == 0 {
         return true;
     }
     if block.stmts.len() == 1 {
-        return is_simple_stmt(&block.stmts[0]);
+        return is_simple_control_flow_stmt(&block.stmts[0]);
     }
     false
 }
 
-fn is_simple_stmt(stmt: &ast::Stmt) -> bool {
+fn is_simple_control_flow_stmt(stmt: &ast::Stmt) -> bool {
     match stmt.kind {
         ast::StmtKind::Expr(ref expr) => match expr.kind {
-            ast::ExprKind::Ret(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Break(..) => true,
+            ast::ExprKind::Continue(..) => true,
+            ast::ExprKind::Break(_, ref opt_expr) | ast::ExprKind::Ret(ref opt_expr) => {
+                if let Some(_) = *opt_expr {
+                    false
+                } else {
+                    true
+                }
+            }
             _ => false,
         },
         _ => false,
