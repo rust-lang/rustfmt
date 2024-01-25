@@ -43,7 +43,7 @@ function init_submodules() {
 # $2: Output file path for the diff
 # $3: Any additional configuration options to pass to rustfmt
 #
-# Globlas:
+# Globals:
 # $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script from $4
 function create_diff() {
     local config;
@@ -64,7 +64,7 @@ function create_diff() {
 # Parameters
 # $1: Name of the repository (used for logging)
 #
-# Globlas:
+# Globals:
 # $RUSFMT_BIN: Path to the rustfmt master binary. Created when running `compile_rustfmt`
 # $FEATURE_BIN: Path to the rustfmt feature binary. Created when running `compile_rustfmt`
 # $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script from $4
@@ -101,7 +101,7 @@ function check_diff() {
 # Parameters:
 # $1: Directory where rustfmt will be cloned
 #
-# Globlas:
+# Globals:
 # $REMOTE_REPO: Clone URL to the rustfmt fork that we want to test
 # $FEATURE_BRANCH: Name of the feature branch
 # $OPTIONAL_COMMIT_HASH: Optional commit hash that will be checked out if provided
