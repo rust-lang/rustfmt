@@ -184,7 +184,7 @@
 
 - Simplify the rustfmt help text by eliding the full path to the rustfmt binary path from the usage string when running `rustfmt --help` [#5214](https://github.com/rust-lang/rustfmt/issues/5214)
 
-- Bumped the version for serveral dependencies. Most notably `dirs` `v2.0.1` -> `v4.0.0`. This changed the global user config directory on macOS from `$HOME/Library/Preferences` to `$HOME/Library/Application Support` [#5237](https://github.com/rust-lang/rustfmt/pull/5237)
+- Bumped the version for several dependencies. Most notably `dirs` `v2.0.1` -> `v4.0.0`. This changed the global user config directory on macOS from `$HOME/Library/Preferences` to `$HOME/Library/Application Support` [#5237](https://github.com/rust-lang/rustfmt/pull/5237)
 
 ### Fixed
 
