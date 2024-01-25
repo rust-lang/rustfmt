@@ -27,7 +27,7 @@
   }
   ```
 - Prevent ICE when formatting `vec!{}` [#5735](https://github.com/rust-lang/rustfmt/issues/5735)
-- Prevent internal trailing whitespace error when formatting an empty `macro_rules!` defintion e.g. `macro_rules! foo {}` [#5882](https://github.com/rust-lang/rustfmt/issues/5882)
+- Prevent internal trailing whitespace error when formatting an empty `macro_rules!` definition e.g. `macro_rules! foo {}` [#5882](https://github.com/rust-lang/rustfmt/issues/5882)
 - Formatting doc comment lines that start with `.` or `)` won't be treated as ordered markdown lists because `.` or `)` must be preceded by a number to start an ordered markdown list [#5835](https://github.com/rust-lang/rustfmt/pull/5835)
 - Add parenthesis around closures when they're used as method receives, don't have a block body, and end with `.` [#4808](https://github.com/rust-lang/rustfmt/issues/4808)
   ```rust
