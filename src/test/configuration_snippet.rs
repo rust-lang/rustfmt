@@ -138,13 +138,7 @@ impl ConfigCodeBlock {
 
     /// True if the code block starts with #![rustfmt::skip]
     fn fmt_skip(&self) -> bool {
-        self.code_block
-            .as_ref()
-            .unwrap()
-            .lines()
-            .nth(0)
-            .unwrap_or("")
-            == "#![rustfmt::skip]"
+        self.code_block.as_ref().unwrap().lines().next() == Some("#![rustfmt::skip]")
     }
 
     fn has_parsing_errors<T: Write>(&self, session: &Session<'_, T>) -> bool {

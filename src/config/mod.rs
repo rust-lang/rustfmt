@@ -238,7 +238,7 @@ impl Config {
     /// Returns a `Config` if the config could be read and parsed from
     /// the file, otherwise errors.
     pub(super) fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
-        let mut file = File::open(&file_path)?;
+        let mut file = File::open(file_path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
         Config::from_toml(&toml, file_path.parent().unwrap())

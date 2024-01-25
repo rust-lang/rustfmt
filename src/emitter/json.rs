@@ -8,7 +8,7 @@ pub(crate) struct JsonEmitter {
     mismatched_files: Vec<MismatchedFile>,
 }
 
-#[derive(Debug, Default, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 struct MismatchedBlock {
     original_begin_line: u32,
     original_end_line: u32,
@@ -18,7 +18,7 @@ struct MismatchedBlock {
     expected: String,
 }
 
-#[derive(Debug, Default, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 struct MismatchedFile {
     name: String,
     mismatches: Vec<MismatchedBlock>,
@@ -136,7 +136,7 @@ mod tests {
             ],
         };
 
-        let _ = emitter
+        emitter
             .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
             .unwrap();
 
@@ -181,7 +181,7 @@ mod tests {
             ],
         };
 
-        let _ = emitter
+        emitter
             .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
             .unwrap();
 

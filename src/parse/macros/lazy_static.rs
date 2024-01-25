@@ -6,10 +6,12 @@ use rustc_span::symbol::{self, kw};
 
 use crate::rewrite::RewriteContext;
 
+type LazyStaticItem = (ast::Visibility, symbol::Ident, P<ast::Ty>, P<ast::Expr>);
+
 pub(crate) fn parse_lazy_static(
     context: &RewriteContext<'_>,
     ts: TokenStream,
-) -> Option<Vec<(ast::Visibility, symbol::Ident, P<ast::Ty>, P<ast::Expr>)>> {
+) -> Option<Vec<LazyStaticItem>> {
     let mut result = vec![];
     let mut parser = super::build_parser(context, ts);
     macro_rules! parse_or {

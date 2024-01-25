@@ -680,10 +680,12 @@ impl Rewrite for ast::Ty {
                 };
                 let mut res = bounds.rewrite(context, shape)?;
                 // We may have falsely removed a trailing `+` inside macro call.
-                if context.inside_macro() && bounds.len() == 1 {
-                    if context.snippet(self.span).ends_with('+') && !res.ends_with('+') {
-                        res.push('+');
-                    }
+                if context.inside_macro()
+                    && bounds.len() == 1
+                    && context.snippet(self.span).ends_with('+')
+                    && !res.ends_with('+')
+                {
+                    res.push('+');
                 }
                 Some(format!("{prefix}{res}"))
             }
@@ -953,10 +955,8 @@ fn join_bounds_inner(
     let is_item_with_multi_items_array = |item: &ast::GenericBound| match item {
         ast::GenericBound::Trait(ref poly_trait_ref, ..) => {
             let segments = &poly_trait_ref.trait_ref.path.segments;
-            if segments.len() > 1 {
-                true
-            } else {
-                if let Some(args_in) = &segments[0].args {
+            segments.len() > 1
+                || if let Some(args_in) = &segments[0].args {
                     matches!(
                         args_in.deref(),
                         ast::GenericArgs::AngleBracketed(bracket_args)
@@ -965,7 +965,6 @@ fn join_bounds_inner(
                 } else {
                     false
                 }
-            }
         }
         _ => false,
     };
@@ -1103,7 +1102,7 @@ pub(crate) fn can_be_overflowed_type(
     match ty.kind {
         ast::TyKind::Tup(..) => context.use_block_indent() && len == 1,
         ast::TyKind::Ref(_, ref mutty) | ast::TyKind::Ptr(ref mutty) => {
-            can_be_overflowed_type(context, &*mutty.ty, len)
+            can_be_overflowed_type(context, &mutty.ty, len)
         }
         _ => false,
     }

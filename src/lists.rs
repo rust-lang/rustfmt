@@ -665,7 +665,7 @@ pub(crate) fn get_comment_end(
     if is_last {
         return post_snippet
             .find_uncommented(terminator)
-            .unwrap_or_else(|| post_snippet.len());
+            .unwrap_or(post_snippet.len());
     }
 
     let mut block_open_index = post_snippet.find("/*");
@@ -721,14 +721,12 @@ pub(crate) fn has_extra_newline(post_snippet: &str, comment_end: usize) -> bool 
         .len_utf8();
     // Everything from the separator to the next item.
     let test_snippet = &post_snippet[comment_end - len_last..];
-    let first_newline = test_snippet
-        .find('\n')
-        .unwrap_or_else(|| test_snippet.len());
+    let first_newline = test_snippet.find('\n').unwrap_or(test_snippet.len());
     // From the end of the first line of comments.
     let test_snippet = &test_snippet[first_newline..];
     let first = test_snippet
         .find(|c: char| !c.is_whitespace())
-        .unwrap_or_else(|| test_snippet.len());
+        .unwrap_or(test_snippet.len());
     // From the end of the first line of comments to the next non-whitespace char.
     let test_snippet = &test_snippet[..first];
 

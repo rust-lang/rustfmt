@@ -273,7 +273,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let comment_snippet = self.snippet(span);
 
         let align_to_right = if unindent_comment && contains_comment(comment_snippet) {
-            let first_lines = comment_snippet.splitn(2, '/').next().unwrap_or("");
+            let first_lines = comment_snippet.split('/').next().unwrap_or("");
             last_line_width(first_lines) > last_line_width(comment_snippet)
         } else {
             false
@@ -921,7 +921,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         attrs: &[ast::Attribute],
     ) {
         let vis_str = utils::format_visibility(&self.get_context(), vis);
-        self.push_str(&*vis_str);
+        self.push_str(&vis_str);
         self.push_str(format_unsafety(unsafety));
         self.push_str("mod ");
         // Calling `to_owned()` to work around borrow checker.

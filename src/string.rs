@@ -61,9 +61,9 @@ impl<'a> StringFormat<'a> {
     }
 }
 
-pub(crate) fn rewrite_string<'a>(
+pub(crate) fn rewrite_string(
     orig: &str,
-    fmt: &StringFormat<'a>,
+    fmt: &StringFormat<'_>,
     newline_max_chars: usize,
 ) -> Option<String> {
     let max_width_with_indent = fmt.max_width_with_indent()?;
@@ -193,7 +193,7 @@ fn trim_end_but_line_feed(trim_end: bool, result: String) -> String {
 
 /// Result of breaking a string so it fits in a line and the state it ended in.
 /// The state informs about what to do with the snippet and how to continue the breaking process.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 enum SnippetState {
     /// The input could not be broken and so rewriting the string is finished.
     EndOfInput(String),
@@ -315,18 +315,13 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
         // Found a whitespace and what is on its left side is big enough.
         Some(index) if index >= MIN_STRING => break_at(index),
         // No whitespace found, try looking for a punctuation instead
-        _ => match (0..max_width_index_in_input)
-            .rev()
-            .skip_while(|pos| !is_valid_linebreak(input, *pos))
-            .next()
-        {
+        _ => match (0..max_width_index_in_input).rfind(|&pos| is_valid_linebreak(input, pos)) {
             // Found a punctuation and what is on its left side is big enough.
             Some(index) if index >= MIN_STRING => break_at(index),
             // Either no boundary character was found to the left of `input[max_chars]`, or the line
             // got too small. We try searching for a boundary character to the right.
             _ => match (max_width_index_in_input..input.len())
-                .skip_while(|pos| !is_valid_linebreak(input, *pos))
-                .next()
+                .find(|&pos| is_valid_linebreak(input, pos))
             {
                 // A boundary was found after the line limit
                 Some(index) => break_at(index),
@@ -390,7 +385,7 @@ mod test {
     #[test]
     fn line_break_at_valid_points_test() {
         let string = "[TheName](Dont::break::my::type::That::would::be::very::nice) break here";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd(
@@ -403,7 +398,7 @@ mod test {
     #[test]
     fn should_break_on_whitespace() {
         let string = "Placerat felis. Mauris porta ante sagittis purus.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd("Placerat felis. ".to_string(), 16)
@@ -417,7 +412,7 @@ mod test {
     #[test]
     fn should_break_on_punctuation() {
         let string = "Placerat_felis._Mauris_porta_ante_sagittis_purus.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd("Placerat_felis.".to_string(), 15)
@@ -427,7 +422,7 @@ mod test {
     #[test]
     fn should_break_forward() {
         let string = "Venenatis_tellus_vel_tellus. Aliquam aliquam dolor at justo.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd("Venenatis_tellus_vel_tellus. ".to_string(), 29)
@@ -441,7 +436,7 @@ mod test {
     #[test]
     fn nothing_to_break() {
         let string = "Venenatis_tellus_vel_tellus";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::EndOfInput("Venenatis_tellus_vel_tellus".to_string())
@@ -451,7 +446,7 @@ mod test {
     #[test]
     fn significant_whitespaces() {
         let string = "Neque in sem.      \n      Pellentesque tellus augue.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(15, false, "", &graphemes[..]),
             SnippetState::EndWithLineFeed("Neque in sem.      \n".to_string(), 20)
@@ -474,7 +469,7 @@ mod test {
     #[test]
     fn big_whitespace() {
         let string = "Neque in sem.            Pellentesque tellus augue.";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(20, false, "", &graphemes[..]),
             SnippetState::LineEnd("Neque in sem.            ".to_string(), 25)
@@ -489,7 +484,7 @@ mod test {
     fn newline_in_candidate_line() {
         let string = "Nulla\nconsequat erat at massa. Vivamus id mi.";
 
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(
             break_string(25, false, "", &graphemes[..]),
             SnippetState::EndWithLineFeed("Nulla\n".to_string(), 6)
@@ -699,27 +694,27 @@ mod test {
     #[test]
     fn detect_urls() {
         let string = "aaa http://example.org something";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(21));
 
         let string = "https://example.org something";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 0), Some(18));
 
         let string = "aaa ftp://example.org something";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(20));
 
         let string = "aaa file://example.org something";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(21));
 
         let string = "aaa http not an url";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 6), None);
 
         let string = "aaa file://example.org";
-        let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
+        let graphemes = UnicodeSegmentation::graphemes(string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(21));
     }
 }

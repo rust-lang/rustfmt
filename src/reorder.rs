@@ -25,10 +25,8 @@ use crate::visitor::FmtVisitor;
 /// Choose the ordering between the given two items.
 fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
     match (&a.kind, &b.kind) {
-        (&ast::ItemKind::Mod(..), &ast::ItemKind::Mod(..)) => {
-            a.ident.as_str().cmp(b.ident.as_str())
-        }
-        (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
+        (ast::ItemKind::Mod(..), ast::ItemKind::Mod(..)) => a.ident.as_str().cmp(b.ident.as_str()),
+        (ast::ItemKind::ExternCrate(a_name), ast::ItemKind::ExternCrate(b_name)) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
             let a_orig_name = a_name.unwrap_or(a.ident.name);
@@ -267,7 +265,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let item_length = items
             .iter()
             .take_while(|ppi| {
-                item_kind.is_same_item_kind(&***ppi)
+                item_kind.is_same_item_kind(ppi)
                     && (!in_group || {
                         let current = self.parse_sess.lookup_line_range(ppi.span());
                         let in_same_group = current.lo < last.hi + 2;

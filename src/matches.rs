@@ -194,7 +194,7 @@ fn rewrite_match_arms(
         context.snippet_provider,
         arms.iter()
             .zip(is_last_iter)
-            .zip(beginning_verts.into_iter())
+            .zip(beginning_verts)
             .map(|((arm, is_last), beginning_vert)| ArmWrapper::new(arm, is_last, beginning_vert)),
         "}",
         "|",
@@ -313,7 +313,7 @@ fn block_can_be_flattened<'a>(
                 && is_simple_block(context, block, Some(&expr.attrs))
                 && !stmt_is_expr_mac(&block.stmts[0]) =>
         {
-            Some(&*block)
+            Some(block)
         }
         _ => None,
     }
@@ -343,16 +343,16 @@ fn flatten_arm_body<'a>(
                     .and_then(|shape| rewrite_cond(context, expr, shape))
                     .map_or(false, |cond| cond.contains('\n'));
                 if cond_becomes_muti_line {
-                    (false, &*body)
+                    (false, body)
                 } else {
-                    (can_extend(expr), &*expr)
+                    (can_extend(expr), expr)
                 }
             }
         } else {
-            (false, &*body)
+            (false, body)
         }
     } else {
-        (can_extend(body), &*body)
+        (can_extend(body), body)
     }
 }
 
@@ -429,26 +429,24 @@ fn rewrite_match_body(
         }
 
         let indent_str = shape.indent.to_string_with_newline(context.config);
-        let (body_prefix, body_suffix) =
-            if context.config.match_arm_blocks() && !context.inside_macro() {
-                let comma = if context.config.match_block_trailing_comma() {
-                    ","
-                } else {
-                    ""
-                };
-                let semicolon = if context.config.version() == Version::One {
-                    ""
-                } else {
-                    if semicolon_for_expr(context, body) {
-                        ";"
-                    } else {
-                        ""
-                    }
-                };
-                ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
+        let (body_prefix, body_suffix) = if context.config.match_arm_blocks()
+            && !context.inside_macro()
+        {
+            let comma = if context.config.match_block_trailing_comma() {
+                ","
             } else {
-                ("", String::from(","))
+                ""
             };
+            let semicolon =
+                if context.config.version() != Version::One && semicolon_for_expr(context, body) {
+                    ";"
+                } else {
+                    ""
+                };
+            ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
+        } else {
+            ("", String::from(","))
+        };
 
         let block_sep = match context.config.control_brace_style() {
             _ if body_prefix.is_empty() => "".to_owned(),

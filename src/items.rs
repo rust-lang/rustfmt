@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 use std::cmp::{max, min, Ordering};
+use std::fmt::Write;
 
 use regex::Regex;
 use rustc_ast::visit;
@@ -306,7 +307,7 @@ impl<'a> FnSig<'a> {
             constness: method_sig.header.constness,
             defaultness: ast::Defaultness::Final,
             ext: method_sig.header.ext,
-            decl: &*method_sig.decl,
+            decl: &method_sig.decl,
             generics,
             visibility,
         }
@@ -340,7 +341,7 @@ impl<'a> FnSig<'a> {
     fn to_str(&self, context: &RewriteContext<'_>) -> String {
         let mut result = String::with_capacity(128);
         // Vis defaultness constness unsafety abi.
-        result.push_str(&*format_visibility(context, self.visibility));
+        result.push_str(&format_visibility(context, self.visibility));
         result.push_str(format_defaultness(self.defaultness));
         result.push_str(format_constness(self.constness));
         self.coroutine_kind
@@ -848,7 +849,7 @@ pub(crate) fn format_impl(
             }
         }
         if where_clause_str.contains('\n') || last_line_contains_single_line_comment(&result) {
-            result.push_str(&format!("{sep}{{{sep}}}"));
+            write!(result, "{sep}{{{sep}}}").unwrap();
         } else {
             result.push_str(" {}");
         }
@@ -1023,7 +1024,7 @@ fn format_impl_ref_and_type(
         IndentStyle::Visual => new_line_offset + trait_ref_overhead,
         IndentStyle::Block => new_line_offset,
     };
-    result.push_str(&*self_ty.rewrite(context, Shape::legacy(budget, type_offset))?);
+    result.push_str(&self_ty.rewrite(context, Shape::legacy(budget, type_offset))?);
     Some(result)
 }
 
@@ -1223,7 +1224,7 @@ pub(crate) fn format_trait(
         let item_snippet = context.snippet(item.span);
         if let Some(lo) = item_snippet.find('/') {
             // 1 = `{`
-            let comment_hi = if generics.params.len() > 0 {
+            let comment_hi = if !generics.params.is_empty() {
                 generics.span.lo() - BytePos(1)
             } else {
                 body_lo - BytePos(1)
@@ -1662,11 +1663,11 @@ struct TyAliasRewriteInfo<'c, 'g>(
     Span,
 );
 
-pub(crate) fn rewrite_type_alias<'a, 'b>(
+pub(crate) fn rewrite_type_alias(
     ty_alias_kind: &ast::TyAlias,
-    context: &RewriteContext<'a>,
+    context: &RewriteContext<'_>,
     indent: Indent,
-    visitor_kind: &ItemVisitorKind<'b>,
+    visitor_kind: &ItemVisitorKind<'_>,
     span: Span,
 ) -> Option<String> {
     use ItemVisitorKind::*;
@@ -1745,7 +1746,7 @@ fn rewrite_ty<R: Rewrite>(
     if !after_where_predicates.is_empty() {
         return None;
     }
-    result.push_str(&format!("{}type ", format_visibility(context, vis)));
+    write!(result, "{}type ", format_visibility(context, vis)).unwrap();
     let ident_str = rewrite_ident(context, ident);
 
     if generics.params.is_empty() {
@@ -1827,7 +1828,7 @@ fn rewrite_ty<R: Rewrite>(
 
         // 1 = `;`
         let shape = Shape::indented(indent, context.config).sub_width(1)?;
-        rewrite_assign_rhs(context, lhs, &*ty, &RhsAssignKind::Ty, shape).map(|s| s + ";")
+        rewrite_assign_rhs(context, lhs, ty, &RhsAssignKind::Ty, shape).map(|s| s + ";")
     } else {
         Some(format!("{result};"))
     }
@@ -2044,7 +2045,7 @@ fn rewrite_static(
         let remaining_width = context.budget(offset.block_indent + 1);
         rewrite_assign_rhs_with_comments(
             context,
-            &lhs,
+            lhs,
             &**expr,
             Shape::legacy(remaining_width, offset.block_only()),
             &RhsAssignKind::Expr(&expr.kind, expr.span),
@@ -2181,7 +2182,7 @@ impl Rewrite for ast::Param {
                 !has_multiple_attr_lines && !has_doc_comments,
             )?;
 
-            if !is_empty_infer(&*self.ty, self.pat.span) {
+            if !is_empty_infer(&self.ty, self.pat.span) {
                 let (before_comment, after_comment) =
                     get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
                 result.push_str(&before_comment);
@@ -2363,7 +2364,7 @@ fn rewrite_fn_base(
     let generics_str = rewrite_generics(
         context,
         rewrite_ident(context, ident),
-        &fn_sig.generics,
+        fn_sig.generics,
         shape,
     )?;
     result.push_str(&generics_str);
@@ -3436,7 +3437,7 @@ pub(crate) fn rewrite_mod(
     attrs_shape: Shape,
 ) -> Option<String> {
     let mut result = String::with_capacity(32);
-    result.push_str(&*format_visibility(context, &item.vis));
+    result.push_str(&format_visibility(context, &item.vis));
     result.push_str("mod ");
     result.push_str(rewrite_ident(context, item.ident));
     result.push(';');

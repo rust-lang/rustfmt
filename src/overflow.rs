@@ -111,7 +111,7 @@ impl<'a> OverflowableItem<'a> {
 
     pub(crate) fn map<F, T>(&self, f: F) -> T
     where
-        F: Fn(&dyn IntoOverflowableItem<'a>) -> T,
+        F: Fn(&dyn ToOverflowableItem<'a>) -> T,
     {
         match self {
             OverflowableItem::Expr(expr) => f(*expr),
@@ -203,21 +203,21 @@ impl<'a> OverflowableItem<'a> {
     }
 }
 
-pub(crate) trait IntoOverflowableItem<'a>: Rewrite + Spanned {
-    fn into_overflowable_item(&'a self) -> OverflowableItem<'a>;
+pub(crate) trait ToOverflowableItem<'a>: Rewrite + Spanned {
+    fn to_overflowable_item(&'a self) -> OverflowableItem<'a>;
 }
 
-impl<'a, T: 'a + IntoOverflowableItem<'a>> IntoOverflowableItem<'a> for ptr::P<T> {
-    fn into_overflowable_item(&'a self) -> OverflowableItem<'a> {
-        (**self).into_overflowable_item()
+impl<'a, T: 'a + ToOverflowableItem<'a>> ToOverflowableItem<'a> for ptr::P<T> {
+    fn to_overflowable_item(&'a self) -> OverflowableItem<'a> {
+        (**self).to_overflowable_item()
     }
 }
 
-macro_rules! impl_into_overflowable_item_for_ast_node {
+macro_rules! impl_to_overflowable_item_for_ast_node {
     ($($ast_node:ident),*) => {
         $(
-            impl<'a> IntoOverflowableItem<'a> for ast::$ast_node {
-                fn into_overflowable_item(&'a self) -> OverflowableItem<'a> {
+            impl<'a> ToOverflowableItem<'a> for ast::$ast_node {
+                fn to_overflowable_item(&'a self) -> OverflowableItem<'a> {
                     OverflowableItem::$ast_node(self)
                 }
             }
@@ -225,18 +225,18 @@ macro_rules! impl_into_overflowable_item_for_ast_node {
     }
 }
 
-macro_rules! impl_into_overflowable_item_for_rustfmt_types {
+macro_rules! impl_to_overflowable_item_for_rustfmt_types {
     ([$($ty:ident),*], [$($ty_with_lifetime:ident),*]) => {
         $(
-            impl<'a> IntoOverflowableItem<'a> for $ty {
-                fn into_overflowable_item(&'a self) -> OverflowableItem<'a> {
+            impl<'a> ToOverflowableItem<'a> for $ty {
+                fn to_overflowable_item(&'a self) -> OverflowableItem<'a> {
                     OverflowableItem::$ty(self)
                 }
             }
         )*
         $(
-            impl<'a> IntoOverflowableItem<'a> for $ty_with_lifetime<'a> {
-                fn into_overflowable_item(&'a self) -> OverflowableItem<'a> {
+            impl<'a> ToOverflowableItem<'a> for $ty_with_lifetime<'a> {
+                fn to_overflowable_item(&'a self) -> OverflowableItem<'a> {
                     OverflowableItem::$ty_with_lifetime(self)
                 }
             }
@@ -244,19 +244,19 @@ macro_rules! impl_into_overflowable_item_for_rustfmt_types {
     }
 }
 
-impl_into_overflowable_item_for_ast_node!(Expr, GenericParam, NestedMetaItem, FieldDef, Ty, Pat);
-impl_into_overflowable_item_for_rustfmt_types!([MacroArg], [SegmentParam, TuplePatField]);
+impl_to_overflowable_item_for_ast_node!(Expr, GenericParam, NestedMetaItem, FieldDef, Ty, Pat);
+impl_to_overflowable_item_for_rustfmt_types!([MacroArg], [SegmentParam, TuplePatField]);
 
 pub(crate) fn into_overflowable_list<'a, T>(
     iter: impl Iterator<Item = &'a T>,
 ) -> impl Iterator<Item = OverflowableItem<'a>>
 where
-    T: 'a + IntoOverflowableItem<'a>,
+    T: 'a + ToOverflowableItem<'a>,
 {
-    iter.map(|x| IntoOverflowableItem::into_overflowable_item(x))
+    iter.map(|x| ToOverflowableItem::to_overflowable_item(x))
 }
 
-pub(crate) fn rewrite_with_parens<'a, T: 'a + IntoOverflowableItem<'a>>(
+pub(crate) fn rewrite_with_parens<'a, T: 'a + ToOverflowableItem<'a>>(
     context: &'a RewriteContext<'_>,
     ident: &'a str,
     items: impl Iterator<Item = &'a T>,
@@ -280,7 +280,7 @@ pub(crate) fn rewrite_with_parens<'a, T: 'a + IntoOverflowableItem<'a>>(
     .rewrite(shape)
 }
 
-pub(crate) fn rewrite_with_angle_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
+pub(crate) fn rewrite_with_angle_brackets<'a, T: 'a + ToOverflowableItem<'a>>(
     context: &'a RewriteContext<'_>,
     ident: &'a str,
     items: impl Iterator<Item = &'a T>,
@@ -302,7 +302,7 @@ pub(crate) fn rewrite_with_angle_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
     .rewrite(shape)
 }
 
-pub(crate) fn rewrite_with_square_brackets<'a, T: 'a + IntoOverflowableItem<'a>>(
+pub(crate) fn rewrite_with_square_brackets<'a, T: 'a + ToOverflowableItem<'a>>(
     context: &'a RewriteContext<'_>,
     name: &'a str,
     items: impl Iterator<Item = &'a T>,
@@ -347,7 +347,7 @@ struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    fn new<T: 'a + IntoOverflowableItem<'a>>(
+    fn new<T: 'a + ToOverflowableItem<'a>>(
         context: &'a RewriteContext<'_>,
         items: impl Iterator<Item = &'a T>,
         ident: &'a str,
@@ -442,8 +442,8 @@ impl<'a> Context<'a> {
         };
 
         if let Some(rewrite) = rewrite {
-            // splitn(2, *).next().unwrap() is always safe.
-            let rewrite_first_line = Some(rewrite.splitn(2, '\n').next().unwrap().to_owned());
+            // split(*).next().unwrap() never panics.
+            let rewrite_first_line = Some(rewrite.split('\n').next().unwrap().to_owned());
             last_list_item.item = rewrite_first_line;
             Some(rewrite)
         } else {
@@ -563,7 +563,7 @@ impl<'a> Context<'a> {
 
                     if tactic == DefinitiveListTactic::Vertical {
                         if let Some((all_simple, num_args_before)) =
-                            maybe_get_args_offset(self.ident, &self.items, &self.context.config)
+                            maybe_get_args_offset(self.ident, &self.items, self.context.config)
                         {
                             let one_line = all_simple
                                 && definitive_tactic(
@@ -735,7 +735,7 @@ fn last_item_shape(
     shape: Shape,
     args_max_width: usize,
 ) -> Option<Shape> {
-    if items.len() == 1 && !lists.get(0)?.is_nested_call() {
+    if items.len() == 1 && !lists.first()?.is_nested_call() {
         return Some(shape);
     }
     let offset = items
@@ -786,7 +786,7 @@ pub(crate) fn maybe_get_args_offset(
     config: &Config,
 ) -> Option<(bool, usize)> {
     if let Some(&(_, num_args_before)) = args
-        .get(0)?
+        .first()?
         .special_cases(config)
         .find(|&&(s, _)| s == callee_str)
     {

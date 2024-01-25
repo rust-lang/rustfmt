@@ -376,7 +376,7 @@ impl FormattingError {
 
 pub(crate) type FormatErrorMap = HashMap<FileName, Vec<FormattingError>>;
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Eq)]
 pub(crate) struct ReportedErrors {
     // Encountered e.g., an IO error.
     pub(crate) has_operational_errors: bool,
@@ -533,7 +533,7 @@ impl<'a> FormatLines<'a> {
     }
 
     // Iterate over the chars in the file map.
-    fn iterate(&mut self, text: &mut String) {
+    fn iterate(&mut self, text: &mut str) {
         for (kind, c) in CharClasses::new(text.chars()) {
             if c == '\r' {
                 continue;

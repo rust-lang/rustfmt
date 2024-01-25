@@ -436,7 +436,7 @@ pub(crate) fn rewrite_macro_def(
         shape
     };
 
-    if parsed_def.branches.len() == 0 {
+    if parsed_def.branches.is_empty() {
         let lo = context.snippet_provider.span_before(span, "{");
         result += " ";
         result += &rewrite_empty_macro_def_body(context, span.with_lo(lo), shape)?;
@@ -799,7 +799,7 @@ impl MacroArgParser {
 
         // Parse '*', '+' or '?.
         for tok in iter {
-            self.set_last_tok(&tok);
+            self.set_last_tok(tok);
             if first {
                 first = false;
             }
@@ -947,7 +947,7 @@ impl MacroArgParser {
                 }
             }
 
-            self.set_last_tok(&tok);
+            self.set_last_tok(tok);
         }
 
         // We are left with some stuff in the buffer. Since there is nothing
@@ -1034,7 +1034,7 @@ fn span_for_token_stream(token_stream: &TokenStream) -> Option<Span> {
 }
 
 // We should insert a space if the next token is a:
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum SpaceState {
     Never,
     Punctuation,
@@ -1370,17 +1370,16 @@ fn format_lazy_static(
     for (i, (vis, id, ty, expr)) in parsed_elems.iter().enumerate() {
         // Rewrite as a static item.
         let vis = crate::utils::format_visibility(context, vis);
-        let mut stmt = String::with_capacity(128);
-        stmt.push_str(&format!(
+        let stmt = format!(
             "{}static ref {}: {} =",
             vis,
             id,
             ty.rewrite(context, nested_shape)?
-        ));
+        );
         result.push_str(&rewrite_assign_rhs(
             context,
             stmt,
-            &*expr,
+            expr,
             &RhsAssignKind::Expr(&expr.kind, expr.span),
             nested_shape.sub_width(1)?,
         )?);

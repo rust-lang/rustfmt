@@ -439,15 +439,15 @@ fn print_version() {
 
 fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
     if matches.opt_present("h") {
-        let topic = matches.opt_str("h");
-        if topic.is_none() {
+        let Some(topic) = matches.opt_str("h") else {
             return Ok(Operation::Help(HelpOp::None));
-        } else if topic == Some("config".to_owned()) {
+        };
+        if topic == "config" {
             return Ok(Operation::Help(HelpOp::Config));
-        } else if topic == Some("file-lines".to_owned()) && is_nightly() {
+        } else if topic == "file-lines" && is_nightly() {
             return Ok(Operation::Help(HelpOp::FileLines));
         } else {
-            return Err(OperationError::UnknownHelpTopic(topic.unwrap()));
+            return Err(OperationError::UnknownHelpTopic(topic));
         }
     }
     let mut free_matches = matches.free.iter();
@@ -523,9 +523,11 @@ struct GetOptsOptions {
 
 impl GetOptsOptions {
     pub fn from_matches(matches: &Matches) -> Result<GetOptsOptions> {
-        let mut options = GetOptsOptions::default();
-        options.verbose = matches.opt_present("verbose");
-        options.quiet = matches.opt_present("quiet");
+        let mut options = Self {
+            verbose: matches.opt_present("verbose"),
+            quiet: matches.opt_present("quiet"),
+            ..Self::default()
+        };
         if options.verbose && options.quiet {
             return Err(format_err!("Can't use both `--verbose` and `--quiet`"));
         }
