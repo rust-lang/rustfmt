@@ -111,8 +111,8 @@ function compile_rustfmt() {
     git remote add feature $REMOTE_REPO
     git fetch feature $FEATURE_BRANCH
 
-    CARGO_VERSON=$(cargo --version)
-    echo -e "\ncompiling with $CARGO_VERSON\n"
+    CARGO_VERSION=$(cargo --version)
+    echo -e "\ncompiling with $CARGO_VERSION\n"
 
     # Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
     # binary can find it's runtime dependencies. See https://github.com/rust-lang/rustfmt/issues/5675
