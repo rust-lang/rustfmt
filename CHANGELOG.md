@@ -1131,7 +1131,7 @@ from formatting an attribute #3665
 
 ### Changed
 
-- Update rustc-ap-syntax to 128.0.0 and ustc-ap-rustc_target to 128.0.0 195395f
+- Update rustc-ap-syntax to 128.0.0 and rustc-ap-rustc_target to 128.0.0 195395f
 - Put operands on its own line when each fits in a single line f8439ce
 - Improve CLI options 55ac062 1869888 798bffb 4d9de48 eca7796 8396da1 5d9f5aa
 
