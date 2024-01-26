@@ -1,5 +1,4 @@
-// rustfmt-single_line_simple_if: true
-// rustfmt-unstable_features: true
+// rustfmt-single_line_if: true
 
 fn main() {
     // if statements may be formatted on a single line if they are "short"
@@ -11,8 +10,9 @@ fn main() {
     }
     
     // Default max width is 50
-    if width == 50_characters_or_shorter { continue }
-    if width == 51_characters_long_and_above { return }
+    if width == is_49_characters____long { continue }
+    if width == is_50_characters_____long { continue }
+    if width == is_51_characters______long { continue }
 
     if name == super_duper_really_really_mega_ultra_giga_long_name_with_a_cherry_on_top { return }
     
@@ -56,17 +56,24 @@ fn main() {
 
     // New line formatted here as 'loop' != 'return/continue/break'
     if i == 1 { loop { return } }
-    
-    // Works on labelled break/continue
-    'gamer: loop { if true{ break 'gamer } }
 
-    'gamer: loop { if true{ break 'gamer; } }
+    // Works on labelled break/continue
+    'gamer: loop { if true{ break 'gamer } if true { continue 'gamer } }
+
+    'gamer: loop { if true{ break 'gamer; } if true { continue 'gamer; } }
 
     let result = 'block: {
         if foo() { break 'block 1 }
         if bar() { break 'block 2; }
         3
     };
+
+    // Works with `if let`
+    if let Some(a) = b { return }
+
+    if let Some(a) = b { do_something(); return }
+
+    if let Some(a) = b { return } else { continue }
 
     #[allow(unused)]
     // Comments after attributes dont mess it up
@@ -84,7 +91,7 @@ fn main() {
         if true { continue }
         if true { if true { continue } }
     } else if false {        
-        if true { if true { if width == 50_characters_or_shorter { continue } if width == 51_characters_long_and_above { return } } }
+        if true { if true { if width == is_49_characters____long { continue } if width == is_50_characters_____long { continue } if width == is_51_characters______long { continue } } }
     } else {
         if true { return; }
     }

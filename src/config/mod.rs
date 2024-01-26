@@ -83,7 +83,7 @@ create_config! {
         "Format hexadecimal integer literals";
 
     // Single line expressions and items
-    single_line_simple_if: bool, false, false, "Simple if statements can format to a single line";
+    single_line_if: bool, false, false, "Simple if statements can format to a single line";
     empty_item_single_line: bool, true, false,
         "Put empty-body functions and impls on a single line";
     struct_lit_single_line: bool, true, false,
@@ -651,7 +651,7 @@ format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
-single_line_simple_if = false
+single_line_if = false
 empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false

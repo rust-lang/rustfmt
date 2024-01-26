@@ -2481,7 +2481,7 @@ fn main() {
 
 See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
-## `single_line_simple_if`
+## `single_line_if`
 
 Allows simple single expression if blocks to format on one line. Useful in the case of keeping `let-else` guards format consistent with `if` guards.
 
@@ -2496,11 +2496,53 @@ Note that line will still break if:
 
 #### `false` (default):
 
+```rust
+fn main() {
+    if true {
+        break;
+    }
+
+    if false {
+        return;
+    }
+
+    if width == is_49_characters____long {
+        continue;
+    }
+
+    if width == is_50_characters_____long {
+        continue;
+    }
+
+    if width == is_51_characters______long {
+        continue;
+    }
+}
+```
+
+#### `true`:
+
+```rust
+fn main() {
+    if true { break }
+
+    if false { return }
+
+    if width == is_49_characters____long { continue }
+
+    if width == is_50_characters_____long { continue }
+
+    if width == is_51_characters______long {
+        continue;
+    }
+}
+```
+
 ## `single_line_simple_if_max_width`
 
 Maximum line length for single line if with a simple inner expression. Useful in the case of keeping `let-else` guards format consistent with `if` guards.
 
-A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
+A value of `0` (zero) results in if blocks always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
 
 - **Default value**: `50`
 - **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)

@@ -1102,31 +1102,20 @@ impl<'a> Rewrite for ControlFlow<'a> {
         };
         let block_str = {
             let old_val = context.is_if_else_block.replace(self.else_block.is_some());
-            let max_width = if context.config.single_line_simple_if() {
-                std::cmp::min(
-                    shape.width,
-                    context.config.single_line_simple_if_max_width(),
+            let result = if self.keyword == "if" {
+                format_if(
+                    context,
+                    shape,
+                    self.block,
+                    &cond_str,
+                    used_width,
+                    block_shape,
                 )
             } else {
-                shape.width
+                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true)
             };
-            let available_space = max_width.saturating_sub(used_width);
-            let allow_single_line = allow_single_line_if(&cond_str, self.block)
-                && self.keyword == "if"
-                && available_space > 0;
-
-            let mut result = if allow_single_line && context.config.single_line_simple_if() {
-                rewrite_block_inner(self.block, None, None, true, context, block_shape)?
-            } else {
-                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true)?
-            };
-
-            let block_exceeds_width = result.len() > available_space;
-            if allow_single_line && !result.contains('\n') && block_exceeds_width {
-                result = rewrite_block_inner(self.block, None, None, false, context, block_shape)?;
-            }
             context.is_if_else_block.replace(old_val);
-            result
+            result?
         };
 
         let mut result = format!("{cond_str}{block_str}");
@@ -1179,6 +1168,41 @@ impl<'a> Rewrite for ControlFlow<'a> {
     }
 }
 
+fn format_if(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    block: &ast::Block,
+    cond_str: &str,
+    used_width: usize,
+    block_shape: Shape,
+) -> Option<String> {
+    let max_width = if context.config.single_line_if() {
+        std::cmp::min(
+            shape.width,
+            context.config.single_line_simple_if_max_width(),
+        )
+    } else {
+        shape.width
+    };
+    let available_space = max_width.saturating_sub(used_width);
+    let allow_single_line = context.config.single_line_if()
+        && available_space > 0
+        && allow_single_line_if(&cond_str, block);
+
+    let result = if allow_single_line {
+        let mut single_line_attempt =
+            rewrite_block_inner(block, None, None, true, context, block_shape)?;
+        if !single_line_attempt.contains('\n') && single_line_attempt.len() > available_space {
+            single_line_attempt =
+                rewrite_block_inner(block, None, None, false, context, block_shape)?;
+        }
+        Some(single_line_attempt)
+    } else {
+        rewrite_block_with_visitor(context, "", block, None, None, block_shape, true)
+    };
+    result
+}
+
 fn allow_single_line_if(result: &str, block: &ast::Block) -> bool {
     if result.contains('\n') {
         return false;
@@ -1198,6 +1222,7 @@ fn is_simple_control_flow_stmt(stmt: &ast::Stmt) -> bool {
             ast::ExprKind::Continue(..) => true,
             ast::ExprKind::Break(_, ref opt_expr) | ast::ExprKind::Ret(ref opt_expr) => {
                 if let Some(_) = *opt_expr {
+                    // Do not allow single line if block has `return/break` with a returned value
                     false
                 } else {
                     true
