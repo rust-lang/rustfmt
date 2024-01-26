@@ -2483,12 +2483,13 @@ See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuri
 
 ## `single_line_if`
 
-Allows simple single expression if blocks to format on one line. Useful in the case of keeping `let-else` guards format consistent with `if` guards.
+Allows if blocks to format on one line only if they contain a single expression of `return`, `continue` or `break`. Useful in the case of keeping `let-else` guards format consistent with `if` guards.
 
 Note that line will still break if:
-1. The condition length is over the `max_width`/`single_line_simple_if_max_width length`
-2. The block contains a trailing semicolon
+1. The total length (condition and block) is over the `max_width`/`single_line_simple_if_max_width length`
+2. The block ends with a trailing semicolon
 3. The block contains a single or multi-lined comment
+4. The block contains `return` or `break` and returns a value
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
@@ -2504,6 +2505,10 @@ fn main() {
 
     if false {
         return;
+    }
+
+    if false {
+        return 5;
     }
 
     if width == is_49_characters____long {
@@ -2527,6 +2532,10 @@ fn main() {
     if true { break }
 
     if false { return }
+
+    if false {
+        return 5;
+    }
 
     if width == is_49_characters____long { continue }
 
