@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_ast::token::{BinOpToken, Delimiter, Token, TokenKind};
-use rustc_ast::tokenstream::{RefTokenTreeCursor, TokenStream, TokenTree};
+use rustc_ast::tokenstream::{DelimSpacing, RefTokenTreeCursor, Spacing, TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_span::{
@@ -235,6 +235,7 @@ fn rewrite_macro_inner(
     if Delimiter::Brace == style && context.config.format_brace_macros() {
         ts = TokenStream::new(vec![TokenTree::Delimited(
             mac.args.dspan,
+            DelimSpacing::new(Spacing::Alone, Spacing::Alone),
             Delimiter::Brace,
             ts,
         )]);
