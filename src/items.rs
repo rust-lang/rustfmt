@@ -287,7 +287,7 @@ pub(crate) struct FnSig<'a> {
     decl: &'a ast::FnDecl,
     generics: &'a ast::Generics,
     ext: ast::Extern,
-    is_async: Cow<'a, ast::Async>,
+    coroutine_kind: Cow<'a, Option<ast::CoroutineKind>>,
     constness: ast::Const,
     defaultness: ast::Defaultness,
     unsafety: ast::Unsafe,
@@ -302,7 +302,7 @@ impl<'a> FnSig<'a> {
     ) -> FnSig<'a> {
         FnSig {
             unsafety: method_sig.header.unsafety,
-            is_async: Cow::Borrowed(&method_sig.header.asyncness),
+            coroutine_kind: Cow::Borrowed(&method_sig.header.coroutine_kind),
             constness: method_sig.header.constness,
             defaultness: ast::Defaultness::Final,
             ext: method_sig.header.ext,
@@ -328,7 +328,7 @@ impl<'a> FnSig<'a> {
                 generics,
                 ext: fn_sig.header.ext,
                 constness: fn_sig.header.constness,
-                is_async: Cow::Borrowed(&fn_sig.header.asyncness),
+                coroutine_kind: Cow::Borrowed(&fn_sig.header.coroutine_kind),
                 defaultness,
                 unsafety: fn_sig.header.unsafety,
                 visibility: vis,
@@ -343,7 +343,8 @@ impl<'a> FnSig<'a> {
         result.push_str(&*format_visibility(context, self.visibility));
         result.push_str(format_defaultness(self.defaultness));
         result.push_str(format_constness(self.constness));
-        result.push_str(format_async(&self.is_async));
+        self.coroutine_kind
+            .map(|coroutine_kind| result.push_str(format_coro(&coroutine_kind)));
         result.push_str(format_unsafety(self.unsafety));
         result.push_str(&format_extern(
             self.ext,
@@ -655,9 +656,16 @@ impl<'a> FmtVisitor<'a> {
         }
 
         let context = self.get_context();
-        // 1 = ','
-        let shape = self.shape().sub_width(1)?;
-        let attrs_str = field.attrs.rewrite(&context, shape)?;
+        let shape = self.shape();
+        let attrs_str = if context.config.version() == Version::Two {
+            field.attrs.rewrite(&context, shape)?
+        } else {
+            // Version::One formatting that was off by 1. See issue #5801
+            field.attrs.rewrite(&context, shape.sub_width(1)?)?
+        };
+        // sub_width(1) to take the trailing comma into account
+        let shape = shape.sub_width(1)?;
+
         let lo = field
             .attrs
             .last()
@@ -665,7 +673,7 @@ impl<'a> FmtVisitor<'a> {
         let span = mk_sp(lo, field.span.lo());
 
         let variant_body = match field.data {
-            ast::VariantData::Tuple(..) | ast::VariantData::Struct(..) => format_struct(
+            ast::VariantData::Tuple(..) | ast::VariantData::Struct { .. } => format_struct(
                 &context,
                 &StructParts::from_variant(field, &context),
                 self.block_indent,
@@ -1093,7 +1101,7 @@ fn enum_variant_span(variant: &ast::Variant, context: &RewriteContext<'_>) -> Sp
     if let Some(ref anon_const) = variant.disr_expr {
         let span_before_consts = variant.span.until(anon_const.value.span);
         let hi = match &variant.data {
-            Struct(..) => context
+            Struct { .. } => context
                 .snippet_provider
                 .span_after_last(span_before_consts, "}"),
             Tuple(..) => context
@@ -1113,12 +1121,12 @@ fn format_struct(
     offset: Indent,
     one_line_width: Option<usize>,
 ) -> Option<String> {
-    match *struct_parts.def {
+    match struct_parts.def {
         ast::VariantData::Unit(..) => format_unit_struct(context, struct_parts, offset),
-        ast::VariantData::Tuple(ref fields, _) => {
+        ast::VariantData::Tuple(fields, _) => {
             format_tuple_struct(context, struct_parts, fields, offset)
         }
-        ast::VariantData::Struct(ref fields, _) => {
+        ast::VariantData::Struct { fields, .. } => {
             format_struct_struct(context, struct_parts, fields, offset, one_line_width)
         }
     }
@@ -2498,7 +2506,7 @@ fn rewrite_fn_base(
                 || context.config.indent_style() == IndentStyle::Visual
             {
                 let indent = if param_str.is_empty() {
-                    // Aligning with non-existent params looks silly.
+                    // Aligning with nonexistent params looks silly.
                     force_new_line_for_brace = true;
                     indent + 4
                 } else {
@@ -2513,7 +2521,7 @@ fn rewrite_fn_base(
             } else {
                 let mut ret_shape = Shape::indented(indent, context.config);
                 if param_str.is_empty() {
-                    // Aligning with non-existent params looks silly.
+                    // Aligning with nonexistent params looks silly.
                     force_new_line_for_brace = true;
                     ret_shape = if context.use_block_indent() {
                         ret_shape.offset_left(4).unwrap_or(ret_shape)

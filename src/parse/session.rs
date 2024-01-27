@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use rustc_data_structures::sync::{IntoDynSyncSend, Lrc};
 use rustc_errors::emitter::{DynEmitter, Emitter, EmitterWriter};
 use rustc_errors::translation::Translate;
-use rustc_errors::{ColorConfig, Diagnostic, Handler, Level as DiagnosticLevel};
+use rustc_errors::{ColorConfig, DiagCtxt, Diagnostic, Level as DiagnosticLevel};
 use rustc_session::parse::ParseSess as RawParseSess;
 use rustc_span::{
     source_map::{FilePathMapping, SourceMap},
@@ -62,7 +62,7 @@ struct SilentOnIgnoredFilesEmitter {
 }
 
 impl SilentOnIgnoredFilesEmitter {
-    fn handle_non_ignoreable_error(&mut self, db: &Diagnostic) {
+    fn handle_non_ignorable_error(&mut self, db: &Diagnostic) {
         self.has_non_ignorable_parser_errors = true;
         self.can_reset.store(false, Ordering::Release);
         self.emitter.emit_diagnostic(db);
@@ -86,7 +86,7 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
 
     fn emit_diagnostic(&mut self, db: &Diagnostic) {
         if db.level() == DiagnosticLevel::Fatal {
-            return self.handle_non_ignoreable_error(db);
+            return self.handle_non_ignorable_error(db);
         }
         if let Some(primary_span) = &db.span.primary_span() {
             let file_name = self.source_map.span_to_filename(*primary_span);
@@ -104,7 +104,7 @@ impl Emitter for SilentOnIgnoredFilesEmitter {
                 }
             };
         }
-        self.handle_non_ignoreable_error(db);
+        self.handle_non_ignorable_error(db);
     }
 }
 
@@ -118,13 +118,13 @@ impl From<Color> for ColorConfig {
     }
 }
 
-fn default_handler(
+fn default_dcx(
     source_map: Lrc<SourceMap>,
     ignore_path_set: Lrc<IgnorePathSet>,
     can_reset: Lrc<AtomicBool>,
-    hide_parse_errors: bool,
+    show_parse_errors: bool,
     color: Color,
-) -> Handler {
+) -> DiagCtxt {
     let supports_color = term::stderr().map_or(false, |term| term.supports_color());
     let emit_color = if supports_color {
         ColorConfig::from(color)
@@ -132,7 +132,7 @@ fn default_handler(
         ColorConfig::Never
     };
 
-    let emitter = if hide_parse_errors {
+    let emitter = if !show_parse_errors {
         silent_emitter()
     } else {
         let fallback_bundle = rustc_errors::fallback_fluent_bundle(
@@ -141,7 +141,7 @@ fn default_handler(
         );
         Box::new(EmitterWriter::stderr(emit_color, fallback_bundle).sm(Some(source_map.clone())))
     };
-    Handler::with_emitter(Box::new(SilentOnIgnoredFilesEmitter {
+    DiagCtxt::with_emitter(Box::new(SilentOnIgnoredFilesEmitter {
         has_non_ignorable_parser_errors: false,
         source_map,
         emitter,
@@ -159,14 +159,14 @@ impl ParseSess {
         let source_map = Lrc::new(SourceMap::new(FilePathMapping::empty()));
         let can_reset_errors = Lrc::new(AtomicBool::new(false));
 
-        let handler = default_handler(
+        let dcx = default_dcx(
             Lrc::clone(&source_map),
             Lrc::clone(&ignore_path_set),
             Lrc::clone(&can_reset_errors),
-            config.hide_parse_errors(),
+            config.show_parse_errors(),
             config.color(),
         );
-        let parse_sess = RawParseSess::with_span_handler(handler, source_map);
+        let parse_sess = RawParseSess::with_dcx(dcx, source_map);
 
         Ok(ParseSess {
             parse_sess,
@@ -179,7 +179,7 @@ impl ParseSess {
     ///
     /// * `id` - The name of the module
     /// * `relative` - If Some(symbol), the symbol name is a directory relative to the dir_path.
-    ///   If relative is Some, resolve the submodle at {dir_path}/{symbol}/{id}.rs
+    ///   If relative is Some, resolve the submodule at {dir_path}/{symbol}/{id}.rs
     ///   or {dir_path}/{symbol}/{id}/mod.rs. if None, resolve the module at {dir_path}/{id}.rs.
     /// *  `dir_path` - Module resolution will occur relative to this directory.
     pub(crate) fn default_submod_path(
@@ -190,7 +190,7 @@ impl ParseSess {
     ) -> Result<ModulePathSuccess, ModError<'_>> {
         rustc_expand::module::default_submod_path(&self.parse_sess, id, relative, dir_path).or_else(
             |e| {
-                // If resloving a module relative to {dir_path}/{symbol} fails because a file
+                // If resolving a module relative to {dir_path}/{symbol} fails because a file
                 // could not be found, then try to resolve the module relative to {dir_path}.
                 // If we still can't find the module after searching for it in {dir_path},
                 // surface the original error.
@@ -218,7 +218,7 @@ impl ParseSess {
     }
 
     pub(crate) fn set_silent_emitter(&mut self) {
-        self.parse_sess.span_diagnostic = Handler::with_emitter(silent_emitter());
+        self.parse_sess.dcx = DiagCtxt::with_emitter(silent_emitter());
     }
 
     pub(crate) fn span_to_filename(&self, span: Span) -> FileName {
@@ -284,10 +284,8 @@ impl ParseSess {
 // Methods that should be restricted within the parse module.
 impl ParseSess {
     pub(super) fn emit_diagnostics(&self, diagnostics: Vec<Diagnostic>) {
-        for mut diagnostic in diagnostics {
-            self.parse_sess
-                .span_diagnostic
-                .emit_diagnostic(&mut diagnostic);
+        for diagnostic in diagnostics {
+            self.parse_sess.dcx.emit_diagnostic(diagnostic);
         }
     }
 
@@ -296,11 +294,11 @@ impl ParseSess {
     }
 
     pub(super) fn has_errors(&self) -> bool {
-        self.parse_sess.span_diagnostic.has_errors().is_some()
+        self.parse_sess.dcx.has_errors().is_some()
     }
 
     pub(super) fn reset_errors(&self) {
-        self.parse_sess.span_diagnostic.reset_err_count();
+        self.parse_sess.dcx.reset_err_count();
     }
 }
 
@@ -372,7 +370,7 @@ mod tests {
 
         fn build_diagnostic(level: DiagnosticLevel, span: Option<MultiSpan>) -> Diagnostic {
             let mut diag = Diagnostic::new(level, "");
-            diag.message.clear();
+            diag.messages.clear();
             if let Some(span) = span {
                 diag.span = span;
             }

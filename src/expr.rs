@@ -3,7 +3,7 @@ use std::cmp::min;
 
 use itertools::Itertools;
 use rustc_ast::token::{Delimiter, Lit, LitKind};
-use rustc_ast::{ast, ptr, token};
+use rustc_ast::{ast, ptr, token, ForLoopKind};
 use rustc_span::{BytePos, Span};
 
 use crate::chains::rewrite_chain;
@@ -134,7 +134,7 @@ pub(crate) fn format_expr(
         }
         ast::ExprKind::Let(ref pat, ref expr, _span, _) => rewrite_let(context, shape, pat, expr),
         ast::ExprKind::If(..)
-        | ast::ExprKind::ForLoop(..)
+        | ast::ExprKind::ForLoop { .. }
         | ast::ExprKind::Loop(..)
         | ast::ExprKind::While(..) => to_control_flow(expr, expr_type)
             .and_then(|control_flow| control_flow.rewrite(context, shape)),
@@ -212,7 +212,7 @@ pub(crate) fn format_expr(
             &cl.binder,
             cl.constness,
             cl.capture_clause,
-            &cl.asyncness,
+            &cl.coroutine_kind,
             cl.movability,
             &cl.fn_decl,
             &cl.body,
@@ -367,15 +367,15 @@ pub(crate) fn format_expr(
                 ))
             }
         }
-        ast::ExprKind::Async(capture_by, ref block) => {
-            let mover = if capture_by == ast::CaptureBy::Value {
+        ast::ExprKind::Gen(capture_by, ref block, ref kind) => {
+            let mover = if matches!(capture_by, ast::CaptureBy::Value { .. }) {
                 "move "
             } else {
                 ""
             };
             if let rw @ Some(_) = rewrite_single_line_block(
                 context,
-                format!("async {mover}").as_str(),
+                format!("{kind} {mover}").as_str(),
                 block,
                 Some(&expr.attrs),
                 None,
@@ -386,7 +386,7 @@ pub(crate) fn format_expr(
                 // 6 = `async `
                 let budget = shape.width.saturating_sub(6);
                 Some(format!(
-                    "async {mover}{}",
+                    "{kind} {mover}{}",
                     rewrite_block(
                         block,
                         Some(&expr.attrs),
@@ -682,9 +682,15 @@ fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow<
                 expr.span,
             ))
         }
-        ast::ExprKind::ForLoop(ref pat, ref cond, ref block, label) => {
-            Some(ControlFlow::new_for(pat, cond, block, label, expr.span))
-        }
+        ast::ExprKind::ForLoop {
+            ref pat,
+            ref iter,
+            ref body,
+            label,
+            kind,
+        } => Some(ControlFlow::new_for(
+            pat, iter, body, label, expr.span, kind,
+        )),
         ast::ExprKind::Loop(ref block, label, _) => {
             Some(ControlFlow::new_loop(block, label, expr.span))
         }
@@ -771,6 +777,7 @@ impl<'a> ControlFlow<'a> {
         block: &'a ast::Block,
         label: Option<ast::Label>,
         span: Span,
+        kind: ForLoopKind,
     ) -> ControlFlow<'a> {
         ControlFlow {
             cond: Some(cond),
@@ -778,7 +785,10 @@ impl<'a> ControlFlow<'a> {
             else_block: None,
             label,
             pat: Some(pat),
-            keyword: "for",
+            keyword: match kind {
+                ForLoopKind::For => "for",
+                ForLoopKind::ForAwait => "for await",
+            },
             matcher: "",
             connector: " in",
             allow_single_line: false,
@@ -1364,14 +1374,14 @@ pub(crate) fn can_be_overflowed_expr(
                 || context.config.overflow_delimited_expr()
         }
         ast::ExprKind::If(..)
-        | ast::ExprKind::ForLoop(..)
+        | ast::ExprKind::ForLoop { .. }
         | ast::ExprKind::Loop(..)
         | ast::ExprKind::While(..) => {
             context.config.combine_control_expr() && context.use_block_indent() && args_len == 1
         }
 
         // Handle always block-like expressions
-        ast::ExprKind::Async(..) | ast::ExprKind::Block(..) | ast::ExprKind::Closure(..) => true,
+        ast::ExprKind::Gen(..) | ast::ExprKind::Block(..) | ast::ExprKind::Closure(..) => true,
 
         // Handle `[]` and `{}`-like expressions
         ast::ExprKind::Array(..) | ast::ExprKind::Struct(..) => {
@@ -1933,7 +1943,7 @@ fn rewrite_unary_op(
     shape: Shape,
 ) -> Option<String> {
     // For some reason, an UnOp is not spanned like BinOp!
-    rewrite_unary_prefix(context, ast::UnOp::to_string(op), expr, shape)
+    rewrite_unary_prefix(context, op.as_str(), expr, shape)
 }
 
 pub(crate) enum RhsAssignKind<'ast> {
