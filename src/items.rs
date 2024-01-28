@@ -2353,7 +2353,13 @@ fn rewrite_fn_base(
         2
     };
     let used_width = last_line_used_width(&result, indent.width());
-    let one_line_budget = context.budget(used_width + overhead);
+    let one_line_budget = std::cmp::min(
+        context.budget(used_width + overhead),
+        context
+            .config
+            .fn_width()
+            .saturating_sub(used_width + overhead),
+    );
     let shape = Shape {
         width: one_line_budget,
         indent,
@@ -2797,7 +2803,10 @@ fn compute_budgets_for_params(
             FnBraceStyle::SameLine => used_space += 2, // 2 = `{}`
             FnBraceStyle::NextLine => (),
         }
-        let one_line_budget = context.budget(used_space);
+        let one_line_budget = std::cmp::min(
+            context.budget(used_space),
+            context.config.fn_width().saturating_sub(used_space),
+        );
 
         if one_line_budget > 0 {
             // 4 = "() {".len()
