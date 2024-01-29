@@ -78,7 +78,7 @@ impl<'a> Display for FormatReportFormatter<'a> {
                     None
                 };
 
-                let origin = format!("{}:{}", file, error.line);
+                let origin = file.to_string();
                 let slice = Slice {
                     source: &error.line_buffer.clone(),
                     line_start: error.line,
