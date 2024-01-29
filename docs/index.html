@@ -81,7 +81,7 @@
                   </select>
               </div>
             </div>
-            <div v-html="aboutHtml"></div>
+            <div v-if="isSearching" v-html="aboutHtml" id="about"></div>
             <div v-html="configurationAboutHtml"></div>
             <div v-html="outputHtml"></div>
           </article>
@@ -114,6 +114,10 @@
                 scrolledOnce: false,
               },
               asyncComputed: {
+                async isSearching() {
+                  // returns true if this.searchCondition contains text, false otherwise.
+                  return !this.searchCondition.trim()
+                },
                 async updateVersion() {
                   let latest;
                   try {
