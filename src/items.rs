@@ -7,6 +7,7 @@ use regex::Regex;
 use rustc_ast::visit;
 use rustc_ast::{ast, ptr};
 use rustc_span::{symbol, BytePos, Span, DUMMY_SP};
+use unicode_width::UnicodeWidthStr;
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
@@ -1132,6 +1133,56 @@ fn format_struct(
     }
 }
 
+fn rewrite_bounds(
+    result: &mut String,
+    context: &RewriteContext<'_>,
+    bounds: &ast::GenericBounds,
+    terminator: &str,
+    shape: Shape,
+    span: Span,
+) -> Option<()> {
+    let indented = shape.block_indent(context.config.tab_spaces());
+    let items = itemize_list(
+        context.snippet_provider,
+        bounds.iter(),
+        terminator,
+        "+",
+        |bound| bound.span().lo(),
+        |bound| bound.span().hi(),
+        |bound| bound.rewrite(context, indented),
+        span.lo(),
+        span.hi(),
+        false,
+    )
+    .collect::<Vec<_>>();
+
+    let tactic = definitive_tactic(
+        &items,
+        ListTactic::LimitedHorizontalVertical(shape.width),
+        Separator::Plus,
+        context.config.max_width(),
+    );
+
+    let fmt = ListFormatting::new(indented, context.config)
+        .tactic(tactic)
+        .trailing_separator(SeparatorTactic::Never)
+        .separator("+")
+        .separator_place(SeparatorPlace::Front)
+        .align_comments(false);
+
+    let item_str = write_list(items, &fmt)?;
+
+    let space = if tactic == DefinitiveListTactic::Horizontal {
+        Cow::from(" ")
+    } else {
+        indented.indent.to_string_with_newline(&context.config)
+    };
+    result.push(':');
+    result.push_str(&space);
+    result.push_str(&item_str);
+    Some(())
+}
+
 pub(crate) fn format_trait(
     context: &RewriteContext<'_>,
     item: &ast::Item,
@@ -1164,25 +1215,40 @@ pub(crate) fn format_trait(
         rewrite_generics(context, rewrite_ident(context, item.ident), generics, shape)?;
     result.push_str(&generics_str);
 
-    // FIXME(#2055): rustfmt fails to format when there are comments between trait bounds.
     if !bounds.is_empty() {
-        // Retrieve *unnormalized* ident (See #6069)
-        let source_ident = context.snippet(item.ident.span);
-        let ident_hi = context.snippet_provider.span_after(item.span, source_ident);
-        let bound_hi = bounds.last().unwrap().span().hi();
-        let snippet = context.snippet(mk_sp(ident_hi, bound_hi));
-        if contains_comment(snippet) {
-            return None;
-        }
+        if context.config.version() == Version::Two {
+            let after_colon = context
+                .snippet_provider
+                .span_after(item.span.with_lo(item.ident.span.hi()), ":");
 
-        result = rewrite_assign_rhs_with(
-            context,
-            result + ":",
-            bounds,
-            shape,
-            &RhsAssignKind::Bounds,
-            RhsTactics::ForceNextLineWithoutIndent,
-        )?;
+            let span = mk_sp(after_colon, body_lo);
+            let shape = if result.contains('\n') {
+                shape
+            } else {
+                // `offset_left` takes into account what we've rewritten already + 1 for `:`
+                // `sub_width` take into account the trailing `{`
+                shape.offset_left(header.width() + 1)?.sub_width(1)?
+            };
+            rewrite_bounds(&mut result, context, bounds, "{", shape, span)?;
+        } else {
+            // Retrieve *unnormalized* ident (See #6069)
+            let source_ident = context.snippet(item.ident.span);
+            let ident_hi = context.snippet_provider.span_after(item.span, source_ident);
+            let bound_hi = bounds.last().unwrap().span().hi();
+            let snippet = context.snippet(mk_sp(ident_hi, bound_hi));
+            if contains_comment(snippet) {
+                return None;
+            }
+
+            result = rewrite_assign_rhs_with(
+                context,
+                result + ":",
+                bounds,
+                shape,
+                &RhsAssignKind::Bounds,
+                RhsTactics::ForceNextLineWithoutIndent,
+            )?;
+        }
     }
 
     // Rewrite where-clause.
@@ -1219,7 +1285,9 @@ pub(crate) fn format_trait(
             result.push_str(&where_indent.to_string_with_newline(context.config));
         }
         result.push_str(&where_clause_str);
-    } else {
+    }
+
+    if generics.where_clause.predicates.is_empty() && bounds.is_empty() {
         let item_snippet = context.snippet(item.span);
         if let Some(lo) = item_snippet.find('/') {
             // 1 = `{`

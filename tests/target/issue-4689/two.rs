@@ -23,7 +23,8 @@ pub trait PrettyPrinter<'tcx>:
         Type = Self,
         DynExistential = Self,
         Const = Self,
-    > + fmt::Write
+    >
+    + fmt::Write
 {
     //
 }
@@ -36,7 +37,8 @@ pub trait PrettyPrinter<'tcx>:
         Type = Self,
         DynExistential = Self,
         Const = Self,
-    > + fmt::Write1
+    >
+    + fmt::Write1
     + fmt::Write2
 {
     //
@@ -65,7 +67,8 @@ pub trait PrettyPrinter<'tcx>:
         Type = Self,
         DynExistential = Self,
         Const = Self,
-    > + Printer2<
+    >
+    + Printer2<
         'tcx,
         Error = fmt::Error,
         Path = Self,
