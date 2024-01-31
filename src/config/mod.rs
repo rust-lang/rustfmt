@@ -660,6 +660,7 @@ reorder_impl_items = false
 type_punctuation_density = "Wide"
 space_before_colon = false
 space_after_colon = true
+space_after_not = false
 spaces_around_ranges = false
 binop_separator = "Front"
 remove_nested_parens = true

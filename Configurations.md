@@ -2546,7 +2546,7 @@ fn lorem<T : Eq>(t : T) {
 
 See also: [`space_after_colon`](#space_after_colon).
 
-## `space_after_not
+## `space_after_not`
 
 Leave a space after the `!` operator.
 
