@@ -10,7 +10,7 @@ use thin_vec::ThinVec;
 use thiserror::Error;
 
 use crate::attr::MetaVisitor;
-use crate::config::FileName;
+use crate::config::{FileName, ReportMissingSubmod};
 use crate::items::is_mod_decl;
 use crate::parse::parser::{
     Directory, DirectoryOwnership, ModError, ModulePathSuccess, Parser, ParserError,
@@ -62,7 +62,7 @@ pub(crate) struct ModResolver<'ast, 'sess> {
     directory: Directory,
     file_map: FileModMap<'ast>,
     recursive: bool,
-    ignore_missing_submod: bool,
+    report_missing_submod: ReportMissingSubmod,
 }
 
 /// Represents errors while trying to resolve modules.
@@ -106,7 +106,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         parse_sess: &'sess ParseSess,
         directory_ownership: DirectoryOwnership,
         recursive: bool,
-        ignore_missing_submod: bool,
+        report_missing_submod: ReportMissingSubmod,
     ) -> Self {
         ModResolver {
             directory: Directory {
@@ -116,7 +116,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             file_map: BTreeMap::new(),
             parse_sess,
             recursive,
-            ignore_missing_submod,
+            report_missing_submod,
         }
     }
 
@@ -254,8 +254,14 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             self.find_external_module(item.ident, &item.attrs, sub_mod)
                 .or_else(|err| match err.kind {
                     ModuleResolutionErrorKind::NotFound { file: _ }
-                        if self.ignore_missing_submod =>
+                        if self.report_missing_submod == ReportMissingSubmod::Ignore =>
                     {
+                        Ok(None)
+                    }
+                    ModuleResolutionErrorKind::NotFound { file: _ }
+                        if self.report_missing_submod == ReportMissingSubmod::Warn =>
+                    {
+                        eprintln!("Warning: {}", err);
                         Ok(None)
                     }
                     _ => Err(err),

@@ -179,7 +179,8 @@ create_config! {
          or they are left with trailing whitespaces";
     ignore: IgnoreList, IgnoreList::default(), false,
         "Skip formatting the specified files and directories";
-    ignore_missing_submod: bool, false, false, "Ignore missing submodule error";
+    report_missing_submod: ReportMissingSubmod, ReportMissingSubmod::Error, false,
+        "Report missing submodule";
 
     // Not user-facing
     verbose: Verbosity, Verbosity::Normal, false, "How much to information to emit to the user";
@@ -698,7 +699,7 @@ show_parse_errors = true
 error_on_line_overflow = false
 error_on_unformatted = false
 ignore = []
-ignore_missing_submod = false
+report_missing_submod = "Error"
 emit_mode = "Files"
 make_backup = false
 "#,
