@@ -202,11 +202,11 @@ fn rustfmt_emits_error_when_control_brace_style_is_always_next_line() {
 }
 
 #[test]
-fn ignore_missing_sub_mod_false() {
+fn report_missing_sub_mod_error() {
     // Ensure that missing submodules cause module not found errors when trying to
-    // resolve submodules with `skip_children=false` and `ignore_missing_submod=false`
+    // resolve submodules with `skip_children=false` and `report_missing_submod=Error`
     let args = [
-        "--config=skip_children=false,ignore_missing_submod=false",
+        "--config=skip_children=false,report_missing_submod=Error",
         "tests/source/issue-5609.rs",
     ];
     let (_stdout, stderr) = rustfmt(&args);
@@ -215,12 +215,29 @@ fn ignore_missing_sub_mod_false() {
 }
 
 #[test]
-fn ignore_missing_sub_mod_true() {
-    // Ensure that missing submodules don't cause module not found errors when trying to
-    // resolve submodules with `skip_children=false` and `ignore_missing_submod=true`.
+fn report_missing_sub_mod_warn() {
+    // Ensure that missing submodules cause module not found warnings when trying to
+    // resolve submodules with `skip_children=false` and `report_missing_submod=Warn`
     let args = [
         "--emit=stdout",
-        "--config=skip_children=false,ignore_missing_submod=true",
+        "--config=skip_children=false,report_missing_submod=Warn",
+        "tests/source/issue-5609.rs",
+    ];
+    let (stdout, stderr) = rustfmt(&args);
+    // Module resolution succeed but we emit warnings because we're unable to find `missing_submod.rs`
+    assert!(stderr.contains("missing_submod.rs does not exist"));
+
+    let target = read_to_string(PathBuf::from("tests/target/issue-5609.rs")).unwrap();
+    assert!(stdout.ends_with(&target));
+}
+
+#[test]
+fn ignore_missing_sub_mod_true() {
+    // Ensure that missing submodules don't cause module not found errors when trying to
+    // resolve submodules with `skip_children=false` and `report_missing_submod=Ignore`.
+    let args = [
+        "--emit=stdout",
+        "--config=skip_children=false,report_missing_submod=Ignore",
         "tests/source/issue-5609.rs",
     ];
     let (stdout, _stderr) = rustfmt(&args);
