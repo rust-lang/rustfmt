@@ -36,7 +36,7 @@ impl<'a> Module<'a> {
         mod_span: Span,
         ast_mod_kind: Option<Cow<'a, ast::ModKind>>,
         mod_items: Cow<'a, ThinVec<rustc_ast::ptr::P<ast::Item>>>,
-        mod_attrs: Cow<'a, ast::AttrVec>,
+        mod_attrs: &[ast::Attribute],
     ) -> Self {
         let inner_attr = mod_attrs
             .iter()
@@ -141,16 +141,16 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 mk_sp(snippet_provider.start_pos(), snippet_provider.end_pos()),
                 None,
                 Cow::Borrowed(&krate.items),
-                Cow::Borrowed(&krate.attrs),
+                &krate.attrs,
             ),
         );
         Ok(self.file_map)
     }
 
     /// Visit `cfg_if` macro and look for module declarations.
-    fn visit_cfg_if(&mut self, item: Cow<'ast, ast::Item>) -> Result<(), ModuleResolutionError> {
+    fn visit_cfg_if(&mut self, item: &ast::Item) -> Result<(), ModuleResolutionError> {
         let mut visitor = visitor::CfgIfVisitor::new(self.parse_sess);
-        visitor.visit_item(&item);
+        visitor.visit_item(item);
         for module_item in visitor.mods() {
             if let ast::ItemKind::Mod(_, ref sub_mod_kind) = module_item.item.kind {
                 self.visit_sub_mod(
@@ -159,7 +159,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         module_item.item.span,
                         Some(Cow::Owned(sub_mod_kind.clone())),
                         Cow::Owned(ThinVec::new()),
-                        Cow::Owned(ast::AttrVec::new()),
+                        &[],
                     ),
                 )?;
             }
@@ -170,11 +170,11 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     /// Visit modules defined inside macro calls.
     fn visit_mod_outside_ast(
         &mut self,
-        items: ThinVec<rustc_ast::ptr::P<ast::Item>>,
+        items: &[rustc_ast::ptr::P<ast::Item>],
     ) -> Result<(), ModuleResolutionError> {
         for item in items {
-            if is_cfg_if(&item) {
-                self.visit_cfg_if(Cow::Owned(item.into_inner()))?;
+            if is_cfg_if(item) {
+                self.visit_cfg_if(item)?;
                 continue;
             }
 
@@ -186,7 +186,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         span,
                         Some(Cow::Owned(sub_mod_kind.clone())),
                         Cow::Owned(ThinVec::new()),
-                        Cow::Owned(ast::AttrVec::new()),
+                        &[],
                     ),
                 )?;
             }
@@ -201,7 +201,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     ) -> Result<(), ModuleResolutionError> {
         for item in items {
             if is_cfg_if(item) {
-                self.visit_cfg_if(Cow::Borrowed(item))?;
+                self.visit_cfg_if(item)?;
             }
 
             if let ast::ItemKind::Mod(_, ref sub_mod_kind) = item.kind {
@@ -212,7 +212,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         span,
                         Some(Cow::Borrowed(sub_mod_kind)),
                         Cow::Owned(ThinVec::new()),
-                        Cow::Owned(ast::AttrVec::new()),
+                        &[],
                     ),
                 )?;
             }
@@ -320,7 +320,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                 self.visit_mod_from_ast(items)
             }
             (Some(Cow::Owned(ast::ModKind::Loaded(items, _, _))), _) | (_, Cow::Owned(items)) => {
-                self.visit_mod_outside_ast(items)
+                self.visit_mod_outside_ast(&items)
             }
             (_, _) => Ok(()),
         }
@@ -350,7 +350,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         span,
                         Some(Cow::Owned(ast::ModKind::Unloaded)),
                         Cow::Owned(items),
-                        Cow::Owned(attrs),
+                        &attrs,
                     ),
                 ))),
                 Err(ParserError::ParseError) => Err(ModuleResolutionError {
@@ -400,7 +400,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                                 span,
                                 Some(Cow::Owned(ast::ModKind::Unloaded)),
                                 Cow::Owned(items),
-                                Cow::Owned(attrs),
+                                &attrs,
                             ),
                         )))
                     }
@@ -412,7 +412,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                                 span,
                                 Some(Cow::Owned(ast::ModKind::Unloaded)),
                                 Cow::Owned(items),
-                                Cow::Owned(attrs),
+                                &attrs,
                             ),
                         ));
                         if should_insert {
@@ -550,7 +550,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     span,
                     Some(Cow::Owned(ast::ModKind::Unloaded)),
                     Cow::Owned(items),
-                    Cow::Owned(attrs),
+                    &attrs,
                 ),
             ))
         }
