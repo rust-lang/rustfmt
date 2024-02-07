@@ -151,19 +151,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
     fn visit_cfg_if(&mut self, item: &ast::Item) -> Result<(), ModuleResolutionError> {
         let mut visitor = visitor::CfgIfVisitor::new(self.parse_sess);
         visitor.visit_item(item);
-        for module_item in visitor.mods() {
-            if let ast::ItemKind::Mod(_, ref sub_mod_kind) = module_item.item.kind {
-                self.visit_sub_mod(
-                    &module_item.item,
-                    Module::new(
-                        module_item.item.span,
-                        Some(Cow::Owned(sub_mod_kind.clone())),
-                        Cow::Owned(ThinVec::new()),
-                        &[],
-                    ),
-                )?;
-            }
-        }
+        self.visit_mod_outside_ast(&visitor.items)?;
         Ok(())
     }
 
