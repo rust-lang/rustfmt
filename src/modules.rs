@@ -225,13 +225,11 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         item: &'c ast::Item,
         sub_mod: Module<'ast>,
     ) -> Result<(), ModuleResolutionError> {
-        let old_directory = self.directory.clone();
         let sub_mod_kind = self.peek_sub_mod(item, &sub_mod)?;
         if let Some(sub_mod_kind) = sub_mod_kind {
             self.insert_sub_mod(sub_mod_kind.clone())?;
             self.visit_sub_mod_inner(sub_mod, sub_mod_kind)?;
         }
-        self.directory = old_directory;
         Ok(())
     }
 
@@ -288,11 +286,15 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     path: mod_path.parent().unwrap().to_path_buf(),
                     ownership: directory_ownership,
                 };
-                self.visit_sub_mod_after_directory_update(sub_mod, Some(directory))
+                self.with_directory(directory, |this| {
+                    this.visit_sub_mod_after_directory_update(sub_mod)
+                })?;
             }
             SubModKind::Internal(item) => {
-                self.push_inline_mod_directory(item.ident, &item.attrs);
-                self.visit_sub_mod_after_directory_update(sub_mod, None)
+                let directory = self.inline_mod_directory(item.ident, &item.attrs);
+                self.with_directory(directory, |this| {
+                    this.visit_sub_mod_after_directory_update(sub_mod)
+                })?;
             }
             SubModKind::MultiExternal(mods) => {
                 for (mod_path, directory_ownership, sub_mod) in mods {
@@ -300,21 +302,19 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         path: mod_path.parent().unwrap().to_path_buf(),
                         ownership: directory_ownership,
                     };
-                    self.visit_sub_mod_after_directory_update(sub_mod, Some(directory))?;
+                    self.with_directory(directory, |this| {
+                        this.visit_sub_mod_after_directory_update(sub_mod)
+                    })?;
                 }
-                Ok(())
             }
         }
+        Ok(())
     }
 
     fn visit_sub_mod_after_directory_update(
         &mut self,
         sub_mod: Module<'ast>,
-        directory: Option<Directory>,
     ) -> Result<(), ModuleResolutionError> {
-        if let Some(directory) = directory {
-            self.directory = directory;
-        }
         match (sub_mod.ast_mod_kind, sub_mod.items) {
             (Some(Cow::Borrowed(ast::ModKind::Loaded(items, _, _))), _) => {
                 self.visit_mod_from_ast(items)
@@ -470,10 +470,12 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         }
     }
 
-    fn push_inline_mod_directory(&mut self, id: symbol::Ident, attrs: &[ast::Attribute]) {
+    fn inline_mod_directory(&mut self, id: symbol::Ident, attrs: &[ast::Attribute]) -> Directory {
         if let Some(path) = find_path_value(attrs) {
-            self.directory.path.push(path.as_str());
-            self.directory.ownership = DirectoryOwnership::Owned { relative: None };
+            Directory {
+                path: self.directory.path.join(path.as_str()),
+                ownership: DirectoryOwnership::Owned { relative: None },
+            }
         } else {
             let id = id.as_str();
             // We have to push on the current module name in the case of relative
@@ -482,19 +484,28 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             //
             // For example, a `mod z { ... }` inside `x/y.rs` should set the current
             // directory path to `/x/y/z`, not `/x/z` with a relative offset of `y`.
-            if let DirectoryOwnership::Owned { relative } = &mut self.directory.ownership {
-                if let Some(ident) = relative.take() {
-                    // remove the relative offset
-                    self.directory.path.push(ident.as_str());
+            let new_path = if let DirectoryOwnership::Owned {
+                relative: Some(ident),
+            } = self.directory.ownership
+            {
+                // remove the relative offset
+                let relative = self.directory.path.join(ident.as_str());
+                let nested = relative.join(id);
 
-                    // In the case where there is an x.rs and an ./x directory we want
-                    // to prevent adding x twice. For example, ./x/x
-                    if self.directory.path.exists() && !self.directory.path.join(id).exists() {
-                        return;
-                    }
+                // In the case where there is an x.rs and an ./x directory we want
+                // to prevent adding x twice. For example, ./x/x
+                if relative.exists() && !nested.exists() {
+                    relative
+                } else {
+                    nested
                 }
+            } else {
+                self.directory.path.join(id)
+            };
+            Directory {
+                path: new_path,
+                ownership: self.directory.ownership,
             }
-            self.directory.path.push(id);
         }
     }
 
@@ -512,8 +523,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         }
         let mut result = vec![];
         for path in path_visitor.paths() {
-            let mut actual_path = self.directory.path.clone();
-            actual_path.push(&path);
+            let actual_path = self.directory.path.join(path);
             if !actual_path.exists() {
                 continue;
             }
@@ -545,6 +555,13 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
             ))
         }
         result
+    }
+
+    fn with_directory<T>(&mut self, directory: Directory, f: impl FnOnce(&mut Self) -> T) -> T {
+        let old = std::mem::replace(&mut self.directory, directory);
+        let out = f(self);
+        self.directory = old;
+        out
     }
 }
 
