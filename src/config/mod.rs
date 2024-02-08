@@ -1065,4 +1065,34 @@ make_backup = false
             ])
         );
     }
+
+    #[test]
+    fn test_required_version_default() {
+        let config = Config::default();
+        assert!(config.version_meets_requirement());
+    }
+
+    #[test]
+    fn test_current_required_version() {
+        let toml = format!("required_version=\"{}\"", env!("CARGO_PKG_VERSION"));
+        let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+        assert!(config.version_meets_requirement());
+    }
+
+    #[test]
+    fn test_required_version_above() {
+        let toml = "required_version=\"1000.0.0\"";
+        let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+        assert!(!config.version_meets_requirement());
+    }
+
+    #[test]
+    fn test_required_version_below() {
+        let toml = "required_version=\"0.0.0\"";
+        let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+        assert!(!config.version_meets_requirement());
+    }
 }
