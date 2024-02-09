@@ -230,11 +230,13 @@ fn check_semver_version(required: &str, actual: &str) -> bool {
     };
 
     required.split(',').enumerate().for_each(|(i, required)| {
-        if let Some(comparator) = required_version.comparators.get_mut(i) {
-            if !required.contains("^") && comparator.op == semver::Op::Caret {
-                comparator.op = semver::Op::Exact;
-            };
+        let Some(comparator) = required_version.comparators.get_mut(i) else {
+            return;
         };
+
+        if !required.contains('^') && comparator.op == semver::Op::Caret {
+            comparator.op = semver::Op::Exact;
+        }
     });
 
     required_version.matches(&actual_version)
@@ -1393,11 +1395,17 @@ make_backup = false
         #[test]
         fn test_wildcard_match_minor() {
             assert!(check_semver_version("1.*", "1.1.0"));
+            assert!(check_semver_version("1.*, <2.0.0", "1.1.0"));
         }
 
         #[test]
         fn test_wildcard_match_major() {
             assert!(check_semver_version("2.*", "2.0.0"));
+        }
+
+        #[test]
+        fn test_wildcard_match_patch() {
+            assert!(check_semver_version("1.0.*", "1.0.1"));
         }
 
         #[test]
@@ -1429,6 +1437,13 @@ make_backup = false
                 "^1.0.0-alpha.beta",
                 "1.0.0-alpha.alpha",
             ));
+        }
+
+        // These are not allowed. '*' can't be used with other version specifiers.
+        #[test]
+        fn test_wildcard_any_with_range() {
+            assert!(!check_semver_version("*, <2.0.0", "1.0.0"));
+            assert!(!check_semver_version("*, 1.0.0", "1.5.0"));
         }
     }
 }
