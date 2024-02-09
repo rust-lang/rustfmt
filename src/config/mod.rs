@@ -1079,6 +1079,7 @@ make_backup = false
     mod required_version {
         use super::*;
 
+        #[allow(dead_code)] // Only used in tests
         fn get_current_version() -> semver::Version {
             semver::Version::parse(env!("CARGO_PKG_VERSION")).unwrap()
         }
