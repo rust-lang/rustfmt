@@ -212,7 +212,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         span,
                         Some(Cow::Borrowed(sub_mod_kind)),
                         Cow::Owned(ThinVec::new()),
-                        Cow::Borrowed(&item.attrs),
+                        Cow::Owned(ast::AttrVec::new()),
                     ),
                 )?;
             }
