@@ -15,6 +15,7 @@ pub use crate::config::lists::*;
 pub use crate::config::macro_names::{MacroSelector, MacroSelectors};
 #[allow(unreachable_pub)]
 pub use crate::config::options::*;
+pub(crate) use crate::config::wrap_comments::WrapComments;
 
 #[macro_use]
 pub(crate) mod config_type;
@@ -27,6 +28,7 @@ pub(crate) mod file_lines;
 pub(crate) mod lists;
 pub(crate) mod macro_names;
 pub(crate) mod style_edition;
+mod wrap_comments;
 
 // This macro defines configuration options used in rustfmt. Each option
 // is defined as follows:
