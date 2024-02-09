@@ -213,7 +213,7 @@ impl PartialConfig {
     }
 }
 
-fn check_semver_version(version: &str, required: &str) -> bool {
+fn check_semver_version(required: &str, actual: &str) -> bool {
     let required = match semver::VersionReq::parse(required) {
         Ok(r) => r,
         Err(e) => {
@@ -221,7 +221,7 @@ fn check_semver_version(version: &str, required: &str) -> bool {
             return false;
         }
     };
-    let version = match semver::Version::parse(version) {
+    let version = match semver::Version::parse(actual) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("Error: failed to parse current version: {}", e);
@@ -236,7 +236,7 @@ impl Config {
         if self.was_set().required_version() {
             let version = env!("CARGO_PKG_VERSION");
             let required_version = self.required_version();
-            if !check_semver_version(version, &required_version) {
+            if !check_semver_version(&required_version, version) {
                 eprintln!(
                     "Error: rustfmt version ({}) doesn't match the required version ({})",
                     version, required_version
@@ -1294,6 +1294,127 @@ make_backup = false
             let config = Config::from_toml(toml, Path::new("")).unwrap();
 
             assert!(!config.version_meets_requirement());
+        }
+    }
+
+    #[cfg(test)]
+    mod check_semver_version {
+        use super::*;
+
+        #[test]
+        fn test_exact_version_match() {
+            assert!(check_semver_version("1.0.0", "1.0.0"));
+        }
+
+        #[test]
+        fn test_version_mismatch() {
+            assert!(!check_semver_version("2.0.0", "1.0.0"));
+        }
+
+        #[test]
+        fn test_patch_version_greater() {
+            assert!(check_semver_version("1.0.0", "1.0.1"));
+        }
+
+        #[test]
+        fn test_minor_version_greater() {
+            assert!(check_semver_version("1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_major_version_less() {
+            assert!(!check_semver_version("1.0.0", "0.9.0"));
+        }
+
+        #[test]
+        fn test_prerelease_less_than_release() {
+            assert!(!check_semver_version("1.0.0", "1.0.0-alpha"));
+        }
+
+        #[test]
+        fn test_prerelease_version_specific_match() {
+            assert!(check_semver_version("1.0.0-alpha", "1.0.0-alpha"));
+        }
+
+        #[test]
+        fn test_build_metadata_ignored() {
+            assert!(check_semver_version("1.0.0", "1.0.0+build.1"));
+        }
+
+        #[test]
+        fn test_greater_than_requirement() {
+            assert!(check_semver_version(">1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_less_than_requirement_fails_when_greater() {
+            assert!(!check_semver_version("<1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_caret_requirement_matches_minor_update() {
+            assert!(check_semver_version("^1.1.0", "1.2.0"));
+        }
+
+        #[test]
+        fn test_tilde_requirement_matches_patch_update() {
+            assert!(check_semver_version("~1.0.0", "1.0.1"));
+        }
+
+        #[test]
+        fn test_range_requirement_inclusive() {
+            assert!(check_semver_version(">=1.0.0, <2.0.0", "1.5.0"));
+        }
+
+        #[test]
+        fn test_pre_release_specific_match() {
+            assert!(check_semver_version("1.0.0-alpha.1", "1.0.0-alpha.1"));
+        }
+
+        #[test]
+        fn test_pre_release_non_match_when_requiring_release() {
+            assert!(!check_semver_version("1.0.0", "1.0.0-alpha.1"));
+        }
+
+        #[test]
+        fn test_wildcard_match_minor() {
+            assert!(check_semver_version("1.*", "1.1.0"));
+        }
+
+        #[test]
+        fn test_wildcard_match_major() {
+            assert!(check_semver_version("2.*", "2.0.0"));
+        }
+
+        #[test]
+        fn test_invalid_inputs() {
+            assert!(!check_semver_version("not.a.requirement", "1.0.0"));
+            assert!(!check_semver_version("1.0.0", "not.a.version"));
+        }
+
+        #[test]
+        fn test_version_with_pre_release_and_build() {
+            assert!(check_semver_version("1.0.0-alpha", "1.0.0-alpha+001"));
+        }
+
+        // Demonstrates precedence of numeric identifiers over alphanumeric in pre-releases
+        #[test]
+        fn test_pre_release_numeric_vs_alphanumeric() {
+            assert!(!check_semver_version("1.0.0-alpha.beta", "1.0.0-alpha.1"));
+            assert!(check_semver_version("1.0.0-alpha.1", "1.0.0-alpha.beta"));
+        }
+
+        // Demonstrates lexicographic ordering of alphanumeric identifiers in pre-releases
+        #[test]
+        fn test_pre_release_lexicographic_ordering() {
+            assert!(check_semver_version(
+                "1.0.0-alpha.alpha",
+                "1.0.0-alpha.beta",
+            ));
+            assert!(!check_semver_version(
+                "1.0.0-alpha.beta",
+                "1.0.0-alpha.alpha",
+            ));
         }
     }
 }
