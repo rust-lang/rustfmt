@@ -216,23 +216,25 @@ impl PartialConfig {
 impl Config {
     pub(crate) fn version_meets_requirement(&self) -> bool {
         if self.was_set().required_version() {
-            let version = semver::Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
-            let required_version = semver::VersionReq::parse(self.required_version().as_str());
+            let Ok(version) = semver::Version::parse(env!("CARGO_PKG_VERSION")) else {
+                return false;
+            };
 
-            match required_version {
-                Ok(required_version) => {
-                    if !required_version.matches(&version) {
-                        eprintln!(
-                            "Error: rustfmt version ({}) doesn't match the required version ({})",
-                            version, required_version
-                        );
-                        return false;
-                    }
-                }
+            let required_version = match semver::VersionReq::parse(self.required_version().as_str())
+            {
+                Ok(required_version) => required_version,
                 Err(e) => {
                     eprintln!("Error: failed to parse required version: {}", e);
                     return false;
                 }
+            };
+
+            if !required_version.matches(&version) {
+                eprintln!(
+                    "Error: rustfmt version ({}) doesn't match the required version ({})",
+                    version, required_version
+                );
+                return false;
             }
         }
 
