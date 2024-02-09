@@ -217,15 +217,22 @@ impl Config {
     pub(crate) fn version_meets_requirement(&self) -> bool {
         if self.was_set().required_version() {
             let version = semver::Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
-            let required_version = semver::VersionReq::parse(self.required_version().as_str())
-                .expect("Failed to parse required_version");
+            let required_version = semver::VersionReq::parse(self.required_version().as_str());
 
-            if !required_version.matches(&version) {
-                eprintln!(
-                    "Error: rustfmt version ({}) doesn't match the required version ({})",
-                    version, required_version
-                );
-                return false;
+            match required_version {
+                Ok(required_version) => {
+                    if !required_version.matches(&version) {
+                        eprintln!(
+                            "Error: rustfmt version ({}) doesn't match the required version ({})",
+                            version, required_version
+                        );
+                        return false;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to parse required version: {}", e);
+                    return false;
+                }
             }
         }
 
