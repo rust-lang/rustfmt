@@ -2376,19 +2376,19 @@ required_version=">=1.0.0"
 required_version="<=1.0.0"
 ```
 
-#### New minor or patch versions
+#### New minor or patch versions:
 
 ```toml
 required_version="^1.0.0"
 ```
 
-#### New patch versions
+#### New patch versions:
 
 ```toml
 required_version="~1.0.0"
 ```
 
-#### Multiple values:
+#### Multiple versions to match:
 
 Any of the semver operators can be combined, being split with commas. The comparison is done using `&&` operator.
     
