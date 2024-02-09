@@ -217,24 +217,13 @@ impl Config {
     pub(crate) fn version_meets_requirement(&self) -> bool {
         if self.was_set().required_version() {
             let version = semver::Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
-            let comparators = vec!["=", ">", "<", ">=", "<=", "~", "^"];
-            let required_version = self.required_version();
-            let has_comparator = comparators.iter().any(|c| required_version.contains(c));
-            let mut req_version = semver::VersionReq::parse(required_version.as_str())
+            let required_version = semver::VersionReq::parse(self.required_version().as_str())
                 .expect("Failed to parse required_version");
 
-            if !has_comparator {
-                // If no comparator is specified, we default to an exact match.
-                // By default, `semver::VersionReq` uses `^` when no comparator is specified.
-                let exact_version = format!("={}", required_version);
-                req_version = semver::VersionReq::parse(exact_version.as_str())
-                    .expect("Failed to parse required_version");
-            }
-
-            if !req_version.matches(&version) {
+            if !required_version.matches(&version) {
                 eprintln!(
                     "Error: rustfmt version ({}) doesn't match the required version ({})",
-                    version, req_version
+                    version, required_version
                 );
                 return false;
             }
@@ -1103,10 +1092,10 @@ make_backup = false
 
     #[test]
     fn test_required_version_below() {
-        let versions = vec!["0.0.0", "0.0.1", "0.1.0", "1.0.0", "1.0.1", "1.1.0"];
+        let versions = vec!["0.0.0", "0.0.1", "0.1.0"];
 
         for version in versions {
-            let toml = format!("required_version=\"{}\"", version);
+            let toml = format!("required_version=\"{}\"", version.to_string());
             let config = Config::from_toml(&toml, Path::new("")).unwrap();
 
             assert!(!config.version_meets_requirement());
