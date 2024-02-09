@@ -2398,9 +2398,9 @@ required_version="1.0.*" # matches any version with the same major and minor ver
 
 #### Multiple versions to match:
 
-Any of the semver operators can be combined, being split with commas. The comparison is done using `&&` operator.
+Except by `*`, can be used by any of the semver operators can be combined, being split with commas. The comparison is done using `&&` operator.
 
-Can be used with any operator except by `*`, as any comparator will override the `*` operator. If you use `*` with other comparators, the comparison will fail.
+`*` has range restrictions as any comparator will override the wildcard operator. When `*` is used within a range, the comparison always fails.
     
 ```toml
 required_version=">=1.0.0, <2.0.0"
