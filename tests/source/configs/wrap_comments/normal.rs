@@ -1,4 +1,4 @@
-// rustfmt-wrap_comments: normal
+// rustfmt-wrap_comments: Normal
 // rustfmt-max_width: 50
 // rustfmt-error_on_line_overflow: false
 // Wrap comments

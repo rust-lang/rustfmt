@@ -1,4 +1,4 @@
-// rustfmt-wrap_comments: doc
+// rustfmt-wrap_comments: Doc
 // rustfmt-max_width: 50
 /// Wrap comments
 
