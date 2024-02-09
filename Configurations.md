@@ -2353,7 +2353,7 @@ Require a specific version of rustfmt. If you want to make sure that the
 specific version of rustfmt is used in your CI, use this option.
 
 - **Default value**: `CARGO_PKG_VERSION`
-- **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/).
+- **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/) and following the following [`semver::Version`](https://docs.rs/semver/latest/semver/struct.Version.html#total-ordering) specification.
   - Multiple values can be used, they should be separated by a comma, e.g.: `1.0.0, 1.1.0`. The comparison is done using the `&&` operator, so all versions from a given range must be satisfied.
   - By default, values without comparison operators are treated as `^` (caret) version requirements.
   - If you want to specify an exact version, use the operator `=`, e.g.: `=1.0.0`.
