@@ -2354,7 +2354,7 @@ specific version of rustfmt is used in your CI, use this option.
 
 - **Default value**: `CARGO_PKG_VERSION`
 - **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/).
-  - Multiple values can be used, they should be separeted by a comma, e.g.: `1.0.0, 1.1.0`.
+  - Multiple values can be used, they should be separated by a comma, e.g.: `1.0.0, 1.1.0`. The comparison is done using the `&&` operator, so all versions from a given range must be satisfied.
   - By default, values without comparison operators are treated as `^` (caret) version requirements.
   - If you want to specify an exact version, use the operator `=`, e.g.: `=1.0.0`.
   - If you want to specify a range, use the operator `, `, e.g.: `1.0.0, <2.0.0`. This is the same as `^1.0.0, <2.0.0` or `^1.0.0`.
