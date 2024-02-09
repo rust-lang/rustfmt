@@ -213,23 +213,30 @@ impl PartialConfig {
     }
 }
 
+fn check_semver_version(version: &str, required: &str) -> bool {
+    let required = match semver::VersionReq::parse(required) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error: failed to parse required version: {}", e);
+            return false;
+        }
+    };
+    let version = match semver::Version::parse(version) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Error: failed to parse current version: {}", e);
+            return false;
+        }
+    };
+    required.matches(&version)
+}
+
 impl Config {
     pub(crate) fn version_meets_requirement(&self) -> bool {
         if self.was_set().required_version() {
-            let Ok(version) = semver::Version::parse(env!("CARGO_PKG_VERSION")) else {
-                return false;
-            };
-
-            let required_version = match semver::VersionReq::parse(self.required_version().as_str())
-            {
-                Ok(required_version) => required_version,
-                Err(e) => {
-                    eprintln!("Error: failed to parse required version: {}", e);
-                    return false;
-                }
-            };
-
-            if !required_version.matches(&version) {
+            let version = env!("CARGO_PKG_VERSION");
+            let required_version = self.required_version();
+            if !check_semver_version(version, &required_version) {
                 eprintln!(
                     "Error: rustfmt version ({}) doesn't match the required version ({})",
                     version, required_version
