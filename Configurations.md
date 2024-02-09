@@ -2353,7 +2353,11 @@ Require a specific version of rustfmt. If you want to make sure that the
 specific version of rustfmt is used in your CI, use this option.
 
 - **Default value**: `CARGO_PKG_VERSION`
-- **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/). Multiple values can be used, they should be separeted by a comma, e.g.: `1.0.0, 1.1.0`. By default, values without comparison operators are treated as `^` (caret) version requirements. If you want to specify an exact version, use the operator `=`, e.g.: `=1.0.0`.
+- **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/).
+  - Multiple values can be used, they should be separeted by a comma, e.g.: `1.0.0, 1.1.0`.
+  - By default, values without comparison operators are treated as `^` (caret) version requirements.
+  - If you want to specify an exact version, use the operator `=`, e.g.: `=1.0.0`.
+  - If you want to specify a range, use the operator `, `, e.g.: `1.0.0, <2.0.0`. This is the same as `^1.0.0, <2.0.0` or `^1.0.0`.
 - **Stable**: No (tracking issue: [#3386](https://github.com/rust-lang/rustfmt/issues/3386))
 
 ## `short_array_element_width_threshold`
