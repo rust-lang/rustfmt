@@ -2358,20 +2358,42 @@ specific version of rustfmt is used in your CI, use this option.
 
 #### `CARGO_PKG_VERSION` (default):
 
+Match on exact version
+
 ```toml
 required_version="1.0.0"
 ```
 
-#### Multiple values:
+#### Higher or equal to:
 
 ```toml
-required_version="1.0.0, 1.1.0"
+required_version=">=1.0.0"
 ```
 
-#### Multiple values with comparison operators:
+#### Lower or equal to:
 
 ```toml
-required_version="^1.0.0, <2.0.0"
+required_version="<=1.0.0"
+```
+
+#### New minor or patch versions
+
+```toml
+required_version="^1.0.0"
+```
+
+#### New patch versions
+
+```toml
+required_version="~1.0.0"
+```
+
+#### Multiple values:
+
+Any of the semver operators can be combined, being split with commas. The comparison is done using `&&` operator.
+    
+```toml
+required_version=">=1.0.0, <2.0.0"
 ```
 
 ## `short_array_element_width_threshold`
