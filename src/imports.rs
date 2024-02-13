@@ -185,7 +185,7 @@ impl UseSegment {
         if name.is_empty() || name == "{{root}}" {
             return None;
         }
-        let kind = match name {
+        let kind = match &*name {
             "self" => UseSegmentKind::Slf(None),
             "super" => UseSegmentKind::Super(None),
             "crate" => UseSegmentKind::Crate(None),
@@ -498,7 +498,7 @@ impl UseTree {
                 let name = if a.prefix.segments.len() == 2 && leading_modsep {
                     context.snippet(a.prefix.span).to_owned()
                 } else {
-                    rewrite_ident(context, path_to_imported_ident(&a.prefix)).to_owned()
+                    rewrite_ident(context, path_to_imported_ident(&a.prefix)).into_owned()
                 };
                 let alias = rename.and_then(|ident| {
                     if ident.name == sym::underscore_imports {
@@ -507,7 +507,7 @@ impl UseTree {
                     } else if ident == path_to_imported_ident(&a.prefix) {
                         None
                     } else {
-                        Some(rewrite_ident(context, ident).to_owned())
+                        Some(rewrite_ident(context, ident).into_owned())
                     }
                 });
                 let kind = match name.as_ref() {

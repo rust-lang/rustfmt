@@ -32,7 +32,7 @@ use crate::types::{rewrite_path, PathContext};
 use crate::utils::{
     colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with,
     inner_attributes, last_line_extendable, last_line_width, mk_sp, outer_attributes,
-    semicolon_for_expr, unicode_str_width, wrap_str,
+    rewrite_ident, semicolon_for_expr, unicode_str_width, wrap_str,
 };
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
@@ -1754,9 +1754,9 @@ pub(crate) fn rewrite_field(
     if !attrs_str.is_empty() {
         attrs_str.push_str(&shape.indent.to_string_with_newline(context.config));
     };
-    let name = context.snippet(field.ident.span);
+    let name = rewrite_ident(context, field.ident);
     if field.is_shorthand {
-        Some(attrs_str + name)
+        Some(attrs_str + &name)
     } else {
         let mut separator = String::from(struct_lit_field_separator(context.config));
         for _ in 0..prefix_max_width.saturating_sub(name.len()) {
@@ -1770,7 +1770,7 @@ pub(crate) fn rewrite_field(
             Some(ref e)
                 if !is_lit && e.as_str() == name && context.config.use_field_init_shorthand() =>
             {
-                Some(attrs_str + name)
+                Some(attrs_str + &name)
             }
             Some(e) => Some(format!("{attrs_str}{name}{separator}{e}")),
             None => {

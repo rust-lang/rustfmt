@@ -679,7 +679,7 @@ impl<'a> FmtVisitor<'a> {
                 self.block_indent,
                 Some(one_line_width),
             )?,
-            ast::VariantData::Unit(..) => rewrite_ident(&context, field.ident).to_owned(),
+            ast::VariantData::Unit(..) => rewrite_ident(&context, field.ident).into_owned(),
         };
 
         let variant_body = if let Some(ref expr) = field.disr_expr {
@@ -1160,8 +1160,12 @@ pub(crate) fn format_trait(
     let body_lo = context.snippet_provider.span_after(item.span, "{");
 
     let shape = Shape::indented(offset, context.config).offset_left(result.len())?;
-    let generics_str =
-        rewrite_generics(context, rewrite_ident(context, item.ident), generics, shape)?;
+    let generics_str = rewrite_generics(
+        context,
+        &rewrite_ident(context, item.ident),
+        generics,
+        shape,
+    )?;
     result.push_str(&generics_str);
 
     // FIXME(#2055): rustfmt fails to format when there are comments between trait bounds.
@@ -1356,7 +1360,7 @@ pub(crate) fn format_trait_alias(
     let alias = rewrite_ident(context, ident);
     // 6 = "trait ", 2 = " ="
     let g_shape = shape.offset_left(6)?.sub_width(2)?;
-    let generics_str = rewrite_generics(context, alias, generics, g_shape)?;
+    let generics_str = rewrite_generics(context, &alias, generics, g_shape)?;
     let vis_str = format_visibility(context, vis);
     let lhs = format!("{vis_str}trait {generics_str} =");
     // 1 = ";"
@@ -1749,13 +1753,13 @@ fn rewrite_ty<R: Rewrite>(
     let ident_str = rewrite_ident(context, ident);
 
     if generics.params.is_empty() {
-        result.push_str(ident_str)
+        result.push_str(&ident_str)
     } else {
         // 2 = `= `
         let g_shape = Shape::indented(indent, context.config)
             .offset_left(result.len())?
             .sub_width(2)?;
-        let generics_str = rewrite_generics(context, ident_str, generics, g_shape)?;
+        let generics_str = rewrite_generics(context, &ident_str, generics, g_shape)?;
         result.push_str(&generics_str);
     }
 
@@ -2362,7 +2366,7 @@ fn rewrite_fn_base(
     let fd = fn_sig.decl;
     let generics_str = rewrite_generics(
         context,
-        rewrite_ident(context, ident),
+        &rewrite_ident(context, ident),
         &fn_sig.generics,
         shape,
     )?;
@@ -3188,7 +3192,7 @@ fn format_header(
         }
     }
 
-    result.push_str(rewrite_ident(context, ident));
+    result.push_str(&rewrite_ident(context, ident));
 
     result
 }
@@ -3438,7 +3442,7 @@ pub(crate) fn rewrite_mod(
     let mut result = String::with_capacity(32);
     result.push_str(&*format_visibility(context, &item.vis));
     result.push_str("mod ");
-    result.push_str(rewrite_ident(context, item.ident));
+    result.push_str(&rewrite_ident(context, item.ident));
     result.push(';');
     rewrite_attrs(context, item, &result, attrs_shape)
 }
