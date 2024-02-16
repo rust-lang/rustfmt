@@ -341,18 +341,12 @@ macro_rules! create_config {
                 let get_width_value = |
                     was_set: bool,
                     override_value: usize,
-                    heuristic_value: usize,
-                    config_key: &str,
+                    heuristic_value: usize
                 | -> usize {
                     if !was_set {
                         return heuristic_value;
                     }
                     if override_value > max_width {
-                        eprintln!(
-                            "`{0}` cannot have a value that exceeds `max_width`. \
-                            `{0}` will be set to the same value as `max_width`",
-                            config_key,
-                        );
                         return max_width;
                     }
                     override_value
@@ -361,64 +355,56 @@ macro_rules! create_config {
                 let fn_call_width = get_width_value(
                     self.was_set().fn_call_width(),
                     self.fn_call_width.2,
-                    heuristics.fn_call_width,
-                    "fn_call_width",
+                    heuristics.fn_call_width
                 );
                 self.fn_call_width.2 = fn_call_width;
 
                 let attr_fn_like_width = get_width_value(
                     self.was_set().attr_fn_like_width(),
                     self.attr_fn_like_width.2,
-                    heuristics.attr_fn_like_width,
-                    "attr_fn_like_width",
+                    heuristics.attr_fn_like_width
                 );
                 self.attr_fn_like_width.2 = attr_fn_like_width;
 
                 let struct_lit_width = get_width_value(
                     self.was_set().struct_lit_width(),
                     self.struct_lit_width.2,
-                    heuristics.struct_lit_width,
-                    "struct_lit_width",
+                    heuristics.struct_lit_width
                 );
                 self.struct_lit_width.2 = struct_lit_width;
 
                 let struct_variant_width = get_width_value(
                     self.was_set().struct_variant_width(),
                     self.struct_variant_width.2,
-                    heuristics.struct_variant_width,
-                    "struct_variant_width",
+                    heuristics.struct_variant_width
                 );
                 self.struct_variant_width.2 = struct_variant_width;
 
                 let array_width = get_width_value(
                     self.was_set().array_width(),
                     self.array_width.2,
-                    heuristics.array_width,
-                    "array_width",
+                    heuristics.array_width
                 );
                 self.array_width.2 = array_width;
 
                 let chain_width = get_width_value(
                     self.was_set().chain_width(),
                     self.chain_width.2,
-                    heuristics.chain_width,
-                    "chain_width",
+                    heuristics.chain_width
                 );
                 self.chain_width.2 = chain_width;
 
                 let single_line_if_else_max_width = get_width_value(
                     self.was_set().single_line_if_else_max_width(),
                     self.single_line_if_else_max_width.2,
-                    heuristics.single_line_if_else_max_width,
-                    "single_line_if_else_max_width",
+                    heuristics.single_line_if_else_max_width
                 );
                 self.single_line_if_else_max_width.2 = single_line_if_else_max_width;
 
                 let single_line_let_else_max_width = get_width_value(
                     self.was_set().single_line_let_else_max_width(),
                     self.single_line_let_else_max_width.2,
-                    heuristics.single_line_let_else_max_width,
-                    "single_line_let_else_max_width",
+                    heuristics.single_line_let_else_max_width
                 );
                 self.single_line_let_else_max_width.2 = single_line_let_else_max_width;
             }
