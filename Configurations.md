@@ -2356,7 +2356,7 @@ specific version of rustfmt is used in your CI, use this option.
 - **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/).
 - **Stable**: No (tracking issue: [#3386](https://github.com/rust-lang/rustfmt/issues/3386))
 
-#### Match on exact version
+#### Match on exact version:
 
 ```toml
 required_version="1.0.0"
