@@ -23,7 +23,7 @@ use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
-use crate::utils::{is_same_visibility, mk_sp, rewrite_ident};
+use crate::utils::{extend_inline_attr, is_same_visibility, mk_sp, rewrite_ident};
 use crate::visitor::FmtVisitor;
 
 /// Returns a name imported by a `use` declaration.
@@ -351,13 +351,8 @@ impl UseTree {
                 let hi = self.span.lo();
                 let span = mk_sp(lo, hi);
 
-                let allow_extend = if attrs.len() == 1 {
-                    let line_len = attr_str.len() + 1 + use_str.len();
-                    !attrs.first().unwrap().is_doc_comment()
-                        && context.config.inline_attribute_width() >= line_len
-                } else {
-                    false
-                };
+                let allow_extend =
+                    extend_inline_attr(attrs, shape, &attr_str, use_str.len(), context);
 
                 combine_strs_with_missing_comments(
                     context,

@@ -7,6 +7,25 @@
 #[cfg(feature = "alloc")]
 use total_len_is::_51___;
 
+#[cfg(feature = "alloc")]
+// c
+use d;
+
+#[cfg(feature = "alloc")]
+// comment
+use total_len_is::_50__;
+
+#[cfg(feature = "alloc")]
+// comment
+use total_len_is::_51___;
+
+fn foo() {
+    #[cfg(feature = "alloc")] use total_len::_50_;
+
+    #[cfg(feature = "alloc")]
+    use total_len::_51__;
+}
+
 #[cfg(feature = "alloc")] extern crate len_is_50_;
 
 #[cfg(feature = "alloc")]
@@ -17,9 +36,30 @@ extern "C" {
     #[no_mangle] fn foo();
 }
 
+extern "C" {
+    #[no_mangle] fn total_len_is_49___________();
+}
+
+extern "C" {
+    #[no_mangle] fn total_len_is_50____________();
+}
+
+extern "C" {
+    #[no_mangle]
+    fn total_len_is_51_____________();
+}
+
 fn main() {
-    #[cfg(feature = "alloc")] foo();
-    #[cfg(feature = "alloc")] {
+    #[cfg(feature = "alloc")] ["total_len_is_50"];
+    #[cfg(feature = "alloc")]
+    ["total_len_is_51_"];
+    #[cfg(feature = "alloc")] total_len_is_50__();
+    #[cfg(feature = "alloc")]
+    total_len_is_51___();
+    #[cfg(feature = "alloc")]
+    total_len_is_52____();
+    #[cfg(feature = "alloc")]
+    {
         foo();
     }
     {
@@ -30,6 +70,21 @@ fn main() {
 // https://github.com/rust-lang/rustfmt/pull/5538#issuecomment-1272367684
 struct EventConfigWidget {
     #[widget] menu_delay: Spinner<u32>,
+}
+
+struct foo {
+    #[x]
+    #[y]
+    z: bool,
+}
+
+struct foo {
+    #[widget] len_is_50____________________: bool,
+}
+
+struct foo {
+    #[widget]
+    len_is_51_____________________: bool,
 }
 
 /// this is a comment to test is_sugared_doc property

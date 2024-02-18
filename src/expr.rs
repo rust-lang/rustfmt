@@ -29,11 +29,7 @@ use crate::spanned::Spanned;
 use crate::stmt;
 use crate::string::{rewrite_string, StringFormat};
 use crate::types::{rewrite_path, PathContext};
-use crate::utils::{
-    colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with,
-    inner_attributes, last_line_extendable, last_line_width, mk_sp, outer_attributes,
-    semicolon_for_expr, unicode_str_width, wrap_str,
-};
+use crate::utils::*;
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
 
@@ -417,13 +413,9 @@ pub(crate) fn format_expr(
                 expr.span.lo(),
             );
 
-            let allow_extend = if attrs.len() == 1 {
-                let line_len = attrs_str.len() + 1 + expr_str.len();
-                !attrs.first().unwrap().is_doc_comment()
-                    && context.config.inline_attribute_width() >= line_len
-            } else {
-                false
-            };
+            // +1 = ";"
+            let allow_extend =
+                extend_inline_attr(&expr.attrs, shape, &attrs_str, expr_str.len() + 1, context);
 
             combine_strs_with_missing_comments(
                 context,

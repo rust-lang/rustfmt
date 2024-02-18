@@ -691,6 +691,25 @@ pub(crate) fn unicode_str_width(s: &str) -> usize {
     s.width()
 }
 
+/// Determine if we could place a single attribute on the same line as the rewritten AST node.
+pub(crate) fn extend_inline_attr(
+    attrs: &[ast::Attribute],
+    shape: Shape,
+    attrs_str: &str,
+    rewrite_len: usize,
+    context: &RewriteContext<'_>,
+) -> bool {
+    if attrs.len() > 1 {
+        return false;
+    }
+
+    attrs.first().is_some_and(|attr| {
+        // +1 = " "
+        let line_len = shape.indent.width() + attrs_str.len() + 1 + rewrite_len;
+        !attr.is_doc_comment() && context.config.inline_attribute_width() >= line_len
+    })
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
