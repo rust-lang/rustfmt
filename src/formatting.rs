@@ -361,6 +361,7 @@ impl FormattingError {
             | ErrorKind::LostComment => {
                 let mut last_non_whitespace = 0;
                 let mut end = 0;
+                // annotate-snippet uses char-length, this code needs to as well
                 for (ind, ch) in self.line_buffer.chars().enumerate() {
                     if !ch.is_whitespace() {
                         last_non_whitespace = ind;
