@@ -364,11 +364,11 @@ impl FormattingError {
                 // annotate-snippet uses char-length, this code needs to as well
                 for (ind, ch) in self.line_buffer.chars().enumerate() {
                     if !ch.is_whitespace() {
-                        last_non_whitespace = ind;
+                        last_non_whitespace = ind + 1;
                     }
-                    end = ind;
+                    end = ind + 1;
                 }
-                (last_non_whitespace, end + 1 - last_non_whitespace)
+                (last_non_whitespace, end - last_non_whitespace)
             }
             _ => unreachable!(),
         }
