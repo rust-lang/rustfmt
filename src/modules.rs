@@ -1,12 +1,12 @@
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use rustc_arena::TypedArena;
 use rustc_ast::ast;
+use rustc_ast::ptr::P;
 use rustc_ast::visit::Visitor;
 use rustc_span::symbol::{self, sym, Symbol};
 use rustc_span::Span;
-use thin_vec::ThinVec;
 use thiserror::Error;
 
 use crate::attr::MetaVisitor;
@@ -25,8 +25,8 @@ type FileModMap<'ast> = BTreeMap<FileName, Module<'ast>>;
 /// Represents module with its inner attributes.
 #[derive(Debug, Clone)]
 pub(crate) struct Module<'a> {
-    ast_mod_kind: Option<Cow<'a, ast::ModKind>>,
-    pub(crate) items: Cow<'a, ThinVec<rustc_ast::ptr::P<ast::Item>>>,
+    ast_mod_kind: Option<&'a ast::ModKind>,
+    pub(crate) items: &'a [rustc_ast::ptr::P<ast::Item>],
     inner_attr: ast::AttrVec,
     pub(crate) span: Span,
 }
@@ -34,8 +34,8 @@ pub(crate) struct Module<'a> {
 impl<'a> Module<'a> {
     pub(crate) fn new(
         mod_span: Span,
-        ast_mod_kind: Option<Cow<'a, ast::ModKind>>,
-        mod_items: Cow<'a, ThinVec<rustc_ast::ptr::P<ast::Item>>>,
+        ast_mod_kind: Option<&'a ast::ModKind>,
+        mod_items: &'a [rustc_ast::ptr::P<ast::Item>],
         mod_attrs: &[ast::Attribute],
     ) -> Self {
         let inner_attr = mod_attrs
@@ -58,6 +58,8 @@ impl<'a> Module<'a> {
 
 /// Maps each module to the corresponding file.
 pub(crate) struct ModResolver<'ast, 'sess> {
+    item_arena: &'ast TypedArena<P<ast::Item>>,
+    mod_kind_arena: &'ast TypedArena<ast::ModKind>,
     parse_sess: &'sess ParseSess,
     directory: Directory,
     file_map: FileModMap<'ast>,
@@ -100,11 +102,15 @@ enum SubModKind<'ast> {
 impl<'ast, 'sess> ModResolver<'ast, 'sess> {
     /// Creates a new `ModResolver`.
     pub(crate) fn new(
+        item_arena: &'ast TypedArena<P<ast::Item>>,
+        mod_kind_arena: &'ast TypedArena<ast::ModKind>,
         parse_sess: &'sess ParseSess,
         directory_ownership: DirectoryOwnership,
         recursive: bool,
     ) -> Self {
         ModResolver {
+            item_arena,
+            mod_kind_arena,
             directory: Directory {
                 path: PathBuf::new(),
                 ownership: directory_ownership,
@@ -128,7 +134,7 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
 
         // Skip visiting sub modules when the input is from stdin.
         if self.recursive {
-            self.visit_mod_from_ast(&krate.items)?;
+            self.visit_items(&krate.items)?;
         }
 
         let snippet_provider = self.parse_sess.snippet_provider(krate.spans.inner_span);
@@ -138,7 +144,7 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
             Module::new(
                 mk_sp(snippet_provider.start_pos(), snippet_provider.end_pos()),
                 None,
-                Cow::Borrowed(&krate.items),
+                &krate.items,
                 &krate.attrs,
             ),
         );
@@ -149,58 +155,20 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
     fn visit_cfg_if(&mut self, item: &ast::Item) -> Result<(), ModuleResolutionError> {
         let mut visitor = visitor::CfgIfVisitor::new(self.parse_sess);
         visitor.visit_item(item);
-        self.visit_mod_outside_ast(&visitor.items)?;
+        let items = self.item_arena.alloc_from_iter(visitor.items);
+        self.visit_items(&*items)?;
         Ok(())
     }
 
-    /// Visit modules defined inside macro calls.
-    fn visit_mod_outside_ast(
-        &mut self,
-        items: &[rustc_ast::ptr::P<ast::Item>],
-    ) -> Result<(), ModuleResolutionError> {
-        for item in items {
-            if is_cfg_if(item) {
-                self.visit_cfg_if(item)?;
-                continue;
-            }
-
-            if let ast::ItemKind::Mod(_, ref sub_mod_kind) = item.kind {
-                let span = item.span;
-                self.visit_sub_mod(
-                    &item,
-                    Module::new(
-                        span,
-                        Some(Cow::Owned(sub_mod_kind.clone())),
-                        Cow::Owned(ThinVec::new()),
-                        &[],
-                    ),
-                )?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Visit modules from AST.
-    fn visit_mod_from_ast(
+    fn visit_items(
         &mut self,
         items: &'ast [rustc_ast::ptr::P<ast::Item>],
     ) -> Result<(), ModuleResolutionError> {
         for item in items {
             if is_cfg_if(item) {
                 self.visit_cfg_if(item)?;
-            }
-
-            if let ast::ItemKind::Mod(_, ref sub_mod_kind) = item.kind {
-                let span = item.span;
-                self.visit_sub_mod(
-                    item,
-                    Module::new(
-                        span,
-                        Some(Cow::Borrowed(sub_mod_kind)),
-                        Cow::Owned(ThinVec::new()),
-                        &[],
-                    ),
-                )?;
+            } else if let ast::ItemKind::Mod(_, sub_mod_kind) = &item.kind {
+                self.visit_sub_mod(&item, Module::new(item.span, Some(sub_mod_kind), &[], &[]))?;
             }
         }
         Ok(())
@@ -208,7 +176,7 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
 
     fn visit_sub_mod(
         &mut self,
-        item: &ast::Item,
+        item: &'ast ast::Item,
         sub_mod: Module<'ast>,
     ) -> Result<(), ModuleResolutionError> {
         if contains_skip(&item.attrs) {
@@ -286,14 +254,10 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
         &mut self,
         sub_mod: Module<'ast>,
     ) -> Result<(), ModuleResolutionError> {
-        match (sub_mod.ast_mod_kind, sub_mod.items) {
-            (Some(Cow::Borrowed(ast::ModKind::Loaded(items, _, _))), _) => {
-                self.visit_mod_from_ast(items)
-            }
-            (Some(Cow::Owned(ast::ModKind::Loaded(items, _, _))), _) | (_, Cow::Owned(items)) => {
-                self.visit_mod_outside_ast(&items)
-            }
-            (_, _) => Ok(()),
+        if let Some(ast::ModKind::Loaded(items, _, _)) = sub_mod.ast_mod_kind {
+            self.visit_items(items)
+        } else {
+            self.visit_items(&sub_mod.items)
         }
     }
 
@@ -319,8 +283,8 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                     DirectoryOwnership::Owned { relative: None },
                     Module::new(
                         span,
-                        Some(Cow::Owned(ast::ModKind::Unloaded)),
-                        Cow::Owned(items),
+                        Some(self.mod_kind_arena.alloc(ast::ModKind::Unloaded)),
+                        self.item_arena.alloc_from_iter(items),
                         &attrs,
                     ),
                 ))),
@@ -369,8 +333,8 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                             dir_ownership,
                             Module::new(
                                 span,
-                                Some(Cow::Owned(ast::ModKind::Unloaded)),
-                                Cow::Owned(items),
+                                Some(self.mod_kind_arena.alloc(ast::ModKind::Unloaded)),
+                                self.item_arena.alloc_from_iter(items),
                                 &attrs,
                             ),
                         )))
@@ -381,8 +345,8 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                             dir_ownership,
                             Module::new(
                                 span,
-                                Some(Cow::Owned(ast::ModKind::Unloaded)),
-                                Cow::Owned(items),
+                                Some(self.mod_kind_arena.alloc(ast::ModKind::Unloaded)),
+                                self.item_arena.alloc_from_iter(items),
                                 &attrs,
                             ),
                         ));
@@ -519,8 +483,8 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                 DirectoryOwnership::Owned { relative: None },
                 Module::new(
                     span,
-                    Some(Cow::Owned(ast::ModKind::Unloaded)),
-                    Cow::Owned(items),
+                    Some(self.mod_kind_arena.alloc(ast::ModKind::Unloaded)),
+                    self.item_arena.alloc_from_iter(items),
                     &attrs,
                 ),
             ))
