@@ -8,7 +8,7 @@ use thiserror::Error;
 use rustfmt_nightly as rustfmt;
 use tracing_subscriber::EnvFilter;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::fs::File;
 use std::io::{self, stdout, Read, Write};
@@ -314,56 +314,84 @@ fn format(
         }
     }
 
-    let out = &mut stdout();
-    let mut session = Session::new(config, Some(out));
+    let num_cpus = 32;
 
-    for file in files {
-        if !file.exists() {
-            eprintln!("Error: file `{}` does not exist", file.to_str().unwrap());
-            session.add_operational_error();
-        } else if file.is_dir() {
-            eprintln!("Error: `{}` is a directory", file.to_str().unwrap());
-            session.add_operational_error();
-        } else {
-            // Check the file directory if the config-path could not be read or not provided
-            if config_path.is_none() {
-                let (local_config, config_path) =
-                    load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
-                if local_config.verbose() == Verbosity::Verbose {
-                    if let Some(path) = config_path {
-                        println!(
-                            "Using rustfmt config file {} for {}",
-                            path.display(),
-                            file.display()
-                        );
+    let exit_code = std::thread::scope(|scope| {
+        let mut exit_code = 0;
+        let mut handles = VecDeque::with_capacity(files.len());
+        for file in files {
+            let cfg = config.clone();
+            let handle = scope.spawn(|| {
+                let mut output = Vec::new();
+                let mut session = Session::new(cfg, Some(&mut output));
+                if !file.exists() {
+                    eprintln!("Error: file `{}` does not exist", file.to_str().unwrap());
+                    session.add_operational_error();
+                } else if file.is_dir() {
+                    eprintln!("Error: `{}` is a directory", file.to_str().unwrap());
+                    session.add_operational_error();
+                } else {
+                    // Check the file directory if the config-path could not be read or not provided
+                    if config_path.is_none() {
+                        let (local_config, config_path) =
+                            load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
+                        if local_config.verbose() == Verbosity::Verbose {
+                            if let Some(path) = config_path {
+                                println!(
+                                    "Using rustfmt config file {} for {}",
+                                    path.display(),
+                                    file.display()
+                                );
+                            }
+                        }
+
+                        session.override_config(local_config, |sess| {
+                            format_and_emit_report(sess, Input::File(file))
+                        });
+                    } else {
+                        format_and_emit_report(&mut session, Input::File(file));
                     }
                 }
-
-                session.override_config(local_config, |sess| {
-                    format_and_emit_report(sess, Input::File(file))
-                });
-            } else {
-                format_and_emit_report(&mut session, Input::File(file));
+                let exit_code = if session.has_operational_errors()
+                    || session.has_parsing_errors()
+                    || ((session.has_diff() || session.has_check_errors()) && options.check)
+                {
+                    1
+                } else {
+                    0
+                };
+                drop(session);
+                Ok::<_, std::io::Error>((output, exit_code))
+            });
+            handles.push_back(handle);
+            if handles.len() >= num_cpus {
+                let (output, exit) = handles.pop_front().unwrap().join().unwrap().unwrap();
+                let out = &mut stdout();
+                out.write_all(&output).unwrap();
+                if exit != 0 {
+                    exit_code = exit;
+                }
             }
         }
-    }
+        let out = &mut stdout();
+        for handle in handles {
+            let (output, exit) = handle.join().unwrap().unwrap();
+            out.write_all(&output).unwrap();
+            if exit != 0 {
+                exit_code = exit;
+            }
+        }
+        exit_code
+    });
 
     // If we were given a path via dump-minimal-config, output any options
     // that were used during formatting as TOML.
     if let Some(path) = minimal_config_path {
         let mut file = File::create(path)?;
-        let toml = session.config.used_options().to_toml()?;
+        let toml = config.used_options().to_toml()?;
         file.write_all(toml.as_bytes())?;
     }
 
-    let exit_code = if session.has_operational_errors()
-        || session.has_parsing_errors()
-        || ((session.has_diff() || session.has_check_errors()) && options.check)
-    {
-        1
-    } else {
-        0
-    };
     Ok(exit_code)
 }
 
