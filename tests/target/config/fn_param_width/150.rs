@@ -1,4 +1,4 @@
-// rustfmt-config: fn_width_150.toml
+// rustfmt-config: fn_param_width/150.toml
 
 impl Trait {
     fn lorem(first: First, second: Second);

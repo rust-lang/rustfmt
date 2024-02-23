@@ -2357,7 +2357,7 @@ fn rewrite_fn_base(
         context.budget(used_width + overhead),
         context
             .config
-            .fn_width()
+            .fn_param_width()
             .saturating_sub(used_width + overhead),
     );
     let shape = Shape {
@@ -2805,7 +2805,7 @@ fn compute_budgets_for_params(
         }
         let one_line_budget = std::cmp::min(
             context.budget(used_space),
-            context.config.fn_width().saturating_sub(used_space),
+            context.config.fn_param_width().saturating_sub(used_space),
         );
 
         if one_line_budget > 0 {
