@@ -8,12 +8,13 @@ use thiserror::Error;
 use rustfmt_nightly as rustfmt;
 use tracing_subscriber::EnvFilter;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{self, stdout, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::thread::JoinHandle;
 
 use getopts::{Matches, Options};
 
@@ -307,6 +308,7 @@ fn format(
 ) -> Result<i32> {
     options.verify_file_lines(&files);
     let (config, config_path) = load_config(None, Some(options.clone()))?;
+    let cfg_path_is_none = config_path.is_none();
 
     if config.verbose() == Verbosity::Verbose {
         if let Some(path) = config_path.as_ref() {
@@ -314,75 +316,103 @@ fn format(
         }
     }
 
-    let num_cpus = 32;
+    let num_cpus = 16;
+    let (send, recv) = std::sync::mpsc::channel();
 
-    let exit_code = std::thread::scope(|scope| {
-        let mut exit_code = 0;
-        let mut handles = VecDeque::with_capacity(files.len());
-        for file in files {
-            let cfg = config.clone();
-            let handle = scope.spawn(|| {
-                let mut output = Vec::new();
-                let mut session = Session::new(cfg, Some(&mut output));
-                if !file.exists() {
-                    eprintln!("Error: file `{}` does not exist", file.to_str().unwrap());
-                    session.add_operational_error();
-                } else if file.is_dir() {
-                    eprintln!("Error: `{}` is a directory", file.to_str().unwrap());
-                    session.add_operational_error();
-                } else {
-                    // Check the file directory if the config-path could not be read or not provided
-                    if config_path.is_none() {
-                        let (local_config, config_path) =
-                            load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
-                        if local_config.verbose() == Verbosity::Verbose {
-                            if let Some(path) = config_path {
-                                println!(
-                                    "Using rustfmt config file {} for {}",
-                                    path.display(),
-                                    file.display()
-                                );
+    let mut exit_code = 0;
+    let mut outstanding = 0;
+    // If the thread panics, the channel will just be dropped,
+    // so keep track of the spinning threads
+    let mut id = 0;
+    let mut handles: HashMap<i32, JoinHandle<_>> = HashMap::new();
+    let check = options.check;
+
+    for file in files {
+        let cfg = config.clone();
+        let opts = options.clone();
+        let s = send.clone();
+        let handle = std::thread::spawn(move || {
+            let my_id = id;
+            let mut session_out = Vec::new();
+            let mut session = Session::new(cfg, Some(&mut session_out));
+            if !file.exists() {
+                eprintln!("Error: file `{}` does not exist", file.to_str().unwrap());
+                session.add_operational_error();
+            } else if file.is_dir() {
+                eprintln!("Error: `{}` is a directory", file.to_str().unwrap());
+                session.add_operational_error();
+            } else {
+                // Check the file directory if the config-path could not be read or not provided
+                if cfg_path_is_none {
+                    let (local_config, config_path) =
+                        match load_config(Some(file.parent().unwrap()), Some(opts)) {
+                            Ok((lc, cf)) => (lc, cf),
+                            Err(e) => {
+                                let _ = s.send((my_id, Err(e)));
+                                return Ok::<_, std::io::Error>(my_id);
                             }
+                        };
+                    if local_config.verbose() == Verbosity::Verbose {
+                        if let Some(path) = config_path {
+                            println!(
+                                "Using rustfmt config file {} for {}",
+                                path.display(),
+                                file.display()
+                            );
                         }
-
-                        session.override_config(local_config, |sess| {
-                            format_and_emit_report(sess, Input::File(file))
-                        });
-                    } else {
-                        format_and_emit_report(&mut session, Input::File(file));
                     }
-                }
-                let exit_code = if session.has_operational_errors()
-                    || session.has_parsing_errors()
-                    || ((session.has_diff() || session.has_check_errors()) && options.check)
-                {
-                    1
+
+                    session.override_config(local_config, |sess| {
+                        format_and_emit_report(sess, Input::File(file))
+                    });
                 } else {
-                    0
-                };
-                drop(session);
-                Ok::<_, std::io::Error>((output, exit_code))
-            });
-            handles.push_back(handle);
-            if handles.len() >= num_cpus {
-                let (output, exit) = handles.pop_front().unwrap().join().unwrap().unwrap();
+                    format_and_emit_report(&mut session, Input::File(file));
+                }
+            }
+            let exit_code = if session.has_operational_errors()
+                || session.has_parsing_errors()
+                || ((session.has_diff() || session.has_check_errors()) && check)
+            {
+                1
+            } else {
+                0
+            };
+            drop(session);
+            let _ = s.send((my_id, Ok((session_out, exit_code))));
+            Ok(my_id)
+        });
+        handles.insert(id, handle);
+        id += 1;
+        outstanding += 1;
+        if outstanding >= num_cpus {
+            if let Ok((id, res)) = recv.recv() {
+                handles.remove(&id).unwrap().join().unwrap().unwrap();
+                let (output, exit) = res?;
                 let out = &mut stdout();
                 out.write_all(&output).unwrap();
                 if exit != 0 {
                     exit_code = exit;
                 }
+                outstanding -= 1;
+            } else {
+                break;
             }
         }
-        let out = &mut stdout();
-        for handle in handles {
-            let (output, exit) = handle.join().unwrap().unwrap();
-            out.write_all(&output).unwrap();
-            if exit != 0 {
-                exit_code = exit;
-            }
+    }
+    drop(send);
+    let out = &mut stdout();
+    while let Ok((id, res)) = recv.recv() {
+        handles.remove(&id).unwrap().join().unwrap().unwrap();
+        let (output, exit) = res?;
+        out.write_all(&output).unwrap();
+        if exit != 0 {
+            exit_code = exit;
         }
-        exit_code
-    });
+    }
+    // These have errors
+    for (_id, jh) in handles {
+        jh.join().unwrap().unwrap();
+    }
 
     // If we were given a path via dump-minimal-config, output any options
     // that were used during formatting as TOML.
