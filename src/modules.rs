@@ -51,6 +51,18 @@ impl<'a> Module<'a> {
         }
     }
 
+    pub(crate) fn from_item(item: &'a ast::Item) -> Module<'a> {
+        let mod_kind = match &item.kind {
+            ast::ItemKind::Mod(_, mod_kind) => Some(mod_kind),
+            _ => None,
+        };
+        let items = match &item.kind {
+            ast::ItemKind::Mod(_, ast::ModKind::Loaded(items, ..)) => &**items,
+            _ => &[],
+        };
+        Module::new(item.span, mod_kind, items, &item.attrs)
+    }
+
     pub(crate) fn attrs(&self) -> &[ast::Attribute] {
         &self.inner_attr
     }
@@ -185,7 +197,7 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
         if is_mod_decl(item) {
             // mod foo;
             // Look for an extern file.
-            let Some(kind) = self.find_external_module(item.ident, &item.attrs, &sub_mod)? else {
+            let Some(kind) = self.find_external_module(item)? else {
                 return Ok(());
             };
             self.insert_sub_mod(kind.clone())?;
@@ -264,19 +276,18 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
     /// Find a file path in the filesystem which corresponds to the given module.
     fn find_external_module(
         &self,
-        mod_name: symbol::Ident,
-        attrs: &[ast::Attribute],
-        sub_mod: &Module<'ast>,
+        item: &'ast ast::Item,
     ) -> Result<Option<SubModKind<'ast>>, ModuleResolutionError> {
+        let mod_name = item.ident;
         let relative = match self.directory.ownership {
             DirectoryOwnership::Owned { relative } => relative,
             DirectoryOwnership::UnownedViaBlock => None,
         };
-        if let Some(path) = Parser::submod_path_from_attr(attrs, &self.directory.path) {
+        if let Some(path) = Parser::submod_path_from_attr(&item.attrs, &self.directory.path) {
             if self.parse_sess.is_file_parsed(&path) {
                 return Ok(None);
             }
-            return match Parser::parse_file_as_module(self.parse_sess, &path, sub_mod.span) {
+            return match Parser::parse_file_as_module(self.parse_sess, &path, item.span) {
                 Ok((ref attrs, _, _)) if contains_skip(attrs) => Ok(None),
                 Ok((attrs, items, span)) => Ok(Some(SubModKind::External(
                     path,
@@ -300,7 +311,7 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
         }
 
         // Look for nested path, like `#[cfg_attr(feature = "foo", path = "bar.rs")]`.
-        let mut mods_outside_ast = self.find_mods_outside_of_ast(attrs, sub_mod);
+        let mut mods_outside_ast = self.find_mods_outside_of_ast(item);
 
         match self
             .parse_sess
@@ -320,12 +331,16 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                         return Ok(None);
                     } else {
                         if should_insert {
-                            mods_outside_ast.push((file_path, dir_ownership, sub_mod.clone()));
+                            mods_outside_ast.push((
+                                file_path,
+                                dir_ownership,
+                                Module::from_item(item),
+                            ));
                         }
                         return Ok(Some(SubModKind::MultiExternal(mods_outside_ast)));
                     }
                 }
-                match Parser::parse_file_as_module(self.parse_sess, &file_path, sub_mod.span) {
+                match Parser::parse_file_as_module(self.parse_sess, &file_path, item.span) {
                     Ok((ref attrs, _, _)) if contains_skip(attrs) => Ok(None),
                     Ok((attrs, items, span)) if outside_mods_empty => {
                         Ok(Some(SubModKind::External(
@@ -351,7 +366,11 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                             ),
                         ));
                         if should_insert {
-                            mods_outside_ast.push((file_path, dir_ownership, sub_mod.clone()));
+                            mods_outside_ast.push((
+                                file_path,
+                                dir_ownership,
+                                Module::from_item(item),
+                            ));
                         }
                         Ok(Some(SubModKind::MultiExternal(mods_outside_ast)))
                     }
@@ -365,7 +384,11 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                     }),
                     Err(..) => {
                         if should_insert {
-                            mods_outside_ast.push((file_path, dir_ownership, sub_mod.clone()));
+                            mods_outside_ast.push((
+                                file_path,
+                                dir_ownership,
+                                Module::from_item(item),
+                            ));
                         }
                         Ok(Some(SubModKind::MultiExternal(mods_outside_ast)))
                     }
@@ -446,12 +469,11 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
 
     fn find_mods_outside_of_ast(
         &self,
-        attrs: &[ast::Attribute],
-        sub_mod: &Module<'ast>,
+        item: &'ast ast::Item,
     ) -> Vec<(PathBuf, DirectoryOwnership, Module<'ast>)> {
         // Filter nested path, like `#[cfg_attr(feature = "foo", path = "bar.rs")]`.
         let mut path_visitor = visitor::PathVisitor::default();
-        for attr in attrs.iter() {
+        for attr in item.attrs.iter() {
             if let Some(meta) = attr.meta() {
                 path_visitor.visit_meta_item(&meta)
             }
@@ -467,12 +489,12 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                 result.push((
                     actual_path,
                     DirectoryOwnership::Owned { relative: None },
-                    sub_mod.clone(),
+                    Module::from_item(item),
                 ));
                 continue;
             }
             let (attrs, items, span) =
-                match Parser::parse_file_as_module(self.parse_sess, &actual_path, sub_mod.span) {
+                match Parser::parse_file_as_module(self.parse_sess, &actual_path, item.span) {
                     Ok((ref attrs, _, _)) if contains_skip(attrs) => continue,
                     Ok(m) => m,
                     Err(..) => continue,
