@@ -90,16 +90,14 @@ pub(crate) enum ModuleResolutionErrorKind {
 }
 
 #[derive(Clone)]
-enum SubModKind<'a, 'ast> {
+enum SubModKind<'ast> {
     /// `mod foo;`
     External(PathBuf, DirectoryOwnership, Module<'ast>),
     /// `mod foo;` with multiple sources.
     MultiExternal(Vec<(PathBuf, DirectoryOwnership, Module<'ast>)>),
-    /// `mod foo {}`
-    Internal(&'a ast::Item),
 }
 
-impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
+impl<'ast, 'sess> ModResolver<'ast, 'sess> {
     /// Creates a new `ModResolver`.
     pub(crate) fn new(
         parse_sess: &'sess ParseSess,
@@ -210,40 +208,33 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
 
     fn visit_sub_mod(
         &mut self,
-        item: &'c ast::Item,
+        item: &ast::Item,
         sub_mod: Module<'ast>,
     ) -> Result<(), ModuleResolutionError> {
-        let sub_mod_kind = self.peek_sub_mod(item, &sub_mod)?;
-        if let Some(sub_mod_kind) = sub_mod_kind {
-            self.insert_sub_mod(sub_mod_kind.clone())?;
-            self.visit_sub_mod_inner(sub_mod, sub_mod_kind)?;
-        }
-        Ok(())
-    }
-
-    /// Inspect the given sub-module which we are about to visit and returns its kind.
-    fn peek_sub_mod(
-        &self,
-        item: &'c ast::Item,
-        sub_mod: &Module<'ast>,
-    ) -> Result<Option<SubModKind<'c, 'ast>>, ModuleResolutionError> {
         if contains_skip(&item.attrs) {
-            return Ok(None);
+            return Ok(());
         }
-
         if is_mod_decl(item) {
             // mod foo;
             // Look for an extern file.
-            self.find_external_module(item.ident, &item.attrs, sub_mod)
+            let Some(kind) = self.find_external_module(item.ident, &item.attrs, &sub_mod)? else {
+                return Ok(());
+            };
+            self.insert_sub_mod(kind.clone())?;
+            self.visit_sub_mod_inner(kind)?;
         } else {
             // An internal module (`mod foo { /* ... */ }`);
-            Ok(Some(SubModKind::Internal(item)))
-        }
+            let directory = self.inline_mod_directory(item.ident, &item.attrs);
+            self.with_directory(directory, |this| {
+                this.visit_sub_mod_after_directory_update(sub_mod)
+            })?;
+        };
+        Ok(())
     }
 
     fn insert_sub_mod(
         &mut self,
-        sub_mod_kind: SubModKind<'c, 'ast>,
+        sub_mod_kind: SubModKind<'ast>,
     ) -> Result<(), ModuleResolutionError> {
         match sub_mod_kind {
             SubModKind::External(mod_path, _, sub_mod) => {
@@ -258,15 +249,13 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                         .or_insert(sub_mod);
                 }
             }
-            _ => (),
         }
         Ok(())
     }
 
     fn visit_sub_mod_inner(
         &mut self,
-        sub_mod: Module<'ast>,
-        sub_mod_kind: SubModKind<'c, 'ast>,
+        sub_mod_kind: SubModKind<'ast>,
     ) -> Result<(), ModuleResolutionError> {
         match sub_mod_kind {
             SubModKind::External(mod_path, directory_ownership, sub_mod) => {
@@ -274,12 +263,6 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
                     path: mod_path.parent().unwrap().to_path_buf(),
                     ownership: directory_ownership,
                 };
-                self.with_directory(directory, |this| {
-                    this.visit_sub_mod_after_directory_update(sub_mod)
-                })?;
-            }
-            SubModKind::Internal(item) => {
-                let directory = self.inline_mod_directory(item.ident, &item.attrs);
                 self.with_directory(directory, |this| {
                     this.visit_sub_mod_after_directory_update(sub_mod)
                 })?;
@@ -320,7 +303,7 @@ impl<'ast, 'sess, 'c> ModResolver<'ast, 'sess> {
         mod_name: symbol::Ident,
         attrs: &[ast::Attribute],
         sub_mod: &Module<'ast>,
-    ) -> Result<Option<SubModKind<'c, 'ast>>, ModuleResolutionError> {
+    ) -> Result<Option<SubModKind<'ast>>, ModuleResolutionError> {
         let relative = match self.directory.ownership {
             DirectoryOwnership::Owned { relative } => relative,
             DirectoryOwnership::UnownedViaBlock => None,
