@@ -24,7 +24,6 @@ type FileModMap<'ast> = BTreeMap<FileName, Module<'ast>>;
 /// Represents module with its inner attributes.
 #[derive(Debug, Clone)]
 pub(crate) struct Module<'a> {
-    ast_mod_kind: Option<&'a ast::ModKind>,
     pub(crate) items: &'a [rustc_ast::ptr::P<ast::Item>],
     inner_attr: ast::AttrVec,
     pub(crate) span: Span,
@@ -33,7 +32,6 @@ pub(crate) struct Module<'a> {
 impl<'a> Module<'a> {
     pub(crate) fn new(
         mod_span: Span,
-        ast_mod_kind: Option<&'a ast::ModKind>,
         mod_items: &'a [rustc_ast::ptr::P<ast::Item>],
         mod_attrs: &[ast::Attribute],
     ) -> Self {
@@ -46,20 +44,15 @@ impl<'a> Module<'a> {
             items: mod_items,
             inner_attr,
             span: mod_span,
-            ast_mod_kind,
         }
     }
 
     pub(crate) fn from_item(item: &'a ast::Item) -> Module<'a> {
-        let mod_kind = match &item.kind {
-            ast::ItemKind::Mod(_, mod_kind) => Some(mod_kind),
-            _ => None,
-        };
         let items = match &item.kind {
             ast::ItemKind::Mod(_, ast::ModKind::Loaded(items, ..)) => &**items,
             _ => &[],
         };
-        Module::new(item.span, mod_kind, items, &item.attrs)
+        Module::new(item.span, items, &item.attrs)
     }
 
     pub(crate) fn attrs(&self) -> &[ast::Attribute] {
@@ -70,7 +63,6 @@ impl<'a> Module<'a> {
 /// Maps each module to the corresponding file.
 pub(crate) struct ModResolver<'ast, 'sess> {
     item_arena: &'ast TypedArena<P<ast::Item>>,
-    mod_kind_arena: &'ast TypedArena<ast::ModKind>,
     parse_sess: &'sess ParseSess,
     directory: Directory,
     file_map: FileModMap<'ast>,
@@ -114,14 +106,12 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
     /// Creates a new `ModResolver`.
     pub(crate) fn new(
         item_arena: &'ast TypedArena<P<ast::Item>>,
-        mod_kind_arena: &'ast TypedArena<ast::ModKind>,
         parse_sess: &'sess ParseSess,
         directory_ownership: DirectoryOwnership,
         recursive: bool,
     ) -> Self {
         ModResolver {
             item_arena,
-            mod_kind_arena,
             directory: Directory {
                 path: PathBuf::new(),
                 ownership: directory_ownership,
@@ -154,7 +144,6 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
             root_filename,
             Module::new(
                 mk_sp(snippet_provider.start_pos(), snippet_provider.end_pos()),
-                None,
                 &krate.items,
                 &krate.attrs,
             ),
@@ -243,9 +232,7 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                     path: mod_path.parent().unwrap().to_path_buf(),
                     ownership: directory_ownership,
                 };
-                self.with_directory(directory, |this| {
-                    this.visit_sub_mod_after_directory_update(sub_mod)
-                })?;
+                self.with_directory(directory, |this| this.visit_items(&sub_mod.items))?;
             }
             SubModKind::MultiExternal(mods) => {
                 for (mod_path, directory_ownership, sub_mod) in mods {
@@ -253,24 +240,11 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                         path: mod_path.parent().unwrap().to_path_buf(),
                         ownership: directory_ownership,
                     };
-                    self.with_directory(directory, |this| {
-                        this.visit_sub_mod_after_directory_update(sub_mod)
-                    })?;
+                    self.with_directory(directory, |this| this.visit_items(&sub_mod.items))?;
                 }
             }
         }
         Ok(())
-    }
-
-    fn visit_sub_mod_after_directory_update(
-        &mut self,
-        sub_mod: Module<'ast>,
-    ) -> Result<(), ModuleResolutionError> {
-        if let Some(ast::ModKind::Loaded(items, _, _)) = sub_mod.ast_mod_kind {
-            self.visit_items(items)
-        } else {
-            self.visit_items(&sub_mod.items)
-        }
     }
 
     /// Find a file path in the filesystem which corresponds to the given module.
@@ -292,12 +266,7 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                 Ok((attrs, items, span)) => Ok(Some(SubModKind::External(
                     path,
                     DirectoryOwnership::Owned { relative: None },
-                    Module::new(
-                        span,
-                        Some(self.mod_kind_arena.alloc(ast::ModKind::Unloaded)),
-                        self.item_arena.alloc_from_iter(items),
-                        &attrs,
-                    ),
+                    Module::new(span, self.item_arena.alloc_from_iter(items), &attrs),
                 ))),
                 Err(ParserError::ParseError) => Err(ModuleResolutionError {
                     module: mod_name.to_string(),
@@ -346,24 +315,14 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
                         Ok(Some(SubModKind::External(
                             file_path,
                             dir_ownership,
-                            Module::new(
-                                span,
-                                Some(self.mod_kind_arena.alloc(ast::ModKind::Unloaded)),
-                                self.item_arena.alloc_from_iter(items),
-                                &attrs,
-                            ),
+                            Module::new(span, self.item_arena.alloc_from_iter(items), &attrs),
                         )))
                     }
                     Ok((attrs, items, span)) => {
                         mods_outside_ast.push((
                             file_path.clone(),
                             dir_ownership,
-                            Module::new(
-                                span,
-                                Some(self.mod_kind_arena.alloc(ast::ModKind::Unloaded)),
-                                self.item_arena.alloc_from_iter(items),
-                                &attrs,
-                            ),
+                            Module::new(span, self.item_arena.alloc_from_iter(items), &attrs),
                         ));
                         if should_insert {
                             mods_outside_ast.push((
@@ -503,12 +462,7 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
             result.push((
                 actual_path,
                 DirectoryOwnership::Owned { relative: None },
-                Module::new(
-                    span,
-                    Some(self.mod_kind_arena.alloc(ast::ModKind::Unloaded)),
-                    self.item_arena.alloc_from_iter(items),
-                    &attrs,
-                ),
+                Module::new(span, self.item_arena.alloc_from_iter(items), &attrs),
             ))
         }
         result

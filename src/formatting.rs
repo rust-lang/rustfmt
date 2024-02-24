@@ -133,10 +133,8 @@ fn format_project<T: FormatHandler>(
 
     let mut context = FormatContext::new(&krate, report, parse_session, config, handler);
     let item_arena = TypedArena::default();
-    let mod_kind_arena = TypedArena::default();
     let files = modules::ModResolver::new(
         &item_arena,
-        &mod_kind_arena,
         &context.parse_session,
         directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaBlock),
         !input_is_stdin && !config.skip_children(),
