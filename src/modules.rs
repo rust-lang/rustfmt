@@ -11,7 +11,6 @@ use thiserror::Error;
 
 use crate::attr::MetaVisitor;
 use crate::config::FileName;
-use crate::items::is_mod_decl;
 use crate::parse::parser::{
     Directory, DirectoryOwnership, ModError, ModulePathSuccess, Parser, ParserError,
 };
@@ -179,36 +178,37 @@ impl<'ast, 'sess> ModResolver<'ast, 'sess> {
         for item in items {
             if is_cfg_if(item) {
                 self.visit_cfg_if(item)?;
-            } else if let ast::ItemKind::Mod(_, sub_mod_kind) = &item.kind {
-                self.visit_sub_mod(&item, Module::new(item.span, Some(sub_mod_kind), &[], &[]))?;
+            } else if let ast::ItemKind::Mod(_, mod_kind) = &item.kind {
+                self.visit_mod(&item, mod_kind)?;
             }
         }
         Ok(())
     }
 
-    fn visit_sub_mod(
+    fn visit_mod(
         &mut self,
         item: &'ast ast::Item,
-        sub_mod: Module<'ast>,
+        mod_kind: &'ast ast::ModKind,
     ) -> Result<(), ModuleResolutionError> {
         if contains_skip(&item.attrs) {
             return Ok(());
         }
-        if is_mod_decl(item) {
-            // mod foo;
-            // Look for an extern file.
-            let Some(kind) = self.find_external_module(item)? else {
-                return Ok(());
-            };
-            self.insert_sub_mod(kind.clone())?;
-            self.visit_sub_mod_inner(kind)?;
-        } else {
-            // An internal module (`mod foo { /* ... */ }`);
-            let directory = self.inline_mod_directory(item.ident, &item.attrs);
-            self.with_directory(directory, |this| {
-                this.visit_sub_mod_after_directory_update(sub_mod)
-            })?;
-        };
+        match mod_kind {
+            ast::ModKind::Loaded(items, ast::Inline::Yes, _) => {
+                // An internal module (`mod foo { /* ... */ }`);
+                let directory = self.inline_mod_directory(item.ident, &item.attrs);
+                self.with_directory(directory, |this| this.visit_items(items))?;
+            }
+            _ => {
+                // mod foo;
+                // Look for an extern file.
+                let Some(kind) = self.find_external_module(item)? else {
+                    return Ok(());
+                };
+                self.insert_sub_mod(kind.clone())?;
+                self.visit_sub_mod_inner(kind)?;
+            }
+        }
         Ok(())
     }
 
