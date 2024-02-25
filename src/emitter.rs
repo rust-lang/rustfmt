@@ -8,6 +8,7 @@ pub(crate) use self::stdout::*;
 use crate::FileName;
 use std::io::{self, Write};
 use std::path::Path;
+use crate::print::Printer;
 
 mod checkstyle;
 mod diff;
@@ -32,6 +33,7 @@ pub(crate) trait Emitter {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,
+        printer: &Printer,
         formatted_file: FormattedFile<'_>,
     ) -> Result<EmitterResult, io::Error>;
 

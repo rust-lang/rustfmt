@@ -15,6 +15,7 @@ use crate::create_emitter;
 use crate::formatting::FileRecord;
 
 use rustc_data_structures::sync::Lrc;
+use crate::print::Printer;
 
 // Append a newline to the end of each file.
 pub(crate) fn append_newline(s: &mut String) {
@@ -55,6 +56,7 @@ pub(crate) fn write_file<T>(
     out: &mut T,
     emitter: &mut dyn Emitter,
     newline_style: NewlineStyle,
+    printer: &Printer,
 ) -> Result<emitter::EmitterResult, io::Error>
 where
     T: Write,
@@ -101,5 +103,5 @@ where
         formatted_text,
     };
 
-    emitter.emit_formatted_file(out, formatted_file)
+    emitter.emit_formatted_file(out, printer, formatted_file)
 }

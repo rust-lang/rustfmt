@@ -16,6 +16,7 @@ impl Emitter for DiffEmitter {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,
+        printer: &Printer,
         FormattedFile {
             filename,
             original_text,
@@ -34,6 +35,7 @@ impl Emitter for DiffEmitter {
                     mismatch,
                     |line_num| format!("Diff in {}:{}:", filename, line_num),
                     &self.config,
+                    printer,
                 );
             }
         } else if original_text != formatted_text {

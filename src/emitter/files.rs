@@ -1,5 +1,6 @@
 use super::*;
 use std::fs;
+use crate::buf_println;
 
 #[derive(Debug, Default)]
 pub(crate) struct FilesEmitter {
@@ -17,7 +18,8 @@ impl FilesEmitter {
 impl Emitter for FilesEmitter {
     fn emit_formatted_file(
         &mut self,
-        output: &mut dyn Write,
+        _output: &mut dyn Write,
+        printer: &Printer,
         FormattedFile {
             filename,
             original_text,
@@ -29,7 +31,7 @@ impl Emitter for FilesEmitter {
         if original_text != formatted_text {
             fs::write(filename, formatted_text)?;
             if self.print_misformatted_file_names {
-                writeln!(output, "{}", filename.display())?;
+                buf_println!(printer, "{}", filename.display());
             }
         }
         Ok(EmitterResult::default())

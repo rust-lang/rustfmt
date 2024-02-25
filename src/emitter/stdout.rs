@@ -1,3 +1,4 @@
+use crate::buf_println;
 use super::*;
 use crate::config::Verbosity;
 
@@ -15,7 +16,8 @@ impl StdoutEmitter {
 impl Emitter for StdoutEmitter {
     fn emit_formatted_file(
         &mut self,
-        output: &mut dyn Write,
+        _output: &mut dyn Write,
+        printer: &Printer,
         FormattedFile {
             filename,
             formatted_text,
@@ -23,9 +25,9 @@ impl Emitter for StdoutEmitter {
         }: FormattedFile<'_>,
     ) -> Result<EmitterResult, io::Error> {
         if self.verbosity != Verbosity::Quiet {
-            writeln!(output, "{filename}:\n")?;
+            buf_println!(printer, "{filename}:\n");
         }
-        write!(output, "{formatted_text}")?;
+        buf_println!(printer, "{formatted_text}");
         Ok(EmitterResult::default())
     }
 }

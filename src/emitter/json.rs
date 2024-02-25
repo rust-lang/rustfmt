@@ -32,6 +32,7 @@ impl Emitter for JsonEmitter {
     fn emit_formatted_file(
         &mut self,
         _output: &mut dyn Write,
+        _printer: &Printer,
         FormattedFile {
             filename,
             original_text,
