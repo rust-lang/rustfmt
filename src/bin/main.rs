@@ -406,10 +406,10 @@ fn format(
         outstanding += 1;
         if outstanding >= num_cpus {
             if let Ok(thread_out) = recv.recv() {
-                handles.remove(&id).unwrap().join().unwrap().unwrap();
+                handles.remove(&thread_out.id).unwrap().join().unwrap().unwrap();
                 let output = thread_out.session_result?;
-                let out = &mut stdout();
-                out.write_all(&output).unwrap();
+                stdout().write_all(&output).unwrap();
+                thread_out.printer.dump()?;
                 if thread_out.exit_code != 0 {
                     exit_code = thread_out.exit_code;
                 }
@@ -420,11 +420,12 @@ fn format(
         }
     }
     drop(send);
-    let out = &mut stdout();
     while let Ok(thread_out) = recv.recv() {
-        handles.remove(&id).unwrap().join().unwrap().unwrap();
+        let handle_res = handles.remove(&thread_out.id).unwrap().join();
+        handle_res.unwrap().unwrap();
         let output = thread_out.session_result?;
-        out.write_all(&output).unwrap();
+        stdout().write_all(&output).unwrap();
+        thread_out.printer.dump()?;
         if thread_out.exit_code != 0 {
             exit_code = thread_out.exit_code;
         }

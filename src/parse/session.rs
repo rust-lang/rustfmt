@@ -124,16 +124,9 @@ fn default_dcx(
     ignore_path_set: Lrc<IgnorePathSet>,
     can_reset: Lrc<AtomicBool>,
     show_parse_errors: bool,
-    color: Color,
+    _color: Color,
     printer: &Printer,
 ) -> DiagCtxt {
-    let supports_color = term::stderr().map_or(false, |term| term.supports_color());
-    let emit_color = if supports_color {
-        ColorConfig::from(color)
-    } else {
-        ColorConfig::Never
-    };
-
     let emitter = if !show_parse_errors {
         silent_emitter()
     } else {

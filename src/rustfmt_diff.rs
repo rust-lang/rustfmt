@@ -1,10 +1,9 @@
 use std::collections::VecDeque;
 use std::fmt;
-use std::io;
 use std::io::Write;
 use crate::buf_term_println;
 
-use crate::config::{Color, Config, Verbosity};
+use crate::config::{Config, Verbosity};
 use crate::print::Printer;
 
 #[derive(Debug, PartialEq)]
@@ -141,43 +140,6 @@ impl std::str::FromStr for ModifiedLines {
     }
 }
 
-// This struct handles writing output to stdout and abstracts away the logic
-// of printing in color, if it's possible in the executing environment.
-pub(crate) struct OutputWriter {
-    terminal: Option<Box<dyn term::Terminal<Output = io::Stdout>>>,
-}
-
-impl OutputWriter {
-    // Create a new OutputWriter instance based on the caller's preference
-    // for colorized output and the capabilities of the terminal.
-    pub(crate) fn new(color: Color) -> Self {
-        if let Some(t) = term::stdout() {
-            if color.use_colored_tty() && t.supports_color() {
-                return OutputWriter { terminal: Some(t) };
-            }
-        }
-        OutputWriter { terminal: None }
-    }
-
-    // Write output in the optionally specified color. The output is written
-    // in the specified color if this OutputWriter instance contains a
-    // Terminal in its `terminal` field.
-    pub(crate) fn writeln(&mut self, msg: &str, color: Option<term::color::Color>) {
-        match &mut self.terminal {
-            Some(ref mut t) => {
-                if let Some(color) = color {
-                    t.fg(color).unwrap();
-                }
-                writeln!(t, "{msg}").unwrap();
-                if color.is_some() {
-                    t.reset().unwrap();
-                }
-            }
-            None => println!("{msg}"),
-        }
-    }
-}
-
 // Produces a diff between the expected output and actual output of rustfmt.
 pub(crate) fn make_diff(expected: &str, actual: &str, context_size: usize) -> Vec<Mismatch> {
     let mut line_number = 1;
@@ -251,18 +213,15 @@ pub(crate) fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &
 where
     F: Fn(u32) -> String,
 {
-    let color = config.color();
     let line_terminator = if config.verbose() == Verbosity::Verbose {
         "⏎"
     } else {
         ""
     };
 
-    let mut writer = OutputWriter::new(color);
-
     for mismatch in diff {
         let title = get_section_title(mismatch.line_number_orig);
-        writer.writeln(&title, None);
+        buf_term_println!(printer, None, "{title}");
 
         for line in mismatch.lines {
             match line {
@@ -270,10 +229,10 @@ where
                     buf_term_println!(printer, None, " {str}{line_terminator}");
                 }
                 DiffLine::Expected(ref str) => {
-                    buf_term_println!(printer, Some(rustc_errors::Color::Green), "+{str}{line_terminator}");
+                    buf_term_println!(printer, Some(term::color::GREEN), "+{str}{line_terminator}");
                 },
                 DiffLine::Resulting(ref str) => {
-                    buf_term_println!(printer, Some(rustc_errors::Color::Red), "-{str}{line_terminator}");
+                    buf_term_println!(printer, Some(term::color::RED), "-{str}{line_terminator}");
                 }
             }
         }
