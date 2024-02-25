@@ -17,7 +17,7 @@ use crate::parse::session::ParseSess;
 use crate::print::Printer;
 use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
-use crate::{buf_eprintln, modules, source_file, ErrorKind, FormatReport, Input, Session};
+use crate::{buf_eprintln, modules, source_file, ErrorKind, FormatReport, Input, Session, buf_println};
 
 mod generated;
 mod newline_style;
@@ -40,7 +40,10 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             if self.config.disable_all_formatting() {
                 // When the input is from stdin, echo back the input.
                 return match input {
-                    Input::Text(ref buf) => echo_back_stdin(buf),
+                    Input::Text(ref buf) => {
+                        buf_println!(self.printer, "{buf}");
+                        Ok(FormatReport::new())
+                    },
                     _ => Ok(FormatReport::new()),
                 };
             }
@@ -89,13 +92,6 @@ fn should_skip_module<T: FormatHandler>(
     }
 
     false
-}
-
-fn echo_back_stdin(input: &str) -> Result<FormatReport, ErrorKind> {
-    if let Err(e) = io::stdout().write_all(input.as_bytes()) {
-        return Err(From::from(e));
-    }
-    Ok(FormatReport::new())
 }
 
 // Format an entire crate (or subset of the module tree).
@@ -153,20 +149,20 @@ fn format_project<T: FormatHandler>(
 
     for (path, module) in files {
         if input_is_stdin && contains_skip(module.attrs()) {
-            return echo_back_stdin(
-                context
+            buf_println!(printer, "{}", context
                     .parse_session
                     .snippet_provider(module.span)
-                    .entire_snippet(),
-            );
+                    .entire_snippet());
+            return Ok(FormatReport::new());
         }
-        should_emit_verbose(input_is_stdin, config, || println!("Formatting {}", path));
+        should_emit_verbose(input_is_stdin, config, || buf_println!(printer, "Formatting {}", path));
         context.format_file(path, &module, is_macro_def)?;
     }
     timer = timer.done_formatting();
 
     should_emit_verbose(input_is_stdin, config, || {
-        println!(
+        buf_println!(
+            printer,
             "Spent {0:.3} secs in the parsing phase, and {1:.3} secs in the formatting phase",
             timer.get_parse_time(),
             timer.get_format_time(),

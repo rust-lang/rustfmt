@@ -295,6 +295,7 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
     let printer = Printer::new(config.color());
     let mut session = Session::new(config, Some(out), &printer);
     format_and_emit_report(&mut session, Input::Text(input));
+    printer.dump()?;
 
     let exit_code = if session.has_operational_errors() || session.has_parsing_errors() {
         1
@@ -424,7 +425,9 @@ fn format(
                     .unwrap()
                     .unwrap();
                 let output = thread_out.session_result?;
-                stdout().write_all(&output).unwrap();
+                if !output.is_empty() {
+                    stdout().write_all(&output).unwrap();
+                }
                 thread_out.printer.dump()?;
                 if thread_out.exit_code != 0 {
                     exit_code = thread_out.exit_code;
@@ -440,7 +443,9 @@ fn format(
         let handle_res = handles.remove(&thread_out.id).unwrap().join();
         handle_res.unwrap().unwrap();
         let output = thread_out.session_result?;
-        stdout().write_all(&output).unwrap();
+        if !output.is_empty() {
+            stdout().write_all(&output).unwrap();
+        }
         thread_out.printer.dump()?;
         if thread_out.exit_code != 0 {
             exit_code = thread_out.exit_code;

@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use crate::Color;
 use rustc_errors::{Color as RustColor, ColorSpec, WriteColor};
 use std::io::{stderr, stdout, Write};
@@ -23,9 +24,17 @@ impl Write for Printer {
     }
 
     #[inline]
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        self.write(buf)?;
         Ok(())
     }
+
+    #[inline]
+    fn flush(&mut self) -> std::io::Result<()> {
+        //println!("Flush");
+        Ok(())
+    }
+
 }
 
 impl WriteColor for Printer {
@@ -45,6 +54,7 @@ impl WriteColor for Printer {
         self.inner.lock().unwrap().current_color.take();
         Ok(())
     }
+
 }
 
 struct PrinterInner {
@@ -77,6 +87,10 @@ impl Printer {
 
     pub fn dump(&self) -> Result<(), std::io::Error> {
         let inner = self.inner.lock().unwrap();
+        // Pretty common case, early exit
+        if inner.messages.is_empty() {
+            return Ok(());
+        }
         let mut use_term_stdout =
             term::stdout().filter(|t| inner.color_setting.use_colored_tty() && t.supports_color());
         let use_rustc_error_color = inner.color_setting.use_colored_tty()
@@ -121,6 +135,8 @@ impl Printer {
                 }
             }
         }
+        stdout().flush()?;
+        stderr().flush()?;
 
         Ok(())
     }
@@ -130,8 +146,15 @@ impl Printer {
 // as far as I can tell
 fn rustc_colorspec_compat(rustc: &ColorSpec) -> termcolor::ColorSpec {
     let mut cs = termcolor::ColorSpec::new();
-    let col = rustc.fg().and_then(rustc_color_compat);
-    cs.set_fg(col);
+    let fg = rustc.fg().and_then(rustc_color_compat);
+    cs.set_fg(fg);
+    let bg = rustc.bg().and_then(rustc_color_compat);
+    cs.set_bg(bg);
+    cs.set_bold(rustc.bold());
+    cs.set_strikethrough(rustc.strikethrough());
+    cs.set_underline(rustc.underline());
+    cs.set_intense(rustc.intense());
+    cs.set_italic(rustc.italic());
     cs
 }
 
@@ -186,6 +209,25 @@ pub enum PrintMessage {
     StdErr(Vec<u8>),
     Term(TermMessage),
     RustcErrTerm(RustcErrTermMessage),
+}
+
+impl std::fmt::Debug for PrintMessage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PrintMessage::Stdout(buf) => {
+                f.write_fmt(format_args!("PrintMessage::Stdout({:?})", core::str::from_utf8(buf)))
+            }
+            PrintMessage::StdErr(buf) => {
+                f.write_fmt(format_args!("PrintMessage::Stderr({:?})", core::str::from_utf8(buf)))
+            }
+            PrintMessage::Term(msg) => {
+                f.write_fmt(format_args!("PrintMessage::Term({:?}, {:?})", core::str::from_utf8(&msg.message), msg.color))
+            }
+            PrintMessage::RustcErrTerm(msg) => {
+                f.write_fmt(format_args!("PrintMessage::RustcErrTerm({:?}, {:?})", core::str::from_utf8(&msg.message), msg.color))
+            }
+        }
+    }
 }
 
 pub struct TermMessage {
