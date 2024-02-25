@@ -17,6 +17,8 @@ use std::str::FromStr;
 use std::thread::JoinHandle;
 
 use getopts::{Matches, Options};
+use rustfmt_nightly::buf_eprintln;
+use rustfmt_nightly::print::Printer;
 
 use crate::rustfmt::{
     load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
@@ -290,7 +292,8 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
     }
 
     let out = &mut stdout();
-    let mut session = Session::new(config, Some(out));
+    let printer = Printer::new(config.color());
+    let mut session = Session::new(config, Some(out), &printer);
     format_and_emit_report(&mut session, Input::Text(input));
 
     let exit_code = if session.has_operational_errors() || session.has_parsing_errors() {
@@ -299,6 +302,13 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
         0
     };
     Ok(exit_code)
+}
+
+struct ThreadedFileOutput {
+    session_result: Result<Vec<u8>, std::io::Error>,
+    id: i32,
+    exit_code: i32,
+    printer: Printer,
 }
 
 fn format(
@@ -326,7 +336,7 @@ fn format(
     let mut id = 0;
     let mut handles: HashMap<i32, JoinHandle<_>> = HashMap::new();
     let check = options.check;
-
+    let color = config.color();
     for file in files {
         let cfg = config.clone();
         let opts = options.clone();
@@ -334,9 +344,10 @@ fn format(
         let handle = std::thread::spawn(move || {
             let my_id = id;
             let mut session_out = Vec::new();
-            let mut session = Session::new(cfg, Some(&mut session_out));
+            let printer = Printer::new(color);
+            let mut session = Session::new(cfg, Some(&mut session_out), &printer);
             if !file.exists() {
-                eprintln!("Error: file `{}` does not exist", file.to_str().unwrap());
+                buf_eprintln!(printer, "Error: file `{}` does not exist", file.to_str().unwrap());
                 session.add_operational_error();
             } else if file.is_dir() {
                 eprintln!("Error: `{}` is a directory", file.to_str().unwrap());
@@ -348,7 +359,13 @@ fn format(
                         match load_config(Some(file.parent().unwrap()), Some(opts)) {
                             Ok((lc, cf)) => (lc, cf),
                             Err(e) => {
-                                let _ = s.send((my_id, Err(e)));
+                                drop(session);
+                                let _ = s.send(ThreadedFileOutput {
+                                    session_result: Err(e),
+                                    id,
+                                    exit_code,
+                                    printer,
+                                });
                                 return Ok::<_, std::io::Error>(my_id);
                             }
                         };
@@ -378,20 +395,25 @@ fn format(
                 0
             };
             drop(session);
-            let _ = s.send((my_id, Ok((session_out, exit_code))));
+            let _ = s.send(ThreadedFileOutput {
+                session_result: Ok(session_out),
+                id,
+                exit_code,
+                printer,
+            });
             Ok(my_id)
         });
         handles.insert(id, handle);
         id += 1;
         outstanding += 1;
         if outstanding >= num_cpus {
-            if let Ok((id, res)) = recv.recv() {
+            if let Ok(thread_out) = recv.recv() {
                 handles.remove(&id).unwrap().join().unwrap().unwrap();
-                let (output, exit) = res?;
+                let output = thread_out.session_result?;
                 let out = &mut stdout();
                 out.write_all(&output).unwrap();
-                if exit != 0 {
-                    exit_code = exit;
+                if thread_out.exit_code != 0 {
+                    exit_code = thread_out.exit_code;
                 }
                 outstanding -= 1;
             } else {
@@ -401,12 +423,12 @@ fn format(
     }
     drop(send);
     let out = &mut stdout();
-    while let Ok((id, res)) = recv.recv() {
+    while let Ok(thread_out) = recv.recv() {
         handles.remove(&id).unwrap().join().unwrap().unwrap();
-        let (output, exit) = res?;
+        let output = thread_out.session_result?;
         out.write_all(&output).unwrap();
-        if exit != 0 {
-            exit_code = exit;
+        if thread_out.exit_code != 0 {
+            exit_code = thread_out.exit_code;
         }
     }
     // These have errors

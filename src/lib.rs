@@ -100,7 +100,7 @@ mod test;
 mod types;
 mod vertical;
 pub(crate) mod visitor;
-mod print;
+pub mod print;
 
 /// The various errors that can occur during formatting. Note that not all of
 /// these can currently be propagated to clients.

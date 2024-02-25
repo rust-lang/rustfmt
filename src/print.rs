@@ -11,6 +11,15 @@ struct PrinterInner {
 }
 
 impl Printer {
+
+    pub fn new(term_output_color: Color) -> Self {
+        Self {
+            inner: Mutex::new(PrinterInner {
+                color: term_output_color,
+                messages: vec![],
+            }),
+        }
+    }
     #[inline]
     pub fn push_msg(&self, msg: PrintMessage) {
         self.inner.lock().unwrap().messages.push(msg);
@@ -22,7 +31,7 @@ macro_rules! buf_println {
     ($pb: expr, $($arg:tt)*) => {{
         let mut msg_buf = Vec::new();
         let _ = writeln!(&mut msg_buf, $($arg)*);
-        $pb.push_msg(PrintMessage::Stdout(msg_buf));
+        $pb.push_msg($crate::print::PrintMessage::Stdout(msg_buf));
     }};
 }
 
@@ -31,7 +40,7 @@ macro_rules! buf_eprintln {
     ($pb: expr, $($arg:tt)*) => {{
         let mut msg_buf = Vec::new();
         let _ = writeln!(&mut msg_buf, $($arg)*);
-        $pb.push_msg(PrintMessage::StdErr(msg_buf));
+        $pb.push_msg($crate::print::PrintMessage::StdErr(msg_buf));
     }};
 }
 
@@ -40,7 +49,7 @@ macro_rules! buf_term_println {
     ($pb: expr, $col:expr, $($arg:tt)*) => {{
         let mut msg_buf = Vec::new();
         let _ = writeln!(&mut msg_buf, $($arg)*);
-        $pb.push_msg(PrintMessage::Term(TermMessage::new(msg_buf, $col)));
+        $pb.push_msg($crate::print::PrintMessage::Term(TermMessage::new(msg_buf, $col)));
     }};
 }
 
