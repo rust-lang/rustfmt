@@ -5,10 +5,10 @@ pub(crate) use self::files_with_backup::*;
 pub(crate) use self::json::*;
 pub(crate) use self::modified_lines::*;
 pub(crate) use self::stdout::*;
+use crate::print::Printer;
 use crate::FileName;
 use std::io::{self, Write};
 use std::path::Path;
-use crate::print::Printer;
 
 mod checkstyle;
 mod diff;

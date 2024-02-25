@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 
 use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
 use crate::config::{Config, EmitMode, Verbosity};
+use crate::print::Printer;
 use crate::rustfmt_diff::{make_diff, Mismatch};
 use crate::{Input, Session};
-use crate::print::Printer;
 
 const CONFIGURATIONS_FILE_NAME: &str = "Configurations.md";
 

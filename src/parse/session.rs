@@ -15,11 +15,11 @@ use crate::config::file_lines::LineRange;
 use crate::config::options::Color;
 use crate::ignore_path::IgnorePathSet;
 use crate::parse::parser::{ModError, ModulePathSuccess};
+use crate::print::Printer;
 use crate::source_map::LineRangeUtils;
 use crate::utils::starts_with_newline;
 use crate::visitor::SnippetProvider;
 use crate::{Config, ErrorKind, FileName};
-use crate::print::Printer;
 
 /// ParseSess holds structs necessary for constructing a parser.
 pub(crate) struct ParseSess {
@@ -134,8 +134,10 @@ fn default_dcx(
             rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
             false,
         );
-        Box::new(EmitterWriter::new(Box::new(printer.clone()), fallback_bundle))
-        //Box::new(EmitterWriter::stderr(emit_color, fallback_bundle).sm(Some(source_map.clone())))
+        Box::new(EmitterWriter::new(
+            Box::new(printer.clone()),
+            fallback_bundle,
+        ))
     };
     DiagCtxt::with_emitter(Box::new(SilentOnIgnoredFilesEmitter {
         has_non_ignorable_parser_errors: false,

@@ -84,6 +84,7 @@ mod overflow;
 mod pairs;
 mod parse;
 mod patterns;
+pub mod print;
 mod release_channel;
 mod reorder;
 mod rewrite;
@@ -100,7 +101,6 @@ mod test;
 mod types;
 mod vertical;
 pub(crate) mod visitor;
-pub mod print;
 
 /// The various errors that can occur during formatting. Note that not all of
 /// these can currently be propagated to clients.
@@ -300,7 +300,12 @@ impl fmt::Display for FormatReport {
 
 /// Format the given snippet. The snippet is expected to be *complete* code.
 /// When we cannot parse the given snippet, this function returns `None`.
-fn format_snippet(snippet: &str, config: &Config, is_macro_def: bool, printer: &Printer) -> Option<FormattedSnippet> {
+fn format_snippet(
+    snippet: &str,
+    config: &Config,
+    is_macro_def: bool,
+    printer: &Printer,
+) -> Option<FormattedSnippet> {
     let mut config = config.clone();
     panic::catch_unwind(|| {
         let mut out: Vec<u8> = Vec::with_capacity(snippet.len() * 2);
@@ -532,9 +537,7 @@ pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
         EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
         EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
         EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
-        EmitMode::Diff => {
-            Box::new(emitter::DiffEmitter::new(config.clone()))
-        },
+        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
     }
 }
 
@@ -589,7 +592,9 @@ mod unit_tests {
         // even when we cannot parse the given snippet.
         let snippet = "let";
         assert!(format_snippet(snippet, &Config::default(), false, &Printer::no_color()).is_none());
-        assert!(format_code_block(snippet, &Config::default(), false, &Printer::no_color()).is_none());
+        assert!(
+            format_code_block(snippet, &Config::default(), false, &Printer::no_color()).is_none()
+        );
     }
 
     fn test_format_inner<F>(formatter: F, input: &str, expected: &str) -> bool
@@ -618,7 +623,10 @@ mod unit_tests {
     fn test_format_code_block_fail() {
         #[rustfmt::skip]
         let code_block = "this_line_is_100_characters_long_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx(x, y, z);";
-        assert!(format_code_block(code_block, &Config::default(), false, &Printer::no_color()).is_none());
+        assert!(
+            format_code_block(code_block, &Config::default(), false, &Printer::no_color())
+                .is_none()
+        );
     }
 
     #[test]

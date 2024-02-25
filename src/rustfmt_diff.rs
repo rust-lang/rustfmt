@@ -1,7 +1,7 @@
+use crate::buf_term_println;
 use std::collections::VecDeque;
 use std::fmt;
 use std::io::Write;
-use crate::buf_term_println;
 
 use crate::config::{Config, Verbosity};
 use crate::print::Printer;
@@ -209,8 +209,12 @@ pub(crate) fn make_diff(expected: &str, actual: &str, context_size: usize) -> Ve
     results
 }
 
-pub(crate) fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config, printer: &Printer)
-where
+pub(crate) fn print_diff<F>(
+    diff: Vec<Mismatch>,
+    get_section_title: F,
+    config: &Config,
+    printer: &Printer,
+) where
     F: Fn(u32) -> String,
 {
     let line_terminator = if config.verbose() == Verbosity::Verbose {
@@ -230,7 +234,7 @@ where
                 }
                 DiffLine::Expected(ref str) => {
                     buf_term_println!(printer, Some(term::color::GREEN), "+{str}{line_terminator}");
-                },
+                }
                 DiffLine::Resulting(ref str) => {
                     buf_term_println!(printer, Some(term::color::RED), "-{str}{line_terminator}");
                 }

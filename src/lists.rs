@@ -258,7 +258,11 @@ where
 }
 
 // Format a list of commented items into a string.
-pub(crate) fn write_list<I, T>(items: I, formatting: &ListFormatting<'_>, printer: &Printer) -> Option<String>
+pub(crate) fn write_list<I, T>(
+    items: I,
+    formatting: &ListFormatting<'_>,
+    printer: &Printer,
+) -> Option<String>
 where
     I: IntoIterator<Item = T> + Clone,
     T: AsRef<ListItem>,
@@ -363,8 +367,13 @@ where
             // Block style in non-vertical mode.
             let block_mode = tactic == DefinitiveListTactic::Horizontal;
             // Width restriction is only relevant in vertical mode.
-            let comment =
-                rewrite_comment(comment, block_mode, formatting.shape, formatting.config, printer)?;
+            let comment = rewrite_comment(
+                comment,
+                block_mode,
+                formatting.shape,
+                formatting.config,
+                printer,
+            )?;
             result.push_str(&comment);
 
             if !inner_item.is_empty() {

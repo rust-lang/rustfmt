@@ -1,8 +1,8 @@
+use crate::Color;
+use rustc_errors::{Color as RustColor, ColorSpec, WriteColor};
 use std::io::{stderr, stdout, Write};
 use std::sync::{Arc, Mutex};
 use termcolor::{ColorChoice, StandardStream, WriteColor as _};
-use rustc_errors::{ColorSpec, WriteColor, Color as RustColor};
-use crate::Color;
 
 #[derive(Clone)]
 pub struct Printer {
@@ -13,7 +13,12 @@ impl Write for Printer {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let mut inner = self.inner.lock().unwrap();
         let col = inner.current_color.clone();
-        inner.messages.push(PrintMessage::RustcErrTerm(RustcErrTermMessage::new(buf.to_vec(), col)));
+        inner
+            .messages
+            .push(PrintMessage::RustcErrTerm(RustcErrTermMessage::new(
+                buf.to_vec(),
+                col,
+            )));
         Ok(buf.len())
     }
 
@@ -50,7 +55,6 @@ struct PrinterInner {
 }
 
 impl Printer {
-
     pub fn new(term_output_color: Color) -> Self {
         Self {
             inner: Arc::new(Mutex::new(PrinterInner {
@@ -73,9 +77,14 @@ impl Printer {
 
     pub fn dump(&self) -> Result<(), std::io::Error> {
         let inner = self.inner.lock().unwrap();
-        let mut use_term_stdout = term::stdout().filter(|t| inner.color_setting.use_colored_tty() && t.supports_color());
-        let use_rustc_error_color = inner.color_setting.use_colored_tty() && term::stderr().map(|t| t.supports_color()).unwrap_or_default();
-        let mut rustc_err_out = use_rustc_error_color.then_some(StandardStream::stderr(ColorChoice::Always));
+        let mut use_term_stdout =
+            term::stdout().filter(|t| inner.color_setting.use_colored_tty() && t.supports_color());
+        let use_rustc_error_color = inner.color_setting.use_colored_tty()
+            && term::stderr()
+                .map(|t| t.supports_color())
+                .unwrap_or_default();
+        let mut rustc_err_out =
+            use_rustc_error_color.then_some(StandardStream::stderr(ColorChoice::Always));
         for msg in &inner.messages {
             match msg {
                 PrintMessage::Stdout(out) => {
@@ -166,7 +175,9 @@ macro_rules! buf_term_println {
     ($pb: expr, $col:expr, $($arg:tt)*) => {{
         let mut msg_buf = Vec::new();
         let _ = writeln!(&mut msg_buf, $($arg)*);
-        $pb.push_msg($crate::print::PrintMessage::Term($crate::print::TermMessage::new(msg_buf, $col)));
+        $pb.push_msg(
+            $crate::print::PrintMessage::Term($crate::print::TermMessage::new(msg_buf, $col))
+        );
     }};
 }
 
@@ -174,7 +185,7 @@ pub enum PrintMessage {
     Stdout(Vec<u8>),
     StdErr(Vec<u8>),
     Term(TermMessage),
-    RustcErrTerm(RustcErrTermMessage)
+    RustcErrTerm(RustcErrTermMessage),
 }
 
 pub struct TermMessage {

@@ -280,15 +280,21 @@ impl<'a> FmtVisitor<'a> {
                     self.push_str(&comment_indent.to_string_with_newline(self.config));
 
                     let other_lines = &subslice[offset + 1..];
-                    let comment_str =
-                        rewrite_comment(other_lines, false, comment_shape, self.config, self.printer)
-                            .unwrap_or_else(|| String::from(other_lines));
+                    let comment_str = rewrite_comment(
+                        other_lines,
+                        false,
+                        comment_shape,
+                        self.config,
+                        self.printer,
+                    )
+                    .unwrap_or_else(|| String::from(other_lines));
                     self.push_str(&comment_str);
                 }
             }
         } else {
-            let comment_str = rewrite_comment(subslice, false, comment_shape, self.config, self.printer)
-                .unwrap_or_else(|| String::from(subslice));
+            let comment_str =
+                rewrite_comment(subslice, false, comment_shape, self.config, self.printer)
+                    .unwrap_or_else(|| String::from(subslice));
             self.push_str(&comment_str);
         }
 

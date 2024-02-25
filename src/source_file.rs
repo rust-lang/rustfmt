@@ -14,8 +14,8 @@ use crate::create_emitter;
 #[cfg(test)]
 use crate::formatting::FileRecord;
 
-use rustc_data_structures::sync::Lrc;
 use crate::print::Printer;
+use rustc_data_structures::sync::Lrc;
 
 // Append a newline to the end of each file.
 pub(crate) fn append_newline(s: &mut String) {
@@ -42,7 +42,7 @@ where
             out,
             &mut *emitter,
             config.newline_style(),
-            &Printer::no_color()
+            &Printer::no_color(),
         )?;
     }
     emitter.emit_footer(out)?;

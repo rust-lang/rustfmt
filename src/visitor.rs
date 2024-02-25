@@ -17,6 +17,7 @@ use crate::items::{
 use crate::macros::{macro_style, rewrite_macro, rewrite_macro_def, MacroPosition};
 use crate::modules::Module;
 use crate::parse::session::ParseSess;
+use crate::print::Printer;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::skip::{is_skip_attr, SkipContext};
@@ -28,7 +29,6 @@ use crate::utils::{
     last_line_width, mk_sp, ptr_vec_to_ref_vec, rewrite_ident, starts_with_newline, stmt_expr,
 };
 use crate::{ErrorKind, FormatReport, FormattingError};
-use crate::print::Printer;
 
 /// Creates a string slice corresponding to the specified span.
 pub(crate) struct SnippetProvider {
@@ -316,8 +316,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
                                 // put the other lines below it, shaping it as needed
                                 let other_lines = &sub_slice[offset + 1..];
-                                let comment_str =
-                                    rewrite_comment(other_lines, false, comment_shape, config, self.printer);
+                                let comment_str = rewrite_comment(
+                                    other_lines,
+                                    false,
+                                    comment_shape,
+                                    config,
+                                    self.printer,
+                                );
                                 match comment_str {
                                     Some(ref s) => self.push_str(s),
                                     None => self.push_str(other_lines),
@@ -347,7 +352,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             self.push_str(&self.block_indent.to_string_with_newline(config));
                         }
 
-                        let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config, self.printer);
+                        let comment_str =
+                            rewrite_comment(&sub_slice, false, comment_shape, config, self.printer);
                         match comment_str {
                             Some(ref s) => self.push_str(s),
                             None => self.push_str(&sub_slice),

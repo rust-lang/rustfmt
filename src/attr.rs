@@ -319,7 +319,12 @@ impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let snippet = context.snippet(self.span);
         if self.is_doc_comment() {
-            rewrite_doc_comment(snippet, shape.comment(context.config), context.config, context.printer)
+            rewrite_doc_comment(
+                snippet,
+                shape.comment(context.config),
+                context.config,
+                context.printer,
+            )
         } else {
             let should_skip = self
                 .ident()

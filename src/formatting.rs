@@ -14,10 +14,10 @@ use crate::formatting::generated::is_generated_file;
 use crate::modules::Module;
 use crate::parse::parser::{DirectoryOwnership, Parser, ParserError};
 use crate::parse::session::ParseSess;
+use crate::print::Printer;
 use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
-use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session, buf_eprintln};
-use crate::print::Printer;
+use crate::{buf_eprintln, modules, source_file, ErrorKind, FormatReport, Input, Session};
 
 mod generated;
 mod newline_style;

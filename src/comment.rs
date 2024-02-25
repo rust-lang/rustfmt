@@ -8,6 +8,7 @@ use regex::Regex;
 use rustc_span::Span;
 
 use crate::config::Config;
+use crate::print::Printer;
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::string::{rewrite_string, StringFormat};
@@ -16,7 +17,6 @@ use crate::utils::{
     trimmed_last_line_width, unicode_str_width,
 };
 use crate::{ErrorKind, FormattingError};
-use crate::print::Printer;
 
 lazy_static! {
     /// A regex matching reference doc links.
@@ -249,7 +249,12 @@ pub(crate) fn combine_strs_with_missing_comments(
     Some(result)
 }
 
-pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config, printer: &Printer) -> Option<String> {
+pub(crate) fn rewrite_doc_comment(
+    orig: &str,
+    shape: Shape,
+    config: &Config,
+    printer: &Printer,
+) -> Option<String> {
     identify_comment(orig, false, shape, config, true, printer)
 }
 
@@ -781,9 +786,12 @@ impl<'a> CommentRewrite<'a> {
                             .doc_comment_code_block_width()
                             .min(config.max_width());
                         config.set().max_width(comment_max_width);
-                        if let Some(s) =
-                            crate::format_code_block(&self.code_block_buffer, &config, false, printer)
-                        {
+                        if let Some(s) = crate::format_code_block(
+                            &self.code_block_buffer,
+                            &config,
+                            false,
+                            printer,
+                        ) {
                             trim_custom_comment_prefix(&s.snippet)
                         } else {
                             trim_custom_comment_prefix(&self.code_block_buffer)
@@ -948,7 +956,14 @@ fn rewrite_comment_inner(
         });
 
     for (i, (line, has_leading_whitespace)) in lines.enumerate() {
-        if rewriter.handle_line(orig, i, line, has_leading_whitespace, is_doc_comment, printer) {
+        if rewriter.handle_line(
+            orig,
+            i,
+            line,
+            has_leading_whitespace,
+            is_doc_comment,
+            printer,
+        ) {
             break;
         }
     }
@@ -1015,7 +1030,13 @@ pub(crate) fn rewrite_missing_comment(
     // check the span starts with a comment
     let pos = trimmed_snippet.find('/');
     if !trimmed_snippet.is_empty() && pos.is_some() {
-        rewrite_comment(trimmed_snippet, false, shape, context.config, context.printer)
+        rewrite_comment(
+            trimmed_snippet,
+            false,
+            shape,
+            context.config,
+            context.printer,
+        )
     } else {
         Some(String::new())
     }

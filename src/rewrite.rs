@@ -8,11 +8,11 @@ use rustc_span::Span;
 
 use crate::config::{Config, IndentStyle};
 use crate::parse::session::ParseSess;
+use crate::print::Printer;
 use crate::shape::Shape;
 use crate::skip::SkipContext;
 use crate::visitor::SnippetProvider;
 use crate::FormatReport;
-use crate::print::Printer;
 
 pub(crate) trait Rewrite {
     /// Rewrite self into shape.

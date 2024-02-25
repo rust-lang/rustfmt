@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use super::read_config;
 
 use crate::modules::{ModuleResolutionError, ModuleResolutionErrorKind};
-use crate::{ErrorKind, Input, Session};
 use crate::print::Printer;
+use crate::{ErrorKind, Input, Session};
 
 #[test]
 fn parser_errors_in_submods_are_surfaced() {

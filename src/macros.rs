@@ -1289,17 +1289,18 @@ impl MacroBranch {
         config.set().max_width(new_width);
 
         // First try to format as items, then as statements.
-        let new_body_snippet = match crate::format_snippet(&body_str, &config, true, context.printer) {
-            Some(new_body) => new_body,
-            None => {
-                let new_width = new_width + config.tab_spaces();
-                config.set().max_width(new_width);
-                match crate::format_code_block(&body_str, &config, true, context.printer) {
-                    Some(new_body) => new_body,
-                    None => return None,
+        let new_body_snippet =
+            match crate::format_snippet(&body_str, &config, true, context.printer) {
+                Some(new_body) => new_body,
+                None => {
+                    let new_width = new_width + config.tab_spaces();
+                    config.set().max_width(new_width);
+                    match crate::format_code_block(&body_str, &config, true, context.printer) {
+                        Some(new_body) => new_body,
+                        None => return None,
+                    }
                 }
-            }
-        };
+            };
 
         if !filtered_str_fits(&new_body_snippet.snippet, config.max_width(), shape) {
             return None;

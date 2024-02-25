@@ -1,6 +1,6 @@
 use super::*;
-use std::fs;
 use crate::buf_println;
+use std::fs;
 
 #[derive(Debug, Default)]
 pub(crate) struct FilesEmitter {

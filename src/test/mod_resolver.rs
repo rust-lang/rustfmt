@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use super::read_config;
 
-use crate::{FileName, Input, Session};
 use crate::print::Printer;
+use crate::{FileName, Input, Session};
 
 fn verify_mod_resolution(input_file_name: &str, exp_misformatted_files: &[&str]) {
     let input_file = PathBuf::from(input_file_name);
