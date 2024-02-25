@@ -31,6 +31,7 @@ use crate::lists::{itemize_list, write_list, ListFormatting};
 use crate::overflow;
 use crate::parse::macros::lazy_static::parse_lazy_static;
 use crate::parse::macros::{parse_expr, parse_macro_args, ParsedMacroArgs};
+use crate::print::Printer;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
@@ -476,7 +477,7 @@ pub(crate) fn rewrite_macro_def(
         result += &arm_shape.indent.to_string_with_newline(context.config);
     }
 
-    match write_list(&branch_items, &fmt) {
+    match write_list(&branch_items, &fmt, context.printer) {
         Some(ref s) => result += s,
         None => return snippet,
     }
@@ -1289,12 +1290,12 @@ impl MacroBranch {
         config.set().max_width(new_width);
 
         // First try to format as items, then as statements.
-        let new_body_snippet = match crate::format_snippet(&body_str, &config, true) {
+        let new_body_snippet = match crate::format_snippet(&body_str, &config, true, context.printer) {
             Some(new_body) => new_body,
             None => {
                 let new_width = new_width + config.tab_spaces();
                 config.set().max_width(new_width);
-                match crate::format_code_block(&body_str, &config, true) {
+                match crate::format_code_block(&body_str, &config, true, context.printer) {
                     Some(new_body) => new_body,
                     None => return None,
                 }

@@ -211,7 +211,7 @@ fn rewrite_match_arms(
         .separator("")
         .preserve_newline(true);
 
-    write_list(&arms_vec, &fmt)
+    write_list(&arms_vec, &fmt, context.printer)
 }
 
 fn rewrite_match_arm(
@@ -408,7 +408,7 @@ fn rewrite_match_body(
         if comment_str.is_empty() {
             String::new()
         } else {
-            rewrite_comment(comment_str, false, shape, context.config)?
+            rewrite_comment(comment_str, false, shape, context.config, context.printer)?
         }
     };
 

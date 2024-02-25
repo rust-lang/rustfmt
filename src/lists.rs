@@ -8,6 +8,7 @@ use rustc_span::BytePos;
 use crate::comment::{find_comment_end, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
 use crate::config::{Config, IndentStyle};
+use crate::print::Printer;
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::utils::{
@@ -257,7 +258,7 @@ where
 }
 
 // Format a list of commented items into a string.
-pub(crate) fn write_list<I, T>(items: I, formatting: &ListFormatting<'_>) -> Option<String>
+pub(crate) fn write_list<I, T>(items: I, formatting: &ListFormatting<'_>, printer: &Printer) -> Option<String>
 where
     I: IntoIterator<Item = T> + Clone,
     T: AsRef<ListItem>,
@@ -363,7 +364,7 @@ where
             let block_mode = tactic == DefinitiveListTactic::Horizontal;
             // Width restriction is only relevant in vertical mode.
             let comment =
-                rewrite_comment(comment, block_mode, formatting.shape, formatting.config)?;
+                rewrite_comment(comment, block_mode, formatting.shape, formatting.config, printer)?;
             result.push_str(&comment);
 
             if !inner_item.is_empty() {
@@ -409,6 +410,7 @@ where
                 true,
                 Shape::legacy(formatting.shape.width, Indent::empty()),
                 formatting.config,
+                printer,
             )?;
 
             result.push(' ');
@@ -457,6 +459,7 @@ where
                     block_style,
                     comment_shape,
                     formatting.config,
+                    printer,
                 )
             };
 

@@ -147,7 +147,7 @@ fn format_derive(
         .tactic(tactic)
         .trailing_separator(trailing_separator)
         .ends_with_newline(false);
-    let item_str = write_list(&all_items, &fmt)?;
+    let item_str = write_list(&all_items, &fmt, context.printer)?;
 
     debug!("item_str: '{}'", item_str);
 
@@ -235,6 +235,7 @@ fn rewrite_initial_doc_comments(
                 &snippet,
                 shape.comment(context.config),
                 context.config,
+                context.printer,
             )?),
         ));
     }
@@ -318,7 +319,7 @@ impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let snippet = context.snippet(self.span);
         if self.is_doc_comment() {
-            rewrite_doc_comment(snippet, shape.comment(context.config), context.config)
+            rewrite_doc_comment(snippet, shape.comment(context.config), context.config, context.printer)
         } else {
             let should_skip = self
                 .ident()
@@ -347,6 +348,7 @@ impl Rewrite for ast::Attribute {
                             &doc_comment,
                             shape.comment(context.config),
                             context.config,
+                            context.printer,
                         );
                     }
                 }

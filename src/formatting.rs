@@ -17,6 +17,7 @@ use crate::parse::session::ParseSess;
 use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
+use crate::print::Printer;
 
 mod generated;
 mod newline_style;
@@ -45,7 +46,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             }
 
             let config = &self.config.clone();
-            let format_result = format_project(input, config, self, is_macro_def);
+            let format_result = format_project(input, config, self, is_macro_def, self.printer);
 
             format_result.map(|report| {
                 self.errors.add(&report.internal.borrow().1);
@@ -103,6 +104,7 @@ fn format_project<T: FormatHandler>(
     config: &Config,
     handler: &mut T,
     is_macro_def: bool,
+    printer: &Printer,
 ) -> Result<FormatReport, ErrorKind> {
     let mut timer = Timer::start();
 
@@ -130,7 +132,7 @@ fn format_project<T: FormatHandler>(
         }
     };
 
-    let mut context = FormatContext::new(&krate, report, parse_session, config, handler);
+    let mut context = FormatContext::new(&krate, report, parse_session, config, handler, printer);
     let files = modules::ModResolver::new(
         &context.parse_session,
         directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaBlock),
@@ -181,6 +183,7 @@ struct FormatContext<'a, T: FormatHandler> {
     parse_session: ParseSess,
     config: &'a Config,
     handler: &'a mut T,
+    printer: &'a Printer,
 }
 
 impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
@@ -190,6 +193,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         parse_session: ParseSess,
         config: &'a Config,
         handler: &'a mut T,
+        printer: &'a Printer,
     ) -> Self {
         FormatContext {
             krate,
@@ -197,6 +201,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             parse_session,
             config,
             handler,
+            printer,
         }
     }
 
@@ -216,6 +221,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             &self.parse_session,
             self.config,
             &snippet_provider,
+            &self.printer,
             self.report.clone(),
         );
         visitor.skip_context.update_with_attrs(&self.krate.attrs);

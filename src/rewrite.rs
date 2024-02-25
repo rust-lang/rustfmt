@@ -12,6 +12,7 @@ use crate::shape::Shape;
 use crate::skip::SkipContext;
 use crate::visitor::SnippetProvider;
 use crate::FormatReport;
+use crate::print::Printer;
 
 pub(crate) trait Rewrite {
     /// Rewrite self into shape.
@@ -43,6 +44,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
     pub(crate) skipped_range: Rc<RefCell<Vec<(usize, usize)>>>,
+    pub(crate) printer: &'a Printer,
 }
 
 pub(crate) struct InsideMacroGuard {

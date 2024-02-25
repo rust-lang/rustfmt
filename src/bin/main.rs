@@ -316,7 +316,7 @@ fn format(
         }
     }
 
-    let num_cpus = 16;
+    let num_cpus = 32;
     let (send, recv) = std::sync::mpsc::channel();
 
     let mut exit_code = 0;
