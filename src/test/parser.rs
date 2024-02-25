@@ -5,6 +5,7 @@ use super::read_config;
 
 use crate::modules::{ModuleResolutionError, ModuleResolutionErrorKind};
 use crate::{ErrorKind, Input, Session};
+use crate::print::Printer;
 
 #[test]
 fn parser_errors_in_submods_are_surfaced() {
@@ -13,7 +14,8 @@ fn parser_errors_in_submods_are_surfaced() {
     let input_file = PathBuf::from(filename);
     let exp_mod_name = "invalid";
     let config = read_config(&input_file);
-    let mut session = Session::<io::Stdout>::new(config, None);
+    let printer = Printer::no_color();
+    let mut session = Session::<io::Stdout>::new(config, None, &printer);
     if let Err(ErrorKind::ModuleResolutionError(ModuleResolutionError { module, kind })) =
         session.format(Input::File(filename.into()))
     {
@@ -37,7 +39,8 @@ fn parser_errors_in_submods_are_surfaced() {
 fn assert_parser_error(filename: &str) {
     let file = PathBuf::from(filename);
     let config = read_config(&file);
-    let mut session = Session::<io::Stdout>::new(config, None);
+    let printer = Printer::no_color();
+    let mut session = Session::<io::Stdout>::new(config, None, &printer);
     let _ = session.format(Input::File(filename.into())).unwrap();
     assert!(session.has_parsing_errors());
 }

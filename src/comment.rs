@@ -1921,19 +1921,19 @@ mod test {
         let comment = rewrite_comment(" //test",
                                       true,
                                       Shape::legacy(100, Indent::new(0, 100)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("/* test */", comment);
 
         let comment = rewrite_comment("// comment on a",
                                       false,
                                       Shape::legacy(10, Indent::empty()),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("// comment\n// on a", comment);
 
         let comment = rewrite_comment("//  A multi line comment\n             // between args.",
                                       false,
                                       Shape::legacy(60, Indent::new(0, 12)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("//  A multi line comment\n            // between args.", comment);
 
         let input = "// comment";
@@ -1942,13 +1942,13 @@ mod test {
         let comment = rewrite_comment(input,
                                       true,
                                       Shape::legacy(9, Indent::new(0, 69)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!(expected, comment);
 
         let comment = rewrite_comment("/*   trimmed    */",
                                       true,
                                       Shape::legacy(100, Indent::new(0, 100)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("/* trimmed */", comment);
 
         // Check that different comment style are properly recognised.
@@ -1959,7 +1959,7 @@ mod test {
                                           */"#,
                                       false,
                                       Shape::legacy(100, Indent::new(0, 0)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("/// test1\n/// test2\n// test3", comment);
 
         // Check that the blank line marks the end of a commented paragraph.
@@ -1968,7 +1968,7 @@ mod test {
                                          // test2"#,
                                       false,
                                       Shape::legacy(100, Indent::new(0, 0)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("// test1\n\n// test2", comment);
 
         // Check that the blank line marks the end of a custom-commented paragraph.
@@ -1977,7 +1977,7 @@ mod test {
                                          //@ test2"#,
                                       false,
                                       Shape::legacy(100, Indent::new(0, 0)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("//@ test1\n\n//@ test2", comment);
 
         // Check that bare lines are just indented but otherwise left unchanged.
@@ -1989,7 +1989,7 @@ mod test {
                                           */"#,
                                       false,
                                       Shape::legacy(100, Indent::new(0, 0)),
-                                      &wrap_config).unwrap();
+                                      &wrap_config, &Printer::no_color()).unwrap();
         assert_eq!("// test1\n/*\n a bare line!\n\n      another bare line!\n*/", comment);
     }
 

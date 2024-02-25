@@ -4,11 +4,13 @@ use std::path::PathBuf;
 use super::read_config;
 
 use crate::{FileName, Input, Session};
+use crate::print::Printer;
 
 fn verify_mod_resolution(input_file_name: &str, exp_misformatted_files: &[&str]) {
     let input_file = PathBuf::from(input_file_name);
     let config = read_config(&input_file);
-    let mut session = Session::<io::Stdout>::new(config, None);
+    let printer = Printer::no_color();
+    let mut session = Session::<io::Stdout>::new(config, None, &printer);
     let report = session
         .format(Input::File(input_file_name.into()))
         .expect("Should not have had any execution errors");

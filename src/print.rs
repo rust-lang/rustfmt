@@ -62,6 +62,10 @@ impl Printer {
         }
     }
 
+    pub fn no_color() -> Self {
+        Self::new(Color::Never)
+    }
+
     #[inline]
     pub fn push_msg(&self, msg: PrintMessage) {
         self.inner.lock().unwrap().messages.push(msg);

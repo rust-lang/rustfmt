@@ -42,6 +42,7 @@ where
             out,
             &mut *emitter,
             config.newline_style(),
+            &Printer::no_color()
         )?;
     }
     emitter.emit_footer(out)?;

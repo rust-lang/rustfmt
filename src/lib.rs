@@ -527,12 +527,14 @@ pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
             config.print_misformatted_file_names(),
         )),
         EmitMode::Stdout | EmitMode::Coverage => {
-            Box::new(emitter::StdoutEmitter::new(config.verbose()))
+            Box::new(emitter::IntoOutputEmitter::new(config.verbose()))
         }
         EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
         EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
         EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
-        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
+        EmitMode::Diff => {
+            Box::new(emitter::DiffEmitter::new(config.clone()))
+        },
     }
 }
 
@@ -586,15 +588,15 @@ mod unit_tests {
         // `format_snippet()` and `format_code_block()` should not panic
         // even when we cannot parse the given snippet.
         let snippet = "let";
-        assert!(format_snippet(snippet, &Config::default(), false).is_none());
-        assert!(format_code_block(snippet, &Config::default(), false).is_none());
+        assert!(format_snippet(snippet, &Config::default(), false, &Printer::no_color()).is_none());
+        assert!(format_code_block(snippet, &Config::default(), false, &Printer::no_color()).is_none());
     }
 
     fn test_format_inner<F>(formatter: F, input: &str, expected: &str) -> bool
     where
-        F: Fn(&str, &Config, bool) -> Option<FormattedSnippet>,
+        F: Fn(&str, &Config, bool, &Printer) -> Option<FormattedSnippet>,
     {
-        let output = formatter(input, &Config::default(), false);
+        let output = formatter(input, &Config::default(), false, &Printer::no_color());
         output.is_some() && output.unwrap().snippet == expected
     }
 
@@ -616,7 +618,7 @@ mod unit_tests {
     fn test_format_code_block_fail() {
         #[rustfmt::skip]
         let code_block = "this_line_is_100_characters_long_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx(x, y, z);";
-        assert!(format_code_block(code_block, &Config::default(), false).is_none());
+        assert!(format_code_block(code_block, &Config::default(), false, &Printer::no_color()).is_none());
     }
 
     #[test]

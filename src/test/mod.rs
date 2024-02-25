@@ -11,11 +11,12 @@ use std::thread;
 
 use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle};
 use crate::formatting::{ReportedErrors, SourceFile};
-use crate::rustfmt_diff::{make_diff, print_diff, DiffLine, Mismatch, ModifiedChunk, OutputWriter};
-use crate::source_file;
+use crate::rustfmt_diff::{make_diff, print_diff, DiffLine, Mismatch, ModifiedChunk};
+use crate::{buf_term_println, source_file};
 use crate::{is_nightly_channel, FormatReport, FormatReportFormatterBuilder, Input, Session};
 
 use rustfmt_config_proc_macro::nightly_only_test;
+use crate::print::Printer;
 
 mod configuration_snippet;
 mod mod_resolver;
@@ -168,8 +169,9 @@ fn verify_config_test_names() {
 // using only one or the other will cause the output order to differ when
 // `print_diff` selects the approach not used.
 fn write_message(msg: &str) {
-    let mut writer = OutputWriter::new(Color::Auto);
-    writer.writeln(msg, None);
+    let print = Printer::new(Color::Auto);
+    buf_term_println!(print, None, "{msg}");
+    print.dump().unwrap();
 }
 
 // Integration tests. The files in `tests/source` are formatted and compared
@@ -237,7 +239,8 @@ fn modified_test() {
         .emit_mode(crate::config::EmitMode::ModifiedLines);
 
     {
-        let mut session = Session::new(config, Some(&mut data));
+        let printer = Printer::no_color();
+        let mut session = Session::new(config, Some(&mut data), &printer);
         session.format(Input::File(filename.into())).unwrap();
     }
 
@@ -329,7 +332,8 @@ fn assert_stdin_output(
     // Populate output by writing to a vec.
     let mut buf: Vec<u8> = vec![];
     {
-        let mut session = Session::new(config, Some(&mut buf));
+        let printer = Printer::no_color();
+        let mut session = Session::new(config, Some(&mut buf), &printer);
         session.format(input).unwrap();
         let errors = ReportedErrors {
             has_diff,
@@ -422,7 +426,8 @@ fn format_files_find_new_files_via_cfg_if() {
         ];
 
         let config = Config::default();
-        let mut session = Session::<io::Stdout>::new(config, None);
+        let printer = Printer::no_color();
+        let mut session = Session::<io::Stdout>::new(config, None, &printer);
 
         let mut write_result = HashMap::new();
         for file in files {
@@ -456,7 +461,8 @@ fn stdin_formatting_smoke_test() {
     config.set().emit_mode(EmitMode::Stdout);
     let mut buf: Vec<u8> = vec![];
     {
-        let mut session = Session::new(config, Some(&mut buf));
+        let printer = Printer::no_color();
+        let mut session = Session::new(config, Some(&mut buf), &printer);
         session.format(input).unwrap();
         assert!(session.has_no_errors());
     }
@@ -473,7 +479,8 @@ fn stdin_parser_panic_caught() {
     // See issue #3239.
     for text in ["{", "}"].iter().cloned().map(String::from) {
         let mut buf = vec![];
-        let mut session = Session::new(Default::default(), Some(&mut buf));
+        let printer = Printer::no_color();
+        let mut session = Session::new(Default::default(), Some(&mut buf), &printer);
         let _ = session.format(Input::Text(text));
 
         assert!(session.has_parsing_errors());
@@ -494,7 +501,8 @@ fn stdin_works_with_modified_lines() {
     config.set().emit_mode(EmitMode::ModifiedLines);
     let mut buf: Vec<u8> = vec![];
     {
-        let mut session = Session::new(config, Some(&mut buf));
+        let printer = Printer::no_color();
+        let mut session = Session::new(config, Some(&mut buf), &printer);
         session.format(input).unwrap();
         let errors = ReportedErrors {
             has_diff: true,
@@ -563,7 +571,8 @@ fn stdin_generated_files_issue_5172() {
     config.set().newline_style(NewlineStyle::Unix);
     let mut buf: Vec<u8> = vec![];
     {
-        let mut session = Session::new(config, Some(&mut buf));
+        let printer = Printer::no_color();
+        let mut session = Session::new(config, Some(&mut buf), &printer);
         session.format(input).unwrap();
         assert!(session.has_no_errors());
     }
@@ -605,7 +614,8 @@ fn format_lines_errors_are_reported() {
     let input = Input::Text(format!("fn {long_identifier}() {{}}"));
     let mut config = Config::default();
     config.set().error_on_line_overflow(true);
-    let mut session = Session::<io::Stdout>::new(config, None);
+    let printer = Printer::no_color();
+    let mut session = Session::<io::Stdout>::new(config, None, &printer);
     session.format(input).unwrap();
     assert!(session.has_formatting_errors());
 }
@@ -618,7 +628,8 @@ fn format_lines_errors_are_reported_with_tabs() {
     let mut config = Config::default();
     config.set().error_on_line_overflow(true);
     config.set().hard_tabs(true);
-    let mut session = Session::<io::Stdout>::new(config, None);
+    let printer = Printer::no_color();
+    let mut session = Session::<io::Stdout>::new(config, None, &printer);
     session.format(input).unwrap();
     assert!(session.has_formatting_errors());
 }
@@ -667,7 +678,7 @@ fn print_mismatches_default_message(result: HashMap<PathBuf, Vec<Mismatch>>) {
     for (file_name, diff) in result {
         let mismatch_msg_formatter =
             |line_num| format!("\nMismatch at {}:{}:", file_name.display(), line_num);
-        print_diff(diff, &mismatch_msg_formatter, &Default::default());
+        print_diff(diff, &mismatch_msg_formatter, &Default::default(), &Printer::no_color());
     }
 
     if let Some(mut t) = term::stdout() {
@@ -680,7 +691,7 @@ fn print_mismatches<T: Fn(u32) -> String>(
     mismatch_msg_formatter: T,
 ) {
     for (_file_name, diff) in result {
-        print_diff(diff, &mismatch_msg_formatter, &Default::default());
+        print_diff(diff, &mismatch_msg_formatter, &Default::default(), &Printer::no_color());
     }
 
     if let Some(mut t) = term::stdout() {
@@ -714,7 +725,8 @@ fn read_config(filename: &Path) -> Config {
 fn format_file<P: Into<PathBuf>>(filepath: P, config: Config) -> (bool, SourceFile, FormatReport) {
     let filepath = filepath.into();
     let input = Input::File(filepath);
-    let mut session = Session::<io::Stdout>::new(config, None);
+    let printer = Printer::no_color();
+    let mut session = Session::<io::Stdout>::new(config, None, &printer);
     let result = session.format(input).unwrap();
     let parsing_errors = session.has_parsing_errors();
     let mut source_file = SourceFile::new();
