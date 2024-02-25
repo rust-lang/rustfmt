@@ -31,7 +31,6 @@ use crate::lists::{itemize_list, write_list, ListFormatting};
 use crate::overflow;
 use crate::parse::macros::lazy_static::parse_lazy_static;
 use crate::parse::macros::{parse_expr, parse_macro_args, ParsedMacroArgs};
-use crate::print::Printer;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;

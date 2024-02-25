@@ -17,7 +17,7 @@ use std::str::FromStr;
 use std::thread::JoinHandle;
 
 use getopts::{Matches, Options};
-use rustfmt_nightly::buf_eprintln;
+use rustfmt_nightly::{buf_eprintln, buf_println};
 use rustfmt_nightly::print::Printer;
 
 use crate::rustfmt::{
@@ -350,7 +350,7 @@ fn format(
                 buf_eprintln!(printer, "Error: file `{}` does not exist", file.to_str().unwrap());
                 session.add_operational_error();
             } else if file.is_dir() {
-                eprintln!("Error: `{}` is a directory", file.to_str().unwrap());
+                buf_eprintln!(printer, "Error: `{}` is a directory", file.to_str().unwrap());
                 session.add_operational_error();
             } else {
                 // Check the file directory if the config-path could not be read or not provided
@@ -371,11 +371,9 @@ fn format(
                         };
                     if local_config.verbose() == Verbosity::Verbose {
                         if let Some(path) = config_path {
-                            println!(
-                                "Using rustfmt config file {} for {}",
+                            buf_println!(printer, "Using rustfmt config file {} for {}",
                                 path.display(),
-                                file.display()
-                            );
+                                file.display());
                         }
                     }
 
@@ -451,16 +449,14 @@ fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) 
     match session.format(input) {
         Ok(report) => {
             if report.has_warnings() {
-                eprintln!(
-                    "{}",
+                buf_eprintln!(session.printer, "{}",
                     FormatReportFormatterBuilder::new(&report)
                         .enable_colors(should_print_with_colors(session))
-                        .build()
-                );
+                        .build());
             }
         }
         Err(msg) => {
-            eprintln!("Error writing files: {msg}");
+            buf_eprintln!(session.printer, "Error writing files: {msg}");
             session.add_operational_error();
         }
     }

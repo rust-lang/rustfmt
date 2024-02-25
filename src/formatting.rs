@@ -16,7 +16,7 @@ use crate::parse::parser::{DirectoryOwnership, Parser, ParserError};
 use crate::parse::session::ParseSess;
 use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
-use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
+use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session, buf_eprintln};
 use crate::print::Printer;
 
 mod generated;
@@ -111,7 +111,7 @@ fn format_project<T: FormatHandler>(
     let main_file = input.file_name();
     let input_is_stdin = main_file == FileName::Stdin;
 
-    let parse_session = ParseSess::new(config)?;
+    let parse_session = ParseSess::new(config, printer)?;
     if config.skip_children() && parse_session.ignore_file(&main_file) {
         return Ok(FormatReport::new());
     }
@@ -125,7 +125,7 @@ fn format_project<T: FormatHandler>(
         Err(e) => {
             let forbid_verbose = input_is_stdin || e != ParserError::ParsePanicError;
             should_emit_verbose(forbid_verbose, config, || {
-                eprintln!("The Rust parser panicked");
+                buf_eprintln!(printer, "The Rust parser panicked");
             });
             report.add_parsing_error();
             return Ok(report);

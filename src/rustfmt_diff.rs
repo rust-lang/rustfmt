@@ -2,8 +2,10 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::io;
 use std::io::Write;
+use crate::buf_term_println;
 
 use crate::config::{Color, Config, Verbosity};
+use crate::print::Printer;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum DiffLine {
@@ -245,7 +247,7 @@ pub(crate) fn make_diff(expected: &str, actual: &str, context_size: usize) -> Ve
     results
 }
 
-pub(crate) fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config)
+pub(crate) fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config, printer: &Printer)
 where
     F: Fn(u32) -> String,
 {
@@ -265,14 +267,13 @@ where
         for line in mismatch.lines {
             match line {
                 DiffLine::Context(ref str) => {
-                    writer.writeln(&format!(" {str}{line_terminator}"), None)
+                    buf_term_println!(printer, None, " {str}{line_terminator}");
                 }
-                DiffLine::Expected(ref str) => writer.writeln(
-                    &format!("+{str}{line_terminator}"),
-                    Some(term::color::GREEN),
-                ),
+                DiffLine::Expected(ref str) => {
+                    buf_term_println!(printer, Some(rustc_errors::Color::Green), "+{str}{line_terminator}");
+                },
                 DiffLine::Resulting(ref str) => {
-                    writer.writeln(&format!("-{str}{line_terminator}"), Some(term::color::RED))
+                    buf_term_println!(printer, Some(rustc_errors::Color::Red), "-{str}{line_terminator}");
                 }
             }
         }
