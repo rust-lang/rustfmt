@@ -8,7 +8,6 @@ impl Emitter for FilesWithBackupEmitter {
     fn emit_formatted_file(
         &mut self,
         _output: &mut dyn Write,
-        _printer: &Printer,
         FormattedFile {
             filename,
             original_text,

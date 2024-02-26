@@ -2,24 +2,23 @@ use super::*;
 use crate::buf_println;
 use std::fs;
 
-#[derive(Debug, Default)]
-pub(crate) struct FilesEmitter {
-    print_misformatted_file_names: bool,
+#[derive(Default)]
+pub(crate) struct FilesEmitter<'a> {
+    print_misformatted_file_names: Option<&'a Printer>,
 }
 
-impl FilesEmitter {
-    pub(crate) fn new(print_misformatted_file_names: bool) -> Self {
+impl<'a> FilesEmitter<'a> {
+    pub(crate) fn new(print_misformatted_file_names: Option<&'a Printer>) -> Self {
         Self {
             print_misformatted_file_names,
         }
     }
 }
 
-impl Emitter for FilesEmitter {
+impl<'a> Emitter for FilesEmitter<'a> {
     fn emit_formatted_file(
         &mut self,
         _output: &mut dyn Write,
-        printer: &Printer,
         FormattedFile {
             filename,
             original_text,
@@ -30,7 +29,7 @@ impl Emitter for FilesEmitter {
         let filename = ensure_real_path(filename);
         if original_text != formatted_text {
             fs::write(filename, formatted_text)?;
-            if self.print_misformatted_file_names {
+            if let Some(printer) = self.print_misformatted_file_names {
                 buf_println!(printer, "{}", filename.display());
             }
         }

@@ -21,7 +21,6 @@ impl Emitter for CheckstyleEmitter {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,
-        _printer: &Printer,
         FormattedFile {
             filename,
             original_text,
@@ -101,7 +100,6 @@ mod tests {
         let _ = emitter
             .emit_formatted_file(
                 &mut writer,
-                &Printer::no_color(),
                 FormattedFile {
                     filename: &FileName::Real(PathBuf::from(bin_file)),
                     original_text: &bin_original.join("\n"),
@@ -112,7 +110,6 @@ mod tests {
         let _ = emitter
             .emit_formatted_file(
                 &mut writer,
-                &Printer::no_color(),
                 FormattedFile {
                     filename: &FileName::Real(PathBuf::from(lib_file)),
                     original_text: &lib_original.join("\n"),

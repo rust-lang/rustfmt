@@ -16,7 +16,6 @@ impl Emitter for IntoOutputEmitter {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,
-        _printer: &Printer,
         FormattedFile {
             filename,
             formatted_text,

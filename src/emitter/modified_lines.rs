@@ -8,7 +8,6 @@ impl Emitter for ModifiedLinesEmitter {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,
-        _printer: &Printer,
         FormattedFile {
             original_text,
             formatted_text,

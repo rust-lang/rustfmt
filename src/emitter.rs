@@ -33,7 +33,6 @@ pub(crate) trait Emitter {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,
-        printer: &Printer,
         formatted_file: FormattedFile<'_>,
     ) -> Result<EmitterResult, io::Error>;
 

@@ -452,7 +452,7 @@ pub struct Session<'b, T: Write> {
 
 impl<'b, T: Write + 'b> Session<'b, T> {
     pub fn new(config: Config, mut out: Option<&'b mut T>, printer: &'b Printer) -> Session<'b, T> {
-        let emitter = create_emitter(&config);
+        let emitter = create_emitter(&config, printer);
 
         if let Some(ref mut out) = out {
             let _ = emitter.emit_header(out);
@@ -523,13 +523,13 @@ impl<'b, T: Write + 'b> Session<'b, T> {
     }
 }
 
-pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
+pub(crate) fn create_emitter<'a>(config: &Config, printer: &'a Printer) -> Box<dyn Emitter + 'a> {
     match config.emit_mode() {
         EmitMode::Files if config.make_backup() => {
             Box::new(emitter::FilesWithBackupEmitter::default())
         }
         EmitMode::Files => Box::new(emitter::FilesEmitter::new(
-            config.print_misformatted_file_names(),
+            config.print_misformatted_file_names().then_some(printer),
         )),
         EmitMode::Stdout | EmitMode::Coverage => {
             Box::new(emitter::IntoOutputEmitter::new(config.verbose()))
@@ -537,7 +537,7 @@ pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
         EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
         EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
         EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
-        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
+        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone(), printer)),
     }
 }
 

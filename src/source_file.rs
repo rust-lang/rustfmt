@@ -14,7 +14,6 @@ use crate::create_emitter;
 #[cfg(test)]
 use crate::formatting::FileRecord;
 
-use crate::print::Printer;
 use rustc_data_structures::sync::Lrc;
 
 // Append a newline to the end of each file.
@@ -31,7 +30,8 @@ pub(crate) fn write_all_files<T>(
 where
     T: Write,
 {
-    let mut emitter = create_emitter(config);
+    let printer = crate::print::Printer::no_color();
+    let mut emitter = create_emitter(config, &printer);
 
     emitter.emit_header(out)?;
     for (filename, text) in source_file {
@@ -42,7 +42,6 @@ where
             out,
             &mut *emitter,
             config.newline_style(),
-            &Printer::no_color(),
         )?;
     }
     emitter.emit_footer(out)?;
@@ -57,7 +56,6 @@ pub(crate) fn write_file<T>(
     out: &mut T,
     emitter: &mut dyn Emitter,
     newline_style: NewlineStyle,
-    printer: &Printer,
 ) -> Result<emitter::EmitterResult, io::Error>
 where
     T: Write,
@@ -104,5 +102,5 @@ where
         formatted_text,
     };
 
-    emitter.emit_formatted_file(out, printer, formatted_file)
+    emitter.emit_formatted_file(out, formatted_file)
 }
