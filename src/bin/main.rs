@@ -17,14 +17,11 @@ use std::str::FromStr;
 use std::thread::JoinHandle;
 use std::{env, panic};
 
-use getopts::{Matches, Options};
-use rustfmt_nightly::print::Printer;
-use rustfmt_nightly::{buf_eprintln, buf_println};
-
 use crate::rustfmt::{
-    load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
-    FormatReportFormatterBuilder, Input, Session, Verbosity,
+    buf_eprintln, buf_println, load_config, print::Printer, CliOptions, Color, Config, Edition,
+    EmitMode, FileLines, FileName, FormatReportFormatterBuilder, Input, Session, Verbosity,
 };
+use getopts::{Matches, Options};
 
 const BUG_REPORT_URL: &str = "https://github.com/rust-lang/rustfmt/issues/new?labels=bug";
 
