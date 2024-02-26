@@ -137,7 +137,7 @@ fn default_dcx(
         Box::new(EmitterWriter::new(
             Box::new(printer.clone()),
             fallback_bundle,
-        ))
+        ).sm(Some(source_map.clone())))
     };
     DiagCtxt::with_emitter(Box::new(SilentOnIgnoredFilesEmitter {
         has_non_ignorable_parser_errors: false,
