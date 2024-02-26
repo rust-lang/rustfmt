@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{self, stdout, Read, Write};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread::JoinHandle;
@@ -327,7 +328,7 @@ fn format(
         }
     }
 
-    let num_cpus = 32;
+    let parallelism = std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN);
     let (send, recv) = std::sync::mpsc::channel();
 
     let mut exit_code = 0;
@@ -416,7 +417,7 @@ fn format(
         handles.insert(id, handle);
         id += 1;
         outstanding += 1;
-        if outstanding >= num_cpus {
+        if outstanding >= parallelism.get() {
             if let Ok(thread_out) = recv.recv() {
                 handles
                     .remove(&thread_out.id)
