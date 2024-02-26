@@ -134,10 +134,10 @@ fn default_dcx(
             rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
             false,
         );
-        Box::new(EmitterWriter::new(
-            Box::new(printer.clone()),
-            fallback_bundle,
-        ).sm(Some(source_map.clone())))
+        Box::new(
+            EmitterWriter::new(Box::new(printer.clone()), fallback_bundle)
+                .sm(Some(source_map.clone())),
+        )
     };
     DiagCtxt::with_emitter(Box::new(SilentOnIgnoredFilesEmitter {
         has_non_ignorable_parser_errors: false,

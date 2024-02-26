@@ -1,6 +1,6 @@
-use std::fmt::Formatter;
 use crate::Color;
 use rustc_errors::{Color as RustColor, ColorSpec, WriteColor};
+use std::fmt::Formatter;
 use std::io::{stderr, stdout, Write};
 use std::sync::{Arc, Mutex};
 use termcolor::{ColorChoice, StandardStream, WriteColor as _};
@@ -34,7 +34,6 @@ impl Write for Printer {
         //println!("Flush");
         Ok(())
     }
-
 }
 
 impl WriteColor for Printer {
@@ -54,7 +53,6 @@ impl WriteColor for Printer {
         self.inner.lock().unwrap().current_color.take();
         Ok(())
     }
-
 }
 
 struct PrinterInner {
@@ -223,18 +221,24 @@ pub enum PrintMessage {
 impl std::fmt::Debug for PrintMessage {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            PrintMessage::Stdout(buf) => {
-                f.write_fmt(format_args!("PrintMessage::Stdout({:?})", core::str::from_utf8(buf)))
-            }
-            PrintMessage::StdErr(buf) => {
-                f.write_fmt(format_args!("PrintMessage::Stderr({:?})", core::str::from_utf8(buf)))
-            }
-            PrintMessage::Term(msg) => {
-                f.write_fmt(format_args!("PrintMessage::Term({:?}, {:?})", core::str::from_utf8(&msg.message), msg.color))
-            }
-            PrintMessage::RustcErrTerm(msg) => {
-                f.write_fmt(format_args!("PrintMessage::RustcErrTerm({:?}, {:?})", core::str::from_utf8(&msg.message), msg.color))
-            }
+            PrintMessage::Stdout(buf) => f.write_fmt(format_args!(
+                "PrintMessage::Stdout({:?})",
+                core::str::from_utf8(buf)
+            )),
+            PrintMessage::StdErr(buf) => f.write_fmt(format_args!(
+                "PrintMessage::Stderr({:?})",
+                core::str::from_utf8(buf)
+            )),
+            PrintMessage::Term(msg) => f.write_fmt(format_args!(
+                "PrintMessage::Term({:?}, {:?})",
+                core::str::from_utf8(&msg.message),
+                msg.color
+            )),
+            PrintMessage::RustcErrTerm(msg) => f.write_fmt(format_args!(
+                "PrintMessage::RustcErrTerm({:?}, {:?})",
+                core::str::from_utf8(&msg.message),
+                msg.color
+            )),
         }
     }
 }

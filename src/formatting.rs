@@ -17,7 +17,10 @@ use crate::parse::session::ParseSess;
 use crate::print::Printer;
 use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
-use crate::{buf_eprintln, modules, source_file, ErrorKind, FormatReport, Input, Session, buf_println, buf_print};
+use crate::{
+    buf_eprintln, buf_print, buf_println, modules, source_file, ErrorKind, FormatReport, Input,
+    Session,
+};
 
 mod generated;
 mod newline_style;
@@ -44,7 +47,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
                         // Echo back stdin
                         buf_print!(self.printer, "{buf}");
                         Ok(FormatReport::new())
-                    },
+                    }
                     _ => Ok(FormatReport::new()),
                 };
             }
@@ -151,13 +154,19 @@ fn format_project<T: FormatHandler>(
     for (path, module) in files {
         if input_is_stdin && contains_skip(module.attrs()) {
             // Echo back stdin
-            buf_print!(printer, "{}", context
+            buf_print!(
+                printer,
+                "{}",
+                context
                     .parse_session
                     .snippet_provider(module.span)
-                    .entire_snippet());
+                    .entire_snippet()
+            );
             return Ok(FormatReport::new());
         }
-        should_emit_verbose(input_is_stdin, config, || buf_println!(printer, "Formatting {}", path));
+        should_emit_verbose(input_is_stdin, config, || {
+            buf_println!(printer, "Formatting {}", path)
+        });
         context.format_file(path, &module, is_macro_def)?;
     }
     timer = timer.done_formatting();
