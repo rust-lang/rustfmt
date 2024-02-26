@@ -124,7 +124,6 @@ fn default_dcx(
     ignore_path_set: Lrc<IgnorePathSet>,
     can_reset: Lrc<AtomicBool>,
     show_parse_errors: bool,
-    _color: Color,
     printer: &Printer,
 ) -> DiagCtxt {
     let emitter = if !show_parse_errors {
@@ -162,7 +161,6 @@ impl ParseSess {
             Lrc::clone(&ignore_path_set),
             Lrc::clone(&can_reset_errors),
             config.show_parse_errors(),
-            config.color(),
             printer,
         );
         let parse_sess = RawParseSess::with_dcx(dcx, source_map);

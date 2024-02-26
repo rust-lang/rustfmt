@@ -529,7 +529,7 @@ pub(crate) fn create_emitter<'a>(config: &Config, printer: &'a Printer) -> Box<d
             Box::new(emitter::FilesWithBackupEmitter::default())
         }
         EmitMode::Files => Box::new(emitter::FilesEmitter::new(
-            config.print_misformatted_file_names().then_some(printer),
+            config.print_misformatted_file_names(),
         )),
         EmitMode::Stdout | EmitMode::Coverage => {
             Box::new(emitter::IntoOutputEmitter::new(config.verbose()))
