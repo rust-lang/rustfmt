@@ -2353,13 +2353,7 @@ fn rewrite_fn_base(
         2
     };
     let used_width = last_line_used_width(&result, indent.width());
-    let one_line_budget = std::cmp::min(
-        context.budget(used_width + overhead),
-        context
-            .config
-            .fn_param_width()
-            .saturating_sub(used_width + overhead),
-    );
+    let one_line_budget = context.budget(used_width + overhead);
     let shape = Shape {
         width: one_line_budget,
         indent,

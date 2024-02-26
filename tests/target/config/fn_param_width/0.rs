@@ -2,97 +2,41 @@
 
 fn lorem(
     mut commands: Commands,
-    icons: Res<Icons>,
 ) {
     // block
 }
-
-fn ret(
-    mut commands: Commands,
-    icons: Res<Icons>,
-) -> bool {
-    // block
-}
-
-unsafe fn lorem(
+fn lorem(
     mut commands: Commands,
     icons: Res<Icons>,
 ) {
     // block
 }
-
-fn lagging(
+fn lorem(
     mut commands: Commands,
     icons: Res<Icons>,
+    mut meshes: ResMut<Assets<Mesh>>,
 ) {
     // block
 }
-
-pub fn public(
-    mut commands: Commands,
-    icons: Res<Icons>,
-) {
-    // block
-}
-
-pub(super) fn up(
-    mut commands: Commands,
-    icons: Res<Icons>,
-) {
-    // block
-}
-
-pub(crate) fn all(
-    mut commands: Commands,
-    icons: Res<Icons>,
-) {
-    // block
-}
-
-pub unsafe fn complicated(
-    mut commands: Commands,
-    icons: Res<Icons>,
-) {
-    // block
-}
-
-extern "C" {
-    fn foreign(
-        mut commands: Commands,
-        icons: Res<Icons>,
-    ) {
-        // block
-    }
-}
-
-fn homura<T: Deref<Target = i32>>(_: T) {}
-
-fn generic<C>(
-    query: Query<C>,
-) {
-    // block
-}
-
-pub fn setup_arena(
+fn lorem(
     mut commands: Commands,
     icons: Res<Icons>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    //models: Res<Models>,
 ) {
     // block
 }
 
 fn comments(
     mut commands: Commands,
-    /* intermission */ icons: Res<Icons>,
+    /**/ icons: Res<Icons>,
 ) {
     // block
 }
 
-fn spacing(
+fn comments(
     mut commands: Commands,
-    icons: Res<Icons>,
+    /* really loooooong intermission */ icons: Res<Icons>,
 ) {
     // block
 }
@@ -100,6 +44,9 @@ fn spacing(
 impl Trait {
     fn lorem(
         mut commands: Commands,
+    );
+    fn lorem(
+        mut commands: Commands,
         icons: Res<Icons>,
     );
     fn lorem(
@@ -113,33 +60,6 @@ impl Trait {
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
     );
-
-    fn lorem(
-        mut commands: Commands,
-    ) {
-        // block
-    }
-    fn lorem(
-        mut commands: Commands,
-        icons: Res<Icons>,
-    ) {
-        // block
-    }
-    fn lorem(
-        mut commands: Commands,
-        icons: Res<Icons>,
-        mut meshes: ResMut<Assets<Mesh>>,
-    ) {
-        // block
-    }
-    fn lorem(
-        mut commands: Commands,
-        icons: Res<Icons>,
-        mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
-    ) {
-        // block
-    }
 }
 
 fn outer(
