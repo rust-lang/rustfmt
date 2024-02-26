@@ -47,18 +47,19 @@ impl Printer {
         if inner.messages.is_empty() {
             return Ok(());
         }
-
-        // Stdout term, from diffs
-        let mut use_term_stdout =
-            term::stdout().filter(|t| inner.color_setting.use_colored_tty() && t.supports_color());
-
-        // `rustc_error` diagnostics, compilation errors.
-        let use_rustc_error_color = inner.color_setting.use_colored_tty()
-            && term::stderr()
-                .map(|t| t.supports_color())
-                .unwrap_or_default();
-        let mut rustc_err_out =
-            use_rustc_error_color.then_some(StandardStream::stderr(ColorChoice::Always));
+        let (mut diff_term_stdout, mut rustc_term_stderr) = inner
+            .color_setting
+            .use_colored_tty()
+            .then(|| {
+                (
+                    term::stdout().filter(|t| t.supports_color()),
+                    term::stderr().and_then(|t| {
+                        t.supports_color()
+                            .then_some(StandardStream::stderr(ColorChoice::Always))
+                    }),
+                )
+            })
+            .unwrap_or_default();
         for msg in &inner.messages {
             match msg {
                 PrintMessage::Stdout(out) => {
@@ -68,7 +69,7 @@ impl Printer {
                     stderr().write_all(err)?;
                 }
                 PrintMessage::Term(t_msg) => {
-                    if let Some(t) = &mut use_term_stdout {
+                    if let Some(t) = &mut diff_term_stdout {
                         if let Some(col) = t_msg.color {
                             t.fg(col).unwrap()
                         }
@@ -81,12 +82,12 @@ impl Printer {
                     }
                 }
                 PrintMessage::RustcErrTerm(msg) => {
-                    if let Some(t) = &mut rustc_err_out {
+                    if let Some(t) = &mut rustc_term_stderr {
                         if let Some(col) = msg.color.as_ref().map(rustc_colorspec_compat) {
                             t.set_color(&col)?;
                         }
                         t.write_all(&msg.message)?;
-                        if msg.color.is_some() {
+                        if msg.color.as_ref().map(|cs| cs.reset()).unwrap_or_default() {
                             t.reset().unwrap();
                         }
                     } else {

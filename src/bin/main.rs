@@ -327,7 +327,7 @@ fn format(
 
     let parallelism = std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN);
     // Use a channel + map to get 'next-completed' thread, rather than
-    // waiting on the chronologically first handle to join, if there are more files
+    // waiting on the chronologically first handle to join, impactful if there are more files
     // than available parallelism.
     let (send, recv) = std::sync::mpsc::channel();
     let mut handles: HashMap<i32, JoinHandle<_>> = HashMap::new();

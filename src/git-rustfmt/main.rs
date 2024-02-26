@@ -9,10 +9,11 @@ use std::str::FromStr;
 
 use getopts::{Matches, Options};
 use rustfmt_nightly as rustfmt;
-use rustfmt_nightly::print::Printer;
 use tracing_subscriber::EnvFilter;
 
-use crate::rustfmt::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
+use crate::rustfmt::{
+    load_config, print::Printer, CliOptions, FormatReportFormatterBuilder, Input, Session,
+};
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
     let prefixes: Vec<_> = files

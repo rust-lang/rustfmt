@@ -1,7 +1,7 @@
 use super::*;
 use std::fs;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct FilesEmitter {
     print_misformatted_file_names: bool,
 }
