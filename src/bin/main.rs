@@ -9,13 +9,13 @@ use rustfmt_nightly as rustfmt;
 use tracing_subscriber::EnvFilter;
 
 use std::collections::HashMap;
-use std::env;
 use std::fs::File;
 use std::io::{self, stdout, Read, Write};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread::JoinHandle;
+use std::{env, panic};
 
 use getopts::{Matches, Options};
 use rustfmt_nightly::print::Printer;
@@ -372,11 +372,11 @@ fn format(
                                 drop(session);
                                 let _ = s.send(ThreadedFileOutput {
                                     session_result: Err(e),
-                                    id,
+                                    id: my_id,
                                     exit_code,
                                     printer,
                                 });
-                                return Ok::<_, std::io::Error>(my_id);
+                                return Ok::<_, std::io::Error>(());
                             }
                         };
                     if local_config.verbose() == Verbosity::Verbose {
@@ -408,30 +408,20 @@ fn format(
             drop(session);
             let _ = s.send(ThreadedFileOutput {
                 session_result: Ok(session_out),
-                id,
+                id: my_id,
                 exit_code,
                 printer,
             });
-            Ok(my_id)
+            Ok(())
         });
         handles.insert(id, handle);
         id += 1;
         outstanding += 1;
         if outstanding >= parallelism.get() {
             if let Ok(thread_out) = recv.recv() {
-                handles
-                    .remove(&thread_out.id)
-                    .unwrap()
-                    .join()
-                    .unwrap()
-                    .unwrap();
-                let output = thread_out.session_result?;
-                if !output.is_empty() {
-                    stdout().write_all(&output).unwrap();
-                }
-                thread_out.printer.dump()?;
-                if thread_out.exit_code != 0 {
-                    exit_code = thread_out.exit_code;
+                let exit = join_thread_reporting_back(&mut handles, thread_out)?;
+                if exit != 0 {
+                    exit_code = exit;
                 }
                 outstanding -= 1;
             } else {
@@ -439,22 +429,26 @@ fn format(
             }
         }
     }
+    // Drop sender, or this will deadlock
     drop(send);
     while let Ok(thread_out) = recv.recv() {
-        let handle_res = handles.remove(&thread_out.id).unwrap().join();
-        handle_res.unwrap().unwrap();
-        let output = thread_out.session_result?;
-        if !output.is_empty() {
-            stdout().write_all(&output).unwrap();
-        }
-        thread_out.printer.dump()?;
-        if thread_out.exit_code != 0 {
-            exit_code = thread_out.exit_code;
+        let exit = join_thread_reporting_back(&mut handles, thread_out)?;
+        if exit != 0 {
+            exit_code = exit;
         }
     }
     // These have errors
     for (_id, jh) in handles {
-        jh.join().unwrap().unwrap();
+        match jh.join() {
+            Ok(res) => {
+                res?;
+            }
+            Err(panicked) => {
+                // Propagate the thread's panic, not much to do here
+                // if the error should be preserved (which it should)
+                panic::resume_unwind(panicked)
+            }
+        }
     }
 
     // If we were given a path via dump-minimal-config, output any options
@@ -466,6 +460,30 @@ fn format(
     }
 
     Ok(exit_code)
+}
+
+fn join_thread_reporting_back(
+    handles: &mut HashMap<i32, JoinHandle<core::result::Result<(), std::io::Error>>>,
+    threaded_file_output: ThreadedFileOutput,
+) -> Result<i32> {
+    let handle = handles
+        .remove(&threaded_file_output.id)
+        .expect("Join thread not found by id");
+    match handle.join() {
+        Ok(result) => {
+            result?;
+        }
+        Err(panicked) => {
+            // Should never end up here logically, since the thread reported back
+            panic::resume_unwind(panicked)
+        }
+    }
+    let output = threaded_file_output.session_result?;
+    if !output.is_empty() {
+        stdout().write_all(&output).unwrap();
+    }
+    threaded_file_output.printer.dump()?;
+    Ok(threaded_file_output.exit_code)
 }
 
 fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) {
