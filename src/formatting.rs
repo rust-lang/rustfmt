@@ -17,7 +17,7 @@ use crate::parse::session::ParseSess;
 use crate::print::Printer;
 use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
-use crate::{buf_eprintln, modules, source_file, ErrorKind, FormatReport, Input, Session, buf_println};
+use crate::{buf_eprintln, modules, source_file, ErrorKind, FormatReport, Input, Session, buf_println, buf_print};
 
 mod generated;
 mod newline_style;
@@ -41,7 +41,8 @@ impl<'b, T: Write + 'b> Session<'b, T> {
                 // When the input is from stdin, echo back the input.
                 return match input {
                     Input::Text(ref buf) => {
-                        buf_println!(self.printer, "{buf}");
+                        // Echo back stdin
+                        buf_print!(self.printer, "{buf}");
                         Ok(FormatReport::new())
                     },
                     _ => Ok(FormatReport::new()),
@@ -149,7 +150,8 @@ fn format_project<T: FormatHandler>(
 
     for (path, module) in files {
         if input_is_stdin && contains_skip(module.attrs()) {
-            buf_println!(printer, "{}", context
+            // Echo back stdin
+            buf_print!(printer, "{}", context
                     .parse_session
                     .snippet_provider(module.span)
                     .entire_snippet());

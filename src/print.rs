@@ -176,6 +176,15 @@ fn rustc_color_compat(rustc: &RustColor) -> Option<termcolor::Color> {
 }
 
 #[macro_export]
+macro_rules! buf_print {
+    ($pb: expr, $($arg:tt)*) => {{
+        let mut msg_buf = Vec::new();
+        let _ = write!(&mut msg_buf, $($arg)*);
+        $pb.push_msg($crate::print::PrintMessage::Stdout(msg_buf));
+    }};
+}
+
+#[macro_export]
 macro_rules! buf_println {
     ($pb: expr, $($arg:tt)*) => {{
         let mut msg_buf = Vec::new();
