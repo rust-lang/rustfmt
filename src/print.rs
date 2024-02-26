@@ -1,58 +1,15 @@
 use crate::Color;
 use rustc_errors::{Color as RustColor, ColorSpec, WriteColor};
-use std::fmt::Formatter;
 use std::io::{stderr, stdout, Write};
 use std::sync::{Arc, Mutex};
 use termcolor::{ColorChoice, StandardStream, WriteColor as _};
 
 #[derive(Clone)]
 pub struct Printer {
+    // Needs `Mutex` to be UnwindSafe, although, this should be
+    // safe to `Unwind` without it.
+    // Needs `Arc` to pass the boundary over to `rustc_error`.
     inner: Arc<Mutex<PrinterInner>>,
-}
-
-impl Write for Printer {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let mut inner = self.inner.lock().unwrap();
-        let col = inner.current_color.clone();
-        inner
-            .messages
-            .push(PrintMessage::RustcErrTerm(RustcErrTermMessage::new(
-                buf.to_vec(),
-                col,
-            )));
-        Ok(buf.len())
-    }
-
-    #[inline]
-    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
-        self.write(buf)?;
-        Ok(())
-    }
-
-    #[inline]
-    fn flush(&mut self) -> std::io::Result<()> {
-        //println!("Flush");
-        Ok(())
-    }
-}
-
-impl WriteColor for Printer {
-    #[inline]
-    fn supports_color(&self) -> bool {
-        self.inner.lock().unwrap().supports_color
-    }
-
-    #[inline]
-    fn set_color(&mut self, spec: &ColorSpec) -> std::io::Result<()> {
-        self.inner.lock().unwrap().current_color = Some(spec.clone());
-        Ok(())
-    }
-
-    #[inline]
-    fn reset(&mut self) -> std::io::Result<()> {
-        self.inner.lock().unwrap().current_color.take();
-        Ok(())
-    }
 }
 
 struct PrinterInner {
@@ -83,14 +40,19 @@ impl Printer {
         self.inner.lock().unwrap().messages.push(msg);
     }
 
-    pub fn dump(&self) -> Result<(), std::io::Error> {
+    /// Writes stored messages to respective outputs in order.
+    pub fn write_to_outputs(&self) -> Result<(), std::io::Error> {
         let inner = self.inner.lock().unwrap();
         // Pretty common case, early exit
         if inner.messages.is_empty() {
             return Ok(());
         }
+
+        // Stdout term, from diffs
         let mut use_term_stdout =
             term::stdout().filter(|t| inner.color_setting.use_colored_tty() && t.supports_color());
+
+        // `rustc_error` diagnostics, compilation errors.
         let use_rustc_error_color = inner.color_setting.use_colored_tty()
             && term::stderr()
                 .map(|t| t.supports_color())
@@ -140,6 +102,52 @@ impl Printer {
     }
 }
 
+/// Trait evoked by `rustc_error`s `EmitterWriter` (`HumanEmitter` on main) to print
+/// compilation errors and diffs.
+impl Write for Printer {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut inner = self.inner.lock().unwrap();
+        let col = inner.current_color.clone();
+        inner
+            .messages
+            .push(PrintMessage::RustcErrTerm(RustcErrTermMessage::new(
+                buf.to_vec(),
+                col,
+            )));
+        Ok(buf.len())
+    }
+
+    #[inline]
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        self.write(buf)?;
+        Ok(())
+    }
+}
+
+impl WriteColor for Printer {
+    #[inline]
+    fn supports_color(&self) -> bool {
+        self.inner.lock().unwrap().supports_color
+    }
+
+    #[inline]
+    fn set_color(&mut self, spec: &ColorSpec) -> std::io::Result<()> {
+        self.inner.lock().unwrap().current_color = Some(spec.clone());
+        Ok(())
+    }
+
+    #[inline]
+    fn reset(&mut self) -> std::io::Result<()> {
+        self.inner.lock().unwrap().current_color.take();
+        Ok(())
+    }
+}
+
 // Rustc vendors termcolor, but not everything needed to use it,
 // as far as I can tell
 fn rustc_colorspec_compat(rustc: &ColorSpec) -> termcolor::ColorSpec {
@@ -149,10 +157,12 @@ fn rustc_colorspec_compat(rustc: &ColorSpec) -> termcolor::ColorSpec {
     let bg = rustc.bg().and_then(rustc_color_compat);
     cs.set_bg(bg);
     cs.set_bold(rustc.bold());
-    cs.set_strikethrough(rustc.strikethrough());
-    cs.set_underline(rustc.underline());
     cs.set_intense(rustc.intense());
+    cs.set_underline(rustc.underline());
+    cs.set_dimmed(rustc.dimmed());
     cs.set_italic(rustc.italic());
+    cs.set_reset(rustc.reset());
+    cs.set_strikethrough(rustc.strikethrough());
     cs
 }
 
@@ -216,31 +226,6 @@ pub enum PrintMessage {
     StdErr(Vec<u8>),
     Term(TermMessage),
     RustcErrTerm(RustcErrTermMessage),
-}
-
-impl std::fmt::Debug for PrintMessage {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PrintMessage::Stdout(buf) => f.write_fmt(format_args!(
-                "PrintMessage::Stdout({:?})",
-                core::str::from_utf8(buf)
-            )),
-            PrintMessage::StdErr(buf) => f.write_fmt(format_args!(
-                "PrintMessage::Stderr({:?})",
-                core::str::from_utf8(buf)
-            )),
-            PrintMessage::Term(msg) => f.write_fmt(format_args!(
-                "PrintMessage::Term({:?}, {:?})",
-                core::str::from_utf8(&msg.message),
-                msg.color
-            )),
-            PrintMessage::RustcErrTerm(msg) => f.write_fmt(format_args!(
-                "PrintMessage::RustcErrTerm({:?}, {:?})",
-                core::str::from_utf8(&msg.message),
-                msg.color
-            )),
-        }
-    }
 }
 
 pub struct TermMessage {

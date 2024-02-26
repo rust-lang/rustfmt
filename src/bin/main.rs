@@ -296,7 +296,7 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
     let printer = Printer::new(config.color());
     let mut session = Session::new(config, Some(out), &printer);
     format_and_emit_report(&mut session, Input::Text(input));
-    printer.dump()?;
+    printer.write_to_outputs()?;
 
     let exit_code = if session.has_operational_errors() || session.has_parsing_errors() {
         1
@@ -488,7 +488,7 @@ fn join_thread_reporting_back(
     if !output.is_empty() {
         stdout().write_all(&output).unwrap();
     }
-    threaded_file_output.printer.dump()?;
+    threaded_file_output.printer.write_to_outputs()?;
     Ok(threaded_file_output.exit_code)
 }
 

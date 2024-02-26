@@ -171,7 +171,7 @@ fn verify_config_test_names() {
 fn write_message(msg: &str) {
     let print = Printer::new(Color::Auto);
     buf_term_println!(print, None, "{msg}");
-    print.dump().unwrap();
+    print.write_to_outputs().unwrap();
 }
 
 // Integration tests. The files in `tests/source` are formatted and compared
