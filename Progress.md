@@ -16,6 +16,8 @@ either the printing facilities need to be reinvented (no), or some compatibility
 
 ## Changes
 
+### Output facilities
+
 In practice there are four printing facilities used:
 
 1. Regular `stdout`, pretty easy, replace `println` with printing into a buffer.
@@ -24,5 +26,3 @@ In practice there are four printing facilities used:
 4. Term stderr, this is done by `rustc_error` and the most complex to integrate.
 
 Additionally, these four facilities can't be separated, since they have to preserve order between each other.
-
-

@@ -329,14 +329,17 @@ fn format(
     }
 
     let parallelism = std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN);
+    // Use a channel + map to get 'next-completed' thread, rather than
+    // waiting on the chronologically first handle to join, if there are more files
+    // than available parallelism.
     let (send, recv) = std::sync::mpsc::channel();
+    let mut handles: HashMap<i32, JoinHandle<_>> = HashMap::new();
 
     let mut exit_code = 0;
     let mut outstanding = 0;
     // If the thread panics, the channel will just be dropped,
-    // so keep track of the spinning threads
+    // so keep track of the spinning threads to get a stacktrace from it later
     let mut id = 0;
-    let mut handles: HashMap<i32, JoinHandle<_>> = HashMap::new();
     let check = options.check;
     let color = config.color();
     for file in files {
@@ -373,7 +376,7 @@ fn format(
                                 let _ = s.send(ThreadedFileOutput {
                                     session_result: Err(e),
                                     id: my_id,
-                                    exit_code,
+                                    exit_code: 1,
                                     printer,
                                 });
                                 return Ok::<_, std::io::Error>(());
@@ -431,13 +434,16 @@ fn format(
     }
     // Drop sender, or this will deadlock
     drop(send);
+
+    // Drain running threads
     while let Ok(thread_out) = recv.recv() {
         let exit = join_thread_reporting_back(&mut handles, thread_out)?;
         if exit != 0 {
             exit_code = exit;
         }
     }
-    // These have errors
+
+    // All successful threads have been removed from `handles` only errors are left
     for (_id, jh) in handles {
         match jh.join() {
             Ok(res) => {
