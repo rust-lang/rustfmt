@@ -922,6 +922,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     ) {
         let vis_str = utils::format_visibility(&self.get_context(), vis);
         self.push_str(&*vis_str);
+        if !vis_str.is_empty() && self.config.version() == Version::Two {
+            // format_visibility doesn't have a trailing space in Version::Two
+            self.push_str(" ");
+        }
         self.push_str(format_unsafety(unsafety));
         self.push_str("mod ");
         // Calling `to_owned()` to work around borrow checker.

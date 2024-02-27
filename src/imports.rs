@@ -332,9 +332,14 @@ impl UseTree {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Option<String> {
-        let vis = self.visibility.as_ref().map_or(Cow::from(""), |vis| {
+        let mut vis = self.visibility.as_ref().map_or(Cow::from(""), |vis| {
             crate::utils::format_visibility(context, vis)
         });
+
+        if !vis.is_empty() && context.config.version() == Version::Two {
+            vis += " ";
+        }
+
         let use_str = self
             .rewrite(context, shape.offset_left(vis.len())?)
             .map(|s| {
