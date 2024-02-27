@@ -766,20 +766,29 @@ Maximum width of the args of a function call before falling back to vertical for
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `fn_call_width` will take precedence.
 
-See also [`fn_param_width`](#fn_param_width), [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
+See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
 
-## `fn_param_width`
+## `enable_fn_param_limit`
 
-Maximum width of the declaration of a function signature before falling back to formatting chosen with `fn_param_layout`.
+Switch to enable the unstable feature `fn_param_limit`.
 
-- **Default value**: `100`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
 - **Stable**: No
 
-By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `fn_param_width` will take precedence.
+See also [`fn_param_limit`](#fn_param_limit) 
 
-See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
+
+## `fn_param_limit`
+
+Maximum parameters in the declaration of a function signature before falling back to formatting chosen with `fn_param_layout`.
+
+- **Default value**: `4`
+- **Possible values**: any non-negative integer
+- **Stable**: No
+
+See also [`enable_fn_param_limit`](#enable_fn_param_limit) and [`fn_params_layout`](#fn_params_layout)
 
 
 ## `fn_params_layout`

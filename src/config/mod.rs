@@ -61,7 +61,6 @@ create_config! {
     single_line_let_else_max_width: usize, 50, true, "Maximum line length for single line \
         let-else statements. A value of zero means always format the divergent `else` block \
         over multiple lines.";
-    fn_param_width: usize, 100, false, "Maximum line length for function declarations.";
 
     // Comments. macros, and strings
     wrap_comments: bool, false, false, "Break comments to fit on the line";
@@ -88,6 +87,9 @@ create_config! {
         "Put small struct literals on a single line";
     fn_single_line: bool, false, false, "Put single-expression functions on a single line";
     where_single_line: bool, false, false, "Force where-clauses to be on a single line";
+    enable_fn_param_limit: bool, false, false, "Switch to enable `fn_param_limit`";
+    fn_param_limit: usize, 4, false, "How many parameters in a function declaration before \
+        falling back to formatting chosen with `fn_param_layout`";
 
     // Imports
     imports_indent: IndentStyle, IndentStyle::Block, false, "Indent of imports";
@@ -491,7 +493,6 @@ mod test {
             single_line_let_else_max_width: usize, 50, false, "Maximum line length for single \
                 line let-else statements. A value of zero means always format the divergent \
                 `else` block over multiple lines.";
-            fn_param_width: usize, 100, true, "Maximum line length for function declarations.";
 
             // Options that are used by the tests
             stable_option: bool, false, true, "A stable option";
@@ -636,7 +637,6 @@ array_width = 60
 chain_width = 60
 single_line_if_else_max_width = 50
 single_line_let_else_max_width = 50
-fn_param_width = 100
 wrap_comments = false
 format_code_in_doc_comments = false
 doc_comment_code_block_width = 100
@@ -652,6 +652,8 @@ empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false
 where_single_line = false
+enable_fn_param_limit = false
+fn_param_limit = 4
 imports_indent = "Block"
 imports_layout = "Mixed"
 imports_granularity = "Preserve"

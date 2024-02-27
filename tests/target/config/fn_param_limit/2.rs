@@ -1,14 +1,11 @@
-// rustfmt-config: fn_param_width/0.toml
+// rustfmt-enable_fn_param_limit: true
+// rustfmt-fn_param_limit: 2
+// rustfmt-edition: 2018
 
-fn lorem(
-    mut commands: Commands,
-) {
+fn lorem(mut commands: Commands) {
     // block
 }
-fn lorem(
-    mut commands: Commands,
-    icons: Res<Icons>,
-) {
+fn lorem(mut commands: Commands, icons: Res<Icons>) {
     // block
 }
 fn lorem(
@@ -27,28 +24,71 @@ fn lorem(
     // block
 }
 
-fn comments(
-    mut commands: Commands,
-    /**/ icons: Res<Icons>,
-) {
+fn comments(mut commands: Commands, /**/ icons: Res<Icons>) {
     // block
 }
 
 fn comments(
     mut commands: Commands,
-    /* really loooooong intermission */ icons: Res<Icons>,
+    /* really really loooooooong intermission */ icons: Res<Icons>,
 ) {
     // block
+}
+
+fn generic<C>(query: Query<C>, query2: Query<C>) {
+    // block
+}
+
+fn lorem<C>(query: Query<C>)
+where
+    C: Add + Sub + Mul + Div,
+{
+    // body
+}
+
+fn lorem<C>(
+    query: Query<C>,
+    mut commands: Commands,
+    icons: Res<Icons>,
+) where
+    C: Add + Sub + Mul + Div,
+{
+    // body
+}
+
+fn lorem(mut commands: Commands, icons: Res<Icons>) -> bool {
+    // block
+}
+
+pub fn lorem(mut commands: Commands, icons: Res<Icons>) {
+    // block
+}
+
+pub(crate) fn lorem(mut commands: Commands, icons: Res<Icons>) {
+    // block
+}
+
+pub(super) fn lorem(mut commands: Commands, icons: Res<Icons>) {
+    // block
+}
+
+async fn lorem(mut commands: Commands, icons: Res<Icons>) {
+    // block
+}
+
+unsafe fn lorem(mut commands: Commands, icons: Res<Icons>) {
+    // block
+}
+
+extern "C" {
+    fn lorem(mut commands: Commands, icons: Res<Icons>) {
+        // block
+    }
 }
 
 impl Trait {
-    fn lorem(
-        mut commands: Commands,
-    );
-    fn lorem(
-        mut commands: Commands,
-        icons: Res<Icons>,
-    );
+    fn lorem(mut commands: Commands);
+    fn lorem(mut commands: Commands, icons: Res<Icons>);
     fn lorem(
         mut commands: Commands,
         icons: Res<Icons>,
