@@ -15,3 +15,11 @@ fn float_literals() {
     let l = 1_000_.0;
     let m = 1_000_.000_000;
 }
+
+fn line_wrapping() {
+    let array = [
+        1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        17.0, 18.0,
+    ];
+    println!("This is floaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaat {}", 10e3);
+}

@@ -1,4 +1,4 @@
-// rustfmt-float_literal_trailing_zero: IfNoPostfix
+// rustfmt-float_literal_trailing_zero: Always
 
 fn float_literals() {
     let a = 0.;
@@ -14,4 +14,11 @@ fn float_literals() {
     let k = 1000.00;
     let l = 1_000_.;
     let m = 1_000_.000_000;
+}
+
+fn line_wrapping() {
+    let array = [
+        1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15., 16., 17., 18.,
+    ];
+    println!("This is floaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaat {}", 10e3);
 }
