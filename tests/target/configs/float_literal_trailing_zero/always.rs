@@ -7,13 +7,19 @@ fn float_literals() {
     let d = 100.0;
     let e = 5.0e3;
     let f = 5.0e3;
-    let g = 7.0f32;
-    let h = 7.0f32;
-    let i = 9.0e3f32;
-    let j = 9.0e3f32;
-    let k = 1000.00;
-    let l = 1_000_.0;
-    let m = 1_000_.000_000;
+    let g = 5.0e+3;
+    let h = 5.0e+3;
+    let i = 5.0e-3;
+    let j = 5.0e-3;
+    let k = 5.0E3;
+    let l = 5.0E3;
+    let m = 7.0f32;
+    let n = 7.0f32;
+    let o = 9.0e3f32;
+    let p = 9.0e3f32;
+    let q = 1000.00;
+    let r = 1_000_.0;
+    let s = 1_000_.000_000;
 }
 
 fn line_wrapping() {

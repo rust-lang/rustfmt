@@ -2398,10 +2398,25 @@ mod test {
         assert_eq!(parts.fractional_part, Some("456"));
         assert_eq!(parts.exponent, Some("e789"));
 
+        let parts = parse_float_symbol("123.456e+789");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, Some("456"));
+        assert_eq!(parts.exponent, Some("e+789"));
+
+        let parts = parse_float_symbol("123.456e-789");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, Some("456"));
+        assert_eq!(parts.exponent, Some("e-789"));
+
         let parts = parse_float_symbol("123e789");
         assert_eq!(parts.integer_part, "123");
         assert_eq!(parts.fractional_part, None);
         assert_eq!(parts.exponent, Some("e789"));
+
+        let parts = parse_float_symbol("123E789");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, None);
+        assert_eq!(parts.exponent, Some("E789"));
 
         let parts = parse_float_symbol("123.");
         assert_eq!(parts.integer_part, "123");
