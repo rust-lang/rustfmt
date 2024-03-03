@@ -29,5 +29,8 @@ jobs:
         sh rustup-init.sh -y --default-toolchain none
         rustup target add x86_64-unknown-linux-gnu
 
+    - name: installl rust-script
+      run: cargo install rust-script
+
     - name: check diff
-      run: bash ${GITHUB_WORKSPACE}/ci/check_diff.sh ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} ${{ github.event.inputs.commit_hash || github.event.inputs.branch_name }} ${{ github.event.inputs.rustfmt_configs }}
+      run: rust-script ${GITHUB_WORKSPACE}/ci/check_diff.rs ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} ${{ github.event.inputs.commit_hash || github.event.inputs.branch_name }} ${{ github.event.inputs.rustfmt_configs }}
