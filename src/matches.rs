@@ -5,7 +5,7 @@ use std::iter::repeat;
 use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, Span};
 
-use crate::comment::{combine_strs_with_missing_comments, rewrite_comment};
+use crate::comment::{combine_strs_with_missing_comments, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, IndentStyle, MatchArmLeadingPipe, Version};
 use crate::expr::{
@@ -402,16 +402,7 @@ fn rewrite_match_body(
         let arrow_snippet = context.snippet(arrow_span).trim();
         // search for the arrow starting from the end of the snippet since there may be a match
         // expression within the guard
-        let mut arrow_index = arrow_snippet.rfind("=>").unwrap();
-        // check whether `=>` is included in the comment
-        if arrow_index != 0 {
-            let prev_arrow = arrow_snippet[..arrow_index].trim();
-            let single_line_comment_index = prev_arrow.rfind("//").unwrap_or(0);
-            let new_line_index = prev_arrow.rfind("\n").unwrap_or(0);
-            if single_line_comment_index > new_line_index {
-                arrow_index = 0;
-            }
-        }
+        let arrow_index = arrow_snippet.find_last_uncommented("=>").unwrap();
         // 2 = `=>`
         let comment_str = arrow_snippet[arrow_index + 2..].trim();
         if comment_str.is_empty() {
