@@ -1,4 +1,4 @@
-// rustfmt-wrap_comments: true
+// rustfmt-version: Two
 fn main() {
     match a {
         _ =>

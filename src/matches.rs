@@ -402,7 +402,11 @@ fn rewrite_match_body(
         let arrow_snippet = context.snippet(arrow_span).trim();
         // search for the arrow starting from the end of the snippet since there may be a match
         // expression within the guard
-        let arrow_index = arrow_snippet.find_last_uncommented("=>").unwrap();
+        let arrow_index = if context.config.version() == Version::One {
+            arrow_snippet.rfind("=>").unwrap()
+        } else {
+            arrow_snippet.find_last_uncommented("=>").unwrap()
+        };
         // 2 = `=>`
         let comment_str = arrow_snippet[arrow_index + 2..].trim();
         if comment_str.is_empty() {
