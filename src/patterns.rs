@@ -271,9 +271,17 @@ impl Rewrite for Pat {
             PatKind::MacCall(ref mac) => {
                 rewrite_macro(mac, None, context, shape, MacroPosition::Pat)
             }
-            PatKind::Paren(ref pat) => pat
-                .rewrite(context, shape.offset_left(1)?.sub_width(1)?)
-                .map(|inner_pat| format!("({})", inner_pat)),
+            PatKind::Paren(ref pat) => {
+                overflow::rewrite_with_parens(
+                    context,
+                    "",
+                    std::iter::once(&**pat), // iterator with a single element
+                    shape,
+                    self.span,
+                    context.config.max_width(),
+                    Some(SeparatorTactic::Never), // no separator needed for a single pattern
+                )
+            },
         }
     }
 }
