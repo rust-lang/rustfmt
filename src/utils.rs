@@ -24,8 +24,26 @@ pub(crate) fn skip_annotation() -> Symbol {
     Symbol::intern("rustfmt::skip")
 }
 
-pub(crate) fn rewrite_ident<'a>(context: &'a RewriteContext<'_>, ident: symbol::Ident) -> &'a str {
-    context.snippet(ident.span)
+pub(crate) fn rewrite_ident<'a>(
+    context: &'a RewriteContext<'a>,
+    ident: symbol::Ident,
+) -> Cow<'a, str> {
+    nfc_normalize(context, context.snippet(ident.span))
+}
+
+pub(crate) fn nfc_normalize<'r, 's>(context: &'r RewriteContext<'r>, s: &'s str) -> Cow<'s, str> {
+    use unicode_normalization::{is_nfc_quick, IsNormalized, UnicodeNormalization};
+
+    if context.config.nfc_normalize_idents() && is_nfc_quick(s.chars()) != IsNormalized::Yes {
+        let normalized_str: String = s.chars().nfc().collect();
+        if s == normalized_str {
+            Cow::Borrowed(s)
+        } else {
+            Cow::Owned(normalized_str)
+        }
+    } else {
+        Cow::Borrowed(s)
+    }
 }
 
 // Computes the length of a string's last line, minus offset.

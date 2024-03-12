@@ -1069,6 +1069,14 @@ Number of lines to check for a `@generated` pragma header, starting from the top
 
 See also [format_generated_files](#format_generated_files) link here.
 
+## `nfc_normalize_idents`
+
+Whether to normalize identifiers with Unicode Normalization Form C (NFC). The compiler considers identifiers with identical NFC normalizations to be interchangeable.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
 ## `format_macro_matchers`
 
 Format the metavariable matching patterns in macros.

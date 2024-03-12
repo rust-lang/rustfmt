@@ -36,7 +36,7 @@ use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
-    filtered_str_fits, format_visibility, indent_next_line, is_empty_line, mk_sp,
+    filtered_str_fits, format_visibility, indent_next_line, is_empty_line, mk_sp, nfc_normalize,
     remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout, NodeIdExt,
 };
 use crate::visitor::FmtVisitor;
@@ -284,7 +284,7 @@ fn rewrite_macro_inner(
                     },
                 )
                 .map(|rw| match position {
-                    MacroPosition::Item => format!("{};", rw),
+                    MacroPosition::Item => format!("{rw};"),
                     _ => rw,
                 })
             }
@@ -425,7 +425,7 @@ pub(crate) fn rewrite_macro_def(
     };
 
     result += " ";
-    result += rewrite_ident(context, ident);
+    result += &rewrite_ident(context, ident);
 
     let multi_branch_style = def.macro_rules || parsed_def.branches.len() != 1;
 
@@ -490,6 +490,7 @@ pub(crate) fn rewrite_macro_def(
 }
 
 fn register_metavariable(
+    context: &RewriteContext<'_>,
     map: &mut HashMap<String, String>,
     result: &mut String,
     name: &str,
@@ -502,6 +503,10 @@ fn register_metavariable(
     new_name.push_str(name);
     old_name.push_str(name);
 
+    // `$` is `NFC_Inert`, so won't get mangled
+    let new_name = nfc_normalize(context, &new_name).into_owned();
+    let old_name = nfc_normalize(context, &old_name).into_owned();
+
     result.push_str(&new_name);
     map.insert(old_name, new_name);
 }
@@ -509,7 +514,10 @@ fn register_metavariable(
 // Replaces `$foo` with `zfoo`. We must check for name overlap to ensure we
 // aren't causing problems.
 // This should also work for escaped `$` variables, where we leave earlier `$`s.
-fn replace_names(input: &str) -> Option<(String, HashMap<String, String>)> {
+fn replace_names(
+    context: &RewriteContext<'_>,
+    input: &str,
+) -> Option<(String, HashMap<String, String>)> {
     // Each substitution will require five or six extra bytes.
     let mut result = String::with_capacity(input.len() + 64);
     let mut substs = HashMap::new();
@@ -523,9 +531,9 @@ fn replace_names(input: &str) -> Option<(String, HashMap<String, String>)> {
             dollar_count += 1;
         } else if dollar_count == 0 {
             result.push(c);
-        } else if !c.is_alphanumeric() && !cur_name.is_empty() {
+        } else if !rustc_lexer::is_id_continue(c) && !cur_name.is_empty() {
             // Terminates a name following one or more dollars.
-            register_metavariable(&mut substs, &mut result, &cur_name, dollar_count);
+            register_metavariable(context, &mut substs, &mut result, &cur_name, dollar_count);
 
             result.push(c);
             dollar_count = 0;
@@ -533,13 +541,13 @@ fn replace_names(input: &str) -> Option<(String, HashMap<String, String>)> {
         } else if c == '(' && cur_name.is_empty() {
             // FIXME: Support macro def with repeat.
             return None;
-        } else if c.is_alphanumeric() || c == '_' {
+        } else if rustc_lexer::is_id_continue(c) {
             cur_name.push(c);
         }
     }
 
     if !cur_name.is_empty() {
-        register_metavariable(&mut substs, &mut result, &cur_name, dollar_count);
+        register_metavariable(context, &mut substs, &mut result, &cur_name, dollar_count);
     }
 
     debug!("replace_names `{}` {:?}", result, substs);
@@ -655,7 +663,9 @@ impl MacroArgKind {
         };
 
         match *self {
-            MacroArgKind::MetaVariable(ty, ref name) => Some(format!("${name}:{ty}")),
+            MacroArgKind::MetaVariable(ty, ref name) => {
+                Some(format!("${}:{ty}", nfc_normalize(context, name)))
+            }
             MacroArgKind::Repeat(delim_tok, ref args, ref another, ref tok) => {
                 let (lhs, inner, rhs) = rewrite_delimited_inner(delim_tok, args)?;
                 let another = another
@@ -1273,7 +1283,7 @@ impl MacroBranch {
         // `$$`). We'll try and format like an AST node, but we'll substitute
         // variables for new names with the same length first.
 
-        let (body_str, substs) = replace_names(old_body)?;
+        let (body_str, substs) = replace_names(context, old_body)?;
 
         let mut config = context.config.clone();
         config.set().show_parse_errors(false);
