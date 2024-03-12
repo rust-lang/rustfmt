@@ -176,7 +176,7 @@ fn rustfmt_emits_error_on_line_overflow_true() {
 #[test]
 #[allow(non_snake_case)]
 fn dont_emit_ICE() {
-    let files = ["tests/target/issue_5728.rs", "tests/target/issue_5729.rs", "tests/target/issue_6069.rs"];
+    let files = ["tests/target/issue_5728.rs", "tests/target/issue_5729.rs", "tests/target/issue_6069.rs", "tests/issue-6083/issue_6083.rs"];
 
     for file in files {
         let args = [file];

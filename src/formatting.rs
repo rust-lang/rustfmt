@@ -359,15 +359,16 @@ impl FormattingError {
             | ErrorKind::DeprecatedAttr
             | ErrorKind::BadAttr
             | ErrorKind::LostComment => {
-                let trailing_ws_start = self
-                    .line_buffer
-                    .rfind(|c: char| !c.is_whitespace())
-                    .map(|pos| pos + 1)
-                    .unwrap_or(0);
-                (
-                    trailing_ws_start,
-                    self.line_buffer.len() - trailing_ws_start,
-                )
+                let mut last_non_whitespace = 0;
+                let mut end = 0;
+                // annotate-snippet uses char-length, this code needs to as well
+                for (ind, ch) in self.line_buffer.chars().enumerate() {
+                    if !ch.is_whitespace() {
+                        last_non_whitespace = ind + 1;
+                    }
+                    end = ind + 1;
+                }
+                (last_non_whitespace, end - last_non_whitespace)
             }
             _ => unreachable!(),
         }
