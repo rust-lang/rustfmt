@@ -333,8 +333,7 @@ fn rewrite_struct_pat(
     }
 
     // 3 = ` { `, 2 = ` }`.
-    let (h_shape, v_shape) =
-        struct_lit_shape(shape, context, path_str.len() + 3, 2)?;
+    let (h_shape, v_shape) = struct_lit_shape(shape, context, path_str.len() + 3, 2)?;
 
     let one_line_width = h_shape.map_or(0, |shape| shape.width);
     let body_lo = context.snippet_provider.span_after(span, "{");
@@ -344,17 +343,25 @@ fn rewrite_struct_pat(
         .map(StructPatField::Regular)
         .chain(match ellipsis {
             false => None,
-            true => { // 2 = `..`.len()
+            true => {
+                // 2 = `..`.len()
                 let last_field_hi = fields.last().map_or(body_lo, |field| field.span.hi());
                 let snippet = context.snippet(mk_sp(last_field_hi, span.hi()));
-                let rest_lo = last_field_hi + BytePos(snippet.find_uncommented("..").unwrap() as u32);
+                let rest_lo =
+                    last_field_hi + BytePos(snippet.find_uncommented("..").unwrap() as u32);
                 let rest_hi = rest_lo + BytePos(2);
                 Some(StructPatField::Rest(mk_sp(rest_lo, rest_hi)))
             }
         });
 
     let span_lo = |item: &StructPatField<'_>| match *item {
-        StructPatField::Regular(f) => f.span.lo(),
+        StructPatField::Regular(f) => {
+            if f.attrs.is_empty() {
+                f.pat.span.lo()
+            } else {
+                f.attrs.first().unwrap().span.lo()
+            }
+        }
         StructPatField::Rest(span) => span.lo(),
     };
     let span_hi = |item: &StructPatField<'_>| match *item {
