@@ -2,17 +2,18 @@ use super::*;
 use crate::config::Config;
 use crate::rustfmt_diff::{make_diff, print_diff};
 
-pub(crate) struct DiffEmitter {
+pub(crate) struct DiffEmitter<'a> {
     config: Config,
+    printer: &'a Printer,
 }
 
-impl DiffEmitter {
-    pub(crate) fn new(config: Config) -> Self {
-        Self { config }
+impl<'a> DiffEmitter<'a> {
+    pub(crate) fn new(config: Config, printer: &'a Printer) -> Self {
+        Self { config, printer }
     }
 }
 
-impl Emitter for DiffEmitter {
+impl<'a> Emitter for DiffEmitter<'a> {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,
@@ -34,6 +35,7 @@ impl Emitter for DiffEmitter {
                     mismatch,
                     |line_num| format!("Diff in {}:{}:", filename, line_num),
                     &self.config,
+                    self.printer,
                 );
             }
         } else if original_text != formatted_text {
@@ -57,7 +59,8 @@ mod tests {
     fn does_not_print_when_no_files_reformatted() {
         let mut writer = Vec::new();
         let config = Config::default();
-        let mut emitter = DiffEmitter::new(config);
+        let printer = Printer::no_color();
+        let mut emitter = DiffEmitter::new(config, &printer);
         let result = emitter
             .emit_formatted_file(
                 &mut writer,
@@ -84,7 +87,8 @@ mod tests {
         let mut writer = Vec::new();
         let mut config = Config::default();
         config.set().print_misformatted_file_names(true);
-        let mut emitter = DiffEmitter::new(config);
+        let printer = Printer::no_color();
+        let mut emitter = DiffEmitter::new(config, &printer);
         let _ = emitter
             .emit_formatted_file(
                 &mut writer,
@@ -116,7 +120,8 @@ mod tests {
     fn prints_newline_message_with_only_newline_style_diff() {
         let mut writer = Vec::new();
         let config = Config::default();
-        let mut emitter = DiffEmitter::new(config);
+        let printer = Printer::no_color();
+        let mut emitter = DiffEmitter::new(config, &printer);
         let _ = emitter
             .emit_formatted_file(
                 &mut writer,

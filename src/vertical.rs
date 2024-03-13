@@ -267,7 +267,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         .tactic(tactic)
         .trailing_separator(separator_tactic)
         .preserve_newline(true);
-    write_list(&items, &fmt)
+    write_list(&items, &fmt, context.printer)
 }
 
 /// Returns the index in `fields` up to which a field belongs to the current group.

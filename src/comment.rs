@@ -8,6 +8,7 @@ use regex::Regex;
 use rustc_span::Span;
 
 use crate::config::Config;
+use crate::print::Printer;
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::string::{rewrite_string, StringFormat};
@@ -248,8 +249,13 @@ pub(crate) fn combine_strs_with_missing_comments(
     Some(result)
 }
 
-pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> Option<String> {
-    identify_comment(orig, false, shape, config, true)
+pub(crate) fn rewrite_doc_comment(
+    orig: &str,
+    shape: Shape,
+    config: &Config,
+    printer: &Printer,
+) -> Option<String> {
+    identify_comment(orig, false, shape, config, true, printer)
 }
 
 pub(crate) fn rewrite_comment(
@@ -257,8 +263,9 @@ pub(crate) fn rewrite_comment(
     block_style: bool,
     shape: Shape,
     config: &Config,
+    printer: &Printer,
 ) -> Option<String> {
-    identify_comment(orig, block_style, shape, config, false)
+    identify_comment(orig, block_style, shape, config, false, printer)
 }
 
 fn identify_comment(
@@ -267,6 +274,7 @@ fn identify_comment(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
+    printer: &Printer,
 ) -> Option<String> {
     let style = comment_style(orig, false);
 
@@ -377,6 +385,7 @@ fn identify_comment(
                 shape,
                 config,
                 is_doc_comment || style.is_doc_comment(),
+                printer,
             )?
         };
     if rest.is_empty() {
@@ -388,6 +397,7 @@ fn identify_comment(
             shape,
             config,
             is_doc_comment,
+            printer,
         )
         .map(|rest_str| {
             format!(
@@ -725,6 +735,7 @@ impl<'a> CommentRewrite<'a> {
         line: &'a str,
         has_leading_whitespace: bool,
         is_doc_comment: bool,
+        printer: &Printer,
     ) -> bool {
         let num_newlines = count_newlines(orig);
         let is_last = i == num_newlines;
@@ -775,9 +786,12 @@ impl<'a> CommentRewrite<'a> {
                             .doc_comment_code_block_width()
                             .min(config.max_width());
                         config.set().max_width(comment_max_width);
-                        if let Some(s) =
-                            crate::format_code_block(&self.code_block_buffer, &config, false)
-                        {
+                        if let Some(s) = crate::format_code_block(
+                            &self.code_block_buffer,
+                            &config,
+                            false,
+                            printer,
+                        ) {
                             trim_custom_comment_prefix(&s.snippet)
                         } else {
                             trim_custom_comment_prefix(&self.code_block_buffer)
@@ -912,6 +926,7 @@ fn rewrite_comment_inner(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
+    printer: &Printer,
 ) -> Option<String> {
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
@@ -941,7 +956,14 @@ fn rewrite_comment_inner(
         });
 
     for (i, (line, has_leading_whitespace)) in lines.enumerate() {
-        if rewriter.handle_line(orig, i, line, has_leading_whitespace, is_doc_comment) {
+        if rewriter.handle_line(
+            orig,
+            i,
+            line,
+            has_leading_whitespace,
+            is_doc_comment,
+            printer,
+        ) {
             break;
         }
     }
@@ -1008,7 +1030,13 @@ pub(crate) fn rewrite_missing_comment(
     // check the span starts with a comment
     let pos = trimmed_snippet.find('/');
     if !trimmed_snippet.is_empty() && pos.is_some() {
-        rewrite_comment(trimmed_snippet, false, shape, context.config)
+        rewrite_comment(
+            trimmed_snippet,
+            false,
+            shape,
+            context.config,
+            context.printer,
+        )
     } else {
         Some(String::new())
     }
@@ -1914,19 +1942,19 @@ mod test {
         let comment = rewrite_comment(" //test",
                                       true,
                                       Shape::legacy(100, Indent::new(0, 100)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("/* test */", comment);
 
         let comment = rewrite_comment("// comment on a",
                                       false,
                                       Shape::legacy(10, Indent::empty()),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("// comment\n// on a", comment);
 
         let comment = rewrite_comment("//  A multi line comment\n             // between args.",
                                       false,
                                       Shape::legacy(60, Indent::new(0, 12)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("//  A multi line comment\n            // between args.", comment);
 
         let input = "// comment";
@@ -1935,13 +1963,13 @@ mod test {
         let comment = rewrite_comment(input,
                                       true,
                                       Shape::legacy(9, Indent::new(0, 69)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!(expected, comment);
 
         let comment = rewrite_comment("/*   trimmed    */",
                                       true,
                                       Shape::legacy(100, Indent::new(0, 100)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("/* trimmed */", comment);
 
         // Check that different comment style are properly recognised.
@@ -1952,7 +1980,7 @@ mod test {
                                           */"#,
                                       false,
                                       Shape::legacy(100, Indent::new(0, 0)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("/// test1\n/// test2\n// test3", comment);
 
         // Check that the blank line marks the end of a commented paragraph.
@@ -1961,7 +1989,7 @@ mod test {
                                          // test2"#,
                                       false,
                                       Shape::legacy(100, Indent::new(0, 0)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("// test1\n\n// test2", comment);
 
         // Check that the blank line marks the end of a custom-commented paragraph.
@@ -1970,7 +1998,7 @@ mod test {
                                          //@ test2"#,
                                       false,
                                       Shape::legacy(100, Indent::new(0, 0)),
-                                      &wrap_normalize_config).unwrap();
+                                      &wrap_normalize_config, &Printer::no_color()).unwrap();
         assert_eq!("//@ test1\n\n//@ test2", comment);
 
         // Check that bare lines are just indented but otherwise left unchanged.
@@ -1982,7 +2010,7 @@ mod test {
                                           */"#,
                                       false,
                                       Shape::legacy(100, Indent::new(0, 0)),
-                                      &wrap_config).unwrap();
+                                      &wrap_config, &Printer::no_color()).unwrap();
         assert_eq!("// test1\n/*\n a bare line!\n\n      another bare line!\n*/", comment);
     }
 

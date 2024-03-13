@@ -2,17 +2,17 @@ use super::*;
 use crate::config::Verbosity;
 
 #[derive(Debug)]
-pub(crate) struct StdoutEmitter {
+pub(crate) struct IntoOutputEmitter {
     verbosity: Verbosity,
 }
 
-impl StdoutEmitter {
+impl IntoOutputEmitter {
     pub(crate) fn new(verbosity: Verbosity) -> Self {
         Self { verbosity }
     }
 }
 
-impl Emitter for StdoutEmitter {
+impl Emitter for IntoOutputEmitter {
     fn emit_formatted_file(
         &mut self,
         output: &mut dyn Write,

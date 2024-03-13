@@ -642,7 +642,7 @@ impl<'a> Context<'a> {
             .trailing_separator(trailing_separator)
             .ends_with_newline(ends_with_newline);
 
-        write_list(&list_items, &fmt)
+        write_list(&list_items, &fmt, self.context.printer)
             .map(|items_str| (tactic == DefinitiveListTactic::Horizontal, items_str))
     }
 

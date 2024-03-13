@@ -55,6 +55,7 @@ pub use crate::config::{
 };
 
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
+use crate::print::Printer;
 
 pub use crate::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 
@@ -84,6 +85,7 @@ mod overflow;
 mod pairs;
 mod parse;
 mod patterns;
+pub mod print;
 mod release_channel;
 mod reorder;
 mod rewrite;
@@ -299,7 +301,12 @@ impl fmt::Display for FormatReport {
 
 /// Format the given snippet. The snippet is expected to be *complete* code.
 /// When we cannot parse the given snippet, this function returns `None`.
-fn format_snippet(snippet: &str, config: &Config, is_macro_def: bool) -> Option<FormattedSnippet> {
+fn format_snippet(
+    snippet: &str,
+    config: &Config,
+    is_macro_def: bool,
+    printer: &Printer,
+) -> Option<FormattedSnippet> {
     let mut config = config.clone();
     panic::catch_unwind(|| {
         let mut out: Vec<u8> = Vec::with_capacity(snippet.len() * 2);
@@ -312,7 +319,7 @@ fn format_snippet(snippet: &str, config: &Config, is_macro_def: bool) -> Option<
 
         let (formatting_error, result) = {
             let input = Input::Text(snippet.into());
-            let mut session = Session::new(config, Some(&mut out));
+            let mut session = Session::new(config, Some(&mut out), printer);
             let result = session.format_input_inner(input, is_macro_def);
             (
                 session.errors.has_macro_format_failure
@@ -344,6 +351,7 @@ fn format_code_block(
     code_snippet: &str,
     config: &Config,
     is_macro_def: bool,
+    printer: &Printer,
 ) -> Option<FormattedSnippet> {
     const FN_MAIN_PREFIX: &str = "fn main() {\n";
 
@@ -377,7 +385,7 @@ fn format_code_block(
     config_with_unix_newline
         .set()
         .newline_style(NewlineStyle::Unix);
-    let mut formatted = format_snippet(&snippet, &config_with_unix_newline, is_macro_def)?;
+    let mut formatted = format_snippet(&snippet, &config_with_unix_newline, is_macro_def, printer)?;
     // Remove wrapping main block
     formatted.unwrap_code_block();
 
@@ -437,14 +445,15 @@ fn format_code_block(
 pub struct Session<'b, T: Write> {
     pub config: Config,
     pub out: Option<&'b mut T>,
+    pub printer: &'b Printer,
     pub(crate) errors: ReportedErrors,
     source_file: SourceFile,
     emitter: Box<dyn Emitter + 'b>,
 }
 
 impl<'b, T: Write + 'b> Session<'b, T> {
-    pub fn new(config: Config, mut out: Option<&'b mut T>) -> Session<'b, T> {
-        let emitter = create_emitter(&config);
+    pub fn new(config: Config, mut out: Option<&'b mut T>, printer: &'b Printer) -> Session<'b, T> {
+        let emitter = create_emitter(&config, printer);
 
         if let Some(ref mut out) = out {
             let _ = emitter.emit_header(out);
@@ -456,6 +465,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             emitter,
             errors: ReportedErrors::default(),
             source_file: SourceFile::new(),
+            printer,
         }
     }
 
@@ -514,7 +524,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
     }
 }
 
-pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
+pub(crate) fn create_emitter<'a>(config: &Config, printer: &'a Printer) -> Box<dyn Emitter + 'a> {
     match config.emit_mode() {
         EmitMode::Files if config.make_backup() => {
             Box::new(emitter::FilesWithBackupEmitter::default())
@@ -523,12 +533,12 @@ pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
             config.print_misformatted_file_names(),
         )),
         EmitMode::Stdout | EmitMode::Coverage => {
-            Box::new(emitter::StdoutEmitter::new(config.verbose()))
+            Box::new(emitter::IntoOutputEmitter::new(config.verbose()))
         }
         EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
         EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
         EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
-        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
+        EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone(), printer)),
     }
 }
 
@@ -582,15 +592,17 @@ mod unit_tests {
         // `format_snippet()` and `format_code_block()` should not panic
         // even when we cannot parse the given snippet.
         let snippet = "let";
-        assert!(format_snippet(snippet, &Config::default(), false).is_none());
-        assert!(format_code_block(snippet, &Config::default(), false).is_none());
+        assert!(format_snippet(snippet, &Config::default(), false, &Printer::no_color()).is_none());
+        assert!(
+            format_code_block(snippet, &Config::default(), false, &Printer::no_color()).is_none()
+        );
     }
 
     fn test_format_inner<F>(formatter: F, input: &str, expected: &str) -> bool
     where
-        F: Fn(&str, &Config, bool) -> Option<FormattedSnippet>,
+        F: Fn(&str, &Config, bool, &Printer) -> Option<FormattedSnippet>,
     {
-        let output = formatter(input, &Config::default(), false);
+        let output = formatter(input, &Config::default(), false, &Printer::no_color());
         output.is_some() && output.unwrap().snippet == expected
     }
 
@@ -612,7 +624,10 @@ mod unit_tests {
     fn test_format_code_block_fail() {
         #[rustfmt::skip]
         let code_block = "this_line_is_100_characters_long_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx(x, y, z);";
-        assert!(format_code_block(code_block, &Config::default(), false).is_none());
+        assert!(
+            format_code_block(code_block, &Config::default(), false, &Printer::no_color())
+                .is_none()
+        );
     }
 
     #[test]

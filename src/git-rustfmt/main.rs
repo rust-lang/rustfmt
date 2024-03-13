@@ -11,7 +11,9 @@ use getopts::{Matches, Options};
 use rustfmt_nightly as rustfmt;
 use tracing_subscriber::EnvFilter;
 
-use crate::rustfmt::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
+use crate::rustfmt::{
+    load_config, print::Printer, CliOptions, FormatReportFormatterBuilder, Input, Session,
+};
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
     let prefixes: Vec<_> = files
@@ -63,7 +65,8 @@ fn fmt_files(files: &[&str]) -> i32 {
 
     let mut exit_code = 0;
     let mut out = stdout();
-    let mut session = Session::new(config, Some(&mut out));
+    let printer = Printer::new(config.color());
+    let mut session = Session::new(config, Some(&mut out), &printer);
     for file in files {
         let report = session.format(Input::File(PathBuf::from(file))).unwrap();
         if report.has_warnings() {

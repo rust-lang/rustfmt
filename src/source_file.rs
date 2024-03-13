@@ -30,7 +30,8 @@ pub(crate) fn write_all_files<T>(
 where
     T: Write,
 {
-    let mut emitter = create_emitter(config);
+    let printer = crate::print::Printer::no_color();
+    let mut emitter = create_emitter(config, &printer);
 
     emitter.emit_header(out)?;
     for (filename, text) in source_file {

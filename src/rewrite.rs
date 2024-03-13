@@ -8,6 +8,7 @@ use rustc_span::Span;
 
 use crate::config::{Config, IndentStyle};
 use crate::parse::session::ParseSess;
+use crate::print::Printer;
 use crate::shape::Shape;
 use crate::skip::SkipContext;
 use crate::visitor::SnippetProvider;
@@ -43,6 +44,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
     pub(crate) skipped_range: Rc<RefCell<Vec<(usize, usize)>>>,
+    pub(crate) printer: &'a Printer,
 }
 
 pub(crate) struct InsideMacroGuard {

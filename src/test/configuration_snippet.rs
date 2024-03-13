@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use super::{print_mismatches, write_message, DIFF_CONTEXT_SIZE};
 use crate::config::{Config, EmitMode, Verbosity};
+use crate::print::Printer;
 use crate::rustfmt_diff::{make_diff, Mismatch};
 use crate::{Input, Session};
 
@@ -197,7 +198,8 @@ impl ConfigCodeBlock {
         let mut buf: Vec<u8> = vec![];
 
         {
-            let mut session = Session::new(config, Some(&mut buf));
+            let printer = Printer::no_color();
+            let mut session = Session::new(config, Some(&mut buf), &printer);
             session.format(input).unwrap();
             if self.has_parsing_errors(&session) {
                 return false;

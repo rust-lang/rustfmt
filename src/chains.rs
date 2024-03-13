@@ -293,7 +293,7 @@ impl Rewrite for ChainItem {
             ),
             ChainItemKind::Await => ".await".to_owned(),
             ChainItemKind::Comment(ref comment, _) => {
-                rewrite_comment(comment, false, shape, context.config)?
+                rewrite_comment(comment, false, shape, context.config, context.printer)?
             }
         };
         Some(format!("{rewrite}{}", "?".repeat(self.tries)))

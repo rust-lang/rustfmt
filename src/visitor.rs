@@ -17,6 +17,7 @@ use crate::items::{
 use crate::macros::{macro_style, rewrite_macro, rewrite_macro_def, MacroPosition};
 use crate::modules::Module;
 use crate::parse::session::ParseSess;
+use crate::print::Printer;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::skip::{is_skip_attr, SkipContext};
@@ -87,6 +88,7 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) report: FormatReport,
     pub(crate) skip_context: SkipContext,
     pub(crate) is_macro_def: bool,
+    pub(crate) printer: &'a Printer,
 }
 
 impl<'a> Drop for FmtVisitor<'a> {
@@ -314,8 +316,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
                                 // put the other lines below it, shaping it as needed
                                 let other_lines = &sub_slice[offset + 1..];
-                                let comment_str =
-                                    rewrite_comment(other_lines, false, comment_shape, config);
+                                let comment_str = rewrite_comment(
+                                    other_lines,
+                                    false,
+                                    comment_shape,
+                                    config,
+                                    self.printer,
+                                );
                                 match comment_str {
                                     Some(ref s) => self.push_str(s),
                                     None => self.push_str(other_lines),
@@ -345,7 +352,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                             self.push_str(&self.block_indent.to_string_with_newline(config));
                         }
 
-                        let comment_str = rewrite_comment(&sub_slice, false, comment_shape, config);
+                        let comment_str =
+                            rewrite_comment(&sub_slice, false, comment_shape, config, self.printer);
                         match comment_str {
                             Some(ref s) => self.push_str(s),
                             None => self.push_str(&sub_slice),
@@ -757,6 +765,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             ctx.parse_sess,
             ctx.config,
             ctx.snippet_provider,
+            ctx.printer,
             ctx.report.clone(),
         );
         visitor.skip_context.update(ctx.skip_context.clone());
@@ -768,6 +777,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         parse_session: &'a ParseSess,
         config: &'a Config,
         snippet_provider: &'a SnippetProvider,
+        printer: &'a Printer,
         report: FormatReport,
     ) -> FmtVisitor<'a> {
         let mut skip_context = SkipContext::default();
@@ -794,6 +804,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             macro_rewrite_failure: false,
             report,
             skip_context,
+            printer,
         }
     }
 
@@ -1014,6 +1025,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             report: self.report.clone(),
             skip_context: self.skip_context.clone(),
             skipped_range: self.skipped_range.clone(),
+            printer: self.printer,
         }
     }
 }

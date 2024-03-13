@@ -100,7 +100,7 @@ impl Rewrite for Pat {
                     .separator(" |")
                     .separator_place(context.config.binop_separator())
                     .ends_with_newline(false);
-                write_list(&items, &fmt)
+                write_list(&items, &fmt, context.printer)
             }
             PatKind::Box(ref pat) => rewrite_unary_prefix(context, "box ", &**pat, shape),
             PatKind::Ident(BindingAnnotation(by_ref, mutability), ident, ref sub_pat) => {
@@ -325,7 +325,7 @@ fn rewrite_struct_pat(
     let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
     let fmt = struct_lit_formatting(nested_shape, tactic, context, false);
 
-    let mut fields_str = write_list(&item_vec, &fmt)?;
+    let mut fields_str = write_list(&item_vec, &fmt, context.printer)?;
     let one_line_width = h_shape.map_or(0, |shape| shape.width);
 
     let has_trailing_comma = fmt.needs_trailing_separator();

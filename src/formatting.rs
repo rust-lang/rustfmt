@@ -14,9 +14,13 @@ use crate::formatting::generated::is_generated_file;
 use crate::modules::Module;
 use crate::parse::parser::{DirectoryOwnership, Parser, ParserError};
 use crate::parse::session::ParseSess;
+use crate::print::Printer;
 use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
-use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
+use crate::{
+    buf_eprintln, buf_print, buf_println, modules, source_file, ErrorKind, FormatReport, Input,
+    Session,
+};
 
 mod generated;
 mod newline_style;
@@ -39,13 +43,17 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             if self.config.disable_all_formatting() {
                 // When the input is from stdin, echo back the input.
                 return match input {
-                    Input::Text(ref buf) => echo_back_stdin(buf),
+                    Input::Text(ref buf) => {
+                        // Echo back stdin
+                        buf_print!(self.printer, "{buf}");
+                        Ok(FormatReport::new())
+                    }
                     _ => Ok(FormatReport::new()),
                 };
             }
 
             let config = &self.config.clone();
-            let format_result = format_project(input, config, self, is_macro_def);
+            let format_result = format_project(input, config, self, is_macro_def, self.printer);
 
             format_result.map(|report| {
                 self.errors.add(&report.internal.borrow().1);
@@ -90,26 +98,20 @@ fn should_skip_module<T: FormatHandler>(
     false
 }
 
-fn echo_back_stdin(input: &str) -> Result<FormatReport, ErrorKind> {
-    if let Err(e) = io::stdout().write_all(input.as_bytes()) {
-        return Err(From::from(e));
-    }
-    Ok(FormatReport::new())
-}
-
 // Format an entire crate (or subset of the module tree).
 fn format_project<T: FormatHandler>(
     input: Input,
     config: &Config,
     handler: &mut T,
     is_macro_def: bool,
+    printer: &Printer,
 ) -> Result<FormatReport, ErrorKind> {
     let mut timer = Timer::start();
 
     let main_file = input.file_name();
     let input_is_stdin = main_file == FileName::Stdin;
 
-    let parse_session = ParseSess::new(config)?;
+    let parse_session = ParseSess::new(config, printer)?;
     if config.skip_children() && parse_session.ignore_file(&main_file) {
         return Ok(FormatReport::new());
     }
@@ -123,14 +125,14 @@ fn format_project<T: FormatHandler>(
         Err(e) => {
             let forbid_verbose = input_is_stdin || e != ParserError::ParsePanicError;
             should_emit_verbose(forbid_verbose, config, || {
-                eprintln!("The Rust parser panicked");
+                buf_eprintln!(printer, "The Rust parser panicked");
             });
             report.add_parsing_error();
             return Ok(report);
         }
     };
 
-    let mut context = FormatContext::new(&krate, report, parse_session, config, handler);
+    let mut context = FormatContext::new(&krate, report, parse_session, config, handler, printer);
     let files = modules::ModResolver::new(
         &context.parse_session,
         directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaBlock),
@@ -151,20 +153,27 @@ fn format_project<T: FormatHandler>(
 
     for (path, module) in files {
         if input_is_stdin && contains_skip(module.attrs()) {
-            return echo_back_stdin(
+            // Echo back stdin
+            buf_print!(
+                printer,
+                "{}",
                 context
                     .parse_session
                     .snippet_provider(module.span)
-                    .entire_snippet(),
+                    .entire_snippet()
             );
+            return Ok(FormatReport::new());
         }
-        should_emit_verbose(input_is_stdin, config, || println!("Formatting {}", path));
+        should_emit_verbose(input_is_stdin, config, || {
+            buf_println!(printer, "Formatting {}", path)
+        });
         context.format_file(path, &module, is_macro_def)?;
     }
     timer = timer.done_formatting();
 
     should_emit_verbose(input_is_stdin, config, || {
-        println!(
+        buf_println!(
+            printer,
             "Spent {0:.3} secs in the parsing phase, and {1:.3} secs in the formatting phase",
             timer.get_parse_time(),
             timer.get_format_time(),
@@ -181,6 +190,7 @@ struct FormatContext<'a, T: FormatHandler> {
     parse_session: ParseSess,
     config: &'a Config,
     handler: &'a mut T,
+    printer: &'a Printer,
 }
 
 impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
@@ -190,6 +200,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         parse_session: ParseSess,
         config: &'a Config,
         handler: &'a mut T,
+        printer: &'a Printer,
     ) -> Self {
         FormatContext {
             krate,
@@ -197,6 +208,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             parse_session,
             config,
             handler,
+            printer,
         }
     }
 
@@ -216,6 +228,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             &self.parse_session,
             self.config,
             &snippet_provider,
+            &self.printer,
             self.report.clone(),
         );
         visitor.skip_context.update_with_attrs(&self.krate.attrs);

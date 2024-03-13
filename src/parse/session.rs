@@ -15,6 +15,7 @@ use crate::config::file_lines::LineRange;
 use crate::config::options::Color;
 use crate::ignore_path::IgnorePathSet;
 use crate::parse::parser::{ModError, ModulePathSuccess};
+use crate::print::Printer;
 use crate::source_map::LineRangeUtils;
 use crate::utils::starts_with_newline;
 use crate::visitor::SnippetProvider;
@@ -123,15 +124,8 @@ fn default_dcx(
     ignore_path_set: Lrc<IgnorePathSet>,
     can_reset: Lrc<AtomicBool>,
     show_parse_errors: bool,
-    color: Color,
+    printer: &Printer,
 ) -> DiagCtxt {
-    let supports_color = term::stderr().map_or(false, |term| term.supports_color());
-    let emit_color = if supports_color {
-        ColorConfig::from(color)
-    } else {
-        ColorConfig::Never
-    };
-
     let emitter = if !show_parse_errors {
         silent_emitter()
     } else {
@@ -139,7 +133,10 @@ fn default_dcx(
             rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
             false,
         );
-        Box::new(EmitterWriter::stderr(emit_color, fallback_bundle).sm(Some(source_map.clone())))
+        Box::new(
+            EmitterWriter::new(Box::new(printer.clone()), fallback_bundle)
+                .sm(Some(source_map.clone())),
+        )
     };
     DiagCtxt::with_emitter(Box::new(SilentOnIgnoredFilesEmitter {
         has_non_ignorable_parser_errors: false,
@@ -151,7 +148,7 @@ fn default_dcx(
 }
 
 impl ParseSess {
-    pub(crate) fn new(config: &Config) -> Result<ParseSess, ErrorKind> {
+    pub(crate) fn new(config: &Config, printer: &Printer) -> Result<ParseSess, ErrorKind> {
         let ignore_path_set = match IgnorePathSet::from_ignore_list(&config.ignore()) {
             Ok(ignore_path_set) => Lrc::new(ignore_path_set),
             Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
@@ -164,7 +161,7 @@ impl ParseSess {
             Lrc::clone(&ignore_path_set),
             Lrc::clone(&can_reset_errors),
             config.show_parse_errors(),
-            config.color(),
+            printer,
         );
         let parse_sess = RawParseSess::with_dcx(dcx, source_map);
 
