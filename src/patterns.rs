@@ -5,7 +5,7 @@ use rustc_span::{BytePos, Span};
 use crate::comment::{combine_strs_with_missing_comments, FindUncommented};
 use crate::config::lists::*;
 use crate::config::Version;
-use crate::expr::{can_be_overflowed_expr, rewrite_unary_prefix, wrap_struct_field};
+use crate::expr::{can_be_overflowed_expr, rewrite_unary_prefix, span_ends_with_comma, wrap_struct_field};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
     struct_lit_tactic, write_list, ListFormatting, ListItem, Separator,
@@ -313,35 +313,68 @@ fn rewrite_struct_pat(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
+    debug!("rewrite_struct_pat: shape: {:?}", shape);
+
+    enum StructPatField<'a> {
+        Regular(&'a ast::PatField),
+        Rest(Span),
+    }
+
     // 2 =  ` {`
     let path_shape = shape.sub_width(2)?;
     let path_str = rewrite_path(context, PathContext::Expr, qself, path, path_shape)?;
 
-    if fields.is_empty() && !ellipsis {
-        return Some(format!("{path_str} {{}}"));
-    }
+    if fields.is_empty() {
+        if ellipsis {
+            return Some(format!("{} {{ .. }}", path_str));
+        }
 
-    let (ellipsis_str, terminator) = if ellipsis { (", ..", "..") } else { ("", "}") };
+        return Some(format!("{} {{}}", path_str));
+    }
 
     // 3 = ` { `, 2 = ` }`.
     let (h_shape, v_shape) =
-        struct_lit_shape(shape, context, path_str.len() + 3, ellipsis_str.len() + 2)?;
+        struct_lit_shape(shape, context, path_str.len() + 3, 2)?;
+
+    let one_line_width = h_shape.map_or(0, |shape| shape.width);
+    let body_lo = context.snippet_provider.span_after(span, "{");
+
+    let field_iter = fields
+        .iter()
+        .map(StructPatField::Regular)
+        .chain(match ellipsis {
+            false => None,
+            true => { // 2 = `..`.len()
+                let last_field_hi = fields.last().map_or(body_lo, |field| field.span.hi());
+                let snippet = context.snippet(mk_sp(last_field_hi, span.hi()));
+                let rest_lo = last_field_hi + BytePos(snippet.find_uncommented("..").unwrap() as u32);
+                let rest_hi = rest_lo + BytePos(2);
+                Some(StructPatField::Rest(mk_sp(rest_lo, rest_hi)))
+            }
+        });
+
+    let span_lo = |item: &StructPatField<'_>| match *item {
+        StructPatField::Regular(f) => f.span.lo(),
+        StructPatField::Rest(span) => span.lo(),
+    };
+    let span_hi = |item: &StructPatField<'_>| match *item {
+        StructPatField::Regular(f) => f.span.hi(),
+        StructPatField::Rest(span) => span.hi(),
+    };
+    let rewrite = |item: &StructPatField<'_>| match *item {
+        StructPatField::Regular(f) => f.rewrite(context, v_shape),
+        StructPatField::Rest(_) => Some("..".to_owned()),
+    };
 
     let items = itemize_list(
         context.snippet_provider,
-        fields.iter(),
-        terminator,
+        field_iter,
+        "}",
         ",",
-        |f| {
-            if f.attrs.is_empty() {
-                f.span.lo()
-            } else {
-                f.attrs.first().unwrap().span.lo()
-            }
-        },
-        |f| f.span.hi(),
-        |f| f.rewrite(context, v_shape),
-        context.snippet_provider.span_after(span, "{"),
+        span_lo,
+        span_hi,
+        rewrite,
+        body_lo,
         span.hi(),
         false,
     );
@@ -349,37 +382,80 @@ fn rewrite_struct_pat(
 
     let tactic = struct_lit_tactic(h_shape, context, &item_vec);
     let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
-    let fmt = struct_lit_formatting(nested_shape, tactic, context, false);
 
-    let mut fields_str = write_list(&item_vec, &fmt)?;
-    let one_line_width = h_shape.map_or(0, |shape| shape.width);
+    let fmt = struct_lit_formatting(nested_shape, tactic, context, ellipsis);
+    let fields_str = write_list(&item_vec, &fmt)?;
 
-    let has_trailing_comma = fmt.needs_trailing_separator();
-
-    if ellipsis {
-        if fields_str.contains('\n') || fields_str.len() > one_line_width {
-            // Add a missing trailing comma.
-            if !has_trailing_comma {
-                fields_str.push(',');
-            }
-            fields_str.push('\n');
-            fields_str.push_str(&nested_shape.indent.to_string(context.config));
-        } else {
-            if !fields_str.is_empty() {
-                // there are preceding struct fields being matched on
-                if has_trailing_comma {
-                    fields_str.push(' ');
-                } else {
-                    fields_str.push_str(", ");
-                }
-            }
-        }
-        fields_str.push_str("..");
-    }
-
-    // ast::Pat doesn't have attrs so use &[]
     let fields_str = wrap_struct_field(context, &[], &fields_str, shape, v_shape, one_line_width)?;
-    Some(format!("{path_str} {{{fields_str}}}"))
+    Some(format!("{} {{{}}}", path_str, fields_str))
+
+    // // 2 =  ` {`
+    // let path_shape = shape.sub_width(2)?;
+    // let path_str = rewrite_path(context, PathContext::Expr, qself, path, path_shape)?;
+
+    // if fields.is_empty() && !ellipsis {
+    //     return Some(format!("{path_str} {{}}"));
+    // }
+
+    // let (ellipsis_str, terminator) = if ellipsis { (", ..", "..") } else { ("", "}") };
+
+    // // 3 = ` { `, 2 = ` }`.
+    // let (h_shape, v_shape) =
+    //     struct_lit_shape(shape, context, path_str.len() + 3, ellipsis_str.len() + 2)?;
+
+    // let items = itemize_list(
+    //     context.snippet_provider,
+    //     fields.iter(),
+    //     terminator,
+    //     ",",
+    //     |f| {
+    //         if f.attrs.is_empty() {
+    //             f.span.lo()
+    //         } else {
+    //             f.attrs.first().unwrap().span.lo()
+    //         }
+    //     },
+    //     |f| f.span.hi(),
+    //     |f| f.rewrite(context, v_shape),
+    //     context.snippet_provider.span_after(span, "{"),
+    //     span.hi(),
+    //     false,
+    // );
+    // let item_vec = items.collect::<Vec<_>>();
+
+    // let tactic = struct_lit_tactic(h_shape, context, &item_vec);
+    // let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
+    // let fmt = struct_lit_formatting(nested_shape, tactic, context, false);
+
+    // let mut fields_str = write_list(&item_vec, &fmt)?;
+    // let one_line_width = h_shape.map_or(0, |shape| shape.width);
+
+    // let has_trailing_comma = fmt.needs_trailing_separator();
+
+    // if ellipsis {
+    //     if fields_str.contains('\n') || fields_str.len() > one_line_width {
+    //         // Add a missing trailing comma.
+    //         if !has_trailing_comma {
+    //             fields_str.push(',');
+    //         }
+    //         fields_str.push('\n');
+    //         fields_str.push_str(&nested_shape.indent.to_string(context.config));
+    //     } else {
+    //         if !fields_str.is_empty() {
+    //             // there are preceding struct fields being matched on
+    //             if has_trailing_comma {
+    //                 fields_str.push(' ');
+    //             } else {
+    //                 fields_str.push_str(", ");
+    //             }
+    //         }
+    //     }
+    //     fields_str.push_str("..");
+    // }
+
+    // // ast::Pat doesn't have attrs so use &[]
+    // let fields_str = wrap_struct_field(context, &[], &fields_str, shape, v_shape, one_line_width)?;
+    // Some(format!("{path_str} {{{fields_str}}}"))
 }
 
 impl Rewrite for PatField {
