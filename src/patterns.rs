@@ -3,8 +3,8 @@ use rustc_ast::ptr;
 use rustc_span::{BytePos, Span};
 
 use crate::comment::{combine_strs_with_missing_comments, FindUncommented};
-use crate::config::lists::*;
 use crate::config::Version;
+use crate::config::{lists::*, IndentStyle};
 use crate::expr::{can_be_overflowed_expr, rewrite_unary_prefix, wrap_struct_field};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
@@ -391,9 +391,25 @@ fn rewrite_struct_pat(
     // code ignored it and directly uses the tactic for the fields.
     let tactic = if ellipsis {
         let field_item_vec = &item_vec[..item_vec.len() - 1];
-        let field_tactic = struct_lit_tactic(h_shape, context, field_item_vec);
-        let rest_item_vec = &item_vec[item_vec.len() - 1..];        
-        let rest_tactic = struct_lit_tactic(h_shape, context, rest_item_vec);        
+        let mut field_tactic = struct_lit_tactic(h_shape, context, field_item_vec);
+        let rest_item_vec = &item_vec[item_vec.len() - 1..];
+        let mut rest_tactic = struct_lit_tactic(h_shape, context, rest_item_vec);
+
+        if !(context.config.struct_lit_single_line()
+            || context.config.indent_style() == IndentStyle::Visual && field_item_vec.len() == 1)
+        {
+            // FIXME: Figure out the exact behavior of mixed tactic. The old
+            // produces mixed tactic by ignoring the `..` when determining the
+            // tactic. See #5066 for an example.
+            let nested_shape = shape_for_tactic(field_tactic, h_shape, v_shape);
+            let fmt = struct_lit_formatting(nested_shape, field_tactic, context, false);
+            let fields_str = write_list(field_item_vec, &fmt)?;
+            if !(fields_str.contains('\n') || fields_str.len() > one_line_width) {
+                field_tactic = DefinitiveListTactic::Horizontal;
+                rest_tactic = DefinitiveListTactic::Horizontal;
+            }
+        }
+
         match (field_tactic, rest_tactic) {
             (DefinitiveListTactic::Vertical, _) | (_, DefinitiveListTactic::Vertical) => {
                 DefinitiveListTactic::Vertical
