@@ -5,7 +5,7 @@ use rustc_span::{BytePos, Span};
 use crate::comment::{combine_strs_with_missing_comments, FindUncommented};
 use crate::config::lists::*;
 use crate::config::Version;
-use crate::expr::{can_be_overflowed_expr, rewrite_unary_prefix, span_ends_with_comma, wrap_struct_field};
+use crate::expr::{can_be_overflowed_expr, rewrite_unary_prefix, wrap_struct_field};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
     struct_lit_tactic, write_list, ListFormatting, ListItem, Separator,
@@ -387,7 +387,22 @@ fn rewrite_struct_pat(
     );
     let item_vec = items.collect::<Vec<_>>();
 
-    let tactic = struct_lit_tactic(h_shape, context, &item_vec);
+    // FIXME: Figure out the way to determine when to use mixed tactic. The old
+    // code ignored it and directly uses the tactic for the fields.
+    let tactic = if ellipsis {
+        let field_item_vec = &item_vec[..item_vec.len() - 1];
+        let field_tactic = struct_lit_tactic(h_shape, context, field_item_vec);
+        let rest_item_vec = &item_vec[item_vec.len() - 1..];        
+        let rest_tactic = struct_lit_tactic(h_shape, context, rest_item_vec);        
+        match (field_tactic, rest_tactic) {
+            (DefinitiveListTactic::Vertical, _) | (_, DefinitiveListTactic::Vertical) => {
+                DefinitiveListTactic::Vertical
+            }
+            _ => field_tactic,
+        }
+    } else {
+        struct_lit_tactic(h_shape, context, &item_vec)
+    };
     let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
 
     let fmt = struct_lit_formatting(nested_shape, tactic, context, ellipsis);
@@ -395,74 +410,6 @@ fn rewrite_struct_pat(
 
     let fields_str = wrap_struct_field(context, &[], &fields_str, shape, v_shape, one_line_width)?;
     Some(format!("{} {{{}}}", path_str, fields_str))
-
-    // // 2 =  ` {`
-    // let path_shape = shape.sub_width(2)?;
-    // let path_str = rewrite_path(context, PathContext::Expr, qself, path, path_shape)?;
-
-    // if fields.is_empty() && !ellipsis {
-    //     return Some(format!("{path_str} {{}}"));
-    // }
-
-    // let (ellipsis_str, terminator) = if ellipsis { (", ..", "..") } else { ("", "}") };
-
-    // // 3 = ` { `, 2 = ` }`.
-    // let (h_shape, v_shape) =
-    //     struct_lit_shape(shape, context, path_str.len() + 3, ellipsis_str.len() + 2)?;
-
-    // let items = itemize_list(
-    //     context.snippet_provider,
-    //     fields.iter(),
-    //     terminator,
-    //     ",",
-    //     |f| {
-    //         if f.attrs.is_empty() {
-    //             f.span.lo()
-    //         } else {
-    //             f.attrs.first().unwrap().span.lo()
-    //         }
-    //     },
-    //     |f| f.span.hi(),
-    //     |f| f.rewrite(context, v_shape),
-    //     context.snippet_provider.span_after(span, "{"),
-    //     span.hi(),
-    //     false,
-    // );
-    // let item_vec = items.collect::<Vec<_>>();
-
-    // let tactic = struct_lit_tactic(h_shape, context, &item_vec);
-    // let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
-    // let fmt = struct_lit_formatting(nested_shape, tactic, context, false);
-
-    // let mut fields_str = write_list(&item_vec, &fmt)?;
-    // let one_line_width = h_shape.map_or(0, |shape| shape.width);
-
-    // let has_trailing_comma = fmt.needs_trailing_separator();
-
-    // if ellipsis {
-    //     if fields_str.contains('\n') || fields_str.len() > one_line_width {
-    //         // Add a missing trailing comma.
-    //         if !has_trailing_comma {
-    //             fields_str.push(',');
-    //         }
-    //         fields_str.push('\n');
-    //         fields_str.push_str(&nested_shape.indent.to_string(context.config));
-    //     } else {
-    //         if !fields_str.is_empty() {
-    //             // there are preceding struct fields being matched on
-    //             if has_trailing_comma {
-    //                 fields_str.push(' ');
-    //             } else {
-    //                 fields_str.push_str(", ");
-    //             }
-    //         }
-    //     }
-    //     fields_str.push_str("..");
-    // }
-
-    // // ast::Pat doesn't have attrs so use &[]
-    // let fields_str = wrap_struct_field(context, &[], &fields_str, shape, v_shape, one_line_width)?;
-    // Some(format!("{path_str} {{{fields_str}}}"))
 }
 
 impl Rewrite for PatField {
