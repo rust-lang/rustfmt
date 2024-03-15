@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::cmp::min;
 
 use itertools::Itertools;
+use lazy_static::lazy_static;
+use regex::Regex;
 use rustc_ast::token::{Delimiter, Lit, LitKind};
 use rustc_ast::{ast, ptr, token, ForLoopKind};
 use rustc_span::{BytePos, Span};
@@ -13,7 +15,9 @@ use crate::comment::{
     rewrite_missing_comment, CharClasses, FindUncommented,
 };
 use crate::config::lists::*;
-use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, Version};
+use crate::config::{
+    Config, ControlBraceStyle, FloatLiteralTrailingZero, HexLiteralCase, IndentStyle, Version,
+};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
     struct_lit_tactic, write_list, ListFormatting, Separator,
@@ -1245,6 +1249,7 @@ pub(crate) fn rewrite_literal(
     match token_lit.kind {
         token::LitKind::Str => rewrite_string_lit(context, span, shape),
         token::LitKind::Integer => rewrite_int_lit(context, token_lit, span, shape),
+        token::LitKind::Float => rewrite_float_lit(context, token_lit, span, shape),
         _ => wrap_str(
             context.snippet(span).to_owned(),
             context.config.max_width(),
@@ -1285,7 +1290,12 @@ fn rewrite_int_lit(
     span: Span,
     shape: Shape,
 ) -> Option<String> {
+    if token_lit.is_semantic_float() {
+        return rewrite_float_lit(context, token_lit, span, shape);
+    }
+
     let symbol = token_lit.symbol.as_str();
+    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
 
     if let Some(symbol_stripped) = symbol.strip_prefix("0x") {
         let hex_lit = match context.config.hex_literal_case() {
@@ -1295,11 +1305,7 @@ fn rewrite_int_lit(
         };
         if let Some(hex_lit) = hex_lit {
             return wrap_str(
-                format!(
-                    "0x{}{}",
-                    hex_lit,
-                    token_lit.suffix.map_or(String::new(), |s| s.to_string())
-                ),
+                format!("0x{}{}", hex_lit, suffix.unwrap_or("")),
                 context.config.max_width(),
                 shape,
             );
@@ -1308,6 +1314,69 @@ fn rewrite_int_lit(
 
     wrap_str(
         context.snippet(span).to_owned(),
+        context.config.max_width(),
+        shape,
+    )
+}
+
+fn rewrite_float_lit(
+    context: &RewriteContext<'_>,
+    token_lit: token::Lit,
+    span: Span,
+    shape: Shape,
+) -> Option<String> {
+    if matches!(
+        context.config.float_literal_trailing_zero(),
+        FloatLiteralTrailingZero::Preserve
+    ) {
+        return wrap_str(
+            context.snippet(span).to_owned(),
+            context.config.max_width(),
+            shape,
+        );
+    }
+
+    let symbol = token_lit.symbol.as_str();
+    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
+
+    let FloatSymbolParts {
+        integer_part,
+        fractional_part,
+        exponent,
+    } = parse_float_symbol(symbol);
+
+    let has_postfix = exponent.is_some() || suffix.is_some();
+    let fractional_part_nonzero = fractional_part.map_or(false, |s| !is_zero_integer_literal(s));
+
+    let (include_period, include_fractional_part) =
+        match context.config.float_literal_trailing_zero() {
+            FloatLiteralTrailingZero::Preserve => unreachable!("handled above"),
+            FloatLiteralTrailingZero::Always => (true, true),
+            FloatLiteralTrailingZero::IfNoPostfix => (
+                fractional_part_nonzero || !has_postfix,
+                fractional_part_nonzero || !has_postfix,
+            ),
+            FloatLiteralTrailingZero::Never => (
+                fractional_part_nonzero || !has_postfix,
+                fractional_part_nonzero,
+            ),
+        };
+
+    let period = if include_period { "." } else { "" };
+    let fractional_part = if include_fractional_part {
+        fractional_part.unwrap_or("0")
+    } else {
+        ""
+    };
+    wrap_str(
+        format!(
+            "{}{}{}{}{}",
+            integer_part,
+            period,
+            fractional_part,
+            exponent.unwrap_or(""),
+            suffix.unwrap_or(""),
+        ),
         context.config.max_width(),
         shape,
     )
@@ -2218,9 +2287,39 @@ pub(crate) fn is_method_call(expr: &ast::Expr) -> bool {
     }
 }
 
+struct FloatSymbolParts<'a> {
+    integer_part: &'a str,
+    fractional_part: Option<&'a str>,
+    exponent: Option<&'a str>,
+}
+
+// Parses a float literal. The `symbol` must be a valid floating point literal without a type
+// suffix. Otherwise the function may panic or return wrong result.
+fn parse_float_symbol(symbol: &str) -> FloatSymbolParts<'_> {
+    lazy_static! {
+        // This regex may accept invalid float literals (such as `1`, `_` or `2.e3`). That's ok.
+        // We only use it to parse literals whose validity has already been established.
+        static ref FLOAT_LITERAL: Regex =
+            Regex::new(r"^([0-9_]+)(?:\.([0-9_]+)?)?([eE][+-]?[0-9_]+)?$").unwrap();
+    }
+    let caps = FLOAT_LITERAL.captures(symbol).unwrap();
+    FloatSymbolParts {
+        integer_part: caps.get(1).unwrap().as_str(),
+        fractional_part: caps.get(2).map(|m| m.as_str()),
+        exponent: caps.get(3).map(|m| m.as_str()),
+    }
+}
+
+fn is_zero_integer_literal(symbol: &str) -> bool {
+    lazy_static! {
+        static ref ZERO_LITERAL: Regex = Regex::new(r"^[0_]+$").unwrap();
+    }
+    ZERO_LITERAL.is_match(symbol)
+}
+
 #[cfg(test)]
 mod test {
-    use super::last_line_offsetted;
+    use super::*;
 
     #[test]
     fn test_last_line_offsetted() {
@@ -2241,5 +2340,61 @@ mod test {
         assert_eq!(last_line_offsetted(2, lines), true);
         let lines = "one\n two      three";
         assert_eq!(last_line_offsetted(2, lines), false);
+    }
+
+    #[test]
+    fn test_parse_float_symbol() {
+        let parts = parse_float_symbol("123.456e789");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, Some("456"));
+        assert_eq!(parts.exponent, Some("e789"));
+
+        let parts = parse_float_symbol("123.456e+789");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, Some("456"));
+        assert_eq!(parts.exponent, Some("e+789"));
+
+        let parts = parse_float_symbol("123.456e-789");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, Some("456"));
+        assert_eq!(parts.exponent, Some("e-789"));
+
+        let parts = parse_float_symbol("123e789");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, None);
+        assert_eq!(parts.exponent, Some("e789"));
+
+        let parts = parse_float_symbol("123E789");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, None);
+        assert_eq!(parts.exponent, Some("E789"));
+
+        let parts = parse_float_symbol("123.");
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, None);
+        assert_eq!(parts.exponent, None);
+    }
+
+    #[test]
+    fn test_parse_float_symbol_with_underscores() {
+        let parts = parse_float_symbol("_123._456e_789");
+        assert_eq!(parts.integer_part, "_123");
+        assert_eq!(parts.fractional_part, Some("_456"));
+        assert_eq!(parts.exponent, Some("e_789"));
+
+        let parts = parse_float_symbol("123_.456_e789_");
+        assert_eq!(parts.integer_part, "123_");
+        assert_eq!(parts.fractional_part, Some("456_"));
+        assert_eq!(parts.exponent, Some("e789_"));
+
+        let parts = parse_float_symbol("1_23.4_56e7_89");
+        assert_eq!(parts.integer_part, "1_23");
+        assert_eq!(parts.fractional_part, Some("4_56"));
+        assert_eq!(parts.exponent, Some("e7_89"));
+
+        let parts = parse_float_symbol("_1_23_._4_56_e_7_89_");
+        assert_eq!(parts.integer_part, "_1_23_");
+        assert_eq!(parts.fractional_part, Some("_4_56_"));
+        assert_eq!(parts.exponent, Some("e_7_89_"));
     }
 }
