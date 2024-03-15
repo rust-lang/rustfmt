@@ -272,16 +272,12 @@ impl Rewrite for Pat {
                 rewrite_macro(mac, None, context, shape, MacroPosition::Pat)
             }
             PatKind::Paren(ref pat) => {
-                overflow::rewrite_with_parens(
-                    context,
-                    "",
-                    std::iter::once(&**pat), // iterator with a single element
-                    shape,
-                    self.span,
-                    context.config.max_width(),
-                    Some(SeparatorTactic::Never), // no separator needed for a single pattern
-                )
-            },
+                let inner_pat = pat.rewrite(context, shape)?;
+                let pre_snippet = context.snippet(mk_sp(self.span.lo(), pat.span.lo()));
+                let post_snippet = context.snippet(mk_sp(pat.span.hi(), self.span.hi()));
+                let result = format!("{}{}{}", pre_snippet, inner_pat, post_snippet);
+                Some(result)
+            }
         }
     }
 }
