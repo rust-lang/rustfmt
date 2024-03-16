@@ -2,7 +2,7 @@
 
 // Ensure comment preservation in parenthesis
 fn main() {
-    let (/**/ () | () /**/) = ();
+    let (/* */ () | () /* */) = ();
     let (/**/ () | () /**/) = ();
     let (/*comment*/ () | () /*comment*/) = ();
     let (/*multi-line
