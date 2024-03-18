@@ -31,7 +31,7 @@ fn bar(
 
 fn foo(a: Aaaaaaaaaaaaaa, b: Bbbbbbbbbbbbbb)
 where
-    T: UUUUUUUUUUU, {
+    T: UUUUUUUUUUU {
     foo();
 }
 
@@ -42,13 +42,13 @@ fn bar(
     d: Dddddddddddddddd,
     e: Eeeeeeeeeeeeeee,
 ) where
-    T: UUUUUUUUUUU, {
+    T: UUUUUUUUUUU {
     bar();
 }
 
 fn foo(a: Aaaaaaaaaaaaaa, b: Bbbbbbbbbbbbbb) -> String
 where
-    T: UUUUUUUUUUU, {
+    T: UUUUUUUUUUU {
     foo();
 }
 
@@ -60,7 +60,7 @@ fn bar(
     e: Eeeeeeeeeeeeeee,
 ) -> String
 where
-    T: UUUUUUUUUUU, {
+    T: UUUUUUUUUUU {
     bar();
 }
 
