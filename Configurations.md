@@ -1138,6 +1138,26 @@ macro_rules! foo {
 
 See also [`format_macro_matchers`](#format_macro_matchers).
 
+## `format_brace_macros`
+
+Format the contents of fn-like macro invocations that use brace delimiters.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+foo! {"bar"}
+```
+
+#### `true`:
+
+```rust
+foo! { "bar" }
+```
+
 ## `skip_macro_invocations`
 
 Skip formatting the bodies of macro invocations with the following names.
