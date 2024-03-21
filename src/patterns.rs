@@ -5,8 +5,8 @@ use rustc_ast::ptr;
 use rustc_span::{BytePos, Span};
 
 use crate::comment::{combine_strs_with_missing_comments, FindUncommented};
-use crate::config::lists::*;
 use crate::config::Version;
+use crate::config::{lists::*, IndentStyle};
 use crate::expr::{can_be_overflowed_expr, rewrite_unary_prefix, wrap_struct_field};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
@@ -287,73 +287,119 @@ fn rewrite_struct_pat(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
+    debug!("rewrite_struct_pat: shape: {:?}", shape);
+
+    enum StructPatField<'a> {
+        Regular(&'a ast::PatField),
+        Rest(Span),
+    }
+
     // 2 =  ` {`
     let path_shape = shape.sub_width(2)?;
     let path_str = rewrite_path(context, PathContext::Expr, qself, path, path_shape)?;
 
-    if fields.is_empty() && !ellipsis {
-        return Some(format!("{path_str} {{}}"));
+    if fields.is_empty() {
+        if ellipsis {
+            return Some(format!("{} {{ .. }}", path_str));
+        }
+
+        return Some(format!("{} {{}}", path_str));
     }
 
-    let (ellipsis_str, terminator) = if ellipsis { (", ..", "..") } else { ("", "}") };
-
     // 3 = ` { `, 2 = ` }`.
-    let (h_shape, v_shape) =
-        struct_lit_shape(shape, context, path_str.len() + 3, ellipsis_str.len() + 2)?;
+    let (h_shape, v_shape) = struct_lit_shape(shape, context, path_str.len() + 3, 2)?;
 
-    let items = itemize_list(
-        context.snippet_provider,
-        fields.iter(),
-        terminator,
-        ",",
-        |f| {
+    let one_line_width = h_shape.map_or(0, |shape| shape.width);
+    let body_lo = context.snippet_provider.span_after(span, "{");
+
+    let field_iter = fields
+        .iter()
+        .map(StructPatField::Regular)
+        .chain(match ellipsis {
+            false => None,
+            true => {
+                // 2 = `..`.len()
+                let last_field_hi = fields.last().map_or(body_lo, |field| field.span.hi());
+                let snippet = context.snippet(mk_sp(last_field_hi, span.hi()));
+                let rest_lo =
+                    last_field_hi + BytePos(snippet.find_uncommented("..").unwrap() as u32);
+                let rest_hi = rest_lo + BytePos(2);
+                Some(StructPatField::Rest(mk_sp(rest_lo, rest_hi)))
+            }
+        });
+
+    let span_lo = |item: &StructPatField<'_>| match *item {
+        StructPatField::Regular(f) => {
             if f.attrs.is_empty() {
-                f.span.lo()
+                f.pat.span.lo()
             } else {
                 f.attrs.first().unwrap().span.lo()
             }
-        },
-        |f| f.span.hi(),
-        |f| f.rewrite(context, v_shape),
-        context.snippet_provider.span_after(span, "{"),
+        }
+        StructPatField::Rest(span) => span.lo(),
+    };
+    let span_hi = |item: &StructPatField<'_>| match *item {
+        StructPatField::Regular(f) => f.span.hi(),
+        StructPatField::Rest(span) => span.hi(),
+    };
+    let rewrite = |item: &StructPatField<'_>| match *item {
+        StructPatField::Regular(f) => f.rewrite(context, v_shape),
+        StructPatField::Rest(_) => Some("..".to_owned()),
+    };
+
+    let items = itemize_list(
+        context.snippet_provider,
+        field_iter,
+        "}",
+        ",",
+        span_lo,
+        span_hi,
+        rewrite,
+        body_lo,
         span.hi(),
         false,
     );
     let item_vec = items.collect::<Vec<_>>();
 
-    let tactic = struct_lit_tactic(h_shape, context, &item_vec);
-    let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
-    let fmt = struct_lit_formatting(nested_shape, tactic, context, false);
+    // FIXME: Figure out the way to determine when to use mixed tactic. The old
+    // code ignored it and directly uses the tactic for the fields.
+    let tactic = if ellipsis {
+        let field_item_vec = &item_vec[..item_vec.len() - 1];
+        let mut field_tactic = struct_lit_tactic(h_shape, context, field_item_vec);
+        let rest_item_vec = &item_vec[item_vec.len() - 1..];
+        let mut rest_tactic = struct_lit_tactic(h_shape, context, rest_item_vec);
 
-    let mut fields_str = write_list(&item_vec, &fmt)?;
-    let one_line_width = h_shape.map_or(0, |shape| shape.width);
-
-    let has_trailing_comma = fmt.needs_trailing_separator();
-
-    if ellipsis {
-        if fields_str.contains('\n') || fields_str.len() > one_line_width {
-            // Add a missing trailing comma.
-            if !has_trailing_comma {
-                fields_str.push(',');
-            }
-            fields_str.push('\n');
-            fields_str.push_str(&nested_shape.indent.to_string(context.config));
-        } else {
-            if !fields_str.is_empty() {
-                // there are preceding struct fields being matched on
-                if has_trailing_comma {
-                    fields_str.push(' ');
-                } else {
-                    fields_str.push_str(", ");
-                }
+        if !(context.config.struct_lit_single_line()
+            || context.config.indent_style() == IndentStyle::Visual && field_item_vec.len() == 1)
+        {
+            // FIXME: Figure out the exact behavior of mixed tactic. The old
+            // produces mixed tactic by ignoring the `..` when determining the
+            // tactic. See #5066 for an example.
+            let nested_shape = shape_for_tactic(field_tactic, h_shape, v_shape);
+            let fmt = struct_lit_formatting(nested_shape, field_tactic, context, false);
+            let fields_str = write_list(field_item_vec, &fmt)?;
+            if !(fields_str.contains('\n') || fields_str.len() > one_line_width) {
+                field_tactic = DefinitiveListTactic::Horizontal;
+                rest_tactic = DefinitiveListTactic::Horizontal;
             }
         }
-        fields_str.push_str("..");
-    }
 
-    // ast::Pat doesn't have attrs so use &[]
+        match (field_tactic, rest_tactic) {
+            (DefinitiveListTactic::Vertical, _) | (_, DefinitiveListTactic::Vertical) => {
+                DefinitiveListTactic::Vertical
+            }
+            _ => field_tactic,
+        }
+    } else {
+        struct_lit_tactic(h_shape, context, &item_vec)
+    };
+    let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
+
+    let fmt = struct_lit_formatting(nested_shape, tactic, context, ellipsis);
+    let fields_str = write_list(&item_vec, &fmt)?;
+
     let fields_str = wrap_struct_field(context, &[], &fields_str, shape, v_shape, one_line_width)?;
-    Some(format!("{path_str} {{{fields_str}}}"))
+    Some(format!("{} {{{}}}", path_str, fields_str))
 }
 
 impl Rewrite for PatField {
