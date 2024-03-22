@@ -122,6 +122,7 @@ macro_rules! create_config {
                     | "fn_call_width"
                     | "single_line_if_else_max_width"
                     | "single_line_let_else_max_width"
+                    | "single_line_simple_if_max_width"
                     | "attr_fn_like_width"
                     | "struct_lit_width"
                     | "struct_variant_width"
@@ -273,6 +274,7 @@ macro_rules! create_config {
                     | "fn_call_width"
                     | "single_line_if_else_max_width"
                     | "single_line_let_else_max_width"
+                    | "single_line_simple_if_max_width"
                     | "attr_fn_like_width"
                     | "struct_lit_width"
                     | "struct_variant_width"
@@ -421,6 +423,14 @@ macro_rules! create_config {
                     "single_line_let_else_max_width",
                 );
                 self.single_line_let_else_max_width.2 = single_line_let_else_max_width;
+
+                let single_line_simple_if_max_width = get_width_value(
+                    self.was_set().single_line_simple_if_max_width(),
+                    self.single_line_simple_if_max_width.2,
+                    heuristics.single_line_simple_if_max_width,
+                    "single_line_simple_if_max_width",
+                );
+                self.single_line_simple_if_max_width.2 = single_line_simple_if_max_width;
             }
 
             fn set_heuristics(&mut self) {
