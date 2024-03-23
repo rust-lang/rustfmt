@@ -11,8 +11,8 @@ use crate::config::{Config, IndentStyle};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::utils::{
-    count_newlines, first_line_width, last_line_width, mk_sp, starts_with_newline,
-    unicode_str_width,
+    count_newlines, first_line_width, last_line_unindented_width, last_line_width, mk_sp,
+    starts_with_newline, unicode_str_width,
 };
 use crate::visitor::SnippetProvider;
 
@@ -464,8 +464,13 @@ where
 
             if !starts_with_newline(comment) {
                 if formatting.align_comments {
+                    // If it's a multiline inner item, the length of indentation shouldn't
+                    // be counted when evaluating line length with respect to comments.
+                    let inner_item_width = last_line_unindented_width(&inner_item)
+                        .unwrap_or_else(|| unicode_str_width(inner_item));
+
                     let mut comment_alignment =
-                        post_comment_alignment(item_max_width, unicode_str_width(inner_item));
+                        post_comment_alignment(item_max_width, inner_item_width);
                     if first_line_width(&formatted_comment)
                         + last_line_width(&result)
                         + comment_alignment
