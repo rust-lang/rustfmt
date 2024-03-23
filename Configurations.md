@@ -188,6 +188,37 @@ Determines how integer literal suffixes are written
 - **Possible values**: `"Preserve"`, `"Separate"`, `"Join"`
 - **Stable**: No (tracking issue: TBD)
 
+### Example
+Original Code:
+
+```rust
+#![rustfmt::skip]
+
+const X: i32 = 0i32;
+const Y: i32 = 1_i32;
+```
+
+#### `"Preserve"` (default):
+
+```rust
+const X: i32 = 0i32;
+const Y: i32 = 1_i32;
+```
+
+#### `"Separate"`:
+
+```rust
+const X: i32 = 0_i32;
+const Y: i32 = 1_i32;
+```
+
+#### `"Join"`:
+
+```rust
+const X: i32 = 0i32;
+const Y: i32 = 1i32;
+```
+
 ## `brace_style`
 
 Brace style for items
