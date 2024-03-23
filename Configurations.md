@@ -182,7 +182,7 @@ See also: [`blank_lines_lower_bound`](#blank_lines_lower_bound)
 
 ## `literal_suffix_style`
 
-Determines how integer literal suffixes are written
+Control whether integer literal suffixes have a leading `_`
 
 - **Default value**: `"Preserve"`
 - **Possible values**: `"Preserve"`, `"Separate"`, `"Join"`

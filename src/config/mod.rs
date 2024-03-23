@@ -146,7 +146,7 @@ create_config! {
     blank_lines_lower_bound: usize, 0, false,
         "Minimum number of blank lines which must be put between items";
     literal_suffix_style: LiteralSuffixStyle, LiteralSuffixStyle::Preserve, false,
-        "Control";
+        "Control whether integer literal suffixes have a leading `_`";
     edition: Edition, Edition::Edition2015, true, "The edition of the parser (RFC 2052)";
     version: Version, Version::One, false, "Version of formatting rules";
     inline_attribute_width: usize, 0, false,
