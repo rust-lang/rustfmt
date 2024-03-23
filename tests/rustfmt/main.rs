@@ -183,7 +183,7 @@ fn dont_emit_ICE() {
         "tests/target/issue_6069.rs",
         "tests/target/issue-6105.rs",
     ];
-    
+
     for file in files {
         let args = [file];
         let (_stdout, stderr) = rustfmt(&args);

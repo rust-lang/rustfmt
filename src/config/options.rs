@@ -81,6 +81,17 @@ pub enum TypeDensity {
 }
 
 #[config_type]
+/// Control for whether to separate or join integer literal suffixes.
+pub enum LiteralSuffixStyle {
+    /// Preserve the literal as-is
+    Preserve,
+    /// Separate the integer component and the suffix (e.g "u8") with an `_`
+    Separate,
+    /// Join the integer component and the suffix (e.g "u8") together
+    Join,
+}
+
+#[config_type]
 /// Heuristic settings that can be used to simply
 /// the configuration of the granular width configurations
 /// like `struct_lit_width`, `array_width`, etc.

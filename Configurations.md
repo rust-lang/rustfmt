@@ -180,6 +180,14 @@ fn bar() {
 
 See also: [`blank_lines_lower_bound`](#blank_lines_lower_bound)
 
+## `literal_suffix_style`
+
+Determines how integer literal suffixes are written
+
+- **Default value**: `"Preserve"`
+- **Possible values**: `"Preserve"`, `"Separate"`, `"Join"`
+- **Stable**: No (tracking issue: TBD)
+
 ## `brace_style`
 
 Brace style for items

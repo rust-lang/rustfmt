@@ -4,7 +4,7 @@ use std::cmp::min;
 use itertools::Itertools;
 use rustc_ast::token::{Delimiter, Lit, LitKind};
 use rustc_ast::{ast, ptr, token, ForLoopKind};
-use rustc_span::{BytePos, Span};
+use rustc_span::{BytePos, Span, Symbol};
 
 use crate::chains::rewrite_chain;
 use crate::closures;
@@ -13,7 +13,9 @@ use crate::comment::{
     rewrite_missing_comment, CharClasses, FindUncommented,
 };
 use crate::config::lists::*;
-use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, Version};
+use crate::config::{
+    Config, ControlBraceStyle, HexLiteralCase, IndentStyle, LiteralSuffixStyle, Version,
+};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
     struct_lit_tactic, write_list, ListFormatting, Separator,
@@ -365,7 +367,7 @@ pub(crate) fn format_expr(
                         Some(&expr.attrs),
                         None,
                         context,
-                        Shape::legacy(budget, shape.indent)
+                        Shape::legacy(budget, shape.indent),
                     )?
                 ))
             }
@@ -395,7 +397,7 @@ pub(crate) fn format_expr(
                         Some(&expr.attrs),
                         None,
                         context,
-                        Shape::legacy(budget, shape.indent)
+                        Shape::legacy(budget, shape.indent),
                     )?
                 ))
             }
@@ -428,7 +430,7 @@ pub(crate) fn format_expr(
 
 pub(crate) fn rewrite_array<'a, T: 'a + IntoOverflowableItem<'a>>(
     name: &'a str,
-    exprs: impl Iterator<Item = &'a T>,
+    exprs: impl Iterator<Item=&'a T>,
     span: Span,
     context: &'a RewriteContext<'_>,
     shape: Shape,
@@ -958,7 +960,7 @@ impl<'a> ControlFlow<'a> {
         let force_newline_brace = (pat_expr_string.contains('\n')
             || pat_expr_string.len() > one_line_budget)
             && (!last_line_extendable(&pat_expr_string)
-                || last_line_offsetted(shape.used_width(), &pat_expr_string));
+            || last_line_offsetted(shape.used_width(), &pat_expr_string));
 
         // Try to format if-else on single line.
         if self.allow_single_line && context.config.single_line_if_else_max_width() > 0 {
@@ -1135,7 +1137,7 @@ impl<'a> Rewrite for ControlFlow<'a> {
                         true,
                         mk_sp(else_block.span.lo(), self.span.hi()),
                     )
-                    .rewrite(context, shape)
+                        .rewrite(context, shape)
                 }
                 _ => {
                     last_in_chain = true;
@@ -1289,6 +1291,28 @@ fn rewrite_int_lit(
     shape: Shape,
 ) -> Option<String> {
     let symbol = token_lit.symbol.as_str();
+    
+
+    if let Some(suffix) = token_lit.suffix {
+        let lit = match context.config.literal_suffix_style() {
+            LiteralSuffixStyle::Preserve => None,
+            LiteralSuffixStyle::Join => {
+                Some([symbol.trim_end_matches('_'), suffix.as_str()].concat())
+            }
+            LiteralSuffixStyle::Separate => {
+                if symbol.ends_with('_') {
+                    None
+                } else {
+                    let s = [symbol, "_", suffix.as_str()].concat();
+                    Some([symbol, "_", suffix.as_str()].concat())
+                }
+            }
+        };
+
+        if let Some(lit) = lit {
+            return wrap_str(lit, context.config.max_width(), shape);
+        }
+    }
 
     if let Some(symbol_stripped) = symbol.strip_prefix("0x") {
         let hex_lit = match context.config.hex_literal_case() {
@@ -1636,7 +1660,7 @@ fn rewrite_struct_lit<'a>(
                 ast::StructRest::Rest(span) => Some(StructLitField::Rest(*span)),
                 ast::StructRest::None => None,
             }
-            .into_iter(),
+                .into_iter(),
         );
 
         let span_lo = |item: &StructLitField<'_>| match *item {
@@ -1715,8 +1739,8 @@ pub(crate) fn wrap_struct_field(
 ) -> Option<String> {
     let should_vertical = context.config.indent_style() == IndentStyle::Block
         && (fields_str.contains('\n')
-            || !context.config.struct_lit_single_line()
-            || fields_str.len() > one_line_width);
+        || !context.config.struct_lit_single_line()
+        || fields_str.len() > one_line_width);
 
     let inner_attrs = &inner_attributes(attrs);
     if inner_attrs.is_empty() {
@@ -1774,10 +1798,10 @@ pub(crate) fn rewrite_field(
         let is_lit = matches!(field.expr.kind, ast::ExprKind::Lit(_));
         match expr {
             Some(ref e)
-                if !is_lit && e.as_str() == name && context.config.use_field_init_shorthand() =>
-            {
-                Some(attrs_str + name)
-            }
+            if !is_lit && e.as_str() == name && context.config.use_field_init_shorthand() =>
+                {
+                    Some(attrs_str + name)
+                }
             Some(e) => Some(format!("{attrs_str}{name}{separator}{e}")),
             None => {
                 let expr_offset = shape.indent.block_indent(context.config);
@@ -1800,7 +1824,7 @@ pub(crate) fn rewrite_field(
 
 fn rewrite_tuple_in_visual_indent_style<'a, T: 'a + IntoOverflowableItem<'a>>(
     context: &RewriteContext<'_>,
-    mut items: impl Iterator<Item = &'a T>,
+    mut items: impl Iterator<Item=&'a T>,
     span: Span,
     shape: Shape,
     is_singleton_tuple: bool,
@@ -1882,7 +1906,7 @@ fn rewrite_let(
 
 pub(crate) fn rewrite_tuple<'a, T: 'a + IntoOverflowableItem<'a>>(
     context: &'a RewriteContext<'_>,
-    items: impl Iterator<Item = &'a T>,
+    items: impl Iterator<Item=&'a T>,
     span: Span,
     shape: Shape,
     is_singleton_tuple: bool,
@@ -2117,10 +2141,10 @@ fn choose_rhs<R: Rewrite>(
     match orig_rhs {
         Some(ref new_str) if new_str.is_empty() => Some(String::new()),
         Some(ref new_str)
-            if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
-        {
-            Some(format!(" {new_str}"))
-        }
+        if !new_str.contains('\n') && unicode_str_width(new_str) <= shape.width =>
+            {
+                Some(format!(" {new_str}"))
+            }
         _ => {
             // Expression did not fit on the same line as the identifier.
             // Try splitting the line and see if that works better.
@@ -2134,15 +2158,15 @@ fn choose_rhs<R: Rewrite>(
 
             match (orig_rhs, new_rhs) {
                 (Some(ref orig_rhs), Some(ref new_rhs))
-                    if !filtered_str_fits(&new_rhs, context.config.max_width(), new_shape) =>
-                {
-                    Some(format!("{before_space_str}{orig_rhs}"))
-                }
+                if !filtered_str_fits(&new_rhs, context.config.max_width(), new_shape) =>
+                    {
+                        Some(format!("{before_space_str}{orig_rhs}"))
+                    }
                 (Some(ref orig_rhs), Some(ref new_rhs))
-                    if prefer_next_line(orig_rhs, new_rhs, rhs_tactics) =>
-                {
-                    Some(format!("{new_indent_str}{new_rhs}"))
-                }
+                if prefer_next_line(orig_rhs, new_rhs, rhs_tactics) =>
+                    {
+                        Some(format!("{new_indent_str}{new_rhs}"))
+                    }
                 (None, Some(ref new_rhs)) => Some(format!("{new_indent_str}{new_rhs}")),
                 (None, None) if rhs_tactics == RhsTactics::AllowOverflow => {
                     let shape = shape.infinite_width();
