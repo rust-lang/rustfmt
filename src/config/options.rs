@@ -494,3 +494,14 @@ pub enum StyleEdition {
     /// [Edition 2024]().
     Edition2024,
 }
+
+/// Controls whether to report missing submodules and whether rustfmt will format.
+#[config_type]
+pub enum ReportMissingSubmod {
+    /// Missing modules will lead to module not found errors and rustfmt won't format anything.
+    Error,
+    /// Missing modules will lead to module not found warnings and rustfmt will format.
+    Warn,
+    /// Ignores missing submodule error and rustfmt will format.
+    Ignore,
+}
