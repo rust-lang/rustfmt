@@ -407,7 +407,7 @@ fn identify_comment(
 }
 
 /// Enum indicating if the code block contains rust based on attributes
-enum CodeBlockAttribute {
+pub(crate) enum CodeBlockAttribute {
     Rust,
     NotRust,
 }
@@ -416,7 +416,7 @@ impl CodeBlockAttribute {
     /// Parse comma separated attributes list. Return rust only if all
     /// attributes are valid rust attributes
     /// See <https://doc.rust-lang.org/rustdoc/print.html#attributes>
-    fn new(attributes: &str) -> CodeBlockAttribute {
+    pub(crate) fn new(attributes: &str) -> CodeBlockAttribute {
         for attribute in attributes.split(',') {
             match attribute.trim() {
                 "" | "rust" | "should_panic" | "no_run" | "edition2015" | "edition2018"
@@ -426,6 +426,12 @@ impl CodeBlockAttribute {
             }
         }
         CodeBlockAttribute::Rust
+    }
+
+    /// Check if the code block was annotated with rust attributes that indicate
+    /// the code block contains rust code that rustfmt should format.
+    pub(crate) fn is_formattable_rust(&self) -> bool {
+        matches!(self, Self::Rust)
     }
 }
 
@@ -951,7 +957,7 @@ fn rewrite_comment_inner(
 
 const RUSTFMT_CUSTOM_COMMENT_PREFIX: &str = "//#### ";
 
-fn hide_sharp_behind_comment(s: &str) -> Cow<'_, str> {
+pub(crate) fn hide_sharp_behind_comment(s: &str) -> Cow<'_, str> {
     let s_trimmed = s.trim();
     if s_trimmed.starts_with("# ") || s_trimmed == "#" {
         Cow::from(format!("{RUSTFMT_CUSTOM_COMMENT_PREFIX}{s}"))
@@ -960,7 +966,7 @@ fn hide_sharp_behind_comment(s: &str) -> Cow<'_, str> {
     }
 }
 
-fn trim_custom_comment_prefix(s: &str) -> String {
+pub(crate) fn trim_custom_comment_prefix(s: &str) -> String {
     s.lines()
         .map(|line| {
             let left_trimmed = line.trim_start();
