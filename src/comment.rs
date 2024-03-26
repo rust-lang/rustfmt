@@ -1773,7 +1773,18 @@ fn changed_comment_content(orig: &str, new: &str) -> bool {
         code_comment_content(orig).collect::<String>(),
         code_comment_content(new).collect::<String>()
     );
+    if removing_empty_comments(orig, new) {
+        return true;
+    }
     res
+}
+
+fn removing_empty_comments(orig: &str, new: &str) -> bool {
+    if contains_comment(orig) && !contains_comment(new) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /// Iterator over the 'payload' characters of a comment.
