@@ -16,7 +16,7 @@ fn main() {
     let (/*comment*/
         (
 
-        ) 
+        )
 
 
         |      (

@@ -16,20 +16,20 @@ fn main() {
         let (/*comment*/
         (
 
-        ) 
+        )
 
 
         |      (
 
         )
-    /*comment*/) = ();
+    /*comment*/) = (); //
             
     enum Foo {
         A,
         B,
         C,
         Bar,
-    } //FF
+    } //
     let x = Foo::A;
     match x {
         Foo::
