@@ -231,14 +231,7 @@ fn rewrite_macro_inner(
     // Format well-known macros which cannot be parsed as a valid AST.
     if macro_name == "lazy_static!" && !has_comment {
         if let success @ Some(..) = format_lazy_static(context, shape, ts.clone()) {
-            return (
-                success,
-                if original_style != Delimiter::Brace {
-                    Some(Delimiter::Brace)
-                } else {
-                    None
-                },
-            );
+            return (success, Some(Delimiter::Brace));
         }
     }
 
