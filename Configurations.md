@@ -1,6 +1,6 @@
 # Configuring Rustfmt
 
-Rustfmt is designed to be very configurable. You can create a TOML file called `rustfmt.toml` or `.rustfmt.toml`, place it in the project or any other parent directory and it will apply the options in that file. If none of these directories contain such a file, both your home directory and a directory called `rustfmt` in your [global config directory](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) (e.g. `.config/rustfmt/`) are checked as well.
+Rustfmt is designed to be very configurable. You can create a TOML file called `rustfmt.toml` or `.rustfmt.toml`, place it in the project or any other parent directory and it will apply the options in that file. If none of these directories contain such a file, both your home directory and a directory called `rustfmt` in your [global config directory](https://docs.rs/dirs/5.0.1/dirs/fn.config_dir.html) (e.g. `.config/rustfmt/`) are checked as well.
 
 A possible content of `rustfmt.toml` or `.rustfmt.toml` might look like this:
 
@@ -1050,14 +1050,24 @@ Max width for code snippets included in doc comments. Only used if [`format_code
 
 ## `format_generated_files`
 
-Format generated files. A file is considered generated
-if any of the first five lines contain a `@generated` comment marker.
+Format generated files. A file is considered generated if any of the first several lines contain a `@generated` comment marker. The number of lines to check is configured by `generated_marker_line_search_limit`.
+
 By default, generated files are reformatted, i. e. `@generated` marker is ignored.
 This option is currently ignored for stdin (`@generated` in stdin is ignored.)
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`
 - **Stable**: No (tracking issue: [#5080](https://github.com/rust-lang/rustfmt/issues/5080))
+
+## `generated_marker_line_search_limit`
+
+Number of lines to check for a `@generated` pragma header, starting from the top of the file. Setting this value to `0` will treat all files as non-generated. When`format_generated_files` is `true`, this option has no effect.
+
+- **Default value**: `5`
+- **Possible values**: any positive integer
+- **Stable**: No (tracking issue: [#5080](https://github.com/rust-lang/rustfmt/issues/5080))
+
+See also [format_generated_files](#format_generated_files) link here.
 
 ## `format_macro_matchers`
 
@@ -1663,7 +1673,7 @@ use core::slice;
 
 Controls whether arm bodies are wrapped in cases where the first line of the body cannot fit on the same line as the `=>` operator.
 
-The Style Guide requires that bodies are block wrapped by default if a line break is required after the `=>`, but this option can be used to disable that behavior to prevent wrapping arm bodies in that event, so long as the body does not contain multiple statements nor line comments.
+The Style Guide requires that bodies are block wrapped by default if a line break is required after the `=>`, but this option can be used to disable that behavior to prevent wrapping arm bodies in that event, so long as the body contains neither multiple statements nor line comments.
 
 - **Default value**: `true`
 - **Possible values**: `true`, `false`

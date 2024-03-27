@@ -151,6 +151,8 @@ create_config! {
         "Write an item and its attribute on the same line \
         if their combined width is below a threshold";
     format_generated_files: bool, true, false, "Format generated files";
+    generated_marker_line_search_limit: usize, 5, false, "Number of lines to check for a \
+        `@generated` marker when `format_generated_files` is enabled";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -285,7 +287,7 @@ impl Config {
                 }
             }
 
-            // If none was found ther either, check in the user's configuration directory.
+            // If none was found there either, check in the user's configuration directory.
             if let Some(mut config_dir) = dirs::config_dir() {
                 config_dir.push("rustfmt");
                 if let Some(path) = get_toml_path(&config_dir)? {
@@ -680,6 +682,7 @@ edition = "2015"
 version = "One"
 inline_attribute_width = 0
 format_generated_files = true
+generated_marker_line_search_limit = 5
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false

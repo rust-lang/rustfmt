@@ -1166,9 +1166,9 @@ pub(crate) fn format_trait(
 
     // FIXME(#2055): rustfmt fails to format when there are comments between trait bounds.
     if !bounds.is_empty() {
-        let ident_hi = context
-            .snippet_provider
-            .span_after(item.span, item.ident.as_str());
+        // Retrieve *unnormalized* ident (See #6069)
+        let source_ident = context.snippet(item.ident.span);
+        let ident_hi = context.snippet_provider.span_after(item.span, source_ident);
         let bound_hi = bounds.last().unwrap().span().hi();
         let snippet = context.snippet(mk_sp(ident_hi, bound_hi));
         if contains_comment(snippet) {
@@ -2506,7 +2506,7 @@ fn rewrite_fn_base(
                 || context.config.indent_style() == IndentStyle::Visual
             {
                 let indent = if param_str.is_empty() {
-                    // Aligning with non-existent params looks silly.
+                    // Aligning with nonexistent params looks silly.
                     force_new_line_for_brace = true;
                     indent + 4
                 } else {
@@ -2521,7 +2521,7 @@ fn rewrite_fn_base(
             } else {
                 let mut ret_shape = Shape::indented(indent, context.config);
                 if param_str.is_empty() {
-                    // Aligning with non-existent params looks silly.
+                    // Aligning with nonexistent params looks silly.
                     force_new_line_for_brace = true;
                     ret_shape = if context.use_block_indent() {
                         ret_shape.offset_left(4).unwrap_or(ret_shape)
