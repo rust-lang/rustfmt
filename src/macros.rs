@@ -216,8 +216,7 @@ fn rewrite_macro_inner(
     let ts = mac.args.tokens.clone();
     let has_comment = contains_comment(context.snippet(mac.span()));
     if ts.is_empty() && !has_comment {
-        return (
-            match style {
+        let rewrite = match style {
                 Delimiter::Parenthesis if position == MacroPosition::Item => {
                     Some(format!("{macro_name}();"))
                 }
@@ -228,13 +227,8 @@ fn rewrite_macro_inner(
                 Delimiter::Bracket => Some(format!("{macro_name}[]")),
                 Delimiter::Brace => Some(format!("{macro_name} {{}}")),
                 _ => unreachable!(),
-            },
-            if original_style != style {
-                Some(style)
-            } else {
-                None
-            },
-        );
+        };
+        return (rewrite, Some(style));
     }
     // Format well-known macros which cannot be parsed as a valid AST.
     if macro_name == "lazy_static!" && !has_comment {
