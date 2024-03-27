@@ -11,6 +11,7 @@ extern crate lazy_static;
 extern crate tracing;
 
 // N.B. these crates are loaded from the sysroot, so they need extern crate.
+extern crate rustc_arena;
 extern crate rustc_ast;
 extern crate rustc_ast_pretty;
 extern crate rustc_builtin_macros;

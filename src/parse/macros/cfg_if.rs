@@ -1,6 +1,7 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_ast::ast;
+use rustc_ast::ptr::P;
 use rustc_ast::token::{Delimiter, TokenKind};
 use rustc_parse::parser::ForceCollect;
 use rustc_span::symbol::kw;
@@ -11,7 +12,7 @@ use crate::parse::session::ParseSess;
 pub(crate) fn parse_cfg_if<'a>(
     sess: &'a ParseSess,
     mac: &'a ast::MacCall,
-) -> Result<Vec<ast::Item>, &'static str> {
+) -> Result<Vec<P<ast::Item>>, &'static str> {
     match catch_unwind(AssertUnwindSafe(|| parse_cfg_if_inner(sess, mac))) {
         Ok(Ok(items)) => Ok(items),
         Ok(err @ Err(_)) => err,
@@ -22,7 +23,7 @@ pub(crate) fn parse_cfg_if<'a>(
 fn parse_cfg_if_inner<'a>(
     sess: &'a ParseSess,
     mac: &'a ast::MacCall,
-) -> Result<Vec<ast::Item>, &'static str> {
+) -> Result<Vec<P<ast::Item>>, &'static str> {
     let ts = mac.args.tokens.clone();
     let mut parser = build_stream_parser(sess.inner(), ts);
 
@@ -63,7 +64,7 @@ fn parse_cfg_if_inner<'a>(
             && parser.token.kind != TokenKind::Eof
         {
             let item = match parser.parse_item(ForceCollect::No) {
-                Ok(Some(item_ptr)) => item_ptr.into_inner(),
+                Ok(Some(item_ptr)) => item_ptr,
                 Ok(None) => continue,
                 Err(err) => {
                     err.cancel();
