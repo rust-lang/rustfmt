@@ -249,8 +249,7 @@ fn rewrite_macro_inner(
     };
 
     if !arg_vec.is_empty() && arg_vec.iter().all(MacroArg::is_item) {
-        return (
-            rewrite_macro_with_items(
+        let rewrite = rewrite_macro_with_items(
                 context,
                 &arg_vec,
                 &macro_name,
@@ -259,12 +258,8 @@ fn rewrite_macro_inner(
                 original_style,
                 position,
                 mac.span(),
-            ),
-            if original_style != style {
-                Some(style)
-            } else {
-                None
-            },
+        );
+        return (rewrite, Some(style));
         );
     }
 
