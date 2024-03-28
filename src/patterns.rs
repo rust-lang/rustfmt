@@ -271,9 +271,13 @@ impl Rewrite for Pat {
             PatKind::MacCall(ref mac) => {
                 rewrite_macro(mac, None, context, shape, MacroPosition::Pat)
             }
-            PatKind::Paren(ref pat) => pat
-                .rewrite(context, shape.offset_left(1)?.sub_width(1)?)
-                .map(|inner_pat| format!("({})", inner_pat)),
+            PatKind::Paren(ref pat) => {
+                let inner_pat = pat.rewrite(context, shape)?;
+                let pre_snippet = context.snippet(mk_sp(self.span.lo(), pat.span.lo()));
+                let post_snippet = context.snippet(mk_sp(pat.span.hi(), self.span.hi()));
+                let result = format!("{}{}{}", pre_snippet, inner_pat, post_snippet);
+                Some(result)
+            }
         }
     }
 }
