@@ -186,7 +186,7 @@ pub(crate) fn rewrite_macro(
 }
 
 //We return not only string but also new delimiter if it changes
-//It needs to remove semicolon if delimiter changes
+//It needs to remove semicolon if delimiter changes in some situations
 fn rewrite_macro_inner(
     mac: &ast::MacCall,
     extra_ident: Option<symbol::Ident>,
@@ -228,7 +228,14 @@ fn rewrite_macro_inner(
             Delimiter::Brace => Some(format!("{macro_name} {{}}")),
             _ => unreachable!(),
         };
-        return (rewrite, Some(style));
+        return (
+            rewrite,
+            if original_style != style {
+                Some(style)
+            } else {
+                None
+            },
+        );
     }
     // Format well-known macros which cannot be parsed as a valid AST.
     if macro_name == "lazy_static!" && !has_comment {
@@ -236,7 +243,7 @@ fn rewrite_macro_inner(
             return (
                 success,
                 if original_style != Delimiter::Brace {
-                    Some(Delimiter::Brace)
+                    Some(Delimiter::Brace) //We return new delimiter only if it changed!!!
                 } else {
                     None
                 },
@@ -268,7 +275,14 @@ fn rewrite_macro_inner(
             position,
             mac.span(),
         );
-        return (rewrite, Some(style));
+        return (
+            rewrite,
+            if original_style != style {
+                Some(style)
+            } else {
+                None
+            },
+        );
     }
 
     (
