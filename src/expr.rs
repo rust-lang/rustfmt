@@ -227,12 +227,12 @@ pub(crate) fn format_expr(
         ast::ExprKind::MacCall(ref mac) => {
             let (rewrite, _) = rewrite_macro(mac, None, context, shape, MacroPosition::Expression);
             rewrite.or_else(|| {
-                    wrap_str(
-                        context.snippet(expr.span).to_owned(),
-                        context.config.max_width(),
-                        shape,
-                    )
-                })
+                wrap_str(
+                    context.snippet(expr.span).to_owned(),
+                    context.config.max_width(),
+                    shape,
+                )
+            })
         }
         ast::ExprKind::Ret(None) => Some("return".to_owned()),
         ast::ExprKind::Ret(Some(ref expr)) => {

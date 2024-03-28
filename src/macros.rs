@@ -217,16 +217,16 @@ fn rewrite_macro_inner(
     let has_comment = contains_comment(context.snippet(mac.span()));
     if ts.is_empty() && !has_comment {
         let rewrite = match style {
-                Delimiter::Parenthesis if position == MacroPosition::Item => {
-                    Some(format!("{macro_name}();"))
-                }
-                Delimiter::Bracket if position == MacroPosition::Item => {
-                    Some(format!("{macro_name}[];"))
-                }
-                Delimiter::Parenthesis => Some(format!("{macro_name}()")),
-                Delimiter::Bracket => Some(format!("{macro_name}[]")),
-                Delimiter::Brace => Some(format!("{macro_name} {{}}")),
-                _ => unreachable!(),
+            Delimiter::Parenthesis if position == MacroPosition::Item => {
+                Some(format!("{macro_name}();"))
+            }
+            Delimiter::Bracket if position == MacroPosition::Item => {
+                Some(format!("{macro_name}[];"))
+            }
+            Delimiter::Parenthesis => Some(format!("{macro_name}()")),
+            Delimiter::Bracket => Some(format!("{macro_name}[]")),
+            Delimiter::Brace => Some(format!("{macro_name} {{}}")),
+            _ => unreachable!(),
         };
         return (rewrite, Some(style));
     }
