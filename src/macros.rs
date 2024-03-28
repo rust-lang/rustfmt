@@ -310,7 +310,7 @@ fn rewrite_macro_inner(
                         force_trailing_comma = Some(SeparatorTactic::Vertical);
                     };
                 }
-                rewrite_array(
+                let Some(rewrite) = rewrite_array(
                     &macro_name,
                     arg_vec.iter(),
                     mac.span(),
@@ -318,15 +318,15 @@ fn rewrite_macro_inner(
                     shape,
                     force_trailing_comma,
                     Some(original_style),
-                )
-                .map(|rewrite| {
-                    let comma = match position {
-                        MacroPosition::Item => ";",
-                        _ => "",
-                    };
+                ) else {
+                    return (None, None);
+                };
 
-                    format!("{rewrite}{comma}")
-                })
+                let comma = match position {
+                    MacroPosition::Item => ";",
+                    _ => "",
+                };
+                Some(format!("{rewrite}{comma}"))
             }
         }
         Delimiter::Brace => {
