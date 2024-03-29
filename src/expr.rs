@@ -2110,7 +2110,7 @@ fn choose_rhs<R: Rewrite>(
     expr: &R,
     shape: Shape,
     orig_rhs: Option<String>,
-    _rhs_kind: &RhsAssignKind<'_>,
+    rhs_kind: &RhsAssignKind<'_>,
     rhs_tactics: RhsTactics,
     has_rhs_comment: bool,
 ) -> Option<String> {
@@ -2141,6 +2141,16 @@ fn choose_rhs<R: Rewrite>(
                 (Some(ref orig_rhs), Some(ref new_rhs))
                     if prefer_next_line(orig_rhs, new_rhs, rhs_tactics) =>
                 {
+                    if let RhsAssignKind::Bounds = rhs_kind {
+                        if new_rhs.contains("->") {
+                            return Some(
+                                new_rhs
+                                    .lines()
+                                    .map(|l| format!("{new_indent_str}{l}"))
+                                    .join(""),
+                            );
+                        }
+                    }
                     Some(format!("{new_indent_str}{new_rhs}"))
                 }
                 (None, Some(ref new_rhs)) => Some(format!("{new_indent_str}{new_rhs}")),
