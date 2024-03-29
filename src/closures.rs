@@ -1,3 +1,4 @@
+use rustc_ast::ast::StmtKind;
 use rustc_ast::{ast, ptr};
 use rustc_span::Span;
 use thin_vec::thin_vec;
@@ -120,13 +121,8 @@ fn get_inner_expr<'a>(
     expr
 }
 
-fn iter_stmts_without_empty(
-    stmts: &thin_vec::ThinVec<ast::Stmt>,
-) -> impl Iterator<Item = &ast::Stmt> {
-    stmts.iter().filter(|x| match x.kind {
-        crate::ast::StmtKind::Empty => false,
-        _ => true,
-    })
+fn iter_stmts_without_empty(stmts: &[ast::Stmt]) -> impl Iterator<Item = &ast::Stmt> {
+    stmts.iter().filter(|x| !matches!(x.kind, StmtKind::Empty))
 }
 
 // Figure out if a block is necessary.
