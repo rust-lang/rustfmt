@@ -155,13 +155,13 @@ pub(crate) fn rewrite_macro(
     context: &RewriteContext<'_>,
     shape: Shape,
     position: MacroPosition,
-) -> Option<String> {
+) -> (Option<String>, Option<Delimiter>) {
     let should_skip = context
         .skip_context
         .macros
         .skip(context.snippet(mac.path.span));
     if should_skip {
-        None
+        (None, None)
     } else {
         let guard = context.enter_macro();
         let result = catch_unwind(AssertUnwindSafe(|| {
@@ -175,15 +175,17 @@ pub(crate) fn rewrite_macro(
             )
         }));
         match result {
-            Err(..) | Ok(None) => {
+            Err(..) | Ok((None, ..)) => {
                 context.macro_rewrite_failure.replace(true);
-                None
+                (None, None)
             }
             Ok(rw) => rw,
         }
     }
 }
 
+//We return not only string but also new delimiter if it changes
+//It needs to remove semicolon if delimiter changes in some situations
 fn rewrite_macro_inner(
     mac: &ast::MacCall,
     extra_ident: Option<symbol::Ident>,
@@ -191,11 +193,11 @@ fn rewrite_macro_inner(
     shape: Shape,
     position: MacroPosition,
     is_nested_macro: bool,
-) -> Option<String> {
+) -> (Option<String>, Option<Delimiter>) {
     if context.config.use_try_shorthand() {
         if let Some(expr) = convert_try_mac(mac, context) {
             context.leave_macro();
-            return expr.rewrite(context, shape);
+            return (expr.rewrite(context, shape), None);
         }
     }
 
@@ -213,7 +215,7 @@ fn rewrite_macro_inner(
     let ts = mac.args.tokens.clone();
     let has_comment = contains_comment(context.snippet(mac.span()));
     if ts.is_empty() && !has_comment {
-        return match style {
+        let rewrite = match style {
             Delimiter::Parenthesis if position == MacroPosition::Item => {
                 Some(format!("{macro_name}();"))
             }
@@ -225,11 +227,12 @@ fn rewrite_macro_inner(
             Delimiter::Brace => Some(format!("{macro_name} {{}}")),
             _ => unreachable!(),
         };
+        return (rewrite, Some(style));
     }
     // Format well-known macros which cannot be parsed as a valid AST.
     if macro_name == "lazy_static!" && !has_comment {
         if let success @ Some(..) = format_lazy_static(context, shape, ts.clone()) {
-            return success;
+            return (success, Some(Delimiter::Brace));
         }
     }
 
@@ -240,17 +243,14 @@ fn rewrite_macro_inner(
     } = match parse_macro_args(context, ts, style, is_forced_bracket) {
         Some(args) => args,
         None => {
-            return return_macro_parse_failure_fallback(
-                context,
-                shape.indent,
-                position,
-                mac.span(),
-            );
+            let rewrite =
+                return_macro_parse_failure_fallback(context, shape.indent, position, mac.span());
+            return (rewrite, None);
         }
     };
 
     if !arg_vec.is_empty() && arg_vec.iter().all(MacroArg::is_item) {
-        return rewrite_macro_with_items(
+        let rewrite = rewrite_macro_with_items(
             context,
             &arg_vec,
             &macro_name,
@@ -260,9 +260,10 @@ fn rewrite_macro_inner(
             position,
             mac.span(),
         );
+        return (rewrite, Some(style));
     }
 
-    match style {
+    let rewrite = match style {
         Delimiter::Parenthesis => {
             // Handle special case: `vec!(expr; expr)`
             if vec_with_semi {
@@ -308,7 +309,7 @@ fn rewrite_macro_inner(
                         force_trailing_comma = Some(SeparatorTactic::Vertical);
                     };
                 }
-                let rewrite = rewrite_array(
+                let Some(rewrite) = rewrite_array(
                     &macro_name,
                     arg_vec.iter(),
                     mac.span(),
@@ -316,12 +317,14 @@ fn rewrite_macro_inner(
                     shape,
                     force_trailing_comma,
                     Some(original_style),
-                )?;
+                ) else {
+                    return (None, None);
+                };
+
                 let comma = match position {
                     MacroPosition::Item => ";",
                     _ => "",
                 };
-
                 Some(format!("{rewrite}{comma}"))
             }
         }
@@ -336,7 +339,8 @@ fn rewrite_macro_inner(
             }
         }
         _ => unreachable!(),
-    }
+    };
+    return (rewrite, Some(style));
 }
 
 fn handle_vec_semi(

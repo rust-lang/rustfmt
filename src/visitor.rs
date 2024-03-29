@@ -683,28 +683,38 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
         // 1 = ;
         let shape = self.shape().saturating_sub_width(1);
-        let rewrite = self.with_context(|ctx| rewrite_macro(mac, ident, ctx, shape, pos));
+        let original_style = macro_style(mac, &self.get_context());
+        let (rewrite, rewrite_style) =
+            self.with_context(|ctx| rewrite_macro(mac, ident, ctx, shape, pos));
         // As of v638 of the rustc-ap-* crates, the associated span no longer includes
         // the trailing semicolon. This determines the correct span to ensure scenarios
         // with whitespace between the delimiters and trailing semi (i.e. `foo!(abc)     ;`)
         // are formatted correctly.
-        let (span, rewrite) = match macro_style(mac, &self.get_context()) {
-            Delimiter::Bracket | Delimiter::Parenthesis if MacroPosition::Item == pos => {
-                let search_span = mk_sp(mac.span().hi(), self.snippet_provider.end_pos());
-                let hi = self.snippet_provider.span_before(search_span, ";");
-                let target_span = mk_sp(mac.span().lo(), hi + BytePos(1));
-                let rewrite = rewrite.map(|rw| {
+        let rewrite = match rewrite_style.unwrap_or(original_style) {
+            Delimiter::Bracket | Delimiter::Parenthesis if MacroPosition::Item == pos => rewrite
+                .map(|rw| {
                     if !rw.ends_with(';') {
                         format!("{};", rw)
                     } else {
                         rw
                     }
-                });
-                (target_span, rewrite)
-            }
-            _ => (mac.span(), rewrite),
+                }),
+            _ => rewrite,
         };
 
+        let span = match original_style {
+            Delimiter::Bracket | Delimiter::Parenthesis
+                if (MacroPosition::Item == pos)
+                    || (MacroPosition::Statement == pos)
+                        && rewrite_style
+                            .is_some_and(|x| x != original_style && x == Delimiter::Brace) =>
+            {
+                let search_span = mk_sp(mac.span().hi(), self.snippet_provider.end_pos());
+                let hi = self.snippet_provider.span_before(search_span, ";");
+                mk_sp(mac.span().lo(), hi + BytePos(1))
+            }
+            _ => mac.span(),
+        };
         self.push_rewrite(span, rewrite);
     }
 
@@ -989,13 +999,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
     }
 
-    pub(crate) fn with_context<F>(&mut self, f: F) -> Option<String>
+    pub(crate) fn with_context<F, RESULT>(&mut self, f: F) -> RESULT
     where
-        F: Fn(&RewriteContext<'_>) -> Option<String>,
+        F: Fn(&RewriteContext<'_>) -> RESULT,
     {
         let context = self.get_context();
         let result = f(&context);
-
         self.macro_rewrite_failure |= context.macro_rewrite_failure.get();
         result
     }
