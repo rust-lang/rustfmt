@@ -1,4 +1,3 @@
-use rustc_ast::ast::StmtKind;
 use rustc_ast::{ast, ptr};
 use rustc_span::Span;
 use thin_vec::thin_vec;
@@ -109,10 +108,7 @@ fn get_inner_expr<'a>(
         if !needs_block(block, prefix, context) {
             // block.stmts.len() == 1 except with `|| {{}}`;
             // https://github.com/rust-lang/rustfmt/issues/3844
-            if let Some(expr) = iter_stmts_without_empty(&block.stmts)
-                .next()
-                .and_then(stmt_expr)
-            {
+            if let Some(expr) = iter_stmts_without_empty(&block).next().and_then(stmt_expr) {
                 return get_inner_expr(expr, prefix, context);
             }
         }
@@ -121,8 +117,11 @@ fn get_inner_expr<'a>(
     expr
 }
 
-fn iter_stmts_without_empty(stmts: &[ast::Stmt]) -> impl Iterator<Item = &ast::Stmt> {
-    stmts.iter().filter(|x| !matches!(x.kind, StmtKind::Empty))
+fn iter_stmts_without_empty(block: &ast::Block) -> impl Iterator<Item = &ast::Stmt> {
+    block
+        .stmts
+        .iter()
+        .filter(|stmt| !matches!(stmt.kind, ast::StmtKind::Empty))
 }
 
 // Figure out if a block is necessary.
@@ -132,7 +131,7 @@ fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext<'_>) -
     });
 
     is_unsafe_block(block)
-        || iter_stmts_without_empty(&block.stmts).count() > 1
+        || iter_stmts_without_empty(&block).count() > 1
         || has_attributes
         || block_contains_comment(context, block)
         || prefix.contains('\n')
