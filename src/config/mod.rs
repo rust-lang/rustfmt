@@ -367,12 +367,18 @@ pub fn load_config<O: CliOptions>(
 // Return the path if a config file exists, empty if no file exists, and Error for IO errors
 fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
     const CONFIG_FILE_NAMES: [&str; 2] = [".rustfmt.toml", "rustfmt.toml"];
+    let mut found_file_name: Option<PathBuf> = None;
     for config_file_name in &CONFIG_FILE_NAMES {
         let config_file = dir.join(config_file_name);
         match fs::metadata(&config_file) {
             // Only return if it's a file to handle the unlikely situation of a directory named
             // `rustfmt.toml`.
-            Ok(ref md) if md.is_file() => return Ok(Some(config_file)),
+            Ok(ref md) if md.is_file() => {if found_file_name.is_some() {
+                let msg = format!("Multiple config files found {:?} and {:?}", &found_file_name, &config_file);
+                return Err(Error::new(ErrorKind::Other, msg))
+            }else {
+                found_file_name = Some(config_file);
+            }},
             // Return the error if it's something other than `NotFound`; otherwise we didn't
             // find the project file yet, and continue searching.
             Err(e) => {
@@ -385,7 +391,7 @@ fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
             _ => {}
         }
     }
-    Ok(None)
+    Ok(found_file_name)
 }
 
 fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
