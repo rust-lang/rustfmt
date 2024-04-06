@@ -373,12 +373,18 @@ fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
         match fs::metadata(&config_file) {
             // Only return if it's a file to handle the unlikely situation of a directory named
             // `rustfmt.toml`.
-            Ok(ref md) if md.is_file() => {if found_file_name.is_some() {
-                let msg = format!("Multiple config files found {:?} and {:?}", &found_file_name, &config_file);
-                return Err(Error::new(ErrorKind::Other, msg))
-            }else {
-                found_file_name = Some(config_file);
-            }},
+            Ok(ref md) if md.is_file() => {
+                if found_file_name.is_some() {
+                    // If both rustfmt.toml and .rustfmt.toml exists, return an Error
+                    let msg = format!(
+                        "Multiple config files found {:?} and {:?}",
+                        &found_file_name, &config_file
+                    );
+                    return Err(Error::new(ErrorKind::Other, msg));
+                } else {
+                    found_file_name = Some(config_file);
+                }
+            }
             // Return the error if it's something other than `NotFound`; otherwise we didn't
             // find the project file yet, and continue searching.
             Err(e) => {
