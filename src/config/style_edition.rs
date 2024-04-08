@@ -1,6 +1,7 @@
 use crate::config::StyleEdition;
 
 /// Defines the default value for the given style edition
+#[allow(dead_code)]
 pub(crate) trait StyleEditionDefault {
     type ConfigType;
     fn style_edition_default(style_edition: StyleEdition) -> Self::ConfigType;
@@ -39,7 +40,6 @@ macro_rules! style_edition_default {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::config::StyleEdition;
 
     #[test]
     fn test_impl_default_style_edition_struct_for_all_editions() {
