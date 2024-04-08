@@ -332,7 +332,7 @@ fn assert_stdin_output(
         let mut session = Session::new(config, Some(&mut buf));
         session.format(input).unwrap();
         let errors = ReportedErrors {
-            has_diff: has_diff,
+            has_diff,
             ..Default::default()
         };
         assert_eq!(session.errors, errors);
@@ -835,7 +835,7 @@ fn handle_result(
         // Ignore LF and CRLF difference for Windows.
         if !string_eq_ignore_newline_repr(&fmt_text, &text) {
             if std::env::var_os("RUSTC_BLESS").is_some_and(|v| v != "0") {
-                std::fs::write(file_name, fmt_text).unwrap();
+                std::fs::write(target, fmt_text).unwrap();
                 continue;
             }
             let diff = make_diff(&text, &fmt_text, DIFF_CONTEXT_SIZE);

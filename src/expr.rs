@@ -282,6 +282,9 @@ pub(crate) fn format_expr(
                 match lhs.kind {
                     ast::ExprKind::Lit(token_lit) => lit_ends_in_dot(&token_lit),
                     ast::ExprKind::Unary(_, ref expr) => needs_space_before_range(context, expr),
+                    ast::ExprKind::Binary(_, _, ref rhs_expr) => {
+                        needs_space_before_range(context, rhs_expr)
+                    }
                     _ => false,
                 }
             }
@@ -401,8 +404,11 @@ pub(crate) fn format_expr(
         ast::ExprKind::FormatArgs(..)
         | ast::ExprKind::IncludedBytes(..)
         | ast::ExprKind::OffsetOf(..) => {
-            // These do not occur in the AST because macros aren't expanded.
-            unreachable!()
+            // These don't normally occur in the AST because macros aren't expanded. However,
+            // rustfmt tries to parse macro arguments when formatting macros, so it's not totally
+            // impossible for rustfmt to come across one of these nodes when formatting a file.
+            // Also, rustfmt might get passed the output from `-Zunpretty=expanded`.
+            None
         }
         ast::ExprKind::Err(_) | ast::ExprKind::Dummy => None,
     };

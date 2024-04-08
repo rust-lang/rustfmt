@@ -3,7 +3,6 @@
 #![warn(unreachable_pub)]
 #![recursion_limit = "256"]
 #![allow(clippy::match_like_matches_macro)]
-#![allow(unreachable_pub)]
 
 #[cfg(test)]
 #[macro_use]
@@ -258,8 +257,8 @@ impl FormatReport {
         self.internal
             .borrow()
             .0
-            .iter()
-            .map(|(_, errors)| errors.len())
+            .values()
+            .map(|errors| errors.len())
             .sum()
     }
 
@@ -305,7 +304,7 @@ fn format_snippet(snippet: &str, config: &Config, is_macro_def: bool) -> Option<
         let mut out: Vec<u8> = Vec::with_capacity(snippet.len() * 2);
         config.set().emit_mode(config::EmitMode::Stdout);
         config.set().verbose(Verbosity::Quiet);
-        config.set().hide_parse_errors(true);
+        config.set().show_parse_errors(false);
         if is_macro_def {
             config.set().error_on_unformatted(true);
         }

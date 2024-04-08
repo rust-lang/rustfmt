@@ -173,10 +173,7 @@ pub(crate) fn combine_strs_with_missing_comments(
 ) -> Option<String> {
     trace!(
         "combine_strs_with_missing_comments `{}` `{}` {:?} {:?}",
-        prev_str,
-        next_str,
-        span,
-        shape
+        prev_str, next_str, span, shape
     );
 
     let mut result =
@@ -208,7 +205,7 @@ pub(crate) fn combine_strs_with_missing_comments(
 
     // We have a missing comment between the first expression and the second expression.
 
-    // Peek the the original source code and find out whether there is a newline between the first
+    // Peek the original source code and find out whether there is a newline between the first
     // expression and the second expression or the missing comment. We will preserve the original
     // layout whenever possible.
     let original_snippet = context.snippet(span);
@@ -506,7 +503,7 @@ impl ItemizedBlock {
         let mut line_start = " ".repeat(indent);
 
         // Markdown blockquote start with a "> "
-        if line.trim_start().starts_with(">") {
+        if line.trim_start().starts_with('>') {
             // remove the original +2 indent because there might be multiple nested block quotes
             // and it's easier to reason about the final indent by just taking the length
             // of the new line_start. We update the indent because it effects the max width
@@ -657,7 +654,7 @@ impl<'a> CommentRewrite<'a> {
         while let Some(line) = iter.next() {
             result.push_str(line);
             result.push_str(match iter.peek() {
-                Some(next_line) if next_line.is_empty() => sep.trim_end(),
+                Some(&"") => sep.trim_end(),
                 Some(..) => sep,
                 None => "",
             });
@@ -666,7 +663,7 @@ impl<'a> CommentRewrite<'a> {
     }
 
     /// Check if any characters were written to the result buffer after the start of the comment.
-    /// when calling [`CommentRewrite::new()`] the result buffer is initiazlied with the opening
+    /// when calling [`CommentRewrite::new()`] the result buffer is initialized with the opening
     /// characters for the comment.
     fn buffer_contains_comment(&self) -> bool {
         // if self.result.len() < self.opener.len() then an empty comment is in the buffer
@@ -839,7 +836,7 @@ impl<'a> CommentRewrite<'a> {
             }
         }
 
-        let is_markdown_header_doc_comment = is_doc_comment && line.starts_with("#");
+        let is_markdown_header_doc_comment = is_doc_comment && line.starts_with('#');
 
         // We only want to wrap the comment if:
         // 1) wrap_comments = true is configured
@@ -1263,15 +1260,15 @@ pub(crate) enum FullCodeCharKind {
     InComment,
     /// Last character of a comment, '\n' for a line comment, '/' for a block comment.
     EndComment,
-    /// Start of a mutlitine string inside a comment
+    /// Start of a multiline string inside a comment
     StartStringCommented,
-    /// End of a mutlitine string inside a comment
+    /// End of a multiline string inside a comment
     EndStringCommented,
     /// Inside a commented string
     InStringCommented,
-    /// Start of a mutlitine string
+    /// Start of a multiline string
     StartString,
-    /// End of a mutlitine string
+    /// End of a multiline string
     EndString,
     /// Inside a string.
     InString,
@@ -1764,7 +1761,7 @@ fn changed_comment_content(orig: &str, new: &str) -> bool {
     let code_comment_content = |code| {
         let slices = UngroupedCommentCodeSlices::new(code);
         slices
-            .filter(|&(ref kind, _, _)| *kind == CodeCharKind::Comment)
+            .filter(|(kind, _, _)| *kind == CodeCharKind::Comment)
             .flat_map(|(_, _, s)| CommentReducer::new(s))
     };
     let res = code_comment_content(orig).ne(code_comment_content(new));
