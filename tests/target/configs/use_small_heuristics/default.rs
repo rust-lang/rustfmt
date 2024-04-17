@@ -33,6 +33,6 @@ fn format_let_else() {
     let Some(c) = opt else { return };
 
     let Some(d) = some_very_very_very_very_long_name else {
-        return;
+        return
     };
 }

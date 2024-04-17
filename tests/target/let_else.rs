@@ -21,7 +21,7 @@ fn main() {
 
     let Some(x) = opt else {
         let y = 1;
-        return y;
+        return y
     };
 
     let Some(x) = y.foo(
@@ -54,13 +54,13 @@ fn with_comments_around_else_keyword() {
     let Some(x) = opt
     /* pre else keyword block-comment */
     else {
-        return;
+        return
     };
 
     let Some(x) = opt else
     /* post else keyword block-comment */
     {
-        return;
+        return
     };
 
     let Some(x) = opt
@@ -68,19 +68,19 @@ fn with_comments_around_else_keyword() {
     else
     /* post else keyword block-comment */
     {
-        return;
+        return
     };
 
     let Some(x) = opt
     // pre else keyword line-comment
     else {
-        return;
+        return
     };
 
     let Some(x) = opt else
     // post else keyword line-comment
     {
-        return;
+        return
     };
 
     let Some(x) = opt
@@ -88,7 +88,7 @@ fn with_comments_around_else_keyword() {
     else
     // post else keyword line-comment
     {
-        return;
+        return
     };
 }
 
@@ -106,7 +106,7 @@ fn unbreakable_initializer_expr_pre_formatting_let_else_length_near_max_width() 
     // and the else block is formatted over multiple lines because we can't fit the
     // else block on the same line as the initializer expr.
     let Some(x) = some_really_really_really_really_really_really_really_long_name___B else {
-        return;
+        return
     };
 
     // Pre Formatting:
@@ -126,7 +126,7 @@ fn unbreakable_initializer_expr_pre_formatting_let_else_length_near_max_width() 
     // and the else block is formatted over multiple lines because we can't fit the
     // else block on the same line as the initializer expr.
     let Some(x) = some_really_really_really_really_really_really_really_long_name__D else {
-        return;
+        return
     };
 }
 
@@ -138,7 +138,7 @@ fn unbreakable_initializer_expr_pre_formatting_length_up_to_opening_brace_near_m
     // and the else block is formatted over multiple lines because we can't fit the
     // else block on the same line as the initializer expr.
     let Some(x) = some_really_really_really_really_really_really_really_really_long_name___E else {
-        return;
+        return
     };
 
     // Pre Formatting:
@@ -148,7 +148,7 @@ fn unbreakable_initializer_expr_pre_formatting_length_up_to_opening_brace_near_m
     // They are formatted on the next line.
     let Some(x) = some_really_really_really_really_really_really_really_really_long_name_____F
     else {
-        return;
+        return
     };
 }
 
@@ -160,7 +160,7 @@ fn unbreakable_initializer_expr_pre_formatting_length_through_initializer_expr_n
     // They are formatted on the next line.
     let Some(x) = some_really_really_really_really_really_really_really_really_really_long_name___G
     else {
-        return;
+        return
     };
 
     // Pre Formatting:
@@ -171,7 +171,7 @@ fn unbreakable_initializer_expr_pre_formatting_length_through_initializer_expr_n
     let Some(x) =
         some_really_really_really_really_really_really_really_really_really_long_name____H
     else {
-        return;
+        return
     };
 
     // Pre Formatting:
@@ -186,7 +186,7 @@ fn unbreakable_initializer_expr_pre_formatting_length_through_initializer_expr_n
     let Some(x) =
         some_really_really_really_really_really_really_really_really_really_really_long_name______I
     else {
-        return;
+        return
     };
 
     // Pre Formatting:
@@ -240,7 +240,7 @@ fn with_trailing_try_operator() {
         &ranking_rule_universes[cur_ranking_rule_index],
     )?
     else {
-        return;
+        return
     };
 
     // Maybe this is a workaround?
@@ -249,7 +249,7 @@ fn with_trailing_try_operator() {
         logger,
         &ranking_rule_universes[cur_ranking_rule_index],
     ) else {
-        return;
+        return
     };
 }
 
