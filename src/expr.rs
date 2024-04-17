@@ -32,7 +32,7 @@ use crate::types::{rewrite_path, PathContext};
 use crate::utils::{
     colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with,
     inner_attributes, last_line_extendable, last_line_width, mk_sp, outer_attributes,
-    semicolon_for_expr, unicode_str_width, wrap_str,
+    semicolon_for_expr_extra_hacky_double_counted_spacing, unicode_str_width, wrap_str,
 };
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
@@ -64,7 +64,9 @@ pub(crate) fn format_expr(
     if contains_skip(&*expr.attrs) {
         return Some(context.snippet(expr.span()).to_owned());
     }
-    let shape = if expr_type == ExprType::Statement && semicolon_for_expr(context, expr) {
+    let shape = if expr_type == ExprType::Statement
+        && semicolon_for_expr_extra_hacky_double_counted_spacing(context, expr)
+    {
         shape.sub_width(1)?
     } else {
         shape

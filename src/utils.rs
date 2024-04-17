@@ -290,6 +290,31 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
     }
 }
 
+/// Previously, we used to have `trailing_semicolon = always` enabled, and due to
+/// a bug between `format_stmt` and `format_expr`, we used to subtract the size of
+/// `;` *TWICE* from the shape. This means that an expr that would fit onto a line
+/// of, e.g. 99 (limit 100) after subtracting one for the semicolon would still be
+/// wrapped.
+///
+/// This function reimplements the old heuristic of double counting the "phantom"
+/// semicolon that should have already been accounted for, to not break existing
+/// formatting with the `trailing_semicolon = preserve` behavior.
+#[inline]
+pub(crate) fn semicolon_for_expr_extra_hacky_double_counted_spacing(
+    context: &RewriteContext<'_>,
+    expr: &ast::Expr,
+) -> bool {
+    match expr.kind {
+        ast::ExprKind::Ret(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Break(..) => {
+            match context.config.trailing_semicolon() {
+                TrailingSemicolon::Always | TrailingSemicolon::Preserve => true,
+                TrailingSemicolon::Never => false,
+            }
+        }
+        _ => false,
+    }
+}
+
 #[inline]
 pub(crate) fn semicolon_for_stmt(
     context: &RewriteContext<'_>,

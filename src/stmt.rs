@@ -8,7 +8,7 @@ use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::source_map::LineRangeUtils;
 use crate::spanned::Spanned;
-use crate::utils::semicolon_for_stmt;
+use crate::utils::{semicolon_for_expr, semicolon_for_stmt};
 
 pub(crate) struct Stmt<'a> {
     inner: &'a ast::Stmt,
@@ -116,8 +116,18 @@ fn format_stmt(
 
     let result = match stmt.kind {
         ast::StmtKind::Local(ref local) => local.rewrite(context, shape),
-        ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
+        ast::StmtKind::Semi(ref ex) => {
             let suffix = if semicolon_for_stmt(context, stmt, is_last_expr) {
+                ";"
+            } else {
+                ""
+            };
+
+            let shape = shape.sub_width(suffix.len())?;
+            format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
+        }
+        ast::StmtKind::Expr(ref ex) => {
+            let suffix = if semicolon_for_expr(context, ex) {
                 ";"
             } else {
                 ""
