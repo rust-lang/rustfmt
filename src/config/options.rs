@@ -50,6 +50,13 @@ pub enum ControlBraceStyle {
 }
 
 #[config_type]
+pub enum TrailingSemicolon {
+    Always,
+    Never,
+    Preserve,
+}
+
+#[config_type]
 /// How to indent.
 pub enum IndentStyle {
     /// First line on the same line as the opening brace, all lines aligned with

@@ -135,7 +135,7 @@ create_config! {
     brace_style: BraceStyle, BraceStyle::SameLineWhere, false, "Brace style for items";
     control_brace_style: ControlBraceStyle, ControlBraceStyle::AlwaysSameLine, false,
         "Brace style for control flow constructs";
-    trailing_semicolon: bool, true, false,
+    trailing_semicolon: TrailingSemicolon, TrailingSemicolon::Preserve, false,
         "Add trailing semicolon after break, continue and return";
     trailing_comma: SeparatorTactic, SeparatorTactic::Vertical, false,
         "How to handle trailing commas for lists";
@@ -673,7 +673,7 @@ force_multiline_blocks = false
 fn_params_layout = "Tall"
 brace_style = "SameLineWhere"
 control_brace_style = "AlwaysSameLine"
-trailing_semicolon = true
+trailing_semicolon = preserve
 trailing_comma = "Vertical"
 match_block_trailing_comma = false
 blank_lines_upper_bound = 1

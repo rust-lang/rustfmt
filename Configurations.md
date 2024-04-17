@@ -2780,20 +2780,32 @@ See also: [`match_block_trailing_comma`](#match_block_trailing_comma).
 
 Add trailing semicolon after break, continue and return
 
-- **Default value**: `true`
-- **Possible values**: `true`, `false`
+- **Default value**: `preserve`
+- **Possible values**: `always`, `never`, `preserve`
 - **Stable**: No (tracking issue: [#3378](https://github.com/rust-lang/rustfmt/issues/3378))
 
-#### `true` (default):
+#### `always` (default):
 ```rust
 fn foo() -> usize {
     return 0;
 }
 ```
 
-#### `false`:
+#### `never`:
 ```rust
 fn foo() -> usize {
+    return 0
+}
+```
+
+
+#### `preserve`:
+```rust
+fn foo() -> usize {
+    return 0;
+}
+
+fn bar() -> usize {
     return 0
 }
 ```
