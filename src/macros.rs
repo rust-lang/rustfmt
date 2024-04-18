@@ -240,12 +240,7 @@ fn rewrite_macro_inner(
     } = match parse_macro_args(context, ts, style, is_forced_bracket) {
         Some(args) => args,
         None => {
-            return return_macro_parse_failure_fallback(
-                context,
-                shape.indent,
-                position,
-                mac.span(),
-            );
+            return return_macro_parse_failure_fallback(context, shape.indent, position, mac.span());
         }
     };
 
