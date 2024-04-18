@@ -64,7 +64,7 @@ pub(crate) fn format_expr(
     if contains_skip(&*expr.attrs) {
         return Some(context.snippet(expr.span()).to_owned());
     }
-    let shape = if expr_type == ExprType::Statement
+    let shape = if context.config.version() == Version::One && expr_type == ExprType::Statement
         && semicolon_for_expr_extra_hacky_double_counted_spacing(context, expr)
     {
         shape.sub_width(1)?

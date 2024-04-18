@@ -290,7 +290,7 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
     }
 }
 
-/// Previously, we used to have `trailing_semicolon = always` enabled, and due to
+/// Previously, we used to have `trailing_semicolon = Always` enabled, and due to
 /// a bug between `format_stmt` and `format_expr`, we used to subtract the size of
 /// `;` *TWICE* from the shape. This means that an expr that would fit onto a line
 /// of, e.g. 99 (limit 100) after subtracting one for the semicolon would still be
@@ -298,7 +298,7 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
 ///
 /// This function reimplements the old heuristic of double counting the "phantom"
 /// semicolon that should have already been accounted for, to not break existing
-/// formatting with the `trailing_semicolon = preserve` behavior.
+/// formatting with the `trailing_semicolon = Preserve` behavior for Version = One.
 #[inline]
 pub(crate) fn semicolon_for_expr_extra_hacky_double_counted_spacing(
     context: &RewriteContext<'_>,
