@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
+use rustc_arena::TypedArena;
 use rustc_ast::ast;
 use rustc_span::Span;
 
@@ -131,7 +132,9 @@ fn format_project<T: FormatHandler>(
     };
 
     let mut context = FormatContext::new(&krate, report, parse_session, config, handler);
+    let item_arena = TypedArena::default();
     let files = modules::ModResolver::new(
+        &item_arena,
         &context.parse_session,
         directory_ownership.unwrap_or(DirectoryOwnership::UnownedViaBlock),
         !input_is_stdin && !config.skip_children(),

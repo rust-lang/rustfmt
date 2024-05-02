@@ -1,4 +1,5 @@
 use rustc_ast::ast;
+use rustc_ast::ptr::P;
 use rustc_ast::visit::Visitor;
 use rustc_span::Symbol;
 
@@ -6,26 +7,18 @@ use crate::attr::MetaVisitor;
 use crate::parse::macros::cfg_if::parse_cfg_if;
 use crate::parse::session::ParseSess;
 
-pub(crate) struct ModItem {
-    pub(crate) item: ast::Item,
-}
-
 /// Traverse `cfg_if!` macro and fetch modules.
 pub(crate) struct CfgIfVisitor<'a> {
     parse_sess: &'a ParseSess,
-    mods: Vec<ModItem>,
+    pub(crate) items: Vec<P<ast::Item>>,
 }
 
 impl<'a> CfgIfVisitor<'a> {
     pub(crate) fn new(parse_sess: &'a ParseSess) -> CfgIfVisitor<'a> {
         CfgIfVisitor {
-            mods: vec![],
             parse_sess,
+            items: Vec::new(),
         }
-    }
-
-    pub(crate) fn mods(self) -> Vec<ModItem> {
-        self.mods
     }
 }
 
@@ -63,8 +56,7 @@ impl<'a, 'ast: 'a> CfgIfVisitor<'a> {
         };
 
         let items = parse_cfg_if(self.parse_sess, mac)?;
-        self.mods
-            .append(&mut items.into_iter().map(|item| ModItem { item }).collect());
+        self.items.extend(items);
 
         Ok(())
     }
