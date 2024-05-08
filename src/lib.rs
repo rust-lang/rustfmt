@@ -76,6 +76,7 @@ mod imports;
 mod items;
 mod lists;
 mod macros;
+mod markdown;
 mod matches;
 mod missed_spans;
 pub(crate) mod modules;

@@ -21,3 +21,8 @@ cargo test
 cd config_proc_macro
 cargo build --locked
 cargo test
+
+cd ../markdown
+# Build markdown crate and generate tests
+cargo build --locked -F gen-tests
+cargo test

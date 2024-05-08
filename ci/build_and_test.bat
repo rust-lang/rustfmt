@@ -17,3 +17,8 @@ cargo test || exit /b 1
 cd config_proc_macro || exit /b 1
 cargo build --locked || exit /b 1
 cargo test || exit /b 1
+
+cd ../markdown || exit /b 1
+:: Build markdown crate and generate tests
+cargo build --locked -F gen-tests || exit /b 1
+cargo test || exit /b 1
