@@ -352,10 +352,14 @@ fn format_code_block(
         result.push_str(FN_MAIN_PREFIX);
         let mut need_indent = true;
         for (kind, line) in LineClasses::new(s) {
-            if need_indent {
+            let not_empty = !line.trim().is_empty();
+            // Only add indentation if the current line isn't empty
+            if need_indent && not_empty {
                 result.push_str(&indent.to_string(config));
             }
-            result.push_str(&line);
+            if not_empty {
+                result.push_str(&line);
+            }
             result.push('\n');
             need_indent = indent_next_line(kind, &line, config);
         }
