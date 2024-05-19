@@ -1,74 +1,52 @@
 // rustfmt-imports_granularity: One
+// rustfmt-style_edition: 2024
 
-pub use foo::x;
-pub use foo::x as x2;
-pub use foo::y;
-use bar::a;
-use bar::b;
-use bar::b::f;
-use bar::b::f as f2;
-use bar::b::g;
-use bar::c;
-use bar::d::e;
-use bar::d::e as e2;
-use qux::h;
-use qux::i;
+pub use foo::{x, x as x2, y};
+use {
+    bar::{
+        a,
+        b::{self, f, g},
+        c,
+        d::{e, e as e2},
+    },
+    qux::{h, i},
+};
 
 mod indent4 {
     use column_____________________________________________________________________________________102::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 
     use column_______________________________________________________________________________096::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 
     use column_________________________________________________________________________090::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 
-    use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::c096::c102::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+    use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::c096::
+        c102::{
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 
     use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::c096::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 
     use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 
     use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 }
 
@@ -133,11 +111,11 @@ use smithay::{
             SecurityContext, SecurityContextHandler, SecurityContextListenerSource,
             SecurityContextState,
         },
-        selection::data_device::{
-            set_data_device_focus, ClientDndGrabHandler, DataDeviceHandler, DataDeviceState,
-            ServerDndGrabHandler,
-        },
         selection::{
+            data_device::{
+                set_data_device_focus, ClientDndGrabHandler, DataDeviceHandler, DataDeviceState,
+                ServerDndGrabHandler,
+            },
             primary_selection::{
                 set_primary_focus, PrimarySelectionHandler, PrimarySelectionState,
             },

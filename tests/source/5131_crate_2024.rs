@@ -1,18 +1,19 @@
-// rustfmt-imports_granularity: One
+// rustfmt-imports_granularity: Crate
+// rustfmt-style_edition: 2024
 
-pub use foo::x;
-pub use foo::x as x2;
-pub use foo::y;
-use bar::a;
-use bar::b;
-use bar::b::f;
-use bar::b::f as f2;
-use bar::b::g;
-use bar::c;
-use bar::d::e;
-use bar::d::e as e2;
+use foo::a;
+use foo::a;
+use foo::b;
+use foo::b as b2;
+use foo::b::f;
+use foo::b::g;
+use foo::b::g as g2;
+use foo::c;
+use foo::d::e;
 use qux::h;
+use qux::h as h2;
 use qux::i;
+
 
 mod indent4 {
     use column_____________________________________________________________________________________102::{
