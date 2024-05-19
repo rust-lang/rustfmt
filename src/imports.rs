@@ -1070,7 +1070,7 @@ impl Rewrite for UseSegment {
                 context,
                 use_tree_list,
                 // 1 = "{" and "}"
-                shape.offset_left(1)?.sub_width(1)?,
+                shape.offset_left(1)?.saturating_sub_width(1),
             )?,
         })
     }
@@ -1079,15 +1079,75 @@ impl Rewrite for UseSegment {
 impl Rewrite for UseTree {
     // This does NOT format attributes and visibility or add a trailing `;`.
     fn rewrite(&self, context: &RewriteContext<'_>, mut shape: Shape) -> Option<String> {
+        let shape_top_level = shape.clone();
         let mut result = String::with_capacity(256);
+        let mut is_first = true;
+        let mut prev_is_allow_overflow = false;
         let mut iter = self.path.iter().peekable();
         while let Some(segment) = iter.next() {
-            let segment_str = segment.rewrite(context, shape)?;
-            result.push_str(&segment_str);
-            if iter.peek().is_some() {
-                result.push_str("::");
-                // 2 = "::"
-                shape = shape.offset_left(2 + segment_str.len())?;
+            // Try stacking the next segment, e.g. `use prev::next_segment::...` and
+            // `use prev::{next, segment}`.
+            let can_stack_with_constraint = (|| {
+                // If the segment follows `use ` or `{`, force to consume the segment with overflow.
+                if is_first {
+                    let mut chunk = segment.rewrite(context, shape.infinite_width())?;
+                    let next_shape = if iter.peek().is_some() {
+                        chunk.push_str("::");
+                        shape.offset_left_maybe_overflow(chunk.len())
+                    } else {
+                        shape.clone()
+                    };
+                    Some((chunk, next_shape))
+                } else {
+                    // If the segment follows `use ` or newline, allow overflow by "{".
+                    let s = if prev_is_allow_overflow
+                        && matches!(segment.kind, UseSegmentKind::List(_))
+                    {
+                        shape.add_width(1)
+                    } else {
+                        shape.clone()
+                    };
+                    let mut chunk = segment.rewrite(context, s)?;
+                    let next_shape = match iter.peek().map(|s| &s.kind) {
+                        Some(UseSegmentKind::List(_)) => {
+                            chunk.push_str("::");
+                            let ret = shape.offset_left(chunk.len())?;
+                            // Ensure that there is a room for the next "{".
+                            ret.offset_left(1)?;
+                            ret
+                        }
+                        Some(_) => {
+                            chunk.push_str("::");
+                            shape.offset_left(chunk.len())?
+                        }
+                        None => shape.clone(),
+                    };
+                    Some((chunk, next_shape))
+                }
+            })();
+            match can_stack_with_constraint {
+                Some((chunk, next_shape)) => {
+                    result.push_str(&chunk);
+                    shape = next_shape;
+                    prev_is_allow_overflow = is_first;
+                    is_first = false;
+                }
+                // If the next segment exceeds the given width, continue with newline.
+                None => {
+                    let segment_str = segment.rewrite(context, shape)?;
+                    let mut chunk = format!(
+                        "{}{}",
+                        " ".repeat(shape.indent.block_indent + 4),
+                        segment_str
+                    );
+                    if iter.peek().is_some() {
+                        chunk.push_str("::");
+                    }
+                    result.push_str("\n");
+                    result.push_str(&chunk);
+                    shape = shape_top_level.offset_left_maybe_overflow(segment_str.len());
+                    prev_is_allow_overflow = true;
+                }
             }
         }
         Some(result)
