@@ -1,4 +1,5 @@
 // rustfmt-imports_granularity: One
+// rustfmt-style_edition: 2024
 
 pub use foo::x;
 pub use foo::x as x2;
