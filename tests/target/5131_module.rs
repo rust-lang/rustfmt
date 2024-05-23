@@ -120,6 +120,12 @@ mod indent4 {
         column_____________________________________________________________________________096::{
         Foo, Foo2,
     };
+
+    // Test for top-level `UseSegmentKind::List`.
+    use {
+        a,
+        column_____________________________________________________________________________________102,
+    };
 }
 
 use smithay::backend::renderer::element::utils::select_dmabuf_feedback;

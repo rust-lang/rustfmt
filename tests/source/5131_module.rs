@@ -117,6 +117,12 @@ mod indent4 {
         Foo2,
         bar::Bar2,
     };
+
+    // Test for top-level `UseSegmentKind::List`.
+    use {
+        a,
+        column_____________________________________________________________________________________102,
+    };
 }
 
 use smithay::{
