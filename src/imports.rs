@@ -1079,74 +1079,75 @@ impl Rewrite for UseSegment {
 impl Rewrite for UseTree {
     // This does NOT format attributes and visibility or add a trailing `;`.
     fn rewrite(&self, context: &RewriteContext<'_>, mut shape: Shape) -> Option<String> {
+        fn proceed(
+            context: &RewriteContext<'_>,
+            shape: &Shape,
+            curr_segment: &UseSegment,
+            curr_segment_is_allow_overflow: bool,
+            next_segment: Option<&&UseSegment>,
+        ) -> Option<(String, Shape)> {
+            let mut rewritten_segment = curr_segment.rewrite(context, shape.clone())?;
+            if next_segment.is_some() {
+                rewritten_segment.push_str("::");
+            }
+            let reserved_room_for_brace = match next_segment.map(|s| &s.kind) {
+                Some(UseSegmentKind::List(_)) => "{".len(),
+                _ => 0,
+            };
+            let next_shape = if matches!(&curr_segment.kind, UseSegmentKind::List(_)) {
+                // This is the last segment and we won't use `next_shape`. Return `shape`
+                // unchanged.
+                shape.clone()
+            } else if curr_segment_is_allow_overflow {
+                // If the segment follows `use ` or newline, force to consume the segment with
+                // overflow.
+
+                let s = shape.offset_left_maybe_overflow(rewritten_segment.len());
+                if s.width == 0 {
+                    // We have to to commit current segment in this line. Make a room for next
+                    // round.
+                    s.add_width(reserved_room_for_brace)
+                } else {
+                    s.clone()
+                }
+            } else {
+                let ret = shape.offset_left(rewritten_segment.len())?;
+                // Check that there is a room for the next "{". If not, return null for retry with
+                // newline.
+                ret.offset_left(reserved_room_for_brace)?;
+                ret
+            };
+            Some((rewritten_segment, next_shape))
+        }
+
         let shape_top_level = shape.clone();
         let mut result = String::with_capacity(256);
         let mut is_first = true;
-        let mut prev_is_allow_overflow = false;
         let mut iter = self.path.iter().peekable();
         while let Some(segment) = iter.next() {
-            // Try stacking the next segment, e.g. `use prev::next_segment::...` and
-            // `use prev::{next, segment}`.
-            let can_stack_with_constraint = (|| {
-                // If the segment follows `use ` or `{`, force to consume the segment with overflow.
-                if is_first {
-                    let mut chunk = segment.rewrite(context, shape.infinite_width())?;
-                    let next_shape = if iter.peek().is_some() {
-                        chunk.push_str("::");
-                        shape.offset_left_maybe_overflow(chunk.len())
-                    } else {
-                        shape.clone()
-                    };
-                    Some((chunk, next_shape))
-                } else {
-                    // If the segment follows `use ` or newline, allow overflow by "{".
-                    let s = if prev_is_allow_overflow
-                        && matches!(segment.kind, UseSegmentKind::List(_))
-                    {
-                        shape.add_width(1)
-                    } else {
-                        shape.clone()
-                    };
-                    let mut chunk = segment.rewrite(context, s)?;
-                    let next_shape = match iter.peek().map(|s| &s.kind) {
-                        Some(UseSegmentKind::List(_)) => {
-                            chunk.push_str("::");
-                            let ret = shape.offset_left(chunk.len())?;
-                            // Ensure that there is a room for the next "{".
-                            ret.offset_left(1)?;
-                            ret
-                        }
-                        Some(_) => {
-                            chunk.push_str("::");
-                            shape.offset_left(chunk.len())?
-                        }
-                        None => shape.clone(),
-                    };
-                    Some((chunk, next_shape))
-                }
-            })();
-            match can_stack_with_constraint {
-                Some((chunk, next_shape)) => {
-                    result.push_str(&chunk);
+            let allow_overflow = is_first;
+            is_first = false;
+            match proceed(context, &shape, segment, allow_overflow, iter.peek()) {
+                Some((rewritten_segment, next_shape)) => {
+                    result.push_str(&rewritten_segment);
                     shape = next_shape;
-                    prev_is_allow_overflow = is_first;
-                    is_first = false;
+                    continue;
                 }
-                // If the next segment exceeds the given width, continue with newline.
+                None => (),
+            }
+            // If the first `proceed()` failed, retry with newline.
+            result.push_str("\n");
+            result.push_str(&" ".repeat(shape.indent.block_indent + 4));
+            shape = shape_top_level.clone();
+            let allow_overflow = true;
+            match proceed(context, &shape, segment, allow_overflow, iter.peek()) {
+                Some((rewritten_segment, next_shape)) => {
+                    result.push_str(&rewritten_segment);
+                    shape = next_shape;
+                }
+                // Give up to format.
                 None => {
-                    let segment_str = segment.rewrite(context, shape)?;
-                    let mut chunk = format!(
-                        "{}{}",
-                        " ".repeat(shape.indent.block_indent + 4),
-                        segment_str
-                    );
-                    if iter.peek().is_some() {
-                        chunk.push_str("::");
-                    }
-                    result.push_str("\n");
-                    result.push_str(&chunk);
-                    shape = shape_top_level.offset_left_maybe_overflow(segment_str.len());
-                    prev_is_allow_overflow = true;
+                    return None;
                 }
             }
         }

@@ -112,7 +112,9 @@ use smithay::{
                 set_data_device_focus, ClientDndGrabHandler, DataDeviceHandler, DataDeviceState,
                 ServerDndGrabHandler,
             },
-            primary_selection::{set_primary_focus, PrimarySelectionHandler, PrimarySelectionState},
+            primary_selection::{
+                set_primary_focus, PrimarySelectionHandler, PrimarySelectionState,
+            },
             wlr_data_control::{DataControlHandler, DataControlState},
             SelectionHandler,
         },
