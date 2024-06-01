@@ -3,7 +3,7 @@
 use std::iter::repeat;
 
 use rustc_ast::{ast, ptr};
-use rustc_span::{BytePos, Span};
+use rustc_span::{BytePos, Pos, Span};
 
 use crate::comment::{combine_strs_with_missing_comments, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
@@ -125,6 +125,30 @@ pub(crate) fn rewrite_match(
         inner_attrs[inner_attrs.len() - 1].span.hi()
     };
 
+    let blank_line_after_inner_attrs = if context.config.version() == Version::Two
+        && !inner_attrs.is_empty()
+        && !arms.is_empty()
+    {
+        let blank_line_snip = if let Some(hi) = context
+            .snippet(mk_sp(open_brace_pos, arms[0].span.lo()))
+            .find('/')
+        {
+            context.snippet(mk_sp(
+                open_brace_pos,
+                open_brace_pos + BytePos::from_usize(hi),
+            ))
+        } else {
+            context.snippet(mk_sp(open_brace_pos, arms[0].span.lo()))
+        };
+        if blank_line_snip.find("\n") != blank_line_snip.rfind("\n") {
+            "\n"
+        } else {
+            ""
+        }
+    } else {
+        ""
+    };
+
     if arms.is_empty() {
         let snippet = context.snippet(mk_sp(open_brace_pos, span.hi() - BytePos(1)));
         if snippet.trim().is_empty() {
@@ -136,10 +160,11 @@ pub(crate) fn rewrite_match(
     } else {
         let span_after_cond = mk_sp(cond.span.hi(), span.hi());
         Some(format!(
-            "match {}{}{{\n{}{}{}\n{}}}",
+            "match {}{}{{\n{}{}{}{}\n{}}}",
             cond_str,
             block_sep,
             inner_attrs_str,
+            blank_line_after_inner_attrs,
             nested_indent_str,
             rewrite_match_arms(context, arms, shape, span_after_cond, open_brace_pos)?,
             shape.indent.to_string(context.config),
