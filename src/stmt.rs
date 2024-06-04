@@ -95,13 +95,7 @@ impl<'a> Rewrite for Stmt<'a> {
         } else {
             ExprType::Statement
         };
-        format_stmt(
-            context,
-            shape,
-            self.as_ast_node(),
-            expr_type,
-            self.is_last,
-        )
+        format_stmt(context, shape, self.as_ast_node(), expr_type, self.is_last)
     }
 }
 
