@@ -100,7 +100,7 @@ impl<'a> Rewrite for Stmt<'a> {
             shape,
             self.as_ast_node(),
             expr_type,
-            self.is_last_expr(),
+            self.is_last,
         )
     }
 }
@@ -110,14 +110,14 @@ fn format_stmt(
     shape: Shape,
     stmt: &ast::Stmt,
     expr_type: ExprType,
-    is_last_expr: bool,
+    is_last: bool,
 ) -> Option<String> {
     skip_out_of_file_lines_range!(context, stmt.span());
 
     let result = match stmt.kind {
         ast::StmtKind::Local(ref local) => local.rewrite(context, shape),
         ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
-            let suffix = if semicolon_for_stmt(context, stmt, is_last_expr) {
+            let suffix = if semicolon_for_stmt(context, stmt, is_last) {
                 ";"
             } else {
                 ""
