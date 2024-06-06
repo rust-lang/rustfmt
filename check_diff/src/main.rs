@@ -1,5 +1,7 @@
 use clap::Parser;
 use std::env;
+use std::io::{self, Write};
+use std::path::Path;
 use std::process::Command;
 
 /// Inputs for the check_diff script
@@ -18,22 +20,36 @@ struct CliInputs {
     rustfmt_config: Option<Vec<String>>,
 }
 
-fn clone_git_repo(url: String, dest: String) {
+/// Clone a git repository and cd into it.
+///
+/// Parameters:
+/// url: git clone url
+/// dest: directory where the repo should be cloned
+fn clone_git_repo(url: &str, dest: &str) {
     env::set_var("GIT_TERMINAL_PROMPT", "0");
-    let mut git_cmd = Command::new("git");
-    git_cmd.args(["clone", "--quiet", url, "--depth", "1", "dest"]);
-    git_cmd.output().expect("failed to clone repository");
-    let mut enter_dest_dir = Command::new("cd")
-        .arg(dest)
+    let git_cmd = Command::new("git")
+        .args(["clone", "--quiet", url, "--depth", "1", dest])
         .output()
-        .expect("failed to enter directory.");
+        .expect("failed to clone repository");
+    // if the git command does not return successfully,
+    // cd command will not work as well. So fail fast.
+    if !git_cmd.status.success() {
+        io::stdout().write_all(&git_cmd.stdout).unwrap();
+        io::stderr().write_all(&git_cmd.stderr).unwrap();
+        return;
+    }
+    println!("Successfully clone repository. Entering repository");
+
+    let dest_path = Path::new(&dest);
+    let _ = env::set_current_dir(&dest_path).is_ok();
+    println!(
+        "Current directory: {}",
+        env::current_dir().unwrap().display()
+    );
 }
 
 fn main() {
-    let args = CliInputs::parse();
-    println!(
-        "remote_repo_url: {:?}, feature_branch: {:?},
-        optional_commit_hash: {:?}, optional_rustfmt_config: {:?}",
-        args.remote_repo_url, args.feature_branch, args.commit_hash, args.rustfmt_config
-    );
+    let _args = CliInputs::parse();
+    let sample_repo = "https://github.com/rust-lang/rustfmt.git";
+    clone_git_repo(sample_repo, "./tmp/");
 }
