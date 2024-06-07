@@ -384,11 +384,10 @@ fn get_targets_root_only(
             .packages
             .into_iter()
             .filter(|p| {
+                let manifest_path = PathBuf::from(&p.manifest_path);
                 in_workspace_root
-                    || PathBuf::from(&p.manifest_path)
-                        .canonicalize()
-                        .unwrap_or_default()
-                        == current_dir_manifest
+                    || manifest_path == current_dir_manifest
+                    || manifest_path.canonicalize().unwrap_or_default() == current_dir_manifest
             })
             .flat_map(|p| p.targets)
             .collect(),
