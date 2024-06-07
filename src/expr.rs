@@ -139,7 +139,7 @@ pub(crate) fn format_expr(
         | ast::ExprKind::While(..) => to_control_flow(expr, expr_type)
             .and_then(|control_flow| control_flow.rewrite(context, shape)),
         ast::ExprKind::ConstBlock(ref anon_const) => {
-            let rewrite = match anon_const.value.kind {
+            let rewrite = match anon_const.kind {
                 ast::ExprKind::Block(ref block, opt_label) => {
                     // Inner attributes are associated with the `ast::ExprKind::ConstBlock` node,
                     // not the `ast::Block` node we're about to rewrite. To prevent dropping inner
