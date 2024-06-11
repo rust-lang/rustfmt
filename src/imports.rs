@@ -662,7 +662,12 @@ impl UseTree {
             match shared_prefix {
                 SharedPrefix::Crate => self.path[0] == other.path[0],
                 SharedPrefix::Module => {
-                    self.path[..self.path.len() - 1] == other.path[..other.path.len() - 1]
+                    if self.path.len() == 1 && other.path.len() == 1 {
+                        // When importing an entire crate, use the crate name for comparison.
+                        self.path[0] == other.path[0]
+                    } else {
+                        self.path[..self.path.len() - 1] == other.path[..other.path.len() - 1]
+                    }
                 }
                 SharedPrefix::One => true,
             }
