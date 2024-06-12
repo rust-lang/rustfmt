@@ -2085,6 +2085,9 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
 ) -> Option<String> {
     let lhs = lhs.into();
     let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_kind, rhs_tactics)?;
+    if context.config.version() == Version::Two && lhs.ends_with(" ") && rhs.starts_with(" ") {
+        return Some(lhs + &rhs.trim_start());
+    }
     Some(lhs + &rhs)
 }
 
