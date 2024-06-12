@@ -472,6 +472,7 @@ impl UseTree {
                     context.snippet_provider.span_after(a.span, "{"),
                     a.span.hi(),
                     false,
+                    context.config.version(),
                 );
 
                 // in case of a global path and the nested list starts at the root,

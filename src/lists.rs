@@ -7,7 +7,7 @@ use rustc_span::BytePos;
 
 use crate::comment::{find_comment_end, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
-use crate::config::{Config, IndentStyle};
+use crate::config::{Config, IndentStyle, Version};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::utils::{
@@ -570,6 +570,7 @@ where
     terminator: &'a str,
     separator: &'a str,
     leave_last: bool,
+    version: Version,
 }
 
 pub(crate) fn extract_pre_comment(pre_snippet: &str) -> (Option<String>, ListItemCommentStyle) {
@@ -612,11 +613,25 @@ pub(crate) fn extract_post_comment(
     comment_end: usize,
     separator: &str,
     is_last: bool,
+    version: Version,
 ) -> Option<String> {
     let white_space: &[_] = &[' ', '\t'];
 
     // Cleanup post-comment: strip separators and whitespace.
-    let post_snippet = post_snippet[..comment_end].trim();
+    let post_snippet = if version == Version::One {
+        post_snippet[..comment_end].trim()
+    } else {
+        // If trimmed string starts with comment - preserve leading new-line.
+        let post_snippet_start_trimmed = post_snippet[..comment_end].trim_start();
+        if post_snippet_start_trimmed.starts_with("//")
+            || post_snippet_start_trimmed.starts_with("/*")
+        {
+            post_snippet[..comment_end].trim_matches(white_space)
+        } else {
+            post_snippet_start_trimmed
+        }
+        .trim_end()
+    };
 
     let last_inline_comment_ends_with_separator = if is_last {
         if let Some(line) = post_snippet.lines().last() {
@@ -767,8 +782,13 @@ where
             let comment_end =
                 get_comment_end(post_snippet, self.separator, self.terminator, is_last);
             let new_lines = has_extra_newline(post_snippet, comment_end);
-            let post_comment =
-                extract_post_comment(post_snippet, comment_end, self.separator, is_last);
+            let post_comment = extract_post_comment(
+                post_snippet,
+                comment_end,
+                self.separator,
+                is_last,
+                self.version,
+            );
 
             self.prev_span_end = (self.get_hi)(&item) + BytePos(comment_end as u32);
 
@@ -800,6 +820,7 @@ pub(crate) fn itemize_list<'a, T, I, F1, F2, F3>(
     prev_span_end: BytePos,
     next_span_start: BytePos,
     leave_last: bool,
+    version: Version,
 ) -> ListItems<'a, I, F1, F2, F3>
 where
     I: Iterator<Item = T>,
@@ -818,6 +839,7 @@ where
         terminator,
         separator,
         leave_last,
+        version,
     }
 }
 

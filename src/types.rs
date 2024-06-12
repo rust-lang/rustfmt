@@ -352,6 +352,7 @@ where
             list_lo,
             span.hi(),
             false,
+            context.config.version(),
         );
 
         let item_vec: Vec<_> = items.collect();

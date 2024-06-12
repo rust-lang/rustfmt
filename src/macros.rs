@@ -463,6 +463,7 @@ pub(crate) fn rewrite_macro_def(
         context.snippet_provider.span_after(span, "{"),
         span.hi(),
         false,
+        context.config.version(),
     )
     .collect::<Vec<_>>();
 

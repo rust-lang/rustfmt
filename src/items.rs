@@ -489,8 +489,8 @@ impl<'a> FmtVisitor<'a> {
             return None;
         }
 
-        let res = Stmt::from_ast_node(block.stmts.first()?, true)
-            .rewrite(&self.get_context(), self.shape())?;
+        let res =
+            Stmt::from_ast_node(block.stmts.first()?, true).rewrite(&context, self.shape())?;
 
         let width = self.block_indent.width() + fn_str.len() + res.len() + 5;
         if !res.contains('\n') && width <= self.config.max_width() {
@@ -549,7 +549,12 @@ impl<'a> FmtVisitor<'a> {
 
         self.last_pos = body_start;
 
-        match self.format_variant_list(enum_def, body_start, span.hi()) {
+        match self.format_variant_list(
+            enum_def,
+            body_start,
+            span.hi(),
+            self.get_context().config.version(),
+        ) {
             Some(ref s) if enum_def.variants.is_empty() => self.push_str(s),
             rw => {
                 self.push_rewrite(mk_sp(body_start, span.hi()), rw);
@@ -564,6 +569,7 @@ impl<'a> FmtVisitor<'a> {
         enum_def: &ast::EnumDef,
         body_lo: BytePos,
         body_hi: BytePos,
+        version: Version,
     ) -> Option<String> {
         if enum_def.variants.is_empty() {
             let mut buffer = String::with_capacity(128);
@@ -618,6 +624,7 @@ impl<'a> FmtVisitor<'a> {
                 body_lo,
                 body_hi,
                 false,
+                version,
             )
             .collect()
         };
@@ -2736,6 +2743,7 @@ fn rewrite_params(
         span.lo(),
         span.hi(),
         false,
+        context.config.version(),
     )
     .collect();
 
@@ -3005,6 +3013,7 @@ fn rewrite_bounds_on_where_clause(
         span_start,
         span_end,
         false,
+        context.config.version(),
     );
     let comma_tactic = if where_clause_option.suppress_comma || force_single_line {
         SeparatorTactic::Never
@@ -3086,6 +3095,7 @@ fn rewrite_where_clause(
         span_start,
         span_end,
         false,
+        context.config.version(),
     );
     let item_vec = items.collect::<Vec<_>>();
     // FIXME: we don't need to collect here

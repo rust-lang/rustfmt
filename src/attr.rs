@@ -105,6 +105,7 @@ fn format_derive(
                 context.snippet_provider.span_after(attr.span, "("),
                 attr.span.hi(),
                 false,
+                context.config.version(),
             );
 
             Some(items)
