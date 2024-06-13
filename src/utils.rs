@@ -207,6 +207,14 @@ pub(crate) fn last_line_width(s: &str) -> usize {
     unicode_str_width(s.rsplitn(2, '\n').next().unwrap_or(""))
 }
 
+#[inline]
+pub(crate) fn last_line_unindented_width(s: &str) -> Option<usize> {
+    s.rsplitn(2, '\n').next().map(|s| {
+        let trimmed = s.trim_start();
+        unicode_str_width(trimmed)
+    })
+}
+
 /// The total used width of the last line.
 #[inline]
 pub(crate) fn last_line_used_width(s: &str, offset: usize) -> usize {
