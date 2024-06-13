@@ -194,7 +194,7 @@ fn rewrite_closure_expr(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> Option<String> {
-    fn allow_multi_line(expr: &ast::Expr) -> bool {
+    fn allow_multi_line(expr: &ast::Expr, context: &RewriteContext<'_>) -> bool {
         match expr.kind {
             ast::ExprKind::Match(..)
             | ast::ExprKind::Gen(..)
@@ -206,7 +206,13 @@ fn rewrite_closure_expr(
             ast::ExprKind::AddrOf(_, _, ref expr)
             | ast::ExprKind::Try(ref expr)
             | ast::ExprKind::Unary(_, ref expr)
-            | ast::ExprKind::Cast(ref expr, _) => allow_multi_line(expr),
+            | ast::ExprKind::Cast(ref expr, _) => allow_multi_line(expr, context),
+
+            ast::ExprKind::Binary(_, ref expr1, ref expr2)
+                if context.config.version() == Version::Two =>
+            {
+                allow_multi_line(expr1, context) && allow_multi_line(expr2, context)
+            }
 
             _ => false,
         }
@@ -214,7 +220,7 @@ fn rewrite_closure_expr(
 
     // When rewriting closure's body without block, we require it to fit in a single line
     // unless it is a block-like expression or we are inside macro call.
-    let veto_multiline = (!allow_multi_line(expr) && !context.inside_macro())
+    let veto_multiline = (!allow_multi_line(expr, context) && !context.inside_macro())
         || context.config.force_multiline_blocks();
     expr.rewrite(context, shape)
         .and_then(|rw| {
