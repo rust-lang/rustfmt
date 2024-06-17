@@ -50,6 +50,19 @@ pub enum ControlBraceStyle {
 }
 
 #[config_type]
+/// How to treat the semicolon that is optional for final diverging expressions
+/// (`return`/`break`/`continue`).
+pub enum TrailingSemicolon {
+    /// Always rewrite `return;` and `break;` expressions to have a trailing semicolon,
+    /// unless the block is a single-line block, e.g. `let PAT = e else { return }`.
+    Always,
+    /// Always return `return` and `break` expressions to remove the trailing semicolon.
+    Never,
+    /// Preserve an existing trailing semicolon if it exists.
+    Preserve,
+}
+
+#[config_type]
 /// How to indent.
 pub enum IndentStyle {
     /// First line on the same line as the opening brace, all lines aligned with

@@ -4,25 +4,25 @@ fn main() {
     let Some(a) = opt else {};
 
     let Some(b) = opt else {
-        return;
+        return
     };
 
     let Some(c) = opt else {
-        return;
+        return
     };
 
     let Some(c) = opt else {
         // a comment should always force the block to be multi-lined
-        return;
+        return
     };
 
     let Some(c) = opt else {
         /* a comment should always force the block to be multi-lined */
-        return;
+        return
     };
 
     let Some(d) = some_very_very_very_very_long_name else {
-        return;
+        return
     };
 
     let Expr::Slice(ast::ExprSlice {
@@ -32,11 +32,11 @@ fn main() {
         range: _,
     }) = slice.as_ref()
     else {
-        return;
+        return
     };
 
     let Some((base_place, current)) = self.lower_expr_as_place(current, *base, true)? else {
-        return Ok(None);
+        return Ok(None)
     };
 
     let Some(doc_attr) = variant
@@ -44,11 +44,11 @@ fn main() {
         .iter()
         .find(|attr| attr.path().is_ident("doc"))
     else {
-        return Err(Error::new(variant.span(), r#"expected a doc comment"#));
+        return Err(Error::new(variant.span(), r#"expected a doc comment"#))
     };
 
     let Some((base_place, current)) = self.lower_expr_as_place(current, *base, true) else {
-        return Ok(None);
+        return Ok(None)
     };
 
     let Stmt::Expr(
@@ -61,6 +61,6 @@ fn main() {
         return Err(Error::new(
             last_stmt.span(),
             "expected last expression to be `Some(match (..) { .. })`",
-        ));
+        ))
     };
 }

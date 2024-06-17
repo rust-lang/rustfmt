@@ -391,26 +391,22 @@ pub(crate) fn rewrite_last_closure(
 
         // We force to use block for the body of the closure for certain kinds of expressions.
         if is_block_closure_forced(context, body) {
-            return rewrite_closure_with_block(body, &prefix, context, body_shape).map(
-                |body_str| {
-                    match fn_decl.output {
-                        ast::FnRetTy::Default(..) if body_str.lines().count() <= 7 => {
-                            // If the expression can fit in a single line, we need not force block
-                            // closure.  However, if the closure has a return type, then we must
-                            // keep the blocks.
-                            match rewrite_closure_expr(body, &prefix, context, shape) {
-                                Some(single_line_body_str)
-                                    if !single_line_body_str.contains('\n') =>
-                                {
-                                    single_line_body_str
-                                }
-                                _ => body_str,
+            return rewrite_closure_with_block(body, &prefix, context, body_shape).map(|body_str| {
+                match fn_decl.output {
+                    ast::FnRetTy::Default(..) if body_str.lines().count() <= 7 => {
+                        // If the expression can fit in a single line, we need not force block
+                        // closure.  However, if the closure has a return type, then we must
+                        // keep the blocks.
+                        match rewrite_closure_expr(body, &prefix, context, shape) {
+                            Some(single_line_body_str) if !single_line_body_str.contains('\n') => {
+                                single_line_body_str
                             }
+                            _ => body_str,
                         }
-                        _ => body_str,
                     }
-                },
-            );
+                    _ => body_str,
+                }
+            });
         }
 
         // When overflowing the closure which consists of a single control flow expression,

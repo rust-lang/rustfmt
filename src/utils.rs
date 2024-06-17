@@ -10,7 +10,7 @@ use rustc_span::{sym, symbol, BytePos, LocalExpnId, Span, Symbol, SyntaxContext}
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
-use crate::config::{Config, Version};
+use crate::config::{Config, TrailingSemicolon, Version};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 
@@ -273,7 +273,7 @@ pub(crate) fn contains_skip(attrs: &[Attribute]) -> bool {
 #[inline]
 pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr) -> bool {
     // Never try to insert semicolons on expressions when we're inside
-    // a macro definition - this can prevent the macro from compiling
+    // a macro definition - this  can prevent the macro from compiling
     // when used in expression position
     if context.is_macro_def {
         return false;
@@ -281,7 +281,35 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
 
     match expr.kind {
         ast::ExprKind::Ret(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Break(..) => {
-            context.config.trailing_semicolon()
+            match context.config.trailing_semicolon() {
+                TrailingSemicolon::Always => true,
+                TrailingSemicolon::Never | TrailingSemicolon::Preserve => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+/// Previously, we used to have `trailing_semicolon = Always` enabled, and due to
+/// a bug between `format_stmt` and `format_expr`, we used to subtract the size of
+/// `;` *TWICE* from the shape. This means that an expr that would fit onto a line
+/// of, e.g. 99 (limit 100) after subtracting one for the semicolon would still be
+/// wrapped.
+///
+/// This function reimplements the old heuristic of double counting the "phantom"
+/// semicolon that should have already been accounted for, to not break existing
+/// formatting with the `trailing_semicolon = Preserve` behavior for Version = One.
+#[inline]
+pub(crate) fn semicolon_for_expr_extra_hacky_double_counted_spacing(
+    context: &RewriteContext<'_>,
+    expr: &ast::Expr,
+) -> bool {
+    match expr.kind {
+        ast::ExprKind::Ret(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Break(..) => {
+            match context.config.trailing_semicolon() {
+                TrailingSemicolon::Always | TrailingSemicolon::Preserve => true,
+                TrailingSemicolon::Never => false,
+            }
         }
         _ => false,
     }
@@ -301,7 +329,14 @@ pub(crate) fn semicolon_for_stmt(
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
                 // The only time we can skip the semi-colon is if the config option is set to false
                 // **and** this is the last expr (even though any following exprs are unreachable)
-                context.config.trailing_semicolon() || !is_last_expr
+                if !is_last_expr {
+                    true
+                } else {
+                    match context.config.trailing_semicolon() {
+                        TrailingSemicolon::Always | TrailingSemicolon::Preserve => true,
+                        TrailingSemicolon::Never => false,
+                    }
+                }
             }
             _ => true,
         },
