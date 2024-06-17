@@ -1,4 +1,4 @@
-use rustc_ast::token::{Delimiter, TokenKind};
+use rustc_ast::token::TokenKind;
 use rustc_ast::tokenstream::TokenStream;
 use rustc_ast::{ast, ptr};
 use rustc_parse::parser::{ForceCollect, Parser};
@@ -69,6 +69,7 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
     None
 }
 
+#[derive(Default)]
 pub(crate) struct ParsedMacroArgs {
     pub(crate) vec_with_semi: bool,
     pub(crate) trailing_comma: bool,
@@ -95,7 +96,6 @@ fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
 pub(crate) fn parse_macro_args(
     context: &RewriteContext<'_>,
     tokens: TokenStream,
-    style: Delimiter,
     forced_bracket: bool,
 ) -> Option<ParsedMacroArgs> {
     let mut parser = build_parser(context, tokens);
@@ -103,51 +103,49 @@ pub(crate) fn parse_macro_args(
     let mut vec_with_semi = false;
     let mut trailing_comma = false;
 
-    if Delimiter::Brace != style {
-        loop {
-            if let Some(arg) = check_keyword(&mut parser) {
-                args.push(arg);
-            } else if let Some(arg) = parse_macro_arg(&mut parser) {
-                args.push(arg);
-            } else {
-                return None;
-            }
+    loop {
+        if let Some(arg) = check_keyword(&mut parser) {
+            args.push(arg);
+        } else if let Some(arg) = parse_macro_arg(&mut parser) {
+            args.push(arg);
+        } else {
+            return None;
+        }
 
-            match parser.token.kind {
-                TokenKind::Eof => break,
-                TokenKind::Comma => (),
-                TokenKind::Semi => {
-                    // Try to parse `vec![expr; expr]`
-                    if forced_bracket {
-                        parser.bump();
-                        if parser.token.kind != TokenKind::Eof {
-                            match parse_macro_arg(&mut parser) {
-                                Some(arg) => {
-                                    args.push(arg);
-                                    parser.bump();
-                                    if parser.token.kind == TokenKind::Eof && args.len() == 2 {
-                                        vec_with_semi = true;
-                                        break;
-                                    }
+        match parser.token.kind {
+            TokenKind::Eof => break,
+            TokenKind::Comma => (),
+            TokenKind::Semi => {
+                // Try to parse `vec![expr; expr]`
+                if forced_bracket {
+                    parser.bump();
+                    if parser.token.kind != TokenKind::Eof {
+                        match parse_macro_arg(&mut parser) {
+                            Some(arg) => {
+                                args.push(arg);
+                                parser.bump();
+                                if parser.token.kind == TokenKind::Eof && args.len() == 2 {
+                                    vec_with_semi = true;
+                                    break;
                                 }
-                                None => {
-                                    return None;
-                                }
+                            }
+                            None => {
+                                return None;
                             }
                         }
                     }
-                    return None;
                 }
-                _ if args.last().map_or(false, MacroArg::is_item) => continue,
-                _ => return None,
+                return None;
             }
+            _ if args.last().map_or(false, MacroArg::is_item) => continue,
+            _ => return None,
+        }
 
-            parser.bump();
+        parser.bump();
 
-            if parser.token.kind == TokenKind::Eof {
-                trailing_comma = true;
-                break;
-            }
+        if parser.token.kind == TokenKind::Eof {
+            trailing_comma = true;
+            break;
         }
     }
 

@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_ast::token::{BinOpToken, Delimiter, Token, TokenKind};
-use rustc_ast::tokenstream::{RefTokenTreeCursor, TokenStream, TokenTree};
+use rustc_ast::tokenstream::{DelimSpacing, RefTokenTreeCursor, Spacing, TokenStream, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_span::{
@@ -210,7 +210,7 @@ fn rewrite_macro_inner(
         original_style
     };
 
-    let ts = mac.args.tokens.clone();
+    let mut ts = mac.args.tokens.clone();
     let has_comment = contains_comment(context.snippet(mac.span()));
     if ts.is_empty() && !has_comment {
         return match style {
@@ -233,23 +233,40 @@ fn rewrite_macro_inner(
         }
     }
 
+    if Delimiter::Brace == style && context.config.format_brace_macros() {
+        ts = TokenStream::new(vec![TokenTree::Delimited(
+            mac.args.dspan,
+            DelimSpacing::new(Spacing::Alone, Spacing::Alone),
+            Delimiter::Brace,
+            ts,
+        )]);
+    }
+
     let ParsedMacroArgs {
         args: arg_vec,
         vec_with_semi,
         trailing_comma,
-    } = match parse_macro_args(context, ts, style, is_forced_bracket) {
-        Some(args) => args,
-        None => {
-            return return_macro_parse_failure_fallback(
-                context,
-                shape.indent,
-                position,
-                mac.span(),
-            );
+    } = if Delimiter::Brace == style && !context.config.format_brace_macros() {
+        ParsedMacroArgs::default()
+    } else {
+        match parse_macro_args(context, ts.clone(), is_forced_bracket) {
+            Some(args) => args,
+            None => {
+                if Delimiter::Brace == style {
+                    ParsedMacroArgs::default()
+                } else {
+                    return return_macro_parse_failure_fallback(
+                        context,
+                        shape.indent,
+                        position,
+                        mac.span(),
+                    );
+                }
+            }
         }
     };
 
-    if !arg_vec.is_empty() && arg_vec.iter().all(MacroArg::is_item) {
+    if !arg_vec.is_empty() && arg_vec.iter().all(MacroArg::is_item) && Delimiter::Brace != style {
         return rewrite_macro_with_items(
             context,
             &arg_vec,
@@ -326,10 +343,39 @@ fn rewrite_macro_inner(
             }
         }
         Delimiter::Brace => {
+            let snippet = if arg_vec.is_empty() || !context.config.format_brace_macros() {
+                None
+            } else {
+                overflow::rewrite_undelimited(
+                    context,
+                    &macro_name,
+                    arg_vec.iter(),
+                    shape,
+                    mac.span(),
+                    context.config.fn_call_width(),
+                    None,
+                )
+            }
+            .unwrap_or(context.snippet(mac.span()).into());
+
+            let mut snippet = snippet.trim_start_matches(|c| c != '{');
+
+            // Only format if the rewritten TokenStream is the same as the original TokenStream.
+            if context.config.format_brace_macros() {
+                let rewritten_ts = rustc_parse::parse_stream_from_source_str(
+                    rustc_span::FileName::anon_source_code(""),
+                    snippet.to_string(),
+                    &rustc_session::parse::ParseSess::with_silent_emitter(None),
+                    None,
+                );
+
+                if !ts.eq_unspanned(&rewritten_ts) {
+                    snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
+                }
+            }
+
             // For macro invocations with braces, always put a space between
-            // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
-            // anything in between the braces (for now).
-            let snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
+            // the `macro_name!` and `{ /* macro_body */ }`.
             match trim_left_preserve_layout(snippet, shape.indent, context.config) {
                 Some(macro_body) => Some(format!("{macro_name} {macro_body}")),
                 None => Some(format!("{macro_name} {snippet}")),
