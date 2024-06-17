@@ -1,7 +1,9 @@
 // High level formatting functions.
 
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::io::{self, Write};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use rustc_ast::ast;
@@ -11,6 +13,7 @@ use self::newline_style::apply_newline_style;
 use crate::comment::{CharClasses, FullCodeCharKind};
 use crate::config::{Config, FileName, Verbosity};
 use crate::formatting::generated::is_generated_file;
+use crate::ignore_path::IgnorePathSet;
 use crate::modules::Module;
 use crate::parse::parser::{DirectoryOwnership, Parser, ParserError};
 use crate::parse::session::ParseSess;
@@ -18,6 +21,7 @@ use crate::utils::{contains_skip, count_newlines};
 use crate::visitor::FmtVisitor;
 use crate::{modules, source_file, ErrorKind, FormatReport, Input, Session};
 
+mod cargo_toml;
 mod generated;
 mod newline_style;
 
@@ -33,6 +37,15 @@ impl<'b, T: Write + 'b> Session<'b, T> {
     ) -> Result<FormatReport, ErrorKind> {
         if !self.config.version_meets_requirement() {
             return Err(ErrorKind::VersionMismatch);
+        }
+
+        let cargo_toml = Some(OsStr::new("Cargo.toml"));
+        match input {
+            Input::File(path) if path.file_name() == cargo_toml => {
+                let config = &self.config.clone();
+                return format_cargo_toml(path, config, self);
+            }
+            _ => {}
         }
 
         rustc_span::create_session_if_not_set_then(self.config.edition().into(), |_| {
@@ -174,6 +187,29 @@ fn format_project<T: FormatHandler>(
     Ok(context.report)
 }
 
+fn format_cargo_toml<T: FormatHandler>(
+    path: PathBuf,
+    config: &Config,
+    handler: &mut T,
+) -> Result<FormatReport, ErrorKind> {
+    let mut report = FormatReport::new();
+
+    let ignore_path_set = IgnorePathSet::from_ignore_list(&config.ignore())?;
+    let file_name = FileName::Real(path.clone());
+    if !config.format_cargo_toml() || ignore_path_set.is_match(&file_name) {
+        return Ok(report);
+    }
+
+    let input = std::fs::read_to_string(&path)?;
+    let mut result = cargo_toml::format_cargo_toml_inner(&input, config)?;
+
+    apply_newline_style(config.newline_style(), &mut result, &input);
+
+    handler.handle_formatted_file(None, file_name, result, &mut report)?;
+
+    Ok(report)
+}
+
 // Used for formatting files.
 struct FormatContext<'a, T: FormatHandler> {
     krate: &'a ast::Crate,
@@ -256,7 +292,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             .add_non_formatted_ranges(visitor.skipped_range.borrow().clone());
 
         self.handler.handle_formatted_file(
-            &self.parse_session,
+            Some(&self.parse_session),
             path,
             visitor.buffer.to_owned(),
             &mut self.report,
@@ -268,7 +304,7 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
 trait FormatHandler {
     fn handle_formatted_file(
         &mut self,
-        parse_session: &ParseSess,
+        parse_session: Option<&ParseSess>,
         path: FileName,
         result: String,
         report: &mut FormatReport,
@@ -279,14 +315,14 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
     // Called for each formatted file.
     fn handle_formatted_file(
         &mut self,
-        parse_session: &ParseSess,
+        parse_session: Option<&ParseSess>,
         path: FileName,
         result: String,
         report: &mut FormatReport,
     ) -> Result<(), ErrorKind> {
         if let Some(ref mut out) = self.out {
             match source_file::write_file(
-                Some(parse_session),
+                parse_session,
                 &path,
                 &result,
                 out,

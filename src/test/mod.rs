@@ -95,8 +95,8 @@ fn is_file_skip(path: &Path) -> bool {
         .any(|file_path| is_subpath(path, file_path))
 }
 
-// Returns a `Vec` containing `PathBuf`s of files with an  `rs` extension in the
-// given path. The `recursive` argument controls if files from subdirectories
+// Returns a `Vec` containing `PathBuf`s of files with an `rs` extension or a `Cargo.toml` filename
+// in the given path. The `recursive` argument controls if files from subdirectories
 // are also returned.
 fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
     let mut files = vec![];
@@ -109,7 +109,10 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
             let path = entry.path();
             if path.is_dir() && recursive {
                 files.append(&mut get_test_files(&path, recursive));
-            } else if path.extension().map_or(false, |f| f == "rs") && !is_file_skip(&path) {
+            } else if (path.extension().map_or(false, |f| f == "rs")
+                || path.file_name().map_or(false, |f| f == "Cargo.toml"))
+                && !is_file_skip(&path)
+            {
                 files.push(path);
             }
         }
@@ -789,15 +792,24 @@ fn get_config(config_file: Option<&Path>) -> Config {
 
 // Reads significant comments of the form: `// rustfmt-key: value` into a hash map.
 fn read_significant_comments(file_name: &Path) -> HashMap<String, String> {
+    let is_cargo_toml = file_name.file_name().map_or(false, |f| f == "Cargo.toml");
     let file = fs::File::open(file_name)
         .unwrap_or_else(|_| panic!("couldn't read file {}", file_name.display()));
     let reader = BufReader::new(file);
-    let pattern = r"^\s*//\s*rustfmt-([^:]+):\s*(\S+)";
+    let pattern = if is_cargo_toml {
+        r"^\s*#\s*rustfmt-([^:]+):\s*(\S+)"
+    } else {
+        r"^\s*//\s*rustfmt-([^:]+):\s*(\S+)"
+    };
     let regex = regex::Regex::new(pattern).expect("failed creating pattern 1");
 
     // Matches lines containing significant comments or whitespace.
-    let line_regex = regex::Regex::new(r"(^\s*$)|(^\s*//\s*rustfmt-[^:]+:\s*\S+)")
-        .expect("failed creating pattern 2");
+    let line_regex = regex::Regex::new(if is_cargo_toml {
+        r"(^\s*$)|(^\s*#\s*rustfmt-[^:]+:\s*\S+)"
+    } else {
+        r"(^\s*$)|(^\s*//\s*rustfmt-[^:]+:\s*\S+)"
+    })
+    .expect("failed creating pattern 2");
 
     reader
         .lines()

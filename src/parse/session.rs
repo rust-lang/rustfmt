@@ -152,10 +152,7 @@ fn default_dcx(
 
 impl ParseSess {
     pub(crate) fn new(config: &Config) -> Result<ParseSess, ErrorKind> {
-        let ignore_path_set = match IgnorePathSet::from_ignore_list(&config.ignore()) {
-            Ok(ignore_path_set) => Lrc::new(ignore_path_set),
-            Err(e) => return Err(ErrorKind::InvalidGlobPattern(e)),
-        };
+        let ignore_path_set = Lrc::new(IgnorePathSet::from_ignore_list(&config.ignore())?);
         let source_map = Lrc::new(SourceMap::new(FilePathMapping::empty()));
         let can_reset_errors = Lrc::new(AtomicBool::new(false));
 

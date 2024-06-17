@@ -57,7 +57,7 @@ mod all_targets {
                 manifest_suffix,
                 "divergent-crate-dir-names",
                 &exp_targets,
-                3,
+                3 + 3, // include 3 Cargo.toml files
             );
         }
 
@@ -112,7 +112,7 @@ mod all_targets {
                 manifest_suffix,
                 "workspaces/path-dep-above",
                 &exp_targets,
-                6,
+                6 + 6, // include 6 Cargo.toml files,
             );
         }
 
