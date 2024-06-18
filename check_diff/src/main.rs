@@ -25,10 +25,17 @@ struct CliInputs {
 /// Parameters:
 /// url: git clone url
 /// dest: directory where the repo should be cloned
-fn clone_git_repo(url: &str, dest: &str) {
+pub fn clone_git_repo(url: &str, dest: &Path) {
     env::set_var("GIT_TERMINAL_PROMPT", "0");
     let git_cmd = Command::new("git")
-        .args(["clone", "--quiet", url, "--depth", "1", dest])
+        .args([
+            "clone",
+            "--quiet",
+            url,
+            "--depth",
+            "1",
+            dest.to_str().unwrap(),
+        ])
         .output()
         .expect("failed to clone repository");
     // if the git command does not return successfully,
@@ -50,6 +57,4 @@ fn clone_git_repo(url: &str, dest: &str) {
 
 fn main() {
     let _args = CliInputs::parse();
-    let sample_repo = "https://github.com/rust-lang/rustfmt.git";
-    clone_git_repo(sample_repo, "./tmp/");
 }
