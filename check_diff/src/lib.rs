@@ -29,11 +29,13 @@ pub fn clone_git_repo(url: &str, dest: &Path) {
         return;
     }
     println!("Successfully clone repository. Entering repository");
+}
 
-    // let dest_path = Path::new(&dest);
-    // let _ = env::set_current_dir(&dest_path).is_ok();
-    // println!(
-    //     "Current directory: {}",
-    //     env::current_dir().unwrap().display()
-    // );
+pub fn change_directory_to_path(dest: &Path) {
+    let dest_path = Path::new(&dest);
+    let _ = env::set_current_dir(&dest_path).is_ok();
+    println!(
+        "Current directory: {}",
+        env::current_dir().unwrap().display()
+    );
 }
