@@ -2,6 +2,7 @@ use std::env;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
+use tracing::{event, Level};
 
 pub struct GitErrors {
     stdout: Vec<u8>,
@@ -36,9 +37,10 @@ pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitErrors> {
             stdout: git_cmd.stdout,
         };
         return Err(errors);
+    } else {
+        event!(Level::INFO, "Successfully clone repository.");
+        return Ok(());
     }
-    println!("Successfully clone repository.");
-    return Ok(());
 }
 
 pub fn change_directory_to_path(dest: &Path) {
