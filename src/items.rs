@@ -222,15 +222,20 @@ impl Rewrite for ast::Local {
         let let_kw_offset = result.len() - "let ".len();
 
         // 4 = "let ".len()
-        let pat_shape = shape.offset_left(4).ok_or_else(|| RewriteError::Unknown)?;
+        let pat_shape = shape
+            .offset_left(4)
+            .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                configured_width: shape.width,
+                span: self.span(),
+            })?;
         // 1 = ;
         let pat_shape = pat_shape
             .sub_width(1)
-            .ok_or_else(|| RewriteError::Unknown)?;
-        let pat_str = self
-            .pat
-            .rewrite(context, pat_shape)
-            .ok_or_else(|| RewriteError::Unknown)?;
+            .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                configured_width: shape.width,
+                span: self.span(),
+            })?;
+        let pat_str = self.pat.rewrite_result(context, pat_shape)?;
         result.push_str(&pat_str);
 
         // String that is placed within the assignment pattern and expression.
@@ -245,10 +250,16 @@ impl Rewrite for ast::Local {
                     shape
                 }
                 .offset_left(last_line_width(&result) + separator.len())
-                .ok_or_else(|| RewriteError::Unknown)?
+                .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                    configured_width: shape.width,
+                    span: self.span(),
+                })?
                 // 2 = ` =`
                 .sub_width(2)
-                .ok_or_else(|| RewriteError::Unknown)?;
+                .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                    configured_width: shape.width,
+                    span: self.span(),
+                })?;
 
                 let rewrite = ty.rewrite_result(context, ty_shape)?;
 
@@ -267,7 +278,12 @@ impl Rewrite for ast::Local {
 
         if let Some((init, else_block)) = self.kind.init_else_opt() {
             // 1 = trailing semicolon;
-            let nested_shape = shape.sub_width(1).ok_or_else(|| RewriteError::Unknown)?;
+            let nested_shape = shape
+                .sub_width(1)
+                .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                    configured_width: shape.width,
+                    span: self.span(),
+                })?;
 
             result = rewrite_assign_rhs(
                 context,

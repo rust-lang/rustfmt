@@ -17,6 +17,8 @@ use crate::FormatReport;
 pub(crate) trait Rewrite {
     /// Rewrite self into shape.
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String>;
+    /// Rewrite self into shape, return RewriteError on formatting failure.
+    /// rewrite() calls will be eventually replaced with rewrite_result()
     fn rewrite_result(
         &self,
         context: &RewriteContext<'_>,
@@ -32,19 +34,17 @@ impl<T: Rewrite> Rewrite for ptr::P<T> {
     }
 }
 
-#[derive(Debug)]
-pub enum SkipFormatting {
-    OutOfFileLinesRange,
-    ContainsSkipAttr, // Should we include variant for skipped macro ?
-}
-
 #[derive(Error, Debug)]
 pub(crate) enum RewriteError {
-    #[error("")]
+    #[error("Formatting was skipped due to skip attribute or out of file range.")]
     SkipFormatting,
 
+    // Question. (1) may miss span ex) wrap_str (2) width? offset? max_width?
+    #[error("It exceeds the required width of {configured_width} for the span: {span:?}")]
+    ExceedsMaxWidth { configured_width: usize, span: Span },
+
     /// Format failure that does not fit to above categories.
-    #[error("")]
+    #[error("An unknown error occurred during formatting.")]
     Unknown,
 }
 

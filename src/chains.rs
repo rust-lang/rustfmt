@@ -66,7 +66,7 @@ use crate::config::{IndentStyle, Version};
 use crate::expr::rewrite_call;
 use crate::lists::extract_pre_comment;
 use crate::macros::convert_try_mac;
-use crate::rewrite::{Rewrite, RewriteContext};
+use crate::rewrite::{Rewrite, RewriteContext, RewriteError};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::utils::{
@@ -542,6 +542,62 @@ impl Rewrite for Chain {
 
         let result = formatter.join_rewrites(context, child_shape)?;
         wrap_str(result, context.config.max_width(), shape)
+    }
+
+    fn rewrite_result(
+        &self,
+        context: &RewriteContext<'_>,
+        shape: Shape,
+    ) -> Result<String, crate::rewrite::RewriteError> {
+        debug!("rewrite chain {:?} {:?}", self, shape);
+
+        let mut formatter = match context.config.indent_style() {
+            IndentStyle::Block => {
+                Box::new(ChainFormatterBlock::new(self)) as Box<dyn ChainFormatter>
+            }
+            IndentStyle::Visual => {
+                Box::new(ChainFormatterVisual::new(self)) as Box<dyn ChainFormatter>
+            }
+        };
+
+        formatter
+            .format_root(&self.parent, context, shape)
+            .ok_or_else(|| RewriteError::Unknown)?;
+        if let Some(result) = formatter.pure_root() {
+            return wrap_str(result, context.config.max_width(), shape).ok_or_else(|| {
+                // pure_root() returns Some when there's no child
+                RewriteError::ExceedsMaxWidth {
+                    configured_width: context.config.max_width(),
+                    span: self.parent.span,
+                }
+            });
+        }
+
+        // Decide how to layout the rest of the chain.
+        let child_shape = formatter
+            .child_shape(context, shape)
+            .ok_or_else(|| RewriteError::Unknown)?;
+
+        formatter
+            .format_children(context, child_shape)
+            .ok_or_else(|| RewriteError::Unknown)?;
+        formatter
+            .format_last_child(context, shape, child_shape)
+            .ok_or_else(|| RewriteError::Unknown)?;
+
+        let result = formatter
+            .join_rewrites(context, child_shape)
+            .ok_or_else(|| RewriteError::Unknown)?;
+        // Q. what should be the value of span?
+        wrap_str(result, context.config.max_width(), shape).ok_or_else(|| {
+            RewriteError::ExceedsMaxWidth {
+                configured_width: context.config.max_width(),
+                span: mk_sp(
+                    self.parent.span.lo(),
+                    self.children.last().unwrap().span.hi(),
+                ),
+            }
+        })
     }
 }
 
