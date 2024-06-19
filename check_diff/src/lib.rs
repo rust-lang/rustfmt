@@ -9,8 +9,8 @@ use std::process::Command;
 /// url: git clone url
 /// dest: directory where the repo should be cloned
 pub fn clone_git_repo(url: &str, dest: &Path) {
-    env::set_var("GIT_TERMINAL_PROMPT", "0");
     let git_cmd = Command::new("git")
+        .env("GIT_TERMINAL_PROMPT", "0")
         .args([
             "clone",
             "--quiet",
@@ -22,13 +22,13 @@ pub fn clone_git_repo(url: &str, dest: &Path) {
         .output()
         .expect("failed to clone repository");
     // if the git command does not return successfully,
-    // cd command will not work as well. So fail fast.
+    // any command on the repo will fail. So fail fast.
     if !git_cmd.status.success() {
         io::stdout().write_all(&git_cmd.stdout).unwrap();
         io::stderr().write_all(&git_cmd.stderr).unwrap();
         return;
     }
-    println!("Successfully clone repository. Entering repository");
+    println!("Successfully clone repository.");
 }
 
 pub fn change_directory_to_path(dest: &Path) {
