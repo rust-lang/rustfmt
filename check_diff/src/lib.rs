@@ -3,12 +3,17 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
 
+pub struct GitErrors {
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
 /// Clone a git repository
 ///
 /// Parameters:
 /// url: git clone url
 /// dest: directory where the repo should be cloned
-pub fn clone_git_repo(url: &str, dest: &Path) {
+pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitErrors> {
     let git_cmd = Command::new("git")
         .env("GIT_TERMINAL_PROMPT", "0")
         .args([
@@ -26,9 +31,14 @@ pub fn clone_git_repo(url: &str, dest: &Path) {
     if !git_cmd.status.success() {
         io::stdout().write_all(&git_cmd.stdout).unwrap();
         io::stderr().write_all(&git_cmd.stderr).unwrap();
-        return;
+        let errors = GitErrors {
+            stderr: git_cmd.stderr,
+            stdout: git_cmd.stdout,
+        };
+        return Err(errors);
     }
     println!("Successfully clone repository.");
+    return Ok(());
 }
 
 pub fn change_directory_to_path(dest: &Path) {
