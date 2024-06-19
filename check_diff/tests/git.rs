@@ -1,25 +1,11 @@
-use check_diff::{change_directory_to_path, clone_git_repo};
-use std::env;
-use std::ffi::OsStr;
+use check_diff::clone_git_repo;
+
 use std::fs;
 use std::path::Path;
 
-const TEMP_DIR_PATH: &str = "./tmp/";
-const HOME_PATH: &str = "./";
+use common::{cleanup, TEMP_DIR_PATH};
 
-// removes the previous tmp folder if it exists
-fn cleanup() {
-    let _ = env::set_current_dir(HOME_PATH);
-    println!(
-        "Current directory: {}",
-        env::current_dir().unwrap().display()
-    );
-    let path = Path::new(TEMP_DIR_PATH);
-    println!("{}", path.exists());
-    if path.exists() {
-        let _ = fs::remove_dir_all(path);
-    }
-}
+mod common;
 
 #[test]
 fn clone_repo_test() {
@@ -33,19 +19,5 @@ fn clone_repo_test() {
     assert_eq!(directory.is_err(), false);
     // check that the directory is non-empty
     assert_eq!(directory.iter().next().is_none(), false);
-    cleanup();
-}
-
-#[test]
-fn cd_test() {
-    cleanup();
-    let dest_path = Path::new(TEMP_DIR_PATH);
-    let _ = fs::create_dir(dest_path);
-    change_directory_to_path(dest_path);
-    assert_eq!(env::current_dir().is_ok(), true);
-    assert_eq!(
-        env::current_dir().unwrap().file_name(),
-        Some(OsStr::new("tmp"))
-    );
     cleanup();
 }
