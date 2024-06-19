@@ -46,7 +46,8 @@ pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitErrors> {
 pub fn change_directory_to_path(dest: &Path) {
     let dest_path = Path::new(&dest);
     let _ = env::set_current_dir(&dest_path).is_ok();
-    println!(
+    event!(
+        Level::INFO,
         "Current directory: {}",
         env::current_dir().unwrap().display()
     );
