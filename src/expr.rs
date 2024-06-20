@@ -13,7 +13,9 @@ use crate::comment::{
     rewrite_missing_comment, CharClasses, FindUncommented,
 };
 use crate::config::lists::*;
-use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, Version};
+use crate::config::{
+    Config, ControlBraceStyle, HexLiteralCase, IndentStyle, LiteralSuffixStyle, Version,
+};
 use crate::lists::{
     definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
     struct_lit_tactic, write_list, ListFormatting, Separator,
@@ -367,7 +369,7 @@ pub(crate) fn format_expr(
                         Some(&expr.attrs),
                         None,
                         context,
-                        Shape::legacy(budget, shape.indent)
+                        Shape::legacy(budget, shape.indent),
                     )?
                 ))
             }
@@ -397,7 +399,7 @@ pub(crate) fn format_expr(
                         Some(&expr.attrs),
                         None,
                         context,
-                        Shape::legacy(budget, shape.indent)
+                        Shape::legacy(budget, shape.indent),
                     )?
                 ))
             }
@@ -1291,8 +1293,22 @@ fn rewrite_int_lit(
     span: Span,
     shape: Shape,
 ) -> Option<String> {
-    let symbol = token_lit.symbol.as_str();
+    let symbol: Cow<'_, str> = Cow::Borrowed(token_lit.symbol.as_str());
 
+    // Suffix rewriting
+    let symbol = match context.config.literal_suffix_style() {
+        LiteralSuffixStyle::Preserve => symbol,
+        LiteralSuffixStyle::Join => Cow::Borrowed(symbol.trim_end_matches('_')),
+        LiteralSuffixStyle::Separate => {
+            if !symbol.ends_with('_') {
+                Cow::Owned([symbol.as_ref(), "_"].concat())
+            } else {
+                symbol
+            }
+        }
+    };
+
+    // Hex rewriting
     if let Some(symbol_stripped) = symbol.strip_prefix("0x") {
         let hex_lit = match context.config.hex_literal_case() {
             HexLiteralCase::Preserve => None,
