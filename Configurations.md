@@ -243,7 +243,7 @@ fn lorem(ipsum: usize) {
 
 fn lorem<T>(ipsum: T)
 where
-    T: Add + Sub + Mul + Div, {
+    T: Add + Sub + Mul + Div {
     // body
 }
 ```
@@ -290,7 +290,7 @@ struct Lorem {
 
 struct Dolor<T>
 where
-    T: Eq, {
+    T: Eq {
     sit: T,
 }
 ```

@@ -11,6 +11,6 @@ fn lorem(ipsum: usize) {
 
 fn lorem<T>(ipsum: T)
 where
-    T: Add + Sub + Mul + Div, {
+    T: Add + Sub + Mul + Div {
     // body
 }
