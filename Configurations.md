@@ -2356,6 +2356,18 @@ mod sit;
 **Note** `mod` with `#[macro_export]` will not be reordered since that could change the semantics
 of the original source code.
 
+## `reorder_type_constraints`
+
+Reorder type constraints alphabetically in group.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `true`
+
+#### `false` (default)
+
 ## `required_version`
 
 Require a specific version of rustfmt. If you want to make sure that the

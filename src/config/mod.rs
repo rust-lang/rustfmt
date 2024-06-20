@@ -101,6 +101,8 @@ create_config! {
     reorder_imports: bool, true, true, "Reorder import and extern crate statements alphabetically";
     reorder_modules: bool, true, true, "Reorder module statements alphabetically in group";
     reorder_impl_items: bool, false, false, "Reorder impl items";
+    reorder_type_constraints: bool, false, false,
+        "Reorder type constraints alphabetically in group";
 
     // Spaces around punctuation
     type_punctuation_density: TypeDensity, TypeDensity::Wide, false,
@@ -656,6 +658,7 @@ group_imports = "Preserve"
 reorder_imports = true
 reorder_modules = true
 reorder_impl_items = false
+reorder_type_constraints = false
 type_punctuation_density = "Wide"
 space_before_colon = false
 space_after_colon = true

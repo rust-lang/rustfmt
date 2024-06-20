@@ -2847,7 +2847,22 @@ fn rewrite_generics(
         return Some(ident.to_owned());
     }
 
-    let params = generics.params.iter();
+    let mut params_vec = generics.params.clone();
+    if context.config.reorder_type_constraints() {
+        for param in params_vec.iter_mut() {
+            param.bounds.sort_by_key(|bound| match bound {
+                ast::GenericBound::Trait(poly_trait_ref, _) => poly_trait_ref
+                    .trait_ref
+                    .path
+                    .segments
+                    .iter()
+                    .map(|s| s.ident.to_string())
+                    .collect::<String>(),
+                ast::GenericBound::Outlives(lifetime) => lifetime.ident.to_string(),
+            })
+        }
+    }
+    let params = params_vec.iter();
     overflow::rewrite_with_angle_brackets(context, ident, params, shape, generics.span)
 }
 
