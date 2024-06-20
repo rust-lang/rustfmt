@@ -1000,10 +1000,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     }
 
     pub(crate) fn get_context(&self) -> RewriteContext<'_> {
+        let inside_macro = self.parent_context.map_or(false, |ctx| ctx.inside_macro());
         RewriteContext {
             psess: self.psess,
             config: self.config,
-            inside_macro: Rc::new(Cell::new(false)),
+            inside_macro: Rc::new(Cell::new(inside_macro)),
             use_block: Cell::new(false),
             is_if_else_block: Cell::new(false),
             force_one_line_chain: Cell::new(false),
