@@ -307,7 +307,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                                 self.push_str(&self.block_indent.to_string_with_newline(config));
 
                                 // put the other lines below it, shaping it as needed
-                                let other_lines = &sub_slice[offset + 1..];
+                                let other_lines = &sub_slice[offset + 1..].trim_start();
                                 let comment_str =
                                     rewrite_comment(other_lines, false, comment_shape, config);
                                 match comment_str {
