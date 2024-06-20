@@ -2874,6 +2874,7 @@ fn rewrite_where_clause_rfc_style(
     span_end: Option<BytePos>,
     span_end_before_where: BytePos,
     where_clause_option: WhereClauseOption,
+    brace_style: BraceStyle,
 ) -> Option<String> {
     let (where_keyword, allow_single_line) = rewrite_where_keyword(
         context,
@@ -2902,6 +2903,7 @@ fn rewrite_where_clause_rfc_style(
         span_end,
         where_clause_option,
         force_single_line,
+        brace_style,
     )?;
 
     // 6 = `where `
@@ -2973,6 +2975,7 @@ fn rewrite_bounds_on_where_clause(
     span_end: Option<BytePos>,
     where_clause_option: WhereClauseOption,
     force_single_line: bool,
+    brace_style: BraceStyle,
 ) -> Option<String> {
     let span_start = predicates[0].span().lo();
     // If we don't have the start of the next span, then use the end of the
@@ -2992,7 +2995,11 @@ fn rewrite_bounds_on_where_clause(
         span_end,
         false,
     );
-    let comma_tactic = if where_clause_option.suppress_comma || force_single_line {
+    let comma_tactic = if where_clause_option.suppress_comma
+        || force_single_line
+        || brace_style == BraceStyle::PreferSameLine
+            && context.config.trailing_comma() == SeparatorTactic::Vertical
+    {
         SeparatorTactic::Never
     } else {
         context.config.trailing_comma()
@@ -3041,6 +3048,7 @@ fn rewrite_where_clause(
             span_end,
             span_end_before_where,
             where_clause_option,
+            brace_style,
         );
     }
 
