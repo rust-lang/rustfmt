@@ -14,6 +14,7 @@ extern crate rustc_builtin_macros;
 extern crate rustc_data_structures;
 extern crate rustc_errors;
 extern crate rustc_expand;
+extern crate rustc_lexer;
 extern crate rustc_parse;
 extern crate rustc_session;
 extern crate rustc_span;

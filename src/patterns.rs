@@ -186,14 +186,14 @@ impl Rewrite for Pat {
                     let hi = context.snippet_provider.span_before(self.span, "@");
                     combine_strs_with_missing_comments(
                         context,
-                        id_str,
+                        &id_str,
                         &sub_pat,
                         mk_sp(ident.span.hi(), hi),
                         shape,
                         true,
                     )?
                 } else {
-                    id_str.to_owned()
+                    id_str.into_owned()
                 };
 
                 combine_strs_with_missing_comments(

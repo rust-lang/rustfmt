@@ -182,7 +182,7 @@ impl Rewrite for ast::AssocItemConstraint {
         use ast::AssocItemConstraintKind::{Bound, Equality};
 
         let mut result = String::with_capacity(128);
-        result.push_str(rewrite_ident(context, self.ident));
+        result.push_str(&rewrite_ident(context, self.ident));
 
         if let Some(ref gen_args) = self.gen_args {
             let budget = shape.width.checked_sub(result.len())?;
@@ -238,7 +238,7 @@ fn rewrite_segment(
     shape: Shape,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
-    result.push_str(rewrite_ident(context, segment.ident));
+    result.push_str(&rewrite_ident(context, segment.ident));
 
     let ident_len = result.len();
     let shape = if context.use_block_indent() {
@@ -532,7 +532,7 @@ impl Rewrite for ast::AnonConst {
 
 impl Rewrite for ast::Lifetime {
     fn rewrite(&self, context: &RewriteContext<'_>, _: Shape) -> Option<String> {
-        Some(rewrite_ident(context, self.ident).to_owned())
+        Some(rewrite_ident(context, self.ident).into_owned())
     }
 }
 
@@ -594,7 +594,7 @@ impl Rewrite for ast::GenericParam {
         } = &self.kind
         {
             param.push_str("const ");
-            param.push_str(rewrite_ident(context, self.ident));
+            param.push_str(&rewrite_ident(context, self.ident));
             param.push_str(": ");
             param.push_str(&ty.rewrite(context, shape)?);
             if let Some(default) = default {
@@ -609,7 +609,7 @@ impl Rewrite for ast::GenericParam {
             }
             kw_span.lo()
         } else {
-            param.push_str(rewrite_ident(context, self.ident));
+            param.push_str(&rewrite_ident(context, self.ident));
             self.ident.span.lo()
         };
 

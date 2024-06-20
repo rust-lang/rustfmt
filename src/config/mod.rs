@@ -153,6 +153,8 @@ create_config! {
     format_generated_files: bool, true, false, "Format generated files";
     generated_marker_line_search_limit: usize, 5, false, "Number of lines to check for a \
         `@generated` marker when `format_generated_files` is enabled";
+    nfc_normalize_idents: bool, false, false, "Whether to normalize identifiers \
+        to Unicode Normalization Form C";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: bool, true, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -683,6 +685,7 @@ version = "One"
 inline_attribute_width = 0
 format_generated_files = true
 generated_marker_line_search_limit = 5
+nfc_normalize_idents = false
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false

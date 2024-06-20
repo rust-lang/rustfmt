@@ -923,8 +923,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.push_str(&*vis_str);
         self.push_str(format_safety(safety));
         self.push_str("mod ");
-        // Calling `to_owned()` to work around borrow checker.
-        let ident_str = rewrite_ident(&self.get_context(), ident).to_owned();
+        // Calling `into_owned()` to work around borrow checker.
+        let ident_str = rewrite_ident(&self.get_context(), ident).into_owned();
         self.push_str(&ident_str);
 
         if let ast::ModKind::Loaded(ref items, ast::Inline::Yes, ref spans) = mod_kind {

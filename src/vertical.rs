@@ -92,7 +92,7 @@ impl AlignedItem for ast::ExprField {
         combine_strs_with_missing_comments(
             context,
             &attrs_str,
-            name,
+            &name,
             missing_span,
             shape,
             is_attributes_extendable(&attrs_str),
