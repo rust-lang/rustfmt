@@ -235,8 +235,20 @@ pub(crate) fn combine_strs_with_missing_comments(
     Some(result)
 }
 
-pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> Option<String> {
-    identify_comment(orig, false, shape, config, true)
+pub(crate) fn rewrite_doc_comment(
+    orig: &str,
+    shape: Shape,
+    config: &Config,
+    has_doc_attr_in_the_middle_of_comments: bool,
+) -> Option<String> {
+    identify_comment(
+        orig,
+        false,
+        shape,
+        config,
+        true,
+        has_doc_attr_in_the_middle_of_comments,
+    )
 }
 
 pub(crate) fn rewrite_comment(
@@ -245,7 +257,7 @@ pub(crate) fn rewrite_comment(
     shape: Shape,
     config: &Config,
 ) -> Option<String> {
-    identify_comment(orig, block_style, shape, config, false)
+    identify_comment(orig, block_style, shape, config, false, false)
 }
 
 fn identify_comment(
@@ -254,6 +266,7 @@ fn identify_comment(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
+    has_doc_attr_in_the_middle_of_comments: bool,
 ) -> Option<String> {
     let style = comment_style(orig, false);
 
@@ -352,7 +365,9 @@ fn identify_comment(
             && !(
                 // `format_code_in_doc_comments` should only take effect on doc comments,
                 // so we only consider it when this comment block is a doc comment block.
-                is_doc_comment && config.format_code_in_doc_comments()
+                is_doc_comment
+                    && config.format_code_in_doc_comments()
+                    && !has_doc_attr_in_the_middle_of_comments
             )
         {
             light_rewrite_comment(first_group, shape.indent, config, is_doc_comment)
@@ -364,6 +379,7 @@ fn identify_comment(
                 shape,
                 config,
                 is_doc_comment || style.is_doc_comment(),
+                has_doc_attr_in_the_middle_of_comments,
             )?
         };
     if rest.is_empty() {
@@ -375,6 +391,7 @@ fn identify_comment(
             shape,
             config,
             is_doc_comment,
+            has_doc_attr_in_the_middle_of_comments,
         )
         .map(|rest_str| {
             format!(
@@ -712,6 +729,7 @@ impl<'a> CommentRewrite<'a> {
         line: &'a str,
         has_leading_whitespace: bool,
         is_doc_comment: bool,
+        has_doc_attr_in_the_middle_of_comments: bool,
     ) -> bool {
         let num_newlines = count_newlines(orig);
         let is_last = i == num_newlines;
@@ -754,6 +772,7 @@ impl<'a> CommentRewrite<'a> {
                 let code_block = match self.code_block_attr.as_ref().unwrap() {
                     CodeBlockAttribute::Rust
                         if self.fmt.config.format_code_in_doc_comments()
+                            && !has_doc_attr_in_the_middle_of_comments
                             && !self.code_block_buffer.trim().is_empty() =>
                     {
                         let mut config = self.fmt.config.clone();
@@ -899,6 +918,7 @@ fn rewrite_comment_inner(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
+    has_doc_attr_in_the_middle_of_comments: bool,
 ) -> Option<String> {
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
@@ -928,7 +948,14 @@ fn rewrite_comment_inner(
         });
 
     for (i, (line, has_leading_whitespace)) in lines.enumerate() {
-        if rewriter.handle_line(orig, i, line, has_leading_whitespace, is_doc_comment) {
+        if rewriter.handle_line(
+            orig,
+            i,
+            line,
+            has_leading_whitespace,
+            is_doc_comment,
+            has_doc_attr_in_the_middle_of_comments,
+        ) {
             break;
         }
     }

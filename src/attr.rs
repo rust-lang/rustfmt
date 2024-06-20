@@ -212,11 +212,60 @@ where
     &attrs[..len]
 }
 
+/// Attr is doc attr with doc.
+///
+/// ```ignore
+/// #[doc = "doc"]
+/// ```
+fn is_doc_eq_attr(attr: &ast::Attribute) -> bool {
+    match &attr.kind {
+        ast::AttrKind::Normal(normal) if normal.item.path == sym::doc => match normal.item.args {
+            ast::AttrArgs::Eq(..) => true,
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+/// Is there a `#[doc = "doc"]` attribute in the middle of doc comments.
+///
+/// If there's such attribute, we skip formatting, because the doc can point to an external file,
+/// and we don't know how that file may break the formatting.
+fn has_doc_eq_attr_in_the_middle_of_comments(attrs: &[ast::Attribute]) -> bool {
+    enum Stage {
+        Start,
+        SeenDocComment,
+        SeenDocAttr,
+    }
+    let mut stage = Stage::Start;
+    for attr in attrs {
+        match &stage {
+            Stage::Start => {
+                if attr.is_doc_comment() {
+                    stage = Stage::SeenDocComment;
+                }
+            }
+            Stage::SeenDocComment => {
+                if is_doc_eq_attr(attr) {
+                    stage = Stage::SeenDocAttr;
+                }
+            }
+            Stage::SeenDocAttr => {
+                if attr.is_doc_comment() {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Rewrite the any doc comments which come before any other attributes.
 fn rewrite_initial_doc_comments(
     context: &RewriteContext<'_>,
     attrs: &[ast::Attribute],
     shape: Shape,
+    has_doc_attr_in_the_middle_of_comments: bool,
 ) -> Option<(usize, Option<String>)> {
     if attrs.is_empty() {
         return Some((0, None));
@@ -235,6 +284,7 @@ fn rewrite_initial_doc_comments(
                 &snippet,
                 shape.comment(context.config),
                 context.config,
+                has_doc_attr_in_the_middle_of_comments,
             )?),
         ));
     }
@@ -318,7 +368,12 @@ impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let snippet = context.snippet(self.span);
         if self.is_doc_comment() {
-            rewrite_doc_comment(snippet, shape.comment(context.config), context.config)
+            rewrite_doc_comment(
+                snippet,
+                shape.comment(context.config),
+                context.config,
+                false,
+            )
         } else {
             let should_skip = self
                 .ident()
@@ -347,6 +402,7 @@ impl Rewrite for ast::Attribute {
                             &doc_comment,
                             shape.comment(context.config),
                             context.config,
+                            false,
                         );
                     }
                 }
@@ -386,6 +442,9 @@ impl Rewrite for [ast::Attribute] {
         // or `#![rustfmt::skip::attributes(derive)]`
         let skip_derives = context.skip_context.attributes.skip("derive");
 
+        let has_doc_attr_in_the_middle_of_comments =
+            has_doc_eq_attr_in_the_middle_of_comments(attrs);
+
         // This is not just a simple map because we need to handle doc comments
         // (where we take as many doc comment attributes as possible) and possibly
         // merging derives into a single attribute.
@@ -395,8 +454,12 @@ impl Rewrite for [ast::Attribute] {
             }
 
             // Handle doc comments.
-            let (doc_comment_len, doc_comment_str) =
-                rewrite_initial_doc_comments(context, attrs, shape)?;
+            let (doc_comment_len, doc_comment_str) = rewrite_initial_doc_comments(
+                context,
+                attrs,
+                shape,
+                has_doc_attr_in_the_middle_of_comments,
+            )?;
             if doc_comment_len > 0 {
                 let doc_comment_str = doc_comment_str.expect("doc comments, but no result");
                 result.push_str(&doc_comment_str);
