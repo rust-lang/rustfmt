@@ -18,12 +18,12 @@ pub(crate) fn apply_newline_style(
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum EffectiveNewlineStyle {
+pub(crate) enum EffectiveNewlineStyle {
     Windows,
     Unix,
 }
 
-fn effective_newline_style(
+pub(crate) fn effective_newline_style(
     newline_style: NewlineStyle,
     raw_input_text: &str,
 ) -> EffectiveNewlineStyle {
@@ -37,8 +37,8 @@ fn effective_newline_style(
 
 const LINE_FEED: char = '\n';
 const CARRIAGE_RETURN: char = '\r';
-const WINDOWS_NEWLINE: &str = "\r\n";
-const UNIX_NEWLINE: &str = "\n";
+pub(crate) const WINDOWS_NEWLINE: &str = "\r\n";
+pub(crate) const UNIX_NEWLINE: &str = "\n";
 
 fn auto_detect_newline_style(raw_input_text: &str) -> EffectiveNewlineStyle {
     let first_line_feed_pos = raw_input_text.chars().position(|ch| ch == LINE_FEED);
