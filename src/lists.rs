@@ -462,6 +462,13 @@ where
 
             let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
 
+            // Multiline comments are not included in a previous "indentation group".
+            // Each multiline comment is considered as a separate group.
+            if formatted_comment.contains('\n') {
+                item_max_width = None;
+                formatted_comment = rewrite_post_comment(&mut item_max_width)?;
+            }
+
             if !starts_with_newline(comment) {
                 if formatting.align_comments {
                     let mut comment_alignment =
@@ -534,10 +541,21 @@ where
     for item in items.clone().into_iter().skip(i) {
         let item = item.as_ref();
         let inner_item_width = unicode_str_width(item.inner_as_ref());
+        let post_comment_is_multiline = item
+            .post_comment
+            .as_ref()
+            .map_or(false, |s| s.trim().contains('\n'));
+
+        // Each multiline comment is an "indentation group" on its own
+        if first && post_comment_is_multiline {
+            return inner_item_width;
+        }
+
         if !first
             && (item.is_different_group()
                 || item.post_comment.is_none()
-                || inner_item_width + overhead > max_budget)
+                || inner_item_width + overhead > max_budget
+                || post_comment_is_multiline)
         {
             return max_width;
         }
