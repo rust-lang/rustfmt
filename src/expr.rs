@@ -1952,7 +1952,12 @@ fn rewrite_unary_op(
     shape: Shape,
 ) -> Option<String> {
     // For some reason, an UnOp is not spanned like BinOp!
-    rewrite_unary_prefix(context, op.as_str(), expr, shape)
+    match op {
+        ast::UnOp::Not if context.config.space_after_not() => {
+            rewrite_unary_prefix(context, format!("{} ", op.as_str()).as_str(), expr, shape)
+        }
+        _ => rewrite_unary_prefix(context, op.as_str(), expr, shape),
+    }
 }
 
 pub(crate) enum RhsAssignKind<'ast> {

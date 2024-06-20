@@ -2555,6 +2555,30 @@ fn lorem<T : Eq>(t : T) {
 
 See also: [`space_after_colon`](#space_after_colon).
 
+## `space_after_not`
+
+Leave a space after the `!` operator.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+fn not(b: bool) -> bool {
+    return !b;
+}
+```
+
+#### `true`:
+
+```rust
+fn not(b: bool) -> bool {
+    return ! b;
+}
+```
+
 ## `spaces_around_ranges`
 
 Put spaces around the .., ..=, and ... range operators

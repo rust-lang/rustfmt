@@ -107,6 +107,7 @@ create_config! {
         "Determines if '+' or '=' are wrapped in spaces in the punctuation of types";
     space_before_colon: bool, false, false, "Leave a space before the colon";
     space_after_colon: bool, true, false, "Leave a space after the colon";
+    space_after_not: bool, false, false, "Leave a space after the `!` operator";
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
     binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
         "Where to put a binary operator when a binary expression goes multiline";
@@ -659,6 +660,7 @@ reorder_impl_items = false
 type_punctuation_density = "Wide"
 space_before_colon = false
 space_after_colon = true
+space_after_not = false
 spaces_around_ranges = false
 binop_separator = "Front"
 remove_nested_parens = true
