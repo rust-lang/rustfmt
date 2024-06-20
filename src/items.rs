@@ -10,7 +10,7 @@ use rustc_span::{symbol, BytePos, Span, DUMMY_SP};
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
-    combine_strs_with_missing_comments, contains_comment, is_last_comment_block,
+    combine_strs_with_missing_comments, comment_style, contains_comment, is_last_comment_block,
     recover_comment_removed, recover_missing_comment_in_span, rewrite_missing_comment,
     FindUncommented,
 };
@@ -1402,6 +1402,30 @@ fn format_unit_struct(
     Some(format!("{header_str}{generics_str};"))
 }
 
+fn set_struct_brace_pos(
+    context: &RewriteContext<'_>,
+    fields: &[ast::FieldDef],
+    span: Span,
+) -> BracePos {
+    if !fields.is_empty() {
+        return BracePos::Auto;
+    }
+    let snippet = context.snippet(span).trim();
+
+    if snippet.is_empty() || context.config.version() == Version::One {
+        return BracePos::ForceSameLine;
+    }
+
+    let is_single_line = is_single_line(snippet);
+    let is_block_comment = comment_style(snippet, false).is_block_comment();
+
+    if is_single_line && is_block_comment {
+        BracePos::ForceSameLine
+    } else {
+        BracePos::Auto
+    }
+}
+
 pub(crate) fn format_struct_struct(
     context: &RewriteContext<'_>,
     struct_parts: &StructParts<'_>,
@@ -1424,16 +1448,13 @@ pub(crate) fn format_struct_struct(
         context.snippet_provider.span_after(span, "{")
     };
 
+    let inner_span = mk_sp(body_lo, span.hi() - BytePos(1));
     let generics_str = match struct_parts.generics {
         Some(g) => format_generics(
             context,
             g,
             context.config.brace_style(),
-            if fields.is_empty() {
-                BracePos::ForceSameLine
-            } else {
-                BracePos::Auto
-            },
+            set_struct_brace_pos(&context, &fields, inner_span),
             offset,
             // make a span that starts right after `struct Foo`
             mk_sp(header_hi, body_lo),
@@ -1466,7 +1487,6 @@ pub(crate) fn format_struct_struct(
     }
 
     if fields.is_empty() {
-        let inner_span = mk_sp(body_lo, span.hi() - BytePos(1));
         format_empty_struct_or_tuple(context, inner_span, offset, &mut result, "", "}");
         return Some(result);
     }
