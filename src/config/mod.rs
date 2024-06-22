@@ -87,6 +87,9 @@ create_config! {
         "Put small struct literals on a single line";
     fn_single_line: bool, false, false, "Put single-expression functions on a single line";
     where_single_line: bool, false, false, "Force where-clauses to be on a single line";
+    enable_fn_param_limit: bool, false, false, "Switch to enable `fn_param_limit`";
+    fn_param_limit: usize, 4, false, "How many parameters in a function declaration before \
+        falling back to formatting chosen with `fn_param_layout`";
 
     // Imports
     imports_indent: IndentStyle, IndentStyle::Block, false, "Indent of imports";
@@ -649,6 +652,8 @@ empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false
 where_single_line = false
+enable_fn_param_limit = false
+fn_param_limit = 4
 imports_indent = "Block"
 imports_layout = "Mixed"
 imports_granularity = "Preserve"

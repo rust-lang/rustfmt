@@ -2383,6 +2383,7 @@ fn rewrite_fn_base(
         ret_str_len,
         fn_brace_style,
         multi_line_ret_str,
+        fd.inputs.len(),
     )?;
 
     debug!(
@@ -2772,6 +2773,7 @@ fn compute_budgets_for_params(
     ret_str_len: usize,
     fn_brace_style: FnBraceStyle,
     force_vertical_layout: bool,
+    param_count: usize,
 ) -> Option<(usize, usize, Indent)> {
     debug!(
         "compute_budgets_for_params {} {:?}, {}, {:?}",
@@ -2780,8 +2782,10 @@ fn compute_budgets_for_params(
         ret_str_len,
         fn_brace_style,
     );
+    let over_param_limit =
+        context.config.enable_fn_param_limit() && param_count > context.config.fn_param_limit();
     // Try keeping everything on the same line.
-    if !result.contains('\n') && !force_vertical_layout {
+    if !result.contains('\n') && !force_vertical_layout && !over_param_limit {
         // 2 = `()`, 3 = `() `, space is before ret_string.
         let overhead = if ret_str_len == 0 { 2 } else { 3 };
         let mut used_space = indent.width() + result.len() + ret_str_len + overhead;
