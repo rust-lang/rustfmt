@@ -15,6 +15,7 @@ pub use crate::config::lists::*;
 pub use crate::config::macro_names::{MacroSelector, MacroSelectors};
 #[allow(unreachable_pub)]
 pub use crate::config::options::*;
+pub(crate) use crate::config::wrap_comments::WrapComments;
 
 #[macro_use]
 pub(crate) mod config_type;
@@ -27,6 +28,7 @@ pub(crate) mod file_lines;
 pub(crate) mod lists;
 pub(crate) mod macro_names;
 pub(crate) mod style_edition;
+mod wrap_comments;
 
 // This macro defines configuration options used in rustfmt. Each option
 // is defined as follows:
@@ -63,7 +65,7 @@ create_config! {
         over multiple lines.";
 
     // Comments. macros, and strings
-    wrap_comments: bool, false, false, "Break comments to fit on the line";
+    wrap_comments: WrapComments, WrapComments::Off, false, "Break comments to fit on the line";
     format_code_in_doc_comments: bool, false, false, "Format the code snippet in doc comments.";
     doc_comment_code_block_width: usize, 100, false, "Maximum width for code snippets in doc \
         comments. No effect unless format_code_in_doc_comments = true";
@@ -634,7 +636,7 @@ array_width = 60
 chain_width = 60
 single_line_if_else_max_width = 50
 single_line_let_else_max_width = 50
-wrap_comments = false
+wrap_comments = "Off"
 format_code_in_doc_comments = false
 doc_comment_code_block_width = 100
 comment_width = 80
