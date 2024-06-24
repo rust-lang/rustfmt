@@ -661,12 +661,15 @@ fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<Format
             continue;
         }
 
+        count += 1;
+
         debug!("Testing '{}'...", file_name.display());
 
         match idempotent_check(&file_name, opt_config) {
             Ok(ref report) if report.has_warnings() => {
                 print!("{}", FormatReportFormatterBuilder::new(report).build());
                 fails += 1;
+                continue;
             }
             Ok(report) => reports.push(report),
             Err(err) => {
@@ -674,13 +677,63 @@ fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<Format
                     print_mismatches_default_message(msg);
                 }
                 fails += 1;
+                continue;
             }
         }
 
-        count += 1;
+        match quiet_test(&file_name, opt_config.as_deref()) {
+            Ok(()) => {}
+            Err(QuietError::Fail { output }) => {
+                println!(
+                    "Unexpected error from rustfmt when formatting `{file_name}`:\n{output}\n",
+                    file_name = file_name.display(),
+                );
+                fails += 1;
+                continue;
+            }
+            Err(QuietError::Erroneous { output }) => {
+                println!(
+                    "Erroneous output from rustfmt when formatting `{file_name}`:\n{output}\n",
+                    file_name = file_name.display(),
+                );
+                fails += 1;
+                continue;
+            }
+        }
     }
 
     (reports, count, fails)
+}
+
+enum QuietError {
+    Erroneous { output: String },
+    Fail { output: String },
+}
+
+fn quiet_test(file_name: &Path, opt_config: Option<&Path>) -> Result<(), QuietError> {
+    let cargo = PathBuf::from(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+    let cmd = Command::new(cargo)
+        .args(["run", "--bin", "quiet-test"])
+        .arg(file_name)
+        .args(opt_config)
+        .output();
+    match cmd {
+        Ok(cmd) => {
+            let output = String::from_utf8_lossy(&cmd.stdout).into_owned();
+            if !cmd.status.success() {
+                Err(QuietError::Fail {
+                    output: format!("non-success error code"),
+                })
+            } else if !output.is_empty() {
+                Err(QuietError::Erroneous { output })
+            } else {
+                Ok(())
+            }
+        }
+        Err(e) => Err(QuietError::Fail {
+            output: e.to_string(),
+        }),
+    }
 }
 
 fn print_mismatches_default_message(result: HashMap<PathBuf, Vec<Mismatch>>) {
@@ -708,7 +761,7 @@ fn print_mismatches<T: Fn(u32) -> String>(
     }
 }
 
-fn read_config(filename: &Path) -> Config {
+pub fn read_config(filename: &Path) -> Config {
     let sig_comments = read_significant_comments(filename);
     // Look for a config file. If there is a 'config' property in the significant comments, use
     // that. Otherwise, if there are no significant comments at all, look for a config file with

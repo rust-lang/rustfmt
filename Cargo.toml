@@ -15,6 +15,10 @@ name = "rustfmt"
 path = "src/bin/main.rs"
 
 [[bin]]
+name = "quiet-test"
+path = "src/bin/quiet.rs"
+
+[[bin]]
 name = "cargo-fmt"
 path = "src/cargo-fmt/main.rs"
 
