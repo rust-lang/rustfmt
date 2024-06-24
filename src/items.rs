@@ -2118,20 +2118,40 @@ impl<'a> Rewrite for OpaqueType<'a> {
 
 impl Rewrite for ast::FnRetTy {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        self.rewrite_result(context, shape).ok()
+    }
+    fn rewrite_result(
+        &self,
+        context: &RewriteContext<'_>,
+        shape: Shape,
+    ) -> Result<String, RewriteError> {
         match *self {
-            ast::FnRetTy::Default(_) => Some(String::new()),
+            ast::FnRetTy::Default(_) => Ok(String::new()),
             ast::FnRetTy::Ty(ref ty) => {
                 if context.config.version() == Version::One
                     || context.config.indent_style() == IndentStyle::Visual
                 {
-                    let inner_width = shape.width.checked_sub(3)?;
+                    let inner_width = shape.width.checked_sub(3).ok_or_else(|| {
+                        RewriteError::ExceedsMaxWidth {
+                            configured_width: shape.width,
+                            span: self.span(),
+                        }
+                    })?;
                     return ty
-                        .rewrite(context, Shape::legacy(inner_width, shape.indent + 3))
+                        .rewrite_result(context, Shape::legacy(inner_width, shape.indent + 3))
                         .map(|r| format!("-> {}", r));
                 }
 
-                ty.rewrite(context, shape.offset_left(3)?)
-                    .map(|s| format!("-> {}", s))
+                ty.rewrite_result(
+                    context,
+                    shape
+                        .offset_left(3)
+                        .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                            configured_width: shape.width,
+                            span: self.span(),
+                        })?,
+                )
+                .map(|s| format!("-> {}", s))
             }
         }
     }
