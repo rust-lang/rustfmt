@@ -108,7 +108,7 @@ create_config! {
     space_before_colon: bool, false, false, "Leave a space before the colon";
     space_after_colon: bool, true, false, "Leave a space after the colon";
     spaces_around_ranges: bool, false, false, "Put spaces around the  .. and ..= range operators";
-    binop_separator: SeparatorPlace, SeparatorPlace::Front, false,
+    binop_separator: SeparatorPlace, SeparatorPlace::Front, true,
         "Where to put a binary operator when a binary expression goes multiline";
 
     // Misc.
