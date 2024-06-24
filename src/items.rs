@@ -48,142 +48,7 @@ fn type_annotation_separator(config: &Config) -> &str {
 // let pat: ty = init; or let pat: ty = init else { .. };
 impl Rewrite for ast::Local {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        debug!(
-            "Local::rewrite {:?} {} {:?}",
-            self, shape.width, shape.indent
-        );
-
-        skip_out_of_file_lines_range!(context, self.span);
-
-        if contains_skip(&self.attrs) {
-            return None;
-        }
-
-        let attrs_str = self.attrs.rewrite(context, shape)?;
-        let mut result = if attrs_str.is_empty() {
-            "let ".to_owned()
-        } else {
-            combine_strs_with_missing_comments(
-                context,
-                &attrs_str,
-                "let ",
-                mk_sp(
-                    self.attrs.last().map(|a| a.span.hi()).unwrap(),
-                    self.span.lo(),
-                ),
-                shape,
-                false,
-            )?
-        };
-        let let_kw_offset = result.len() - "let ".len();
-
-        // 4 = "let ".len()
-        let pat_shape = shape.offset_left(4)?;
-        // 1 = ;
-        let pat_shape = pat_shape.sub_width(1)?;
-        let pat_str = self.pat.rewrite(context, pat_shape)?;
-        result.push_str(&pat_str);
-
-        // String that is placed within the assignment pattern and expression.
-        let infix = {
-            let mut infix = String::with_capacity(32);
-
-            if let Some(ref ty) = self.ty {
-                let separator = type_annotation_separator(context.config);
-                let ty_shape = if pat_str.contains('\n') {
-                    shape.with_max_width(context.config)
-                } else {
-                    shape
-                }
-                .offset_left(last_line_width(&result) + separator.len())?
-                // 2 = ` =`
-                .sub_width(2)?;
-
-                let rewrite = ty.rewrite(context, ty_shape)?;
-
-                infix.push_str(separator);
-                infix.push_str(&rewrite);
-            }
-
-            if self.kind.init().is_some() {
-                infix.push_str(" =");
-            }
-
-            infix
-        };
-
-        result.push_str(&infix);
-
-        if let Some((init, else_block)) = self.kind.init_else_opt() {
-            // 1 = trailing semicolon;
-            let nested_shape = shape.sub_width(1)?;
-
-            result = rewrite_assign_rhs(
-                context,
-                result,
-                init,
-                &RhsAssignKind::Expr(&init.kind, init.span),
-                nested_shape,
-            )?;
-
-            if let Some(block) = else_block {
-                let else_kw_span = init.span.between(block.span);
-                // Strip attributes and comments to check if newline is needed before the else
-                // keyword from the initializer part. (#5901)
-                let init_str = if context.config.version() == Version::Two {
-                    &result[let_kw_offset..]
-                } else {
-                    result.as_str()
-                };
-                let force_newline_else = pat_str.contains('\n')
-                    || !same_line_else_kw_and_brace(init_str, context, else_kw_span, nested_shape);
-                let else_kw = rewrite_else_kw_with_comments(
-                    force_newline_else,
-                    true,
-                    context,
-                    else_kw_span,
-                    shape,
-                );
-                result.push_str(&else_kw);
-
-                // At this point we've written `let {pat} = {expr} else' into the buffer, and we
-                // want to calculate up front if there's room to write the divergent block on the
-                // same line. The available space varies based on indentation so we clamp the width
-                // on the smaller of `shape.width` and `single_line_let_else_max_width`.
-                let max_width =
-                    std::cmp::min(shape.width, context.config.single_line_let_else_max_width());
-
-                // If available_space hits zero we know for sure this will be a multi-lined block
-                let assign_str_with_else_kw = if context.config.version() == Version::Two {
-                    &result[let_kw_offset..]
-                } else {
-                    result.as_str()
-                };
-                let available_space = max_width.saturating_sub(assign_str_with_else_kw.len());
-
-                let allow_single_line = !force_newline_else
-                    && available_space > 0
-                    && allow_single_line_let_else_block(assign_str_with_else_kw, block);
-
-                let mut rw_else_block =
-                    rewrite_let_else_block(block, allow_single_line, context, shape)?;
-
-                let single_line_else = !rw_else_block.contains('\n');
-                // +1 for the trailing `;`
-                let else_block_exceeds_width = rw_else_block.len() + 1 > available_space;
-
-                if allow_single_line && single_line_else && else_block_exceeds_width {
-                    // writing this on one line would exceed the available width
-                    // so rewrite the else block over multiple lines.
-                    rw_else_block = rewrite_let_else_block(block, false, context, shape)?;
-                }
-
-                result.push_str(&rw_else_block);
-            };
-        }
-
-        result.push(';');
-        Some(result)
+        self.rewrite_result(context, shape).ok()
     }
 
     fn rewrite_result(
@@ -226,11 +91,17 @@ impl Rewrite for ast::Local {
         // 1 = ;
         let pat_shape = pat_shape
             .sub_width(1)
-            .ok_or_else(|| RewriteError::Unknown)?;
-        let pat_str = self
-            .pat
-            .rewrite(context, pat_shape)
-            .ok_or_else(|| RewriteError::Unknown)?;
+            .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                configured_width: shape.width,
+                span: self.span(),
+            })?;
+        let pat_str =
+            self.pat
+                .rewrite(context, pat_shape)
+                .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                    configured_width: shape.width,
+                    span: self.span(),
+                })?;
         result.push_str(&pat_str);
 
         // String that is placed within the assignment pattern and expression.
@@ -245,10 +116,16 @@ impl Rewrite for ast::Local {
                     shape
                 }
                 .offset_left(last_line_width(&result) + separator.len())
-                .ok_or_else(|| RewriteError::Unknown)?
+                .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                    configured_width: shape.width,
+                    span: self.span(),
+                })?
                 // 2 = ` =`
                 .sub_width(2)
-                .ok_or_else(|| RewriteError::Unknown)?;
+                .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                    configured_width: shape.width,
+                    span: self.span(),
+                })?;
 
                 let rewrite = ty.rewrite_result(context, ty_shape)?;
 
@@ -2013,7 +1890,15 @@ pub(crate) fn rewrite_struct_field_prefix(
 
 impl Rewrite for ast::FieldDef {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        rewrite_struct_field(context, self, shape, 0)
+        self.rewrite_result(context, shape).ok()
+    }
+
+    fn rewrite_result(
+        &self,
+        context: &RewriteContext<'_>,
+        shape: Shape,
+    ) -> Result<String, RewriteError> {
+        rewrite_struct_field(context, self, shape, 0).ok_or_else(|| RewriteError::Unknown)
     }
 }
 
@@ -2297,9 +2182,17 @@ fn get_missing_param_comments(
 
 impl Rewrite for ast::Param {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        self.rewrite_result(context, shape).ok()
+    }
+
+    fn rewrite_result(
+        &self,
+        context: &RewriteContext<'_>,
+        shape: Shape,
+    ) -> Result<String, RewriteError> {
         let param_attrs_result = self
             .attrs
-            .rewrite(context, Shape::legacy(shape.width, shape.indent))?;
+            .rewrite_result(context, Shape::legacy(shape.width, shape.indent))?;
         // N.B. Doc comments aren't typically valid syntax, but could appear
         // in the presence of certain macros - https://github.com/rust-lang/rustfmt/issues/4936
         let (span, has_multiple_attr_lines, has_doc_comments) = if !self.attrs.is_empty() {
@@ -2322,10 +2215,11 @@ impl Rewrite for ast::Param {
                 shape,
                 has_multiple_attr_lines,
             )
+            .ok_or_else(|| RewriteError::Unknown)
         } else if is_named_param(self) {
             let param_name = &self
                 .pat
-                .rewrite(context, Shape::legacy(shape.width, shape.indent))?;
+                .rewrite_result(context, Shape::legacy(shape.width, shape.indent))?;
             let mut result = combine_strs_with_missing_comments(
                 context,
                 &param_attrs_result,
@@ -2333,7 +2227,8 @@ impl Rewrite for ast::Param {
                 span,
                 shape,
                 !has_multiple_attr_lines && !has_doc_comments,
-            )?;
+            )
+            .ok_or_else(|| RewriteError::Unknown)?;
 
             if !is_empty_infer(&*self.ty, self.pat.span) {
                 let (before_comment, after_comment) =
@@ -2342,10 +2237,15 @@ impl Rewrite for ast::Param {
                 result.push_str(colon_spaces(context.config));
                 result.push_str(&after_comment);
                 let overhead = last_line_width(&result);
-                let max_width = shape.width.checked_sub(overhead)?;
-                if let Some(ty_str) = self
+                let max_width = shape.width.checked_sub(overhead).ok_or_else(|| {
+                    RewriteError::ExceedsMaxWidth {
+                        configured_width: shape.width,
+                        span: self.span(),
+                    }
+                })?;
+                if let Ok(ty_str) = self
                     .ty
-                    .rewrite(context, Shape::legacy(max_width, shape.indent))
+                    .rewrite_result(context, Shape::legacy(max_width, shape.indent))
                 {
                     result.push_str(&ty_str);
                 } else {
@@ -2362,22 +2262,28 @@ impl Rewrite for ast::Param {
                         span,
                         shape,
                         !has_multiple_attr_lines,
-                    )?;
+                    )
+                    .ok_or_else(|| RewriteError::Unknown)?;
                     result.push_str(&before_comment);
                     result.push_str(colon_spaces(context.config));
                     result.push_str(&after_comment);
                     let overhead = last_line_width(&result);
-                    let max_width = shape.width.checked_sub(overhead)?;
+                    let max_width = shape.width.checked_sub(overhead).ok_or_else(|| {
+                        RewriteError::ExceedsMaxWidth {
+                            configured_width: shape.width,
+                            span: self.span(),
+                        }
+                    })?;
                     let ty_str = self
                         .ty
-                        .rewrite(context, Shape::legacy(max_width, shape.indent))?;
+                        .rewrite_result(context, Shape::legacy(max_width, shape.indent))?;
                     result.push_str(&ty_str);
                 }
             }
 
-            Some(result)
+            Ok(result)
         } else {
-            self.ty.rewrite(context, shape)
+            self.ty.rewrite_result(context, shape)
         }
     }
 }
