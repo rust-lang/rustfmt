@@ -2,7 +2,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use rustc_ast::ast;
 use rustc_ast::token::{Delimiter, TokenKind};
-use rustc_parse::parser::ForceCollect;
+use rustc_parse::parser::{ForceCollect, Parser};
 use rustc_span::symbol::kw;
 
 use crate::parse::macros::build_stream_parser;
@@ -31,32 +31,7 @@ fn parse_cfg_if_inner<'a>(
 
     while parser.token.kind != TokenKind::Eof {
         if process_if_cfg {
-            if !parser.eat_keyword(kw::If) {
-                return Err("Expected `if`");
-            }
-
-            if !matches!(parser.token.kind, TokenKind::Pound) {
-                return Err("Failed to parse attributes");
-            }
-
-            // Inner attributes are not actually syntactically permitted here, but we don't
-            // care about inner vs outer attributes in this position. Our purpose with this
-            // special case parsing of cfg_if macros is to ensure we can correctly resolve
-            // imported modules that may have a custom `path` defined.
-            //
-            // As such, we just need to advance the parser past the attribute and up to
-            // to the opening brace.
-            // See also https://github.com/rust-lang/rust/pull/79433
-            parser
-                .parse_attribute(rustc_parse::parser::attr::InnerAttrPolicy::Permitted)
-                .map_err(|e| {
-                    e.cancel();
-                    "Failed to parse attributes"
-                })?;
-        }
-
-        if !parser.eat(&TokenKind::OpenDelim(Delimiter::Brace)) {
-            return Err("Expected an opening brace");
+            eat_if(&mut parser)?;
         }
 
         while parser.token != TokenKind::CloseDelim(Delimiter::Brace)
@@ -64,7 +39,17 @@ fn parse_cfg_if_inner<'a>(
         {
             let item = match parser.parse_item(ForceCollect::No) {
                 Ok(Some(item_ptr)) => item_ptr.into_inner(),
-                Ok(None) => continue,
+                Ok(None) => {
+                    if matches!(parser.token.kind, TokenKind::Ident(symbol, ..) if symbol == kw::If)
+                    {
+                        // eat a nested if
+                        eat_if(&mut parser)?;
+                    } else {
+                        // Not sure what token we're on. To prevent infinite loops bump the parser
+                        parser.bump();
+                    }
+                    continue;
+                }
                 Err(err) => {
                     err.cancel();
                     parser.psess.dcx.reset_err_count();
@@ -82,16 +67,49 @@ fn parse_cfg_if_inner<'a>(
             return Err("Expected a closing brace");
         }
 
-        if parser.eat(&TokenKind::Eof) {
-            break;
+        if matches!(parser.token.kind, TokenKind::Ident(symbol, ..) if symbol == kw::Else) {
+            // there might be an `else` after the `if`
+            parser.eat_keyword(kw::Else);
+            // there might be an opening brace after the `else`, but it might also be an `else if`
+            parser.eat(&TokenKind::OpenDelim(Delimiter::Brace));
         }
 
-        if !parser.eat_keyword(kw::Else) {
-            return Err("Expected `else`");
+        if parser.eat(&TokenKind::Eof) {
+            break;
         }
 
         process_if_cfg = parser.token.is_keyword(kw::If);
     }
 
     Ok(items)
+}
+
+fn eat_if(parser: &mut Parser<'_>) -> Result<(), &'static str> {
+    if !parser.eat_keyword(kw::If) {
+        return Err("Expected `if`");
+    }
+
+    if !matches!(parser.token.kind, TokenKind::Pound) {
+        return Err("Failed to parse attributes");
+    }
+
+    // Inner attributes are not actually syntactically permitted here, but we don't
+    // care about inner vs outer attributes in this position. Our purpose with this
+    // special case parsing of cfg_if macros is to ensure we can correctly resolve
+    // imported modules that may have a custom `path` defined.
+    //
+    // As such, we just need to advance the parser past the attribute and up to
+    // to the opening brace.
+    // See also https://github.com/rust-lang/rust/pull/79433
+    parser
+        .parse_attribute(rustc_parse::parser::attr::InnerAttrPolicy::Permitted)
+        .map_err(|e| {
+            e.cancel();
+            "Failed to parse attributes"
+        })?;
+
+    if !parser.eat(&TokenKind::OpenDelim(Delimiter::Brace)) {
+        return Err("Expected an opening brace");
+    }
+    Ok(())
 }
