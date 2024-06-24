@@ -32,19 +32,16 @@ impl<T: Rewrite> Rewrite for ptr::P<T> {
     }
 }
 
-#[derive(Debug)]
-pub enum SkipFormatting {
-    OutOfFileLinesRange,
-    ContainsSkipAttr, // Should we include variant for skipped macro ?
-}
-
 #[derive(Error, Debug)]
 pub(crate) enum RewriteError {
-    #[error("")]
+    #[error("Formatting was skipped due to skip attribute or out of file range.")]
     SkipFormatting,
 
+    #[error("It exceeds the required width of {configured_width} for the span: {span:?}")]
+    ExceedsMaxWidth { configured_width: usize, span: Span },
+
     /// Format failure that does not fit to above categories.
-    #[error("")]
+    #[error("An unknown error occurred during formatting.")]
     Unknown,
 }
 
