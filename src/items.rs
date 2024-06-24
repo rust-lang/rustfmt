@@ -278,7 +278,7 @@ fn allow_single_line_let_else_block(result: &str, block: &ast::Block) -> bool {
 #[allow(dead_code)]
 #[derive(Debug)]
 struct Item<'a> {
-    unsafety: ast::Unsafe,
+    safety: ast::Safety,
     abi: Cow<'static, str>,
     vis: Option<&'a ast::Visibility>,
     body: Vec<BodyElement<'a>>,
@@ -288,7 +288,7 @@ struct Item<'a> {
 impl<'a> Item<'a> {
     fn from_foreign_mod(fm: &'a ast::ForeignMod, span: Span, config: &Config) -> Item<'a> {
         Item {
-            unsafety: fm.unsafety,
+            safety: fm.safety,
             abi: format_extern(
                 ast::Extern::from_abi(fm.abi, DUMMY_SP),
                 config.force_explicit_abi(),
@@ -321,7 +321,7 @@ pub(crate) struct FnSig<'a> {
     coroutine_kind: Cow<'a, Option<ast::CoroutineKind>>,
     constness: ast::Const,
     defaultness: ast::Defaultness,
-    unsafety: ast::Unsafe,
+    safety: ast::Safety,
     visibility: &'a ast::Visibility,
 }
 
@@ -332,7 +332,7 @@ impl<'a> FnSig<'a> {
         visibility: &'a ast::Visibility,
     ) -> FnSig<'a> {
         FnSig {
-            unsafety: method_sig.header.unsafety,
+            safety: method_sig.header.safety,
             coroutine_kind: Cow::Borrowed(&method_sig.header.coroutine_kind),
             constness: method_sig.header.constness,
             defaultness: ast::Defaultness::Final,
@@ -361,7 +361,7 @@ impl<'a> FnSig<'a> {
                 constness: fn_sig.header.constness,
                 coroutine_kind: Cow::Borrowed(&fn_sig.header.coroutine_kind),
                 defaultness,
-                unsafety: fn_sig.header.unsafety,
+                safety: fn_sig.header.safety,
                 visibility: vis,
             },
             _ => unreachable!(),
@@ -376,7 +376,7 @@ impl<'a> FnSig<'a> {
         result.push_str(format_constness(self.constness));
         self.coroutine_kind
             .map(|coroutine_kind| result.push_str(format_coro(&coroutine_kind)));
-        result.push_str(format_unsafety(self.unsafety));
+        result.push_str(format_safety(self.safety));
         result.push_str(&format_extern(
             self.ext,
             context.config.force_explicit_abi(),
@@ -387,7 +387,7 @@ impl<'a> FnSig<'a> {
 
 impl<'a> FmtVisitor<'a> {
     fn format_item(&mut self, item: &Item<'_>) {
-        self.buffer.push_str(format_unsafety(item.unsafety));
+        self.buffer.push_str(format_safety(item.safety));
         self.buffer.push_str(&item.abi);
 
         let snippet = self.snippet(item.span);
@@ -766,7 +766,9 @@ impl<'a> FmtVisitor<'a> {
                 (Const(..), Const(..)) | (MacCall(..), MacCall(..)) => {
                     a.ident.as_str().cmp(b.ident.as_str())
                 }
-                (Fn(..), Fn(..)) => a.span.lo().cmp(&b.span.lo()),
+                (Fn(..), Fn(..)) | (Delegation(..), Delegation(..)) => {
+                    a.span.lo().cmp(&b.span.lo())
+                }
                 (Type(ty), _) if is_type(&ty.ty) => Ordering::Less,
                 (_, Type(ty)) if is_type(&ty.ty) => Ordering::Greater,
                 (Type(..), _) => Ordering::Less,
@@ -775,6 +777,8 @@ impl<'a> FmtVisitor<'a> {
                 (_, Const(..)) => Ordering::Greater,
                 (MacCall(..), _) => Ordering::Less,
                 (_, MacCall(..)) => Ordering::Greater,
+                (Delegation(..), _) | (DelegationMac(..), _) => Ordering::Less,
+                (_, Delegation(..)) | (_, DelegationMac(..)) => Ordering::Greater,
             });
             let mut prev_kind = None;
             for (buf, item) in buffer {
@@ -960,7 +964,7 @@ fn format_impl_ref_and_type(
     offset: Indent,
 ) -> Option<String> {
     let ast::Impl {
-        unsafety,
+        safety,
         polarity,
         defaultness,
         constness,
@@ -973,7 +977,7 @@ fn format_impl_ref_and_type(
 
     result.push_str(&format_visibility(context, &item.vis));
     result.push_str(format_defaultness(defaultness));
-    result.push_str(format_unsafety(unsafety));
+    result.push_str(format_safety(safety));
 
     let shape = if context.config.version() == Version::Two {
         Shape::indented(offset + last_line_width(&result), context.config)
@@ -1173,7 +1177,7 @@ pub(crate) fn format_trait(
     };
     let ast::Trait {
         is_auto,
-        unsafety,
+        safety,
         ref generics,
         ref bounds,
         ref items,
@@ -1183,7 +1187,7 @@ pub(crate) fn format_trait(
     let header = format!(
         "{}{}{}trait ",
         format_visibility(context, &item.vis),
-        format_unsafety(unsafety),
+        format_safety(safety),
         format_auto(is_auto),
     );
     result.push_str(&header);
@@ -1687,8 +1691,7 @@ struct TyAliasRewriteInfo<'c, 'g>(
     &'c RewriteContext<'c>,
     Indent,
     &'g ast::Generics,
-    (ast::TyAliasWhereClause, ast::TyAliasWhereClause),
-    usize,
+    ast::TyAliasWhereClauses,
     symbol::Ident,
     Span,
 );
@@ -1708,7 +1711,6 @@ pub(crate) fn rewrite_type_alias<'a, 'b>(
         ref bounds,
         ref ty,
         where_clauses,
-        where_predicates_split,
     } = *ty_alias_kind;
     let ty_opt = ty.as_ref();
     let (ident, vis) = match visitor_kind {
@@ -1716,15 +1718,7 @@ pub(crate) fn rewrite_type_alias<'a, 'b>(
         AssocTraitItem(i) | AssocImplItem(i) => (i.ident, &i.vis),
         ForeignItem(i) => (i.ident, &i.vis),
     };
-    let rw_info = &TyAliasRewriteInfo(
-        context,
-        indent,
-        generics,
-        where_clauses,
-        where_predicates_split,
-        ident,
-        span,
-    );
+    let rw_info = &TyAliasRewriteInfo(context, indent, generics, where_clauses, ident, span);
     let op_ty = opaque_ty(ty);
     // Type Aliases are formatted slightly differently depending on the context
     // in which they appear, whether they are opaque, and whether they are associated.
@@ -1760,19 +1754,11 @@ fn rewrite_ty<R: Rewrite>(
     vis: &ast::Visibility,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
-    let TyAliasRewriteInfo(
-        context,
-        indent,
-        generics,
-        where_clauses,
-        where_predicates_split,
-        ident,
-        span,
-    ) = *rw_info;
+    let TyAliasRewriteInfo(context, indent, generics, where_clauses, ident, span) = *rw_info;
     let (before_where_predicates, after_where_predicates) = generics
         .where_clause
         .predicates
-        .split_at(where_predicates_split);
+        .split_at(where_clauses.split);
     if !after_where_predicates.is_empty() {
         return None;
     }
@@ -1807,7 +1793,7 @@ fn rewrite_ty<R: Rewrite>(
     let where_clause_str = rewrite_where_clause(
         context,
         before_where_predicates,
-        where_clauses.0.1,
+        where_clauses.before.span,
         context.config.brace_style(),
         Shape::legacy(where_budget, indent),
         false,
@@ -1831,7 +1817,7 @@ fn rewrite_ty<R: Rewrite>(
         let comment_span = context
             .snippet_provider
             .opt_span_before(span, "=")
-            .map(|op_lo| mk_sp(where_clauses.0.1.hi(), op_lo));
+            .map(|op_lo| mk_sp(where_clauses.before.span.hi(), op_lo));
 
         let lhs = match comment_span {
             Some(comment_span)
@@ -1968,6 +1954,7 @@ pub(crate) fn rewrite_struct_field(
 
 pub(crate) struct StaticParts<'a> {
     prefix: &'a str,
+    safety: ast::Safety,
     vis: &'a ast::Visibility,
     ident: symbol::Ident,
     ty: &'a ast::Ty,
@@ -1979,11 +1966,12 @@ pub(crate) struct StaticParts<'a> {
 
 impl<'a> StaticParts<'a> {
     pub(crate) fn from_item(item: &'a ast::Item) -> Self {
-        let (defaultness, prefix, ty, mutability, expr) = match &item.kind {
-            ast::ItemKind::Static(s) => (None, "static", &s.ty, s.mutability, &s.expr),
+        let (defaultness, prefix, safety, ty, mutability, expr) = match &item.kind {
+            ast::ItemKind::Static(s) => (None, "static", s.safety, &s.ty, s.mutability, &s.expr),
             ast::ItemKind::Const(c) => (
                 Some(c.defaultness),
                 "const",
+                ast::Safety::Default,
                 &c.ty,
                 ast::Mutability::Not,
                 &c.expr,
@@ -1992,6 +1980,7 @@ impl<'a> StaticParts<'a> {
         };
         StaticParts {
             prefix,
+            safety,
             vis: &item.vis,
             ident: item.ident,
             ty,
@@ -2009,6 +1998,7 @@ impl<'a> StaticParts<'a> {
         };
         StaticParts {
             prefix: "const",
+            safety: ast::Safety::Default,
             vis: &ti.vis,
             ident: ti.ident,
             ty,
@@ -2026,6 +2016,7 @@ impl<'a> StaticParts<'a> {
         };
         StaticParts {
             prefix: "const",
+            safety: ast::Safety::Default,
             vis: &ii.vis,
             ident: ii.ident,
             ty,
@@ -2042,11 +2033,13 @@ fn rewrite_static(
     static_parts: &StaticParts<'_>,
     offset: Indent,
 ) -> Option<String> {
+    println!("rewriting static");
     let colon = colon_spaces(context.config);
     let mut prefix = format!(
-        "{}{}{} {}{}{}",
+        "{}{}{}{} {}{}{}",
         format_visibility(context, static_parts.vis),
         static_parts.defaultness.map_or("", format_defaultness),
+        format_safety(static_parts.safety),
         static_parts.prefix,
         format_mutability(static_parts.mutability),
         rewrite_ident(context, static_parts.ident),
@@ -3428,14 +3421,16 @@ impl Rewrite for ast::ForeignItem {
                     .map(|(s, _, _)| format!("{};", s))
                 }
             }
-            ast::ForeignItemKind::Static(ref ty, mutability, _) => {
+            ast::ForeignItemKind::Static(ref static_foreign_item) => {
                 // FIXME(#21): we're dropping potential comments in between the
                 // function kw here.
                 let vis = format_visibility(context, &self.vis);
-                let mut_str = format_mutability(mutability);
+                let safety = format_safety(static_foreign_item.safety);
+                let mut_str = format_mutability(static_foreign_item.mutability);
                 let prefix = format!(
-                    "{}static {}{}:",
+                    "{}{}static {}{}:",
                     vis,
+                    safety,
                     mut_str,
                     rewrite_ident(context, self.ident)
                 );
@@ -3443,7 +3438,7 @@ impl Rewrite for ast::ForeignItem {
                 rewrite_assign_rhs(
                     context,
                     prefix,
-                    &**ty,
+                    &static_foreign_item.ty,
                     &RhsAssignKind::Ty,
                     shape.sub_width(1)?,
                 )
