@@ -24,7 +24,7 @@ use crate::expr::{
 use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::overflow;
-use crate::rewrite::{Rewrite, RewriteContext, RewriteError};
+use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
@@ -51,11 +51,7 @@ impl Rewrite for ast::Local {
         self.rewrite_result(context, shape).ok()
     }
 
-    fn rewrite_result(
-        &self,
-        context: &RewriteContext<'_>,
-        shape: Shape,
-    ) -> Result<String, RewriteError> {
+    fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         debug!(
             "Local::rewrite {:?} {} {:?}",
             self, shape.width, shape.indent
@@ -87,7 +83,12 @@ impl Rewrite for ast::Local {
         let let_kw_offset = result.len() - "let ".len();
 
         // 4 = "let ".len()
-        let pat_shape = shape.offset_left(4).ok_or_else(|| RewriteError::Unknown)?;
+        let pat_shape = shape
+            .offset_left(4)
+            .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                configured_width: shape.width,
+                span: self.span(),
+            })?;
         // 1 = ;
         let pat_shape = pat_shape
             .sub_width(1)
@@ -95,13 +96,8 @@ impl Rewrite for ast::Local {
                 configured_width: shape.width,
                 span: self.span(),
             })?;
-        let pat_str =
-            self.pat
-                .rewrite(context, pat_shape)
-                .ok_or_else(|| RewriteError::ExceedsMaxWidth {
-                    configured_width: shape.width,
-                    span: self.span(),
-                })?;
+        let pat_str = self.pat.rewrite_result(context, pat_shape)?;
+
         result.push_str(&pat_str);
 
         // String that is placed within the assignment pattern and expression.
@@ -153,7 +149,10 @@ impl Rewrite for ast::Local {
                 &RhsAssignKind::Expr(&init.kind, init.span),
                 nested_shape,
             )
-            .ok_or_else(|| RewriteError::Unknown)?;
+            .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                configured_width: shape.width,
+                span: self.span(),
+            })?;
 
             if let Some(block) = else_block {
                 let else_kw_span = init.span.between(block.span);
@@ -1876,15 +1875,7 @@ pub(crate) fn rewrite_struct_field_prefix(
 
 impl Rewrite for ast::FieldDef {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        self.rewrite_result(context, shape).ok()
-    }
-
-    fn rewrite_result(
-        &self,
-        context: &RewriteContext<'_>,
-        shape: Shape,
-    ) -> Result<String, RewriteError> {
-        rewrite_struct_field(context, self, shape, 0).ok_or_else(|| RewriteError::Unknown)
+        rewrite_struct_field(context, self, shape, 0)
     }
 }
 
@@ -2113,11 +2104,7 @@ impl Rewrite for ast::FnRetTy {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
-    fn rewrite_result(
-        &self,
-        context: &RewriteContext<'_>,
-        shape: Shape,
-    ) -> Result<String, RewriteError> {
+    fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         match *self {
             ast::FnRetTy::Default(_) => Ok(String::new()),
             ast::FnRetTy::Ty(ref ty) => {
@@ -2135,16 +2122,16 @@ impl Rewrite for ast::FnRetTy {
                         .map(|r| format!("-> {}", r));
                 }
 
-                ty.rewrite_result(
-                    context,
-                    shape
-                        .offset_left(3)
-                        .ok_or_else(|| RewriteError::ExceedsMaxWidth {
-                            configured_width: shape.width,
-                            span: self.span(),
-                        })?,
-                )
-                .map(|s| format!("-> {}", s))
+                // 3 = "-> "
+                let shape = shape
+                    .offset_left(3)
+                    .ok_or_else(|| RewriteError::ExceedsMaxWidth {
+                        configured_width: shape.width,
+                        span: self.span(),
+                    })?;
+
+                ty.rewrite_result(context, shape)
+                    .map(|s| format!("-> {}", s))
             }
         }
     }
@@ -2198,11 +2185,7 @@ impl Rewrite for ast::Param {
         self.rewrite_result(context, shape).ok()
     }
 
-    fn rewrite_result(
-        &self,
-        context: &RewriteContext<'_>,
-        shape: Shape,
-    ) -> Result<String, RewriteError> {
+    fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         let param_attrs_result = self
             .attrs
             .rewrite_result(context, Shape::legacy(shape.width, shape.indent))?;

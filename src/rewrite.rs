@@ -14,14 +14,11 @@ use crate::skip::SkipContext;
 use crate::visitor::SnippetProvider;
 use crate::FormatReport;
 
+pub type RewriteResult = Result<String, RewriteError>;
 pub(crate) trait Rewrite {
     /// Rewrite self into shape.
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String>;
-    fn rewrite_result(
-        &self,
-        context: &RewriteContext<'_>,
-        shape: Shape,
-    ) -> Result<String, RewriteError> {
+    fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         self.rewrite(context, shape).ok_or(RewriteError::Unknown)
     }
 }
