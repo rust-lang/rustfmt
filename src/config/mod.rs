@@ -289,9 +289,17 @@ impl Config {
             }
 
             // If none was found there either, check in the user's configuration directory.
-            if let Ok(strategy) = etcetera::choose_base_strategy() {
+            if let Ok(strategy) = etcetera::base_strategy::choose_base_strategy() {
                 let config_dir = strategy.config_dir().join("rustfmt");
                 if let Some(path) = get_toml_path(&config_dir)? {
+                    return Ok(Some(path));
+                }
+            }
+
+            // If nothing was found there either, check the legacy configuration directory.
+            if let Ok(strategy) = etcetera::base_strategy::choose_native_strategy() {
+                let data_dir = strategy.data_dir().join("rustfmt");
+                if let Some(path) = get_toml_path(&data_dir)? {
                     return Ok(Some(path));
                 }
             }
