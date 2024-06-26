@@ -42,6 +42,25 @@ pub(crate) enum RewriteError {
     Unknown,
 }
 
+/// Extension trait used to conveniently convert to RewriteError
+pub(crate) trait RewriteErrorExt<T> {
+    fn max_width_error(self, width: usize, span: Span) -> Result<T, RewriteError>;
+    fn unknown_error(self) -> Result<T, RewriteError>;
+}
+
+impl<T> RewriteErrorExt<T> for Option<T> {
+    fn max_width_error(self, width: usize, span: Span) -> Result<T, RewriteError> {
+        self.ok_or_else(|| RewriteError::ExceedsMaxWidth {
+            configured_width: width,
+            span: span,
+        })
+    }
+
+    fn unknown_error(self) -> Result<T, RewriteError> {
+        self.ok_or_else(|| RewriteError::Unknown)
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct RewriteContext<'a> {
     pub(crate) psess: &'a ParseSess,
