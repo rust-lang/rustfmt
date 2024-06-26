@@ -458,7 +458,9 @@ impl UseTree {
                     version,
                 });
             }
-            UseTreeKind::Nested(ref list) => {
+            UseTreeKind::Nested {
+                items: ref list, ..
+            } => {
                 // Extract comments between nested use items.
                 // This needs to be done before sorting use items.
                 let items = itemize_list(
@@ -683,9 +685,9 @@ impl UseTree {
                 let prefix = &self.path[..self.path.len() - 1];
                 let mut result = vec![];
                 for nested_use_tree in list {
-                    for flattend in &mut nested_use_tree.clone().flatten(import_granularity) {
+                    for flattened in &mut nested_use_tree.clone().flatten(import_granularity) {
                         let mut new_path = prefix.to_vec();
-                        new_path.append(&mut flattend.path);
+                        new_path.append(&mut flattened.path);
                         result.push(UseTree {
                             path: new_path,
                             span: self.span,
@@ -1102,7 +1104,6 @@ enum SharedPrefix {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rustc_span::DUMMY_SP;
 
     // Parse the path part of an import. This parser is not robust and is only
     // suitable for use in a test harness.

@@ -2,10 +2,10 @@
 
 use std::iter::repeat;
 
-use rustc_ast::{ast, ptr};
+use rustc_ast::{ast, ptr, MatchKind};
 use rustc_span::{BytePos, Span};
 
-use crate::comment::{combine_strs_with_missing_comments, rewrite_comment};
+use crate::comment::{combine_strs_with_missing_comments, rewrite_comment, FindUncommented};
 use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, IndentStyle, MatchArmLeadingPipe, Version};
 use crate::expr::{
@@ -72,6 +72,7 @@ pub(crate) fn rewrite_match(
     shape: Shape,
     span: Span,
     attrs: &[ast::Attribute],
+    match_kind: MatchKind,
 ) -> Option<String> {
     // Do not take the rhs overhead from the upper expressions into account
     // when rewriting match condition.
@@ -103,6 +104,10 @@ pub(crate) fn rewrite_match(
     let inner_attrs_str = if inner_attrs.is_empty() {
         String::new()
     } else {
+        let shape = match context.config.version() {
+            Version::One => shape,
+            _ => shape.block_indent(context.config.tab_spaces()),
+        };
         inner_attrs
             .rewrite(context, shape)
             .map(|s| format!("{}{}\n", nested_indent_str, s))?
@@ -131,15 +136,27 @@ pub(crate) fn rewrite_match(
         }
     } else {
         let span_after_cond = mk_sp(cond.span.hi(), span.hi());
-        Some(format!(
-            "match {}{}{{\n{}{}{}\n{}}}",
-            cond_str,
-            block_sep,
-            inner_attrs_str,
-            nested_indent_str,
-            rewrite_match_arms(context, arms, shape, span_after_cond, open_brace_pos)?,
-            shape.indent.to_string(context.config),
-        ))
+
+        match match_kind {
+            MatchKind::Prefix => Some(format!(
+                "match {}{}{{\n{}{}{}\n{}}}",
+                cond_str,
+                block_sep,
+                inner_attrs_str,
+                nested_indent_str,
+                rewrite_match_arms(context, arms, shape, span_after_cond, open_brace_pos)?,
+                shape.indent.to_string(context.config),
+            )),
+            MatchKind::Postfix => Some(format!(
+                "{}.match{}{{\n{}{}{}\n{}}}",
+                cond_str,
+                block_sep,
+                inner_attrs_str,
+                nested_indent_str,
+                rewrite_match_arms(context, arms, shape, span_after_cond, open_brace_pos)?,
+                shape.indent.to_string(context.config),
+            )),
+        }
     }
 }
 
@@ -223,7 +240,7 @@ fn rewrite_match_arm(
 ) -> Option<String> {
     let (missing_span, attrs_str) = if !arm.attrs.is_empty() {
         if contains_skip(&arm.attrs) {
-            let (_, body) = flatten_arm_body(context, &arm.body, None);
+            let (_, body) = flatten_arm_body(context, arm.body.as_deref()?, None);
             // `arm.span()` does not include trailing comma, add it manually.
             return Some(format!(
                 "{}{}",
@@ -246,7 +263,7 @@ fn rewrite_match_arm(
     };
 
     // Patterns
-    let pat_shape = match &arm.body.kind {
+    let pat_shape = match &arm.body.as_ref()?.kind {
         ast::ExprKind::Block(_, Some(label)) => {
             // Some block with a label ` => 'label: {`
             // 7 = ` => : {`
@@ -280,10 +297,10 @@ fn rewrite_match_arm(
         false,
     )?;
 
-    let arrow_span = mk_sp(arm.pat.span.hi(), arm.body.span().lo());
+    let arrow_span = mk_sp(arm.pat.span.hi(), arm.body.as_ref()?.span().lo());
     rewrite_match_body(
         context,
-        &arm.body,
+        arm.body.as_ref()?,
         &lhs_str,
         shape,
         guard_str.contains('\n'),
@@ -339,10 +356,10 @@ fn flatten_arm_body<'a>(
                     (true, body)
                 }
             } else {
-                let cond_becomes_muti_line = opt_shape
+                let cond_becomes_multi_line = opt_shape
                     .and_then(|shape| rewrite_cond(context, expr, shape))
                     .map_or(false, |cond| cond.contains('\n'));
-                if cond_becomes_muti_line {
+                if cond_becomes_multi_line {
                     (false, &*body)
                 } else {
                     (can_extend(expr), &*expr)
@@ -402,7 +419,11 @@ fn rewrite_match_body(
         let arrow_snippet = context.snippet(arrow_span).trim();
         // search for the arrow starting from the end of the snippet since there may be a match
         // expression within the guard
-        let arrow_index = arrow_snippet.rfind("=>").unwrap();
+        let arrow_index = if context.config.version() == Version::One {
+            arrow_snippet.rfind("=>").unwrap()
+        } else {
+            arrow_snippet.find_last_uncommented("=>").unwrap()
+        };
         // 2 = `=>`
         let comment_str = arrow_snippet[arrow_index + 2..].trim();
         if comment_str.is_empty() {
@@ -591,7 +612,7 @@ fn can_flatten_block_around_this(body: &ast::Expr) -> bool {
         ast::ExprKind::If(..) => false,
         // We do not allow collapsing a block around expression with condition
         // to avoid it being cluttered with match arm.
-        ast::ExprKind::ForLoop(..) | ast::ExprKind::While(..) => false,
+        ast::ExprKind::ForLoop { .. } | ast::ExprKind::While(..) => false,
         ast::ExprKind::Loop(..)
         | ast::ExprKind::Match(..)
         | ast::ExprKind::Block(..)

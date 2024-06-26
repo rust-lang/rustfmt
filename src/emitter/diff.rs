@@ -32,7 +32,7 @@ impl Emitter for DiffEmitter {
             } else {
                 print_diff(
                     mismatch,
-                    |line_num| format!("Diff in {} at line {}:", filename, line_num),
+                    |line_num| format!("Diff in {}:{}:", filename, line_num),
                     &self.config,
                 );
             }
@@ -51,8 +51,6 @@ impl Emitter for DiffEmitter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
-    use crate::FileName;
     use std::path::PathBuf;
 
     #[test]

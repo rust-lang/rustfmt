@@ -25,6 +25,7 @@ use crate::comment::{
     contains_comment, CharClasses, FindUncommented, FullCodeCharKind, LineClasses,
 };
 use crate::config::lists::*;
+use crate::config::Version;
 use crate::expr::{rewrite_array, rewrite_assign_rhs, RhsAssignKind};
 use crate::lists::{itemize_list, write_list, ListFormatting};
 use crate::overflow;
@@ -136,8 +137,8 @@ fn return_macro_parse_failure_fallback(
     }
 
     context.skipped_range.borrow_mut().push((
-        context.parse_sess.line_of_byte_pos(span.lo()),
-        context.parse_sess.line_of_byte_pos(span.hi()),
+        context.psess.line_of_byte_pos(span.lo()),
+        context.psess.line_of_byte_pos(span.hi()),
     ));
 
     // Return the snippet unmodified if the macro is not block-like
@@ -389,7 +390,7 @@ fn rewrite_empty_macro_def_body(
         stmts: vec![].into(),
         id: rustc_ast::node_id::DUMMY_NODE_ID,
         rules: ast::BlockCheckMode::Default,
-        span: span,
+        span,
         tokens: None,
         could_be_bare_literal: false,
     };
@@ -708,7 +709,7 @@ struct MacroArgParser {
 fn last_tok(tt: &TokenTree) -> Token {
     match *tt {
         TokenTree::Token(ref t, _) => t.clone(),
-        TokenTree::Delimited(delim_span, delim, _) => Token {
+        TokenTree::Delimited(delim_span, _, delim, _) => Token {
             kind: TokenKind::CloseDelim(delim),
             span: delim_span.close,
         },
@@ -925,7 +926,7 @@ impl MacroArgParser {
                     self.add_meta_variable(&mut iter)?;
                 }
                 TokenTree::Token(ref t, _) => self.update_buffer(t),
-                &TokenTree::Delimited(_delimited_span, delimited, ref tts) => {
+                &TokenTree::Delimited(_dspan, _spacing, delimited, ref tts) => {
                     if !self.buf.is_empty() {
                         if next_space(&self.last_tok.kind) == SpaceState::Always {
                             self.add_separator();
@@ -1091,7 +1092,7 @@ fn next_space(tok: &TokenKind) -> SpaceState {
         | TokenKind::DotDotEq
         | TokenKind::Question => SpaceState::Punctuation,
 
-        TokenKind::ModSep
+        TokenKind::PathSep
         | TokenKind::Pound
         | TokenKind::Dollar
         | TokenKind::OpenDelim(_)
@@ -1167,7 +1168,7 @@ impl<'a> MacroParser<'a> {
         let tok = self.toks.next()?;
         let (lo, args_paren_kind) = match tok {
             TokenTree::Token(..) => return None,
-            &TokenTree::Delimited(delimited_span, d, _) => (delimited_span.open.lo(), d),
+            &TokenTree::Delimited(delimited_span, _, d, _) => (delimited_span.open.lo(), d),
         };
         let args = TokenStream::new(vec![tok.clone()]);
         match self.toks.next()? {
@@ -1245,8 +1246,16 @@ impl MacroBranch {
             return None;
         }
 
-        // 5 = " => {"
-        let mut result = format_macro_args(context, self.args.clone(), shape.sub_width(5)?)?;
+        let old_body = context.snippet(self.body).trim();
+        let has_block_body = old_body.starts_with('{');
+        let mut prefix_width = 5; // 5 = " => {"
+        if context.config.version() == Version::Two {
+            if has_block_body {
+                prefix_width = 6; // 6 = " => {{"
+            }
+        }
+        let mut result =
+            format_macro_args(context, self.args.clone(), shape.sub_width(prefix_width)?)?;
 
         if multi_branch_style {
             result += " =>";
@@ -1264,12 +1273,10 @@ impl MacroBranch {
         // `$$`). We'll try and format like an AST node, but we'll substitute
         // variables for new names with the same length first.
 
-        let old_body = context.snippet(self.body).trim();
         let (body_str, substs) = replace_names(old_body)?;
-        let has_block_body = old_body.starts_with('{');
 
         let mut config = context.config.clone();
-        config.set().hide_parse_errors(true);
+        config.set().show_parse_errors(false);
 
         result += " {";
 

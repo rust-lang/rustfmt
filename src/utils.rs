@@ -75,10 +75,11 @@ pub(crate) fn format_visibility(
 }
 
 #[inline]
-pub(crate) fn format_async(is_async: &ast::Async) -> &'static str {
-    match is_async {
-        ast::Async::Yes { .. } => "async ",
-        ast::Async::No => "",
+pub(crate) fn format_coro(coroutine_kind: &ast::CoroutineKind) -> &'static str {
+    match coroutine_kind {
+        ast::CoroutineKind::Async { .. } => "async ",
+        ast::CoroutineKind::Gen { .. } => "gen ",
+        ast::CoroutineKind::AsyncGen { .. } => "async gen ",
     }
 }
 
@@ -107,10 +108,11 @@ pub(crate) fn format_defaultness(defaultness: ast::Defaultness) -> &'static str 
 }
 
 #[inline]
-pub(crate) fn format_unsafety(unsafety: ast::Unsafe) -> &'static str {
+pub(crate) fn format_safety(unsafety: ast::Safety) -> &'static str {
     match unsafety {
-        ast::Unsafe::Yes(..) => "unsafe ",
-        ast::Unsafe::No => "",
+        ast::Safety::Unsafe(..) => "unsafe ",
+        ast::Safety::Safe(..) => "safe ",
+        ast::Safety::Default => "",
     }
 }
 
@@ -294,7 +296,7 @@ pub(crate) fn semicolon_for_stmt(
 ) -> bool {
     match stmt.kind {
         ast::StmtKind::Semi(ref expr) => match expr.kind {
-            ast::ExprKind::While(..) | ast::ExprKind::Loop(..) | ast::ExprKind::ForLoop(..) => {
+            ast::ExprKind::While(..) | ast::ExprKind::Loop(..) | ast::ExprKind::ForLoop { .. } => {
                 false
             }
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
@@ -361,7 +363,7 @@ macro_rules! out_of_file_lines_range {
             && !$self
                 .config
                 .file_lines()
-                .intersects(&$self.parse_sess.lookup_line_range($span))
+                .intersects(&$self.psess.lookup_line_range($span))
     };
 }
 
@@ -473,9 +475,9 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::If(..)
         | ast::ExprKind::Block(..)
         | ast::ExprKind::ConstBlock(..)
-        | ast::ExprKind::Async(..)
+        | ast::ExprKind::Gen(..)
         | ast::ExprKind::Loop(..)
-        | ast::ExprKind::ForLoop(..)
+        | ast::ExprKind::ForLoop { .. }
         | ast::ExprKind::TryBlock(..)
         | ast::ExprKind::Match(..) => repr.contains('\n'),
         ast::ExprKind::Paren(ref expr)
@@ -496,7 +498,8 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Break(..)
         | ast::ExprKind::Cast(..)
         | ast::ExprKind::Continue(..)
-        | ast::ExprKind::Err
+        | ast::ExprKind::Dummy
+        | ast::ExprKind::Err(_)
         | ast::ExprKind::Field(..)
         | ast::ExprKind::IncludedBytes(..)
         | ast::ExprKind::InlineAsm(..)
