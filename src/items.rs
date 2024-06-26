@@ -1859,10 +1859,10 @@ fn type_annotation_spacing(config: &Config) -> (&str, &str) {
 pub(crate) fn rewrite_struct_field_prefix(
     context: &RewriteContext<'_>,
     field: &ast::FieldDef,
-) -> Option<String> {
+) -> RewriteResult {
     let vis = format_visibility(context, &field.vis);
     let type_annotation_spacing = type_annotation_spacing(context.config);
-    Some(match field.ident {
+    Ok(match field.ident {
         Some(name) => format!(
             "{}{}{}:",
             vis,
@@ -1875,6 +1875,9 @@ pub(crate) fn rewrite_struct_field_prefix(
 
 impl Rewrite for ast::FieldDef {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        self.rewrite_result(context, shape).ok()
+    }
+    fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         rewrite_struct_field(context, self, shape, 0)
     }
 }
@@ -1884,15 +1887,15 @@ pub(crate) fn rewrite_struct_field(
     field: &ast::FieldDef,
     shape: Shape,
     lhs_max_width: usize,
-) -> Option<String> {
+) -> RewriteResult {
     if contains_skip(&field.attrs) {
-        return Some(context.snippet(field.span()).to_owned());
+        return Ok(context.snippet(field.span()).to_owned());
     }
 
     let type_annotation_spacing = type_annotation_spacing(context.config);
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
-    let attrs_str = field.attrs.rewrite(context, shape)?;
+    let attrs_str = field.attrs.rewrite_result(context, shape)?;
     let attrs_extendable = field.ident.is_none() && is_attributes_extendable(&attrs_str);
     let missing_span = if field.attrs.is_empty() {
         mk_sp(field.span.lo(), field.span.lo())
@@ -1912,7 +1915,8 @@ pub(crate) fn rewrite_struct_field(
         missing_span,
         shape,
         attrs_extendable,
-    )?;
+    )
+    .ok_or_else(|| RewriteError::Unknown)?;
     let overhead = trimmed_last_line_width(&attr_prefix);
     let lhs_offset = lhs_max_width.saturating_sub(overhead);
     for _ in 0..lhs_offset {
@@ -1922,18 +1926,28 @@ pub(crate) fn rewrite_struct_field(
     if prefix.is_empty() && !attrs_str.is_empty() && attrs_extendable && spacing.is_empty() {
         spacing.push(' ');
     }
-    let orig_ty = shape
-        .offset_left(overhead + spacing.len())
-        .and_then(|ty_shape| field.ty.rewrite(context, ty_shape));
-    if let Some(ref ty) = orig_ty {
+
+    // Question. Why don't we immediately return None/Err with ?
+    // let orig_ty = shape
+    //     .offset_left(overhead + spacing.len())
+    //     .and_then(|ty_shape| field.ty.rewrite(context, ty_shape));
+    let ty_shape = shape.offset_left(overhead + spacing.len()).ok_or_else(|| {
+        RewriteError::ExceedsMaxWidth {
+            configured_width: shape.width,
+            span: field.span(),
+        }
+    })?;
+    let orig_ty = field.ty.rewrite_result(context, ty_shape);
+    if let Ok(ref ty) = orig_ty {
         if !ty.contains('\n') && !contains_comment(context.snippet(missing_span)) {
-            return Some(attr_prefix + &spacing + ty);
+            return Ok(attr_prefix + &spacing + ty);
         }
     }
 
     let is_prefix_empty = prefix.is_empty();
     // We must use multiline. We are going to put attributes and a field on different lines.
-    let field_str = rewrite_assign_rhs(context, prefix, &*field.ty, &RhsAssignKind::Ty, shape)?;
+    let field_str = rewrite_assign_rhs(context, prefix, &*field.ty, &RhsAssignKind::Ty, shape)
+        .ok_or_else(|| RewriteError::Unknown)?;
     // Remove a leading white-space from `rewrite_assign_rhs()` when rewriting a tuple struct.
     let field_str = if is_prefix_empty {
         field_str.trim_start()
@@ -1941,6 +1955,7 @@ pub(crate) fn rewrite_struct_field(
         &field_str
     };
     combine_strs_with_missing_comments(context, &attrs_str, field_str, missing_span, shape, false)
+        .ok_or_else(|| RewriteError::Unknown)
 }
 
 pub(crate) struct StaticParts<'a> {
@@ -2211,7 +2226,6 @@ impl Rewrite for ast::Param {
                 shape,
                 has_multiple_attr_lines,
             )
-            .ok_or_else(|| RewriteError::Unknown)
         } else if is_named_param(self) {
             let param_name = &self
                 .pat
@@ -2291,58 +2305,62 @@ fn rewrite_explicit_self(
     span: Span,
     shape: Shape,
     has_multiple_attr_lines: bool,
-) -> Option<String> {
+) -> RewriteResult {
     match explicit_self.node {
         ast::SelfKind::Region(lt, m) => {
             let mut_str = format_mutability(m);
             match lt {
                 Some(ref l) => {
-                    let lifetime_str = l.rewrite(
+                    let lifetime_str = l.rewrite_result(
                         context,
                         Shape::legacy(context.config.max_width(), Indent::empty()),
                     )?;
-                    Some(combine_strs_with_missing_comments(
+                    Ok(combine_strs_with_missing_comments(
                         context,
                         param_attrs,
                         &format!("&{lifetime_str} {mut_str}self"),
                         span,
                         shape,
                         !has_multiple_attr_lines,
-                    )?)
+                    )
+                    .ok_or_else(|| RewriteError::Unknown)?)
                 }
-                None => Some(combine_strs_with_missing_comments(
+                None => Ok(combine_strs_with_missing_comments(
                     context,
                     param_attrs,
                     &format!("&{mut_str}self"),
                     span,
                     shape,
                     !has_multiple_attr_lines,
-                )?),
+                )
+                .ok_or_else(|| RewriteError::Unknown)?),
             }
         }
         ast::SelfKind::Explicit(ref ty, mutability) => {
-            let type_str = ty.rewrite(
+            let type_str = ty.rewrite_result(
                 context,
                 Shape::legacy(context.config.max_width(), Indent::empty()),
             )?;
 
-            Some(combine_strs_with_missing_comments(
+            Ok(combine_strs_with_missing_comments(
                 context,
                 param_attrs,
                 &format!("{}self: {}", format_mutability(mutability), type_str),
                 span,
                 shape,
                 !has_multiple_attr_lines,
-            )?)
+            )
+            .ok_or_else(|| RewriteError::Unknown)?)
         }
-        ast::SelfKind::Value(mutability) => Some(combine_strs_with_missing_comments(
+        ast::SelfKind::Value(mutability) => Ok(combine_strs_with_missing_comments(
             context,
             param_attrs,
             &format!("{}self", format_mutability(mutability)),
             span,
             shape,
             !has_multiple_attr_lines,
-        )?),
+        )
+        .ok_or_else(|| RewriteError::Unknown)?),
     }
 }
 

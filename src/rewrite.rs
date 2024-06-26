@@ -14,7 +14,7 @@ use crate::skip::SkipContext;
 use crate::visitor::SnippetProvider;
 use crate::FormatReport;
 
-pub type RewriteResult = Result<String, RewriteError>;
+pub(crate) type RewriteResult = Result<String, RewriteError>;
 pub(crate) trait Rewrite {
     /// Rewrite self into shape.
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String>;
