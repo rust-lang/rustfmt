@@ -1917,10 +1917,9 @@ pub(crate) fn rewrite_struct_field(
 
     let orig_ty = shape
         .offset_left(overhead + spacing.len())
-        .unknown_error()
-        .and_then(|ty_shape| field.ty.rewrite_result(context, ty_shape));
+        .and_then(|ty_shape| field.ty.rewrite_result(context, ty_shape).ok());
 
-    if let Ok(ref ty) = orig_ty {
+    if let Some(ref ty) = orig_ty {
         if !ty.contains('\n') && !contains_comment(context.snippet(missing_span)) {
             return Ok(attr_prefix + &spacing + ty);
         }
