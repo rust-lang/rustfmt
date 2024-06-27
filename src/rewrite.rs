@@ -20,7 +20,7 @@ pub(crate) trait Rewrite {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String>;
 
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
-        self.rewrite(context, shape).ok_or(RewriteError::Unknown)
+        self.rewrite(context, shape).unknown_error()
     }
 }
 

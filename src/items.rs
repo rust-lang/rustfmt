@@ -2115,7 +2115,10 @@ impl Rewrite for ast::FnRetTy {
                         .checked_sub(arrow_width)
                         .max_width_error(shape.width, self.span())?;
                     return ty
-                        .rewrite_result(context, Shape::legacy(inner_width, shape.indent + 3))
+                        .rewrite_result(
+                            context,
+                            Shape::legacy(inner_width, shape.indent + arrow_width),
+                        )
                         .map(|r| format!("-> {}", r));
                 }
 
