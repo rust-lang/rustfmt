@@ -128,7 +128,9 @@ impl Rewrite for ast::Local {
 
         if let Some((init, else_block)) = self.kind.init_else_opt() {
             // 1 = trailing semicolon;
-            let nested_shape = shape.sub_width(1).unknown_error()?;
+            let nested_shape = shape
+                .sub_width(1)
+                .max_width_error(shape.width, self.span())?;
 
             result = rewrite_assign_rhs(
                 context,
@@ -1862,6 +1864,7 @@ impl Rewrite for ast::FieldDef {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
+
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         rewrite_struct_field(context, self, shape, 0)
     }
@@ -1912,14 +1915,11 @@ pub(crate) fn rewrite_struct_field(
         spacing.push(' ');
     }
 
-    // Question. Why don't we immediately return None/Err with ?
-    // let orig_ty = shape
-    //     .offset_left(overhead + spacing.len())
-    //     .and_then(|ty_shape| field.ty.rewrite(context, ty_shape));
-    let ty_shape = shape
+    let orig_ty = shape
         .offset_left(overhead + spacing.len())
-        .max_width_error(shape.width, field.ty.span())?;
-    let orig_ty = field.ty.rewrite_result(context, ty_shape);
+        .unknown_error()
+        .and_then(|ty_shape| field.ty.rewrite_result(context, ty_shape));
+
     if let Ok(ref ty) = orig_ty {
         if !ty.contains('\n') && !contains_comment(context.snippet(missing_span)) {
             return Ok(attr_prefix + &spacing + ty);
@@ -2101,25 +2101,26 @@ impl Rewrite for ast::FnRetTy {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
+
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         match *self {
             ast::FnRetTy::Default(_) => Ok(String::new()),
             ast::FnRetTy::Ty(ref ty) => {
+                let arrow_width = "-> ".len();
                 if context.config.version() == Version::One
                     || context.config.indent_style() == IndentStyle::Visual
                 {
                     let inner_width = shape
                         .width
-                        .checked_sub(3)
+                        .checked_sub(arrow_width)
                         .max_width_error(shape.width, self.span())?;
                     return ty
                         .rewrite_result(context, Shape::legacy(inner_width, shape.indent + 3))
                         .map(|r| format!("-> {}", r));
                 }
 
-                // 3 = "-> "
                 let shape = shape
-                    .offset_left(3)
+                    .offset_left(arrow_width)
                     .max_width_error(shape.width, self.span())?;
 
                 ty.rewrite_result(context, shape)

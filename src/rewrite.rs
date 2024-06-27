@@ -18,6 +18,7 @@ pub(crate) type RewriteResult = Result<String, RewriteError>;
 pub(crate) trait Rewrite {
     /// Rewrite self into shape.
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String>;
+
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         self.rewrite(context, shape).ok_or(RewriteError::Unknown)
     }
@@ -81,6 +82,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) skip_context: SkipContext,
     pub(crate) skipped_range: Rc<RefCell<Vec<(usize, usize)>>>,
 }
+
 pub(crate) struct InsideMacroGuard {
     is_nested_macro_context: bool,
     inside_macro_ref: Rc<Cell<bool>>,
