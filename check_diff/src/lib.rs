@@ -1,12 +1,18 @@
 use std::env;
-use std::io::{self, Write};
+use std::io;
 use std::path::Path;
 use std::process::Command;
-use tracing::{event, Level};
+use tracing::info;
 
-pub struct GitErrors {
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
+pub enum GitError {
+    FailedClone { stdout: Vec<u8>, stderr: Vec<u8> },
+    IO(std::io::Error),
+}
+
+impl From<io::Error> for GitError {
+    fn from(error: io::Error) -> Self {
+        GitError::IO(error)
+    }
 }
 
 /// Clone a git repository
@@ -14,7 +20,7 @@ pub struct GitErrors {
 /// Parameters:
 /// url: git clone url
 /// dest: directory where the repo should be cloned
-pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitErrors> {
+pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitError> {
     let git_cmd = Command::new("git")
         .env("GIT_TERMINAL_PROMPT", "0")
         .args([
@@ -25,30 +31,28 @@ pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitErrors> {
             "1",
             dest.to_str().unwrap(),
         ])
-        .output()
-        .expect("failed to clone repository");
+        .output()?;
+
     // if the git command does not return successfully,
     // any command on the repo will fail. So fail fast.
     if !git_cmd.status.success() {
-        io::stdout().write_all(&git_cmd.stdout).unwrap();
-        io::stderr().write_all(&git_cmd.stderr).unwrap();
-        let errors = GitErrors {
-            stderr: git_cmd.stderr,
+        let error = GitError::FailedClone {
             stdout: git_cmd.stdout,
+            stderr: git_cmd.stderr,
         };
-        return Err(errors);
-    } else {
-        event!(Level::INFO, "Successfully clone repository.");
-        return Ok(());
+        return Err(error);
     }
+
+    info!("Successfully clone repository.");
+    return Ok(());
 }
 
-pub fn change_directory_to_path(dest: &Path) {
+pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     let dest_path = Path::new(&dest);
-    let _ = env::set_current_dir(&dest_path).is_ok();
-    event!(
-        Level::INFO,
+    env::set_current_dir(&dest_path)?;
+    info!(
         "Current directory: {}",
         env::current_dir().unwrap().display()
     );
+    return Ok(());
 }
