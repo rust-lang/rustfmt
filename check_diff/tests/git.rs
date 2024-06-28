@@ -2,6 +2,7 @@ use check_diff::clone_git_repo;
 
 use std::fs;
 use tempfile::Builder;
+use tracing::error;
 
 #[test]
 fn clone_repo_test() {
@@ -19,12 +20,14 @@ fn clone_repo_test() {
             assert_eq!(directory.iter().next().is_none(), false);
             match d.close() {
                 Ok(_) => {}
-                Err(_) => {
+                Err(e) => {
+                    error!("Error from closing: {}", e);
                     assert_eq!(1, 2);
                 }
             }
         }
-        Err(_) => {
+        Err(e) => {
+            error!("Error from building: {}", e);
             assert_eq!(1, 2);
         }
     }

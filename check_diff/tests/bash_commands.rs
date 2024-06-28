@@ -2,6 +2,7 @@ use check_diff::change_directory_to_path;
 use std::env;
 use std::ffi::OsStr;
 use tempfile::Builder;
+use tracing::error;
 
 #[test]
 fn cd_test() {
@@ -20,13 +21,13 @@ fn cd_test() {
             match d.close() {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("Error from closing: {}", e);
+                    error!("Error from closing: {}", e);
                     assert_eq!(1, 2);
                 }
             }
         }
         Err(e) => {
-            println!("Error from building: {}", e);
+            error!("Error from building: {}", e);
             assert_eq!(1, 2);
         }
     };
