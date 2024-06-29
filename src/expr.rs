@@ -1111,8 +1111,18 @@ impl<'a> Rewrite for ControlFlow<'a> {
         };
         let block_str = {
             let old_val = context.is_if_else_block.replace(self.else_block.is_some());
-            let result =
-                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true);
+            let result = if self.keyword == "if" {
+                format_if(
+                    context,
+                    shape,
+                    self.block,
+                    &cond_str,
+                    used_width,
+                    block_shape,
+                )
+            } else {
+                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true)
+            };
             context.is_if_else_block.replace(old_val);
             result?
         };
@@ -1164,6 +1174,72 @@ impl<'a> Rewrite for ControlFlow<'a> {
         }
 
         Some(result)
+    }
+}
+
+fn format_if(
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    block: &ast::Block,
+    cond_str: &str,
+    used_width: usize,
+    block_shape: Shape,
+) -> Option<String> {
+    let max_width = if context.config.single_line_if() {
+        std::cmp::min(
+            shape.width,
+            context.config.single_line_simple_if_max_width(),
+        )
+    } else {
+        shape.width
+    };
+    let available_space = max_width.saturating_sub(used_width);
+    let allow_single_line = context.config.single_line_if()
+        && available_space > 0
+        && allow_single_line_if(&cond_str, block);
+
+    let result = if allow_single_line {
+        let mut single_line_attempt =
+            rewrite_block_inner(block, None, None, true, context, block_shape)?;
+        if !single_line_attempt.contains('\n') && single_line_attempt.len() > available_space {
+            single_line_attempt =
+                rewrite_block_inner(block, None, None, false, context, block_shape)?;
+        }
+        Some(single_line_attempt)
+    } else {
+        rewrite_block_with_visitor(context, "", block, None, None, block_shape, true)
+    };
+    result
+}
+
+fn allow_single_line_if(result: &str, block: &ast::Block) -> bool {
+    if result.contains('\n') {
+        return false;
+    }
+    if block.stmts.len() == 0 {
+        return true;
+    }
+    if block.stmts.len() == 1 {
+        return is_simple_control_flow_stmt(&block.stmts[0]);
+    }
+    false
+}
+
+fn is_simple_control_flow_stmt(stmt: &ast::Stmt) -> bool {
+    match stmt.kind {
+        ast::StmtKind::Expr(ref expr) => match expr.kind {
+            ast::ExprKind::Continue(..) => true,
+            ast::ExprKind::Break(_, ref opt_expr) | ast::ExprKind::Ret(ref opt_expr) => {
+                if let Some(_) = *opt_expr {
+                    // Do not allow single line if block has `return/break` with a returned value
+                    false
+                } else {
+                    true
+                }
+            }
+            _ => false,
+        },
+        _ => false,
     }
 }
 

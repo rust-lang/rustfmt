@@ -2490,6 +2490,85 @@ fn main() {
 
 See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
+## `single_line_if`
+
+Allows if blocks to format on one line only if they contain a single expression of `return`, `continue` or `break`. Useful in the case of keeping `let-else` guards format consistent with `if` guards.
+
+Note that line will still break if:
+1. The total length (condition and block) is over the `max_width`/`single_line_simple_if_max_width length`
+2. The block ends with a trailing semicolon
+3. The block contains a single or multi-lined comment
+4. The block contains `return` or `break` and returns a value
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+#### `false` (default):
+
+```rust
+fn main() {
+    if true {
+        break;
+    }
+
+    if false {
+        return;
+    }
+
+    if false {
+        return 5;
+    }
+
+    if width == is_49_characters____long {
+        continue;
+    }
+
+    if width == is_50_characters_____long {
+        continue;
+    }
+
+    if width == is_51_characters______long {
+        continue;
+    }
+}
+```
+
+#### `true`:
+
+```rust
+fn main() {
+    if true { break }
+
+    if false { return }
+
+    if false {
+        return 5;
+    }
+
+    if width == is_49_characters____long { continue }
+
+    if width == is_50_characters_____long { continue }
+
+    if width == is_51_characters______long {
+        continue;
+    }
+}
+```
+
+## `single_line_simple_if_max_width`
+
+Maximum line length for single line if with a simple inner expression. Useful in the case of keeping `let-else` guards format consistent with `if` guards.
+
+A value of `0` (zero) results in if blocks always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
+
+- **Default value**: `50`
+- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Stable**: Yes
+
+By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `single_line_if_else_max_width` will take precedence.
+
+See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
 ## `space_after_colon`
 
