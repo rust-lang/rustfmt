@@ -876,7 +876,26 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             .collect();
 
         if items.is_empty() {
+            let stmt = &stmts[0];
+
+            let should_preced_with_empty_line = self.config.surround_blocks_with_empty_lines()
+                && !self.buffer.ends_with('\n')
+                && !stmt.is_first()
+                && stmt.is_block_with_curly_braces();
+
+            if should_preced_with_empty_line {
+                self.push_str("\n");
+            }
+
             self.visit_stmt(&stmts[0], include_current_empty_semi);
+
+            let should_follow_with_empty_line = self.config.surround_blocks_with_empty_lines()
+                && !stmt.is_last()
+                && stmt.is_block_with_curly_braces();
+
+            if should_follow_with_empty_line {
+                self.push_str("\n");
+            }
 
             // FIXME(calebcartwright 2021-01-03) - This exists strictly to maintain legacy
             // formatting where rustfmt would preserve redundant semicolons on Items in a
