@@ -811,7 +811,13 @@ impl<'a> CommentRewrite<'a> {
         } else if self.is_prev_line_multi_line && !line.is_empty() {
             self.result.push(' ')
         } else if is_last && line.is_empty() {
-            // trailing blank lines are unwanted
+            // Trailing blank lines are unwanted; if the last line is blank, look for additional,
+            // preceding blank lines to remove, also.
+            let trailing_line = self.comment_line_separator.trim_end_matches(' ');
+            while self.result.ends_with(trailing_line) {
+                self.result
+                    .truncate(self.result.len() - trailing_line.len());
+            }
             if !self.closer.is_empty() {
                 self.result.push_str(&self.indent_str);
             }
