@@ -1860,7 +1860,11 @@ fn rewrite_let(
     // TODO(ytmimi) comments could appear between `let` and the `pat`
 
     // 4 = "let ".len()
-    let pat_shape = shape.offset_left(4)?;
+    let mut pat_shape = shape.offset_left(4)?;
+    if context.config.version() == Version::Two {
+        // 2 to account for the length of " ="
+        pat_shape = pat_shape.sub_width(2)?;
+    }
     let pat_str = pat.rewrite(context, pat_shape)?;
     result.push_str(&pat_str);
 
