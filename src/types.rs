@@ -685,7 +685,7 @@ impl Rewrite for ast::GenericParam {
 
         let param_start = if let ast::GenericParamKind::Const {
             ref ty,
-            kw_span,
+            span,
             default,
         } = &self.kind
         {
@@ -707,7 +707,7 @@ impl Rewrite for ast::GenericParam {
                     default.rewrite_result(context, Shape::legacy(budget, shape.indent))?;
                 param.push_str(&rewrite);
             }
-            kw_span.lo()
+            span.lo()
         } else {
             param.push_str(rewrite_ident(context, self.ident));
             self.ident.span.lo()
