@@ -264,3 +264,11 @@ fn issue_3034() {
     disallowed_headers.iter().any(|header| *header == name) ||
         disallowed_header_prefixes.iter().any(|prefix| name.starts_with(prefix))
 }
+
+fn issue_5823() {
+    a.b(
+      |    | {
+     let c = "very long text for formatting test of very long text, frequently used on logging and other situations";
+        }
+    );
+}
