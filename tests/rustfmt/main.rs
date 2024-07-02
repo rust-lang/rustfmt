@@ -2,13 +2,51 @@
 
 use std::env;
 use std::fs::remove_file;
+use std::io::{Result, Write};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
 
 use rustfmt_config_proc_macro::rustfmt_only_ci_test;
 
 /// Run the rustfmt executable and return its output.
 fn rustfmt(args: &[&str]) -> (String, String) {
+    match rustfm_builder(|rustfmt| rustfmt.args(args).output()) {
+        Ok(output) => (
+            String::from_utf8(output.stdout).expect("utf-8"),
+            String::from_utf8(output.stderr).expect("utf-8"),
+        ),
+        Err(e) => panic!("failed to run `rustfmt {:?}`: {}", args, e),
+    }
+}
+
+/// Run the rustfmt executable and take input from stdin
+fn rustfmt_std_input(args: &[&str], input: &str) -> (String, String) {
+    let output = rustfm_builder(|cmd| {
+        let mut rustfmt = cmd
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+
+        rustfmt
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(input.as_bytes())?;
+        rustfmt.wait_with_output()
+    });
+    match output {
+        Ok(output) => (
+            String::from_utf8(output.stdout).expect("utf-8"),
+            String::from_utf8(output.stderr).expect("utf-8"),
+        ),
+        Err(e) => panic!("failed to run `rustfmt {:?}`: {}", args, e),
+    }
+}
+
+fn rustfm_builder<F: Fn(&mut Command) -> Result<Output>>(f: F) -> Result<Output> {
     let mut bin_dir = env::current_exe().unwrap();
     bin_dir.pop(); // chop off test exe name
     if bin_dir.ends_with("deps") {
@@ -22,13 +60,8 @@ fn rustfmt(args: &[&str]) -> (String, String) {
     paths.insert(0, bin_dir);
     let new_path = env::join_paths(paths).unwrap();
 
-    match Command::new(&cmd).args(args).env("PATH", new_path).output() {
-        Ok(output) => (
-            String::from_utf8(output.stdout).expect("utf-8"),
-            String::from_utf8(output.stderr).expect("utf-8"),
-        ),
-        Err(e) => panic!("failed to run `{cmd:?} {args:?}`: {e}"),
-    }
+    let mut rustfmt = Command::new(&cmd);
+    f(rustfmt.env("PATH", new_path))
 }
 
 macro_rules! assert_that {
@@ -206,4 +239,127 @@ fn rustfmt_emits_error_when_control_brace_style_is_always_next_line() {
 
     let (_stdout, stderr) = rustfmt(&args);
     assert!(!stderr.contains("error[internal]: left behind trailing whitespace"))
+}
+mod rustfmt_stdin_formatting {
+    use super::rustfmt_std_input;
+    use rustfmt_config_proc_macro::{nightly_only_test, stable_only_test};
+
+    #[rustfmt::skip]
+    #[test]
+    fn changes_are_output_to_stdout() {
+        // line endings are normalized to '\n' to avoid platform differences
+        let args = ["--config", "newline_style=Unix"];
+        let source = "fn main     () {    println!(\"hello world!\"); }";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        let expected_output =
+r#"fn main() {
+    println!("hello world!");
+}
+"#;
+        assert!(stdout == expected_output);
+    }
+
+    #[test]
+    fn properly_formatted_input_is_output_to_stdout_unchanged() {
+        // NOTE: Technicallly a newline is added, but nothing meaningful is changed
+        let args = [];
+        let source = "fn main() {}";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        assert!(stdout.trim_end() == source)
+    }
+
+    #[nightly_only_test]
+    #[test]
+    fn input_ignored_when_stdin_file_hint_is_ignored() {
+        // NOTE: the source is not properly formatted, but we're giving rustfmt a hint that
+        // the input actually corresponds to `src/lib.rs`, which is ignored in the given config file
+        let args = [
+            "--stdin-file-hint",
+            "src/lib.rs",
+            "--config-path",
+            "tests/config/stdin-file-hint-ignore.toml",
+        ];
+        let source = "fn main     () {    println!(\"hello world!\"); }";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        assert!(stdout.trim_end() == source)
+    }
+
+    #[rustfmt::skip]
+    #[nightly_only_test]
+    #[test]
+    fn input_formatted_when_stdin_file_hint_is_not_ignored() {
+        // NOTE: `src/bin/main.rs` is not ignored in the config file so the input is formatted.
+        // line endings are normalized to '\n' to avoid platform differences
+        let args = [
+            "--stdin-file-hint",
+            "src/bin/main.rs",
+            "--config-path",
+            "tests/config/stdin-file-hint-ignore.toml",
+            "--config",
+            "newline_style=Unix",
+        ];
+        let source = "fn main     () {    println!(\"hello world!\"); }";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        let expected_output =
+r#"fn main() {
+    println!("hello world!");
+}
+"#;
+        assert!(stdout == expected_output);
+    }
+
+    #[rustfmt::skip]
+    #[stable_only_test]
+    #[test]
+    fn ignore_list_is_not_set_on_stable_channel_and_therefore_stdin_file_hint_does_nothing() {
+        // NOTE: the source is not properly formatted, and although the file is `ignored` we
+        // can't set the `ignore` list on the stable channel so the input is formatted
+        // line endings are normalized to '\n' to avoid platform differences
+        let args = [
+            "--stdin-file-hint",
+            "src/lib.rs",
+            "--config-path",
+            "tests/config/stdin-file-hint-ignore.toml",
+            "--config",
+            "newline_style=Unix",
+        ];
+        let source = "fn main     () {    println!(\"hello world!\"); }";
+        let (stdout, _stderr) = rustfmt_std_input(&args, source);
+        let expected_output =
+r#"fn main() {
+    println!("hello world!");
+}
+"#;
+        assert!(stdout == expected_output);
+
+    }
+}
+
+mod stdin_file_hint {
+    use super::{rustfmt, rustfmt_std_input};
+
+    #[test]
+    fn error_not_a_rust_file() {
+        let args = ["--stdin-file-hint", "README.md"];
+        let source = "fn main() {}";
+        let (_stdout, stderr) = rustfmt_std_input(&args, source);
+        assert!(stderr.contains("`--std-file-hint=\"README.md\"` is not a rust file"))
+    }
+
+    #[test]
+    fn error_file_not_found() {
+        let args = ["--stdin-file-hint", "does_not_exist.rs"];
+        let source = "fn main() {}";
+        let (_stdout, stderr) = rustfmt_std_input(&args, source);
+        assert!(stderr.contains("`--std-file-hint=\"does_not_exist.rs\"` could not be found"))
+    }
+
+    #[test]
+    fn cant_use_stdin_file_hint_if_input_not_passed_to_rustfmt_via_stdin() {
+        let args = ["--stdin-file-hint", "src/lib.rs", "src/lib.rs"];
+        let (_stdout, stderr) = rustfmt(&args);
+        assert!(
+            stderr.contains("Cannot use `--std-file-hint` without formatting input from stdin.")
+        );
+    }
 }

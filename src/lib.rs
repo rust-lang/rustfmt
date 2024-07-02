@@ -76,6 +76,7 @@ mod expr;
 mod format_report_formatter;
 pub(crate) mod formatting;
 mod ignore_path;
+pub use ignore_path::is_std_ignored;
 mod imports;
 mod items;
 mod lists;
