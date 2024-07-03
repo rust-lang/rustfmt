@@ -27,6 +27,16 @@ pub enum NewlineStyle {
 }
 
 #[config_type]
+pub enum TrimFinalNewlines {
+    /// Remove final newlines.
+    Always,
+    /// Leave a single final newline.
+    Single,
+    /// Preserve final newlines.
+    Never,
+}
+
+#[config_type]
 /// Where to put the opening brace of items (`fn`, `impl`, etc.).
 pub enum BraceStyle {
     /// Put the opening brace on the next line.
