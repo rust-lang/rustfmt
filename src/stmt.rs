@@ -3,7 +3,7 @@ use rustc_span::Span;
 
 use crate::comment::recover_comment_removed;
 use crate::config::Version;
-use crate::expr::{format_expr, is_simple_block, ExprType};
+use crate::expr::{contains_curly_block, format_expr, is_simple_block, ExprType};
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::Shape;
 use crate::source_map::LineRangeUtils;
@@ -12,6 +12,7 @@ use crate::utils::semicolon_for_stmt;
 
 pub(crate) struct Stmt<'a> {
     inner: &'a ast::Stmt,
+    is_first: bool,
     is_last: bool,
 }
 
@@ -41,15 +42,24 @@ impl<'a> Stmt<'a> {
         if is_simple_block(context, block, attrs) {
             let inner = &block.stmts[0];
             // Simple blocks only contain one expr and no stmts
+            let is_first = true;
             let is_last = true;
-            Some(Stmt { inner, is_last })
+            Some(Stmt {
+                inner,
+                is_first,
+                is_last,
+            })
         } else {
             None
         }
     }
 
-    pub(crate) fn from_ast_node(inner: &'a ast::Stmt, is_last: bool) -> Self {
-        Stmt { inner, is_last }
+    pub(crate) fn from_ast_node(inner: &'a ast::Stmt, is_first: bool, is_last: bool) -> Self {
+        Stmt {
+            inner,
+            is_first,
+            is_last,
+        }
     }
 
     pub(crate) fn from_ast_nodes<I>(iter: I) -> Vec<Self>
@@ -58,9 +68,19 @@ impl<'a> Stmt<'a> {
     {
         let mut result = vec![];
         let mut iter = iter.peekable();
-        while iter.peek().is_some() {
+
+        if let Some(inner) = iter.next() {
             result.push(Stmt {
-                inner: iter.next().unwrap(),
+                inner,
+                is_first: true,
+                is_last: iter.peek().is_none(),
+            })
+        }
+
+        while let Some(inner) = iter.next() {
+            result.push(Stmt {
+                inner,
+                is_first: false,
                 is_last: iter.peek().is_none(),
             })
         }
@@ -69,6 +89,14 @@ impl<'a> Stmt<'a> {
 
     pub(crate) fn is_empty(&self) -> bool {
         matches!(self.inner.kind, ast::StmtKind::Empty)
+    }
+
+    pub(crate) fn is_first(&self) -> bool {
+        self.is_first
+    }
+
+    pub(crate) fn is_last(&self) -> bool {
+        self.is_last
     }
 
     fn is_last_expr(&self) -> bool {
@@ -83,6 +111,20 @@ impl<'a> Stmt<'a> {
                 }
                 _ => true,
             },
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_block_with_curly_braces(&self) -> bool {
+        match self.as_ast_node().kind {
+            ast::StmtKind::Let(ref local) => match local.kind {
+                ast::LocalKind::Decl => false,
+                ast::LocalKind::Init(ref expr) => contains_curly_block(expr),
+                ast::LocalKind::InitElse(..) => true,
+            },
+            ast::StmtKind::Expr(ref expr) | ast::StmtKind::Semi(ref expr) => {
+                contains_curly_block(expr)
+            }
             _ => false,
         }
     }
