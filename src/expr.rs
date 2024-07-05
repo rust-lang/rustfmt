@@ -3,7 +3,7 @@ use std::cmp::min;
 
 use itertools::Itertools;
 use rustc_ast::token::{Delimiter, Lit, LitKind};
-use rustc_ast::{ast, ptr, token, ForLoopKind};
+use rustc_ast::{ast, ptr, token, ForLoopKind, MatchKind};
 use rustc_span::{BytePos, Span};
 
 use crate::chains::rewrite_chain;
@@ -135,7 +135,17 @@ pub(crate) fn format_expr(
         | ast::ExprKind::While(..) => to_control_flow(expr, expr_type)
             .and_then(|control_flow| control_flow.rewrite(context, shape)),
         ast::ExprKind::ConstBlock(ref anon_const) => {
-            Some(format!("const {}", anon_const.rewrite(context, shape)?))
+            let rewrite = match anon_const.value.kind {
+                ast::ExprKind::Block(ref block, opt_label) => {
+                    // Inner attributes are associated with the `ast::ExprKind::ConstBlock` node,
+                    // not the `ast::Block` node we're about to rewrite. To prevent dropping inner
+                    // attributes call `rewrite_block` directly.
+                    // See https://github.com/rust-lang/rustfmt/issues/6158
+                    rewrite_block(block, Some(&expr.attrs), opt_label, context, shape)?
+                }
+                _ => anon_const.rewrite(context, shape)?,
+            };
+            Some(format!("const {}", rewrite))
         }
         ast::ExprKind::Block(ref block, opt_label) => {
             match expr_type {
@@ -166,8 +176,8 @@ pub(crate) fn format_expr(
                 }
             }
         }
-        ast::ExprKind::Match(ref cond, ref arms) => {
-            rewrite_match(context, cond, arms, shape, expr.span, &expr.attrs)
+        ast::ExprKind::Match(ref cond, ref arms, kind) => {
+            rewrite_match(context, cond, arms, shape, expr.span, &expr.attrs, kind)
         }
         ast::ExprKind::Path(ref qself, ref path) => {
             rewrite_path(context, PathContext::Expr, qself, path, shape)
@@ -249,14 +259,6 @@ pub(crate) fn format_expr(
             shape,
             SeparatorPlace::Front,
         ),
-        ast::ExprKind::Type(ref expr, ref ty) => rewrite_pair(
-            &**expr,
-            &**ty,
-            PairParts::infix(": "),
-            context,
-            shape,
-            SeparatorPlace::Back,
-        ),
         ast::ExprKind::Index(ref expr, ref index, _) => {
             rewrite_index(&**expr, &**index, context, shape)
         }
@@ -278,6 +280,9 @@ pub(crate) fn format_expr(
                 match lhs.kind {
                     ast::ExprKind::Lit(token_lit) => lit_ends_in_dot(&token_lit),
                     ast::ExprKind::Unary(_, ref expr) => needs_space_before_range(context, expr),
+                    ast::ExprKind::Binary(_, _, ref rhs_expr) => {
+                        needs_space_before_range(context, rhs_expr)
+                    }
                     _ => false,
                 }
             }
@@ -395,12 +400,16 @@ pub(crate) fn format_expr(
         }
         ast::ExprKind::Underscore => Some("_".to_owned()),
         ast::ExprKind::FormatArgs(..)
+        | ast::ExprKind::Type(..)
         | ast::ExprKind::IncludedBytes(..)
         | ast::ExprKind::OffsetOf(..) => {
-            // These do not occur in the AST because macros aren't expanded.
-            unreachable!()
+            // These don't normally occur in the AST because macros aren't expanded. However,
+            // rustfmt tries to parse macro arguments when formatting macros, so it's not totally
+            // impossible for rustfmt to come across one of these nodes when formatting a file.
+            // Also, rustfmt might get passed the output from `-Zunpretty=expanded`.
+            None
         }
-        ast::ExprKind::Err => None,
+        ast::ExprKind::Err(_) | ast::ExprKind::Dummy => None,
     };
 
     expr_rw
@@ -633,7 +642,7 @@ pub(crate) fn rewrite_cond(
     shape: Shape,
 ) -> Option<String> {
     match expr.kind {
-        ast::ExprKind::Match(ref cond, _) => {
+        ast::ExprKind::Match(ref cond, _, MatchKind::Prefix) => {
             // `match `cond` {`
             let cond_shape = match context.config.indent_style() {
                 IndentStyle::Visual => shape.shrink_left(6).and_then(|s| s.sub_width(2))?,
@@ -1955,7 +1964,7 @@ fn rewrite_unary_op(
 }
 
 pub(crate) enum RhsAssignKind<'ast> {
-    Expr(&'ast ast::ExprKind, Span),
+    Expr(&'ast ast::ExprKind, #[allow(dead_code)] Span),
     Bounds,
     Ty,
 }

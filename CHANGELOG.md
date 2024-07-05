@@ -2,7 +2,99 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix an idempotency issue when rewriting where clauses in which rustfmt would continuously add a trailing comma `,` to the end of trailing line comments [#5941](https://github.com/rust-lang/rustfmt/issues/5941).
+- Prevent enum variant attributes from wrapping one character early when using `version=Two` [#5801](https://github.com/rust-lang/rustfmt/issues/5801)
+- Properly wrap macro matchers at the `max_width` when using `version=Two` and `format_macro_matchers=true` [#3805](https://github.com/rust-lang/rustfmt/issues/3805)
+- Prevent panic when formatting trait declaration with non [Unicode Normalization Form] C (NFC) identifiers [#6069](https://github.com/rust-lang/rustfmt/issues/6069)
+  ```rust
+  // The ó below is two codepoints, ASCII o followed by U+0301 COMBINING ACUTE ACCENT.
+  // It NFC-normalizes to ó, U+00F3 LATIN SMALL LETTER O WITH ACUTE.
+  trait Foó: Bar {}
+  ```
+  [unicode normalization form]: https://unicode.org/reports/tr15/
+- Ensure a space is added to a range expression, when the right hand side of the range expression is a binary expression that ends with a trailing period [#6059](https://github.com/rust-lang/rustfmt/issues/6059)
+  ```rust
+  let range = 3. / 2. ..4.;
+  ```
+- When using `version=Two`, comments in match arms that contain `=>` no longer prevent formatting [#5998](https://github.com/rust-lang/rustfmt/issues/5998)
+  ```rust
+  match a {
+      _ =>
+      // comment with =>
+      {
+          println!("A")
+      }
+  }
+  ```
+- Prevent panics when formatting input that contains the expanded form of `offset_of!` [#5885](https://github.com/rust-lang/rustfmt/issues/5885) [#6105](https://github.com/rust-lang/rustfmt/issues/6105)
+  ```rust
+  const _: () = builtin # offset_of(x, x);
+  ```
+- When using `version=Two` inner attributes in `match` expressions are correctly indented [#6147](https://github.com/rust-lang/rustfmt/issues/6147)
+  ```rust
+  pub fn main() {
+      match x {
+          #![attr1]
+          #![attr2]
+          _ => (),
+      }
+  }
+  ```
+- Output correct syntax for type ascription builtin [#6159](https://github.com/rust-lang/rustfmt/issues/6159)
+  ```rust
+  fn main() {
+      builtin # type_ascribe(10, usize)
+  }
+  ```
+- rustfmt no longer removes inner attributes from inline const blocks [#6158](https://github.com/rust-lang/rustfmt/issues/6158)
+  ```rust
+  fn main() {
+      const {
+          #![allow(clippy::assertions_on_constants)]
+
+          assert!(1 < 2);
+      }
+  }
+  ```
+- rustfmt no longer removes `safe` and `unsafe` keywords from static items in extern blocks.
+  This helps support [`#![feature(unsafe_extern_blocks)]`](https://github.com/rust-lang/rust/issues/123743) [#6204](https://github.com/rust-lang/rustfmt/pull/6204)
+  ```rust
+  #![feature(unsafe_extern_blocks)]
+
+  unsafe extern "C" {
+      safe static TEST1: i32;
+      unsafe static TEST2: i32;
+  }
+  ```
+
+
+### Changed
+
+- `hide_parse_errors` has been soft deprecated and it's been renamed to `show_parse_errors` [#5961](https://github.com/rust-lang/rustfmt/pull/5961).
+- The diff output produced by `rustfmt --check` is more compatable with editors that support navigating directly to line numbers [#5971](https://github.com/rust-lang/rustfmt/pull/5971)
+- When using `version=Two`, the `trace!` macro from the [log crate] is now formatted similarly to `debug!`, `info!`, `warn!`, and `error!` [#5987](https://github.com/rust-lang/rustfmt/issues/5987).
+
+  [log crate]: https://crates.io/crates/log
+
+
+### Added
+
+- `generated_marker_line_search_limit` is a new unstable configuration option that allows users to configure how many lines to search for an `@generated` marker when `format_generated_files=false` [#5658](https://github.com/rust-lang/rustfmt/issues/5658)
+
+
+### Misc
+
 - Updating `dirs 4.0.0 -> 5.0.1` and `cargo_metadata 0.15.4 -> 0.18.0` [#6033] (https://github.com/rust-lang/rustfmt/issues/6033)
+  - For reference, here's the [dirs v5 changelog](https://github.com/dirs-dev/dirs-rs/blob/main/README.md#5)
+- Updated [itertools v0.11 -> v0.12](https://github.com/rust-itertools/itertools/blob/v0.12.1/CHANGELOG.md#0120) [#6093](https://github.com/rust-lang/rustfmt/pull/6093)
+- Addressed clap deprecations output when running `cargo check --features clap/deprecated` [#6101](https://github.com/rust-lang/rustfmt/pull/6101)
+- Bumped bytecount `0.6.4` -> `0.6.8` to fix compilation issues with the `generic-simd` feature. See [bytecount#92] and [bytecount#93]
+
+  [bytecount#92]: https://github.com/llogiq/bytecount/pull/92
+  [bytecount#93]: https://github.com/llogiq/bytecount/pull/93
+- Replace the `lazy_static` dependency with `std::sync::OnceLock` [#6154](https://github.com/rust-lang/rustfmt/pull/6154)
 
 ## [1.7.0] 2023-10-22
 
@@ -146,7 +238,7 @@
 
 ### Added
 
-- New configuration option (`skip_macro_invocations`)[https://rust-lang.github.io/rustfmt/?version=master&search=#skip_macro_invocations] [#5347](https://github.com/rust-lang/rustfmt/pull/5347) that can be used to globally define a single enumerated list of macro calls that rustfmt should skip formatting. rustfmt [currently also supports this via a custom tool attribute](https://github.com/rust-lang/rustfmt#tips), however, these cannot be used in all contexts because [custom inner attributes are unstable](https://github.com/rust-lang/rust/issues/54726)
+- New configuration option [`skip_macro_invocations`](https://rust-lang.github.io/rustfmt/?version=master&search=#skip_macro_invocations) [#5347](https://github.com/rust-lang/rustfmt/pull/5347) that can be used to globally define a single enumerated list of macro calls that rustfmt should skip formatting. rustfmt [currently also supports this via a custom tool attribute](https://github.com/rust-lang/rustfmt#tips), however, these cannot be used in all contexts because [custom inner attributes are unstable](https://github.com/rust-lang/rust/issues/54726)
 
 ### Misc
 

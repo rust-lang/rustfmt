@@ -43,11 +43,13 @@ pub(crate) fn rewrite_path(
 ) -> Option<String> {
     let skip_count = qself.as_ref().map_or(0, |x| x.position);
 
-    let mut result = if path.is_global() && qself.is_none() && path_context != PathContext::Import {
-        "::".to_owned()
-    } else {
-        String::new()
-    };
+    // 32 covers almost all path lengths measured when compiling core, and there isn't a big
+    // downside from allocating slightly more than necessary.
+    let mut result = String::with_capacity(32);
+
+    if path.is_global() && qself.is_none() && path_context != PathContext::Import {
+        result.push_str("::");
+    }
 
     let mut span_lo = path.span.lo();
 
@@ -140,7 +142,7 @@ pub(crate) enum SegmentParam<'a> {
     Const(&'a ast::AnonConst),
     LifeTime(&'a ast::Lifetime),
     Type(&'a ast::Ty),
-    Binding(&'a ast::AssocConstraint),
+    Binding(&'a ast::AssocItemConstraint),
 }
 
 impl<'a> SegmentParam<'a> {
@@ -175,9 +177,20 @@ impl<'a> Rewrite for SegmentParam<'a> {
     }
 }
 
-impl Rewrite for ast::AssocConstraint {
+impl Rewrite for ast::PreciseCapturingArg {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        use ast::AssocConstraintKind::{Bound, Equality};
+        match self {
+            ast::PreciseCapturingArg::Lifetime(lt) => lt.rewrite(context, shape),
+            ast::PreciseCapturingArg::Arg(p, _) => {
+                rewrite_path(context, PathContext::Type, &None, p, shape)
+            }
+        }
+    }
+}
+
+impl Rewrite for ast::AssocItemConstraint {
+    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
+        use ast::AssocItemConstraintKind::{Bound, Equality};
 
         let mut result = String::with_capacity(128);
         result.push_str(rewrite_ident(context, self.ident));
@@ -205,14 +218,14 @@ impl Rewrite for ast::AssocConstraint {
     }
 }
 
-impl Rewrite for ast::AssocConstraintKind {
+impl Rewrite for ast::AssocItemConstraintKind {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match self {
-            ast::AssocConstraintKind::Equality { term } => match term {
+            ast::AssocItemConstraintKind::Equality { term } => match term {
                 Term::Ty(ty) => ty.rewrite(context, shape),
                 Term::Const(c) => c.rewrite(context, shape),
             },
-            ast::AssocConstraintKind::Bound { bounds } => bounds.rewrite(context, shape),
+            ast::AssocItemConstraintKind::Bound { bounds } => bounds.rewrite(context, shape),
         }
     }
 }
@@ -537,19 +550,33 @@ impl Rewrite for ast::Lifetime {
 impl Rewrite for ast::GenericBound {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         match *self {
-            ast::GenericBound::Trait(ref poly_trait_ref, modifiers) => {
+            ast::GenericBound::Trait(
+                ref poly_trait_ref,
+                ast::TraitBoundModifiers {
+                    constness,
+                    asyncness,
+                    polarity,
+                },
+            ) => {
                 let snippet = context.snippet(self.span());
                 let has_paren = snippet.starts_with('(') && snippet.ends_with(')');
-                let mut constness = modifiers.constness.as_str().to_string();
+                let mut constness = constness.as_str().to_string();
                 if !constness.is_empty() {
                     constness.push(' ');
                 }
-                let polarity = modifiers.polarity.as_str();
+                let mut asyncness = asyncness.as_str().to_string();
+                if !asyncness.is_empty() {
+                    asyncness.push(' ');
+                }
+                let polarity = polarity.as_str();
                 let shape = shape.offset_left(constness.len() + polarity.len())?;
                 poly_trait_ref
                     .rewrite(context, shape)
-                    .map(|s| format!("{constness}{polarity}{s}"))
+                    .map(|s| format!("{constness}{asyncness}{polarity}{s}"))
                     .map(|s| if has_paren { format!("({})", s) } else { s })
+            }
+            ast::GenericBound::Use(ref args, span) => {
+                overflow::rewrite_with_angle_brackets(context, "use", args.iter(), shape, span)
             }
             ast::GenericBound::Outlives(ref lifetime) => lifetime.rewrite(context, shape),
         }
@@ -680,10 +707,12 @@ impl Rewrite for ast::Ty {
                 };
                 let mut res = bounds.rewrite(context, shape)?;
                 // We may have falsely removed a trailing `+` inside macro call.
-                if context.inside_macro() && bounds.len() == 1 {
-                    if context.snippet(self.span).ends_with('+') && !res.ends_with('+') {
-                        res.push('+');
-                    }
+                if context.inside_macro()
+                    && bounds.len() == 1
+                    && context.snippet(self.span).ends_with('+')
+                    && !res.ends_with('+')
+                {
+                    res.push('+');
                 }
                 Some(format!("{prefix}{res}"))
             }
@@ -806,8 +835,8 @@ impl Rewrite for ast::Ty {
             ast::TyKind::Tup(ref items) => {
                 rewrite_tuple(context, items.iter(), self.span, shape, items.len() == 1)
             }
-            ast::TyKind::AnonStruct(_) => Some(context.snippet(self.span).to_owned()),
-            ast::TyKind::AnonUnion(_) => Some(context.snippet(self.span).to_owned()),
+            ast::TyKind::AnonStruct(..) => Some(context.snippet(self.span).to_owned()),
+            ast::TyKind::AnonUnion(..) => Some(context.snippet(self.span).to_owned()),
             ast::TyKind::Path(ref q_self, ref path) => {
                 rewrite_path(context, PathContext::Type, q_self, path, shape)
             }
@@ -848,7 +877,7 @@ impl Rewrite for ast::Ty {
                 })
             }
             ast::TyKind::CVarArgs => Some("...".to_owned()),
-            ast::TyKind::Err => Some(context.snippet(self.span).to_owned()),
+            ast::TyKind::Dummy | ast::TyKind::Err(_) => Some(context.snippet(self.span).to_owned()),
             ast::TyKind::Typeof(ref anon_const) => rewrite_call(
                 context,
                 "typeof",
@@ -856,6 +885,11 @@ impl Rewrite for ast::Ty {
                 self.span,
                 shape,
             ),
+            ast::TyKind::Pat(ref ty, ref pat) => {
+                let ty = ty.rewrite(context, shape)?;
+                let pat = pat.rewrite(context, shape)?;
+                Some(format!("{ty} is {pat}"))
+            }
         }
     }
 }
@@ -879,7 +913,7 @@ fn rewrite_bare_fn(
         result.push_str("> ");
     }
 
-    result.push_str(crate::utils::format_unsafety(bare_fn.unsafety));
+    result.push_str(crate::utils::format_safety(bare_fn.safety));
 
     result.push_str(&format_extern(
         bare_fn.ext,
@@ -911,7 +945,7 @@ fn rewrite_bare_fn(
 fn is_generic_bounds_in_order(generic_bounds: &[ast::GenericBound]) -> bool {
     let is_trait = |b: &ast::GenericBound| match b {
         ast::GenericBound::Outlives(..) => false,
-        ast::GenericBound::Trait(..) => true,
+        ast::GenericBound::Trait(..) | ast::GenericBound::Use(..) => true,
     };
     let is_lifetime = |b: &ast::GenericBound| !is_trait(b);
     let last_trait_index = generic_bounds.iter().rposition(is_trait);
@@ -945,7 +979,8 @@ fn join_bounds_inner(
     let generic_bounds_in_order = is_generic_bounds_in_order(items);
     let is_bound_extendable = |s: &str, b: &ast::GenericBound| match b {
         ast::GenericBound::Outlives(..) => true,
-        ast::GenericBound::Trait(..) => last_line_extendable(s),
+        // We treat `use<>` like a trait bound here.
+        ast::GenericBound::Trait(..) | ast::GenericBound::Use(..) => last_line_extendable(s),
     };
 
     // Whether a GenericBound item is a PathSegment segment that includes internal array
@@ -967,6 +1002,7 @@ fn join_bounds_inner(
                 }
             }
         }
+        ast::GenericBound::Use(args, _) => args.len() > 1,
         _ => false,
     };
 
