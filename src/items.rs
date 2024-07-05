@@ -1884,7 +1884,7 @@ pub(crate) fn rewrite_struct_field(
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
     let attrs_str = field.attrs.rewrite_result(context, shape)?;
-    let ty_str = field.ty.rewrite(context, shape)?;
+    let ty_str = field.ty.rewrite_result(context, shape)?;
 
     let allow_extend = extend_inline_attr(
         &field.attrs,
