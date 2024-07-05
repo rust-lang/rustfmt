@@ -144,6 +144,21 @@ pub enum HexLiteralCase {
     Lower,
 }
 
+/// How to treat trailing zeros in floating-point literals.
+#[config_type]
+pub enum FloatLiteralTrailingZero {
+    /// Leave the literal as-is.
+    Preserve,
+    /// Add a trailing zero to the literal.
+    Always,
+    /// Add a trailing zero by default. If the literal contains an exponent or a suffix, the zero
+    /// and the preceding period are removed.
+    IfNoPostfix,
+    /// Remove the trailing zero. If the literal contains an exponent or a suffix, the preceding
+    /// period is also removed.
+    Never,
+}
+
 #[config_type]
 pub enum ReportTactic {
     Always,
