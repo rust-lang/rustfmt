@@ -424,7 +424,8 @@ pub(crate) fn format_expr(
 
             // +1 = ";"
             let allow_extend =
-                extend_inline_attr(&expr.attrs, shape, &attrs_str, expr_str.len() + 1, context);
+                extend_inline_attr(&expr.attrs, shape, &attrs_str, expr_str.len() + 1, context)
+                    && expr_type == ExprType::Statement;
 
             combine_strs_with_missing_comments(
                 context,
