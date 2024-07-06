@@ -775,7 +775,7 @@ where
             ListItem {
                 pre_comment,
                 pre_comment_style,
-                item: if self.inner.peek().is_none() && self.leave_last {
+                item: if is_last && self.leave_last {
                     None
                 } else {
                     (self.get_item_string)(&item)
