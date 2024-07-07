@@ -207,3 +207,14 @@ fn rustfmt_emits_error_when_control_brace_style_is_always_next_line() {
     let (_stdout, stderr) = rustfmt(&args);
     assert!(!stderr.contains("error[internal]: left behind trailing whitespace"))
 }
+
+#[test]
+fn rustfmt_generates_no_error() {
+    // See also https://github.com/rust-lang/rustfmt/issues/6109
+
+    let file = "tests/target/issue-6109.rs";
+    let args = ["--config", "format_code_in_doc_comments=true", file];
+    let (stdout, stderr) = rustfmt(&args);
+    assert!(stderr.is_empty());
+    assert!(stdout.is_empty());
+}
