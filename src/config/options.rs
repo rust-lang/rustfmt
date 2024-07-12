@@ -241,6 +241,9 @@ pub struct WidthHeuristics {
     // Maximum line length for single line let-else statements. A value of zero means
     // always format the divergent `else` block over multiple lines.
     pub(crate) single_line_let_else_max_width: usize,
+    // Maximum line length for single line if statement.
+    // A value of zero means always format to multiple lines.
+    pub(crate) single_line_simple_if_max_width: usize,
 }
 
 impl fmt::Display for WidthHeuristics {
@@ -261,6 +264,7 @@ impl WidthHeuristics {
             chain_width: usize::max_value(),
             single_line_if_else_max_width: 0,
             single_line_let_else_max_width: 0,
+            single_line_simple_if_max_width: 0,
         }
     }
 
@@ -274,6 +278,7 @@ impl WidthHeuristics {
             chain_width: max_width,
             single_line_if_else_max_width: max_width,
             single_line_let_else_max_width: max_width,
+            single_line_simple_if_max_width: max_width,
         }
     }
 
@@ -296,6 +301,7 @@ impl WidthHeuristics {
             chain_width: (60.0 * max_width_ratio).round() as usize,
             single_line_if_else_max_width: (50.0 * max_width_ratio).round() as usize,
             single_line_let_else_max_width: (50.0 * max_width_ratio).round() as usize,
+            single_line_simple_if_max_width: (50.0 * max_width_ratio).round() as usize,
         }
     }
 }
