@@ -61,6 +61,74 @@ impl<'a> StringFormat<'a> {
     }
 }
 
+/// Look for unicode escape codes surrounded by braces; return the number of
+/// characters on success.
+fn is_valid_braced_unicode(mut chars: std::str::Chars<'_>) -> Option<usize> {
+    match (chars.next(), chars.next()) {
+        (Some('{'), Some('}')) => return None,
+        (Some('{'), Some(_)) => (),
+        _ => return None,
+    }
+
+    for count in 3..=7 {
+        match chars.next() {
+            Some('}') => return Some(count),
+            None => return None,
+            _ => (),
+        }
+    }
+
+    if let Some('}') = chars.next() {
+        Some(8)
+    } else {
+        None
+    }
+}
+
+/// Look for valid escape sequences; return the number of characters on
+/// success.
+fn is_valid_escape(input: &str) -> Option<usize> {
+    let mut chars = input.chars();
+    match (chars.next(), chars.next()) {
+        (Some('\\'), Some('n')) => Some(2),
+        (Some('\\'), Some('r')) => Some(2),
+        (Some('\\'), Some('t')) => Some(2),
+        (Some('\\'), Some('\\')) => Some(2),
+        (Some('\\'), Some('0')) => Some(2),
+        (Some('\\'), Some('\'')) => Some(2),
+        (Some('\\'), Some('"')) => Some(2),
+        (Some('\\'), Some('x')) => {
+            if chars.count() >= 2 {
+                Some(4)
+            } else {
+                None
+            }
+        }
+        (Some('\\'), Some('u')) => is_valid_braced_unicode(chars).map(|n| n + 2),
+        _ => None,
+    }
+}
+
+fn segment(input: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut current = input;
+
+    'outer: loop {
+        for (ii, _) in current.char_indices() {
+            if let Some(n) = is_valid_escape(&current[ii..]) {
+                out.extend(current[..ii].graphemes(false));
+                out.push(&current[ii..ii + n]);
+                current = &current[ii + n..];
+                continue 'outer;
+            }
+        }
+        out.extend(current.graphemes(false));
+        break;
+    }
+
+    out
+}
+
 pub(crate) fn rewrite_string<'a>(
     orig: &str,
     fmt: &StringFormat<'a>,
@@ -73,10 +141,11 @@ pub(crate) fn rewrite_string<'a>(
 
     // Strip line breaks.
     // With this regex applied, all remaining whitespaces are significant
-    let strip_line_breaks_re = Regex::new(r"([^\\](\\\\)*)\\[\n\r][[:space:]]*").unwrap();
+    let strip_line_breaks_re = Regex::new(r"(([^\\]|\\\\)(\\\\)*)\\[\n\r][[:space:]]*").unwrap();
     let stripped_str = strip_line_breaks_re.replace_all(orig, "$1");
 
-    let graphemes = UnicodeSegmentation::graphemes(&*stripped_str, false).collect::<Vec<&str>>();
+    // let graphemes = UnicodeSegmentation::graphemes(&*stripped_str, false).collect::<Vec<&str>>();
+    let graphemes = segment(&stripped_str);
 
     // `cur_start` is the position in `orig` of the start of the current line.
     let mut cur_start = 0;
@@ -317,16 +386,14 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
         // No whitespace found, try looking for a punctuation instead
         _ => match (0..max_width_index_in_input)
             .rev()
-            .skip_while(|pos| !is_valid_linebreak(input, *pos))
-            .next()
+            .find(|pos| is_valid_linebreak(input, *pos))
         {
             // Found a punctuation and what is on its left side is big enough.
             Some(index) if index >= MIN_STRING => break_at(index),
             // Either no boundary character was found to the left of `input[max_chars]`, or the line
             // got too small. We try searching for a boundary character to the right.
             _ => match (max_width_index_in_input..input.len())
-                .skip_while(|pos| !is_valid_linebreak(input, *pos))
-                .next()
+                .find(|pos| is_valid_linebreak(input, *pos))
             {
                 // A boundary was found after the line limit
                 Some(index) => break_at(index),
@@ -340,6 +407,10 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
 fn is_valid_linebreak(input: &[&str], pos: usize) -> bool {
     let is_whitespace = is_whitespace(input[pos]);
     if is_whitespace {
+        return true;
+    }
+    let is_escape = input[pos].starts_with('\\');
+    if is_escape {
         return true;
     }
     let is_punctuation = is_punctuation(input[pos]);
@@ -378,6 +449,7 @@ mod test {
     use super::{break_string, detect_url, rewrite_string, SnippetState, StringFormat};
     use crate::config::Config;
     use crate::shape::{Indent, Shape};
+    use crate::string::{is_valid_braced_unicode, is_valid_escape, segment};
     use unicode_segmentation::UnicodeSegmentation;
 
     #[test]
@@ -721,5 +793,57 @@ mod test {
         let string = "aaa file://example.org";
         let graphemes = UnicodeSegmentation::graphemes(&*string, false).collect::<Vec<&str>>();
         assert_eq!(detect_url(&graphemes, 8), Some(21));
+    }
+
+    #[test]
+    fn test_unicode_escapes() {
+        assert_eq!(is_valid_braced_unicode("{1}".chars()), Some(3));
+        assert_eq!(is_valid_braced_unicode("{12}".chars()), Some(4));
+        assert_eq!(is_valid_braced_unicode("{123}".chars()), Some(5));
+        assert_eq!(is_valid_braced_unicode("{1234}".chars()), Some(6));
+        assert_eq!(is_valid_braced_unicode("{12345}".chars()), Some(7));
+        assert_eq!(is_valid_braced_unicode("{123456}".chars()), Some(8));
+
+        assert_eq!(is_valid_braced_unicode("}".chars()), None);
+        assert_eq!(is_valid_braced_unicode("}abc".chars()), None);
+        assert_eq!(is_valid_braced_unicode("abc".chars()), None);
+        assert_eq!(is_valid_braced_unicode("{}".chars()), None);
+        assert_eq!(is_valid_braced_unicode("{1234567}".chars()), None);
+        assert_eq!(is_valid_braced_unicode("{12345679".chars()), None);
+    }
+
+    #[test]
+    fn test_valid_escapes() {
+        assert_eq!(is_valid_escape("\\u{1}"), Some(5));
+        assert_eq!(is_valid_escape("\\u{12}"), Some(6));
+        assert_eq!(is_valid_escape("\\u{123}"), Some(7));
+        assert_eq!(is_valid_escape("\\u{1234}"), Some(8));
+        assert_eq!(is_valid_escape("\\u{12345}"), Some(9));
+        assert_eq!(is_valid_escape("\\u{123456}"), Some(10));
+
+        assert_eq!(is_valid_escape("\\u}"), None);
+        assert_eq!(is_valid_escape("\\u}abc"), None);
+        assert_eq!(is_valid_escape("\\uabc"), None);
+        assert_eq!(is_valid_escape("\\u{}"), None);
+        assert_eq!(is_valid_escape("\\u{1234567}"), None);
+        assert_eq!(is_valid_escape("\\u{12345679"), None);
+
+        assert_eq!(is_valid_escape("\\n"), Some(2));
+        assert_eq!(is_valid_escape("\\r"), Some(2));
+        assert_eq!(is_valid_escape("\\t"), Some(2));
+        assert_eq!(is_valid_escape("\\'"), Some(2));
+        assert_eq!(is_valid_escape("\\\""), Some(2));
+        assert_eq!(is_valid_escape("\\\\"), Some(2));
+
+        assert_eq!(is_valid_escape("\\xab"), Some(4));
+
+        assert_eq!(is_valid_escape("\\f"), None);
+    }
+
+    #[test]
+    fn test_segment() {
+        assert_eq!(segment("input"), vec!["i", "n", "p", "u", "t"]);
+        assert_eq!(segment(r#"i\nput"#), vec!["i", "\\n", "p", "u", "t"]);
+        assert_eq!(segment(r#"\x61\u{61}"#), vec![r#"\x61"#, r#"\u{61}"#]);
     }
 }
