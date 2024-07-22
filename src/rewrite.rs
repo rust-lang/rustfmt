@@ -38,6 +38,9 @@ pub(crate) enum RewriteError {
     #[error("It exceeds the required width of {configured_width} for the span: {span:?}")]
     ExceedsMaxWidth { configured_width: usize, span: Span },
 
+    #[error("")]
+    MacroFailure,
+
     /// Format failure that does not fit to above categories.
     #[error("An unknown error occurred during formatting.")]
     Unknown,
@@ -46,6 +49,7 @@ pub(crate) enum RewriteError {
 /// Extension trait used to conveniently convert to RewriteError
 pub(crate) trait RewriteErrorExt<T> {
     fn max_width_error(self, width: usize, span: Span) -> Result<T, RewriteError>;
+    fn macro_error(self) -> Result<T, RewriteError>;
     fn unknown_error(self) -> Result<T, RewriteError>;
 }
 
@@ -55,6 +59,10 @@ impl<T> RewriteErrorExt<T> for Option<T> {
             configured_width: width,
             span: span,
         })
+    }
+
+    fn macro_error(self) -> Result<T, RewriteError> {
+        self.ok_or_else(|| RewriteError::MacroFailure)
     }
 
     fn unknown_error(self) -> Result<T, RewriteError> {
