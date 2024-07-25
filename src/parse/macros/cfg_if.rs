@@ -3,6 +3,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use rustc_ast::ast;
 use rustc_ast::token::{Delimiter, TokenKind};
 use rustc_parse::parser::ForceCollect;
+use rustc_parse::parser::Parser;
 use rustc_span::symbol::kw;
 
 use crate::parse::macros::build_stream_parser;
@@ -12,7 +13,10 @@ pub(crate) fn parse_cfg_if<'a>(
     psess: &'a ParseSess,
     mac: &'a ast::MacCall,
 ) -> Result<Vec<ast::Item>, &'static str> {
-    match catch_unwind(AssertUnwindSafe(|| parse_cfg_if_inner(psess, mac))) {
+    let ts = mac.args.tokens.clone();
+    let mut parser = build_stream_parser(psess.inner(), ts);
+
+    match catch_unwind(AssertUnwindSafe(|| parse_cfg_if_inner(&mut parser, vec![]))) {
         Ok(Ok(items)) => Ok(items),
         Ok(err @ Err(_)) => err,
         Err(..) => Err("failed to parse cfg_if!"),
@@ -20,13 +24,9 @@ pub(crate) fn parse_cfg_if<'a>(
 }
 
 fn parse_cfg_if_inner<'a>(
-    psess: &'a ParseSess,
-    mac: &'a ast::MacCall,
+    parser: &mut Parser<'a>,
+    mut items: Vec<ast::Item>,
 ) -> Result<Vec<ast::Item>, &'static str> {
-    let ts = mac.args.tokens.clone();
-    let mut parser = build_stream_parser(psess.inner(), ts);
-
-    let mut items = vec![];
     let mut process_if_cfg = true;
 
     while parser.token.kind != TokenKind::Eof {
@@ -64,7 +64,11 @@ fn parse_cfg_if_inner<'a>(
         {
             let item = match parser.parse_item(ForceCollect::No) {
                 Ok(Some(item_ptr)) => item_ptr.into_inner(),
-                Ok(None) => continue,
+                Ok(None) => {
+                    // maybe recursive if
+                    items = parse_cfg_if_inner(parser, items)?;
+                    continue;
+                }
                 Err(err) => {
                     err.cancel();
                     parser.psess.dcx().reset_err_count();
