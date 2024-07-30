@@ -1703,6 +1703,9 @@ pub(crate) fn rewrite_type_alias<'a, 'b>(
         where_clauses,
     } = *ty_alias_kind;
     let ty_opt = ty.as_ref();
+    let rhs_hi = ty
+        .as_ref()
+        .map_or(where_clauses.before.span.hi(), |ty| ty.span.hi());
     let (ident, vis) = match visitor_kind {
         Item(i) => (i.ident, &i.vis),
         AssocTraitItem(i) | AssocImplItem(i) => (i.ident, &i.vis),
@@ -1717,17 +1720,23 @@ pub(crate) fn rewrite_type_alias<'a, 'b>(
     match (visitor_kind, &op_ty) {
         (Item(_) | AssocTraitItem(_) | ForeignItem(_), Some(op_bounds)) => {
             let op = OpaqueType { bounds: op_bounds };
-            rewrite_ty(rw_info, Some(bounds), Some(&op), vis)
+            rewrite_ty(rw_info, Some(bounds), Some(&op), rhs_hi, vis)
         }
         (Item(_) | AssocTraitItem(_) | ForeignItem(_), None) => {
-            rewrite_ty(rw_info, Some(bounds), ty_opt, vis)
+            rewrite_ty(rw_info, Some(bounds), ty_opt, rhs_hi, vis)
         }
         (AssocImplItem(_), _) => {
             let result = if let Some(op_bounds) = op_ty {
                 let op = OpaqueType { bounds: op_bounds };
-                rewrite_ty(rw_info, Some(bounds), Some(&op), &DEFAULT_VISIBILITY)
+                rewrite_ty(
+                    rw_info,
+                    Some(bounds),
+                    Some(&op),
+                    rhs_hi,
+                    &DEFAULT_VISIBILITY,
+                )
             } else {
-                rewrite_ty(rw_info, Some(bounds), ty_opt, vis)
+                rewrite_ty(rw_info, Some(bounds), ty_opt, rhs_hi, vis)
             }?;
             match defaultness {
                 ast::Defaultness::Default(..) => Some(format!("default {result}")),
@@ -1741,6 +1750,8 @@ fn rewrite_ty<R: Rewrite>(
     rw_info: &TyAliasRewriteInfo<'_, '_>,
     generic_bounds_opt: Option<&ast::GenericBounds>,
     rhs: Option<&R>,
+    // the span of the end of the RHS (or the end of the generics, if there is no RHS)
+    rhs_hi: BytePos,
     vis: &ast::Visibility,
 ) -> Option<String> {
     let mut result = String::with_capacity(128);
@@ -1749,9 +1760,6 @@ fn rewrite_ty<R: Rewrite>(
         .where_clause
         .predicates
         .split_at(where_clauses.split);
-    if !after_where_predicates.is_empty() {
-        return None;
-    }
     result.push_str(&format!("{}type ", format_visibility(context, vis)));
     let ident_str = rewrite_ident(context, ident);
 
@@ -1780,7 +1788,7 @@ fn rewrite_ty<R: Rewrite>(
     if rhs.is_none() {
         option.suppress_comma();
     }
-    let where_clause_str = rewrite_where_clause(
+    let before_where_clause_str = rewrite_where_clause(
         context,
         before_where_predicates,
         where_clauses.before.span,
@@ -1792,14 +1800,20 @@ fn rewrite_ty<R: Rewrite>(
         generics.span.hi(),
         option,
     )?;
-    result.push_str(&where_clause_str);
+    result.push_str(&before_where_clause_str);
 
-    if let Some(ty) = rhs {
-        // If there's a where clause, add a newline before the assignment. Otherwise just add a
-        // space.
-        let has_where = !before_where_predicates.is_empty();
-        if has_where {
+    let mut result = if let Some(ty) = rhs {
+        // If there are any where clauses, add a newline before the assignment.
+        // If there is a before where clause, do not indent, but if there is
+        // only an after where clause, additionally indent the type.
+        if !before_where_predicates.is_empty() {
             result.push_str(&indent.to_string_with_newline(context.config));
+        } else if !after_where_predicates.is_empty() {
+            result.push_str(
+                &indent
+                    .block_indent(context.config)
+                    .to_string_with_newline(context.config),
+            );
         } else {
             result.push(' ');
         }
@@ -1813,7 +1827,7 @@ fn rewrite_ty<R: Rewrite>(
             Some(comment_span)
                 if contains_comment(context.snippet_provider.span_to_snippet(comment_span)?) =>
             {
-                let comment_shape = if has_where {
+                let comment_shape = if !before_where_predicates.is_empty() {
                     Shape::indented(indent, context.config)
                 } else {
                     Shape::indented(indent, context.config)
@@ -1832,12 +1846,36 @@ fn rewrite_ty<R: Rewrite>(
             _ => format!("{result}="),
         };
 
-        // 1 = `;`
-        let shape = Shape::indented(indent, context.config).sub_width(1)?;
-        rewrite_assign_rhs(context, lhs, &*ty, &RhsAssignKind::Ty, shape).map(|s| s + ";")
+        // 1 = `;` unless there's a trailing where clause
+        let shape = if after_where_predicates.is_empty() {
+            Shape::indented(indent, context.config).sub_width(1)?
+        } else {
+            Shape::indented(indent, context.config)
+        };
+        rewrite_assign_rhs(context, lhs, &*ty, &RhsAssignKind::Ty, shape)?
     } else {
-        Some(format!("{result};"))
+        result
+    };
+
+    if !after_where_predicates.is_empty() {
+        let option = WhereClauseOption::new(true, WhereClauseSpace::Newline);
+        let after_where_clause_str = rewrite_where_clause(
+            context,
+            after_where_predicates,
+            where_clauses.after.span,
+            context.config.brace_style(),
+            Shape::indented(indent, context.config),
+            false,
+            ";",
+            None,
+            rhs_hi,
+            option,
+        )?;
+        result.push_str(&after_where_clause_str);
     }
+
+    result += ";";
+    Some(result)
 }
 
 fn type_annotation_spacing(config: &Config) -> (&str, &str) {
