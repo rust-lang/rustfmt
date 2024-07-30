@@ -16,6 +16,7 @@ use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::types::{rewrite_path, PathContext};
 use crate::utils::{count_newlines, mk_sp};
+use std::ops::Add;
 
 mod doc_comment;
 
@@ -376,7 +377,29 @@ impl Rewrite for ast::Attribute {
                     },
                 ))
             } else {
-                Some(snippet.to_owned())
+                let count = count_newlines(snippet);
+                if count > 0 {
+                    let mut lines = snippet.lines();
+                    let mut res = String::new();
+                    let first: &str = lines.next().unwrap();
+                    //first string without indent
+                    res.push_str(first);
+                    res.push('\n');
+                    let indent_last = shape.indent.to_string(context.config);
+                    let indent_middle = shape.indent.add(4).to_string(context.config);
+                    for _ in 1..count {
+                        let next = lines.next().unwrap().trim();
+                        res.push_str(&indent_middle);
+                        res.push_str(next);
+                        res.push('\n');
+                    }
+                    let last = lines.next().unwrap().trim();
+                    res.push_str(&indent_last);
+                    res.push_str(last);
+                    Some(res)
+                } else {
+                    Some(snippet.to_owned())
+                }
             }
         }
     }
