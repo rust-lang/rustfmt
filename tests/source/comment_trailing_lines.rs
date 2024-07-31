@@ -19,3 +19,10 @@ pub mod bar {}
  *
  */
 pub mod block {}
+
+/**
+Outer Block doc comment with multiple trailing lines
+
+
+ */
+pub mod outer_block_doc_comment {}
