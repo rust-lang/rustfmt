@@ -10,8 +10,8 @@ use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
 use crate::string::{rewrite_string, StringFormat};
 use crate::utils::{
-    count_newlines, first_line_width, last_line_width, trim_left_preserve_layout,
-    trimmed_last_line_width, unicode_str_width,
+    count_newlines, first_line_width, is_horizontal_space, last_line_width,
+    trim_left_preserve_layout, trimmed_last_line_width, unicode_str_width,
 };
 use crate::{ErrorKind, FormattingError};
 
@@ -346,7 +346,14 @@ fn identify_comment(
     let (first_group, rest) = orig.split_at(first_group_ending);
     let rewritten_first_group =
         if !config.normalize_comments() && has_bare_lines && style.is_block_comment() {
-            trim_left_preserve_layout(first_group, shape.indent, config)?
+            let reindented = trim_left_preserve_layout(first_group, shape.indent, config)?;
+
+            // If wrap_comments is enabled, then remove any trailing blank lines
+            if config.wrap_comments() {
+                strip_comment_trailing_lines(reindented, style)
+            } else {
+                reindented
+            }
         } else if !config.normalize_comments()
             && !config.wrap_comments()
             && !(
@@ -811,7 +818,13 @@ impl<'a> CommentRewrite<'a> {
         } else if self.is_prev_line_multi_line && !line.is_empty() {
             self.result.push(' ')
         } else if is_last && line.is_empty() {
-            // trailing blank lines are unwanted
+            // Trailing blank lines are unwanted; if the last line is blank, look for additional,
+            // preceding blank lines to remove, also.
+            let trailing_line = self.comment_line_separator.trim_end_matches(' ');
+            while self.result.ends_with(trailing_line) {
+                self.result
+                    .truncate(self.result.len() - trailing_line.len());
+            }
             if !self.closer.is_empty() {
                 self.result.push_str(&self.indent_str);
             }
@@ -1047,6 +1060,46 @@ fn trim_end_unless_two_whitespaces(s: &str, is_doc_comment: bool) -> &str {
     }
 }
 
+/// Removes blank lines at the end of block comments
+fn strip_comment_trailing_lines(comment: String, style: CommentStyle<'_>) -> String {
+    debug_assert!(
+        style.is_block_comment(),
+        "strip_suffix(style.closer()) ensures this function is a no-op on non-block comments"
+    );
+
+    // If final line is a normal closing line, look for trailing blank lines
+    if let Some(without_closer) = comment
+        .strip_suffix(style.closer())
+        .map(|s| s.trim_end_matches(is_horizontal_space))
+        .and_then(|s| s.strip_suffix('\n'))
+    {
+        let mut trimmed = without_closer.trim_end();
+        let closer_line = &comment[without_closer.len()..];
+        let line_start = style.line_start().trim_end();
+        // Start trimming trailing blank lines
+        loop {
+            // Remove any asterisk-prefixed or bare block comment lines
+            let t = trimmed.trim_end_matches(line_start).trim_end();
+            if t.len() == trimmed.len() {
+                // If no trimming occurred
+                break;
+            } else {
+                // ... otherwise, keep trying to trim
+                trimmed = t;
+            }
+        }
+
+        if without_closer.len() == trimmed.len() {
+            // No blank lines were removed
+            comment
+        } else {
+            trimmed.to_string() + closer_line
+        }
+    } else {
+        // Final line either didn't have a closer or had non-whitespace along with the closer
+        comment
+    }
+}
 /// Trims whitespace and aligns to indent, but otherwise does not change comments.
 fn light_rewrite_comment(
     orig: &str,

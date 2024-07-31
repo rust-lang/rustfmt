@@ -675,6 +675,10 @@ pub(crate) fn is_empty_line(s: &str) -> bool {
     s.is_empty() || s.chars().all(char::is_whitespace)
 }
 
+pub(crate) fn is_horizontal_space(c: char) -> bool {
+    c == ' ' || c == '\t'
+}
+
 fn get_prefix_space_width(config: &Config, s: &str) -> usize {
     let mut width = 0;
     for c in s.chars() {
