@@ -416,6 +416,8 @@ impl FromStr for IgnoreList {
 pub trait CliOptions {
     fn apply_to(self, config: &mut Config);
     fn config_path(&self) -> Option<&Path>;
+    fn edition(&self) -> Option<Edition>;
+    fn style_edition(&self) -> Option<StyleEdition>;
 }
 
 /// The edition of the syntax and semantics of code (RFC 2052).
