@@ -223,6 +223,41 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.push_str("{");
         self.trim_spaces_after_opening_brace(b, inner_attrs);
 
+        // Try to detect comments that refer to the block, not the first statement in the block.
+        if has_braces {
+            let block_line_range = self.psess.lookup_line_range(b.span);
+            if block_line_range.lo != block_line_range.hi {
+                // Skipping if a single line block
+                // Make sure there is no code on the first line we have to worry about.
+                // That would also be ambiguous: what should `if { /* comment */ statement;`
+                // even do -- should the comment be attached to the `if` or the `statement`?
+                // The current logic answers this with "statement".
+                let first_line_contains_stmt = if let Some(first_stmt) = b.stmts.first() {
+                    self.psess.lookup_line_range(first_stmt.span).lo == block_line_range.lo
+                } else {
+                    false
+                };
+                if !first_line_contains_stmt {
+                    let first_line_bounds = self.psess.line_bounds(self.last_pos).unwrap();
+                    let first_line_snip = self
+                        .snippet(mk_sp(self.last_pos, first_line_bounds.end))
+                        .trim();
+
+                    if contains_comment(first_line_snip) {
+                        if let Ok(comment) =
+                            rewrite_comment(first_line_snip, false, self.shape(), self.config)
+                        {
+                            self.push_str(" ");
+                            self.push_str(&comment);
+                            // This line has no statements, so we can jump to the end of it
+                            // (but *before* the newline).
+                            self.last_pos = first_line_bounds.end - BytePos::from_usize(1);
+                        }
+                    }
+                }
+            }
+        }
+
         // Format inner attributes if available.
         if let Some(attrs) = inner_attrs {
             self.visit_attrs(attrs, ast::AttrStyle::Inner);

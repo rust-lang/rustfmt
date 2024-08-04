@@ -19,8 +19,7 @@ fn main() {
             // comment
             break 'block 1;
         }
-        if bar() {
-            /* comment */
+        if bar() { /* comment */
             break 'block 2;
         }
         3
