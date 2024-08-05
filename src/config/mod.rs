@@ -219,15 +219,44 @@ impl PartialConfig {
     }
 }
 
+fn check_semver_version(required: &str, actual: &str) -> bool {
+    let mut required_version = match semver::VersionReq::parse(required) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error: failed to parse required version: {}", e);
+            return false;
+        }
+    };
+    let actual_version = match semver::Version::parse(actual) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Error: failed to parse current version: {}", e);
+            return false;
+        }
+    };
+
+    required.split(',').enumerate().for_each(|(i, required)| {
+        let Some(comparator) = required_version.comparators.get_mut(i) else {
+            return;
+        };
+
+        if !required.contains('^') && comparator.op == semver::Op::Caret {
+            comparator.op = semver::Op::Exact;
+        }
+    });
+
+    required_version.matches(&actual_version)
+}
+
 impl Config {
     pub(crate) fn version_meets_requirement(&self) -> bool {
         if self.was_set().required_version() {
             let version = env!("CARGO_PKG_VERSION");
             let required_version = self.required_version();
-            if version != required_version {
-                println!(
-                    "Error: rustfmt version ({version}) doesn't match the required version \
-({required_version})"
+            if !check_semver_version(&required_version, version) {
+                eprintln!(
+                    "Error: rustfmt version ({}) doesn't match the required version ({})",
+                    version, required_version
                 );
                 return false;
             }
@@ -1197,5 +1226,357 @@ make_backup = false
                 MacroSelector::Name(MacroName::new("println".to_owned()))
             ])
         );
+    }
+
+    #[cfg(test)]
+    mod required_version {
+        use super::*;
+
+        #[allow(dead_code)] // Only used in tests
+        fn get_current_version() -> semver::Version {
+            semver::Version::parse(env!("CARGO_PKG_VERSION")).unwrap()
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_default() {
+            let config = Config::default();
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_current_required_version() {
+            let toml = format!("required_version=\"{}\"", env!("CARGO_PKG_VERSION"));
+            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_above() {
+            let toml = "required_version=\"1000.0.0\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_below() {
+            let versions = vec!["0.0.0", "0.0.1", "0.1.0"];
+
+            for version in versions {
+                let toml = format!("required_version=\"{}\"", version.to_string());
+                let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+                assert!(!config.version_meets_requirement());
+            }
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_tilde() {
+            let toml = format!("required_version=\"~{}\"", env!("CARGO_PKG_VERSION"));
+            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_caret() {
+            let current_version = get_current_version();
+
+            for minor in current_version.minor..0 {
+                let toml = format!(
+                    "required_version=\"^{}.{}.0\"",
+                    current_version.major.to_string(),
+                    minor.to_string()
+                );
+                let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+                assert!(!config.version_meets_requirement());
+            }
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_greater_than() {
+            let toml = "required_version=\">1.0.0\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_less_than() {
+            let toml = "required_version=\"<1.0.0\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_range() {
+            let current_version = get_current_version();
+
+            let toml = format!(
+                "required_version=\">={}.0.0, <{}.0.0\"",
+                current_version.major,
+                current_version.major + 1
+            );
+            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_exact_boundary() {
+            let toml = format!("required_version=\"{}\"", get_current_version().to_string());
+            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_pre_release() {
+            let toml = format!(
+                "required_version=\"^{}-alpha\"",
+                get_current_version().to_string()
+            );
+            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_with_build_metadata() {
+            let toml = format!(
+                "required_version=\"{}+build.1\"",
+                get_current_version().to_string()
+            );
+
+            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_invalid_specification() {
+            let toml = "required_version=\"not.a.version\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(!config.version_meets_requirement())
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_complex_range() {
+            let current_version = get_current_version();
+
+            let toml = format!(
+                "required_version=\">={}.0.0, <{}.0.0, ~{}.{}.0\"",
+                current_version.major,
+                current_version.major + 1,
+                current_version.major,
+                current_version.minor
+            );
+            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_wildcard_major() {
+            let toml = "required_version=\"1.x\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_wildcard_any() {
+            let toml = "required_version=\"*\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_major_version_zero() {
+            let toml = "required_version=\"0.1.0\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_future_major_version() {
+            let toml = "required_version=\"3.0.0\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_fail_different_operator() {
+            // != is not supported
+            let toml = "required_version=\"!=1.0.0\"";
+            let config = Config::from_toml(toml, Path::new("")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+    }
+
+    #[cfg(test)]
+    mod check_semver_version {
+        use super::*;
+
+        #[test]
+        fn test_exact_version_match() {
+            assert!(check_semver_version("1.0.0", "1.0.0"));
+            assert!(!check_semver_version("1.0.0", "1.1.0"));
+            assert!(!check_semver_version("1.0.0", "1.0.1"));
+            assert!(!check_semver_version("1.0.0", "2.1.0"));
+            assert!(!check_semver_version("1.0.0", "0.1.0"));
+            assert!(!check_semver_version("1.0.0", "0.0.1"));
+        }
+
+        #[test]
+        fn test_version_mismatch() {
+            assert!(!check_semver_version("2.0.0", "1.0.0"));
+        }
+
+        #[test]
+        fn test_patch_version_greater() {
+            assert!(check_semver_version("^1.0.0", "1.0.1"));
+        }
+
+        #[test]
+        fn test_minor_version_greater() {
+            assert!(check_semver_version("^1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_major_version_less() {
+            assert!(!check_semver_version("1.0.0", "0.9.0"));
+        }
+
+        #[test]
+        fn test_prerelease_less_than_release() {
+            assert!(!check_semver_version("1.0.0", "1.0.0-alpha"));
+        }
+
+        #[test]
+        fn test_prerelease_version_specific_match() {
+            assert!(check_semver_version("1.0.0-alpha", "1.0.0-alpha"));
+        }
+
+        #[test]
+        fn test_build_metadata_ignored() {
+            assert!(check_semver_version("1.0.0", "1.0.0+build.1"));
+        }
+
+        #[test]
+        fn test_greater_than_requirement() {
+            assert!(check_semver_version(">1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_less_than_requirement_fails_when_greater() {
+            assert!(!check_semver_version("<1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_caret_requirement_matches_minor_update() {
+            assert!(check_semver_version("^1.1.0", "1.2.0"));
+        }
+
+        #[test]
+        fn test_tilde_requirement_matches_patch_update() {
+            assert!(check_semver_version("~1.0.0", "1.0.1"));
+        }
+
+        #[test]
+        fn test_range_requirement_inclusive() {
+            assert!(check_semver_version(">=1.0.0, <2.0.0", "1.5.0"));
+        }
+
+        #[test]
+        fn test_pre_release_specific_match() {
+            assert!(check_semver_version("1.0.0-alpha.1", "1.0.0-alpha.1"));
+        }
+
+        #[test]
+        fn test_pre_release_non_match_when_requiring_release() {
+            assert!(!check_semver_version("1.0.0", "1.0.0-alpha.1"));
+        }
+
+        #[test]
+        fn test_wildcard_match_minor() {
+            assert!(check_semver_version("1.*", "1.1.0"));
+            assert!(check_semver_version("1.*, <2.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_wildcard_match_major() {
+            assert!(check_semver_version("2.*", "2.0.0"));
+        }
+
+        #[test]
+        fn test_wildcard_match_patch() {
+            assert!(check_semver_version("1.0.*", "1.0.1"));
+        }
+
+        #[test]
+        fn test_invalid_inputs() {
+            assert!(!check_semver_version("not.a.requirement", "1.0.0"));
+            assert!(!check_semver_version("1.0.0", "not.a.version"));
+        }
+
+        #[test]
+        fn test_version_with_pre_release_and_build() {
+            assert!(check_semver_version("1.0.0-alpha", "1.0.0-alpha+001"));
+        }
+
+        // Demonstrates precedence of numeric identifiers over alphanumeric in pre-releases
+        #[test]
+        fn test_pre_release_numeric_vs_alphanumeric() {
+            assert!(!check_semver_version("^1.0.0-alpha.beta", "1.0.0-alpha.1"));
+            assert!(check_semver_version("^1.0.0-alpha.1", "1.0.0-alpha.beta"));
+        }
+
+        // Demonstrates lexicographic ordering of alphanumeric identifiers in pre-releases
+        #[test]
+        fn test_pre_release_lexicographic_ordering() {
+            assert!(check_semver_version(
+                "^1.0.0-alpha.alpha",
+                "1.0.0-alpha.beta",
+            ));
+            assert!(!check_semver_version(
+                "^1.0.0-alpha.beta",
+                "1.0.0-alpha.alpha",
+            ));
+        }
+
+        // These are not allowed. '*' can't be used with other version specifiers.
+        #[test]
+        fn test_wildcard_any_with_range() {
+            assert!(!check_semver_version("*, <2.0.0", "1.0.0"));
+            assert!(!check_semver_version("*, 1.0.0", "1.5.0"));
+        }
     }
 }
