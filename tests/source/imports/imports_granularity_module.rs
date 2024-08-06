@@ -45,3 +45,7 @@ use b::v::{
 };
 use b::t::{/* Before b::t::self */ self};
 use b::c;
+
+// Issue #6191: grouping of top-level modules
+use library1;
+use {library2 as lib2, library3};
