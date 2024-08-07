@@ -13,7 +13,8 @@ async unsafe fn foo() {
 }
 
 async unsafe fn rust() {
-    async move { // comment
+    async move {
+        // comment
         Ok(())
     }
 }

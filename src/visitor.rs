@@ -224,7 +224,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.trim_spaces_after_opening_brace(b, inner_attrs);
 
         // Try to detect comments that refer to the block, not the first statement in the block.
-        if has_braces {
+        if has_braces && self.config.style_edition() >= StyleEdition::Edition2024 {
             let block_line_range = self.psess.lookup_line_range(b.span);
             if block_line_range.lo != block_line_range.hi {
                 // Skipping if a single line block

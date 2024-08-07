@@ -1,3 +1,5 @@
+// rustfmt-style_edition: 2024
+
 fn foo() {
     if true { // Sample comment
         // second-line comment
