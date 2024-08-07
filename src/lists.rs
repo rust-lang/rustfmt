@@ -210,6 +210,8 @@ impl ListItem {
 pub(crate) enum Separator {
     Comma,
     VerticalBar,
+    // Used to format trait bounds
+    Plus,
 }
 
 impl Separator {
@@ -219,6 +221,8 @@ impl Separator {
             Separator::Comma => 2,
             // 3 = ` | `
             Separator::VerticalBar => 3,
+            // 3 = ` + `
+            Separator::Plus => 3,
         }
     }
 }
