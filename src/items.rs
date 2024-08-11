@@ -131,14 +131,23 @@ impl Rewrite for ast::Local {
                 .sub_width(1)
                 .max_width_error(shape.width, self.span())?;
 
-            result = rewrite_assign_rhs(
+            // should always find a comment span if init exists
+            let comment_span = context
+                .snippet_provider
+                .opt_span_after(self.span, "=")
+                .map(|op_lo| mk_sp(op_lo, init.span.lo()))
+                .unwrap();
+
+            result = rewrite_assign_rhs_with_comments(
                 context,
                 result,
                 init,
-                &RhsAssignKind::Expr(&init.kind, init.span),
                 nested_shape,
-            )
-            .max_width_error(shape.width, self.span())?;
+                &RhsAssignKind::Expr(&init.kind, init.span),
+                RhsTactics::Default,
+                comment_span,
+                true,
+            )?;
 
             if let Some(block) = else_block {
                 let else_kw_span = init.span.between(block.span);
