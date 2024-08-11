@@ -160,7 +160,10 @@ pub(crate) fn combine_strs_with_missing_comments(
 ) -> RewriteResult {
     trace!(
         "combine_strs_with_missing_comments `{}` `{}` {:?} {:?}",
-        prev_str, next_str, span, shape
+        prev_str,
+        next_str,
+        span,
+        shape
     );
 
     let mut result =
@@ -1713,6 +1716,8 @@ pub(crate) fn recover_comment_removed(
     if snippet != new && changed_comment_content(snippet, &new) {
         // We missed some comments. Warn and keep the original text.
         if context.config.error_on_unformatted() {
+            println!("new = {:?}", new);
+            println!("snippet = {:?}", snippet);
             context.report.append(
                 context.psess.span_to_filename(span),
                 vec![FormattingError::from_span(

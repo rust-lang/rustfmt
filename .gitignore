@@ -23,3 +23,6 @@ tests/cargo-fmt/**/target
 .idea/
 .vscode/
 *~
+
+# Git
+.git/
