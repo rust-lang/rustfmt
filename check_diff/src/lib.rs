@@ -2,6 +2,7 @@ use std::env;
 use std::io;
 use std::path::Path;
 use std::process::Command;
+use structs::CliInputs;
 use tracing::info;
 
 pub mod structs;
@@ -56,5 +57,9 @@ pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
         "Current directory: {}",
         env::current_dir().unwrap().display()
     );
+    return Ok(());
+}
+
+pub fn compile_rustfmt(dest: &Path, inputs: CliInputs) -> Result<(), GitError> {
     return Ok(());
 }
