@@ -4,6 +4,8 @@ use std::path::Path;
 use std::process::Command;
 use tracing::info;
 
+pub mod structs;
+
 pub enum GitError {
     FailedClone { stdout: Vec<u8>, stderr: Vec<u8> },
     IO(std::io::Error),
