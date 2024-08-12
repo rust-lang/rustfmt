@@ -1,54 +1,17 @@
+use git::clone_git_repo;
+use git::git_fetch;
+use git::git_remote_add;
+use git::GitError;
 use std::env;
 use std::io;
 use std::path::Path;
-use std::process::Command;
 use structs::CliInputs;
 use tracing::info;
 
+pub mod git;
 pub mod structs;
 
-pub enum GitError {
-    FailedClone { stdout: Vec<u8>, stderr: Vec<u8> },
-    IO(std::io::Error),
-}
-
-impl From<io::Error> for GitError {
-    fn from(error: io::Error) -> Self {
-        GitError::IO(error)
-    }
-}
-
-/// Clone a git repository
-///
-/// Parameters:
-/// url: git clone url
-/// dest: directory where the repo should be cloned
-pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitError> {
-    let git_cmd = Command::new("git")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .args([
-            "clone",
-            "--quiet",
-            url,
-            "--depth",
-            "1",
-            dest.to_str().unwrap(),
-        ])
-        .output()?;
-
-    // if the git command does not return successfully,
-    // any command on the repo will fail. So fail fast.
-    if !git_cmd.status.success() {
-        let error = GitError::FailedClone {
-            stdout: git_cmd.stdout,
-            stderr: git_cmd.stderr,
-        };
-        return Err(error);
-    }
-
-    info!("Successfully clone repository.");
-    return Ok(());
-}
+const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
 
 pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     let dest_path = Path::new(&dest);
@@ -60,6 +23,29 @@ pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     return Ok(());
 }
 
+// Compiles and produces two rustfmt binaries.
+// One for the current master, and another for the feature branch
+// Parameters:
+// dest: Directory where rustfmt will be cloned
 pub fn compile_rustfmt(dest: &Path, inputs: CliInputs) -> Result<(), GitError> {
+    let clone_repo_result = clone_git_repo(RUSTFMT_REPO, dest);
+
+    if clone_repo_result.is_err() {
+        return clone_repo_result;
+    }
+
+    let remote_add_result = git_remote_add(inputs.remote_repo_url.as_str());
+    if remote_add_result.is_err() {
+        return remote_add_result;
+    }
+
+    let fetch_result = git_fetch(inputs.feature_branch.as_str());
+    if fetch_result.is_err() {
+        return fetch_result;
+    }
+
+    let cargo_version = env!("CARGO_PKG_VERSION");
+    info!("Compiling with {}", cargo_version);
+
     return Ok(());
 }

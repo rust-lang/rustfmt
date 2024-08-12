@@ -1,4 +1,4 @@
-use check_diff::clone_git_repo;
+use check_diff::git::clone_git_repo;
 
 use tempfile::Builder;
 
