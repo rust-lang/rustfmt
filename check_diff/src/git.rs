@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::Command;
 use tracing::info;
 
-pub enum GitCommand {
+enum GitCommand {
     Clone,
     RemoteAdd,
     Fetch,
