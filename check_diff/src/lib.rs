@@ -51,7 +51,8 @@ pub fn compile_rustfmt(dest: &Path, inputs: CliInputs) -> io::Result<Command> {
     info!("Compiling with {}", cargo_version);
 
     //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
-    // binary can find it's runtime dependencies. See https://github.com/rust-lang/rustfmt/issues/5675
+    // binary can find it's runtime dependencies.
+    // See https://github.com/rust-lang/rustfmt/issues/5675
     // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
 
     let Ok(command) = std::process::Command::new("rustc")
@@ -67,6 +68,8 @@ pub fn compile_rustfmt(dest: &Path, inputs: CliInputs) -> io::Result<Command> {
 
     let ld_lib_path = format!("{}/lib", sysroot.trim_end());
     env::set_var("LD_LIBRARY_PATH", ld_lib_path);
+    info!("Building rustfmt from scratch");
+
     let result = Command::new("ls");
 
     return Ok(result);
