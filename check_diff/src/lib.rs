@@ -5,6 +5,19 @@ use std::path::Path;
 use std::process::Command;
 use tracing::info;
 
+pub enum CheckDiffError {
+    FailedGit(GitError),
+    FailedCommand,
+    FailedUtf8,
+    IO(std::io::Error),
+}
+
+impl From<io::Error> for CheckDiffError {
+    fn from(error: io::Error) -> Self {
+        CheckDiffError::IO(error)
+    }
+}
+
 pub enum GitError {
     FailedClone { stdout: Vec<u8>, stderr: Vec<u8> },
     FailedRemoteAdd { stdout: Vec<u8>, stderr: Vec<u8> },
@@ -107,26 +120,25 @@ pub fn compile_rustfmt(
     remote_repo_url: String,
     feature_branch: String,
     _rustfmt_config: Option<Vec<String>>,
-) -> io::Result<Command> {
+) -> Result<Command, CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
 
-    let Ok(_) = clone_git_repo(RUSTFMT_REPO, dest) else {
-        return Err(Error::other("Error cloning repo while compiling rustfmt"));
-    };
+    let clone_git_result = clone_git_repo(RUSTFMT_REPO, dest);
+    if clone_git_result.is_err() {
+        return Err(CheckDiffError::FailedGit(x.err().unwrap()));
+    }
 
-    let Ok(_) = git_remote_add(remote_repo_url.as_str()) else {
-        return Err(Error::other(format!(
-            "Error adding remote from {} while compiling rustfmt",
-            remote_repo_url
-        )));
-    };
+    let git_remote_add_result = git_remote_add(remote_repo_url.as_str());
+    if git_remote_add_result.is_err() {
+        return Err(CheckDiffError::FailedGit(
+            git_remote_add_result.err().unwrap(),
+        ));
+    }
 
-    let Ok(_) = git_fetch(feature_branch.as_str()) else {
-        return Err(Error::other(format!(
-            "Error fetching from {} while compiling rustfmt",
-            feature_branch
-        )));
-    };
+    let git_fetch_result = git_fetch(feature_branch.as_str());
+    if git_fetch_result.is_err() {
+        return Err(CheckDiffError::FailedGit(git_fetch_result.err().unwrap()));
+    }
 
     let cargo_version = env!("CARGO_PKG_VERSION");
     info!("Compiling with {}", cargo_version);
