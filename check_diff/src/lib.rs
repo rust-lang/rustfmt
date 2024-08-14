@@ -12,8 +12,6 @@ pub enum GitError {
     IO(std::io::Error),
 }
 
-const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
-
 impl From<io::Error> for GitError {
     fn from(error: io::Error) -> Self {
         GitError::IO(error)
@@ -108,8 +106,10 @@ pub fn compile_rustfmt(
     dest: &Path,
     remote_repo_url: String,
     feature_branch: String,
-    rustfmt_config: Option<Vec<String>>,
+    _rustfmt_config: Option<Vec<String>>,
 ) -> io::Result<Command> {
+    const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
+
     let Ok(_) = clone_git_repo(RUSTFMT_REPO, dest) else {
         return Err(Error::other("Error cloning repo while compiling rustfmt"));
     };
@@ -135,7 +135,6 @@ pub fn compile_rustfmt(
     // binary can find it's runtime dependencies.
     // See https://github.com/rust-lang/rustfmt/issues/5675
     // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
-
     let Ok(command) = std::process::Command::new("rustc")
         .args(["--print", "sysroot"])
         .output()
@@ -147,8 +146,7 @@ pub fn compile_rustfmt(
         return Err(Error::other("Error converting sysroot to string"));
     };
 
-    let ld_lib_path = format!("{}/lib", sysroot.trim_end());
-    env::set_var("LD_LIBRARY_PATH", ld_lib_path);
+    let _ld_lib_path = format!("{}/lib", sysroot.trim_end());
     info!("Building rustfmt from scratch");
 
     let result = Command::new("ls");
