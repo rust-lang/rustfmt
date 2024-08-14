@@ -555,6 +555,7 @@ impl GetOptsOptions {
         }
 
         let rust_nightly = is_nightly();
+        println!("test123 = {:?}", options.unstable_features);
 
         if rust_nightly {
             options.unstable_features = matches.opt_present("unstable-features");
