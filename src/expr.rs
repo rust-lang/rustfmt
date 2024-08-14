@@ -2136,6 +2136,7 @@ pub(crate) fn rewrite_assign_rhs_with<S: Into<String>, R: Rewrite>(
 ) -> Option<String> {
     let lhs = lhs.into();
     let rhs = rewrite_assign_rhs_expr(context, &lhs, ex, shape, rhs_kind, rhs_tactics)?;
+
     Some(lhs + &rhs)
 }
 

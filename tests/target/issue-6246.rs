@@ -1,5 +1,5 @@
 fn main() {
-    let foo =
+    let foo = 
     // 114514
     if true {
         1919
