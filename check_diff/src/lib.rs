@@ -1,14 +1,13 @@
 use std::env;
 use std::io;
-use std::io::Error;
 use std::path::Path;
 use std::process::Command;
 use tracing::info;
 
 pub enum CheckDiffError {
     FailedGit(GitError),
-    FailedCommand,
-    FailedUtf8,
+    FailedCommand(String),
+    FailedUtf8(String),
     IO(std::io::Error),
 }
 
@@ -125,7 +124,7 @@ pub fn compile_rustfmt(
 
     let clone_git_result = clone_git_repo(RUSTFMT_REPO, dest);
     if clone_git_result.is_err() {
-        return Err(CheckDiffError::FailedGit(x.err().unwrap()));
+        return Err(CheckDiffError::FailedGit(clone_git_result.err().unwrap()));
     }
 
     let git_remote_add_result = git_remote_add(remote_repo_url.as_str());
@@ -151,11 +150,15 @@ pub fn compile_rustfmt(
         .args(["--print", "sysroot"])
         .output()
     else {
-        return Err(Error::other("Error getting sysroot"));
+        return Err(CheckDiffError::FailedCommand(
+            "Error getting sysroot".to_string(),
+        ));
     };
 
     let Ok(sysroot) = String::from_utf8(command.stdout) else {
-        return Err(Error::other("Error converting sysroot to string"));
+        return Err(CheckDiffError::FailedUtf8(
+            "Error converting sysroot to string".to_string(),
+        ));
     };
 
     let _ld_lib_path = format!("{}/lib", sysroot.trim_end());
