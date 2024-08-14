@@ -131,6 +131,15 @@ impl Rewrite for ast::Local {
                 .sub_width(1)
                 .max_width_error(shape.width, self.span())?;
 
+            // let x =[target_string]{expr}
+
+            println!("{:?}", self);
+            let test_span = mk_sp(BytePos(16), init.span.lo());
+            println!("test={:?}\n", context.snippet(test_span));
+            // let test_span2 = mk_sp(BytePos(11), BytePos(9));
+            // println!("test2={:?}", context.snippet(test_span2));
+            // result = "let foo =\n    // 114514\n".to_string();
+
             result = rewrite_assign_rhs(
                 context,
                 result,
