@@ -96,9 +96,6 @@ impl<'a> Rewrite for Stmt<'a> {
             } else {
                 ExprType::Statement
             };
-
-        // println!("rewrite: {:?} \n", self.as_ast_node().kind);
-
         format_stmt(
             context,
             shape,
@@ -118,16 +115,9 @@ fn format_stmt(
 ) -> Option<String> {
     skip_out_of_file_lines_range!(context, stmt.span());
 
-    // println!("format_stmt: {:?} \n", stmt.kind);
-
     let result = match stmt.kind {
-        ast::StmtKind::Let(ref local) => {
-            // println!("let local={:?}\n", local);
-            let result = local.rewrite(context, shape);
-            result
-        }
+        ast::StmtKind::Let(ref local) => local.rewrite(context, shape),
         ast::StmtKind::Expr(ref ex) | ast::StmtKind::Semi(ref ex) => {
-            // println!("other local={:?}\n", ex);
             let suffix = if semicolon_for_stmt(context, stmt, is_last_expr) {
                 ";"
             } else {
@@ -139,8 +129,5 @@ fn format_stmt(
         }
         ast::StmtKind::MacCall(..) | ast::StmtKind::Item(..) | ast::StmtKind::Empty => None,
     };
-
-    // println!("result={result:?}\n");
-
     result.and_then(|res| recover_comment_removed(res, stmt.span(), context))
 }
