@@ -21,7 +21,9 @@ use crate::expr::{
     rewrite_assign_rhs_with_comments, rewrite_else_kw_with_comments, rewrite_let_else_block,
     RhsAssignKind, RhsTactics,
 };
-use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
+use crate::lists::{
+    definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
+};
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::overflow;
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
@@ -643,8 +645,27 @@ impl<'a> FmtVisitor<'a> {
         let mut items: Vec<_> = itemize_list_with(self.config.struct_variant_width());
 
         // If one of the variants use multiple lines, use multi-lined formatting for all variants.
-        let has_multiline_variant = items.iter().any(|item| item.inner_as_ref().contains('\n'));
-        let has_single_line_variant = items.iter().any(|item| !item.inner_as_ref().contains('\n'));
+        fn is_multi_line_variant(item: &ListItem) -> bool {
+            let variant_str = item.inner_as_ref();
+            let mut first_line_is_read = false;
+            for line in variant_str.split('\n') {
+                if first_line_is_read {
+                    return false;
+                }
+
+                // skip rustdoc comments and macro attributes
+                let line = line.trim_start();
+                if line.starts_with("///") || line.starts_with("#") {
+                    continue;
+                } else {
+                    first_line_is_read = true;
+                }
+            }
+
+            true
+        }
+        let has_multiline_variant = items.iter().any(is_multi_line_variant);
+        let has_single_line_variant = items.iter().any(|item| !is_multi_line_variant(item));
         if has_multiline_variant && has_single_line_variant {
             items = itemize_list_with(0);
         }
