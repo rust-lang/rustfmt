@@ -8,6 +8,28 @@ fn main() {
     };
 }
 
+fn main() {
+    let foo = 
+    // line 1
+    // line 2
+    if true {
+        1919
+    } else {
+        810
+    };
+}
+
+fn main() {
+    let foo = 
+    /* line 1
+       line 2 */
+    if true {
+        1919
+    } else {
+        810
+    };
+}
+
 // Test a let statement without equal sign
 fn main() {
     let mut foo ;
