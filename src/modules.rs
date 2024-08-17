@@ -77,10 +77,14 @@ pub struct ModuleResolutionError {
 pub(crate) enum ModuleResolutionErrorKind {
     /// Find a file that cannot be parsed.
     #[error("cannot parse {file}")]
-    ParseError { file: PathBuf },
+    ParseError {
+        file: PathBuf,
+    },
     /// File cannot be found.
     #[error("{file} does not exist")]
-    NotFound { file: PathBuf },
+    NotFound {
+        file: PathBuf,
+    },
     /// File a.rs and a/mod.rs both exist
     #[error("file for module found at both {default_path:?} and {secondary_path:?}")]
     MultipleCandidates {

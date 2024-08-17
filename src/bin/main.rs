@@ -64,11 +64,17 @@ enum Operation {
     /// Print version information
     Version,
     /// Output default config to a file, or stdout if None
-    ConfigOutputDefault { path: Option<String> },
+    ConfigOutputDefault {
+        path: Option<String>,
+    },
     /// Output current config (as if formatting to a file) to stdout
-    ConfigOutputCurrent { path: Option<String> },
+    ConfigOutputCurrent {
+        path: Option<String>,
+    },
     /// No file specified, read from stdin
-    Stdin { input: String },
+    Stdin {
+        input: String,
+    },
 }
 
 /// Rustfmt operations errors.
