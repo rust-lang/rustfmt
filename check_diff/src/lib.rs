@@ -8,6 +8,8 @@ pub enum CheckDiffError {
     FailedGit(GitError),
     FailedCommand(String),
     FailedUtf8(String),
+    FailedSourceBuild(String),
+    FailedCopy(String),
     IO(std::io::Error),
 }
 
@@ -21,6 +23,7 @@ pub enum GitError {
     FailedClone { stdout: Vec<u8>, stderr: Vec<u8> },
     FailedRemoteAdd { stdout: Vec<u8>, stderr: Vec<u8> },
     FailedFetch { stdout: Vec<u8>, stderr: Vec<u8> },
+    FailedSwitch { stdout: Vec<u8>, stderr: Vec<u8> },
     IO(std::io::Error),
 }
 
@@ -100,6 +103,22 @@ pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
     return Ok(());
 }
 
+pub fn git_switch(arg: &str, should_detach: bool) -> Result<(), GitError> {
+    let detach_arg = if should_detach { "--detach" } else { "" };
+    let git_cmd = Command::new("git").args([arg, detach_arg]).output()?;
+
+    if !git_cmd.status.success() {
+        let error = GitError::FailedSwitch {
+            stdout: git_cmd.stdout,
+            stderr: git_cmd.stderr,
+        };
+        return Err(error);
+    }
+
+    info!("Successfully switched to {}", arg);
+    return Ok(());
+}
+
 pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     let dest_path = Path::new(&dest);
     env::set_current_dir(&dest_path)?;
@@ -118,7 +137,7 @@ pub fn compile_rustfmt(
     dest: &Path,
     remote_repo_url: String,
     feature_branch: String,
-    _rustfmt_config: Option<Vec<String>>,
+    commit_hash: Option<String>,
 ) -> Result<Command, CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
 
@@ -146,10 +165,7 @@ pub fn compile_rustfmt(
     // binary can find it's runtime dependencies.
     // See https://github.com/rust-lang/rustfmt/issues/5675
     // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
-    let Ok(command) = std::process::Command::new("rustc")
-        .args(["--print", "sysroot"])
-        .output()
-    else {
+    let Ok(command) = Command::new("rustc").args(["--print", "sysroot"]).output() else {
         return Err(CheckDiffError::FailedCommand(
             "Error getting sysroot".to_string(),
         ));
@@ -162,7 +178,31 @@ pub fn compile_rustfmt(
     };
 
     let _ld_lib_path = format!("{}/lib", sysroot.trim_end());
-    info!("Building rustfmt from scratch");
+    info!("Building rustfmt from source");
+    let Ok(_) = Command::new("cargo")
+        .args(["build", "-q", "--release", "--bin", "rustfmt"])
+        .output()
+    else {
+        return Err(CheckDiffError::FailedSourceBuild(
+            "Error building rustfmt from source".to_string(),
+        ));
+    };
+
+    let dest_rustfmt = format!("{}/rustfmt", dest.display());
+    let Ok(_) = Command::new("cp")
+        .args(["target/release/rustfmt", dest_rustfmt.as_str()])
+        .output()
+    else {
+        return Err(CheckDiffError::FailedCopy(
+            "Error copying rustfmt release to destination".to_string(),
+        ));
+    };
+
+    if (commit_hash.is_none() || feature_branch == commit_hash.unwrap()) {
+        git_switch(feature_branch.as_str(), false);
+    } else {
+        git_switch(commit_hash.unwrap().as_str(), true);
+    }
 
     let result = Command::new("ls");
 
