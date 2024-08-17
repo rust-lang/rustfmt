@@ -27,6 +27,6 @@ fn main() {
         tmp_dir.path(),
         args.remote_repo_url,
         args.feature_branch,
-        args.rustfmt_config,
+        args.commit_hash,
     );
 }
