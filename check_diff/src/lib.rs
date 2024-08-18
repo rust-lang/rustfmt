@@ -198,11 +198,11 @@ pub fn compile_rustfmt(
         ));
     };
 
-    if (commit_hash.is_none() || feature_branch == commit_hash.unwrap()) {
-        git_switch(feature_branch.as_str(), false);
-    } else {
-        git_switch(commit_hash.unwrap().as_str(), true);
-    }
+    let should_detach = commit_hash.is_some();
+    let _ = git_switch(
+        commit_hash.unwrap_or(feature_branch).as_str(),
+        should_detach,
+    );
 
     let result = Command::new("ls");
 
