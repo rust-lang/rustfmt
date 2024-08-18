@@ -278,6 +278,12 @@ impl Shape {
         offset_indent.to_string_inner(config, 0)
     }
 
+    pub(crate) fn to_string(&self, config: &Config) -> Cow<'static, str> {
+        let mut offset_indent = self.indent;
+        offset_indent.alignment = self.offset;
+        offset_indent.to_string_inner(config, 1)
+    }
+
     /// Creates a `Shape` with a virtually infinite width.
     pub(crate) fn infinite_width(&self) -> Shape {
         Shape {
