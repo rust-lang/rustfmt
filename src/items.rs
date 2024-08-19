@@ -645,8 +645,14 @@ impl<'a> FmtVisitor<'a> {
         let mut items: Vec<_> = itemize_list_with(self.config.struct_variant_width());
 
         // If one of the variants use multiple lines, use multi-lined formatting for all variants.
-        fn is_multi_line_variant(item: &ListItem) -> bool {
+        let is_multi_line_variant = |item: &ListItem| -> bool {
             let variant_str = item.inner_as_ref();
+            if self.config.style_edition() < StyleEdition::Edition2024 {
+                // Fall back to previous naive implementation (#5662) because of
+                // rustfmt's stability guarantees
+                return variant_str.contains('\n');
+            }
+
             let mut first_line_is_read = false;
             for line in variant_str.split('\n') {
                 if first_line_is_read {
@@ -663,7 +669,7 @@ impl<'a> FmtVisitor<'a> {
             }
 
             true
-        }
+        };
         let has_multiline_variant = items.iter().any(is_multi_line_variant);
         let has_single_line_variant = items.iter().any(|item| !is_multi_line_variant(item));
         if has_multiline_variant && has_single_line_variant {

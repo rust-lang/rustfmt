@@ -1,3 +1,4 @@
+// rustfmt-style_edition: 2024
 enum A {
     B {
         a: usize,
