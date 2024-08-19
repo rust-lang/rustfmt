@@ -19,6 +19,12 @@ impl From<io::Error> for CheckDiffError {
     }
 }
 
+impl From<GitError> for CheckDiffError {
+    fn from(error: GitError) -> Self {
+        CheckDiffError::FailedGit(error)
+    }
+}
+
 pub enum GitError {
     FailedClone { stdout: Vec<u8>, stderr: Vec<u8> },
     FailedRemoteAdd { stdout: Vec<u8>, stderr: Vec<u8> },
@@ -141,22 +147,11 @@ pub fn compile_rustfmt(
 ) -> Result<Command, CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
 
-    let clone_git_result = clone_git_repo(RUSTFMT_REPO, dest);
-    if clone_git_result.is_err() {
-        return Err(CheckDiffError::FailedGit(clone_git_result.err().unwrap()));
-    }
+    let _clone_git_result = clone_git_repo(RUSTFMT_REPO, dest)?;
 
-    let git_remote_add_result = git_remote_add(remote_repo_url.as_str());
-    if git_remote_add_result.is_err() {
-        return Err(CheckDiffError::FailedGit(
-            git_remote_add_result.err().unwrap(),
-        ));
-    }
+    let _git_remote_add_result = git_remote_add(remote_repo_url.as_str())?;
 
-    let git_fetch_result = git_fetch(feature_branch.as_str());
-    if git_fetch_result.is_err() {
-        return Err(CheckDiffError::FailedGit(git_fetch_result.err().unwrap()));
-    }
+    let _git_fetch_result = git_fetch(feature_branch.as_str())?;
 
     let cargo_version = env!("CARGO_PKG_VERSION");
     info!("Compiling with {}", cargo_version);
