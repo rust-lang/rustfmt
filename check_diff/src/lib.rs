@@ -11,6 +11,7 @@ pub enum CheckDiffError {
     FailedSourceBuild(String),
     FailedCopy(String),
     FailedCargoVersion(String),
+    FailedVersioning(String),
     IO(std::io::Error),
 }
 
@@ -137,10 +138,6 @@ pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
 }
 
 pub fn get_ld_lib_path() -> Result<String, CheckDiffError> {
-    //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
-    // binary can find it's runtime dependencies.
-    // See https://github.com/rust-lang/rustfmt/issues/5675
-    // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
     let Ok(command) = Command::new("rustc").args(["--print", "sysroot"]).output() else {
         return Err(CheckDiffError::FailedCommand(
             "Error getting sysroot".to_string(),
@@ -195,6 +192,13 @@ pub fn build_rsfmt_from_src(ld_lib_path: String) -> Result<(), CheckDiffError> {
     return Ok(());
 }
 
+pub fn get_binary_version(binary: String) -> Result<(), CheckDiffError> {
+    let Ok(_) = Command::new(binary.as_str()).args(["--version"]).output() else {
+        return Err(CheckDiffError::FailedVersioning(format!("Failed to get version for {}", binary)));
+    };
+    return Ok(());
+}
+
 // Compiles and produces two rustfmt binaries.
 // One for the current master, and another for the feature branch
 // Parameters:
@@ -214,13 +218,17 @@ pub fn compile_rustfmt(
     let cargo_version = get_cargo_version()?;
     info!("Compiling with {}", cargo_version);
 
+    //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
+    // binary can find it's runtime dependencies.
+    // See https://github.com/rust-lang/rustfmt/issues/5675
+    // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
     let ld_lib_path = get_ld_lib_path()?;
 
     info!("Building rustfmt from source");
     let _build_from_src = build_rsfmt_from_src(ld_lib_path)?;
 
-    let dest_rustfmt = format!("{}/rustfmt", dest.display());
-    let _cp = copy_src_to_dst("target/release/rustfmt", dest_rustfmt.as_str())?;
+    let rustfmt_binary = format!("{}/rustfmt", dest.display());
+    let _cp = copy_src_to_dst("target/release/rustfmt", rustfmt_binary.as_str())?;
 
     let should_detach = commit_hash.is_some();
     let _ = git_switch(
@@ -228,7 +236,24 @@ pub fn compile_rustfmt(
         should_detach,
     );
 
-    let result = Command::new("ls");
+    // This will prepend the `LD_LIBRARY_PATH` for the feature branch rustfmt binary.
+    //  In most cases the `LD_LIBRARY_PATH` should be the same for both rustfmt binaries that we build
+    //  in `compile_rustfmt`, however, there are scenarios where each binary has different runtime
+    //  dependencies. For example, during subtree syncs we bump the nightly toolchain required to build
+    //  rustfmt, and therefore the feature branch relies on a newer set of runtime dependencies.
+    let ld_lib_path = get_ld_lib_path()?;
+    info!("Building rustfmt from source");
+    let _build_from_src = build_rsfmt_from_src(ld_lib_path)?;
+    let feature_binary = format!("{}/feature_rustfmt", dest.display());
+
+    let _cp = copy_src_to_dst("target/release/rustfmt", rustfmt_binary.as_str())?;
+    info!("\nRuntime dependencies for rustfmt -- LD_LIBRARY_PATH: {}", ld_lib_path);
+
+    let rustfmt_version = get_binary_version(rustfmt_binary)?;
+    info!("\nRUSFMT_BIN {}\n", rustfmt_version);
+
+    let feature_binary_version = get_binary_version(feature_binary)?;
+    info!("FEATURE_BIN {}\n", feature_binary_version);
 
     return Ok(result);
 }
