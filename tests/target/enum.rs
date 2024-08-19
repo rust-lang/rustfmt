@@ -68,7 +68,10 @@ pub enum EnumWithAttributes {
     SkippedItem(String,String,), // Post-comment
     #[another_attr]
     #[attr2]
-    ItemStruct { x: usize, y: usize }, /* Comment AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA */
+    ItemStruct {
+        x: usize,
+        y: usize,
+    }, /* Comment AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA */
     // And another
     ForcedPreflight, /* AAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                       * AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA */
