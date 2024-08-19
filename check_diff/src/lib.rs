@@ -10,6 +10,7 @@ pub enum CheckDiffError {
     FailedUtf8(String),
     FailedSourceBuild(String),
     FailedCopy(String),
+    FailedCargoVersion(String),
     IO(std::io::Error),
 }
 
@@ -135,27 +136,7 @@ pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     return Ok(());
 }
 
-// Compiles and produces two rustfmt binaries.
-// One for the current master, and another for the feature branch
-// Parameters:
-// dest: Directory where rustfmt will be cloned
-pub fn compile_rustfmt(
-    dest: &Path,
-    remote_repo_url: String,
-    feature_branch: String,
-    commit_hash: Option<String>,
-) -> Result<Command, CheckDiffError> {
-    const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
-
-    let _clone_git_result = clone_git_repo(RUSTFMT_REPO, dest)?;
-
-    let _git_remote_add_result = git_remote_add(remote_repo_url.as_str())?;
-
-    let _git_fetch_result = git_fetch(feature_branch.as_str())?;
-
-    let cargo_version = env!("CARGO_PKG_VERSION");
-    info!("Compiling with {}", cargo_version);
-
+pub fn get_ld_lib_path() -> Result<String, CheckDiffError> {
     //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
     // binary can find it's runtime dependencies.
     // See https://github.com/rust-lang/rustfmt/issues/5675
@@ -172,9 +153,38 @@ pub fn compile_rustfmt(
         ));
     };
 
-    let _ld_lib_path = format!("{}/lib", sysroot.trim_end());
-    info!("Building rustfmt from source");
+    let ld_lib_path = format!("{}/lib", sysroot.trim_end());
+    return Ok(ld_lib_path);
+}
+
+pub fn get_cargo_version() -> Result<String, CheckDiffError> {
+    let Ok(command) = Command::new("cargo").args(["--version"]).output() else {
+        return Err(CheckDiffError::FailedCargoVersion(
+            "Failed to obtain cargo version".to_string(),
+        ));
+    };
+
+    let Ok(cargo_version) = String::from_utf8(command.stdout) else {
+        return Err(CheckDiffError::FailedUtf8(
+            "Error converting cargo version to string".to_string(),
+        ));
+    };
+
+    return Ok(cargo_version);
+}
+
+pub fn copy_src_to_dst(src: &str, dst: &str) -> Result<(), CheckDiffError> {
+    let Ok(_) = Command::new("cp").args([src, dst]).output() else {
+        return Err(CheckDiffError::FailedCopy(
+            "Error copying rustfmt release to destination".to_string(),
+        ));
+    };
+    return Ok(());
+}
+
+pub fn build_rsfmt_from_src(ld_lib_path: String) -> Result<(), CheckDiffError> {
     let Ok(_) = Command::new("cargo")
+        .env("LD_LIB_PATH", ld_lib_path)
         .args(["build", "-q", "--release", "--bin", "rustfmt"])
         .output()
     else {
@@ -182,16 +192,35 @@ pub fn compile_rustfmt(
             "Error building rustfmt from source".to_string(),
         ));
     };
+    return Ok(());
+}
+
+// Compiles and produces two rustfmt binaries.
+// One for the current master, and another for the feature branch
+// Parameters:
+// dest: Directory where rustfmt will be cloned
+pub fn compile_rustfmt(
+    dest: &Path,
+    remote_repo_url: String,
+    feature_branch: String,
+    commit_hash: Option<String>,
+) -> Result<Command, CheckDiffError> {
+    const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
+
+    let _clone_git_result = clone_git_repo(RUSTFMT_REPO, dest)?;
+    let _git_remote_add_result = git_remote_add(remote_repo_url.as_str())?;
+    let _git_fetch_result = git_fetch(feature_branch.as_str())?;
+
+    let cargo_version = get_cargo_version()?;
+    info!("Compiling with {}", cargo_version);
+
+    let ld_lib_path = get_ld_lib_path()?;
+
+    info!("Building rustfmt from source");
+    let _build_from_src = build_rsfmt_from_src(ld_lib_path)?;
 
     let dest_rustfmt = format!("{}/rustfmt", dest.display());
-    let Ok(_) = Command::new("cp")
-        .args(["target/release/rustfmt", dest_rustfmt.as_str()])
-        .output()
-    else {
-        return Err(CheckDiffError::FailedCopy(
-            "Error copying rustfmt release to destination".to_string(),
-        ));
-    };
+    let _cp = copy_src_to_dst("target/release/rustfmt", dest_rustfmt.as_str())?;
 
     let should_detach = commit_hash.is_some();
     let _ = git_switch(
