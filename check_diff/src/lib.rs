@@ -194,7 +194,10 @@ pub fn build_rsfmt_from_src(ld_lib_path: &String) -> Result<(), CheckDiffError> 
 
 pub fn get_binary_version(binary: String) -> Result<String, CheckDiffError> {
     let Ok(command) = Command::new(binary.as_str()).args(["--version"]).output() else {
-        return Err(CheckDiffError::FailedVersioning(format!("Failed to get version for {}", binary)));
+        return Err(CheckDiffError::FailedVersioning(format!(
+            "Failed to get version for {}",
+            binary
+        )));
     };
 
     let Ok(binary_version) = String::from_utf8(command.stdout) else {
@@ -243,17 +246,21 @@ pub fn compile_rustfmt(
     );
 
     // This will prepend the `LD_LIBRARY_PATH` for the feature branch rustfmt binary.
-    //  In most cases the `LD_LIBRARY_PATH` should be the same for both rustfmt binaries that we build
-    //  in `compile_rustfmt`, however, there are scenarios where each binary has different runtime
-    //  dependencies. For example, during subtree syncs we bump the nightly toolchain required to build
-    //  rustfmt, and therefore the feature branch relies on a newer set of runtime dependencies.
+    // In most cases the `LD_LIBRARY_PATH` should be the same for both rustfmt binaries
+    // that we build in `compile_rustfmt`, however, there are scenarios where each binary
+    // has different runtime dependencies. For example, during subtree syncs we
+    // bump the nightly toolchain required to build rustfmt, and therefore the feature branch
+    // relies on a newer set of runtime dependencies.
     let ld_lib_path = get_ld_lib_path()?;
     info!("Building rustfmt from source");
     let _build_from_src = build_rsfmt_from_src(&ld_lib_path)?;
     let feature_binary = format!("{}/feature_rustfmt", dest.display());
 
     let _cp = copy_src_to_dst("target/release/rustfmt", rustfmt_binary.as_str())?;
-    info!("\nRuntime dependencies for rustfmt -- LD_LIBRARY_PATH: {}", &ld_lib_path);
+    info!(
+        "\nRuntime dependencies for rustfmt -- LD_LIBRARY_PATH: {}",
+        &ld_lib_path
+    );
 
     let rustfmt_version = get_binary_version(rustfmt_binary)?;
     info!("\nRUSFMT_BIN {}\n", rustfmt_version);
