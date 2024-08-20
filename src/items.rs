@@ -1981,6 +1981,27 @@ impl<'a> StaticParts<'a> {
         }
     }
 
+    pub(crate) fn from_foreign_item(item: &'a ast::ForeignItem) -> Self {
+        let (defaultness, prefix, safety, ty, mutability, expr) = match &item.kind {
+            ast::ForeignItemKind::Static(s) => {
+                (None, "static", s.safety, &s.ty, s.mutability, &s.expr)
+            }
+            _ => unreachable!(),
+        };
+
+        StaticParts {
+            prefix,
+            safety,
+            vis: &item.vis,
+            ident: item.ident,
+            ty,
+            mutability,
+            expr_opt: expr.as_ref(),
+            defaultness,
+            span: item.span,
+        }
+    }
+
     pub(crate) fn from_trait_item(ti: &'a ast::AssocItem) -> Self {
         let (defaultness, ty, expr_opt) = match &ti.kind {
             ast::AssocItemKind::Const(c) => (c.defaultness, &c.ty, &c.expr),
@@ -3399,28 +3420,9 @@ impl Rewrite for ast::ForeignItem {
                     .map(|(s, _, _)| format!("{};", s))
                 }
             }
-            ast::ForeignItemKind::Static(ref static_foreign_item) => {
-                // FIXME(#21): we're dropping potential comments in between the
-                // function kw here.
-                let vis = format_visibility(context, &self.vis);
-                let safety = format_safety(static_foreign_item.safety);
-                let mut_str = format_mutability(static_foreign_item.mutability);
-                let prefix = format!(
-                    "{}{}static {}{}:",
-                    vis,
-                    safety,
-                    mut_str,
-                    rewrite_ident(context, self.ident)
-                );
-                // 1 = ;
-                rewrite_assign_rhs(
-                    context,
-                    prefix,
-                    &static_foreign_item.ty,
-                    &RhsAssignKind::Ty,
-                    shape.sub_width(1)?,
-                )
-                .map(|s| s + ";")
+            ast::ForeignItemKind::Static(_) => {
+                let static_parts = StaticParts::from_foreign_item(&self);
+                rewrite_static(context, &static_parts, shape.indent)
             }
             ast::ForeignItemKind::TyAlias(ref ty_alias) => {
                 let (kind, span) = (&ItemVisitorKind::ForeignItem(self), self.span);
