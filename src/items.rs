@@ -2075,6 +2075,27 @@ fn rewrite_static(
         )
         .ok()
         .and_then(|res| recover_comment_removed(res, static_parts.span, context))
+        .or_else(|| {
+            let nested_indent = offset.block_indent(context.config);
+            let ty_span_hi = static_parts.ty.span.hi();
+            let rhs_span_lo = expr.span.lo();
+            let eq_pos_offset = context
+                .snippet(mk_sp(ty_span_hi, rhs_span_lo))
+                .find_uncommented("=")?;
+            let str_from_eq_to_rhs = context.snippet(mk_sp(
+                ty_span_hi + BytePos(eq_pos_offset as u32),
+                rhs_span_lo,
+            ));
+            let rhs = context.snippet(expr.span);
+            let str_between_lhs_and_hrs = if str_from_eq_to_rhs.find_uncommented("\n").is_some() {
+                nested_indent
+                    .to_string_with_newline(context.config)
+                    .to_string()
+            } else {
+                String::from(" ")
+            };
+            Some(format!("{}{}{}", lhs, str_between_lhs_and_hrs, rhs.trim()))
+        })
         .map(|s| if s.ends_with(';') { s } else { s + ";" })
     } else {
         Some(format!("{prefix}{ty_str};"))
