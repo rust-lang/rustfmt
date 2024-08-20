@@ -19,7 +19,7 @@ use crate::config::{Edition, IndentStyle, StyleEdition};
 use crate::lists::{
     definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
 };
-use crate::rewrite::{Rewrite, RewriteContext, RewriteErrorExt, RewriteResult};
+use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
@@ -1127,12 +1127,13 @@ impl Rewrite for UseTree {
     fn rewrite_result(&self, context: &RewriteContext<'_>, mut shape: Shape) -> RewriteResult {
         fn proceed(
             context: &RewriteContext<'_>,
+            span: &Span,
             shape: &Shape,
             curr_segment: &UseSegment,
             curr_segment_is_allow_overflow: bool,
             next_segment: Option<&&UseSegment>,
-        ) -> Option<(String, Shape)> {
-            let mut rewritten_segment = curr_segment.rewrite(context, shape.clone())?;
+        ) -> Result<(String, Shape), RewriteError> {
+            let mut rewritten_segment = curr_segment.rewrite_result(context, shape.clone())?;
             if next_segment.is_some() {
                 rewritten_segment.push_str("::");
             }
@@ -1157,45 +1158,55 @@ impl Rewrite for UseTree {
                     s.clone()
                 }
             } else {
-                let ret = shape.offset_left(rewritten_segment.len())?;
-                // Check that there is a room for the next "{". If not, return null for retry with
-                // newline.
-                ret.offset_left(reserved_room_for_brace)?;
+                let Some(ret) = shape.offset_left(rewritten_segment.len()) else {
+                    return Err(RewriteError::ExceedsMaxWidth {
+                        configured_width: shape.width,
+                        span: span.clone(),
+                    });
+                };
+                // Check that there is a room for the next "{". If not, return an error for retry
+                // with newline.
+                if ret.offset_left(reserved_room_for_brace).is_none() {
+                    return Err(RewriteError::ExceedsMaxWidth {
+                        configured_width: shape.width,
+                        span: span.clone(),
+                    });
+                }
                 ret
             };
-            Some((rewritten_segment, next_shape))
+            Ok((rewritten_segment, next_shape))
         }
 
         let shape_top_level = shape.clone();
         let mut result = String::with_capacity(256);
         let mut is_first = true;
         let mut iter = self.path.iter().peekable();
+        let span = self.span();
         while let Some(segment) = iter.next() {
             let allow_overflow = is_first;
             is_first = false;
-            match proceed(context, &shape, segment, allow_overflow, iter.peek()) {
-                Some((rewritten_segment, next_shape)) => {
+            match proceed(context, &span, &shape, segment, allow_overflow, iter.peek()) {
+                Ok((rewritten_segment, next_shape)) => {
                     result.push_str(&rewritten_segment);
                     shape = next_shape;
                     continue;
                 }
-                None => (),
+                Err(RewriteError::ExceedsMaxWidth { .. }) => {
+                    // If the first `proceed()` failed with no room, retry with newline.
+                }
+                Err(e) => {
+                    // Abort otherwise.
+                    return Err(e);
+                }
             }
-            // If the first `proceed()` failed, retry with newline.
             result.push_str("\n");
             result.push_str(&" ".repeat(shape.indent.block_indent + 4));
             shape = shape_top_level.clone();
             let allow_overflow = true;
-            match proceed(context, &shape, segment, allow_overflow, iter.peek()) {
-                Some((rewritten_segment, next_shape)) => {
-                    result.push_str(&rewritten_segment);
-                    shape = next_shape;
-                }
-                // Give up to format.
-                None => {
-                    return Err(crate::rewrite::RewriteError::Unknown);
-                }
-            }
+            let (rewritten_segment, next_shape) =
+                proceed(context, &span, &shape, segment, allow_overflow, iter.peek())?;
+            result.push_str(&rewritten_segment);
+            shape = next_shape;
         }
         Ok(result)
     }
