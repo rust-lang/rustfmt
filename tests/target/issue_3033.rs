@@ -1,5 +1,5 @@
-use dom::bindings::codegen::Bindings::BluetoothRemoteGATTServerBinding::
-    BluetoothRemoteGATTServerBinding::BluetoothRemoteGATTServerMethods;
+use dom::bindings::codegen::Bindings::BluetoothRemoteGATTServerBinding::BluetoothRemoteGATTServerBinding::
+    BluetoothRemoteGATTServerMethods;
 
 mod indent4 {
     use column__This_segment_overflows_because_it_follows_use______________________________________102::

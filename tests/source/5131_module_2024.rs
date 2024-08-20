@@ -1,15 +1,37 @@
-// rustfmt-imports_granularity: One
+// rustfmt-imports_granularity: Module
+// rustfmt-style_edition: 2024
 
-pub use foo::{x, x as x2, y};
-use {
-    bar::{
-        a,
-        b::{self, f, g},
-        c,
-        d::{e, e as e2},
-    },
-    qux::{h, i},
-};
+#![allow(dead_code)]
+
+mod a {
+    pub mod b {
+        pub struct Data {
+            pub a: i32,
+        }
+    }
+
+    use crate::a::b::Data;
+    use crate::a::b::Data as Data2;
+
+    pub fn data(a: i32) -> Data {
+        Data { a }
+    }
+
+    pub fn data2(a: i32) -> Data2 {
+        Data2 { a }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        pub fn test() {
+            data(1);
+            data2(1);
+        }
+    }
+}
 
 mod indent4 {
     use column_____________________________________________________________________________________102::{
@@ -21,13 +43,19 @@ mod indent4 {
     };
 
     use column_______________________________________________________________________________096::{
-        bar::{baz::Baz, Bar, Bar2},
-        Foo, Foo2,
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
     };
 
     use column_________________________________________________________________________090::{
-        bar::{baz::Baz, Bar, Bar2},
-        Foo, Foo2,
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
     };
 
     use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::c096::c102::{
@@ -39,18 +67,62 @@ mod indent4 {
     };
 
     use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::c096::{
-        bar::{baz::Baz, Bar, Bar2},
-        Foo, Foo2,
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
     };
 
     use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::{
-        bar::{baz::Baz, Bar, Bar2},
-        Foo, Foo2,
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
     };
 
     use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::{
-        bar::{baz::Baz, Bar, Bar2},
-        Foo, Foo2,
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
+    };
+
+    // Check that the behavior when "{" exceeds the max column.
+    //
+    // Note that `shape.offset_left(4)?.sub_width(1)?;` in
+    // `rewrite_reorderable_or_regroupable_items()` replaces the max column 100 by 99.
+
+    use x::column______________________________________________________________________________098::{
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
+    };
+
+    use x::column__Only_the_last_one_wraps_due_to_brace_______________________________________097::{
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
+    };
+
+    use x::column_____________________________________________________________________________096::{
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
+    };
+
+    // Test for top-level `UseSegmentKind::List`.
+    use {
+        a,
+        column_____________________________________________________________________________________102,
     };
 }
 
@@ -115,11 +187,11 @@ use smithay::{
             SecurityContext, SecurityContextHandler, SecurityContextListenerSource,
             SecurityContextState,
         },
+        selection::data_device::{
+            set_data_device_focus, ClientDndGrabHandler, DataDeviceHandler, DataDeviceState,
+            ServerDndGrabHandler,
+        },
         selection::{
-            data_device::{
-                set_data_device_focus, ClientDndGrabHandler, DataDeviceHandler, DataDeviceState,
-                ServerDndGrabHandler,
-            },
             primary_selection::{
                 set_primary_focus, PrimarySelectionHandler, PrimarySelectionState,
             },

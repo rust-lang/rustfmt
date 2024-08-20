@@ -1,4 +1,5 @@
 // rustfmt-imports_granularity: One
+// rustfmt-style_edition: 2024
 
 pub use foo::{x, x as x2, y};
 use {
@@ -13,11 +14,8 @@ use {
 
 mod indent4 {
     use column_____________________________________________________________________________________102::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 
     use column_______________________________________________________________________________096::{
@@ -30,12 +28,10 @@ mod indent4 {
         Foo, Foo2,
     };
 
-    use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::c096::c102::{
-        Foo,
-        bar::Bar,
-        bar::baz::Baz,
-        Foo2,
-        bar::Bar2,
+    use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::c096::
+        c102::{
+        bar::{baz::Baz, Bar, Bar2},
+        Foo, Foo2,
     };
 
     use c012::c018::c024::c030::c036::c042::c048::c054::c060::c066::c072::c078::c084::c090::c096::{
