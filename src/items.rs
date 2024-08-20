@@ -647,7 +647,7 @@ impl<'a> FmtVisitor<'a> {
         // If one of the variants use multiple lines, use multi-lined formatting for all variants.
         let is_multi_line_variant = |item: &ListItem| -> bool {
             let variant_str = item.inner_as_ref();
-            if self.config.style_edition() < StyleEdition::Edition2024 {
+            if self.config.style_edition() <= StyleEdition::Edition2021 {
                 // Fall back to previous naive implementation (#5662) because of
                 // rustfmt's stability guarantees
                 return variant_str.contains('\n');
