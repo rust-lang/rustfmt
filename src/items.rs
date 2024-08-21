@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::cmp::{max, min, Ordering};
 
+use itertools::Itertools;
 use regex::Regex;
 use rustc_ast::visit;
 use rustc_ast::{ast, ptr};
@@ -653,22 +654,66 @@ impl<'a> FmtVisitor<'a> {
                 return variant_str.contains('\n');
             }
 
-            let mut first_line_is_read = false;
-            for line in variant_str.split('\n') {
-                if first_line_is_read {
-                    return false;
+            // First exclude all doc comments
+            let mut lines = variant_str
+                .split('\n')
+                .filter(|line| !line.trim().starts_with("///"));
+
+            let mut variant_str = lines.join("\n");
+            // Skip macro attributes in variant_str
+            // We skip one macro attribute per loop iteration
+            loop {
+                let mut macro_attribute_found = false;
+                let mut macro_attribute_start_i = 0;
+                let mut bracket_count = 0;
+                let mut chars = variant_str.chars().enumerate();
+                while let Some((i, c)) = chars.next() {
+                    match c {
+                        '#' => {
+                            if let Some((_, '[')) = chars.next() {
+                                macro_attribute_start_i = i;
+                                bracket_count += 1;
+                            }
+                        }
+                        '[' => bracket_count += 1,
+                        ']' => {
+                            bracket_count -= 1;
+                            if bracket_count == 0 {
+                                // Macro attribute was found and ends at the i-th position
+                                // We remove it from variant_str
+                                let mut s =
+                                    variant_str[..macro_attribute_start_i].trim().to_owned();
+                                s.push_str(variant_str[(i + 1)..].trim());
+                                variant_str = s;
+                                macro_attribute_found = true;
+                                break;
+                            }
+                        }
+                        '\'' => {
+                            // Handle char in attribute
+                            chars.next();
+                            chars.next();
+                        }
+                        '"' => {
+                            // Handle quoted strings within attribute
+                            while let Some((_, c)) = chars.next() {
+                                if c == '\\' {
+                                    chars.next(); // Skip escaped character
+                                } else if c == '"' {
+                                    break; // end of string
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
                 }
 
-                // skip rustdoc comments and macro attributes
-                let line = line.trim_start();
-                if line.starts_with("///") || line.starts_with("#") {
-                    continue;
-                } else {
-                    first_line_is_read = true;
+                if !macro_attribute_found {
+                    break;
                 }
             }
 
-            true
+            variant_str.contains('\n')
         };
         let has_multiline_variant = items.iter().any(is_multi_line_variant);
         let has_single_line_variant = items.iter().any(|item| !is_multi_line_variant(item));
