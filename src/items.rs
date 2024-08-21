@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::cmp::{max, min, Ordering};
 
+use itertools::Itertools;
 use regex::Regex;
 use rustc_ast::visit;
 use rustc_ast::{ast, ptr};
@@ -21,7 +22,9 @@ use crate::expr::{
     rewrite_assign_rhs_with_comments, rewrite_else_kw_with_comments, rewrite_let_else_block,
     RhsAssignKind, RhsTactics,
 };
-use crate::lists::{definitive_tactic, itemize_list, write_list, ListFormatting, Separator};
+use crate::lists::{
+    definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
+};
 use crate::macros::{rewrite_macro, MacroPosition};
 use crate::overflow;
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
@@ -643,8 +646,112 @@ impl<'a> FmtVisitor<'a> {
         let mut items: Vec<_> = itemize_list_with(self.config.struct_variant_width());
 
         // If one of the variants use multiple lines, use multi-lined formatting for all variants.
-        let has_multiline_variant = items.iter().any(|item| item.inner_as_ref().contains('\n'));
-        let has_single_line_variant = items.iter().any(|item| !item.inner_as_ref().contains('\n'));
+        let is_multi_line_variant = |item: &ListItem| -> bool {
+            let variant_str = item.inner_as_ref();
+            if self.config.style_edition() <= StyleEdition::Edition2021 {
+                // Fall back to previous naive implementation (#5662) because of
+                // rustfmt's stability guarantees
+                return variant_str.contains('\n');
+            }
+
+            // First exclude all outer one-line doc comments
+            let mut lines = variant_str
+                .split('\n')
+                .filter(|line| !line.trim().starts_with("///"));
+
+            let mut variant_str = lines.join("\n");
+
+            // Then exclude all outer documentation blocks
+            // Exclude one block per loop iteration
+            loop {
+                let mut block_found = false;
+                let mut chars = variant_str.chars().enumerate();
+                'block: while let Some((i, c)) = chars.next() {
+                    if c != '/' {
+                        continue;
+                    }
+                    let block_start = i;
+                    if let Some((_, '*')) = chars.next() {
+                        if let Some((_, '*')) = chars.next() {
+                            while let Some((_, c)) = chars.next() {
+                                if c == '*' {
+                                    if let Some((i, '/')) = chars.next() {
+                                        // block was found and ends at the i-th position
+                                        // We remove it from variant_str
+                                        let mut s = variant_str[..block_start].trim().to_owned();
+                                        s.push_str(variant_str[(i + 1)..].trim());
+                                        variant_str = s;
+                                        block_found = true;
+                                        break 'block;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !block_found {
+                    break;
+                }
+            }
+
+            // Skip macro attributes in variant_str
+            // We skip one macro attribute per loop iteration
+            loop {
+                let mut macro_attribute_found = false;
+                let mut macro_attribute_start_i = 0;
+                let mut bracket_count = 0;
+                let mut chars = variant_str.chars().enumerate();
+                while let Some((i, c)) = chars.next() {
+                    match c {
+                        '#' => {
+                            if let Some((_, '[')) = chars.next() {
+                                macro_attribute_start_i = i;
+                                bracket_count += 1;
+                            }
+                        }
+                        '[' => bracket_count += 1,
+                        ']' => {
+                            bracket_count -= 1;
+                            if bracket_count == 0 {
+                                // Macro attribute was found and ends at the i-th position
+                                // We remove it from variant_str
+                                let mut s =
+                                    variant_str[..macro_attribute_start_i].trim().to_owned();
+                                s.push_str(variant_str[(i + 1)..].trim());
+                                variant_str = s;
+                                macro_attribute_found = true;
+                                break;
+                            }
+                        }
+                        '\'' => {
+                            // Handle char in attribute
+                            chars.next();
+                            chars.next();
+                        }
+                        '"' => {
+                            // Handle quoted strings within attribute
+                            while let Some((_, c)) = chars.next() {
+                                if c == '\\' {
+                                    chars.next(); // Skip escaped character
+                                } else if c == '"' {
+                                    break; // end of string
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                if !macro_attribute_found {
+                    break;
+                }
+            }
+
+            variant_str.contains('\n')
+        };
+        let has_multiline_variant = items.iter().any(is_multi_line_variant);
+        let has_single_line_variant = items.iter().any(|item| !is_multi_line_variant(item));
         if has_multiline_variant && has_single_line_variant {
             items = itemize_list_with(0);
         }
