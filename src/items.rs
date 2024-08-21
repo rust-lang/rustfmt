@@ -654,12 +654,47 @@ impl<'a> FmtVisitor<'a> {
                 return variant_str.contains('\n');
             }
 
-            // First exclude all doc comments
+            // First exclude all outer one-line doc comments
             let mut lines = variant_str
                 .split('\n')
                 .filter(|line| !line.trim().starts_with("///"));
 
             let mut variant_str = lines.join("\n");
+
+            // Then exclude all outer documentation blocks
+            // Exclude one block per loop iteration
+            loop {
+                let mut block_found = false;
+                let mut chars = variant_str.chars().enumerate();
+                'block: while let Some((i, c)) = chars.next() {
+                    if c != '/' {
+                        continue;
+                    }
+                    let block_start = i;
+                    if let Some((_, '*')) = chars.next() {
+                        if let Some((_, '*')) = chars.next() {
+                            while let Some((_, c)) = chars.next() {
+                                if c == '*' {
+                                    if let Some((i, '/')) = chars.next() {
+                                        // block was found and ends at the i-th position
+                                        // We remove it from variant_str
+                                        let mut s = variant_str[..block_start].trim().to_owned();
+                                        s.push_str(variant_str[(i + 1)..].trim());
+                                        variant_str = s;
+                                        block_found = true;
+                                        break 'block;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !block_found {
+                    break;
+                }
+            }
+
             // Skip macro attributes in variant_str
             // We skip one macro attribute per loop iteration
             loop {

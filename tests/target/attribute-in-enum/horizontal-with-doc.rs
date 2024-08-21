@@ -2,7 +2,8 @@
 enum MyType {
     A { field1: bool, field2: bool },
     B { field1: bool, field2: bool },
-    /// OMG a comment
+    /// One-line doc comment
     C { field1: bool, field2: bool },
+    /** Documentation block */
     D { field1: bool, field2: bool },
 }
