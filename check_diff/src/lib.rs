@@ -258,7 +258,7 @@ pub fn compile_rustfmt(
     remote_repo_url: String,
     feature_branch: String,
     commit_hash: Option<String>,
-) -> Result<Command, CheckDiffError> {
+) -> Result<[RustfmtRunner; 2], CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
 
     clone_git_repo(RUSTFMT_REPO, dest)?;
@@ -268,7 +268,7 @@ pub fn compile_rustfmt(
     let cargo_version = get_cargo_version()?;
     info!("Compiling with {}", cargo_version);
     let rustfmt_binary = dest.join("/rustfmt");
-    build_rustfmt_from_src(&rustfmt_binary)?;
+    let src_runner = build_rustfmt_from_src(&rustfmt_binary)?;
 
     let should_detach = commit_hash.is_some();
     git_switch(
@@ -293,5 +293,5 @@ pub fn compile_rustfmt(
 
     let result = Command::new("ls");
 
-    return Ok(result);
+    return Ok([src_runner, feature_runner]);
 }
