@@ -1,6 +1,7 @@
 use std::env;
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use tracing::info;
 
@@ -12,6 +13,7 @@ pub enum CheckDiffError {
     FailedCopy(String),
     FailedCargoVersion(String),
     FailedVersioning(String),
+    FailedPathBuf(String),
     IO(std::io::Error),
 }
 
@@ -170,8 +172,9 @@ pub fn get_cargo_version() -> Result<String, CheckDiffError> {
     return Ok(cargo_version);
 }
 
-pub fn copy_src_to_dst(src: &str, dst: &str) -> Result<(), CheckDiffError> {
-    let Ok(_) = Command::new("cp").args([src, dst]).output() else {
+pub fn copy_src_to_dst(src: &str, dst: &PathBuf) -> Result<(), CheckDiffError> {
+    let dst_str = pathbuf_to_str(dst)?;
+    let Ok(_) = Command::new("cp").args([src, dst_str]).output() else {
         return Err(CheckDiffError::FailedCopy(
             "Error copying rustfmt release to destination".to_string(),
         ));
@@ -179,7 +182,7 @@ pub fn copy_src_to_dst(src: &str, dst: &str) -> Result<(), CheckDiffError> {
     return Ok(());
 }
 
-pub fn build_rsfmt_from_src(ld_lib_path: &String) -> Result<(), CheckDiffError> {
+pub fn build_rustfmt_from_src(ld_lib_path: &String) -> Result<(), CheckDiffError> {
     let Ok(_) = Command::new("cargo")
         .env("LD_LIB_PATH", ld_lib_path)
         .args(["build", "-q", "--release", "--bin", "rustfmt"])
@@ -192,10 +195,18 @@ pub fn build_rsfmt_from_src(ld_lib_path: &String) -> Result<(), CheckDiffError> 
     return Ok(());
 }
 
-pub fn get_binary_version(binary: String) -> Result<String, CheckDiffError> {
-    let Ok(command) = Command::new(binary.as_str()).args(["--version"]).output() else {
+pub fn get_binary_version(
+    binary: &PathBuf,
+    ld_lib_path: &String,
+) -> Result<String, CheckDiffError> {
+    let binary_str = pathbuf_to_str(binary)?;
+    let Ok(command) = Command::new(binary_str)
+        .env("LD_LIB_PATH", ld_lib_path)
+        .args(["--version"])
+        .output()
+    else {
         return Err(CheckDiffError::FailedVersioning(format!(
-            "Failed to get version for {}",
+            "Failed to get version for {:?}",
             binary
         )));
     };
@@ -206,6 +217,27 @@ pub fn get_binary_version(binary: String) -> Result<String, CheckDiffError> {
         ));
     };
     return Ok(binary_version);
+}
+
+pub fn build_rustfmt_with_lib_path() -> Result<String, CheckDiffError> {
+    //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
+    // binary can find it's runtime dependencies.
+    // See https://github.com/rust-lang/rustfmt/issues/5675
+    // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
+    let ld_lib_path = get_ld_lib_path()?;
+    info!("Building rustfmt from source");
+    build_rustfmt_from_src(&ld_lib_path)?;
+    return Ok(ld_lib_path);
+}
+
+fn pathbuf_to_str(pathbuf: &PathBuf) -> Result<&str, CheckDiffError> {
+    let Some(result) = pathbuf.to_str() else {
+        return Err(CheckDiffError::FailedPathBuf(format!(
+            "Unable to convert {:?} to str",
+            pathbuf
+        )));
+    };
+    return Ok(result);
 }
 
 // Compiles and produces two rustfmt binaries.
@@ -220,52 +252,37 @@ pub fn compile_rustfmt(
 ) -> Result<Command, CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
 
-    let _clone_git_result = clone_git_repo(RUSTFMT_REPO, dest)?;
-    let _git_remote_add_result = git_remote_add(remote_repo_url.as_str())?;
-    let _git_fetch_result = git_fetch(feature_branch.as_str())?;
+    clone_git_repo(RUSTFMT_REPO, dest)?;
+    git_remote_add(remote_repo_url.as_str())?;
+    git_fetch(feature_branch.as_str())?;
 
     let cargo_version = get_cargo_version()?;
     info!("Compiling with {}", cargo_version);
 
-    //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
-    // binary can find it's runtime dependencies.
-    // See https://github.com/rust-lang/rustfmt/issues/5675
-    // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
-    let ld_lib_path = get_ld_lib_path()?;
+    build_rustfmt_with_lib_path()?;
 
-    info!("Building rustfmt from source");
-    let _build_from_src = build_rsfmt_from_src(&ld_lib_path)?;
-
-    let rustfmt_binary = format!("{}/rustfmt", dest.display());
-    let _cp = copy_src_to_dst("target/release/rustfmt", rustfmt_binary.as_str())?;
+    let rustfmt_binary = dest.join("/rustfmt");
+    copy_src_to_dst("target/release/rustfmt", &rustfmt_binary)?;
 
     let should_detach = commit_hash.is_some();
-    let _ = git_switch(
+    git_switch(
         commit_hash.unwrap_or(feature_branch).as_str(),
         should_detach,
-    );
+    )?;
 
-    // This will prepend the `LD_LIBRARY_PATH` for the feature branch rustfmt binary.
-    // In most cases the `LD_LIBRARY_PATH` should be the same for both rustfmt binaries
-    // that we build in `compile_rustfmt`, however, there are scenarios where each binary
-    // has different runtime dependencies. For example, during subtree syncs we
-    // bump the nightly toolchain required to build rustfmt, and therefore the feature branch
-    // relies on a newer set of runtime dependencies.
-    let ld_lib_path = get_ld_lib_path()?;
-    info!("Building rustfmt from source");
-    let _build_from_src = build_rsfmt_from_src(&ld_lib_path)?;
-    let feature_binary = format!("{}/feature_rustfmt", dest.display());
+    let ld_lib_path = build_rustfmt_with_lib_path()?;
+    let feature_binary = dest.join("/feature_rustfmt");
 
-    let _cp = copy_src_to_dst("target/release/rustfmt", rustfmt_binary.as_str())?;
+    copy_src_to_dst("target/release/rustfmt", &rustfmt_binary)?;
     info!(
         "\nRuntime dependencies for rustfmt -- LD_LIBRARY_PATH: {}",
         &ld_lib_path
     );
 
-    let rustfmt_version = get_binary_version(rustfmt_binary)?;
+    let rustfmt_version = get_binary_version(&rustfmt_binary, &ld_lib_path)?;
     info!("\nRUSFMT_BIN {}\n", rustfmt_version);
 
-    let feature_binary_version = get_binary_version(feature_binary)?;
+    let feature_binary_version = get_binary_version(&feature_binary, &ld_lib_path)?;
     info!("FEATURE_BIN {}\n", feature_binary_version);
 
     let result = Command::new("ls");
