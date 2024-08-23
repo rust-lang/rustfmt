@@ -291,7 +291,5 @@ pub fn compile_rustfmt(
         get_binary_version(&feature_binary, &(feature_runner.ld_library_path))?;
     info!("FEATURE_BIN {}\n", feature_binary_version);
 
-    let result = Command::new("ls");
-
     return Ok([src_runner, feature_runner]);
 }
