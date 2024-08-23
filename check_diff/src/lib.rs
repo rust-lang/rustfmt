@@ -18,6 +18,11 @@ pub enum CheckDiffError {
     IO(std::io::Error),
 }
 
+pub struct GlobalRunners {
+    pub feature_runner: RustfmtRunner,
+    pub src_runner: RustfmtRunner,
+}
+
 pub struct RustfmtRunner {
     pub ld_library_path: String,
     pub binary_path: PathBuf,
@@ -258,7 +263,7 @@ pub fn compile_rustfmt(
     remote_repo_url: String,
     feature_branch: String,
     commit_hash: Option<String>,
-) -> Result<[RustfmtRunner; 2], CheckDiffError> {
+) -> Result<GlobalRunners, CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
 
     clone_git_repo(RUSTFMT_REPO, dest)?;
@@ -291,5 +296,8 @@ pub fn compile_rustfmt(
         get_binary_version(&feature_binary, &(feature_runner.ld_library_path))?;
     info!("FEATURE_BIN {}\n", feature_binary_version);
 
-    return Ok([src_runner, feature_runner]);
+    return Ok(GlobalRunners {
+        src_runner,
+        feature_runner,
+    });
 }
