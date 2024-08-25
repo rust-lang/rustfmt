@@ -151,6 +151,31 @@ for more info.
 To run rustfmt after this, use `cargo run --bin rustfmt -- filename`. See the
 notes above on running rustfmt.
 
+All command should be run in the project's root directory.
+
+### Update Toolchain
+
+Make sure to have installed the correct toolchain and all components.
+The needed parts can be found in the file `rust-toolchain`. For example:
+
+```
+[toolchain]
+channel = "nightly-2024-08-17"
+components = ["llvm-tools", "rustc-dev"]
+```
+
+According to this content, install the toolchain with `rustup install`:
+
+```
+rustup install nightly-2024-08-17
+```
+
+and the components with `rustup component add`
+
+```
+rustup component add llvm-tools
+rustup component add rustc-dev
+```
 
 ## Configuring Rustfmt
 
