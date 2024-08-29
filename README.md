@@ -153,29 +153,29 @@ notes above on running rustfmt.
 
 All command should be run in the project's root directory.
 
-### Update Toolchain
+### Troubleshooting the toolchain
 
-Make sure to have installed the correct toolchain and all components.
-The needed parts can be found in the file `rust-toolchain`. For example:
+This project uses a pinned toolchain with specific components, as indicated in 
+[`rust-toolchain`](https://github.com/rust-lang/rustfmt/blob/master/rust-toolchain).
+The toolchain hat the name 'nightly-YYYY-MM-DD'.
 
-```
-[toolchain]
-channel = "nightly-2024-08-17"
-components = ["llvm-tools", "rustc-dev"]
-```
+If your compiler complains that it cannot find dependencies like `rustc_*`, you might have
+a wrong or corrupted toolchain. Here's what you can do:
 
-According to this content, install the toolchain with `rustup install`:
+Check the active toolchain by running `rustup show` in the project directory. It should
+list all installed toolchains, including the one indicated in `rust-toolchain`. The same
+should be given as 'active toolchain' with the hint that it was overridden by the
+`rust-toolchain` file.
 
-```
-rustup install nightly-2024-08-17
-```
+Make sure that you don't have a directory override. You can remove it with
+`rustup override unset`.
 
-and the components with `rustup component add`
+If the build still fails, try to completly remove the given toolchain with 
+`rustup toolchain uninstall nightly-YYYY-MM-DD`. The next `cargo build` should 
+download and install it correctly.
 
-```
-rustup component add llvm-tools
-rustup component add rustc-dev
-```
+Additional documentation can be found here:
+[Rustup Book, Chapter Overrides](https://rust-lang.github.io/rustup/overrides.html).
 
 ## Configuring Rustfmt
 
