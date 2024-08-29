@@ -151,8 +151,6 @@ for more info.
 To run rustfmt after this, use `cargo run --bin rustfmt -- filename`. See the
 notes above on running rustfmt.
 
-All command should be run in the project's root directory.
-
 ### Troubleshooting the toolchain
 
 This project uses a pinned toolchain with specific components, as indicated in 
