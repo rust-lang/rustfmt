@@ -217,9 +217,48 @@ impl PartialConfig {
 
         ::toml::to_string(&cloned).map_err(ToTomlError)
     }
+
+    pub(super) fn to_parsed_config(
+        self,
+        style_edition_override: Option<StyleEdition>,
+        edition_override: Option<Edition>,
+        version_override: Option<Version>,
+        dir: &Path,
+    ) -> Config {
+        Config::default_for_possible_style_edition(
+            style_edition_override.or(self.style_edition),
+            edition_override.or(self.edition),
+            version_override.or(self.version),
+        )
+        .fill_from_parsed_config(self, dir)
+    }
 }
 
 impl Config {
+    pub fn default_for_possible_style_edition(
+        style_edition: Option<StyleEdition>,
+        edition: Option<Edition>,
+        version: Option<Version>,
+    ) -> Config {
+        // Ensures the configuration defaults associated with Style Editions
+        // follow the precedence set in
+        // https://rust-lang.github.io/rfcs/3338-style-evolution.html
+        // 'version' is a legacy alias for 'style_edition' that we'll support
+        // for some period of time
+        // FIXME(calebcartwright) - remove 'version' at some point
+        match (style_edition, version, edition) {
+            (Some(se), _, _) => Self::default_with_style_edition(se),
+            (None, Some(Version::Two), _) => {
+                Self::default_with_style_edition(StyleEdition::Edition2024)
+            }
+            (None, Some(Version::One), _) => {
+                Self::default_with_style_edition(StyleEdition::Edition2015)
+            }
+            (None, None, Some(e)) => Self::default_with_style_edition(e.into()),
+            (None, None, None) => Config::default(),
+        }
+    }
+
     pub(crate) fn version_meets_requirement(&self) -> bool {
         if self.was_set().required_version() {
             let version = env!("CARGO_PKG_VERSION");
@@ -243,12 +282,23 @@ impl Config {
     ///
     /// Returns a `Config` if the config could be read and parsed from
     /// the file, otherwise errors.
-    pub(super) fn from_toml_path(file_path: &Path) -> Result<Config, Error> {
+    pub(super) fn from_toml_path(
+        file_path: &Path,
+        edition: Option<Edition>,
+        style_edition: Option<StyleEdition>,
+        version: Option<Version>,
+    ) -> Result<Config, Error> {
         let mut file = File::open(&file_path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
-        Config::from_toml(&toml, file_path.parent().unwrap())
-            .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+        Config::from_toml_for_style_edition(
+            &toml,
+            file_path.parent().unwrap(),
+            edition,
+            style_edition,
+            version,
+        )
+        .map_err(|err| Error::new(ErrorKind::InvalidData, err))
     }
 
     /// Resolves the config for input in `dir`.
@@ -260,7 +310,12 @@ impl Config {
     ///
     /// Returns the `Config` to use, and the path of the project file if there was
     /// one.
-    pub(super) fn from_resolved_toml_path(dir: &Path) -> Result<(Config, Option<PathBuf>), Error> {
+    pub(super) fn from_resolved_toml_path(
+        dir: &Path,
+        edition: Option<Edition>,
+        style_edition: Option<StyleEdition>,
+        version: Option<Version>,
+    ) -> Result<(Config, Option<PathBuf>), Error> {
         /// Try to find a project file in the given directory and its parents.
         /// Returns the path of the nearest project file if one exists,
         /// or `None` if no project file was found.
@@ -305,12 +360,27 @@ impl Config {
         }
 
         match resolve_project_file(dir)? {
-            None => Ok((Config::default(), None)),
-            Some(path) => Config::from_toml_path(&path).map(|config| (config, Some(path))),
+            None => Ok((
+                Config::default_for_possible_style_edition(style_edition, edition, version),
+                None,
+            )),
+            Some(path) => Config::from_toml_path(&path, edition, style_edition, version)
+                .map(|config| (config, Some(path))),
         }
     }
 
-    pub(crate) fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
+    #[allow(dead_code)]
+    pub(super) fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
+        Self::from_toml_for_style_edition(toml, dir, None, None, None)
+    }
+
+    pub(crate) fn from_toml_for_style_edition(
+        toml: &str,
+        dir: &Path,
+        edition: Option<Edition>,
+        style_edition: Option<StyleEdition>,
+        version: Option<Version>,
+    ) -> Result<Config, String> {
         let parsed: ::toml::Value = toml
             .parse()
             .map_err(|e| format!("Could not parse TOML: {}", e))?;
@@ -324,12 +394,13 @@ impl Config {
                 err.push_str(msg)
             }
         }
-        match parsed.try_into() {
+
+        match parsed.try_into::<PartialConfig>() {
             Ok(parsed_config) => {
                 if !err.is_empty() {
                     eprint!("{err}");
                 }
-                Ok(Config::default().fill_from_parsed_config(parsed_config, dir))
+                Ok(parsed_config.to_parsed_config(style_edition, edition, version, dir))
             }
             Err(e) => {
                 err.push_str("Error: Decoding config file failed:\n");
@@ -347,17 +418,26 @@ pub fn load_config<O: CliOptions>(
     file_path: Option<&Path>,
     options: Option<O>,
 ) -> Result<(Config, Option<PathBuf>), Error> {
-    let over_ride = match options {
-        Some(ref opts) => config_path(opts)?,
-        None => None,
+    let (over_ride, edition, style_edition, version) = match options {
+        Some(ref opts) => (
+            config_path(opts)?,
+            opts.edition(),
+            opts.style_edition(),
+            opts.version(),
+        ),
+        None => (None, None, None, None),
     };
 
     let result = if let Some(over_ride) = over_ride {
-        Config::from_toml_path(over_ride.as_ref()).map(|p| (p, Some(over_ride.to_owned())))
+        Config::from_toml_path(over_ride.as_ref(), edition, style_edition, version)
+            .map(|p| (p, Some(over_ride.to_owned())))
     } else if let Some(file_path) = file_path {
-        Config::from_resolved_toml_path(file_path)
+        Config::from_resolved_toml_path(file_path, edition, style_edition, version)
     } else {
-        Ok((Config::default(), None))
+        Ok((
+            Config::default_for_possible_style_edition(style_edition, edition, version),
+            None,
+        ))
     };
 
     result.map(|(mut c, p)| {
@@ -768,7 +848,7 @@ binop_separator = "Front"
 remove_nested_parens = true
 combine_control_expr = true
 short_array_element_width_threshold = 10
-overflow_delimited_expr = false
+overflow_delimited_expr = true
 struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
