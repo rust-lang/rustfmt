@@ -749,8 +749,7 @@ impl CliOptions for GetOptsOptions {
     fn version(&self) -> Option<Version> {
         self.inline_config
             .get("version")
-            .map(|version| Version::from_str(version).ok())
-            .flatten()
+            .and_then(|version| Version::from_str(version).ok())
     }
 }
 
