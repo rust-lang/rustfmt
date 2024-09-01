@@ -28,7 +28,7 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
         (&ast::ItemKind::Mod(..), &ast::ItemKind::Mod(..)) => {
             a.ident.as_str().cmp(b.ident.as_str())
         }
-        (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
+        (&ast::ItemKind::ExternCrate(a_name), ast::ItemKind::ExternCrate(ref b_name)) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
             let a_orig_name = a_name.unwrap_or(a.ident.name);
