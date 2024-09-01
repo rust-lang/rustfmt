@@ -81,12 +81,12 @@ impl Cache {
     /// Creates an uninitialized cache.
     #[allow(clippy::declare_interior_mutable_const)]
     const fn uninitialized() -> Self {
-        Cache(AtomicU64::new(u64::max_value()))
+        Cache(AtomicU64::new(u64::MAX))
     }
     /// Is the cache uninitialized?
     #[inline]
     pub(crate) fn is_uninitialized(&self) -> bool {
-        self.0.load(Ordering::Relaxed) == u64::max_value()
+        self.0.load(Ordering::Relaxed) == u64::MAX
     }
 
     /// Is the `bit` in the cache set?
@@ -113,15 +113,12 @@ struct Cache(AtomicU32, AtomicU32);
 impl Cache {
     /// Creates an uninitialized cache.
     const fn uninitialized() -> Self {
-        Cache(
-            AtomicU32::new(u32::max_value()),
-            AtomicU32::new(u32::max_value()),
-        )
+        Cache(AtomicU32::new(u32::MAX), AtomicU32::new(u32::MAX))
     }
     /// Is the cache uninitialized?
     #[inline]
     pub(crate) fn is_uninitialized(&self) -> bool {
-        self.1.load(Ordering::Relaxed) == u32::max_value()
+        self.1.load(Ordering::Relaxed) == u32::MAX
     }
 
     /// Is the `bit` in the cache set?
