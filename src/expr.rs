@@ -295,13 +295,11 @@ pub(crate) fn format_expr(
                 ast::RangeLimits::Closed => "..=",
             };
 
-            fn needs_space_before_range(context: &RewriteContext<'_>, lhs: &ast::Expr) -> bool {
+            fn needs_space_before_range(lhs: &ast::Expr) -> bool {
                 match lhs.kind {
                     ast::ExprKind::Lit(token_lit) => lit_ends_in_dot(&token_lit),
-                    ast::ExprKind::Unary(_, ref expr) => needs_space_before_range(context, expr),
-                    ast::ExprKind::Binary(_, _, ref rhs_expr) => {
-                        needs_space_before_range(context, rhs_expr)
-                    }
+                    ast::ExprKind::Unary(_, ref expr) => needs_space_before_range(expr),
+                    ast::ExprKind::Binary(_, _, ref rhs_expr) => needs_space_before_range(rhs_expr),
                     _ => false,
                 }
             }
@@ -320,7 +318,7 @@ pub(crate) fn format_expr(
 
                 format!(
                     "{}{}{}",
-                    lhs.map_or("", |lhs| space_if(needs_space_before_range(context, lhs))),
+                    lhs.map_or("", |lhs| space_if(needs_space_before_range(lhs))),
                     delim,
                     rhs.map_or("", |rhs| space_if(needs_space_after_range(rhs))),
                 )
