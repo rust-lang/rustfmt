@@ -61,7 +61,7 @@ pub(crate) fn format_expr(
 ) -> Option<String> {
     skip_out_of_file_lines_range!(context, expr.span);
 
-    if contains_skip(&*expr.attrs) {
+    if contains_skip(&expr.attrs) {
         return Some(context.snippet(expr.span()).to_owned());
     }
     let shape = if expr_type == ExprType::Statement && semicolon_for_expr(context, expr) {
@@ -278,7 +278,7 @@ pub(crate) fn format_expr(
         )
         .ok(),
         ast::ExprKind::Index(ref expr, ref index, _) => {
-            rewrite_index(&**expr, &**index, context, shape)
+            rewrite_index(&*expr, &*index, context, shape)
         }
         ast::ExprKind::Repeat(ref expr, ref repeats) => rewrite_pair(
             &**expr,
@@ -1392,7 +1392,7 @@ pub(crate) fn is_simple_expr(expr: &ast::Expr) -> bool {
         | ast::ExprKind::Unary(_, ref expr) => is_simple_expr(expr),
         ast::ExprKind::Index(ref lhs, ref rhs, _) => is_simple_expr(lhs) && is_simple_expr(rhs),
         ast::ExprKind::Repeat(ref lhs, ref rhs) => {
-            is_simple_expr(lhs) && is_simple_expr(&*rhs.value)
+            is_simple_expr(lhs) && is_simple_expr(&rhs.value)
         }
         _ => false,
     }
@@ -1672,7 +1672,7 @@ fn rewrite_struct_lit<'a>(
     } else {
         let field_iter = fields.iter().map(StructLitField::Regular).chain(
             match struct_rest {
-                ast::StructRest::Base(expr) => Some(StructLitField::Base(&**expr)),
+                ast::StructRest::Base(expr) => Some(StructLitField::Base(&*expr)),
                 ast::StructRest::Rest(span) => Some(StructLitField::Rest(*span)),
                 ast::StructRest::None => None,
             }

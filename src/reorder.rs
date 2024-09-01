@@ -274,7 +274,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let item_length = items
             .iter()
             .take_while(|ppi| {
-                item_kind.is_same_item_kind(&***ppi)
+                item_kind.is_same_item_kind(ppi)
                     && (!in_group || {
                         let current = self.psess.lookup_line_range(ppi.span());
                         let in_same_group = current.lo < last.hi + 2;
