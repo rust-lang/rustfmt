@@ -295,7 +295,7 @@ fn assert_output(source: &Path, expected_filename: &Path) {
     let _ = source_file::write_all_files(&source_file, &mut out, &config);
     let output = String::from_utf8(out).unwrap();
 
-    let mut expected_file = fs::File::open(&expected_filename).expect("couldn't open target");
+    let mut expected_file = fs::File::open(expected_filename).expect("couldn't open target");
     let mut expected_text = String::new();
     expected_file
         .read_to_string(&mut expected_text)
@@ -322,7 +322,7 @@ fn assert_stdin_output(
     config.set().newline_style(NewlineStyle::Unix);
     config.set().emit_mode(emit_mode);
 
-    let mut source_file = fs::File::open(&source).expect("couldn't open source");
+    let mut source_file = fs::File::open(source).expect("couldn't open source");
     let mut source_text = String::new();
     source_file
         .read_to_string(&mut source_text)
@@ -341,7 +341,7 @@ fn assert_stdin_output(
         assert_eq!(session.errors, errors);
     }
 
-    let mut expected_file = fs::File::open(&expected_filename).expect("couldn't open target");
+    let mut expected_file = fs::File::open(expected_filename).expect("couldn't open target");
     let mut expected_text = String::new();
     expected_file
         .read_to_string(&mut expected_text)
@@ -690,7 +690,7 @@ fn print_mismatches_default_message(result: HashMap<PathBuf, Vec<Mismatch>>) {
     for (file_name, diff) in result {
         let mismatch_msg_formatter =
             |line_num| format!("\nMismatch at {}:{}:", file_name.display(), line_num);
-        print_diff(diff, &mismatch_msg_formatter, &Default::default());
+        print_diff(diff, mismatch_msg_formatter, &Default::default());
     }
 
     if let Some(mut t) = term::stdout() {

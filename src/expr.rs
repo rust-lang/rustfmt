@@ -916,7 +916,7 @@ impl<'a> ControlFlow<'a> {
             let comments_span = mk_sp(comments_lo, expr.span.lo());
             return rewrite_assign_rhs_with_comments(
                 context,
-                &format!("{}{}{}", matcher, pat_string, self.connector),
+                format!("{}{}{}", matcher, pat_string, self.connector),
                 expr,
                 cond_shape,
                 &RhsAssignKind::Expr(&expr.kind, expr.span),

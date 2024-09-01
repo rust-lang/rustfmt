@@ -288,7 +288,7 @@ impl Config {
         style_edition: Option<StyleEdition>,
         version: Option<Version>,
     ) -> Result<Config, Error> {
-        let mut file = File::open(&file_path)?;
+        let mut file = File::open(file_path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
         Config::from_toml_for_style_edition(
