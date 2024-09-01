@@ -581,7 +581,7 @@ impl<'a> Context<'a> {
 
                     if tactic == DefinitiveListTactic::Vertical {
                         if let Some((all_simple, num_args_before)) =
-                            maybe_get_args_offset(self.ident, &self.items, &self.context.config)
+                            maybe_get_args_offset(self.ident, &self.items, self.context.config)
                         {
                             let one_line = all_simple
                                 && definitive_tactic(

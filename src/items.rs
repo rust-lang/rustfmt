@@ -2412,7 +2412,7 @@ fn rewrite_fn_base(
     let generics_str = rewrite_generics(
         context,
         rewrite_ident(context, ident),
-        &fn_sig.generics,
+        fn_sig.generics,
         shape,
     )?;
     result.push_str(&generics_str);
