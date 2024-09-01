@@ -389,7 +389,7 @@ fn format_code_block(
     let block_len = formatted
         .snippet
         .rfind('}')
-        .unwrap_or_else(|| formatted.snippet.len());
+        .unwrap_or(formatted.snippet.len());
 
     // It's possible that `block_len < FN_MAIN_PREFIX.len()`. This can happen if the code block was
     // formatted into the empty string, leading to the enclosing `fn main() {\n}` being formatted
