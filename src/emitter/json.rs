@@ -136,7 +136,7 @@ mod tests {
             ],
         };
 
-        let _ = emitter
+        emitter
             .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
             .unwrap();
 
@@ -181,7 +181,7 @@ mod tests {
             ],
         };
 
-        let _ = emitter
+        emitter
             .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
             .unwrap();
 
