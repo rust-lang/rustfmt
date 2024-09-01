@@ -95,7 +95,7 @@ mod tests {
         let lib_original = ["fn greet() {", "println!(\"Greetings!\");", "}"];
         let lib_formatted = ["fn greet() {", "    println!(\"Greetings!\");", "}"];
         let mut writer = Vec::new();
-        let mut emitter = CheckstyleEmitter::default();
+        let mut emitter = CheckstyleEmitter;
         let _ = emitter.emit_header(&mut writer);
         let _ = emitter
             .emit_formatted_file(
