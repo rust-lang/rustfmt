@@ -1769,10 +1769,23 @@ fn rewrite_ty<R: Rewrite>(
 
     if let Some(bounds) = generic_bounds_opt {
         if !bounds.is_empty() {
-            // 2 = `: `
-            let shape = Shape::indented(indent, context.config).offset_left(result.len() + 2)?;
-            let type_bounds = bounds.rewrite(context, shape).map(|s| format!(": {}", s))?;
-            result.push_str(&type_bounds);
+            if context.config.style_edition() <= StyleEdition::Edition2021 {
+                // 2 = `: `
+                let shape =
+                    Shape::indented(indent, context.config).offset_left(result.len() + 2)?;
+                let type_bounds = bounds.rewrite(context, shape).map(|s| format!(": {}", s))?;
+                result.push_str(&type_bounds);
+            } else {
+                let shape = Shape::indented(indent, context.config).offset_left(result.len())?;
+                result = rewrite_assign_rhs_with(
+                    context,
+                    result.clone() + ":",
+                    bounds,
+                    shape,
+                    &RhsAssignKind::Bounds,
+                    RhsTactics::ForceNextLineWithoutIndent,
+                )?;
+            }
         }
     }
 
