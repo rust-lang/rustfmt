@@ -210,3 +210,21 @@ pub enum E {
     A { a: u32 } = 0x100,
     B { field1: u32, field2: u8, field3: m::M } = 0x300 // comment
 }
+
+// #3422
+#[rustfmt::sort]
+enum SortE {
+
+    Y, // whitespace from above dropped
+
+    X, // whitespace from above dropped
+    E,
+    // something
+    D(),
+    C(),
+    /// Comment for B
+    B,
+    /// Comment for A
+    #[rustfmt::skip]
+    A,
+}

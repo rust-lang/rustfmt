@@ -1,12 +1,12 @@
 // Formatting top-level items - functions, structs, enums, traits, impls.
 
-use std::borrow::Cow;
-use std::cmp::{Ordering, max, min};
-
+use itertools::Itertools;
 use regex::Regex;
-use rustc_ast::visit;
+use rustc_ast::{AttrVec, visit};
 use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, DUMMY_SP, Span, symbol};
+use std::borrow::Cow;
+use std::cmp::{Ordering, max, min};
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
@@ -536,6 +536,7 @@ impl<'a> FmtVisitor<'a> {
         enum_def: &ast::EnumDef,
         generics: &ast::Generics,
         span: Span,
+        sort: bool,
     ) {
         let enum_header =
             format_header(&self.get_context(), "enum ", ident, vis, self.block_indent);
@@ -563,7 +564,7 @@ impl<'a> FmtVisitor<'a> {
 
         self.last_pos = body_start;
 
-        match self.format_variant_list(enum_def, body_start, span.hi()) {
+        match self.format_variant_list(enum_def, body_start, span.hi(), sort) {
             Some(ref s) if enum_def.variants.is_empty() => self.push_str(s),
             rw => {
                 self.push_rewrite(mk_sp(body_start, span.hi()), rw);
@@ -578,6 +579,7 @@ impl<'a> FmtVisitor<'a> {
         enum_def: &ast::EnumDef,
         body_lo: BytePos,
         body_hi: BytePos,
+        sort: bool,
     ) -> Option<String> {
         if enum_def.variants.is_empty() {
             let mut buffer = String::with_capacity(128);
@@ -615,7 +617,7 @@ impl<'a> FmtVisitor<'a> {
             .unwrap_or(&0);
 
         let itemize_list_with = |one_line_width: usize| {
-            itemize_list(
+            let iter = itemize_list(
                 self.snippet_provider,
                 enum_def.variants.iter(),
                 "}",
@@ -635,8 +637,16 @@ impl<'a> FmtVisitor<'a> {
                 body_lo,
                 body_hi,
                 false,
-            )
-            .collect()
+            );
+            if sort {
+                // sort the items by their name as this enum has the rustfmt::sort attr
+                iter.enumerate()
+                    .sorted_by_key(|&(i, _)| enum_def.variants[i].ident.name.as_str())
+                    .map(|(_, item)| item)
+                    .collect()
+            } else {
+                iter.collect()
+            }
         };
         let mut items: Vec<_> = itemize_list_with(self.config.struct_variant_width());
 

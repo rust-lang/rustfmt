@@ -287,3 +287,19 @@ pub enum E {
         field3: m::M,
     } = 0x300, // comment
 }
+
+// #3422
+#[rustfmt::sort]
+enum SortE {
+    /// Comment for A
+    #[rustfmt::skip]
+    A,
+    /// Comment for B
+    B,
+    C(),
+    // something
+    D(),
+    E,
+    X, // whitespace from above dropped
+    Y, // whitespace from above dropped
+}

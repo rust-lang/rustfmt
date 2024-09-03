@@ -24,6 +24,11 @@ pub(crate) fn skip_annotation() -> Symbol {
     Symbol::intern("rustfmt::skip")
 }
 
+#[inline]
+pub(crate) fn sort_annotation() -> Symbol {
+    Symbol::intern("rustfmt::sort")
+}
+
 pub(crate) fn rewrite_ident<'a>(context: &'a RewriteContext<'_>, ident: symbol::Ident) -> &'a str {
     context.snippet(ident.span)
 }
@@ -269,6 +274,35 @@ pub(crate) fn contains_skip(attrs: &[Attribute]) -> bool {
     attrs
         .iter()
         .any(|a| a.meta().map_or(false, |a| is_skip(&a)))
+}
+
+#[inline]
+pub(crate) fn contains_sort(attrs: &[Attribute]) -> bool {
+    attrs
+        .iter()
+        .any(|a| a.meta().map_or(false, |a| is_sort(&a)))
+}
+
+#[inline]
+fn is_sort(meta_item: &MetaItem) -> bool {
+    match meta_item.kind {
+        MetaItemKind::Word => {
+            let path_str = pprust::path_to_string(&meta_item.path);
+            path_str == sort_annotation().as_str()
+        }
+        MetaItemKind::List(ref l) => {
+            meta_item.has_name(sym::cfg_attr) && l.len() == 2 && crate::utils::is_sort_nested(&l[1])
+        }
+        _ => false,
+    }
+}
+
+#[inline]
+fn is_sort_nested(meta_item: &NestedMetaItem) -> bool {
+    match meta_item {
+        NestedMetaItem::MetaItem(ref mi) => crate::utils::is_sort(mi),
+        NestedMetaItem::Lit(_) => false,
+    }
 }
 
 #[inline]
