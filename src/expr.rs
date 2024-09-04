@@ -3,32 +3,32 @@ use std::cmp::min;
 
 use itertools::Itertools;
 use rustc_ast::token::{Delimiter, Lit, LitKind};
-use rustc_ast::{ast, ptr, token, ForLoopKind, MatchKind};
+use rustc_ast::{ForLoopKind, MatchKind, ast, ptr, token};
 use rustc_span::{BytePos, Span};
 
 use crate::chains::rewrite_chain;
 use crate::closures;
 use crate::comment::{
-    combine_strs_with_missing_comments, contains_comment, recover_comment_removed, rewrite_comment,
-    rewrite_missing_comment, CharClasses, FindUncommented,
+    CharClasses, FindUncommented, combine_strs_with_missing_comments, contains_comment,
+    recover_comment_removed, rewrite_comment, rewrite_missing_comment,
 };
 use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, StyleEdition};
 use crate::lists::{
-    definitive_tactic, itemize_list, shape_for_tactic, struct_lit_formatting, struct_lit_shape,
-    struct_lit_tactic, write_list, ListFormatting, Separator,
+    ListFormatting, Separator, definitive_tactic, itemize_list, shape_for_tactic,
+    struct_lit_formatting, struct_lit_shape, struct_lit_tactic, write_list,
 };
-use crate::macros::{rewrite_macro, MacroPosition};
+use crate::macros::{MacroPosition, rewrite_macro};
 use crate::matches::rewrite_match;
 use crate::overflow::{self, IntoOverflowableItem, OverflowableItem};
-use crate::pairs::{rewrite_all_pairs, rewrite_pair, PairParts};
+use crate::pairs::{PairParts, rewrite_all_pairs, rewrite_pair};
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt;
-use crate::string::{rewrite_string, StringFormat};
-use crate::types::{rewrite_path, PathContext};
+use crate::string::{StringFormat, rewrite_string};
+use crate::types::{PathContext, rewrite_path};
 use crate::utils::{
     colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with,
     inner_attributes, last_line_extendable, last_line_width, mk_sp, outer_attributes,
@@ -2124,25 +2124,24 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     rhs_kind: &RhsAssignKind<'_>,
     rhs_tactics: RhsTactics,
 ) -> RewriteResult {
-    let get_lhs_last_line_shape = || {
-        let last_line = lhs.rsplitn(2, "\n").next().unwrap_or_default();
+    let get_rhs_shape = || {
+        let last_line = lhs.lines().last().unwrap_or_default();
         let tab_spaces = context.config.tab_spaces();
         let new_shape = shape
             .block_indent(tab_spaces)
             .saturating_sub_width(tab_spaces);
-        let extra_indent_string = new_shape.to_string(&context.config).to_string();
-        if last_line.starts_with(&extra_indent_string) {
+        let extra_indent_string = new_shape.to_string(&context.config);
+        if last_line.starts_with(extra_indent_string.as_ref()) {
             new_shape
         } else {
             shape
         }
     };
     let shape = if context.config.style_edition() >= StyleEdition::Edition2024 {
-        get_lhs_last_line_shape()
+        get_rhs_shape()
     } else {
         shape
     };
-
     let last_line_width = last_line_width(lhs).saturating_sub(if lhs.contains('\n') {
         shape.indent.width()
     } else {

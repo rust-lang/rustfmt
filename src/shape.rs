@@ -278,6 +278,7 @@ impl Shape {
         offset_indent.to_string_inner(config, 0)
     }
 
+    /// similar to to_string_with_newline, except the result does not start with a new line
     pub(crate) fn to_string(&self, config: &Config) -> Cow<'static, str> {
         let mut offset_indent = self.indent;
         offset_indent.alignment = self.offset;
