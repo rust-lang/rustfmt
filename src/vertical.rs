@@ -114,6 +114,7 @@ pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
     shape: Shape,
     span: Span,
     one_line_width: usize,
+    ranks: Option<&[usize]>,
 ) -> Option<String> {
     let (spaces, group_index) = if context.config.struct_field_align_threshold() > 0 {
         group_aligned_items(context, fields)
@@ -170,12 +171,20 @@ pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
         shape.indent,
         one_line_width,
         force_separator,
+        ranks.map(|v| &v[0..=group_index]),
     )?;
     if rest.is_empty() {
         Some(result + spaces)
     } else {
         let rest_span = mk_sp(init_last_pos, span.hi());
-        let rest_str = rewrite_with_alignment(rest, context, shape, rest_span, one_line_width)?;
+        let rest_str = rewrite_with_alignment(
+            rest,
+            context,
+            shape,
+            rest_span,
+            one_line_width,
+            ranks.map(|v| &v[group_index + 1..]),
+        )?;
         Some(format!(
             "{}{}\n{}{}",
             result,
@@ -211,6 +220,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     offset: Indent,
     one_line_width: usize,
     force_trailing_separator: bool,
+    ranks: Option<&[usize]>,
 ) -> Option<String> {
     // 1 = ","
     let item_shape = Shape::indented(offset, context.config).sub_width(1)?;
@@ -266,6 +276,14 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         .tactic(tactic)
         .trailing_separator(separator_tactic)
         .preserve_newline(true);
+    if let Some(ranks) = ranks {
+        items = ranks
+            .iter()
+            .zip(items.into_iter())
+            .sorted_by_key(|&(index, _)| *index)
+            .map(|(_, item)| item)
+            .collect();
+    }
     write_list(&items, &fmt).ok()
 }
 
