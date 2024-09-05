@@ -13,7 +13,7 @@ use crate::items::{rewrite_struct_field, rewrite_struct_field_prefix};
 use crate::lists::{
     ListFormatting, ListItem, Separator, definitive_tactic, itemize_list, write_list,
 };
-use crate::rewrite::{Rewrite, RewriteContext, RewriteResult};
+use crate::rewrite::{Rewrite, RewriteContext, RewriteErrorExt, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
@@ -114,7 +114,7 @@ pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
     shape: Shape,
     span: Span,
     one_line_width: usize,
-) -> Option<String> {
+) -> RewriteResult {
     let (spaces, group_index) = if context.config.struct_field_align_threshold() > 0 {
         group_aligned_items(context, fields)
     } else {
@@ -172,11 +172,11 @@ pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
         force_separator,
     )?;
     if rest.is_empty() {
-        Some(result + spaces)
+        Ok(result + spaces)
     } else {
         let rest_span = mk_sp(init_last_pos, span.hi());
         let rest_str = rewrite_with_alignment(rest, context, shape, rest_span, one_line_width)?;
-        Some(format!(
+        Ok(format!(
             "{}{}\n{}{}",
             result,
             spaces,
@@ -211,9 +211,10 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     offset: Indent,
     one_line_width: usize,
     force_trailing_separator: bool,
-) -> Option<String> {
+) -> RewriteResult {
     // 1 = ","
-    let item_shape = Shape::indented(offset, context.config).sub_width(1)?;
+    let shape = Shape::indented(offset, context.config);
+    let item_shape = shape.sub_width(1).max_width_error(shape.width, span)?;
     let (mut field_prefix_max_width, field_prefix_min_width) =
         struct_field_prefix_max_min_width(context, fields, item_shape);
     let max_diff = field_prefix_max_width.saturating_sub(field_prefix_min_width);
@@ -266,7 +267,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         .tactic(tactic)
         .trailing_separator(separator_tactic)
         .preserve_newline(true);
-    write_list(&items, &fmt).ok()
+    write_list(&items, &fmt)
 }
 
 /// Returns the index in `fields` up to which a field belongs to the current group.
