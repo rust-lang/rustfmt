@@ -85,6 +85,7 @@ impl SkipNameContext {
 
 static RUSTFMT: &str = "rustfmt";
 static SKIP: &str = "skip";
+static SORT: &str = "sort";
 
 /// Say if you're playing with `rustfmt`'s skip attribute
 pub(crate) fn is_skip_attr(segments: &[ast::PathSegment]) -> bool {
@@ -99,6 +100,16 @@ pub(crate) fn is_skip_attr(segments: &[ast::PathSegment]) -> bool {
                     .iter()
                     .any(|&n| n == pprust::path_segment_to_string(&segments[2]))
         }
+        _ => false,
+    }
+}
+
+pub(crate) fn is_sort_attr(segments: &[ast::PathSegment]) -> bool {
+    if segments.len() < 2 || segments[0].ident.to_string() != RUSTFMT {
+        return false;
+    }
+    match segments.len() {
+        2 => segments[1].ident.to_string() == SORT,
         _ => false,
     }
 }

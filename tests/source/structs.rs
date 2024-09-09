@@ -296,3 +296,24 @@ struct Test {
 // #2818
 struct Paren((i32)) where i32: Trait;
 struct Parens((i32, i32)) where i32: Trait;
+
+// #3422
+#[rustfmt::sort]
+struct Foo {
+
+    #[skip]
+    b: u32,
+    a: u32, // a
+
+    bb: u32,
+    /// A
+    aa: u32,
+}
+
+#[rustfmt::sort]
+struct Fooy {
+    a: u32, // a
+    b: u32,
+    /// C
+    c: u32,
+}

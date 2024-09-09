@@ -1,12 +1,12 @@
 // Formatting top-level items - functions, structs, enums, traits, impls.
 
-use std::borrow::Cow;
-use std::cmp::{Ordering, max, min};
-
+use itertools::Itertools;
 use regex::Regex;
 use rustc_ast::visit;
 use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, DUMMY_SP, Span, symbol};
+use std::borrow::Cow;
+use std::cmp::{Ordering, max, min};
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
@@ -519,13 +519,19 @@ impl<'a> FmtVisitor<'a> {
         self.push_rewrite(static_parts.span, rewrite);
     }
 
-    pub(crate) fn visit_struct(&mut self, struct_parts: &StructParts<'_>) {
+    pub(crate) fn visit_struct(&mut self, struct_parts: &StructParts<'_>, sort: bool) {
         let is_tuple = match struct_parts.def {
             ast::VariantData::Tuple(..) => true,
             _ => false,
         };
-        let rewrite = format_struct(&self.get_context(), struct_parts, self.block_indent, None)
-            .map(|s| if is_tuple { s + ";" } else { s });
+        let rewrite = format_struct(
+            &self.get_context(),
+            struct_parts,
+            self.block_indent,
+            None,
+            sort,
+        )
+        .map(|s| if is_tuple { s + ";" } else { s });
         self.push_rewrite(struct_parts.span, rewrite);
     }
 
@@ -536,6 +542,7 @@ impl<'a> FmtVisitor<'a> {
         enum_def: &ast::EnumDef,
         generics: &ast::Generics,
         span: Span,
+        sort: bool,
     ) {
         let enum_header =
             format_header(&self.get_context(), "enum ", ident, vis, self.block_indent);
@@ -563,7 +570,7 @@ impl<'a> FmtVisitor<'a> {
 
         self.last_pos = body_start;
 
-        match self.format_variant_list(enum_def, body_start, span.hi()) {
+        match self.format_variant_list(enum_def, body_start, span.hi(), sort) {
             Some(ref s) if enum_def.variants.is_empty() => self.push_str(s),
             rw => {
                 self.push_rewrite(mk_sp(body_start, span.hi()), rw);
@@ -578,6 +585,7 @@ impl<'a> FmtVisitor<'a> {
         enum_def: &ast::EnumDef,
         body_lo: BytePos,
         body_hi: BytePos,
+        sort: bool,
     ) -> Option<String> {
         if enum_def.variants.is_empty() {
             let mut buffer = String::with_capacity(128);
@@ -615,7 +623,7 @@ impl<'a> FmtVisitor<'a> {
             .unwrap_or(&0);
 
         let itemize_list_with = |one_line_width: usize| {
-            itemize_list(
+            let iter = itemize_list(
                 self.snippet_provider,
                 enum_def.variants.iter(),
                 "}",
@@ -635,8 +643,16 @@ impl<'a> FmtVisitor<'a> {
                 body_lo,
                 body_hi,
                 false,
-            )
-            .collect()
+            );
+            if sort {
+                // sort the items by their name as this enum has the rustfmt::sort attr
+                iter.enumerate()
+                    .sorted_by_key(|&(i, _)| enum_def.variants[i].ident.name.as_str())
+                    .map(|(_, item)| item)
+                    .collect()
+            } else {
+                iter.collect()
+            }
         };
         let mut items: Vec<_> = itemize_list_with(self.config.struct_variant_width());
 
@@ -695,6 +711,7 @@ impl<'a> FmtVisitor<'a> {
                 &StructParts::from_variant(field, &context),
                 self.block_indent,
                 Some(one_line_width),
+                false,
             )?,
             ast::VariantData::Unit(..) => rewrite_ident(&context, field.ident).to_owned(),
         };
@@ -1144,6 +1161,7 @@ fn format_struct(
     struct_parts: &StructParts<'_>,
     offset: Indent,
     one_line_width: Option<usize>,
+    sort: bool,
 ) -> Option<String> {
     match struct_parts.def {
         ast::VariantData::Unit(..) => format_unit_struct(context, struct_parts, offset),
@@ -1151,7 +1169,7 @@ fn format_struct(
             format_tuple_struct(context, struct_parts, fields, offset)
         }
         ast::VariantData::Struct { fields, .. } => {
-            format_struct_struct(context, struct_parts, fields, offset, one_line_width)
+            format_struct_struct(context, struct_parts, fields, offset, one_line_width, sort)
         }
     }
 }
@@ -1435,6 +1453,7 @@ pub(crate) fn format_struct_struct(
     fields: &[ast::FieldDef],
     offset: Indent,
     one_line_width: Option<usize>,
+    sort: bool,
 ) -> Option<String> {
     let mut result = String::with_capacity(1024);
     let span = struct_parts.span;
@@ -1503,12 +1522,36 @@ pub(crate) fn format_struct_struct(
     let one_line_budget =
         one_line_width.map_or(0, |one_line_width| min(one_line_width, one_line_budget));
 
+    let ranks: Option<Vec<_>> = if sort {
+        // get the sequence of indices that would sort the vec
+        let indices: Vec<usize> = fields
+            .iter()
+            .enumerate()
+            .sorted_by(|(_, field_a), (_, field_b)| {
+                field_a
+                    .ident
+                    .zip(field_b.ident)
+                    .map(|(a, b)| a.name.as_str().cmp(b.name.as_str()))
+                    .unwrap_or(Ordering::Equal)
+            })
+            .map(|(i, _)| i)
+            .collect();
+        // create a vec with ranks for the fields, allowing for use in Itertools.sorted_by_key
+        let mut ranks = vec![0; indices.len()];
+        for (rank, original_index) in indices.into_iter().enumerate() {
+            ranks[original_index] = rank;
+        }
+        Some(ranks)
+    } else {
+        None
+    };
     let items_str = rewrite_with_alignment(
         fields,
         context,
         Shape::indented(offset.block_indent(context.config), context.config).sub_width(1)?,
         mk_sp(body_lo, span.hi()),
         one_line_budget,
+        ranks.as_ref().map(|v| v.as_slice()),
     )?;
 
     if !items_str.contains('\n')

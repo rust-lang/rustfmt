@@ -18,13 +18,14 @@ use crate::modules::Module;
 use crate::parse::session::ParseSess;
 use crate::rewrite::{Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
-use crate::skip::{SkipContext, is_skip_attr};
+use crate::skip::{SkipContext, is_skip_attr, is_sort_attr};
 use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt::Stmt;
 use crate::utils::{
-    self, contains_skip, count_newlines, depr_skip_annotation, format_safety, inner_attributes,
-    last_line_width, mk_sp, ptr_vec_to_ref_vec, rewrite_ident, starts_with_newline, stmt_expr,
+    self, contains_skip, contains_sort, count_newlines, depr_skip_annotation, format_safety,
+    inner_attributes, last_line_width, mk_sp, ptr_vec_to_ref_vec, rewrite_ident,
+    starts_with_newline, stmt_expr,
 };
 use crate::{ErrorKind, FormatReport, FormattingError};
 
@@ -511,11 +512,18 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.push_rewrite(span, rw);
                 }
                 ast::ItemKind::Struct(..) | ast::ItemKind::Union(..) => {
-                    self.visit_struct(&StructParts::from_item(item));
+                    self.visit_struct(&StructParts::from_item(item), contains_sort(&item.attrs));
                 }
                 ast::ItemKind::Enum(ref def, ref generics) => {
                     self.format_missing_with_indent(source!(self, item.span).lo());
-                    self.visit_enum(item.ident, &item.vis, def, generics, item.span);
+                    self.visit_enum(
+                        item.ident,
+                        &item.vis,
+                        def,
+                        generics,
+                        item.span,
+                        contains_sort(&item.attrs),
+                    );
                     self.last_pos = source!(self, item.span).hi();
                 }
                 ast::ItemKind::Mod(safety, ref mod_kind) => {
@@ -862,7 +870,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if segments[0].ident.to_string() != "rustfmt" {
             return false;
         }
-        !is_skip_attr(segments)
+        !(is_skip_attr(segments) | is_sort_attr(segments))
     }
 
     fn walk_mod_items(&mut self, items: &[rustc_ast::ptr::P<ast::Item>]) {

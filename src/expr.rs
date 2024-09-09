@@ -1670,6 +1670,7 @@ fn rewrite_struct_lit<'a>(
             v_shape,
             mk_sp(body_lo, span.hi()),
             one_line_width,
+            None,
         )
         .unknown_error()?
     } else {
