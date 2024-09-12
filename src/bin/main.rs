@@ -770,6 +770,7 @@ fn style_edition_from_style_edition_str(edition_str: &str) -> Result<StyleEditio
         "2018" => Ok(StyleEdition::Edition2018),
         "2021" => Ok(StyleEdition::Edition2021),
         "2024" => Ok(StyleEdition::Edition2024),
+        "2027" => Ok(StyleEdition::Edition2027),
         _ => Err(format_err!("Invalid value for `--style-edition`")),
     }
 }
