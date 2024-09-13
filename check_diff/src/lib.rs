@@ -18,7 +18,7 @@ pub enum CheckDiffError {
     IO(std::io::Error),
 }
 
-pub struct GlobalRunners {
+pub struct CheckDiffRunners {
     feature_runner: RustfmtRunner,
     src_runner: RustfmtRunner,
 }
