@@ -61,6 +61,7 @@ pub(crate) enum MacroArg {
     Pat(ptr::P<ast::Pat>),
     Item(ptr::P<ast::Item>),
     Keyword(symbol::Ident, Span),
+    KeyValue(ptr::P<ast::Expr>, ptr::P<ast::Expr>),
 }
 
 impl MacroArg {
@@ -98,6 +99,11 @@ impl Rewrite for MacroArg {
             MacroArg::Pat(ref pat) => pat.rewrite_result(context, shape),
             MacroArg::Item(ref item) => item.rewrite_result(context, shape),
             MacroArg::Keyword(ident, _) => Ok(ident.name.to_string()),
+            MacroArg::KeyValue(ref key, ref value) => {
+                let key_str = key.rewrite_result(context, shape)?;
+                let value_str = value.rewrite_result(context, shape)?;
+                Ok(format!("{} => {}", key_str, value_str))
+            }
         }
     }
 }
@@ -264,7 +270,8 @@ fn rewrite_macro_inner(
         args: arg_vec,
         vec_with_semi,
         trailing_comma,
-    } = match parse_macro_args(context, ts, style, is_forced_bracket) {
+        kv_brace_args,
+    } = match parse_macro_args(context, ts, style, is_forced_bracket, has_comment) {
         Some(args) => args,
         None => {
             return return_macro_parse_failure_fallback(
@@ -354,16 +361,69 @@ fn rewrite_macro_inner(
         }
         Delimiter::Brace => {
             // For macro invocations with braces, always put a space between
-            // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
-            // anything in between the braces (for now).
-            let snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
-            match trim_left_preserve_layout(snippet, shape.indent, context.config) {
-                Some(macro_body) => Ok(format!("{macro_name} {macro_body}")),
-                None => Ok(format!("{macro_name} {snippet}")),
+            // the `macro_name!` and `{ /* macro_body */ }` if the macro is
+            // a simple key-value map with only `x => y, ...` we ensure
+            // consistent indentation.
+
+            if !kv_brace_args {
+                let snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
+                return match trim_left_preserve_layout(snippet, shape.indent, context.config) {
+                    Some(macro_body) => Ok(format!("{macro_name} {macro_body}")),
+                    None => Ok(format!("{macro_name} {snippet}")),
+                };
             }
+
+            return handle_brace_delimited_macro(context, &arg_vec, &macro_name, shape, position);
         }
         _ => unreachable!(),
     }
+}
+
+fn handle_brace_delimited_macro(
+    context: &RewriteContext<'_>,
+    args: &[MacroArg],
+    macro_name: &str,
+    shape: Shape,
+    position: MacroPosition,
+) -> RewriteResult {
+    let mut result = String::new();
+    let brace_open = "{";
+    let brace_close = "}";
+
+    result.push_str(&format!("{} {}", macro_name, brace_open));
+
+    let block_indent = shape.block_indent(context.config.tab_spaces());
+
+    let mut key_value_pairs = Vec::new();
+    for arg in args {
+        if let MacroArg::KeyValue(ref key_expr, ref value_expr) = arg {
+            let key_str = key_expr.rewrite(context, shape).unknown_error()?;
+            let value_str = value_expr.rewrite(context, shape).unknown_error()?;
+            key_value_pairs.push((key_str.clone(), value_str));
+        }
+    }
+
+    result.push('\n');
+
+    for (i, (key, value)) in key_value_pairs.iter().enumerate() {
+        result.push_str(&block_indent.indent.to_string(context.config));
+
+        result.push_str(&format!("{} => {}", key.trim(), value.trim()));
+
+        result.push(',');
+        if i < key_value_pairs.len() - 1 {
+            result.push('\n');
+        }
+    }
+
+    result.push_str(&shape.indent.to_string_with_newline(context.config));
+    result.push_str(brace_close);
+
+    if position == MacroPosition::Item {
+        result.push(';');
+    }
+
+    Ok(result)
 }
 
 fn handle_vec_semi(

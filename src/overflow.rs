@@ -183,6 +183,7 @@ impl<'a> OverflowableItem<'a> {
                 MacroArg::Pat(..) => false,
                 MacroArg::Item(..) => len == 1,
                 MacroArg::Keyword(..) => false,
+                MacroArg::KeyValue(..) => false,
             },
             OverflowableItem::NestedMetaItem(nested_meta_item) if len == 1 => {
                 match nested_meta_item {

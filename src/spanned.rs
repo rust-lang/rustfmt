@@ -195,6 +195,7 @@ impl Spanned for MacroArg {
             MacroArg::Pat(ref pat) => pat.span(),
             MacroArg::Item(ref item) => item.span(),
             MacroArg::Keyword(_, span) => span,
+            MacroArg::KeyValue(ref key, ref value) => key.span().to(value.span()),
         }
     }
 }

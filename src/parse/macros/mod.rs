@@ -78,6 +78,7 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
 pub(crate) struct ParsedMacroArgs {
     pub(crate) vec_with_semi: bool,
     pub(crate) trailing_comma: bool,
+    pub(crate) kv_brace_args: bool,
     pub(crate) args: Vec<MacroArg>,
 }
 
@@ -101,13 +102,85 @@ pub(crate) fn parse_macro_args(
     tokens: TokenStream,
     style: Delimiter,
     forced_bracket: bool,
+    has_comment: bool,
 ) -> Option<ParsedMacroArgs> {
     let mut parser = build_parser(context, tokens);
     let mut args = Vec::new();
     let mut vec_with_semi = false;
     let mut trailing_comma = false;
+    let mut kv_brace_args = false;
 
-    if Delimiter::Brace != style {
+    if Delimiter::Brace == style {
+        // This parses "simple" brace-delimited macros like key value pairs to
+        // be formatted.  For example: `params! { "a" => "b", "b" => "d" }`
+
+        if has_comment {
+            return Some(ParsedMacroArgs {
+                vec_with_semi,
+                trailing_comma,
+                kv_brace_args,
+                args,
+            });
+        }
+
+        kv_brace_args = true;
+
+        while parser.token != TokenKind::Eof
+            && parser.token.kind != TokenKind::CloseDelim(Delimiter::Brace)
+        {
+            let key = if let Some(arg) = parse_macro_arg(&mut parser) {
+                arg
+            } else {
+                kv_brace_args = false;
+                break;
+            };
+
+            if parser.token.kind == TokenKind::FatArrow {
+                parser.bump();
+            } else {
+                kv_brace_args = false;
+                break;
+            }
+
+            let value = if let Some(arg) = parse_macro_arg(&mut parser) {
+                arg
+            } else {
+                kv_brace_args = false;
+                break;
+            };
+
+            args.push(MacroArg::KeyValue(
+                match key {
+                    MacroArg::Expr(ref expr) => expr.clone(),
+                    _ => {
+                        kv_brace_args = false;
+                        break;
+                    }
+                },
+                match value {
+                    MacroArg::Expr(ref expr) => expr.clone(),
+                    _ => {
+                        kv_brace_args = false;
+                        break;
+                    }
+                },
+            ));
+
+            match parser.token.kind {
+                TokenKind::Comma => {
+                    trailing_comma = true;
+                    parser.bump();
+                }
+                TokenKind::CloseDelim(Delimiter::Brace) => {
+                    break;
+                }
+                _ => {
+                    kv_brace_args = false;
+                    break;
+                }
+            }
+        }
+    } else {
         loop {
             if let Some(arg) = check_keyword(&mut parser) {
                 args.push(arg);
@@ -158,6 +231,7 @@ pub(crate) fn parse_macro_args(
     Some(ParsedMacroArgs {
         vec_with_semi,
         trailing_comma,
+        kv_brace_args,
         args,
     })
 }
