@@ -19,13 +19,14 @@ pub enum CheckDiffError {
 }
 
 pub struct GlobalRunners {
-    pub feature_runner: RustfmtRunner,
-    pub src_runner: RustfmtRunner,
+    feature_runner: RustfmtRunner,
+    src_runner: RustfmtRunner,
 }
 
+#[allow(dead_code)]
 pub struct RustfmtRunner {
-    pub ld_library_path: String,
-    pub binary_path: PathBuf,
+    ld_library_path: String,
+    binary_path: PathBuf,
 }
 
 impl RustfmtRunner {
