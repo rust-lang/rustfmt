@@ -23,7 +23,7 @@ fn main() {
     let args = CliInputs::parse();
     let tmp_dir = Builder::new().tempdir_in("").unwrap();
     info!("Created tmp_dir {:?}", tmp_dir);
-    let runner = compile_rustfmt(
+    let _ = compile_rustfmt(
         tmp_dir.path(),
         args.remote_repo_url,
         args.feature_branch,
