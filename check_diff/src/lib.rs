@@ -18,6 +18,7 @@ pub enum CheckDiffError {
     IO(std::io::Error),
 }
 
+// will be used in future PRs, just added to make the compiler happy
 #[allow(dead_code)]
 pub struct CheckDiffRunners {
     feature_runner: RustfmtRunner,
@@ -30,6 +31,7 @@ pub struct RustfmtRunner {
 }
 
 impl RustfmtRunner {
+    // will be used in future PRs, just added to make the compiler happy
     #[allow(dead_code)]
     fn run(&self, args: &[&str]) -> io::Result<Output> {
         Command::new(&self.binary_path)
