@@ -18,18 +18,19 @@ pub enum CheckDiffError {
     IO(std::io::Error),
 }
 
+#[allow(dead_code)]
 pub struct CheckDiffRunners {
     feature_runner: RustfmtRunner,
     src_runner: RustfmtRunner,
 }
 
-#[allow(dead_code)]
 pub struct RustfmtRunner {
     ld_library_path: String,
     binary_path: PathBuf,
 }
 
 impl RustfmtRunner {
+    #[allow(dead_code)]
     fn run(&self, args: &[&str]) -> io::Result<Output> {
         Command::new(&self.binary_path)
             .env("LD_LIBRARY_PATH", &self.ld_library_path)
