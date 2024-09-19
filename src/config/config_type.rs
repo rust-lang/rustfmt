@@ -61,7 +61,7 @@ impl ConfigType for WidthHeuristics {
 
 impl ConfigType for IgnoreList {
     fn doc_hint() -> String {
-        String::from("[<string>,..]")
+        String::from("[<string>, ...]")
     }
 }
 
