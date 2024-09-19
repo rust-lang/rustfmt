@@ -83,14 +83,20 @@ macro_rules! create_config {
         #[derive(Clone)]
         #[allow(unreachable_pub)]
         pub struct Config {
-            // For each config item, we store:
-            //
-            // - 0: true if the value has been access
-            // - 1: true if the option was manually initialized
-            // - 2: the option value
-            // - 3: true if the option is stable
-            // - 4: true if the option was set manually from a CLI flag
-            $($i: (Cell<bool>, bool, <$ty as StyleEditionDefault>::ConfigType, bool, bool)),+
+            $($i: ConfigOption<<$ty as StyleEditionDefault>::ConfigType>),+
+        }
+
+        #[derive(Clone)]
+        struct ConfigOption<T> {
+            value: T,
+            /// `true` if the value has been accessed
+            is_used: std::cell::Cell<bool>,
+            /// `true` if the option is stable
+            is_stable: bool,
+            /// `true` if the option was manually initialized
+            was_set: bool,
+            /// `true` if the option was set manually from a CLI flag
+            was_set_cli: bool,
         }
 
         // Just like the Config struct but with each property wrapped
@@ -116,7 +122,7 @@ macro_rules! create_config {
             $(
             #[allow(unreachable_pub)]
             pub fn $i(&mut self, value: <$ty as StyleEditionDefault>::ConfigType) {
-                (self.0).$i.2 = value;
+                (self.0).$i.value = value;
                 match stringify!($i) {
                     "max_width"
                     | "use_small_heuristics"
@@ -145,8 +151,8 @@ macro_rules! create_config {
             $(
             #[allow(unreachable_pub)]
             pub fn $i(&mut self, value: <$ty as StyleEditionDefault>::ConfigType) {
-                (self.0).$i.2 = value;
-                (self.0).$i.4 = true;
+                (self.0).$i.value = value;
+                (self.0).$i.was_set_cli = true;
                 match stringify!($i) {
                     "max_width"
                     | "use_small_heuristics"
@@ -177,7 +183,7 @@ macro_rules! create_config {
             $(
             #[allow(unreachable_pub)]
             pub fn $i(&self) -> bool {
-                (self.0).$i.1
+                (self.0).$i.was_set
             }
             )+
         }
@@ -191,7 +197,7 @@ macro_rules! create_config {
             $(
             #[allow(unreachable_pub)]
             pub fn $i(&self) -> bool {
-                (self.0).$i.4
+                (self.0).$i.was_set_cli
             }
             )+
         }
@@ -200,8 +206,8 @@ macro_rules! create_config {
             $(
             #[allow(unreachable_pub)]
             pub fn $i(&self) -> <$ty as StyleEditionDefault>::ConfigType {
-                self.$i.0.set(true);
-                self.$i.2.clone()
+                self.$i.is_used.set(true);
+                self.$i.value.clone()
             }
             )+
 
@@ -209,15 +215,15 @@ macro_rules! create_config {
             pub(super) fn default_with_style_edition(style_edition: StyleEdition) -> Config {
                 Config {
                     $(
-                        $i: (
-                                Cell::new(false),
-                                false,
-                                <$ty as StyleEditionDefault>::style_edition_default(
-                                    style_edition
-                                ),
-                                $stb,
-                                false,
+                        $i: ConfigOption {
+                            is_used: Cell::new(false),
+                            was_set: false,
+                            value: <$ty as StyleEditionDefault>::style_edition_default(
+                                style_edition
                             ),
+                            is_stable: $stb,
+                            was_set_cli: false,
+                        },
                     )+
                 }
             }
@@ -245,12 +251,11 @@ macro_rules! create_config {
             fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Config {
             $(
                 if let Some(option_value) = parsed.$i {
-                    let option_stable = self.$i.3;
                     if $crate::config::config_type::is_stable_option_and_value(
-                        stringify!($i), option_stable, &option_value
+                        stringify!($i), self.$i.is_stable, &option_value
                     ) {
-                        self.$i.1 = true;
-                        self.$i.2 = option_value;
+                        self.$i.was_set = true;
+                        self.$i.value = option_value;
                     }
                 }
             )+
@@ -298,8 +303,8 @@ macro_rules! create_config {
             pub fn used_options(&self) -> PartialConfig {
                 PartialConfig {
                     $(
-                        $i: if self.$i.0.get() {
-                                Some(self.$i.2.clone())
+                        $i: if self.$i.is_used.get() {
+                                Some(self.$i.value.clone())
                             } else {
                                 None
                             },
@@ -311,7 +316,7 @@ macro_rules! create_config {
             pub fn all_options(&self) -> PartialConfig {
                 PartialConfig {
                     $(
-                        $i: Some(self.$i.2.clone()),
+                        $i: Some(self.$i.value.clone()),
                     )+
                 }
             }
@@ -340,8 +345,8 @@ macro_rules! create_config {
                             //
                             // For now, do not validate whether the option or value is stable,
                             // just always set it.
-                            self.$i.1 = true;
-                            self.$i.2 = value;
+                            self.$i.was_set = true;
+                            self.$i.value = value;
                         }
                     )+
                     _ => panic!("Unknown config key in override: {}", key)
@@ -422,7 +427,7 @@ macro_rules! create_config {
             }
 
             fn set_width_heuristics(&mut self, heuristics: WidthHeuristics) {
-                let max_width = self.max_width.2;
+                let max_width = self.max_width.value;
                 let get_width_value = |
                     was_set: bool,
                     override_value: usize,
@@ -444,73 +449,73 @@ macro_rules! create_config {
                 };
 
                 let fn_call_width = get_width_value(
-                    self.was_set().fn_call_width(),
-                    self.fn_call_width.2,
+                    self.fn_call_width.was_set,
+                    self.fn_call_width.value,
                     heuristics.fn_call_width,
                     "fn_call_width",
                 );
-                self.fn_call_width.2 = fn_call_width;
+                self.fn_call_width.value = fn_call_width;
 
                 let attr_fn_like_width = get_width_value(
-                    self.was_set().attr_fn_like_width(),
-                    self.attr_fn_like_width.2,
+                    self.attr_fn_like_width.was_set,
+                    self.attr_fn_like_width.value,
                     heuristics.attr_fn_like_width,
                     "attr_fn_like_width",
                 );
-                self.attr_fn_like_width.2 = attr_fn_like_width;
+                self.attr_fn_like_width.value = attr_fn_like_width;
 
                 let struct_lit_width = get_width_value(
-                    self.was_set().struct_lit_width(),
-                    self.struct_lit_width.2,
+                    self.struct_lit_width.was_set,
+                    self.struct_lit_width.value,
                     heuristics.struct_lit_width,
                     "struct_lit_width",
                 );
-                self.struct_lit_width.2 = struct_lit_width;
+                self.struct_lit_width.value = struct_lit_width;
 
                 let struct_variant_width = get_width_value(
-                    self.was_set().struct_variant_width(),
-                    self.struct_variant_width.2,
+                    self.struct_variant_width.was_set,
+                    self.struct_variant_width.value,
                     heuristics.struct_variant_width,
                     "struct_variant_width",
                 );
-                self.struct_variant_width.2 = struct_variant_width;
+                self.struct_variant_width.value = struct_variant_width;
 
                 let array_width = get_width_value(
-                    self.was_set().array_width(),
-                    self.array_width.2,
+                    self.array_width.was_set,
+                    self.array_width.value,
                     heuristics.array_width,
                     "array_width",
                 );
-                self.array_width.2 = array_width;
+                self.array_width.value = array_width;
 
                 let chain_width = get_width_value(
-                    self.was_set().chain_width(),
-                    self.chain_width.2,
+                    self.chain_width.was_set,
+                    self.chain_width.value,
                     heuristics.chain_width,
                     "chain_width",
                 );
-                self.chain_width.2 = chain_width;
+                self.chain_width.value = chain_width;
 
                 let single_line_if_else_max_width = get_width_value(
-                    self.was_set().single_line_if_else_max_width(),
-                    self.single_line_if_else_max_width.2,
+                    self.single_line_if_else_max_width.was_set,
+                    self.single_line_if_else_max_width.value,
                     heuristics.single_line_if_else_max_width,
                     "single_line_if_else_max_width",
                 );
-                self.single_line_if_else_max_width.2 = single_line_if_else_max_width;
+                self.single_line_if_else_max_width.value = single_line_if_else_max_width;
 
                 let single_line_let_else_max_width = get_width_value(
-                    self.was_set().single_line_let_else_max_width(),
-                    self.single_line_let_else_max_width.2,
+                    self.single_line_let_else_max_width.was_set,
+                    self.single_line_let_else_max_width.value,
                     heuristics.single_line_let_else_max_width,
                     "single_line_let_else_max_width",
                 );
-                self.single_line_let_else_max_width.2 = single_line_let_else_max_width;
+                self.single_line_let_else_max_width.value = single_line_let_else_max_width;
             }
 
             fn set_heuristics(&mut self) {
-                let max_width = self.max_width.2;
-                match self.use_small_heuristics.2 {
+                let max_width = self.max_width.value;
+                match self.use_small_heuristics.value {
                     Heuristics::Default =>
                         self.set_width_heuristics(WidthHeuristics::scaled(max_width)),
                     Heuristics::Max => self.set_width_heuristics(WidthHeuristics::set(max_width)),
@@ -519,17 +524,17 @@ macro_rules! create_config {
             }
 
             fn set_ignore(&mut self, dir: &Path) {
-                self.ignore.2.add_prefix(dir);
+                self.ignore.value.add_prefix(dir);
             }
 
             fn set_merge_imports(&mut self) {
-                if self.was_set().merge_imports() {
+                if self.merge_imports.was_set {
                     eprintln!(
                         "Warning: the `merge_imports` option is deprecated. \
                         Use `imports_granularity=\"Crate\"` instead"
                     );
-                    if !self.was_set().imports_granularity() {
-                        self.imports_granularity.2 = if self.merge_imports() {
+                    if !self.imports_granularity.was_set {
+                        self.imports_granularity.value = if self.merge_imports() {
                             ImportGranularity::Crate
                         } else {
                             ImportGranularity::Preserve
@@ -539,31 +544,31 @@ macro_rules! create_config {
             }
 
             fn set_fn_args_layout(&mut self) {
-                if self.was_set().fn_args_layout() {
+                if self.fn_args_layout.was_set {
                     eprintln!(
                         "Warning: the `fn_args_layout` option is deprecated. \
                         Use `fn_params_layout`. instead"
                     );
-                    if !self.was_set().fn_params_layout() {
-                        self.fn_params_layout.2 = self.fn_args_layout();
+                    if !self.fn_params_layout.was_set {
+                        self.fn_params_layout.value = self.fn_args_layout();
                     }
                 }
             }
 
             fn set_hide_parse_errors(&mut self) {
-                if self.was_set().hide_parse_errors() {
+                if self.hide_parse_errors.was_set {
                     eprintln!(
                         "Warning: the `hide_parse_errors` option is deprecated. \
                         Use `show_parse_errors` instead"
                     );
-                    if !self.was_set().show_parse_errors() {
-                        self.show_parse_errors.2 = self.hide_parse_errors();
+                    if !self.show_parse_errors.was_set {
+                        self.show_parse_errors.value = self.hide_parse_errors();
                     }
                 }
             }
 
             fn set_version(&mut self) {
-                if !self.was_set().version() {
+                if !self.version.was_set {
                     return;
                 }
 
@@ -572,7 +577,7 @@ macro_rules! create_config {
                     Use `style_edition` instead."
                 );
 
-                if self.was_set().style_edition() || self.was_set_cli().style_edition() {
+                if self.style_edition.was_set || self.style_edition.was_set_cli {
                     eprintln!(
                         "Warning: the deprecated `version` option was \
                         used in conjunction with the `style_edition` \
@@ -591,7 +596,7 @@ macro_rules! create_config {
                         style_edition
                     );
                     if let stringify!($i) = key {
-                        return self.$i.1 && self.$i.2 == default_value;
+                        return self.$i.was_set && self.$i.value == default_value;
                     }
                  )+
                 false
