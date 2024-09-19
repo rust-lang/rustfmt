@@ -57,7 +57,7 @@ impl JsonEmitter {
         filename: &FileName,
         diff: Vec<Mismatch>,
     ) -> Result<(), io::Error> {
-        let mut mismatches = vec![];
+        let mut mismatches = Vec::with_capacity(diff.len());
         for mismatch in diff {
             let original_begin_line = mismatch.line_number_orig;
             let expected_begin_line = mismatch.line_number;
