@@ -88,10 +88,8 @@ macro_rules! create_config {
             // - 0: true if the value has been access
             // - 1: true if the option was manually initialized
             // - 2: the option value
-            // - 3: true if the option is unstable
+            // - 3: true if the option is stable
             // - 4: true if the option was set manually from a CLI flag
-            // FIXME: 4 is probably unnecessary and duplicative
-            // https://github.com/rust-lang/rustfmt/issues/6252
             $($i: (Cell<bool>, bool, <$ty as StyleEditionDefault>::ConfigType, bool, bool)),+
         }
 
