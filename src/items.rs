@@ -620,7 +620,10 @@ impl<'a> FmtVisitor<'a> {
             .unwrap_or(&0);
 
         let itemize_list_with = |one_line_width: usize| {
-            itemize_list(
+            let mut has_multiline_variant = false;
+            let mut has_single_line_variant = false;
+
+            let items: Vec<_> = itemize_list(
                 self.snippet_provider,
                 enum_def.variants.iter(),
                 "}",
@@ -634,126 +637,26 @@ impl<'a> FmtVisitor<'a> {
                 },
                 |f| f.span.hi(),
                 |f| {
-                    self.format_variant(f, one_line_width, pad_discrim_ident_to)
-                        .unknown_error()
+                    let (result, is_multi_line) =
+                        self.format_variant(f, one_line_width, pad_discrim_ident_to);
+                    has_multiline_variant |= is_multi_line;
+                    has_single_line_variant |= !is_multi_line;
+                    result.unknown_error()
                 },
                 body_lo,
                 body_hi,
                 false,
             )
-            .collect()
+            .collect();
+
+            (items, has_multiline_variant, has_single_line_variant)
         };
-        let mut items: Vec<_> = itemize_list_with(self.config.struct_variant_width());
 
-        // If one of the variants use multiple lines, use multi-lined formatting for all variants.
-        let is_multi_line_variant = |item: &ListItem| -> bool {
-            let variant_str = item.inner_as_ref();
-            if self.config.style_edition() <= StyleEdition::Edition2021 {
-                // Fall back to previous naive implementation (#5662) because of
-                // rustfmt's stability guarantees
-                return variant_str.contains('\n');
-            }
+        let (mut items, has_multiline_variant, has_single_line_variant) =
+            itemize_list_with(self.config.struct_variant_width());
 
-            // First exclude all outer one-line doc comments
-            let mut lines = variant_str
-                .split('\n')
-                .filter(|line| !line.trim().starts_with("///"));
-
-            let mut variant_str = lines.join("\n");
-
-            // Then exclude all outer documentation blocks
-            // Exclude one block per loop iteration
-            loop {
-                let mut block_found = false;
-                let mut chars = variant_str.chars().enumerate();
-                'block: while let Some((i, c)) = chars.next() {
-                    if c != '/' {
-                        continue;
-                    }
-                    let block_start = i;
-                    if let Some((_, '*')) = chars.next() {
-                        if let Some((_, '*')) = chars.next() {
-                            while let Some((_, c)) = chars.next() {
-                                if c == '*' {
-                                    if let Some((i, '/')) = chars.next() {
-                                        // block was found and ends at the i-th position
-                                        // We remove it from variant_str
-                                        let mut s = variant_str[..block_start].trim().to_owned();
-                                        s.push_str(variant_str[(i + 1)..].trim());
-                                        variant_str = s;
-                                        block_found = true;
-                                        break 'block;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if !block_found {
-                    break;
-                }
-            }
-
-            // Skip macro attributes in variant_str
-            // We skip one macro attribute per loop iteration
-            loop {
-                let mut macro_attribute_found = false;
-                let mut macro_attribute_start_i = 0;
-                let mut bracket_count = 0;
-                let mut chars = variant_str.chars().enumerate();
-                while let Some((i, c)) = chars.next() {
-                    match c {
-                        '#' => {
-                            if let Some((_, '[')) = chars.next() {
-                                macro_attribute_start_i = i;
-                                bracket_count += 1;
-                            }
-                        }
-                        '[' => bracket_count += 1,
-                        ']' => {
-                            bracket_count -= 1;
-                            if bracket_count == 0 {
-                                // Macro attribute was found and ends at the i-th position
-                                // We remove it from variant_str
-                                let mut s =
-                                    variant_str[..macro_attribute_start_i].trim().to_owned();
-                                s.push_str(variant_str[(i + 1)..].trim());
-                                variant_str = s;
-                                macro_attribute_found = true;
-                                break;
-                            }
-                        }
-                        '\'' => {
-                            // Handle char in attribute
-                            chars.next();
-                            chars.next();
-                        }
-                        '"' => {
-                            // Handle quoted strings within attribute
-                            while let Some((_, c)) = chars.next() {
-                                if c == '\\' {
-                                    chars.next(); // Skip escaped character
-                                } else if c == '"' {
-                                    break; // end of string
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-
-                if !macro_attribute_found {
-                    break;
-                }
-            }
-
-            variant_str.contains('\n')
-        };
-        let has_multiline_variant = items.iter().any(is_multi_line_variant);
-        let has_single_line_variant = items.iter().any(|item| !is_multi_line_variant(item));
         if has_multiline_variant && has_single_line_variant {
-            items = itemize_list_with(0);
+            (items, _, _) = itemize_list_with(0);
         }
 
         let shape = self.shape().sub_width(2)?;
@@ -774,23 +677,35 @@ impl<'a> FmtVisitor<'a> {
         field: &ast::Variant,
         one_line_width: usize,
         pad_discrim_ident_to: usize,
-    ) -> Option<String> {
+    ) -> (Option<String>, bool) {
+        // Makes the early return a little more ergonomic since we can't use `?`
+        macro_rules! unwrap_early_return {
+            ($option:expr, $is_multi_line:expr) => {
+                match $option {
+                    Some(v) => v,
+                    None => return (None, $is_multi_line),
+                }
+            };
+        }
+
+        let mut is_variant_multi_line = self.snippet(field.span).contains('\n');
         if contains_skip(&field.attrs) {
             let lo = field.attrs[0].span.lo();
             let span = mk_sp(lo, field.span.hi());
-            return Some(self.snippet(span).to_owned());
+            return (Some(self.snippet(span).to_owned()), is_variant_multi_line);
         }
 
         let context = self.get_context();
         let shape = self.shape();
         let attrs_str = if context.config.style_edition() >= StyleEdition::Edition2024 {
-            field.attrs.rewrite(&context, shape)?
+            unwrap_early_return!(field.attrs.rewrite(&context, shape), is_variant_multi_line)
         } else {
             // StyleEdition::Edition20{15|18|21} formatting that was off by 1. See issue #5801
-            field.attrs.rewrite(&context, shape.sub_width(1)?)?
+            let shape = unwrap_early_return!(shape.sub_width(1), is_variant_multi_line);
+            unwrap_early_return!(field.attrs.rewrite(&context, shape), is_variant_multi_line)
         };
         // sub_width(1) to take the trailing comma into account
-        let shape = shape.sub_width(1)?;
+        let shape = unwrap_early_return!(shape.sub_width(1), is_variant_multi_line);
 
         let lo = field
             .attrs
@@ -799,32 +714,45 @@ impl<'a> FmtVisitor<'a> {
         let span = mk_sp(lo, field.span.lo());
 
         let variant_body = match field.data {
-            ast::VariantData::Tuple(..) | ast::VariantData::Struct { .. } => format_struct(
-                &context,
-                &StructParts::from_variant(field, &context),
-                self.block_indent,
-                Some(one_line_width),
-            )?,
+            ast::VariantData::Tuple(..) | ast::VariantData::Struct { .. } => {
+                let rewrite = format_struct(
+                    &context,
+                    &StructParts::from_variant(field, &context),
+                    self.block_indent,
+                    Some(one_line_width),
+                );
+                unwrap_early_return!(rewrite, is_variant_multi_line)
+            }
             ast::VariantData::Unit(..) => rewrite_ident(&context, field.ident).to_owned(),
         };
 
         let variant_body = if let Some(ref expr) = field.disr_expr {
             let lhs = format!("{variant_body:pad_discrim_ident_to$} =");
             let ex = &*expr.value;
-            rewrite_assign_rhs_with(
+            let rewrite = rewrite_assign_rhs_with(
                 &context,
                 lhs,
                 ex,
                 shape,
                 &RhsAssignKind::Expr(&ex.kind, ex.span),
                 RhsTactics::AllowOverflow,
-            )?
+            );
+            unwrap_early_return!(rewrite, is_variant_multi_line)
         } else {
             variant_body
         };
 
-        combine_strs_with_missing_comments(&context, &attrs_str, &variant_body, span, shape, false)
-            .ok()
+        is_variant_multi_line = variant_body.contains('\n');
+        let rewirte = combine_strs_with_missing_comments(
+            &context,
+            &attrs_str,
+            &variant_body,
+            span,
+            shape,
+            false,
+        )
+        .ok();
+        (rewirte, is_variant_multi_line)
     }
 
     fn visit_impl_items(&mut self, items: &[ptr::P<ast::AssocItem>]) {

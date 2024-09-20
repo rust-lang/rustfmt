@@ -745,7 +745,7 @@ where
     I: Iterator<Item = T>,
     F1: Fn(&T) -> BytePos,
     F2: Fn(&T) -> BytePos,
-    F3: Fn(&T) -> RewriteResult,
+    F3: FnMut(&T) -> RewriteResult,
 {
     type Item = ListItem;
 
@@ -810,7 +810,7 @@ where
     I: Iterator<Item = T>,
     F1: Fn(&T) -> BytePos,
     F2: Fn(&T) -> BytePos,
-    F3: Fn(&T) -> RewriteResult,
+    F3: FnMut(&T) -> RewriteResult,
 {
     ListItems {
         snippet_provider,
