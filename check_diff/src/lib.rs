@@ -1,9 +1,7 @@
 use std::env;
 use std::io;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Command;
-use std::process::Output;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
 use tracing::info;
 
 pub enum CheckDiffError {
@@ -196,12 +194,8 @@ pub fn get_cargo_version() -> Result<String, CheckDiffError> {
     return Ok(cargo_version);
 }
 
-pub fn get_binary_version(
-    binary: &PathBuf,
-    ld_lib_path: &String,
-) -> Result<String, CheckDiffError> {
-    let binary_str = pathbuf_to_str(binary)?;
-    let Ok(command) = Command::new(binary_str)
+pub fn get_binary_version(binary: &Path, ld_lib_path: &String) -> Result<String, CheckDiffError> {
+    let Ok(command) = Command::new(binary)
         .env("LD_LIB_PATH", ld_lib_path)
         .args(["--version"])
         .output()
@@ -222,7 +216,7 @@ pub fn get_binary_version(
 
 /// Obtains the ld_lib path and then builds rustfmt from source
 /// If that operation succeeds, the source is then copied to the output path specified
-pub fn build_rustfmt_from_src(output_path: &PathBuf) -> Result<RustfmtRunner, CheckDiffError> {
+pub fn build_rustfmt_from_src(binary_path: &Path) -> Result<RustfmtRunner, CheckDiffError> {
     //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
     // binary can find it's runtime dependencies.
     // See https://github.com/rust-lang/rustfmt/issues/5675
@@ -240,22 +234,12 @@ pub fn build_rustfmt_from_src(output_path: &PathBuf) -> Result<RustfmtRunner, Ch
         ));
     };
 
-    std::fs::copy("target/release/rustfmt", &output_path)?;
+    std::fs::copy("target/release/rustfmt", &binary_path)?;
 
     return Ok(RustfmtRunner {
         ld_library_path: ld_lib_path,
-        binary_path: output_path.to_path_buf(),
+        binary_path: binary_path.into(),
     });
-}
-
-fn pathbuf_to_str(pathbuf: &PathBuf) -> Result<&str, CheckDiffError> {
-    let Some(result) = pathbuf.to_str() else {
-        return Err(CheckDiffError::FailedPathBuf(format!(
-            "Unable to convert {:?} to str",
-            pathbuf
-        )));
-    };
-    return Ok(result);
 }
 
 // Compiles and produces two rustfmt binaries.
