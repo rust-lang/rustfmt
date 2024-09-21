@@ -2,17 +2,18 @@ use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::str::Utf8Error;
+use std::string::FromUtf8Error;
 use tracing::info;
 
 pub enum CheckDiffError {
     FailedGit(GitError),
     FailedCommand(String),
-    FailedUtf8(String),
+    FailedUtf8(Utf8Error),
     FailedSourceBuild(String),
     FailedCopy(String),
     FailedCargoVersion(String),
     FailedVersioning(String),
-    FailedPathBuf(String),
     IO(std::io::Error),
 }
 
@@ -48,6 +49,12 @@ impl From<io::Error> for CheckDiffError {
 impl From<GitError> for CheckDiffError {
     fn from(error: GitError) -> Self {
         CheckDiffError::FailedGit(error)
+    }
+}
+
+impl From<FromUtf8Error> for CheckDiffError {
+    fn from(error: FromUtf8Error) -> Self {
+        CheckDiffError::FailedUtf8(error.utf8_error())
     }
 }
 
@@ -168,28 +175,15 @@ pub fn get_ld_lib_path() -> Result<String, CheckDiffError> {
         ));
     };
 
-    let Ok(sysroot) = String::from_utf8(command.stdout) else {
-        return Err(CheckDiffError::FailedUtf8(
-            "Error converting sysroot to string".to_string(),
-        ));
-    };
+    let sysroot = String::from_utf8(command.stdout)?;
 
     let ld_lib_path = format!("{}/lib", sysroot.trim_end());
     return Ok(ld_lib_path);
 }
 
 pub fn get_cargo_version() -> Result<String, CheckDiffError> {
-    let Ok(command) = Command::new("cargo").args(["--version"]).output() else {
-        return Err(CheckDiffError::FailedCargoVersion(
-            "Failed to obtain cargo version".to_string(),
-        ));
-    };
-
-    let Ok(cargo_version) = String::from_utf8(command.stdout) else {
-        return Err(CheckDiffError::FailedUtf8(
-            "Error converting cargo version to string".to_string(),
-        ));
-    };
+    let command = Command::new("cargo").args(["--version"]).output()?;
+    let cargo_version = String::from_utf8(command.stdout)?;
 
     return Ok(cargo_version);
 }
@@ -206,11 +200,8 @@ pub fn get_binary_version(binary: &Path, ld_lib_path: &String) -> Result<String,
         )));
     };
 
-    let Ok(binary_version) = String::from_utf8(command.stdout) else {
-        return Err(CheckDiffError::FailedUtf8(
-            "Error converting binary version to string".to_string(),
-        ));
-    };
+    let binary_version = String::from_utf8(command.stdout)?;
+
     return Ok(binary_version);
 }
 
