@@ -6,38 +6,29 @@ use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 use tracing::info;
 
+// ========= Start of error enums ===========
+
 pub enum CheckDiffError {
+    /// Git related errors
     FailedGit(GitError),
-    FailedCommand(String),
+    /// Error for `rustc --print sysroot` command
+    FailedToGetSysroot {
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    },
+    /// UTF8 related errors
     FailedUtf8(Utf8Error),
-    FailedSourceBuild(String),
-    FailedCopy(String),
-    FailedCargoVersion(String),
-    FailedVersioning(String),
+    /// Error for building rustfmt from source
+    FailedSourceBuild {
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    },
+    /// Error when `--version` flag is used in a command
+    FailedVersioning {
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    },
     IO(std::io::Error),
-}
-
-// will be used in future PRs, just added to make the compiler happy
-#[allow(dead_code)]
-pub struct CheckDiffRunners {
-    feature_runner: RustfmtRunner,
-    src_runner: RustfmtRunner,
-}
-
-pub struct RustfmtRunner {
-    ld_library_path: String,
-    binary_path: PathBuf,
-}
-
-impl RustfmtRunner {
-    // will be used in future PRs, just added to make the compiler happy
-    #[allow(dead_code)]
-    fn run(&self, args: &[&str]) -> io::Result<Output> {
-        Command::new(&self.binary_path)
-            .env("LD_LIBRARY_PATH", &self.ld_library_path)
-            .args(args)
-            .output()
-    }
 }
 
 impl From<io::Error> for CheckDiffError {
@@ -69,6 +60,31 @@ pub enum GitError {
 impl From<io::Error> for GitError {
     fn from(error: io::Error) -> Self {
         GitError::IO(error)
+    }
+}
+
+// ========= End of error enums ===========
+
+// will be used in future PRs, just added to make the compiler happy
+#[allow(dead_code)]
+pub struct CheckDiffRunners {
+    feature_runner: RustfmtRunner,
+    src_runner: RustfmtRunner,
+}
+
+pub struct RustfmtRunner {
+    ld_library_path: String,
+    binary_path: PathBuf,
+}
+
+impl RustfmtRunner {
+    // will be used in future PRs, just added to make the compiler happy
+    #[allow(dead_code)]
+    fn run(&self, args: &[&str]) -> io::Result<Output> {
+        Command::new(&self.binary_path)
+            .env("LD_LIBRARY_PATH", &self.ld_library_path)
+            .args(args)
+            .output()
     }
 }
 
@@ -169,11 +185,16 @@ pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
 }
 
 pub fn get_ld_lib_path() -> Result<String, CheckDiffError> {
-    let Ok(command) = Command::new("rustc").args(["--print", "sysroot"]).output() else {
-        return Err(CheckDiffError::FailedCommand(
-            "Error getting sysroot".to_string(),
-        ));
-    };
+    let command = Command::new("rustc")
+        .args(["--print", "sysroot"])
+        .output()?;
+
+    if !command.status.success() {
+        return Err(CheckDiffError::FailedToGetSysroot {
+            stdout: command.stdout,
+            stderr: command.stderr,
+        });
+    }
 
     let sysroot = String::from_utf8(command.stdout)?;
 
@@ -183,22 +204,30 @@ pub fn get_ld_lib_path() -> Result<String, CheckDiffError> {
 
 pub fn get_cargo_version() -> Result<String, CheckDiffError> {
     let command = Command::new("cargo").args(["--version"]).output()?;
+
+    if !command.status.success() {
+        return Err(CheckDiffError::FailedVersioning {
+            stdout: command.stdout,
+            stderr: command.stderr,
+        });
+    }
     let cargo_version = String::from_utf8(command.stdout)?;
 
     return Ok(cargo_version);
 }
 
 pub fn get_binary_version(binary: &Path, ld_lib_path: &String) -> Result<String, CheckDiffError> {
-    let Ok(command) = Command::new(binary)
+    let command = Command::new(binary)
         .env("LD_LIB_PATH", ld_lib_path)
         .args(["--version"])
-        .output()
-    else {
-        return Err(CheckDiffError::FailedVersioning(format!(
-            "Failed to get version for {:?}",
-            binary
-        )));
-    };
+        .output()?;
+
+    if !command.status.success() {
+        return Err(CheckDiffError::FailedVersioning {
+            stdout: command.stdout,
+            stderr: command.stderr,
+        });
+    }
 
     let binary_version = String::from_utf8(command.stdout)?;
 
@@ -215,15 +244,17 @@ pub fn build_rustfmt_from_src(binary_path: &Path) -> Result<RustfmtRunner, Check
     let ld_lib_path = get_ld_lib_path()?;
 
     info!("Building rustfmt from source");
-    let Ok(_) = Command::new("cargo")
+    let command = Command::new("cargo")
         .env("LD_LIB_PATH", &ld_lib_path.as_str())
         .args(["build", "-q", "--release", "--bin", "rustfmt"])
-        .output()
-    else {
-        return Err(CheckDiffError::FailedSourceBuild(
-            "Error building rustfmt from source".to_string(),
-        ));
-    };
+        .output()?;
+
+    if !command.status.success() {
+        return Err(CheckDiffError::FailedSourceBuild {
+            stdout: command.stdout,
+            stderr: command.stderr,
+        });
+    }
 
     std::fs::copy("target/release/rustfmt", &binary_path)?;
 
