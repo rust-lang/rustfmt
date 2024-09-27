@@ -514,6 +514,11 @@ pub enum StyleEdition {
     #[unstable_variant]
     /// [Edition 2024]().
     Edition2024,
+    #[value = "2027"]
+    #[doc_hint = "2027"]
+    #[unstable_variant]
+    /// [Edition 2027]().
+    Edition2027,
 }
 
 impl From<StyleEdition> for rustc_span::edition::Edition {
@@ -523,6 +528,8 @@ impl From<StyleEdition> for rustc_span::edition::Edition {
             StyleEdition::Edition2018 => Self::Edition2018,
             StyleEdition::Edition2021 => Self::Edition2021,
             StyleEdition::Edition2024 => Self::Edition2024,
+            // TODO: should update to Edition2027 when it becomes available
+            StyleEdition::Edition2027 => Self::Edition2024,
         }
     }
 }
