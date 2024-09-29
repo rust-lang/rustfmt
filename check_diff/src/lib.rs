@@ -223,7 +223,6 @@ pub fn build_rustfmt_from_src(binary_path: &Path) -> Result<RustfmtRunner, Check
 
     info!("Building rustfmt from source");
     let Ok(_) = Command::new("cargo")
-        .env("LD_LIB_PATH", &ld_lib_path.as_str())
         .args(["build", "-q", "--release", "--bin", "rustfmt"])
         .output()
     else {
