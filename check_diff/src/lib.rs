@@ -124,7 +124,7 @@ pub fn git_remote_add(url: &str) -> Result<(), GitError> {
         return Err(error);
     }
 
-    info!("Successfully added remote.");
+    info!("Successfully added remote: {url}");
     return Ok(());
 }
 
@@ -143,7 +143,7 @@ pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
         return Err(error);
     }
 
-    info!("Successfully fetched.");
+    info!("Successfully fetched: {branch_name}");
     return Ok(());
 }
 
