@@ -267,16 +267,16 @@ pub fn compile_rustfmt(
 
     let feature_runner = build_rustfmt_from_src(dest.join("/feature_rustfmt"))?;
 
+    info!("RUSFMT_BIN {}", src_runner.get_binary_version()?);
     info!(
-        "\nRuntime dependencies for rustfmt -- LD_LIBRARY_PATH: {}",
-        &feature_runner.ld_library_path
+        "Runtime dependencies for (src) rustfmt -- LD_LIBRARY_PATH: {}",
+        src_runner.ld_library_path
     );
-
-    let rustfmt_version = src_runner.get_binary_version()?;
-    info!("\nRUSFMT_BIN {}\n", rustfmt_version);
-
-    let feature_binary_version = feature_runner.get_binary_version()?;
-    info!("FEATURE_BIN {}\n", feature_binary_version);
+    info!("FEATURE_BIN {}", feature_runner.get_binary_version()?);
+    info!(
+        "Runtime dependencies for (feature) rustfmt -- LD_LIBRARY_PATH: {}",
+        feature_runner.ld_library_path
+    );
 
     return Ok(CheckDiffRunners {
         src_runner,
