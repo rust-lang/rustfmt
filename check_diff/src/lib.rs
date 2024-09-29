@@ -6,8 +6,6 @@ use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 use tracing::info;
 
-// ========= Start of error enums ===========
-
 pub enum CheckDiffError {
     /// Git related errors
     FailedGit(GitError),
@@ -55,8 +53,6 @@ impl From<io::Error> for GitError {
         GitError::IO(error)
     }
 }
-
-// ========= End of error enums ===========
 
 // will be used in future PRs, just added to make the compiler happy
 #[allow(dead_code)]
@@ -153,7 +149,9 @@ pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
 
 pub fn git_switch(arg: &str, should_detach: bool) -> Result<(), GitError> {
     let detach_arg = if should_detach { "--detach" } else { "" };
-    let git_cmd = Command::new("git").args([arg, detach_arg]).output()?;
+    let git_cmd = Command::new("git")
+        .args(["switch", arg, detach_arg])
+        .output()?;
 
     if !git_cmd.status.success() {
         let error = GitError::FailedSwitch {
