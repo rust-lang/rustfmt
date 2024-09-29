@@ -3,7 +3,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::str::Utf8Error;
-use std::string::FromUtf8Error;
 use tracing::info;
 
 pub enum CheckDiffError {
@@ -34,9 +33,9 @@ impl From<GitError> for CheckDiffError {
     }
 }
 
-impl From<FromUtf8Error> for CheckDiffError {
-    fn from(error: FromUtf8Error) -> Self {
-        CheckDiffError::FailedUtf8(error.utf8_error())
+impl From<Utf8Error> for CheckDiffError {
+    fn from(error: Utf8Error) -> Self {
+        CheckDiffError::FailedUtf8(error)
     }
 }
 
@@ -87,8 +86,7 @@ impl RustfmtRunner {
             ));
         };
 
-        let binding = String::from_utf8(command.stdout)?;
-        let binary_version = binding.trim();
+        let binary_version = std::str::from_utf8(&command.stdout)?.trim_end();
         return Ok(binary_version.to_string());
     }
 }
@@ -196,7 +194,7 @@ pub fn get_ld_lib_path() -> Result<String, CheckDiffError> {
         return Err(CheckDiffError::FailedCommand("Error getting sysroot"));
     };
 
-    let sysroot = String::from_utf8(command.stdout)?;
+    let sysroot = std::str::from_utf8(&command.stdout)?.trim_end();
 
     let ld_lib_path = format!("{}/lib", sysroot.trim_end());
     return Ok(ld_lib_path);
@@ -209,9 +207,8 @@ pub fn get_cargo_version() -> Result<String, CheckDiffError> {
         ));
     };
 
-    let cargo_version = String::from_utf8(command.stdout)?;
-
-    return Ok(cargo_version);
+    let cargo_version = std::str::from_utf8(&command.stdout)?.trim_end();
+    return Ok(cargo_version.to_string());
 }
 
 /// Obtains the ld_lib path and then builds rustfmt from source
