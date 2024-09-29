@@ -75,6 +75,22 @@ impl RustfmtRunner {
             .args(args)
             .output()
     }
+
+    fn get_binary_version(&self) -> Result<String, CheckDiffError> {
+        let Ok(command) = Command::new(&self.binary_path)
+            .env("LD_LIB_PATH", &self.ld_library_path)
+            .args(["--version"])
+            .output()
+        else {
+            return Err(CheckDiffError::FailedBinaryVersioning(
+                self.binary_path.to_path_buf(),
+            ));
+        };
+
+        let binding = String::from_utf8(command.stdout)?;
+        let binary_version = binding.trim();
+        return Ok(binary_version.to_string());
+    }
 }
 
 /// Clone a git repository
@@ -198,23 +214,9 @@ pub fn get_cargo_version() -> Result<String, CheckDiffError> {
     return Ok(cargo_version);
 }
 
-pub fn get_binary_version(binary: &Path, ld_lib_path: &String) -> Result<String, CheckDiffError> {
-    let Ok(command) = Command::new(binary)
-        .env("LD_LIB_PATH", ld_lib_path)
-        .args(["--version"])
-        .output()
-    else {
-        return Err(CheckDiffError::FailedBinaryVersioning(binary.to_path_buf()));
-    };
-
-    let binary_version = String::from_utf8(command.stdout)?;
-
-    return Ok(binary_version);
-}
-
 /// Obtains the ld_lib path and then builds rustfmt from source
 /// If that operation succeeds, the source is then copied to the output path specified
-pub fn build_rustfmt_from_src(binary_path: &Path) -> Result<RustfmtRunner, CheckDiffError> {
+pub fn build_rustfmt_from_src(binary_path: PathBuf) -> Result<RustfmtRunner, CheckDiffError> {
     //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
     // binary can find it's runtime dependencies.
     // See https://github.com/rust-lang/rustfmt/issues/5675
@@ -235,7 +237,7 @@ pub fn build_rustfmt_from_src(binary_path: &Path) -> Result<RustfmtRunner, Check
 
     return Ok(RustfmtRunner {
         ld_library_path: ld_lib_path,
-        binary_path: binary_path.into(),
+        binary_path,
     });
 }
 
@@ -252,33 +254,31 @@ pub fn compile_rustfmt(
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
 
     clone_git_repo(RUSTFMT_REPO, dest)?;
+    change_directory_to_path(dest)?;
     git_remote_add(remote_repo_url.as_str())?;
     git_fetch(feature_branch.as_str())?;
 
     let cargo_version = get_cargo_version()?;
     info!("Compiling with {}", cargo_version);
-    let rustfmt_binary = dest.join("/rustfmt");
-    let src_runner = build_rustfmt_from_src(&rustfmt_binary)?;
+    let src_runner = build_rustfmt_from_src(dest.join("/rustfmt"))?;
 
     let should_detach = commit_hash.is_some();
     git_switch(
         commit_hash.unwrap_or(feature_branch).as_str(),
         should_detach,
     )?;
-    let feature_binary = dest.join("/feature_rustfmt");
 
-    let feature_runner = build_rustfmt_from_src(&feature_binary)?;
+    let feature_runner = build_rustfmt_from_src(dest.join("/feature_rustfmt"))?;
 
     info!(
         "\nRuntime dependencies for rustfmt -- LD_LIBRARY_PATH: {}",
         &feature_runner.ld_library_path
     );
 
-    let rustfmt_version = get_binary_version(&rustfmt_binary, &feature_runner.ld_library_path)?;
+    let rustfmt_version = src_runner.get_binary_version()?;
     info!("\nRUSFMT_BIN {}\n", rustfmt_version);
 
-    let feature_binary_version =
-        get_binary_version(&feature_binary, &(feature_runner.ld_library_path))?;
+    let feature_binary_version = feature_runner.get_binary_version()?;
     info!("FEATURE_BIN {}\n", feature_binary_version);
 
     return Ok(CheckDiffRunners {
