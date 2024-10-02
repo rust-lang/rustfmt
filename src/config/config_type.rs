@@ -112,13 +112,16 @@ macro_rules! create_config {
         // with `config.set_option(false)` if we ever get a stable/usable
         // `concat_idents!()`.
         #[allow(unreachable_pub)]
-        pub struct ConfigSetter<'a>(&'a mut Config);
+        pub struct ConfigSetter<'a> {
+            config: &'a mut Config,
+            warn: bool,
+        }
 
         impl<'a> ConfigSetter<'a> {
             $(
             #[allow(unreachable_pub)]
             pub fn $i(&mut self, value: <$ty as StyleEditionDefault>::ConfigType) {
-                (self.0).$i.2 = value;
+                (self.config).$i.2 = value;
                 match stringify!($i) {
                     "max_width"
                     | "use_small_heuristics"
@@ -129,11 +132,11 @@ macro_rules! create_config {
                     | "struct_lit_width"
                     | "struct_variant_width"
                     | "array_width"
-                    | "chain_width" => self.0.set_heuristics(),
-                    "merge_imports" => self.0.set_merge_imports(),
-                    "fn_args_layout" => self.0.set_fn_args_layout(),
-                    "hide_parse_errors" => self.0.set_hide_parse_errors(),
-                    "version" => self.0.set_version(),
+                    | "chain_width" => self.config.set_heuristics(self.warn),
+                    "merge_imports" => self.config.set_merge_imports(),
+                    "fn_args_layout" => self.config.set_fn_args_layout(),
+                    "hide_parse_errors" => self.config.set_hide_parse_errors(),
+                    "version" => self.config.set_version(),
                     &_ => (),
                 }
             }
@@ -159,7 +162,7 @@ macro_rules! create_config {
                     | "struct_lit_width"
                     | "struct_variant_width"
                     | "array_width"
-                    | "chain_width" => self.0.set_heuristics(),
+                    | "chain_width" => self.0.set_heuristics(true),
                     "merge_imports" => self.0.set_merge_imports(),
                     "fn_args_layout" => self.0.set_fn_args_layout(),
                     "hide_parse_errors" => self.0.set_hide_parse_errors(),
@@ -226,7 +229,12 @@ macro_rules! create_config {
 
             #[allow(unreachable_pub)]
             pub fn set(&mut self) -> ConfigSetter<'_> {
-                ConfigSetter(self)
+                ConfigSetter { config: self, warn: true }
+            }
+
+            #[allow(unreachable_pub)]
+            pub fn set_no_warn(&mut self) -> ConfigSetter<'_> {
+                ConfigSetter { config: self, warn: false }
             }
 
             #[allow(unreachable_pub)]
@@ -256,7 +264,7 @@ macro_rules! create_config {
                     }
                 }
             )+
-                self.set_heuristics();
+                self.set_heuristics(true);
                 self.set_ignore(dir);
                 self.set_merge_imports();
                 self.set_fn_args_layout();
@@ -359,7 +367,7 @@ macro_rules! create_config {
                     | "struct_lit_width"
                     | "struct_variant_width"
                     | "array_width"
-                    | "chain_width" => self.set_heuristics(),
+                    | "chain_width" => self.set_heuristics(true),
                     "merge_imports" => self.set_merge_imports(),
                     "fn_args_layout" => self.set_fn_args_layout(),
                     "hide_parse_errors" => self.set_hide_parse_errors(),
@@ -423,7 +431,7 @@ macro_rules! create_config {
                 )+
             }
 
-            fn set_width_heuristics(&mut self, heuristics: WidthHeuristics) {
+            fn set_width_heuristics(&mut self, heuristics: WidthHeuristics, warn: bool) {
                 let max_width = self.max_width.2;
                 let get_width_value = |
                     was_set: bool,
@@ -435,11 +443,13 @@ macro_rules! create_config {
                         return heuristic_value;
                     }
                     if override_value > max_width {
-                        eprintln!(
-                            "`{0}` cannot have a value that exceeds `max_width`. \
-                            `{0}` will be set to the same value as `max_width`",
-                            config_key,
-                        );
+                        if warn {
+                            eprintln!(
+                                "`{0}` cannot have a value that exceeds `max_width`. \
+                                `{0}` will be set to the same value as `max_width` {1} - {2}",
+                                config_key, override_value, max_width
+                            );
+                        }
                         return max_width;
                     }
                     override_value
@@ -510,13 +520,16 @@ macro_rules! create_config {
                 self.single_line_let_else_max_width.2 = single_line_let_else_max_width;
             }
 
-            fn set_heuristics(&mut self) {
+            fn set_heuristics(&mut self, warn: bool) {
                 let max_width = self.max_width.2;
                 match self.use_small_heuristics.2 {
                     Heuristics::Default =>
-                        self.set_width_heuristics(WidthHeuristics::scaled(max_width)),
-                    Heuristics::Max => self.set_width_heuristics(WidthHeuristics::set(max_width)),
-                    Heuristics::Off => self.set_width_heuristics(WidthHeuristics::null()),
+                        self.set_width_heuristics(WidthHeuristics::scaled(max_width), warn),
+                    Heuristics::Max => self.set_width_heuristics(
+                        WidthHeuristics::set(max_width),
+                        warn
+                    ),
+                    Heuristics::Off => self.set_width_heuristics(WidthHeuristics::null(), warn),
                 };
             }
 
