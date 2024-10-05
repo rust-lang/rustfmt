@@ -20,6 +20,9 @@ struct CliInputs {
 }
 
 fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_env("CHECK_DIFF_LOG"))
+        .init();
     let args = CliInputs::parse();
     let tmp_dir = Builder::new().tempdir_in("").unwrap();
     info!("Created tmp_dir {:?}", tmp_dir);
