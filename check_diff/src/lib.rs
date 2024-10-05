@@ -1,7 +1,7 @@
 use std::env;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 use std::str::Utf8Error;
 use tracing::info;
 
@@ -66,27 +66,18 @@ pub struct RustfmtRunner {
 }
 
 impl RustfmtRunner {
-    // will be used in future PRs, just added to make the compiler happy
-    #[allow(dead_code)]
-    fn run(&self, args: &[&str]) -> io::Result<Output> {
-        Command::new(&self.binary_path)
-            .env("LD_LIBRARY_PATH", &self.ld_library_path)
-            .args(args)
-            .output()
-    }
-
     fn get_binary_version(&self) -> Result<String, CheckDiffError> {
         let Ok(command) = Command::new(&self.binary_path)
-            .env("LD_LIB_PATH", &self.ld_library_path)
+            .env("LD_LIBRARY_PATH", &self.ld_library_path)
             .args(["--version"])
             .output()
         else {
             return Err(CheckDiffError::FailedBinaryVersioning(
-                self.binary_path.to_path_buf(),
+                self.binary_path.clone(),
             ));
         };
 
-        let binary_version = std::str::from_utf8(&command.stdout)?.trim_end();
+        let binary_version = std::str::from_utf8(&command.stdout)?.trim();
         return Ok(binary_version.to_string());
     }
 }
@@ -161,21 +152,21 @@ pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
     return Ok(());
 }
 
-pub fn git_switch(arg: &str, should_detach: bool) -> Result<(), GitError> {
+pub fn git_switch(git_ref: &str, should_detach: bool) -> Result<(), GitError> {
     let detach_arg = if should_detach { "--detach" } else { "" };
-    let git_cmd = Command::new("git")
-        .args(["switch", arg, detach_arg])
+    let args = ["switch", git_ref, detach_arg];
+    let output = Command::new("git")
+        .args(args.iter().filter(|arg| !arg.is_empty()))
         .output()?;
-
-    if !git_cmd.status.success() {
+    if !output.status.success() {
+        tracing::error!("Git switch failed: {output:?}");
         let error = GitError::FailedSwitch {
-            stdout: git_cmd.stdout,
-            stderr: git_cmd.stderr,
+            stdout: output.stdout,
+            stderr: output.stderr,
         };
         return Err(error);
     }
-
-    info!("Successfully switched to {}", arg);
+    info!("Successfully switched to {git_ref}");
     return Ok(());
 }
 
@@ -189,14 +180,12 @@ pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     return Ok(());
 }
 
-pub fn get_ld_lib_path() -> Result<String, CheckDiffError> {
+pub fn get_ld_library_path() -> Result<String, CheckDiffError> {
     let Ok(command) = Command::new("rustc").args(["--print", "sysroot"]).output() else {
         return Err(CheckDiffError::FailedCommand("Error getting sysroot"));
     };
-
     let sysroot = std::str::from_utf8(&command.stdout)?.trim_end();
-
-    let ld_lib_path = format!("{}/lib", sysroot.trim_end());
+    let ld_lib_path = format!("{}/lib", sysroot);
     return Ok(ld_lib_path);
 }
 
@@ -218,7 +207,7 @@ pub fn build_rustfmt_from_src(binary_path: PathBuf) -> Result<RustfmtRunner, Che
     // binary can find it's runtime dependencies.
     // See https://github.com/rust-lang/rustfmt/issues/5675
     // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
-    let ld_lib_path = get_ld_lib_path()?;
+    let ld_lib_path = get_ld_library_path()?;
 
     info!("Building rustfmt from source");
     let Ok(_) = Command::new("cargo")
@@ -257,16 +246,14 @@ pub fn compile_rustfmt(
 
     let cargo_version = get_cargo_version()?;
     info!("Compiling with {}", cargo_version);
-    let src_runner = build_rustfmt_from_src(dest.join("/rustfmt"))?;
-
+    let src_runner = build_rustfmt_from_src(dest.join("src_rustfmt"))?;
     let should_detach = commit_hash.is_some();
     git_switch(
         commit_hash.unwrap_or(feature_branch).as_str(),
         should_detach,
     )?;
 
-    let feature_runner = build_rustfmt_from_src(dest.join("/feature_rustfmt"))?;
-
+    let feature_runner = build_rustfmt_from_src(dest.join("feature_rustfmt"))?;
     info!("RUSFMT_BIN {}", src_runner.get_binary_version()?);
     info!(
         "Runtime dependencies for (src) rustfmt -- LD_LIBRARY_PATH: {}",
