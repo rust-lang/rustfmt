@@ -431,18 +431,24 @@ macro_rules! create_config {
                     heuristic_value: usize,
                     config_key: &str,
                 | -> usize {
-                    if !was_set {
-                        return heuristic_value;
-                    }
-                    if override_value > max_width {
+                    let value = if !was_set {
+                        heuristic_value
+                    } else {
+                        override_value
+                    };
+
+                    let value = value.min(max_width);
+
+                    if value > max_width {
                         eprintln!(
                             "`{0}` cannot have a value that exceeds `max_width`. \
                             `{0}` will be set to the same value as `max_width`",
                             config_key,
                         );
-                        return max_width;
+                        max_width
+                    } else {
+                        value
                     }
-                    override_value
                 };
 
                 let fn_call_width = get_width_value(
