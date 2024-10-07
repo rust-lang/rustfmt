@@ -1,11 +1,11 @@
-use rustc_ast::token::{Delimiter, TokenKind};
+use rustc_ast::token::{Delimiter, NonterminalKind, NtExprKind::*, NtPatKind::*, TokenKind};
 use rustc_ast::tokenstream::TokenStream;
 use rustc_ast::{ast, ptr};
-use rustc_parse::parser::{ForceCollect, Parser};
-use rustc_parse::{stream_to_parser, MACRO_ARGUMENTS};
+use rustc_parse::MACRO_ARGUMENTS;
+use rustc_parse::parser::{ForceCollect, Parser, Recovery};
 use rustc_session::parse::ParseSess;
-use rustc_span::symbol::{self, kw};
 use rustc_span::Symbol;
+use rustc_span::symbol::{self, kw};
 
 use crate::macros::MacroArg;
 use crate::rewrite::RewriteContext;
@@ -14,31 +14,33 @@ pub(crate) mod asm;
 pub(crate) mod cfg_if;
 pub(crate) mod lazy_static;
 
-fn build_stream_parser<'a>(sess: &'a ParseSess, tokens: TokenStream) -> Parser<'a> {
-    stream_to_parser(sess, tokens, MACRO_ARGUMENTS)
+fn build_stream_parser<'a>(psess: &'a ParseSess, tokens: TokenStream) -> Parser<'a> {
+    Parser::new(psess, tokens, MACRO_ARGUMENTS).recovery(Recovery::Forbidden)
 }
 
 fn build_parser<'a>(context: &RewriteContext<'a>, tokens: TokenStream) -> Parser<'a> {
-    build_stream_parser(context.parse_sess.inner(), tokens)
+    build_stream_parser(context.psess.inner(), tokens)
 }
 
 fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
     macro_rules! parse_macro_arg {
-        ($macro_arg:ident, $parser:expr, $f:expr) => {
+        ($macro_arg:ident, $nt_kind:expr, $try_parse:expr, $then:expr) => {
             let mut cloned_parser = (*parser).clone();
-            match $parser(&mut cloned_parser) {
-                Ok(x) => {
-                    if parser.sess.dcx.has_errors().is_some() {
-                        parser.sess.dcx.reset_err_count();
-                    } else {
-                        // Parsing succeeded.
-                        *parser = cloned_parser;
-                        return Some(MacroArg::$macro_arg($f(x)?));
+            if Parser::nonterminal_may_begin_with($nt_kind, &cloned_parser.token) {
+                match $try_parse(&mut cloned_parser) {
+                    Ok(x) => {
+                        if parser.psess.dcx().has_errors().is_some() {
+                            parser.psess.dcx().reset_err_count();
+                        } else {
+                            // Parsing succeeded.
+                            *parser = cloned_parser;
+                            return Some(MacroArg::$macro_arg($then(x)?));
+                        }
                     }
-                }
-                Err(e) => {
-                    e.cancel();
-                    parser.sess.dcx.reset_err_count();
+                    Err(e) => {
+                        e.cancel();
+                        parser.psess.dcx().reset_err_count();
+                    }
                 }
             }
         };
@@ -46,23 +48,27 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
 
     parse_macro_arg!(
         Expr,
-        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_expr(),
+        NonterminalKind::Expr(Expr),
+        |parser: &mut Parser<'b>| parser.parse_expr(),
         |x: ptr::P<ast::Expr>| Some(x)
     );
     parse_macro_arg!(
         Ty,
-        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_ty(),
+        NonterminalKind::Ty,
+        |parser: &mut Parser<'b>| parser.parse_ty(),
         |x: ptr::P<ast::Ty>| Some(x)
     );
     parse_macro_arg!(
         Pat,
-        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_pat_no_top_alt(None, None),
+        NonterminalKind::Pat(PatParam { inferred: false }),
+        |parser: &mut Parser<'b>| parser.parse_pat_no_top_alt(None, None),
         |x: ptr::P<ast::Pat>| Some(x)
     );
     // `parse_item` returns `Option<ptr::P<ast::Item>>`.
     parse_macro_arg!(
         Item,
-        |parser: &mut rustc_parse::parser::Parser<'b>| parser.parse_item(ForceCollect::No),
+        NonterminalKind::Item,
+        |parser: &mut Parser<'b>| parser.parse_item(ForceCollect::No),
         |x: Option<ptr::P<ast::Item>>| x
     );
 
@@ -78,9 +84,7 @@ pub(crate) struct ParsedMacroArgs {
 fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
     for &keyword in RUST_KW.iter() {
         if parser.token.is_keyword(keyword)
-            && parser.look_ahead(1, |t| {
-                t.kind == TokenKind::Eof || t.kind == TokenKind::Comma
-            })
+            && parser.look_ahead(1, |t| *t == TokenKind::Eof || *t == TokenKind::Comma)
         {
             parser.bump();
             return Some(MacroArg::Keyword(
@@ -125,7 +129,7 @@ pub(crate) fn parse_macro_args(
                                 Some(arg) => {
                                     args.push(arg);
                                     parser.bump();
-                                    if parser.token.kind == TokenKind::Eof && args.len() == 2 {
+                                    if parser.token == TokenKind::Eof && args.len() == 2 {
                                         vec_with_semi = true;
                                         break;
                                     }
@@ -144,7 +148,7 @@ pub(crate) fn parse_macro_args(
 
             parser.bump();
 
-            if parser.token.kind == TokenKind::Eof {
+            if parser.token == TokenKind::Eof {
                 trailing_comma = true;
                 break;
             }
