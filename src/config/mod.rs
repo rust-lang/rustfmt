@@ -213,8 +213,8 @@ impl PartialConfig {
     }
 }
 
-fn check_semver_version(required: &str, actual: &str) -> bool {
-    let mut required_version = match semver::VersionReq::parse(required) {
+fn check_semver_version(range_requirement: &str, actual: &str) -> bool {
+    let mut required_version = match semver::VersionReq::parse(range_requirement) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Error: failed to parse required version: {}", e);
@@ -229,15 +229,18 @@ fn check_semver_version(required: &str, actual: &str) -> bool {
         }
     };
 
-    required.split(',').enumerate().for_each(|(i, required)| {
-        let Some(comparator) = required_version.comparators.get_mut(i) else {
-            return;
-        };
+    range_requirement
+        .split(',')
+        .enumerate()
+        .for_each(|(i, requirement)| {
+            let Some(comparator) = required_version.comparators.get_mut(i) else {
+                return;
+            };
 
-        if !required.contains('^') && comparator.op == semver::Op::Caret {
-            comparator.op = semver::Op::Exact;
-        }
-    });
+            if !requirement.starts_with('^') && comparator.op == semver::Op::Caret {
+                comparator.op = semver::Op::Exact;
+            }
+        });
 
     required_version.matches(&actual_version)
 }
