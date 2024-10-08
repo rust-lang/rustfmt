@@ -1341,7 +1341,7 @@ make_backup = false
         #[test]
         fn test_current_required_version() {
             let toml = format!("required_version=\"{}\"", env!("CARGO_PKG_VERSION"));
-            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1350,7 +1350,7 @@ make_backup = false
         #[test]
         fn test_required_version_above() {
             let toml = "required_version=\"1000.0.0\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(!config.version_meets_requirement());
         }
@@ -1362,7 +1362,7 @@ make_backup = false
 
             for version in versions {
                 let toml = format!("required_version=\"{}\"", version.to_string());
-                let config = Config::from_toml(&toml, Path::new("")).unwrap();
+                let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
                 assert!(!config.version_meets_requirement());
             }
@@ -1372,7 +1372,7 @@ make_backup = false
         #[test]
         fn test_required_version_tilde() {
             let toml = format!("required_version=\"~{}\"", env!("CARGO_PKG_VERSION"));
-            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1388,7 +1388,7 @@ make_backup = false
                     current_version.major.to_string(),
                     minor.to_string()
                 );
-                let config = Config::from_toml(&toml, Path::new("")).unwrap();
+                let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
                 assert!(!config.version_meets_requirement());
             }
@@ -1398,7 +1398,7 @@ make_backup = false
         #[test]
         fn test_required_version_greater_than() {
             let toml = "required_version=\">1.0.0\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1407,7 +1407,7 @@ make_backup = false
         #[test]
         fn test_required_version_less_than() {
             let toml = "required_version=\"<1.0.0\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(!config.version_meets_requirement());
         }
@@ -1422,7 +1422,7 @@ make_backup = false
                 current_version.major,
                 current_version.major + 1
             );
-            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1431,7 +1431,7 @@ make_backup = false
         #[test]
         fn test_required_version_exact_boundary() {
             let toml = format!("required_version=\"{}\"", get_current_version().to_string());
-            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1443,7 +1443,7 @@ make_backup = false
                 "required_version=\"^{}-alpha\"",
                 get_current_version().to_string()
             );
-            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1456,7 +1456,7 @@ make_backup = false
                 get_current_version().to_string()
             );
 
-            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1465,7 +1465,7 @@ make_backup = false
         #[test]
         fn test_required_version_invalid_specification() {
             let toml = "required_version=\"not.a.version\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(!config.version_meets_requirement())
         }
@@ -1482,7 +1482,7 @@ make_backup = false
                 current_version.major,
                 current_version.minor
             );
-            let config = Config::from_toml(&toml, Path::new("")).unwrap();
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1491,7 +1491,7 @@ make_backup = false
         #[test]
         fn test_required_version_wildcard_major() {
             let toml = "required_version=\"1.x\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1500,7 +1500,7 @@ make_backup = false
         #[test]
         fn test_required_version_wildcard_any() {
             let toml = "required_version=\"*\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
         }
@@ -1509,7 +1509,7 @@ make_backup = false
         #[test]
         fn test_required_version_major_version_zero() {
             let toml = "required_version=\"0.1.0\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(!config.version_meets_requirement());
         }
@@ -1518,7 +1518,7 @@ make_backup = false
         #[test]
         fn test_required_version_future_major_version() {
             let toml = "required_version=\"3.0.0\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(!config.version_meets_requirement());
         }
@@ -1528,7 +1528,7 @@ make_backup = false
         fn test_required_version_fail_different_operator() {
             // != is not supported
             let toml = "required_version=\"!=1.0.0\"";
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(!config.version_meets_requirement());
         }
