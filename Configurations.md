@@ -2405,10 +2405,16 @@ required_version="1.0.*" # matches any version with the same major and minor ver
 
 #### Multiple versions to match:
 
-Except by `*`, can be used by any of the semver operators can be combined, being split with commas. The comparison is done using `&&` operator.
+Except by `*`, any of the semver operators can be combined, being split with commas. The comparison is done using `&&` operator.
 
-`*` has range restrictions as any comparator will override the wildcard operator. When `*` is used within a range, the comparison always fails.
-    
+`*` can't be used with other comparators.
+
+Since `*` has range restrictions, any comparator will override the wildcard operator. When `*` is used alone, the comparison always fails, as that's an invalid config. `*, <1.0.0` for example is invalid.
+
+Versions can't contradict themselves, otherwise they'll always fail. Some examples are `"1.*, <2.0.0"` and `1.0.*, <2.0.0`, since both versions can't be true at the same time.
+
+By now, `&&` (using comma `,`) is the only way to declare `required_version`. `||` Operator is not valid. Valid examples are `1.0.0, 1.1.0` and `1.0.0, 1.1.0, 1.1.*` but not `1.0.0 || 1.1.0` or `1.0.0, 2.0.0`.
+
 ```toml
 required_version=">=1.0.0, <2.0.0"
 ```
@@ -2739,17 +2745,6 @@ Maximum width in the body of a struct variant before falling back to vertical fo
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `struct_variant_width` will take precedence.
 
 See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
-
-## `style_edition`
-
-Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338])
-
-- **Default value**: `"2015"`
-- **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
-- **Stable**: No
-
-[Rust Style Guide]: https://doc.rust-lang.org/nightly/style-guide/
-[RFC 3338]: https://rust-lang.github.io/rfcs/3338-style-evolution.html
 
 ## `tab_spaces`
 
@@ -3110,7 +3105,9 @@ fn main() {
 
 ## `version`
 
-This option is deprecated and has been replaced by [`style_edition`](#style_edition)
+Which version of the formatting rules to use. `Version::One` is backwards-compatible
+with Rustfmt 1.0. Other versions are only backwards compatible within a major
+version number.
 
 - **Default value**: `One`
 - **Possible values**: `One`, `Two`
