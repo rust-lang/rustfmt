@@ -4,12 +4,6 @@
 #![recursion_limit = "256"]
 #![allow(clippy::match_like_matches_macro)]
 
-#[cfg(test)]
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate tracing;
-
 // N.B. these crates are loaded from the sysroot, so they need extern crate.
 extern crate rustc_ast;
 extern crate rustc_ast_pretty;
@@ -50,8 +44,8 @@ use crate::shape::Indent;
 use crate::utils::indent_next_line;
 
 pub use crate::config::{
-    load_config, CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName, NewlineStyle,
-    Range, Verbosity,
+    CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName, NewlineStyle, Range,
+    StyleEdition, Verbosity, Version, load_config,
 };
 
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
@@ -60,6 +54,13 @@ pub use crate::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 
 #[macro_use]
 mod utils;
+
+macro_rules! static_regex {
+    ($re:literal) => {{
+        static RE: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
+        RE.get_or_init(|| ::regex::Regex::new($re).unwrap())
+    }};
+}
 
 mod attr;
 mod chains;
@@ -89,6 +90,7 @@ mod rewrite;
 pub(crate) mod rustfmt_diff;
 mod shape;
 mod skip;
+mod sort;
 pub(crate) mod source_file;
 pub(crate) mod source_map;
 mod spanned;

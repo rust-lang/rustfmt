@@ -4,12 +4,10 @@
 
 #![deny(warnings)]
 
-#[macro_use]
-extern crate tracing;
-
 use serde::{Deserialize, Serialize};
 use serde_json as json;
 use thiserror::Error;
+use tracing::debug;
 use tracing_subscriber::EnvFilter;
 
 use std::collections::HashSet;
@@ -38,14 +36,14 @@ enum FormatDiffError {
 }
 
 #[derive(Parser, Debug)]
-#[clap(
+#[command(
     name = "rustfmt-format-diff",
     disable_version_flag = true,
     next_line_help = true
 )]
 pub struct Opts {
     /// Skip the smallest prefix containing NUMBER slashes
-    #[clap(
+    #[arg(
         short = 'p',
         long = "skip-prefix",
         value_name = "NUMBER",
@@ -54,7 +52,7 @@ pub struct Opts {
     skip_prefix: u32,
 
     /// Custom pattern selecting file paths to reformat
-    #[clap(
+    #[arg(
         short = 'f',
         long = "filter",
         value_name = "PATTERN",
