@@ -237,6 +237,10 @@ fn check_semver_version(range_requirement: &str, actual: &str) -> bool {
                 return;
             };
 
+            // semver crate handles "1.0.0" as "^1.0.0", and we want to treat it as "=1.0.0"
+            // because of this, we need to iterate over the comparators, and change each one
+            // that has "default caret operator" to an exact operator
+            // this condition overrides the "default caret operator" of semver create.
             if !requirement.starts_with('^') && comparator.op == semver::Op::Caret {
                 comparator.op = semver::Op::Exact;
             }
