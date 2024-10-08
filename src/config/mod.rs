@@ -235,7 +235,7 @@ impl PartialConfig {
 }
 
 fn check_semver_version(range_requirement: &str, actual: &str) -> bool {
-    let mut required_version = match semver::VersionReq::parse(range_requirement) {
+    let mut version_req = match semver::VersionReq::parse(range_requirement) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Error: failed to parse required version: {}", e);
@@ -253,8 +253,9 @@ fn check_semver_version(range_requirement: &str, actual: &str) -> bool {
     range_requirement
         .split(',')
         .enumerate()
-        .for_each(|(i, requirement)| {
-            let Some(comparator) = required_version.comparators.get_mut(i) else {
+        .for_each(|(i, label)| {
+            // the label refers to the current comparator
+            let Some(comparator) = version_req.comparators.get_mut(i) else {
                 return;
             };
 
@@ -262,12 +263,12 @@ fn check_semver_version(range_requirement: &str, actual: &str) -> bool {
             // because of this, we need to iterate over the comparators, and change each one
             // that has "default caret operator" to an exact operator
             // this condition overrides the "default caret operator" of semver create.
-            if !requirement.starts_with('^') && comparator.op == semver::Op::Caret {
+            if !label.starts_with('^') && comparator.op == semver::Op::Caret {
                 comparator.op = semver::Op::Exact;
             }
         });
 
-    required_version.matches(&actual_version)
+    version_req.matches(&actual_version)
 }
 
 impl Config {
