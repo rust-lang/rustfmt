@@ -1618,6 +1618,15 @@ make_backup = false
             assert!(!check_semver_version("1.0.0", "1.0.0-alpha.1"));
         }
 
+        // That's not our choice. `semver` does not support `||` operator.
+        // Only asserting here to ensure this behavior (which match our docs).
+        #[test]
+        fn test_invalid_or() {
+            assert!(!check_semver_version("1.0.0 || 2.0.0", "1.0.0"));
+            assert!(!check_semver_version("1.0.0 || 2.0.0", "2.0.0"));
+            assert!(!check_semver_version("1.0.0 || 2.0.0", "3.0.0"));
+        }
+
         #[test]
         fn test_wildcard_match_minor() {
             assert!(check_semver_version("1.*", "1.1.0"));
