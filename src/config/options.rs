@@ -536,13 +536,15 @@ impl From<StyleEdition> for rustc_span::edition::Edition {
 
 impl PartialOrd for StyleEdition {
     fn partial_cmp(&self, other: &StyleEdition) -> Option<std::cmp::Ordering> {
-        // FIXME(ytmimi): Update the `StyleEdition::Edition2027` logic when the
-        // `Edition::Edition2027` becomes available in the compiler
+        // FIXME(ytmimi): Update `StyleEdition::Edition2027` logic when
+        // `rustc_span::edition::Edition::Edition2027` becomes available in the compiler
         match (self, other) {
             (Self::Edition2027, Self::Edition2027) => Some(std::cmp::Ordering::Equal),
             (_, Self::Edition2027) => Some(std::cmp::Ordering::Less),
             (Self::Edition2027, _) => Some(std::cmp::Ordering::Greater),
-            _ => rustc_span::edition::Edition::partial_cmp(&(*self).into(), &(*other).into()),
+            (Self::Edition2015 | Self::Edition2018 | Self::Edition2021 | Self::Edition2024, _) => {
+                rustc_span::edition::Edition::partial_cmp(&(*self).into(), &(*other).into())
+            }
         }
     }
 }
