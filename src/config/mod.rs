@@ -238,14 +238,14 @@ fn check_semver_version(range_requirement: &str, actual: &str) -> bool {
     let mut version_req = match semver::VersionReq::parse(range_requirement) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("Error: failed to parse required version: {}", e);
+            eprintln!("Error: failed to parse required version {range_requirement:?}: {e}");
             return false;
         }
     };
     let actual_version = match semver::Version::parse(actual) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("Error: failed to parse current version: {}", e);
+            eprintln!("Error: failed to parse current version {actual:?}: {e}");
             return false;
         }
     };
