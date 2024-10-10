@@ -2411,9 +2411,7 @@ Except by `*`, any of the semver operators can be combined, being split with com
 
 Since `*` has range restrictions, any comparator will override the wildcard operator. When `*` is used alone, the comparison always fails, as that's an invalid config. `*, <1.0.0` for example is invalid.
 
-Versions can't contradict themselves, otherwise they'll always fail. Some examples are `"1.*, <2.0.0"` and `1.0.*, <2.0.0`, since both versions can't be true at the same time.
-
-By now, `&&` (using comma `,`) is the only way to declare `required_version`. `||` Operator is not valid. Valid examples are `1.0.0, 1.1.0` and `1.0.0, 1.1.0, 1.1.*` but not `1.0.0 || 1.1.0` or `1.0.0, 2.0.0`.
+Versions can't contradict themselves, otherwise they'll always fail. Some examples are `"1.*, >2.0.0"`, `1.0.*, >2.0.0`, since both versions can't be true at the same time.
 
 ```toml
 required_version=">=1.0.0, <2.0.0"
