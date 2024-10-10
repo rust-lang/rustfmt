@@ -1634,11 +1634,16 @@ make_backup = false
         }
 
         #[test]
-        fn test_wildcard_unmatch() {
+        fn test_wildcard_mismatch() {
             assert!(!check_semver_version("1.*, <2.0.0", "2.1.0"));
             assert!(!check_semver_version("1.*, <2.0.0", "2.0.0"));
             assert!(!check_semver_version("1.*, <2.*", "2.1.0"));
             assert!(!check_semver_version("1.*, <2.*", "2.0.0"));
+
+            assert!(!check_semver_version("1.*, >2.0.0", "1.1.0"));
+            assert!(!check_semver_version("1.*, >2.0.0", "1.0.0"));
+            assert!(!check_semver_version("1.*, >2.*", "1.1.0"));
+            assert!(!check_semver_version("1.*, >2.*", "1.0.0"));
         }
 
         #[test]
