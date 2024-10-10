@@ -2570,7 +2570,7 @@ fn rewrite_fn_base(
             .last()
             .map_or(false, |last_line| last_line.contains("//"));
 
-        if context.config.style_edition() >= StyleEdition::Edition2024 {
+        if context.config.style_edition() >= StyleEdition::Edition2027 {
             if closing_paren_overflow_max_width {
                 result.push(')');
                 result.push_str(&indent.to_string_with_newline(context.config));
