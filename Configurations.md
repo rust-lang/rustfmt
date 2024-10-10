@@ -2732,6 +2732,17 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 
 See also [`max_width`](#max_width), [`use_small_heuristics`](#use_small_heuristics), and [`struct_lit_single_line`](#struct_lit_single_line)
 
+## `style_edition`
+
+Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338])	
+
+- **Default value**: `"2015"`	
+- **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)	
+- **Stable**: No	
+
+[Rust Style Guide]: https://doc.rust-lang.org/nightly/style-guide/	
+[RFC 3338]: https://rust-lang.github.io/rfcs/3338-style-evolution.html	
+
 ## `struct_variant_width`
 
 Maximum width in the body of a struct variant before falling back to vertical formatting. A value of `0` (zero) results in struct literals always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
