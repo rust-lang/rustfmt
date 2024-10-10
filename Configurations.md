@@ -3105,9 +3105,9 @@ fn main() {
 
 ## `version`
 
-Which version of the formatting rules to use. `Version::One` is backwards-compatible
-with Rustfmt 1.0. Other versions are only backwards compatible within a major
-version number.
+This option is deprecated and has been replaced by [`style_edition`](#style_edition).
+`version = "One"` is equivalent to `style_edition = "(2015|2018|2021)"` and
+`version = "Two"` is equivalent to `style_edition = "2024"`
 
 - **Default value**: `One`
 - **Possible values**: `One`, `Two`
