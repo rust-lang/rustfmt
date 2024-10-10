@@ -1644,6 +1644,8 @@ make_backup = false
             assert!(!check_semver_version("1.*, >2.0.0", "1.0.0"));
             assert!(!check_semver_version("1.*, >2.*", "1.1.0"));
             assert!(!check_semver_version("1.*, >2.*", "1.0.0"));
+
+            assert!(!check_semver_version("<1.5.0, >1.10.*", "1.6.0"));
         }
 
         #[test]
