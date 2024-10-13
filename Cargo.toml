@@ -33,28 +33,28 @@ rustfmt-format-diff = []
 generic-simd = ["bytecount/generic-simd"]
 
 [dependencies]
-annotate-snippets = { version = "0.9", features = ["color"] }
-anyhow = "1.0"
+annotate-snippets = "0.11.4"
+anyhow = "1.0.89"
 bytecount = "0.6.8"
-cargo_metadata = "0.18"
-clap = { version = "4.4.2", features = ["derive"] }
-clap-cargo = "0.12.0"
-diff = "0.1"
-dirs = "5.0"
-getopts = "0.2"
-ignore = "0.4"
-itertools = "0.12"
-regex = "1.7"
-serde = { version = "1.0.160", features = ["derive"] }
-serde_json = "1.0"
-term = "0.7"
-thiserror = "1.0.40"
-toml = "0.7.4"
-tracing = { version = "0.1.37", default-features = false, features = ["std"] }
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-unicode-segmentation = "1.9"
-unicode-width = "0.1"
-unicode-properties = { version = "0.1", default-features = false, features = ["general-category"] }
+cargo_metadata = "0.18.1"
+clap = { version = "4.5.20", features = ["derive"] }
+clap-cargo = "0.14.1"
+diff = "0.1.13"
+dirs = "5.0.1"
+getopts = "0.2.21"
+ignore = "0.4.23"
+itertools = "0.13.0"
+regex = "1.11.0"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+term = "1.0.0"
+thiserror = "1.0.64"
+toml = "0.8.19"
+tracing = { version = "0.1.40", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+unicode-segmentation = "1.12.0"
+unicode-width = "0.2.0"
+unicode-properties = { version = "0.1.3", default-features = false, features = ["general-category"] }
 
 rustfmt-config_proc_macro = { version = "0.3", path = "config_proc_macro" }
 

@@ -690,7 +690,7 @@ impl NodeIdExt for NodeId {
 }
 
 pub(crate) fn unicode_str_width(s: &str) -> usize {
-    s.width()
+    s.lines().map(|l| l.width()).sum()
 }
 
 #[cfg(test)]
