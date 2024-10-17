@@ -11,29 +11,40 @@ use std::cmp::Ordering;
 use rustc_ast::{ast, attr};
 use rustc_span::{Span, symbol::sym};
 
+use crate::StyleEdition;
 use crate::config::{Config, GroupImportsTactic};
 use crate::imports::{UseSegmentKind, UseTree, normalize_use_trees_with_granularity};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{ListFormatting, ListItem, itemize_list, write_list};
 use crate::rewrite::{RewriteContext, RewriteErrorExt};
 use crate::shape::Shape;
+use crate::sort::version_sort;
 use crate::source_map::LineRangeUtils;
 use crate::spanned::Spanned;
 use crate::utils::{contains_skip, mk_sp};
 use crate::visitor::FmtVisitor;
 
 /// Choose the ordering between the given two items.
-fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
+fn compare_items(a: &ast::Item, b: &ast::Item, context: &RewriteContext<'_>) -> Ordering {
+    let style_edition = context.config.style_edition();
     match (&a.kind, &b.kind) {
         (&ast::ItemKind::Mod(..), &ast::ItemKind::Mod(..)) => {
-            a.ident.as_str().cmp(b.ident.as_str())
+            if style_edition <= StyleEdition::Edition2021 {
+                a.ident.as_str().cmp(b.ident.as_str())
+            } else {
+                version_sort(a.ident.as_str(), b.ident.as_str())
+            }
         }
         (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
             let a_orig_name = a_name.unwrap_or(a.ident.name);
             let b_orig_name = b_name.unwrap_or(b.ident.name);
-            let result = a_orig_name.as_str().cmp(b_orig_name.as_str());
+            let result = if style_edition <= StyleEdition::Edition2021 {
+                a_orig_name.as_str().cmp(b_orig_name.as_str())
+            } else {
+                version_sort(a_orig_name.as_str(), b_orig_name.as_str())
+            };
             if result != Ordering::Equal {
                 return result;
             }
@@ -44,7 +55,10 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
                 (Some(..), None) => Ordering::Greater,
                 (None, Some(..)) => Ordering::Less,
                 (None, None) => Ordering::Equal,
-                (Some(..), Some(..)) => a.ident.as_str().cmp(b.ident.as_str()),
+                (Some(..), Some(..)) if style_edition <= StyleEdition::Edition2021 => {
+                    a.ident.as_str().cmp(b.ident.as_str())
+                }
+                (Some(..), Some(..)) => version_sort(a.ident.as_str(), b.ident.as_str()),
             }
         }
         _ => unreachable!(),
@@ -165,7 +179,7 @@ fn rewrite_reorderable_or_regroupable_items(
             );
 
             let mut item_pair_vec: Vec<_> = list_items.zip(reorderable_items.iter()).collect();
-            item_pair_vec.sort_by(|a, b| compare_items(a.1, b.1));
+            item_pair_vec.sort_by(|a, b| compare_items(a.1, b.1, context));
             let item_vec: Vec<_> = item_pair_vec.into_iter().map(|pair| pair.0).collect();
 
             wrap_reorderable_items(context, &item_vec, shape)
