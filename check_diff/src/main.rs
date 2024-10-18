@@ -1,4 +1,7 @@
+use check_diff::compile_rustfmt;
 use clap::Parser;
+use tempfile::Builder;
+use tracing::info;
 
 /// Inputs for the check_diff script
 #[derive(Parser)]
@@ -17,5 +20,16 @@ struct CliInputs {
 }
 
 fn main() {
-    let _args = CliInputs::parse();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_env("CHECK_DIFF_LOG"))
+        .init();
+    let args = CliInputs::parse();
+    let tmp_dir = Builder::new().tempdir_in("").unwrap();
+    info!("Created tmp_dir {:?}", tmp_dir);
+    let _ = compile_rustfmt(
+        tmp_dir.path(),
+        args.remote_repo_url,
+        args.feature_branch,
+        args.commit_hash,
+    );
 }
