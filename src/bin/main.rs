@@ -43,7 +43,13 @@ fn main() {
         }
     };
     // Make sure standard output is flushed before we exit.
-    std::io::stdout().flush().unwrap();
+    // Silently ignore broken pipe errors, but any other errors are unexpected.
+    match std::io::stdout().flush() {
+        Err(e) if e.kind() != io::ErrorKind::BrokenPipe => {
+            panic!("flushing stdout failed: unexpected error: {:?}", e)
+        }
+        _ => {}
+    };
 
     // Exit with given exit code.
     //
