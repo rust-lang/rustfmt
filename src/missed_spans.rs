@@ -1,7 +1,10 @@
 use rustc_span::{BytePos, Pos, Span};
 use tracing::debug;
 
-use crate::comment::{CodeCharKind, CommentCodeSlices, is_last_comment_block, rewrite_comment};
+use crate::comment::{
+    CodeCharKind, CommentCodeSlices, is_last_comment_block, is_multi_lined_block_comment,
+    rewrite_comment,
+};
 use crate::config::FileName;
 use crate::config::StyleEdition;
 use crate::config::file_lines::FileLines;
@@ -239,6 +242,7 @@ impl<'a> FmtVisitor<'a> {
 
         let fix_indent = last_char.map_or(true, |rev_c| ['{', '\n'].contains(&rev_c));
         let mut on_same_line = false;
+        let multi_lined_block_comment = is_multi_lined_block_comment(subslice);
 
         let comment_indent = if fix_indent {
             if let Some('{') = last_char {
@@ -255,7 +259,12 @@ impl<'a> FmtVisitor<'a> {
             // the same level and avoid mixing it with possible other comment.
             on_same_line = true;
             self.push_str(" ");
-            self.block_indent
+
+            if multi_lined_block_comment {
+                Indent::from_width(self.config, last_line_width(&self.buffer))
+            } else {
+                self.block_indent
+            }
         } else {
             self.push_str(" ");
             Indent::from_width(self.config, last_line_width(&self.buffer))
@@ -267,7 +276,7 @@ impl<'a> FmtVisitor<'a> {
         );
         let comment_shape = Shape::legacy(comment_width, comment_indent);
 
-        if on_same_line {
+        if on_same_line && !multi_lined_block_comment {
             match subslice.find('\n') {
                 None => {
                     self.push_str(subslice);
