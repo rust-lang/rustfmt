@@ -224,7 +224,7 @@ fn rewrite_match_arms(
             .zip(beginning_verts.into_iter())
             .map(|((arm, is_last), beginning_vert)| ArmWrapper::new(arm, is_last, beginning_vert)),
         "}",
-        "|",
+        ",",
         |arm| arm.span().lo(),
         |arm| arm.span().hi(),
         |arm| arm.rewrite_result(context, arm_shape),
