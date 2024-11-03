@@ -1,4 +1,4 @@
-// rustfmt-style_edition: 2015
+// rustfmt-style_edition: 2024
 pub use crate::r#_StructUtil_Compile::CanonCryptoItem;
 pub use crate::r#_StructUtil_Compile::MessageID;
 pub use crate::r#_Wrappers_Compile::Outcome;
@@ -9,15 +9,15 @@ pub use crate::software::amazon::crypt::mat::internaldafny::types::EncryptionMat
 pub use crate::software::amazon::crypt::primitives::internaldafny::types::HMacInput;
 pub use crate::software::amazon::crypt::primitives::internaldafny::types::IAwsPrimClient;
 pub use dafny_runtime::_System::nat;
-pub use dafny_runtime::int;
-pub use dafny_runtime::itertools::Itertools;
-pub use dafny_runtime::rd;
-pub use dafny_runtime::string_utf16_of;
-pub use dafny_runtime::truncate;
 pub use dafny_runtime::DafnyCharUTF16;
 pub use dafny_runtime::DafnyType;
 pub use dafny_runtime::DafnyTypeEq;
 pub use dafny_runtime::MapBuilder;
 pub use dafny_runtime::Object;
 pub use dafny_runtime::Sequence;
+pub use dafny_runtime::int;
+pub use dafny_runtime::itertools::Itertools;
+pub use dafny_runtime::rd;
+pub use dafny_runtime::string_utf16_of;
+pub use dafny_runtime::truncate;
 pub use std::rc::Rc;
