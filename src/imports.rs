@@ -943,10 +943,10 @@ impl Ord for UseSegment {
                     version_sort(ia, ib)
                 } else {
                     // snake_case < CamelCase < UPPER_SNAKE_CASE
-                    if ia.starts_with(char::is_uppercase) && ib.starts_with(char::is_lowercase) {
+                    if ia.starts_with(char::is_uppercase) && !ib.starts_with(char::is_uppercase) {
                         return Ordering::Greater;
                     }
-                    if ia.starts_with(char::is_lowercase) && ib.starts_with(char::is_uppercase) {
+                    if !ia.starts_with(char::is_uppercase) && ib.starts_with(char::is_uppercase) {
                         return Ordering::Less;
                     }
                     if is_upper_snake_case(ia) && !is_upper_snake_case(ib) {
