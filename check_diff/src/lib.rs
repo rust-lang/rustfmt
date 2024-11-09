@@ -227,6 +227,35 @@ pub fn build_rustfmt_from_src(binary_path: PathBuf) -> Result<RustfmtRunner, Che
     });
 }
 
+// # Run rusfmt with the --check flag to see if a diff is produced.
+//
+// Parameters:
+// $1: Path to a rustfmt binary
+// $2: Output file path for the diff
+// $3: Any additional configuration options to pass to rustfmt
+//
+// Globals:
+// $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script from $4
+pub fn create_diff(binary_path: PathBuf, output_path: &Path, config: Option<Vec<String>>) {
+    let config_arg: String = match config {
+        Some(configs) => {
+            let mut result = String::new();
+            result.push(',');
+            for arg in configs.iter() {
+                result.push_str(arg.as_str());
+                result.push(',');
+            }
+            result.pop();
+            result
+        }
+        None => String::new(),
+    };
+    let config = format!(
+        "error_on_line_overflow=false,error_on_unformatted=false{}",
+        config_arg.as_str()
+    );
+}
+
 // Compiles and produces two rustfmt binaries.
 // One for the current master, and another for the feature branch
 // Parameters:
