@@ -56,8 +56,8 @@ impl From<io::Error> for GitError {
 // will be used in future PRs, just added to make the compiler happy
 #[allow(dead_code)]
 pub struct CheckDiffRunners {
-    feature_runner: RustfmtRunner,
-    src_runner: RustfmtRunner,
+    pub feature_runner: RustfmtRunner,
+    pub src_runner: RustfmtRunner,
 }
 
 pub struct RustfmtRunner {
@@ -79,6 +79,33 @@ impl RustfmtRunner {
 
         let binary_version = std::str::from_utf8(&command.stdout)?.trim();
         return Ok(binary_version.to_string());
+    }
+
+    //  Run rusfmt with the --check flag to see if a diff is produced.
+    //
+    // Parameters:
+    // binary_path: Path to a rustfmt binary
+    // output_path: Output file path for the diff
+    // config: Any additional configuration options to pass to rustfmt
+    //
+    fn create_diff(&self, output_path: &Path, config: Option<Vec<String>>) {
+        let config_arg: String = match config {
+            Some(configs) => {
+                let mut result = String::new();
+                result.push(',');
+                for arg in configs.iter() {
+                    result.push_str(arg.as_str());
+                    result.push(',');
+                }
+                result.pop();
+                result
+            }
+            None => String::new(),
+        };
+        let config = format!(
+            "error_on_line_overflow=false,error_on_unformatted=false{}",
+            config_arg.as_str()
+        );
     }
 }
 
@@ -225,35 +252,6 @@ pub fn build_rustfmt_from_src(binary_path: PathBuf) -> Result<RustfmtRunner, Che
         ld_library_path: ld_lib_path,
         binary_path,
     });
-}
-
-// # Run rusfmt with the --check flag to see if a diff is produced.
-//
-// Parameters:
-// $1: Path to a rustfmt binary
-// $2: Output file path for the diff
-// $3: Any additional configuration options to pass to rustfmt
-//
-// Globals:
-// $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script from $4
-pub fn create_diff(binary_path: PathBuf, output_path: &Path, config: Option<Vec<String>>) {
-    let config_arg: String = match config {
-        Some(configs) => {
-            let mut result = String::new();
-            result.push(',');
-            for arg in configs.iter() {
-                result.push_str(arg.as_str());
-                result.push(',');
-            }
-            result.pop();
-            result
-        }
-        None => String::new(),
-    };
-    let config = format!(
-        "error_on_line_overflow=false,error_on_unformatted=false{}",
-        config_arg.as_str()
-    );
 }
 
 // Compiles and produces two rustfmt binaries.
