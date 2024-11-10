@@ -1,9 +1,11 @@
 use std::env;
+use std::fs::OpenOptions;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::Utf8Error;
 use tracing::info;
+use walkdir::WalkDir;
 
 pub enum CheckDiffError {
     /// Git related errors
@@ -18,6 +20,9 @@ pub enum CheckDiffError {
     FailedBinaryVersioning(PathBuf),
     /// Error when obtaining cargo version
     FailedCargoVersion(&'static str),
+    /// Error when trying to find rust files
+    FailedFindingRustFiles(&'static str),
+    FailedWritingToFile(&'static str),
     IO(std::io::Error),
 }
 
@@ -88,7 +93,12 @@ impl RustfmtRunner {
     // output_path: Output file path for the diff
     // config: Any additional configuration options to pass to rustfmt
     //
-    fn create_diff(&self, output_path: &Path, config: Option<Vec<String>>) {
+    #[allow(dead_code)]
+    fn create_diff(
+        &self,
+        output_path: &Path,
+        config: Option<Vec<String>>,
+    ) -> Result<(), CheckDiffError> {
         let config_arg: String = match config {
             Some(configs) => {
                 let mut result = String::new();
@@ -106,6 +116,34 @@ impl RustfmtRunner {
             "error_on_line_overflow=false,error_on_unformatted=false{}",
             config_arg.as_str()
         );
+
+        // walks the "." directory and finds all files with .rs extensions
+        for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "rs") {
+                let file = OpenOptions::new()
+                    .write(true)
+                    .append(true)
+                    .open(output_path)?;
+                let Ok(_) = Command::new(&self.binary_path)
+                    .env("LD_LIBRARY_PATH", &self.ld_library_path)
+                    .args([
+                        "--unstable-features",
+                        "--skip-children",
+                        "--check",
+                        "--color=always",
+                        config.as_str(),
+                    ])
+                    .stdout(file)
+                    .output()
+                else {
+                    return Err(CheckDiffError::FailedWritingToFile(
+                        "Failed to write to file",
+                    ));
+                };
+            }
+        }
+        Ok(())
     }
 }
 
