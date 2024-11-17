@@ -527,7 +527,7 @@ impl<'a> FmtVisitor<'a> {
         };
         let rewrite = format_struct(&self.get_context(), struct_parts, self.block_indent, None)
             .map(|s| if is_tuple { s + ";" } else { s });
-        self.push_rewrite(struct_parts.span, rewrite);
+        self.push_rewrite(struct_parts.span, rewrite.ok());
     }
 
     pub(crate) fn visit_enum(
@@ -565,9 +565,10 @@ impl<'a> FmtVisitor<'a> {
         self.last_pos = body_start;
 
         match self.format_variant_list(enum_def, body_start, span.hi()) {
-            Some(ref s) if enum_def.variants.is_empty() => self.push_str(s),
+            Ok(ref s) if enum_def.variants.is_empty() => self.push_str(s),
+
             rw => {
-                self.push_rewrite(mk_sp(body_start, span.hi()), rw);
+                self.push_rewrite(mk_sp(body_start, span.hi()), rw.ok());
                 self.block_indent = self.block_indent.block_unindent(self.config);
             }
         }
@@ -579,7 +580,7 @@ impl<'a> FmtVisitor<'a> {
         enum_def: &ast::EnumDef,
         body_lo: BytePos,
         body_hi: BytePos,
-    ) -> Option<String> {
+    ) -> RewriteResult {
         if enum_def.variants.is_empty() {
             let mut buffer = String::with_capacity(128);
             // 1 = "}"
@@ -592,7 +593,7 @@ impl<'a> FmtVisitor<'a> {
                 "",
                 "}",
             );
-            return Some(buffer);
+            return Ok(buffer);
         }
         let mut result = String::with_capacity(1024);
         let original_offset = self.block_indent;
@@ -629,10 +630,7 @@ impl<'a> FmtVisitor<'a> {
                     }
                 },
                 |f| f.span.hi(),
-                |f| {
-                    self.format_variant(f, one_line_width, pad_discrim_ident_to)
-                        .unknown_error()
-                },
+                |f| self.format_variant(f, one_line_width, pad_discrim_ident_to),
                 body_lo,
                 body_hi,
                 false,
@@ -648,16 +646,19 @@ impl<'a> FmtVisitor<'a> {
             items = itemize_list_with(0);
         }
 
-        let shape = self.shape().sub_width(2)?;
+        let shape = self
+            .shape()
+            .sub_width(2)
+            .max_width_error(self.shape().width, mk_sp(body_lo, body_hi))?;
         let fmt = ListFormatting::new(shape, self.config)
             .trailing_separator(self.config.trailing_comma())
             .preserve_newline(true);
 
-        let list = write_list(&items, &fmt).ok()?;
+        let list = write_list(&items, &fmt)?;
         result.push_str(&list);
         result.push_str(&original_offset.to_string_with_newline(self.config));
         result.push('}');
-        Some(result)
+        Ok(result)
     }
 
     // Variant of an enum.
@@ -666,23 +667,30 @@ impl<'a> FmtVisitor<'a> {
         field: &ast::Variant,
         one_line_width: usize,
         pad_discrim_ident_to: usize,
-    ) -> Option<String> {
+    ) -> RewriteResult {
         if contains_skip(&field.attrs) {
             let lo = field.attrs[0].span.lo();
             let span = mk_sp(lo, field.span.hi());
-            return Some(self.snippet(span).to_owned());
+            return Ok(self.snippet(span).to_owned());
         }
 
         let context = self.get_context();
         let shape = self.shape();
         let attrs_str = if context.config.style_edition() >= StyleEdition::Edition2024 {
-            field.attrs.rewrite(&context, shape)?
+            field.attrs.rewrite_result(&context, shape)?
         } else {
             // StyleEdition::Edition20{15|18|21} formatting that was off by 1. See issue #5801
-            field.attrs.rewrite(&context, shape.sub_width(1)?)?
+            field.attrs.rewrite_result(
+                &context,
+                shape
+                    .sub_width(1)
+                    .max_width_error(shape.width, field.span)?,
+            )?
         };
         // sub_width(1) to take the trailing comma into account
-        let shape = shape.sub_width(1)?;
+        let shape = shape
+            .sub_width(1)
+            .max_width_error(shape.width, field.span)?;
 
         let lo = field
             .attrs
@@ -710,14 +718,12 @@ impl<'a> FmtVisitor<'a> {
                 shape,
                 &RhsAssignKind::Expr(&ex.kind, ex.span),
                 RhsTactics::AllowOverflow,
-            )
-            .ok()?
+            )?
         } else {
             variant_body
         };
 
         combine_strs_with_missing_comments(&context, &attrs_str, &variant_body, span, shape, false)
-            .ok()
     }
 
     fn visit_impl_items(&mut self, items: &[ptr::P<ast::AssocItem>]) {
@@ -1145,7 +1151,7 @@ fn format_struct(
     struct_parts: &StructParts<'_>,
     offset: Indent,
     one_line_width: Option<usize>,
-) -> Option<String> {
+) -> RewriteResult {
     match struct_parts.def {
         ast::VariantData::Unit(..) => format_unit_struct(context, struct_parts, offset),
         ast::VariantData::Tuple(fields, _) => {
@@ -1410,7 +1416,7 @@ fn format_unit_struct(
     context: &RewriteContext<'_>,
     p: &StructParts<'_>,
     offset: Indent,
-) -> Option<String> {
+) -> RewriteResult {
     let header_str = format_header(context, p.prefix, p.ident, p.vis, offset);
     let generics_str = if let Some(generics) = p.generics {
         let hi = context.snippet_provider.span_before_last(p.span, ";");
@@ -1427,7 +1433,7 @@ fn format_unit_struct(
     } else {
         String::new()
     };
-    Some(format!("{header_str}{generics_str};"))
+    Ok(format!("{header_str}{generics_str};"))
 }
 
 pub(crate) fn format_struct_struct(
@@ -1436,7 +1442,7 @@ pub(crate) fn format_struct_struct(
     fields: &[ast::FieldDef],
     offset: Indent,
     one_line_width: Option<usize>,
-) -> Option<String> {
+) -> RewriteResult {
     let mut result = String::with_capacity(1024);
     let span = struct_parts.span;
 
@@ -1496,7 +1502,7 @@ pub(crate) fn format_struct_struct(
     if fields.is_empty() {
         let inner_span = mk_sp(body_lo, span.hi() - BytePos(1));
         format_empty_struct_or_tuple(context, inner_span, offset, &mut result, "", "}");
-        return Some(result);
+        return Ok(result);
     }
 
     // 3 = ` ` and ` }`
@@ -1504,10 +1510,12 @@ pub(crate) fn format_struct_struct(
     let one_line_budget =
         one_line_width.map_or(0, |one_line_width| min(one_line_width, one_line_budget));
 
+    let shape = Shape::indented(offset.block_indent(context.config), context.config);
+    let shape = shape.sub_width(1).max_width_error(shape.width, span)?;
     let items_str = rewrite_with_alignment(
         fields,
         context,
-        Shape::indented(offset.block_indent(context.config), context.config).sub_width(1)?,
+        shape,
         mk_sp(body_lo, span.hi()),
         one_line_budget,
     )?;
@@ -1517,9 +1525,9 @@ pub(crate) fn format_struct_struct(
         && items_str.len() <= one_line_budget
         && !last_line_contains_single_line_comment(&items_str)
     {
-        Some(format!("{result} {items_str} }}"))
+        Ok(format!("{result} {items_str} }}"))
     } else {
-        Some(format!(
+        Ok(format!(
             "{}\n{}{}\n{}}}",
             result,
             offset
@@ -1582,7 +1590,7 @@ fn format_tuple_struct(
     struct_parts: &StructParts<'_>,
     fields: &[ast::FieldDef],
     offset: Indent,
-) -> Option<String> {
+) -> RewriteResult {
     let mut result = String::with_capacity(1024);
     let span = struct_parts.span;
 
@@ -1614,7 +1622,7 @@ fn format_tuple_struct(
         Some(generics) => {
             let budget = context.budget(last_line_width(&header_str));
             let shape = Shape::legacy(budget, offset);
-            let generics_str = rewrite_generics(context, "", generics, shape).ok()?;
+            let generics_str = rewrite_generics(context, "", generics, shape)?;
             result.push_str(&generics_str);
 
             let where_budget = context.budget(last_line_width(&result));
@@ -1630,8 +1638,7 @@ fn format_tuple_struct(
                 None,
                 body_hi,
                 option,
-            )
-            .ok()?
+            )?
         }
         None => "".to_owned(),
     };
@@ -1643,7 +1650,8 @@ fn format_tuple_struct(
         let inner_span = mk_sp(body_lo, body_hi);
         format_empty_struct_or_tuple(context, inner_span, offset, &mut result, "(", ")");
     } else {
-        let shape = Shape::indented(offset, context.config).sub_width(1)?;
+        let shape = Shape::indented(offset, context.config);
+        let shape = shape.sub_width(1).max_width_error(shape.width, span)?;
         let lo = if let Some(generics) = struct_parts.generics {
             generics.span.hi()
         } else {
@@ -1657,8 +1665,7 @@ fn format_tuple_struct(
             mk_sp(lo, span.hi()),
             context.config.fn_call_width(),
             None,
-        )
-        .ok()?;
+        )?;
     }
 
     if !where_clause_str.is_empty()
@@ -1676,7 +1683,7 @@ fn format_tuple_struct(
     }
     result.push_str(&where_clause_str);
 
-    Some(result)
+    Ok(result)
 }
 
 pub(crate) enum ItemVisitorKind<'a> {
@@ -3321,9 +3328,9 @@ fn format_generics(
     offset: Indent,
     span: Span,
     used_width: usize,
-) -> Option<String> {
+) -> RewriteResult {
     let shape = Shape::legacy(context.budget(used_width + offset.width()), offset);
-    let mut result = rewrite_generics(context, "", generics, shape).ok()?;
+    let mut result = rewrite_generics(context, "", generics, shape)?;
 
     // If the generics are not parameterized then generics.span.hi() == 0,
     // so we use span.lo(), which is the position after `struct Foo`.
@@ -3349,8 +3356,7 @@ fn format_generics(
             Some(span.hi()),
             span_end_before_where,
             option,
-        )
-        .ok()?;
+        )?;
         result.push_str(&where_clause_str);
         (
             brace_pos == BracePos::ForceSameLine || brace_style == BraceStyle::PreferSameLine,
@@ -3389,7 +3395,7 @@ fn format_generics(
             !is_block
         });
     if brace_pos == BracePos::None {
-        return Some(result);
+        return Ok(result);
     }
     let total_used_width = last_line_used_width(&result, used_width);
     let remaining_budget = context.budget(total_used_width);
@@ -3412,7 +3418,7 @@ fn format_generics(
     }
     result.push('{');
 
-    Some(result)
+    Ok(result)
 }
 
 impl Rewrite for ast::ForeignItem {

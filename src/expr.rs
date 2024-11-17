@@ -1671,8 +1671,7 @@ fn rewrite_struct_lit<'a>(
             v_shape,
             mk_sp(body_lo, span.hi()),
             one_line_width,
-        )
-        .unknown_error()?
+        )?
     } else {
         let field_iter = fields.iter().map(StructLitField::Regular).chain(
             match struct_rest {
