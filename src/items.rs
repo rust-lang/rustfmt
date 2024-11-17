@@ -552,9 +552,13 @@ impl<'a> FmtVisitor<'a> {
             // make a span that starts right after `enum Foo`
             mk_sp(ident.span.hi(), body_start),
             last_line_width(&enum_header),
-        )
-        .unwrap();
-        self.push_str(&generics_str);
+        );
+
+        if let Some(generics_str) = generics_str {
+            self.push_str(&generics_str);
+        } else {
+            self.push_str(self.snippet(mk_sp(ident.span.hi(), body_start)));
+        }
 
         self.last_pos = body_start;
 
