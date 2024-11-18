@@ -188,8 +188,8 @@ impl Shape {
         }
     }
 
-    pub(crate) fn visual_indent(&self, extra_width: usize) -> Shape {
-        let alignment = self.offset + extra_width;
+    pub(crate) fn visual_indent(&self, delta: usize) -> Shape {
+        let alignment = self.offset + delta;
         Shape {
             width: self.width,
             indent: Indent::new(self.indent.block_indent, alignment),
@@ -197,29 +197,29 @@ impl Shape {
         }
     }
 
-    pub(crate) fn block_indent(&self, extra_width: usize) -> Shape {
+    pub(crate) fn block_indent(&self, delta: usize) -> Shape {
         if self.indent.alignment == 0 {
             Shape {
                 width: self.width,
-                indent: Indent::new(self.indent.block_indent + extra_width, 0),
+                indent: Indent::new(self.indent.block_indent + delta, 0),
                 offset: 0,
             }
         } else {
             Shape {
                 width: self.width,
-                indent: self.indent + extra_width,
-                offset: self.indent.alignment + extra_width,
+                indent: self.indent + delta,
+                offset: self.indent.alignment + delta,
             }
         }
     }
 
-    pub(crate) fn block_left(&self, width: usize) -> Option<Shape> {
-        self.block_indent(width).sub_width(width)
+    pub(crate) fn block_left(&self, delta: usize) -> Option<Shape> {
+        self.block_indent(delta).sub_width(delta)
     }
 
-    pub(crate) fn add_offset(&self, extra_width: usize) -> Shape {
+    pub(crate) fn add_offset(&self, delta: usize) -> Shape {
         Shape {
-            offset: self.offset + extra_width,
+            offset: self.offset + delta,
             ..*self
         }
     }
@@ -231,27 +231,27 @@ impl Shape {
         }
     }
 
-    pub(crate) fn saturating_sub_width(&self, width: usize) -> Shape {
-        self.sub_width(width).unwrap_or(Shape { width: 0, ..*self })
+    pub(crate) fn saturating_sub_width(&self, delta: usize) -> Shape {
+        self.sub_width(delta).unwrap_or(Shape { width: 0, ..*self })
     }
 
-    pub(crate) fn sub_width(&self, width: usize) -> Option<Shape> {
+    pub(crate) fn sub_width(&self, n: usize) -> Option<Shape> {
         Some(Shape {
-            width: self.width.checked_sub(width)?,
+            width: self.width.checked_sub(n)?,
             ..*self
         })
     }
 
-    pub(crate) fn shrink_left(&self, width: usize) -> Option<Shape> {
+    pub(crate) fn shrink_left(&self, delta: usize) -> Option<Shape> {
         Some(Shape {
-            width: self.width.checked_sub(width)?,
-            indent: self.indent + width,
-            offset: self.offset + width,
+            width: self.width.checked_sub(delta)?,
+            indent: self.indent + delta,
+            offset: self.offset + delta,
         })
     }
 
-    pub(crate) fn offset_left(&self, width: usize) -> Option<Shape> {
-        self.add_offset(width).sub_width(width)
+    pub(crate) fn offset_left(&self, delta: usize) -> Option<Shape> {
+        self.add_offset(delta).sub_width(delta)
     }
 
     pub(crate) fn used_width(&self) -> usize {
