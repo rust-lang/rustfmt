@@ -138,7 +138,7 @@ fn rewrite_reorderable_or_regroupable_items(
             }
 
             // 4 = "use ", 1 = ";"
-            let nested_shape = shape.offset_left(4)?.sub_width(1)?;
+            let nested_shape = shape.offset_left_opt(4)?.sub_width_opt(1)?;
             let item_vec: Vec<_> = regrouped_items
                 .into_iter()
                 .filter(|use_group| !use_group.is_empty())
