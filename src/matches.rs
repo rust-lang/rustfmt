@@ -87,12 +87,8 @@ pub(crate) fn rewrite_match(
     };
     // 6 = `match `
     let cond_shape = match context.config.indent_style() {
-        IndentStyle::Visual => cond_shape
-            .shrink_left(6)
-            .max_width_error(shape.width, span)?,
-        IndentStyle::Block => cond_shape
-            .offset_left(6)
-            .max_width_error(shape.width, span)?,
+        IndentStyle::Visual => cond_shape.shrink_left(6, span)?,
+        IndentStyle::Block => cond_shape.offset_left(6, span)?,
     };
     let cond_str = cond.rewrite_result(context, cond_shape)?;
     let alt_block_sep = &shape.indent.to_string_with_newline(context.config);
@@ -279,16 +275,14 @@ fn rewrite_match_arm(
             // 7 = ` => : {`
             let label_len = label.ident.as_str().len();
             shape
-                .sub_width(7 + label_len)
-                .and_then(|s| s.offset_left(pipe_offset))
-                .max_width_error(shape.width, arm.span)?
+                .sub_width(7 + label_len, arm.span)?
+                .offset_left(pipe_offset, arm.span)?
         }
         _ => {
             // 5 = ` => {`
             shape
-                .sub_width(5)
-                .and_then(|s| s.offset_left(pipe_offset))
-                .max_width_error(shape.width, arm.span)?
+                .sub_width(5, arm.span)?
+                .offset_left(pipe_offset, arm.span)?
         }
     };
     let pats_str = arm.pat.rewrite_result(context, pat_shape)?;
@@ -404,7 +398,7 @@ fn rewrite_match_body(
     let (extend, body) = flatten_arm_body(
         context,
         body,
-        shape.offset_left(extra_offset(pats_str, shape) + 4),
+        shape.offset_left_opt(extra_offset(pats_str, shape) + 4),
     );
     let (is_block, is_empty_block) = if let ast::ExprKind::Block(ref block, _) = body.kind {
         (true, is_empty_block(context, block, Some(&body.attrs)))
@@ -514,8 +508,8 @@ fn rewrite_match_body(
     // Let's try and get the arm body on the same line as the condition.
     // 4 = ` => `.len()
     let orig_body_shape = shape
-        .offset_left(extra_offset(pats_str, shape) + 4)
-        .and_then(|shape| shape.sub_width(comma.len()));
+        .offset_left_opt(extra_offset(pats_str, shape) + 4)
+        .and_then(|shape| shape.sub_width_opt(comma.len()));
     let orig_body = if forbid_same_line || !arrow_comment.is_empty() {
         Err(RewriteError::Unknown)
     } else if let Some(body_shape) = orig_body_shape {
@@ -580,8 +574,8 @@ fn rewrite_guard(
         // First try to fit the guard string on the same line as the pattern.
         // 4 = ` if `, 5 = ` => {`
         let cond_shape = shape
-            .offset_left(pattern_width + 4)
-            .and_then(|s| s.sub_width(5));
+            .offset_left_opt(pattern_width + 4)
+            .and_then(|s| s.sub_width_opt(5));
         if !multiline_pattern {
             if let Some(cond_shape) = cond_shape {
                 if let Ok(cond_str) = guard.rewrite_result(context, cond_shape) {
@@ -595,9 +589,8 @@ fn rewrite_guard(
         // Not enough space to put the guard after the pattern, try a newline.
         // 3 = `if `, 5 = ` => {`
         let cond_shape = Shape::indented(shape.indent.block_indent(context.config), context.config)
-            .offset_left(3)
-            .and_then(|s| s.sub_width(5))
-            .max_width_error(shape.width, guard.span)?;
+            .offset_left(3, guard.span)?
+            .sub_width(5, guard.span)?;
         let cond_str = guard.rewrite_result(context, cond_shape)?;
         Ok(format!(
             "{}if {}",

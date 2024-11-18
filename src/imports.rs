@@ -338,12 +338,7 @@ impl UseTree {
             crate::utils::format_visibility(context, vis)
         });
         let use_str = self
-            .rewrite_result(
-                context,
-                shape
-                    .offset_left(vis.len())
-                    .max_width_error(shape.width, self.span())?,
-            )
+            .rewrite_result(context, shape.offset_left(vis.len(), self.span())?)
             .map(|s| {
                 if s.is_empty() {
                     s
@@ -1024,7 +1019,7 @@ fn rewrite_nested_use_tree(
         IndentStyle::Block => shape
             .block_indent(context.config.tab_spaces())
             .with_max_width(context.config)
-            .sub_width(1)
+            .sub_width_opt(1)
             .unknown_error()?,
         IndentStyle::Visual => shape.visual_indent(0),
     };
@@ -1115,8 +1110,8 @@ impl Rewrite for UseSegment {
                     use_tree_list,
                     // 1 = "{" and "}"
                     shape
-                        .offset_left(1)
-                        .and_then(|s| s.sub_width(1))
+                        .offset_left_opt(1)
+                        .and_then(|s| s.sub_width_opt(1))
                         .unknown_error()?,
                 )?
             }
@@ -1139,9 +1134,7 @@ impl Rewrite for UseTree {
             if iter.peek().is_some() {
                 result.push_str("::");
                 // 2 = "::"
-                shape = shape
-                    .offset_left(2 + segment_str.len())
-                    .max_width_error(shape.width, self.span())?;
+                shape = shape.offset_left(2 + segment_str.len(), self.span())?;
             }
         }
         Ok(result)

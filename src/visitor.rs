@@ -325,7 +325,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                                 .saturating_sub(self.block_indent.width());
                             match comment_shape
                                 .visual_indent(offset_len)
-                                .sub_width(offset_len)
+                                .sub_width_opt(offset_len)
                             {
                                 Some(shp) => comment_shape = shp,
                                 None => comment_on_same_line = false,

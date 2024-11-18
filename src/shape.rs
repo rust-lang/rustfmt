@@ -2,7 +2,10 @@ use std::borrow::Cow;
 use std::cmp::min;
 use std::ops::{Add, Sub};
 
+use rustc_span::Span;
+
 use crate::Config;
+use crate::rewrite::ExceedsMaxWidthError;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Indent {
@@ -213,8 +216,12 @@ impl Shape {
         }
     }
 
-    pub(crate) fn block_left(&self, delta: usize) -> Option<Shape> {
-        self.block_indent(delta).sub_width(delta)
+    pub(crate) fn block_left(
+        &self,
+        delta: usize,
+        span: Span,
+    ) -> Result<Shape, ExceedsMaxWidthError> {
+        self.block_indent(delta).sub_width(delta, span)
     }
 
     pub(crate) fn add_offset(&self, delta: usize) -> Shape {
@@ -232,26 +239,55 @@ impl Shape {
     }
 
     pub(crate) fn saturating_sub_width(&self, delta: usize) -> Shape {
-        self.sub_width(delta).unwrap_or(Shape { width: 0, ..*self })
-    }
-
-    pub(crate) fn sub_width(&self, n: usize) -> Option<Shape> {
-        Some(Shape {
-            width: self.width.checked_sub(n)?,
+        Shape {
+            width: self.width.saturating_sub(delta),
             ..*self
-        })
+        }
     }
 
-    pub(crate) fn shrink_left(&self, delta: usize) -> Option<Shape> {
-        Some(Shape {
-            width: self.width.checked_sub(delta)?,
+    pub(crate) fn sub_width(
+        &self,
+        delta: usize,
+        span: Span,
+    ) -> Result<Shape, ExceedsMaxWidthError> {
+        self.sub_width_opt(delta)
+            .ok_or_else(|| self.exceeds_max_width_error(span))
+    }
+
+    pub(crate) fn sub_width_opt(&self, delta: usize) -> Option<Shape> {
+        self.width
+            .checked_sub(delta)
+            .map(|width| Shape { width, ..*self })
+    }
+
+    pub(crate) fn shrink_left(
+        &self,
+        delta: usize,
+        span: Span,
+    ) -> Result<Shape, ExceedsMaxWidthError> {
+        self.shrink_left_opt(delta)
+            .ok_or_else(|| self.exceeds_max_width_error(span))
+    }
+
+    pub(crate) fn shrink_left_opt(&self, delta: usize) -> Option<Shape> {
+        self.width.checked_sub(delta).map(|width| Shape {
+            width,
             indent: self.indent + delta,
             offset: self.offset + delta,
         })
     }
 
-    pub(crate) fn offset_left(&self, delta: usize) -> Option<Shape> {
-        self.add_offset(delta).sub_width(delta)
+    pub(crate) fn offset_left(
+        &self,
+        delta: usize,
+        span: Span,
+    ) -> Result<Shape, ExceedsMaxWidthError> {
+        self.offset_left_opt(delta)
+            .ok_or_else(|| self.exceeds_max_width_error(span))
+    }
+
+    pub(crate) fn offset_left_opt(&self, delta: usize) -> Option<Shape> {
+        self.add_offset(delta).sub_width_opt(delta)
     }
 
     pub(crate) fn used_width(&self) -> usize {
@@ -283,6 +319,13 @@ impl Shape {
         Shape {
             width: INFINITE_SHAPE_WIDTH,
             ..*self
+        }
+    }
+
+    fn exceeds_max_width_error(&self, span: Span) -> ExceedsMaxWidthError {
+        ExceedsMaxWidthError {
+            configured_width: self.width,
+            span,
         }
     }
 }
