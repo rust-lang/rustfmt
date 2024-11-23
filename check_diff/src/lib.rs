@@ -1,9 +1,9 @@
 use diffy;
 use std::env;
 use std::fmt::Debug;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str::Utf8Error;
 use tracing::info;
 use walkdir::WalkDir;
@@ -115,39 +115,46 @@ impl RustfmtRunner {
         code: &'a str,
         config: &Option<Vec<String>>,
     ) -> Result<String, CheckDiffError> {
-        let config_arg: String = match config {
-            Some(configs) => {
-                let mut result = String::new();
-                result.push(',');
-                for arg in configs.iter() {
-                    result.push_str(arg.as_str());
-                    result.push(',');
-                }
-                result.pop();
-                result
-            }
-            None => String::new(),
-        };
-        let config = format!(
-            "error_on_line_overflow=false,error_on_unformatted=false{}",
-            config_arg.as_str()
-        );
-
-        let output = Command::new(&self.binary_path)
+        let config = create_config_arg(config);
+        let mut command = Command::new(&self.binary_path)
             .env("LD_LIBRARY_PATH", &self.ld_library_path)
             .args([
                 "--unstable-features",
                 "--skip-children",
                 "--emit=stdout",
                 config.as_str(),
-                code,
             ])
-            .output()?;
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
 
+        command.stdin.as_mut().unwrap().write_all(code.as_bytes())?;
+        let output = command.wait_with_output()?;
         Ok(std::str::from_utf8(&output.stdout)?.to_string())
     }
 }
 
+fn create_config_arg(config: &Option<Vec<String>>) -> String {
+    let config_arg: String = match config {
+        Some(configs) => {
+            let mut result = String::new();
+            result.push(',');
+            for arg in configs.iter() {
+                result.push_str(arg.as_str());
+                result.push(',');
+            }
+            result.pop();
+            result
+        }
+        None => String::new(),
+    };
+    let config = format!(
+        "error_on_line_overflow=false,error_on_unformatted=false{}",
+        config_arg.as_str()
+    );
+    config
+}
 /// Clone a git repository
 ///
 /// Parameters:
