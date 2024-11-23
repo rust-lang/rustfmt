@@ -8,6 +8,7 @@ use std::str::Utf8Error;
 use tracing::info;
 use walkdir::WalkDir;
 
+#[derive(Debug)]
 pub enum CheckDiffError {
     /// Git related errors
     FailedGit(GitError),
@@ -25,12 +26,6 @@ pub enum CheckDiffError {
     FailedFindingRustFiles(&'static str),
     FailedWritingToFile(&'static str),
     IO(std::io::Error),
-}
-
-impl Debug for CheckDiffError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CheckDiffError").finish()
-    }
 }
 
 impl From<io::Error> for CheckDiffError {
@@ -51,6 +46,7 @@ impl From<Utf8Error> for CheckDiffError {
     }
 }
 
+#[derive(Debug)]
 pub enum GitError {
     FailedClone { stdout: Vec<u8>, stderr: Vec<u8> },
     FailedRemoteAdd { stdout: Vec<u8>, stderr: Vec<u8> },
