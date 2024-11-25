@@ -33,7 +33,8 @@ fn main() -> Result<(), CheckDiffError> {
         args.commit_hash,
     )?;
 
-    let _ = check_diff(args.rustfmt_config, check_diff_runners);
+    // TODO: currently using same tmp dir path for sake of compilation
+    let _ = check_diff(args.rustfmt_config, check_diff_runners, tmp_dir.path());
 
     Ok(())
 }

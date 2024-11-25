@@ -349,24 +349,35 @@ pub fn compile_rustfmt(
     });
 }
 
-pub fn check_diff(config: Option<Vec<String>>, runners: CheckDiffRunners) -> i32 {
+fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
+    return WalkDir::new(repo)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|entry| {
+            let path = entry.path();
+            return path.is_file() && path.extension().map_or(false, |ext| ext == "rs");
+        })
+        .map(|entry| entry.into_path());
+}
+
+pub fn check_diff(config: Option<Vec<String>>, runners: CheckDiffRunners, repo: &Path) -> i32 {
     let mut errors = 0;
-    for entry in WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "rs") {
-            match runners.create_diff(path, &config) {
-                Ok(diff) => {
-                    if !diff.is_empty() {
-                        eprint!("{diff}");
-                        errors += 1;
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error creating diff for {:?}: {:?}", path.display(), e);
-                    errors += 1;
-                }
+    search_for_rs_files(repo).for_each(|file| match runners.create_diff(file.as_path(), &config) {
+        Ok(diff) => {
+            if !diff.is_empty() {
+                eprint!("{diff}");
+                errors += 1;
             }
         }
-    }
+        Err(e) => {
+            eprintln!(
+                "Error creating diff for {:?}: {:?}",
+                file.as_path().display(),
+                e
+            );
+            errors += 1;
+        }
+    });
+
     return errors;
 }
