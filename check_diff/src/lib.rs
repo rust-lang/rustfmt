@@ -347,14 +347,16 @@ pub fn compile_rustfmt(
 }
 
 fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
-    return WalkDir::new(repo)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|entry| {
+    return WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
+        Some(entry) => {
             let path = entry.path();
-            return path.is_file() && path.extension().map_or(false, |ext| ext == "rs");
-        })
-        .map(|entry| entry.into_path());
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "rs") {
+                return Some(entry.into_path());
+            }
+            return None;
+        }
+        None => None,
+    });
 }
 
 pub fn check_diff(config: Option<Vec<String>>, runners: CheckDiffRunners, repo: &Path) -> i32 {
