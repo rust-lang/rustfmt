@@ -638,3 +638,32 @@ where
         f();
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+
+    use crate::FormatReportFormatterBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_internal_error_file_and_line_number_annotations() {
+        let mut config = Config::default();
+        config.set().error_on_unformatted(true);
+
+        let mut text = String::new();
+        text.push_str("fn main() {\n");
+        text.push_str("    println!(\"hello world!\"); \n"); // Note the space before the '\n'
+        text.push_str("}");
+
+        let report = FormatReport::new();
+        let name = FileName::Real(PathBuf::from("internal_error_test.rs"));
+
+        format_lines(&mut text, &name, &vec![], &config, &report);
+        let output = FormatReportFormatterBuilder::new(&report)
+            .build()
+            .to_string();
+        assert!(output.contains("--> internal_error_test.rs:2:30"));
+    }
+}
