@@ -143,18 +143,16 @@ fn create_config_arg(config: &Option<Vec<String>>) -> String {
     let config_arg: String = match config {
         Some(configs) => {
             let mut result = String::new();
-            result.push(',');
             for arg in configs.iter() {
-                result.push_str(arg.as_str());
                 result.push(',');
+                result.push_str(arg.as_str());
             }
-            result.pop();
             result
         }
         None => String::new(),
     };
     let config = format!(
-        "error_on_line_overflow=false,error_on_unformatted=false{}",
+        "--config=error_on_line_overflow=false,error_on_unformatted=false{}",
         config_arg.as_str()
     );
     config
@@ -361,22 +359,25 @@ fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
 
 pub fn check_diff(config: Option<Vec<String>>, runners: CheckDiffRunners, repo: &Path) -> i32 {
     let mut errors = 0;
-    search_for_rs_files(repo).for_each(|file| match runners.create_diff(file.as_path(), &config) {
-        Ok(diff) => {
-            if !diff.is_empty() {
-                eprint!("{diff}");
+    let iter = search_for_rs_files(repo);
+    for file in iter {
+        match runners.create_diff(file.as_path(), &config) {
+            Ok(diff) => {
+                if !diff.is_empty() {
+                    eprint!("{diff}");
+                    errors += 1;
+                }
+            }
+            Err(e) => {
+                eprintln!(
+                    "Error creating diff for {:?}: {:?}",
+                    file.as_path().display(),
+                    e
+                );
                 errors += 1;
             }
         }
-        Err(e) => {
-            eprintln!(
-                "Error creating diff for {:?}: {:?}",
-                file.as_path().display(),
-                e
-            );
-            errors += 1;
-        }
-    });
+    }
 
     return errors;
 }
