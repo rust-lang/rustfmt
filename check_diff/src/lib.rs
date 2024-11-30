@@ -114,7 +114,7 @@ impl RustfmtRunner {
     // code: Code to run the binary on
     // config: Any additional configuration options to pass to rustfmt
     //
-    fn format_code<'a>(
+    pub fn format_code<'a>(
         &self,
         code: &'a str,
         config: &Option<Vec<String>>,
@@ -346,7 +346,7 @@ pub fn compile_rustfmt(
     });
 }
 
-fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
+pub fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
     return WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
         Some(entry) => {
             let path = entry.path();
