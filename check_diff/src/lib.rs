@@ -1,6 +1,6 @@
-use diffy;
+use diffy::{self};
 use std::env;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -61,6 +61,25 @@ impl From<io::Error> for GitError {
     }
 }
 
+pub struct Diff {
+    src_format: String,
+    feature_format: String,
+}
+
+impl Display for Diff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let patch = diffy::create_patch(self.src_format.as_str(), self.feature_format.as_str());
+        write!(f, "{}", patch)
+    }
+}
+
+impl Diff {
+    pub fn is_empty(&self) -> bool {
+        let patch = diffy::create_patch(self.src_format.as_str(), self.feature_format.as_str());
+        patch.hunks().is_empty()
+    }
+}
+
 // will be used in future PRs, just added to make the compiler happy
 pub struct CheckDiffRunners {
     pub feature_runner: RustfmtRunner,
@@ -78,16 +97,14 @@ impl CheckDiffRunners {
         &self,
         path: &Path,
         additional_configs: &Option<Vec<String>>,
-    ) -> Result<String, CheckDiffError> {
+    ) -> Result<Diff, CheckDiffError> {
         let code = std::fs::read_to_string(path)?;
         let src_format = self.src_runner.format_code(&code, additional_configs)?;
         let feature_format = self.feature_runner.format_code(&code, additional_configs)?;
-        let diff = diffy::create_patch(src_format.as_str(), feature_format.as_str());
-        if diff.hunks().is_empty() {
-            Ok(String::new())
-        } else {
-            Ok(format!("{diff}"))
-        }
+        Ok(Diff {
+            src_format,
+            feature_format,
+        })
     }
 }
 
