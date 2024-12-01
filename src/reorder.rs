@@ -16,7 +16,7 @@ use crate::config::{Config, GroupImportsTactic};
 use crate::imports::{UseSegmentKind, UseTree, normalize_use_trees_with_granularity};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{ListFormatting, ListItem, itemize_list, write_list};
-use crate::rewrite::{RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
+use crate::rewrite::{RewriteContext, RewriteError, RewriteResult};
 use crate::shape::Shape;
 use crate::sort::version_sort;
 use crate::source_map::LineRangeUtils;
@@ -80,11 +80,11 @@ fn rewrite_reorderable_item(
     context: &RewriteContext<'_>,
     item: &ast::Item,
     shape: Shape,
-) -> Option<String> {
+) -> RewriteResult {
     match item.kind {
         ast::ItemKind::ExternCrate(..) => rewrite_extern_crate(context, item, shape),
         ast::ItemKind::Mod(..) => rewrite_mod(context, item, shape),
-        _ => None,
+        _ => Err(RewriteError::Unknown),
     }
 }
 
@@ -172,7 +172,7 @@ fn rewrite_reorderable_or_regroupable_items(
                 ";",
                 |item| item.span().lo(),
                 |item| item.span().hi(),
-                |item| rewrite_reorderable_item(context, item, shape).unknown_error(),
+                |item| rewrite_reorderable_item(context, item, shape),
                 span.lo(),
                 span.hi(),
                 false,
