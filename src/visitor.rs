@@ -483,24 +483,24 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 ast::ItemKind::Impl(ref iimpl) => {
                     let block_indent = self.block_indent;
                     let rw = self.with_context(|ctx| format_impl(ctx, item, iimpl, block_indent));
-                    self.push_rewrite(item.span, rw);
+                    self.push_rewrite(item.span, rw.ok());
                 }
-                ast::ItemKind::Trait(..) => {
+                ast::ItemKind::Trait(ref trait_kind) => {
                     let block_indent = self.block_indent;
-                    let rw = self.with_context(|ctx| format_trait(ctx, item, block_indent));
-                    self.push_rewrite(item.span, rw);
+                    let rw =
+                        self.with_context(|ctx| format_trait(ctx, item, trait_kind, block_indent));
+                    self.push_rewrite(item.span, rw.ok());
                 }
                 ast::ItemKind::TraitAlias(ref generics, ref generic_bounds) => {
                     let shape = Shape::indented(self.block_indent, self.config);
                     let rw = format_trait_alias(
                         &self.get_context(),
-                        item.ident,
-                        &item.vis,
+                        item,
                         generics,
                         generic_bounds,
                         shape,
                     );
-                    self.push_rewrite(item.span, rw);
+                    self.push_rewrite(item.span, rw.ok());
                 }
                 ast::ItemKind::ExternCrate(_) => {
                     let rw = rewrite_extern_crate(&self.get_context(), item, self.shape());
@@ -509,7 +509,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     } else {
                         mk_sp(attrs[0].span.lo(), item.span.hi())
                     };
-                    self.push_rewrite(span, rw);
+                    self.push_rewrite(span, rw.ok());
                 }
                 ast::ItemKind::Struct(..) | ast::ItemKind::Union(..) => {
                     self.visit_struct(&StructParts::from_item(item));
@@ -995,10 +995,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
     }
 
-    pub(crate) fn with_context<F>(&mut self, f: F) -> Option<String>
-    where
-        F: Fn(&RewriteContext<'_>) -> Option<String>,
-    {
+    pub(crate) fn with_context<T>(&mut self, f: impl Fn(&RewriteContext<'_>) -> T) -> T {
         let context = self.get_context();
         let result = f(&context);
 

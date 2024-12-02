@@ -16,7 +16,7 @@ use crate::config::{Config, GroupImportsTactic};
 use crate::imports::{UseSegmentKind, UseTree, normalize_use_trees_with_granularity};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{ListFormatting, ListItem, itemize_list, write_list};
-use crate::rewrite::{RewriteContext, RewriteErrorExt};
+use crate::rewrite::{RewriteContext, RewriteError, RewriteResult};
 use crate::shape::Shape;
 use crate::sort::version_sort;
 use crate::source_map::LineRangeUtils;
@@ -69,22 +69,22 @@ fn wrap_reorderable_items(
     context: &RewriteContext<'_>,
     list_items: &[ListItem],
     shape: Shape,
-) -> Option<String> {
+) -> RewriteResult {
     let fmt = ListFormatting::new(shape, context.config)
         .separator("")
         .align_comments(false);
-    write_list(list_items, &fmt).ok()
+    write_list(list_items, &fmt)
 }
 
 fn rewrite_reorderable_item(
     context: &RewriteContext<'_>,
     item: &ast::Item,
     shape: Shape,
-) -> Option<String> {
+) -> RewriteResult {
     match item.kind {
         ast::ItemKind::ExternCrate(..) => rewrite_extern_crate(context, item, shape),
         ast::ItemKind::Mod(..) => rewrite_mod(context, item, shape),
-        _ => None,
+        _ => Err(RewriteError::Unknown),
     }
 }
 
@@ -96,7 +96,7 @@ fn rewrite_reorderable_or_regroupable_items(
     reorderable_items: &[&ast::Item],
     shape: Shape,
     span: Span,
-) -> Option<String> {
+) -> RewriteResult {
     match reorderable_items[0].kind {
         // FIXME: Remove duplicated code.
         ast::ItemKind::Use(..) => {
@@ -138,7 +138,7 @@ fn rewrite_reorderable_or_regroupable_items(
             }
 
             // 4 = "use ", 1 = ";"
-            let nested_shape = shape.offset_left_opt(4)?.sub_width_opt(1)?;
+            let nested_shape = shape.offset_left(4, span)?.sub_width(1, span)?;
             let item_vec: Vec<_> = regrouped_items
                 .into_iter()
                 .filter(|use_group| !use_group.is_empty())
@@ -159,10 +159,10 @@ fn rewrite_reorderable_or_regroupable_items(
                         .collect();
                     wrap_reorderable_items(context, &item_vec, nested_shape)
                 })
-                .collect::<Option<Vec<_>>>()?;
+                .collect::<Result<Vec<_>, RewriteError>>()?;
 
             let join_string = format!("\n\n{}", shape.indent.to_string(context.config));
-            Some(item_vec.join(&join_string))
+            Ok(item_vec.join(&join_string))
         }
         _ => {
             let list_items = itemize_list(
@@ -172,7 +172,7 @@ fn rewrite_reorderable_or_regroupable_items(
                 ";",
                 |item| item.span().lo(),
                 |item| item.span().hi(),
-                |item| rewrite_reorderable_item(context, item, shape).unknown_error(),
+                |item| rewrite_reorderable_item(context, item, shape),
                 span.lo(),
                 span.hi(),
                 false,
@@ -313,7 +313,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.shape(),
                 span,
             );
-            self.push_rewrite(span, rw);
+            self.push_rewrite(span, rw.ok());
         } else {
             for item in items {
                 self.push_rewrite(item.span, None);
