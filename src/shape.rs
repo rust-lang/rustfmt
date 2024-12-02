@@ -322,7 +322,7 @@ impl Shape {
         }
     }
 
-    fn exceeds_max_width_error(&self, span: Span) -> ExceedsMaxWidthError {
+    pub(crate) fn exceeds_max_width_error(&self, span: Span) -> ExceedsMaxWidthError {
         ExceedsMaxWidthError {
             configured_width: self.width,
             span,
