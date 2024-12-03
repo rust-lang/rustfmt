@@ -74,7 +74,7 @@ use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::utils::{
     self, filtered_str_fits, first_line_width, last_line_extendable, last_line_width, mk_sp,
-    rewrite_ident, trimmed_last_line_width, wrap_str,
+    rewrite_ident, trimmed_last_line_width, validate_shape,
 };
 
 use thin_vec::ThinVec;
@@ -550,8 +550,8 @@ impl Rewrite for Chain {
 
         formatter.format_root(&self.parent, context, shape)?;
         if let Some(result) = formatter.pure_root() {
-            return wrap_str(result, context.config.max_width(), shape)
-                .max_width_error(shape.width, self.parent.span);
+            validate_shape(&result, shape, context.config, self.parent.span)?;
+            return Ok(result);
         }
 
         let first = self.children.first().unwrap_or(&self.parent);
@@ -566,7 +566,8 @@ impl Rewrite for Chain {
         formatter.format_last_child(context, shape, child_shape)?;
 
         let result = formatter.join_rewrites(context, child_shape)?;
-        wrap_str(result, context.config.max_width(), shape).max_width_error(shape.width, full_span)
+        validate_shape(&result, shape, context.config, full_span)?;
+        Ok(result)
     }
 }
 

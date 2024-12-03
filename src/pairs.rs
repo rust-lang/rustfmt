@@ -7,7 +7,7 @@ use crate::rewrite::{Rewrite, RewriteContext, RewriteErrorExt, RewriteResult};
 use crate::shape::Shape;
 use crate::spanned::Spanned;
 use crate::utils::{
-    first_line_width, is_single_line, last_line_width, trimmed_last_line_width, wrap_str,
+    filtered_str_fits, first_line_width, is_single_line, last_line_width, trimmed_last_line_width,
 };
 
 /// Sigils that decorate a binop pair.
@@ -102,7 +102,10 @@ fn rewrite_pairs_one_line<T: Rewrite>(
         return None;
     }
 
-    wrap_str(result, context.config.max_width(), shape)
+    if !filtered_str_fits(&result, context.config.max_width(), shape) {
+        return None;
+    }
+    Some(result)
 }
 
 fn rewrite_pairs_multiline<T: Rewrite>(
