@@ -461,8 +461,8 @@ impl Rewrite for ast::WherePredicate {
 
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         // FIXME: dead spans?
-        let result = match *self {
-            ast::WherePredicate::BoundPredicate(ast::WhereBoundPredicate {
+        let result = match self.kind {
+            ast::WherePredicateKind::BoundPredicate(ast::WhereBoundPredicate {
                 ref bound_generic_params,
                 ref bounded_ty,
                 ref bounds,
@@ -480,12 +480,11 @@ impl Rewrite for ast::WherePredicate {
 
                 rewrite_assign_rhs(context, lhs, bounds, &RhsAssignKind::Bounds, shape)?
             }
-            ast::WherePredicate::RegionPredicate(ast::WhereRegionPredicate {
+            ast::WherePredicateKind::RegionPredicate(ast::WhereRegionPredicate {
                 ref lifetime,
                 ref bounds,
-                span,
-            }) => rewrite_bounded_lifetime(lifetime, bounds, span, context, shape)?,
-            ast::WherePredicate::EqPredicate(ast::WhereEqPredicate {
+            }) => rewrite_bounded_lifetime(lifetime, bounds, self.span, context, shape)?,
+            ast::WherePredicateKind::EqPredicate(ast::WhereEqPredicate {
                 ref lhs_ty,
                 ref rhs_ty,
                 ..
@@ -606,29 +605,11 @@ impl Rewrite for ast::GenericBound {
 
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         match *self {
-            ast::GenericBound::Trait(
-                ref poly_trait_ref,
-                ast::TraitBoundModifiers {
-                    constness,
-                    asyncness,
-                    polarity,
-                },
-            ) => {
+            ast::GenericBound::Trait(ref poly_trait_ref) => {
                 let snippet = context.snippet(self.span());
                 let has_paren = snippet.starts_with('(') && snippet.ends_with(')');
-                let mut constness = constness.as_str().to_string();
-                if !constness.is_empty() {
-                    constness.push(' ');
-                }
-                let mut asyncness = asyncness.as_str().to_string();
-                if !asyncness.is_empty() {
-                    asyncness.push(' ');
-                }
-                let polarity = polarity.as_str();
-                let shape = shape.offset_left(constness.len() + polarity.len(), self.span())?;
                 poly_trait_ref
                     .rewrite_result(context, shape)
-                    .map(|s| format!("{constness}{asyncness}{polarity}{s}"))
                     .map(|s| if has_paren { format!("({})", s) } else { s })
             }
             ast::GenericBound::Use(ref args, span) => {
@@ -752,17 +733,37 @@ impl Rewrite for ast::PolyTraitRef {
     }
 
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
-        if let Some(lifetime_str) = rewrite_bound_params(context, shape, &self.bound_generic_params)
+        let (binder, shape) = if let Some(lifetime_str) =
+            rewrite_bound_params(context, shape, &self.bound_generic_params)
         {
             // 6 is "for<> ".len()
             let extra_offset = lifetime_str.len() + 6;
             let shape = shape.offset_left(extra_offset, self.span)?;
-            let path_str = self.trait_ref.rewrite_result(context, shape)?;
-
-            Ok(format!("for<{lifetime_str}> {path_str}"))
+            (format!("for<{lifetime_str}> "), shape)
         } else {
-            self.trait_ref.rewrite_result(context, shape)
+            (String::new(), shape)
+        };
+
+        let ast::TraitBoundModifiers {
+            constness,
+            asyncness,
+            polarity,
+        } = self.modifiers;
+        let mut constness = constness.as_str().to_string();
+        if !constness.is_empty() {
+            constness.push(' ');
         }
+        let mut asyncness = asyncness.as_str().to_string();
+        if !asyncness.is_empty() {
+            asyncness.push(' ');
+        }
+        let polarity = polarity.as_str();
+        let shape = shape.offset_left(constness.len() + polarity.len(), self.span)?;
+
+        let path_str = self.trait_ref.rewrite_result(context, shape)?;
+        Ok(format!(
+            "{binder}{constness}{asyncness}{polarity}{path_str}"
+        ))
     }
 }
 
@@ -815,7 +816,8 @@ impl Rewrite for ast::Ty {
 
                 rewrite_unary_prefix(context, prefix, &*mt.ty, shape)
             }
-            ast::TyKind::Ref(ref lifetime, ref mt) => {
+            ast::TyKind::Ref(ref lifetime, ref mt)
+            | ast::TyKind::PinnedRef(ref lifetime, ref mt) => {
                 let mut_str = format_mutability(mt.mutbl);
                 let mut_len = mut_str.len();
                 let mut result = String::with_capacity(128);
@@ -847,6 +849,13 @@ impl Rewrite for ast::Ty {
                     }
                     result.push(' ');
                     cmnt_lo = lifetime.ident.span.hi();
+                }
+
+                if let ast::TyKind::PinnedRef(..) = self.kind {
+                    result.push_str("pin ");
+                    if ast::Mutability::Not == mt.mutbl {
+                        result.push_str("const ");
+                    }
                 }
 
                 if ast::Mutability::Mut == mt.mutbl {
@@ -939,8 +948,6 @@ impl Rewrite for ast::Ty {
             ast::TyKind::Tup(ref items) => {
                 rewrite_tuple(context, items.iter(), self.span, shape, items.len() == 1)
             }
-            ast::TyKind::AnonStruct(..) => Ok(context.snippet(self.span).to_owned()),
-            ast::TyKind::AnonUnion(..) => Ok(context.snippet(self.span).to_owned()),
             ast::TyKind::Path(ref q_self, ref path) => {
                 rewrite_path(context, PathContext::Type, q_self, path, shape)
             }
@@ -1247,9 +1254,9 @@ pub(crate) fn can_be_overflowed_type(
 ) -> bool {
     match ty.kind {
         ast::TyKind::Tup(..) => context.use_block_indent() && len == 1,
-        ast::TyKind::Ref(_, ref mutty) | ast::TyKind::Ptr(ref mutty) => {
-            can_be_overflowed_type(context, &*mutty.ty, len)
-        }
+        ast::TyKind::Ref(_, ref mutty)
+        | ast::TyKind::PinnedRef(_, ref mutty)
+        | ast::TyKind::Ptr(ref mutty) => can_be_overflowed_type(context, &*mutty.ty, len),
         _ => false,
     }
 }

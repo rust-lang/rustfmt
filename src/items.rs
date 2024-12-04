@@ -1223,6 +1223,7 @@ pub(crate) fn format_trait(
             pos_before_where,
             option,
         )?;
+
         // If the where-clause cannot fit on the same line,
         // put the where-clause on a new line
         if !where_clause_str.contains('\n')
@@ -1901,15 +1902,15 @@ pub(crate) fn rewrite_struct_field_prefix(
     field: &ast::FieldDef,
 ) -> RewriteResult {
     let vis = format_visibility(context, &field.vis);
+    let safety = format_safety(field.safety);
     let type_annotation_spacing = type_annotation_spacing(context.config);
     Ok(match field.ident {
         Some(name) => format!(
-            "{}{}{}:",
-            vis,
+            "{vis}{safety}{}{}:",
             rewrite_ident(context, name),
             type_annotation_spacing.0
         ),
-        None => vis.to_string(),
+        None => format!("{vis}{safety}"),
     })
 }
 
@@ -1994,6 +1995,7 @@ pub(crate) struct StaticParts<'a> {
     safety: ast::Safety,
     vis: &'a ast::Visibility,
     ident: symbol::Ident,
+    generics: Option<&'a ast::Generics>,
     ty: &'a ast::Ty,
     mutability: ast::Mutability,
     expr_opt: Option<&'a ptr::P<ast::Expr>>,
@@ -2003,8 +2005,10 @@ pub(crate) struct StaticParts<'a> {
 
 impl<'a> StaticParts<'a> {
     pub(crate) fn from_item(item: &'a ast::Item) -> Self {
-        let (defaultness, prefix, safety, ty, mutability, expr) = match &item.kind {
-            ast::ItemKind::Static(s) => (None, "static", s.safety, &s.ty, s.mutability, &s.expr),
+        let (defaultness, prefix, safety, ty, mutability, expr, generics) = match &item.kind {
+            ast::ItemKind::Static(s) => {
+                (None, "static", s.safety, &s.ty, s.mutability, &s.expr, None)
+            }
             ast::ItemKind::Const(c) => (
                 Some(c.defaultness),
                 "const",
@@ -2012,6 +2016,7 @@ impl<'a> StaticParts<'a> {
                 &c.ty,
                 ast::Mutability::Not,
                 &c.expr,
+                Some(&c.generics),
             ),
             _ => unreachable!(),
         };
@@ -2020,6 +2025,7 @@ impl<'a> StaticParts<'a> {
             safety,
             vis: &item.vis,
             ident: item.ident,
+            generics,
             ty,
             mutability,
             expr_opt: expr.as_ref(),
@@ -2029,8 +2035,8 @@ impl<'a> StaticParts<'a> {
     }
 
     pub(crate) fn from_trait_item(ti: &'a ast::AssocItem) -> Self {
-        let (defaultness, ty, expr_opt) = match &ti.kind {
-            ast::AssocItemKind::Const(c) => (c.defaultness, &c.ty, &c.expr),
+        let (defaultness, ty, expr_opt, generics) = match &ti.kind {
+            ast::AssocItemKind::Const(c) => (c.defaultness, &c.ty, &c.expr, Some(&c.generics)),
             _ => unreachable!(),
         };
         StaticParts {
@@ -2038,6 +2044,7 @@ impl<'a> StaticParts<'a> {
             safety: ast::Safety::Default,
             vis: &ti.vis,
             ident: ti.ident,
+            generics,
             ty,
             mutability: ast::Mutability::Not,
             expr_opt: expr_opt.as_ref(),
@@ -2047,8 +2054,8 @@ impl<'a> StaticParts<'a> {
     }
 
     pub(crate) fn from_impl_item(ii: &'a ast::AssocItem) -> Self {
-        let (defaultness, ty, expr) = match &ii.kind {
-            ast::AssocItemKind::Const(c) => (c.defaultness, &c.ty, &c.expr),
+        let (defaultness, ty, expr, generics) = match &ii.kind {
+            ast::AssocItemKind::Const(c) => (c.defaultness, &c.ty, &c.expr, Some(&c.generics)),
             _ => unreachable!(),
         };
         StaticParts {
@@ -2056,6 +2063,7 @@ impl<'a> StaticParts<'a> {
             safety: ast::Safety::Default,
             vis: &ii.vis,
             ident: ii.ident,
+            generics,
             ty,
             mutability: ast::Mutability::Not,
             expr_opt: expr.as_ref(),
@@ -2070,6 +2078,14 @@ fn rewrite_static(
     static_parts: &StaticParts<'_>,
     offset: Indent,
 ) -> Option<String> {
+    // For now, if this static (or const) has generics, then bail.
+    if static_parts
+        .generics
+        .is_some_and(|g| !g.params.is_empty() || !g.where_clause.is_empty())
+    {
+        return None;
+    }
+
     let colon = colon_spaces(context.config);
     let mut prefix = format!(
         "{}{}{}{} {}{}{}",
@@ -3420,21 +3436,14 @@ impl Rewrite for ast::ForeignItem {
                     ref generics,
                     ref body,
                 } = **fn_kind;
-                if let Some(ref body) = body {
+                if body.is_some() {
                     let mut visitor = FmtVisitor::from_context(context);
                     visitor.block_indent = shape.indent;
                     visitor.last_pos = self.span.lo();
                     let inner_attrs = inner_attributes(&self.attrs);
                     let fn_ctxt = visit::FnCtxt::Foreign;
                     visitor.visit_fn(
-                        visit::FnKind::Fn(
-                            fn_ctxt,
-                            self.ident,
-                            sig,
-                            &self.vis,
-                            generics,
-                            Some(body),
-                        ),
+                        visit::FnKind::Fn(fn_ctxt, &self.ident, sig, &self.vis, generics, body),
                         &sig.decl,
                         self.span,
                         defaultness,
