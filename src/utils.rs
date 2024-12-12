@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use rustc_ast::ast::{
     self, Attribute, MetaItem, MetaItemInner, MetaItemKind, NodeId, Path, Visibility,
     VisibilityKind,
@@ -7,11 +5,12 @@ use rustc_ast::ast::{
 use rustc_ast::ptr;
 use rustc_ast_pretty::pprust;
 use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
+use std::borrow::Cow;
 use unicode_width::UnicodeWidthStr;
 
 use crate::comment::{CharClasses, FullCodeCharKind, LineClasses, filter_normal_code};
 use crate::config::{Config, StyleEdition};
-use crate::rewrite::RewriteContext;
+use crate::rewrite::{ExceedsMaxWidthError, RewriteContext};
 use crate::shape::{Indent, Shape};
 
 #[inline]
@@ -384,13 +383,16 @@ macro_rules! skip_out_of_file_lines_range_visitor {
     };
 }
 
-// Wraps String in an Option. Returns Some when the string adheres to the
-// Rewrite constraints defined for the Rewrite trait and None otherwise.
-pub(crate) fn wrap_str(s: String, max_width: usize, shape: Shape) -> Option<String> {
-    if filtered_str_fits(&s, max_width, shape) {
-        Some(s)
+pub(crate) fn validate_shape(
+    string: &str,
+    shape: Shape,
+    config: &Config,
+    span: Span,
+) -> Result<(), ExceedsMaxWidthError> {
+    if filtered_str_fits(&string, config.max_width(), shape) {
+        Ok(())
     } else {
-        None
+        Err(shape.exceeds_max_width_error(span))
     }
 }
 
