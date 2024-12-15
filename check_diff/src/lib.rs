@@ -1,4 +1,4 @@
-use diffy::{self};
+use diffy;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::io::{self, Write};
@@ -82,8 +82,8 @@ impl Diff {
 
 // will be used in future PRs, just added to make the compiler happy
 pub struct CheckDiffRunners {
-    pub feature_runner: RustfmtRunner,
-    pub src_runner: RustfmtRunner,
+    feature_runner: RustfmtRunner,
+    src_runner: RustfmtRunner,
 }
 
 pub struct RustfmtRunner {
@@ -106,6 +106,14 @@ impl CheckDiffRunners {
             feature_format,
         })
     }
+
+    pub fn get_feature_runner(self) -> RustfmtRunner {
+        self.feature_runner
+    }
+
+    pub fn get_src_runner(self) -> RustfmtRunner {
+        self.src_runner
+    }
 }
 
 impl RustfmtRunner {
@@ -124,10 +132,9 @@ impl RustfmtRunner {
         return Ok(binary_version.to_string());
     }
 
-    //  Run rusfmt with the --check flag to see if a diff is produced. Runs on the code specified
+    //  Run rusfmt to see if a diff is produced. Runs on the code specified
     //
     // Parameters:
-    // binary_path: Path to a rustfmt binary
     // code: Code to run the binary on
     // config: Any additional configuration options to pass to rustfmt
     //
@@ -156,6 +163,8 @@ impl RustfmtRunner {
     }
 }
 
+/// Creates a configuration in the following form:
+/// <config_name>=<config_val>, <config_name>=<config_val>, ...
 fn create_config_arg(config: &Option<Vec<String>>) -> String {
     let config_arg: String = match config {
         Some(configs) => {
@@ -363,6 +372,7 @@ pub fn compile_rustfmt(
     });
 }
 
+/// Searches for rust files in the particular path and returns an iterator to them.
 pub fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
     return WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
         Some(entry) => {
@@ -376,6 +386,8 @@ pub fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
     });
 }
 
+/// Calculates the number of errors when running the compiled binary and the feature binary on the
+/// repo specified with the specific configs.
 pub fn check_diff(config: Option<Vec<String>>, runners: CheckDiffRunners, repo: &Path) -> i32 {
     let mut errors = 0;
     let iter = search_for_rs_files(repo);
