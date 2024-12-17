@@ -1110,7 +1110,7 @@ impl Rewrite for UseSegment {
                     use_tree_list,
                     // 1 = "{" and "}"
                     shape
-                        .offset_left(1)
+                        .offset_left_opt(1)
                         .unknown_error()?
                         .saturating_sub_width(1),
                 )?
@@ -1160,7 +1160,7 @@ impl Rewrite for UseTree {
                         s.clone()
                     }
                 } else {
-                    let Some(ret) = shape.offset_left(rewritten_segment.len()) else {
+                    let Some(ret) = shape.offset_left_opt(rewritten_segment.len()) else {
                         return Err(RewriteError::ExceedsMaxWidth {
                             configured_width: shape.width,
                             span: span.clone(),
@@ -1168,7 +1168,7 @@ impl Rewrite for UseTree {
                     };
                     // Check that there is a room for the next "{". If not, return an error for
                     // retry with newline.
-                    if ret.offset_left(reserved_room_for_brace).is_none() {
+                    if ret.offset_left_opt(reserved_room_for_brace).is_none() {
                         return Err(RewriteError::ExceedsMaxWidth {
                             configured_width: shape.width,
                             span: span.clone(),
@@ -1221,7 +1221,7 @@ impl Rewrite for UseTree {
                     result.push_str("::");
                     // 2 = "::"
                     shape = shape
-                        .offset_left(2 + segment_str.len())
+                        .offset_left_opt(2 + segment_str.len())
                         .max_width_error(shape.width, self.span())?;
                 }
             }
