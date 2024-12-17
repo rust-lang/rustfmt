@@ -131,12 +131,12 @@ mod indent4 {
 
 use smithay::backend::renderer::element::utils::select_dmabuf_feedback;
 use smithay::backend::renderer::element::{
-    default_primary_scanout_output_compare, RenderElementStates,
+    RenderElementStates, default_primary_scanout_output_compare,
 };
 use smithay::desktop::space::SpaceElement;
 use smithay::desktop::utils::{
-    surface_presentation_feedback_flags_from_states, surface_primary_scanout_output,
-    update_surface_primary_scanout_output, OutputPresentationFeedback,
+    OutputPresentationFeedback, surface_presentation_feedback_flags_from_states,
+    surface_primary_scanout_output, update_surface_primary_scanout_output,
 };
 use smithay::desktop::{PopupKind, PopupManager, Space};
 use smithay::input::keyboard::{Keysym, LedState, XkbConfig};
@@ -154,11 +154,11 @@ use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{Display, DisplayHandle, Resource};
 use smithay::utils::{Clock, Monotonic, Rectangle};
 use smithay::wayland::compositor::{
-    get_parent, with_states, CompositorClientState, CompositorState,
+    CompositorClientState, CompositorState, get_parent, with_states,
 };
 use smithay::wayland::dmabuf::DmabufFeedback;
 use smithay::wayland::fractional_scale::{
-    with_fractional_scale, FractionalScaleHandler, FractionalScaleManagerState,
+    FractionalScaleHandler, FractionalScaleManagerState, with_fractional_scale,
 };
 use smithay::wayland::input_method::{InputMethodHandler, InputMethodManagerState, PopupSurface};
 use smithay::wayland::keyboard_shortcuts_inhibit::{
@@ -166,7 +166,7 @@ use smithay::wayland::keyboard_shortcuts_inhibit::{
 };
 use smithay::wayland::output::{OutputHandler, OutputManagerState};
 use smithay::wayland::pointer_constraints::{
-    with_pointer_constraint, PointerConstraintsHandler, PointerConstraintsState,
+    PointerConstraintsHandler, PointerConstraintsState, with_pointer_constraint,
 };
 use smithay::wayland::pointer_gestures::PointerGesturesState;
 use smithay::wayland::presentation::PresentationState;
@@ -175,15 +175,15 @@ use smithay::wayland::seat::WaylandFocus;
 use smithay::wayland::security_context::{
     SecurityContext, SecurityContextHandler, SecurityContextListenerSource, SecurityContextState,
 };
+use smithay::wayland::selection::SelectionHandler;
 use smithay::wayland::selection::data_device::{
-    set_data_device_focus, ClientDndGrabHandler, DataDeviceHandler, DataDeviceState,
-    ServerDndGrabHandler,
+    ClientDndGrabHandler, DataDeviceHandler, DataDeviceState, ServerDndGrabHandler,
+    set_data_device_focus,
 };
 use smithay::wayland::selection::primary_selection::{
-    set_primary_focus, PrimarySelectionHandler, PrimarySelectionState,
+    PrimarySelectionHandler, PrimarySelectionState, set_primary_focus,
 };
 use smithay::wayland::selection::wlr_data_control::{DataControlHandler, DataControlState};
-use smithay::wayland::selection::SelectionHandler;
 use smithay::wayland::shell::wlr_layer::WlrLayerShellState;
 use smithay::wayland::shell::xdg::decoration::{XdgDecorationHandler, XdgDecorationState};
 use smithay::wayland::shell::xdg::{ToplevelSurface, XdgShellState, XdgToplevelSurfaceData};
