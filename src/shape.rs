@@ -293,14 +293,6 @@ impl Shape {
         }
     }
 
-    pub(crate) fn shrink_left(&self, width: usize) -> Option<Shape> {
-        Some(Shape {
-            width: self.width.checked_sub(width)?,
-            indent: self.indent + width,
-            offset: self.offset + width,
-        })
-    }
-
     pub(crate) fn offset_left_opt(&self, delta: usize) -> Option<Shape> {
         self.add_offset(delta).sub_width_opt(delta)
     }
