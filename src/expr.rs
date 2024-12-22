@@ -200,14 +200,22 @@ pub(crate) fn format_expr(
         }
         ast::ExprKind::Continue(ref opt_label) => {
             let id_str = match *opt_label {
-                Some(label) => format!(" {}", label.ident),
+                Some(label) => {
+                    // Ident lose the `r#` prefix in raw labels,　so use the original snippet
+                    let label_name = context.snippet(label.ident.span);
+                    format!(" {}", label_name)
+                }
                 None => String::new(),
             };
             Ok(format!("continue{id_str}"))
         }
         ast::ExprKind::Break(ref opt_label, ref opt_expr) => {
             let id_str = match *opt_label {
-                Some(label) => format!(" {}", label.ident),
+                Some(label) => {
+                    // Ident lose the `r#` prefix in raw labels,　so use the original snippet
+                    let label_name = context.snippet(label.ident.span);
+                    format!(" {}", label_name)
+                }
                 None => String::new(),
             };
 
