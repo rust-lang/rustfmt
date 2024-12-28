@@ -1139,6 +1139,8 @@ impl Rewrite for UseTree {
                 if next_segment.is_some() {
                     rewritten_segment.push_str("::");
                 }
+                // If `next_segment` is a list, we should check overflow with `curr_segment` with
+                // open brace: `...::curr_segment{`. So, 1 will be added to a shape.
                 let reserved_room_for_brace = match next_segment.map(|s| &s.kind) {
                     Some(UseSegmentKind::List(_)) => "{".len(),
                     _ => 0,
