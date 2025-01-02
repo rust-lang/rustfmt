@@ -1,5 +1,34 @@
 # Changelog
 
+## [Unreleased]
+
+
+## [1.9.0] 2025-01-03
+
+### Fixed
+- No longer strip `r#` prefix from `break` and `continue` labels [#6411](https://github.com/rust-lang/rustfmt/issues/6411)
+  ```rust
+  fn main() {
+      'r#if: {
+          break 'r#if;
+      }
+  }
+  ```
+- Fix panic when sorting imports [#6333](https://github.com/rust-lang/rustfmt/issues/6333)
+
+### Changed
+- Stabalize `style_edition=2024` and stabalize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
+- Apply version sorting to module declarations when using `style_edition=2024` [#6368](https://github.com/rust-lang/rustfmt/pull/6368)
+- When users set the deprecated `version` config, rustfmt now gives a hint about which equivalent `style_edition` they should use [#6361](https://github.com/rust-lang/rustfmt/pull/6361)
+
+### Added
+Add `style_edition=2027` to gate unstable formatting [#6324](https://github.com/rust-lang/rustfmt/pull/6324)
+
+### Misc
+- Correct version chunk splitting in the internal version sort algorithm [#6407](https://github.com/rust-lang/rustfmt/pull/6407)
+- Return `Result` from `Shape` methods [#6398](https://github.com/rust-lang/rustfmt/pull/6398)
+
+
 ## [1.8.0] 2024-09-20
 
 ### Fixed
