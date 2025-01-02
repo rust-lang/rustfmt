@@ -53,9 +53,7 @@ pub(crate) fn rewrite_closure(
         shape,
     )?;
     // 1 = space between `|...|` and body.
-    let body_shape = shape
-        .offset_left(extra_offset)
-        .max_width_error(shape.width, span)?;
+    let body_shape = shape.offset_left(extra_offset, span)?;
 
     if let ast::ExprKind::Block(ref block, _) = body.kind {
         // The body of the closure is an empty block.
@@ -293,17 +291,12 @@ fn rewrite_closure_fn_decl(
     };
     // 4 = "|| {".len(), which is overconservative when the closure consists of
     // a single expression.
-    let nested_shape = shape
-        .shrink_left(binder.len() + const_.len() + immovable.len() + coro.len() + mover.len())
-        .and_then(|shape| shape.sub_width(4))
-        .max_width_error(shape.width, span)?;
+    let offset = binder.len() + const_.len() + immovable.len() + coro.len() + mover.len();
+    let nested_shape = shape.shrink_left(offset, span)?.sub_width(4, span)?;
 
     // 1 = |
     let param_offset = nested_shape.indent + 1;
-    let param_shape = nested_shape
-        .offset_left(1)
-        .max_width_error(nested_shape.width, span)?
-        .visual_indent(0);
+    let param_shape = nested_shape.offset_left(1, span)?.visual_indent(0);
     let ret_str = fn_decl.output.rewrite_result(context, param_shape)?;
 
     let param_items = itemize_list(
@@ -328,9 +321,7 @@ fn rewrite_closure_fn_decl(
         horizontal_budget,
     );
     let param_shape = match tactic {
-        DefinitiveListTactic::Horizontal => param_shape
-            .sub_width(ret_str.len() + 1)
-            .max_width_error(param_shape.width, span)?,
+        DefinitiveListTactic::Horizontal => param_shape.sub_width(ret_str.len() + 1, span)?,
         _ => param_shape,
     };
 
@@ -401,9 +392,7 @@ pub(crate) fn rewrite_last_closure(
             return Err(RewriteError::Unknown);
         }
 
-        let body_shape = shape
-            .offset_left(extra_offset)
-            .max_width_error(shape.width, expr.span)?;
+        let body_shape = shape.offset_left(extra_offset, expr.span)?;
 
         // We force to use block for the body of the closure for certain kinds of expressions.
         if is_block_closure_forced(context, body) {
