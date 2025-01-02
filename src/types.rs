@@ -1015,14 +1015,11 @@ impl Rewrite for ast::Ty {
                 }
 
                 let inner_ty_shape = if context.use_block_indent() {
-                    shape
-                        .offset_left(result.len())
-                        .max_width_error(shape.width, self.span())?
+                    shape.offset_left(result.len(), self.span())?
                 } else {
                     shape
                         .visual_indent(result.len())
-                        .sub_width(result.len())
-                        .max_width_error(shape.width, self.span())?
+                        .sub_width(result.len(), self.span())?
                 };
 
                 let rewrite = binder.inner_ty.rewrite_result(context, inner_ty_shape)?;
