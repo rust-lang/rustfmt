@@ -220,10 +220,10 @@ pub enum Verbosity {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct WidthHeuristics {
-    // Maximum width of the args of a function call before falling back
-    // to vertical formatting.
+    // Maximum width of the args of a function call (or tuple constructor) before
+    // falling back to vertical formatting.
     pub(crate) fn_call_width: usize,
-    // Maximum width of the args of a function-like attributes before falling
+    // Maximum width of the args of a function-like attribute before falling
     // back to vertical formatting.
     pub(crate) attr_fn_like_width: usize,
     // Maximum width in the body of a struct lit before falling back to
