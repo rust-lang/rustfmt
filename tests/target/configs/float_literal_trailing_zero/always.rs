@@ -22,6 +22,13 @@ fn float_literals() {
     let s = 1_000_.000_000;
 }
 
+fn range_bounds() {
+    if (1.0..2.0).contains(&1.0) {}
+    if (1.1..2.2).contains(&1.1) {}
+    if (1.0e1..2.0e1).contains(&1.0e1) {}
+    let _binop_range = 3.0 / 2.0..4.0;
+}
+
 fn line_wrapping() {
     let array = [
         1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,

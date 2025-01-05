@@ -264,7 +264,7 @@ impl ChainItemKind {
                 return (
                     ChainItemKind::Parent {
                         expr: expr.clone(),
-                        parens: is_method_call_receiver && should_add_parens(expr),
+                        parens: is_method_call_receiver && should_add_parens(expr, context),
                     },
                     expr.span,
                 );
@@ -1049,12 +1049,12 @@ fn trim_tries(s: &str) -> String {
 /// 1. .method();
 /// ```
 /// Which all need parenthesis or a space before `.method()`.
-fn should_add_parens(expr: &ast::Expr) -> bool {
+fn should_add_parens(expr: &ast::Expr, context: &RewriteContext<'_>) -> bool {
     match expr.kind {
-        ast::ExprKind::Lit(ref lit) => crate::expr::lit_ends_in_dot(lit),
+        ast::ExprKind::Lit(ref lit) => crate::expr::lit_ends_in_dot(lit, context),
         ast::ExprKind::Closure(ref cl) => match cl.body.kind {
             ast::ExprKind::Range(_, _, ast::RangeLimits::HalfOpen) => true,
-            ast::ExprKind::Lit(ref lit) => crate::expr::lit_ends_in_dot(lit),
+            ast::ExprKind::Lit(ref lit) => crate::expr::lit_ends_in_dot(lit, context),
             _ => false,
         },
         _ => false,

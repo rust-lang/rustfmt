@@ -54,8 +54,11 @@ pub(crate) enum ExprType {
     SubExpression,
 }
 
-pub(crate) fn lit_ends_in_dot(lit: &Lit) -> bool {
-    matches!(lit, Lit { kind: LitKind::Float, suffix: None, symbol } if symbol.as_str().ends_with('.'))
+pub(crate) fn lit_ends_in_dot(lit: &Lit, context: &RewriteContext<'_>) -> bool {
+    match lit.kind {
+        LitKind::Float => do_rewrite_float_lit(context, *lit).ends_with('.'),
+        _ => false,
+    }
 }
 
 pub(crate) fn format_expr(
@@ -297,7 +300,7 @@ pub(crate) fn format_expr(
 
             fn needs_space_before_range(context: &RewriteContext<'_>, lhs: &ast::Expr) -> bool {
                 match lhs.kind {
-                    ast::ExprKind::Lit(token_lit) => lit_ends_in_dot(&token_lit),
+                    ast::ExprKind::Lit(token_lit) => lit_ends_in_dot(&token_lit, context),
                     ast::ExprKind::Unary(_, ref expr) => needs_space_before_range(context, expr),
                     ast::ExprKind::Binary(_, _, ref rhs_expr) => {
                         needs_space_before_range(context, rhs_expr)
@@ -1351,26 +1354,16 @@ fn rewrite_int_lit(
     .max_width_error(shape.width, span)
 }
 
-fn rewrite_float_lit(
-    context: &RewriteContext<'_>,
-    token_lit: token::Lit,
-    span: Span,
-    shape: Shape,
-) -> RewriteResult {
+fn do_rewrite_float_lit(context: &RewriteContext<'_>, token_lit: token::Lit) -> String {
+    let symbol = token_lit.symbol.as_str();
+    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
+
     if matches!(
         context.config.float_literal_trailing_zero(),
         FloatLiteralTrailingZero::Preserve
     ) {
-        return wrap_str(
-            context.snippet(span).to_owned(),
-            context.config.max_width(),
-            shape,
-        )
-        .max_width_error(shape.width, span);
+        return format!("{}{}", symbol, suffix.unwrap_or(""));
     }
-
-    let symbol = token_lit.symbol.as_str();
-    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
 
     let FloatSymbolParts {
         integer_part,
@@ -1401,15 +1394,24 @@ fn rewrite_float_lit(
     } else {
         ""
     };
+    format!(
+        "{}{}{}{}{}",
+        integer_part,
+        period,
+        fractional_part,
+        exponent.unwrap_or(""),
+        suffix.unwrap_or(""),
+    )
+}
+
+fn rewrite_float_lit(
+    context: &RewriteContext<'_>,
+    token_lit: token::Lit,
+    span: Span,
+    shape: Shape,
+) -> RewriteResult {
     wrap_str(
-        format!(
-            "{}{}{}{}{}",
-            integer_part,
-            period,
-            fractional_part,
-            exponent.unwrap_or(""),
-            suffix.unwrap_or(""),
-        ),
+        do_rewrite_float_lit(context, token_lit),
         context.config.max_width(),
         shape,
     )

@@ -21,3 +21,10 @@ fn float_literals() {
     let r = 1_000_.;
     let s = 1_000_.000_000;
 }
+
+fn range_bounds() {
+    if (1.0..2.0).contains(&1.0) {}
+    if (1.1..2.2).contains(&1.1) {}
+    if (1.0e1..2.0e1).contains(&1.0e1) {}
+    let _binop_range = 3.0 / 2.0..4.0;
+}
