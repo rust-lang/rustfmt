@@ -1268,13 +1268,19 @@ Control the presence of trailing zero in floating-point literal values
 
 Leave the literal as-is.
 
+```rust
+fn main() {
+    let values = [1.0, 2., 3.0e10, 4f32];
+}
+```
+
 #### `Always`:
 
 Add a trailing zero to the literal:
 
 ```rust
 fn main() {
-    let values = [1.0, 2.0e10, 3.0f32];
+    let values = [1.0, 2.0, 3.0e10, 4.0f32];
 }
 ```
 
@@ -1285,7 +1291,7 @@ and the preceding period are removed:
 
 ```rust
 fn main() {
-    let values = [1.0, 2e10, 3f32];
+    let values = [1.0, 2.0, 3e10, 4f32];
 }
 ```
 
@@ -1296,7 +1302,7 @@ period is also removed:
 
 ```rust
 fn main() {
-    let values = [1., 2e10, 3f32];
+    let values = [1., 2., 3e10, 4f32];
 }
 ```
 
