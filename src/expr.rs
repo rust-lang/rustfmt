@@ -56,7 +56,7 @@ pub(crate) enum ExprType {
 
 pub(crate) fn lit_ends_in_dot(lit: &Lit, context: &RewriteContext<'_>) -> bool {
     match lit.kind {
-        LitKind::Float => do_rewrite_float_lit(context, *lit).ends_with('.'),
+        LitKind::Float => rewrite_float_lit_inner(context, *lit).ends_with('.'),
         _ => false,
     }
 }
@@ -1354,7 +1354,7 @@ fn rewrite_int_lit(
     .max_width_error(shape.width, span)
 }
 
-fn do_rewrite_float_lit(context: &RewriteContext<'_>, token_lit: token::Lit) -> String {
+fn rewrite_float_lit_inner(context: &RewriteContext<'_>, token_lit: token::Lit) -> String {
     let symbol = token_lit.symbol.as_str();
     let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
 
@@ -1365,14 +1365,15 @@ fn do_rewrite_float_lit(context: &RewriteContext<'_>, token_lit: token::Lit) -> 
         return format!("{}{}", symbol, suffix.unwrap_or(""));
     }
 
+    let float_parts = parse_float_symbol(symbol).unwrap();
     let FloatSymbolParts {
         integer_part,
         fractional_part,
         exponent,
-    } = parse_float_symbol(symbol);
+    } = float_parts;
 
     let has_postfix = exponent.is_some() || suffix.is_some();
-    let fractional_part_nonzero = fractional_part.map_or(false, |s| !is_zero_integer_literal(s));
+    let fractional_part_nonzero = !float_parts.is_fractional_part_zero();
 
     let (include_period, include_fractional_part) =
         match context.config.float_literal_trailing_zero() {
@@ -1411,7 +1412,7 @@ fn rewrite_float_lit(
     shape: Shape,
 ) -> RewriteResult {
     wrap_str(
-        do_rewrite_float_lit(context, token_lit),
+        rewrite_float_lit_inner(context, token_lit),
         context.config.max_width(),
         shape,
     )
@@ -2343,29 +2344,40 @@ pub(crate) fn is_method_call(expr: &ast::Expr) -> bool {
     }
 }
 
+/// Indicates the parts of a float literal specified as a string.
 struct FloatSymbolParts<'a> {
+    /// The integer part, e.g. `123` in `123.456e789`.
+    /// Always non-empty, because in Rust `.1` is not a valid floating-point literal:
+    /// <https://doc.rust-lang.org/reference/tokens.html#floating-point-literals>
     integer_part: &'a str,
+    /// The fractional part excluding the decimal point, e.g. `456` in `123.456e789`.
     fractional_part: Option<&'a str>,
+    /// The exponent part including the `e` or `E`, e.g. `e789` in `123.456e789`.
     exponent: Option<&'a str>,
 }
 
-// Parses a float literal. The `symbol` must be a valid floating point literal without a type
-// suffix. Otherwise the function may panic or return wrong result.
-fn parse_float_symbol(symbol: &str) -> FloatSymbolParts<'_> {
-    // This regex may accept invalid float literals (such as `1`, `_` or `2.e3`). That's ok.
-    // We only use it to parse literals whose validity has already been established.
-    let float_literal_regex = static_regex!(r"^([0-9_]+)(?:\.([0-9_]+)?)?([eE][+-]?[0-9_]+)?$");
-    let caps = float_literal_regex.captures(symbol).unwrap();
-    FloatSymbolParts {
-        integer_part: caps.get(1).unwrap().as_str(),
-        fractional_part: caps.get(2).map(|m| m.as_str()),
-        exponent: caps.get(3).map(|m| m.as_str()),
+impl FloatSymbolParts<'_> {
+    fn is_fractional_part_zero(&self) -> bool {
+        let zero_literal_regex = static_regex!(r"^[0_]+$");
+        self.fractional_part
+            .is_none_or(|s| zero_literal_regex.is_match(s))
     }
 }
 
-fn is_zero_integer_literal(symbol: &str) -> bool {
-    let zero_literal_regex = static_regex!(r"^[0_]+$");
-    zero_literal_regex.is_match(symbol)
+/// Parses a float literal. The `symbol` must be a valid floating point literal without a type
+/// suffix. Otherwise the function may panic or return wrong result.
+fn parse_float_symbol(symbol: &str) -> Result<FloatSymbolParts<'_>, &'static str> {
+    // This regex may accept invalid float literals (such as `1`, `_` or `2.e3`). That's ok.
+    // We only use it to parse literals whose validity has already been established.
+    let float_literal_regex = static_regex!(r"^([0-9_]+)(?:\.([0-9_]+)?)?([eE][+-]?[0-9_]+)?$");
+    let caps = float_literal_regex
+        .captures(symbol)
+        .ok_or("invalid float literal")?;
+    Ok(FloatSymbolParts {
+        integer_part: caps.get(1).ok_or("missing integer part")?.as_str(),
+        fractional_part: caps.get(2).map(|m| m.as_str()),
+        exponent: caps.get(3).map(|m| m.as_str()),
+    })
 }
 
 #[cfg(test)]
@@ -2395,32 +2407,32 @@ mod test {
 
     #[test]
     fn test_parse_float_symbol() {
-        let parts = parse_float_symbol("123.456e789");
+        let parts = parse_float_symbol("123.456e789").unwrap();
         assert_eq!(parts.integer_part, "123");
         assert_eq!(parts.fractional_part, Some("456"));
         assert_eq!(parts.exponent, Some("e789"));
 
-        let parts = parse_float_symbol("123.456e+789");
+        let parts = parse_float_symbol("123.456e+789").unwrap();
         assert_eq!(parts.integer_part, "123");
         assert_eq!(parts.fractional_part, Some("456"));
         assert_eq!(parts.exponent, Some("e+789"));
 
-        let parts = parse_float_symbol("123.456e-789");
+        let parts = parse_float_symbol("123.456e-789").unwrap();
         assert_eq!(parts.integer_part, "123");
         assert_eq!(parts.fractional_part, Some("456"));
         assert_eq!(parts.exponent, Some("e-789"));
 
-        let parts = parse_float_symbol("123e789");
+        let parts = parse_float_symbol("123e789").unwrap();
         assert_eq!(parts.integer_part, "123");
         assert_eq!(parts.fractional_part, None);
         assert_eq!(parts.exponent, Some("e789"));
 
-        let parts = parse_float_symbol("123E789");
+        let parts = parse_float_symbol("123E789").unwrap();
         assert_eq!(parts.integer_part, "123");
         assert_eq!(parts.fractional_part, None);
         assert_eq!(parts.exponent, Some("E789"));
 
-        let parts = parse_float_symbol("123.");
+        let parts = parse_float_symbol("123.").unwrap();
         assert_eq!(parts.integer_part, "123");
         assert_eq!(parts.fractional_part, None);
         assert_eq!(parts.exponent, None);
@@ -2428,22 +2440,22 @@ mod test {
 
     #[test]
     fn test_parse_float_symbol_with_underscores() {
-        let parts = parse_float_symbol("_123._456e_789");
+        let parts = parse_float_symbol("_123._456e_789").unwrap();
         assert_eq!(parts.integer_part, "_123");
         assert_eq!(parts.fractional_part, Some("_456"));
         assert_eq!(parts.exponent, Some("e_789"));
 
-        let parts = parse_float_symbol("123_.456_e789_");
+        let parts = parse_float_symbol("123_.456_e789_").unwrap();
         assert_eq!(parts.integer_part, "123_");
         assert_eq!(parts.fractional_part, Some("456_"));
         assert_eq!(parts.exponent, Some("e789_"));
 
-        let parts = parse_float_symbol("1_23.4_56e7_89");
+        let parts = parse_float_symbol("1_23.4_56e7_89").unwrap();
         assert_eq!(parts.integer_part, "1_23");
         assert_eq!(parts.fractional_part, Some("4_56"));
         assert_eq!(parts.exponent, Some("e7_89"));
 
-        let parts = parse_float_symbol("_1_23_._4_56_e_7_89_");
+        let parts = parse_float_symbol("_1_23_._4_56_e_7_89_").unwrap();
         assert_eq!(parts.integer_part, "_1_23_");
         assert_eq!(parts.fractional_part, Some("_4_56_"));
         assert_eq!(parts.exponent, Some("e_7_89_"));
