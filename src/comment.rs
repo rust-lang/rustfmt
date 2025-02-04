@@ -885,6 +885,9 @@ impl<'a> CommentRewrite<'a> {
                 // Remove space if this is an empty comment or a doc comment.
                 self.result.pop();
             }
+            if self.code_block_attr.is_some() && self.is_prev_line_multi_line {
+                self.result.push_str(&self.comment_line_separator);
+            }
             self.result.push_str(line);
             self.fmt.shape = Shape::legacy(self.max_width, self.fmt_indent);
             self.is_prev_line_multi_line = false;
