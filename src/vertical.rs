@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rustc_ast::ast;
 use rustc_span::{BytePos, Span};
 
-use crate::comment::combine_strs_with_missing_comments;
+use crate::comment::{FindUncommented, combine_strs_with_missing_comments};
 use crate::config::lists::*;
 use crate::expr::rewrite_field;
 use crate::items::{rewrite_struct_field, rewrite_struct_field_prefix};
@@ -108,12 +108,13 @@ impl AlignedItem for ast::ExprField {
     }
 }
 
-pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
+pub(crate) fn rewrite_with_alignment<T: AlignedItem + std::fmt::Debug>(
     fields: &[T],
     context: &RewriteContext<'_>,
     shape: Shape,
     span: Span,
     one_line_width: usize,
+    struct_rest: Option<&ast::StructRest>,
 ) -> Option<String> {
     let (spaces, group_index) = if context.config.struct_field_align_threshold() > 0 {
         group_aligned_items(context, fields)
@@ -170,12 +171,15 @@ pub(crate) fn rewrite_with_alignment<T: AlignedItem>(
         shape.indent,
         one_line_width,
         force_separator,
+        struct_rest,
+        shape,
     )?;
     if rest.is_empty() {
         Some(result + spaces)
     } else {
         let rest_span = mk_sp(init_last_pos, span.hi());
-        let rest_str = rewrite_with_alignment(rest, context, shape, rest_span, one_line_width)?;
+        let rest_str =
+            rewrite_with_alignment(rest, context, shape, rest_span, one_line_width, struct_rest)?;
         Some(format!(
             "{}{}\n{}{}",
             result,
@@ -211,6 +215,8 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     offset: Indent,
     one_line_width: usize,
     force_trailing_separator: bool,
+    struct_rest: Option<&ast::StructRest>,
+    shape: Shape,
 ) -> Option<String> {
     // 1 = ","
     let item_shape = Shape::indented(offset, context.config).sub_width_opt(1)?;
@@ -221,14 +227,71 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         field_prefix_max_width = 0;
     }
 
+    enum StructLitField<'a, T> {
+        Regular(&'a T),
+        Base(&'a ast::Expr),
+        Rest(Span),
+    }
+
+    let has_base_or_rest = match struct_rest {
+        Some(rest) => match rest {
+            // ast::StructRest::None if fields.is_empty() => return format!("{path_str} {{}}"),
+            // ast::StructRest::Rest(_) if fields.is_empty() => {
+            // return Ok(format!("{path_str} {{ .. }}"));
+            // }
+            ast::StructRest::Rest(_) | ast::StructRest::Base(_) => true,
+            _ => false,
+        },
+        None => false,
+    };
+
+    let field_iter = fields.iter().map(StructLitField::Regular).chain(
+        struct_rest
+            .and_then(|rest| match rest {
+                ast::StructRest::Base(expr) => Some(StructLitField::Base(&**expr)),
+                ast::StructRest::Rest(span) => Some(StructLitField::Rest(*span)),
+                ast::StructRest::None => None,
+            })
+            .into_iter(),
+    );
+
+    let span_lo = |item: &StructLitField<'_, T>| match *item {
+        StructLitField::Regular(field) => field.get_span().lo(),
+        StructLitField::Base(expr) => {
+            let last_field_hi = fields
+                .last()
+                .map_or(span.lo(), |field| field.get_span().hi());
+            let snippet = context.snippet(mk_sp(last_field_hi, expr.span.lo()));
+            let pos = snippet.find_uncommented("..").unwrap();
+            last_field_hi + BytePos(pos as u32)
+        }
+        StructLitField::Rest(span) => span.lo(),
+    };
+    let span_hi = |item: &StructLitField<'_, T>| match *item {
+        StructLitField::Regular(field) => field.get_span().hi(),
+        StructLitField::Base(expr) => expr.span.hi(),
+        StructLitField::Rest(span) => span.hi(),
+    };
+    let rewrite = |item: &StructLitField<'_, T>| match *item {
+        StructLitField::Regular(field) => {
+            field.rewrite_aligned_item(context, item_shape, field_prefix_max_width)
+        }
+        StructLitField::Base(expr) => {
+            // 2 = ..
+            expr.rewrite_result(context, shape.offset_left(2, span)?)
+                .map(|s| format!("..{}", s))
+        }
+        StructLitField::Rest(_) => Ok("..".to_owned()),
+    };
+
     let mut items = itemize_list(
         context.snippet_provider,
-        fields.iter(),
+        field_iter,
         "}",
         ",",
-        |field| field.get_span().lo(),
-        |field| field.get_span().hi(),
-        |field| field.rewrite_aligned_item(context, item_shape, field_prefix_max_width),
+        span_lo,
+        span_hi,
+        rewrite,
         span.lo(),
         span.hi(),
         false,
@@ -258,6 +321,8 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
 
     let separator_tactic = if force_trailing_separator {
         SeparatorTactic::Always
+    } else if has_base_or_rest {
+        SeparatorTactic::Never
     } else {
         context.config.trailing_comma()
     };

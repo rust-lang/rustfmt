@@ -1620,10 +1620,6 @@ fn rewrite_index(
     }
 }
 
-fn struct_lit_can_be_aligned(fields: &[ast::ExprField], has_base: bool) -> bool {
-    !has_base && fields.iter().all(|field| !field.is_shorthand)
-}
-
 fn rewrite_struct_lit<'a>(
     context: &RewriteContext<'_>,
     path: &ast::Path,
@@ -1660,15 +1656,14 @@ fn rewrite_struct_lit<'a>(
 
     let one_line_width = h_shape.map_or(0, |shape| shape.width);
     let body_lo = context.snippet_provider.span_after(span, "{");
-    let fields_str = if struct_lit_can_be_aligned(fields, has_base_or_rest)
-        && context.config.struct_field_align_threshold() > 0
-    {
+    let fields_str = if context.config.struct_field_align_threshold() > 0 {
         rewrite_with_alignment(
             fields,
             context,
             v_shape,
             mk_sp(body_lo, span.hi()),
             one_line_width,
+            Some(struct_rest),
         )
         .unknown_error()?
     } else {
@@ -1720,10 +1715,10 @@ fn rewrite_struct_lit<'a>(
             body_lo,
             span.hi(),
             false,
-        );
-        let item_vec = items.collect::<Vec<_>>();
+        )
+        .collect::<Vec<_>>();
 
-        let tactic = struct_lit_tactic(h_shape, context, &item_vec);
+        let tactic = struct_lit_tactic(h_shape, context, &items);
         let nested_shape = shape_for_tactic(tactic, h_shape, v_shape);
 
         let ends_with_comma = span_ends_with_comma(context, span);
@@ -1736,7 +1731,7 @@ fn rewrite_struct_lit<'a>(
             force_no_trailing_comma || has_base_or_rest || !context.use_block_indent(),
         );
 
-        write_list(&item_vec, &fmt)?
+        write_list(&items, &fmt)?
     };
 
     let fields_str =
