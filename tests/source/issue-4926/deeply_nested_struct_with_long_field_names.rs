@@ -1,4 +1,4 @@
-// rustfmt-struct_field_align_threshold: 27
+// rustfmt-struct_field_align_threshold: 30
 
 struct X {
     really_really_long_field_a: i32,
