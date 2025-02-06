@@ -235,10 +235,6 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
 
     let has_base_or_rest = match struct_rest {
         Some(rest) => match rest {
-            // ast::StructRest::None if fields.is_empty() => return format!("{path_str} {{}}"),
-            // ast::StructRest::Rest(_) if fields.is_empty() => {
-            // return Ok(format!("{path_str} {{ .. }}"));
-            // }
             ast::StructRest::Rest(_) | ast::StructRest::Base(_) => true,
             _ => false,
         },

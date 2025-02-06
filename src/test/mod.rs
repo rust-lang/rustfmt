@@ -181,12 +181,12 @@ fn system_tests() {
     init_log();
     run_test_with(&TestSetting::default(), || {
         // Get all files in the tests/source directory.
-        // let files = get_test_files(Path::new("tests/source"), true);
-        let files = vec![
-            // PathBuf::from("tests/source/issue_6096.rs"),
-            // PathBuf::from("tests/source/issue_6080.rs")
-            PathBuf::from("tests/source/configs/struct_field_align_threshold/20.rs")
-        ];
+        let files = get_test_files(Path::new("tests/source"), true);
+        // let files = vec![
+        //     PathBuf::from("tests/source/issue_6096.rs"),
+        //     PathBuf::from("tests/source/issue_6080.rs"),
+        //     PathBuf::from("tests/source/issue-4926/deeply_nested_struct_with_long_field_names.rs"),
+        // ];
         // dbg!(&files);
         let (_reports, count, fails) = check_files(files, &None);
 

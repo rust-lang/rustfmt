@@ -1656,7 +1656,7 @@ fn rewrite_struct_lit<'a>(
 
     let one_line_width = h_shape.map_or(0, |shape| shape.width);
     let body_lo = context.snippet_provider.span_after(span, "{");
-    let fields_str = if context.config.struct_field_align_threshold() > 0 {
+    let fields_str = if !fields.is_empty() && context.config.struct_field_align_threshold() > 0 {
         rewrite_with_alignment(
             fields,
             context,
