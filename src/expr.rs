@@ -56,8 +56,29 @@ pub(crate) enum ExprType {
 
 pub(crate) fn lit_ends_in_dot(lit: &Lit, context: &RewriteContext<'_>) -> bool {
     match lit.kind {
-        LitKind::Float => rewrite_float_lit_inner(context, *lit).ends_with('.'),
+        LitKind::Float => float_lit_ends_in_dot(
+            lit.symbol.as_str(),
+            lit.suffix.as_ref().map(|s| s.as_str()),
+            context.config.float_literal_trailing_zero(),
+        ),
         _ => false,
+    }
+}
+
+pub(crate) fn float_lit_ends_in_dot(
+    symbol: &str,
+    suffix: Option<&str>,
+    float_literal_trailing_zero: FloatLiteralTrailingZero,
+) -> bool {
+    match float_literal_trailing_zero {
+        FloatLiteralTrailingZero::Preserve => symbol.ends_with('.') && suffix.is_none(),
+        FloatLiteralTrailingZero::IfNoPostfix | FloatLiteralTrailingZero::Always => false,
+        FloatLiteralTrailingZero::Never => {
+            let float_parts = parse_float_symbol(symbol).unwrap();
+            let has_postfix = float_parts.exponent.is_some() || suffix.is_some();
+            let fractional_part_zero = float_parts.is_fractional_part_zero();
+            !has_postfix && fractional_part_zero
+        }
     }
 }
 
@@ -1328,7 +1349,6 @@ fn rewrite_int_lit(
     }
 
     let symbol = token_lit.symbol.as_str();
-    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
 
     if let Some(symbol_stripped) = symbol.strip_prefix("0x") {
         let hex_lit = match context.config.hex_literal_case() {
@@ -1338,7 +1358,11 @@ fn rewrite_int_lit(
         };
         if let Some(hex_lit) = hex_lit {
             return wrap_str(
-                format!("0x{}{}", hex_lit, suffix.unwrap_or("")),
+                format!(
+                    "0x{}{}",
+                    hex_lit,
+                    token_lit.suffix.as_ref().map_or("", |s| s.as_str())
+                ),
                 context.config.max_width(),
                 shape,
             )
@@ -1354,16 +1378,26 @@ fn rewrite_int_lit(
     .max_width_error(shape.width, span)
 }
 
-fn rewrite_float_lit_inner(context: &RewriteContext<'_>, token_lit: token::Lit) -> String {
-    let symbol = token_lit.symbol.as_str();
-    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
-
+fn rewrite_float_lit(
+    context: &RewriteContext<'_>,
+    token_lit: token::Lit,
+    span: Span,
+    shape: Shape,
+) -> RewriteResult {
     if matches!(
         context.config.float_literal_trailing_zero(),
         FloatLiteralTrailingZero::Preserve
     ) {
-        return format!("{}{}", symbol, suffix.unwrap_or(""));
+        return wrap_str(
+            context.snippet(span).to_owned(),
+            context.config.max_width(),
+            shape,
+        )
+        .max_width_error(shape.width, span);
     }
+
+    let symbol = token_lit.symbol.as_str();
+    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
 
     let float_parts = parse_float_symbol(symbol).unwrap();
     let FloatSymbolParts {
@@ -1395,24 +1429,15 @@ fn rewrite_float_lit_inner(context: &RewriteContext<'_>, token_lit: token::Lit) 
     } else {
         ""
     };
-    format!(
-        "{}{}{}{}{}",
-        integer_part,
-        period,
-        fractional_part,
-        exponent.unwrap_or(""),
-        suffix.unwrap_or(""),
-    )
-}
-
-fn rewrite_float_lit(
-    context: &RewriteContext<'_>,
-    token_lit: token::Lit,
-    span: Span,
-    shape: Shape,
-) -> RewriteResult {
     wrap_str(
-        rewrite_float_lit_inner(context, token_lit),
+        format!(
+            "{}{}{}{}{}",
+            integer_part,
+            period,
+            fractional_part,
+            exponent.unwrap_or(""),
+            suffix.unwrap_or(""),
+        ),
         context.config.max_width(),
         shape,
     )
@@ -2459,5 +2484,38 @@ mod test {
         assert_eq!(parts.integer_part, "_1_23_");
         assert_eq!(parts.fractional_part, Some("_4_56_"));
         assert_eq!(parts.exponent, Some("e_7_89_"));
+    }
+
+    #[test]
+    fn test_float_lit_ends_in_dot() {
+        type TZ = FloatLiteralTrailingZero;
+
+        assert!(float_lit_ends_in_dot("1.", None, TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.0", None, TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.e2", None, TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.0e2", None, TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.", Some("f32"), TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.0", Some("f32"), TZ::Preserve));
+
+        assert!(!float_lit_ends_in_dot("1.", None, TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.0", None, TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.e2", None, TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.0e2", None, TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.", Some("f32"), TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.0", Some("f32"), TZ::Always));
+
+        assert!(!float_lit_ends_in_dot("1.", None, TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.0", None, TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.e2", None, TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.0e2", None, TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.", Some("f32"), TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.0", Some("f32"), TZ::IfNoPostfix));
+
+        assert!(float_lit_ends_in_dot("1.", None, TZ::Never));
+        assert!(float_lit_ends_in_dot("1.0", None, TZ::Never));
+        assert!(!float_lit_ends_in_dot("1.e2", None, TZ::Never));
+        assert!(!float_lit_ends_in_dot("1.0e2", None, TZ::Never));
+        assert!(!float_lit_ends_in_dot("1.", Some("f32"), TZ::Never));
+        assert!(!float_lit_ends_in_dot("1.0", Some("f32"), TZ::Never));
     }
 }
