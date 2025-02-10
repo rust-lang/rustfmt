@@ -1,4 +1,4 @@
-use rustc_ast::{ast, ptr};
+use rustc_ast::{Label, ast, ptr};
 use rustc_span::Span;
 use thin_vec::thin_vec;
 use tracing::debug;
@@ -55,7 +55,7 @@ pub(crate) fn rewrite_closure(
     // 1 = space between `|...|` and body.
     let body_shape = shape.offset_left(extra_offset, span)?;
 
-    if let ast::ExprKind::Block(ref block, _) = body.kind {
+    if let ast::ExprKind::Block(ref block, ref label) = body.kind {
         // The body of the closure is an empty block.
         if block.stmts.is_empty() && !block_contains_comment(context, block) {
             return body
@@ -72,7 +72,7 @@ pub(crate) fn rewrite_closure(
 
         result.or_else(|_| {
             // Either we require a block, or tried without and failed.
-            rewrite_closure_block(block, &prefix, context, body_shape)
+            rewrite_closure_block(block, label, &prefix, context, body_shape)
         })
     } else {
         rewrite_closure_expr(body, &prefix, context, body_shape).or_else(|_| {
@@ -104,8 +104,8 @@ fn get_inner_expr<'a>(
     prefix: &str,
     context: &RewriteContext<'_>,
 ) -> &'a ast::Expr {
-    if let ast::ExprKind::Block(ref block, _) = expr.kind {
-        if !needs_block(block, prefix, context) {
+    if let ast::ExprKind::Block(ref block, ref label) = expr.kind {
+        if !needs_block(block, label, prefix, context) {
             // block.stmts.len() == 1 except with `|| {{}}`;
             // https://github.com/rust-lang/rustfmt/issues/3844
             if let Some(expr) = block.stmts.first().and_then(stmt_expr) {
@@ -118,7 +118,12 @@ fn get_inner_expr<'a>(
 }
 
 // Figure out if a block is necessary.
-fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext<'_>) -> bool {
+fn needs_block(
+    block: &ast::Block,
+    label: &Option<Label>,
+    prefix: &str,
+    context: &RewriteContext<'_>,
+) -> bool {
     let has_attributes = block.stmts.first().map_or(false, |first_stmt| {
         !get_attrs_from_stmt(first_stmt).is_empty()
     });
@@ -128,6 +133,7 @@ fn needs_block(block: &ast::Block, prefix: &str, context: &RewriteContext<'_>) -
         || has_attributes
         || block_contains_comment(context, block)
         || prefix.contains('\n')
+        || label.is_some()
 }
 
 fn veto_block(e: &ast::Expr) -> bool {
@@ -231,15 +237,25 @@ fn rewrite_closure_expr(
 // Rewrite closure whose body is block.
 fn rewrite_closure_block(
     block: &ast::Block,
+    label: &Option<Label>,
     prefix: &str,
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> RewriteResult {
-    Ok(format!(
-        "{} {}",
-        prefix,
-        block.rewrite_result(context, shape)?
-    ))
+    if let Some(label) = label {
+        Ok(format!(
+            "{} {}: {}",
+            prefix,
+            context.snippet(label.ident.span),
+            block.rewrite_result(context, shape)?
+        ))
+    } else {
+        Ok(format!(
+            "{} {}",
+            prefix,
+            block.rewrite_result(context, shape)?
+        ))
+    }
 }
 
 // Return type is (prefix, extra_offset)
@@ -368,10 +384,11 @@ pub(crate) fn rewrite_last_closure(
             fn_arg_span: _,
         } = **closure;
         let body = match body.kind {
-            ast::ExprKind::Block(ref block, _)
+            ast::ExprKind::Block(ref block, ref label)
                 if !is_unsafe_block(block)
                     && !context.inside_macro()
-                    && is_simple_block(context, block, Some(&body.attrs)) =>
+                    && is_simple_block(context, block, Some(&body.attrs))
+                    && label.is_none() =>
             {
                 stmt_expr(&block.stmts[0]).unwrap_or(body)
             }
