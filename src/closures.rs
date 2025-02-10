@@ -353,6 +353,8 @@ pub(crate) fn rewrite_last_closure(
     expr: &ast::Expr,
     shape: Shape,
 ) -> RewriteResult {
+    debug!("rewrite_last_closure {:?}", expr);
+
     if let ast::ExprKind::Closure(ref closure) = expr.kind {
         let ast::Closure {
             ref binder,
