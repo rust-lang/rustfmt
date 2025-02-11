@@ -57,47 +57,6 @@ pub fn rustfnmt_test0_3(condition: bool) {
     };
 }
 
-// test0: the cause reported in issue: label is used, and there is usage, multiple statements
-pub fn rustfnmt_test0_0(condition: bool) {
-    test_macro!(|transaction| 'block: {
-        if condition {
-            break 'block 0;
-        }
-
-        todo!()
-    });
-}
-
-pub fn rustfnmt_test0_1(condition: bool) {
-    test_func(|transaction| 'block: {
-        if condition {
-            break 'block 0;
-        }
-
-        todo!()
-    });
-}
-
-pub fn rustfnmt_test0_2(condition: bool) {
-    test_func2(|transaction| 'block: {
-        if condition {
-            break 'block 0;
-        }
-
-        todo!()
-    }, 0);
-}
-
-pub fn rustfnmt_test0_3(condition: bool) {
-    let x = |transaction| 'block: {
-        if condition {
-            break 'block 0;
-        }
-
-        todo!()
-    };
-}
-
 
 // test1: label is unused, and there is usage, multiple statements
 pub fn rustfnmt_test1_0(condition: bool) {
