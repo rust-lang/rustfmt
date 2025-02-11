@@ -1,16 +1,3 @@
-macro_rules! test_macro {
-    (|$transaction: ident| $body: expr) => {{
-        let $transaction = some_value;
-        let _ = $body;
-    }};
-}
-
-fn test_func<T>(func: impl FnOnce(u8) -> T) {
-}
-
-fn test_func2<T>(func: impl FnOnce(u8) -> T, value: u8) {
-}
-
 // _0: in-macro
 // _1: last argument in function invocation
 // _2: non-last argument in function invocation
