@@ -55,7 +55,7 @@ pub(crate) fn rewrite_closure(
     // 1 = space between `|...|` and body.
     let body_shape = shape.offset_left(extra_offset, span)?;
 
-    if let ast::ExprKind::Block(ref block, ref label) = body.kind {
+    if let ast::ExprKind::Block(ref block, _) = body.kind {
         // The body of the closure is an empty block.
         if block.stmts.is_empty() && !block_contains_comment(context, block) {
             return body
@@ -72,7 +72,7 @@ pub(crate) fn rewrite_closure(
 
         result.or_else(|_| {
             // Either we require a block, or tried without and failed.
-            rewrite_closure_block(block, label, &prefix, context, body_shape)
+            rewrite_closure_block(body, &prefix, context, body_shape)
         })
     } else {
         rewrite_closure_expr(body, &prefix, context, body_shape).or_else(|_| {
@@ -236,26 +236,16 @@ fn rewrite_closure_expr(
 
 // Rewrite closure whose body is block.
 fn rewrite_closure_block(
-    block: &ast::Block,
-    label: &Option<Label>,
+    block: &ast::Expr,
     prefix: &str,
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> RewriteResult {
-    if let Some(label) = label {
-        Ok(format!(
-            "{} {}: {}",
-            prefix,
-            context.snippet(label.ident.span),
-            block.rewrite_result(context, shape)?
-        ))
-    } else {
-        Ok(format!(
-            "{} {}",
-            prefix,
-            block.rewrite_result(context, shape)?
-        ))
-    }
+    Ok(format!(
+        "{} {}",
+        prefix,
+        block.rewrite_result(context, shape)?
+    ))
 }
 
 // Return type is (prefix, extra_offset)
