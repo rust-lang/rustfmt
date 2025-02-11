@@ -29,6 +29,14 @@ fn range_bounds() {
     let _binop_range = 3. / 2. ..4.;
 }
 
+fn method_calls() {
+    let x = (1.).neg();
+    let y = 2.3.neg();
+    let z = (4.).neg();
+    let u = 5f32.neg();
+    let v = -(6.).neg();
+}
+
 fn line_wrapping() {
     let array = [
         1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15., 16., 17., 18.,

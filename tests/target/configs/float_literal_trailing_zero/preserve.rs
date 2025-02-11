@@ -28,3 +28,11 @@ fn range_bounds() {
     if (1.0e1..2.0e1).contains(&1.0e1) {}
     let _binop_range = 3.0 / 2.0..4.0;
 }
+
+fn method_calls() {
+    let x = 1.0.neg();
+    let y = 2.3.neg();
+    let z = (4.).neg();
+    let u = 5.0f32.neg();
+    let v = -6.0.neg();
+}
