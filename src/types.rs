@@ -435,7 +435,7 @@ where
 }
 
 fn type_bound_colon(context: &RewriteContext<'_>) -> &'static str {
-    colon_spaces(context.config)
+    colon_spaces(context.config, false)
 }
 
 // If the return type is multi-lined, then force to use multiple lines for

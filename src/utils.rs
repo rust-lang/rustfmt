@@ -423,9 +423,9 @@ pub(crate) fn filtered_str_fits(snippet: &str, max_width: usize, shape: Shape) -
 }
 
 #[inline]
-pub(crate) fn colon_spaces(config: &Config) -> &'static str {
+pub(crate) fn colon_spaces(config: &Config, force_space_after_colon: bool) -> &'static str {
     let before = config.space_before_colon();
-    let after = config.space_after_colon();
+    let after = force_space_after_colon || config.space_after_colon();
     match (before, after) {
         (true, true) => " : ",
         (true, false) => " :",

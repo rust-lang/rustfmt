@@ -1786,7 +1786,7 @@ pub(crate) fn wrap_struct_field(
 }
 
 pub(crate) fn struct_lit_field_separator(config: &Config) -> &str {
-    colon_spaces(config)
+    colon_spaces(config, false)
 }
 
 pub(crate) fn rewrite_field(
