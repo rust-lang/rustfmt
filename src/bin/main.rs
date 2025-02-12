@@ -137,6 +137,12 @@ fn make_opts() -> Options {
     );
     opts.optopt(
         "",
+        "style-edition",
+        "The edition of the Style Guide (unstable).",
+        "[2015|2018|2021|2024]",
+    );
+    opts.optopt(
+        "",
         "color",
         "Use colored output (if supported)",
         "[always|never|auto]",
@@ -628,6 +634,10 @@ impl GetOptsOptions {
             options.edition = Some(edition_from_edition_str(edition_str)?);
         }
 
+        if let Some(ref edition_str) = matches.opt_str("style-edition") {
+            options.style_edition = Some(style_edition_from_style_edition_str(edition_str)?);
+        }
+
         if matches.opt_present("backup") {
             options.backup = true;
         }
@@ -652,10 +662,6 @@ impl GetOptsOptions {
                 Ok(color) => options.color = Some(color),
                 _ => return Err(format_err!("Invalid color: {}", color)),
             }
-        }
-
-        if let Some(ref edition_str) = matches.opt_str("style-edition") {
-            options.style_edition = Some(style_edition_from_style_edition_str(edition_str)?);
         }
 
         Ok(options)
@@ -767,6 +773,7 @@ fn style_edition_from_style_edition_str(edition_str: &str) -> Result<StyleEditio
         "2018" => Ok(StyleEdition::Edition2018),
         "2021" => Ok(StyleEdition::Edition2021),
         "2024" => Ok(StyleEdition::Edition2024),
+        "2027" => Ok(StyleEdition::Edition2027),
         _ => Err(format_err!("Invalid value for `--style-edition`")),
     }
 }

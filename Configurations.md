@@ -3062,7 +3062,9 @@ fn main() {
 
 ## `version`
 
-This option is deprecated and has been replaced by [`style_edition`](#style_edition)
+This option is deprecated and has been replaced by [`style_edition`](#style_edition).
+`version = "One"` is equivalent to `style_edition = "(2015|2018|2021)"` and
+`version = "Two"` is equivalent to `style_edition = "2024"`
 
 - **Default value**: `One`
 - **Possible values**: `One`, `Two`
@@ -3112,7 +3114,7 @@ Break comments to fit on the line
 
 Note that no wrapping will happen if:
 1. The comment is the start of a markdown header doc comment
-2. An URL was found in the comment
+2. A URL was found in the comment
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
