@@ -2,7 +2,6 @@
 
 use std::borrow::Cow;
 use std::cmp::{Ordering, max, min};
-use std::backtrace::Backtrace;
 
 use regex::Regex;
 use rustc_ast::visit;
@@ -1930,10 +1929,6 @@ impl Rewrite for ast::FieldDef {
         rewrite_struct_field(context, self, shape, 0)
     }
 }
-
-use std::sync::atomic::{AtomicUsize};
-
-static CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) fn rewrite_struct_field(
     context: &RewriteContext<'_>,
