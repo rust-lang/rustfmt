@@ -241,6 +241,11 @@ fn rewrite_closure_block(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> RewriteResult {
+    debug_assert!(
+        matches!(block.kind, ast::ExprKind::Block(..)),
+        "expected a block expression"
+    );
+
     Ok(format!(
         "{} {}",
         prefix,
