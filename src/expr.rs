@@ -33,7 +33,7 @@ use crate::types::{PathContext, rewrite_path};
 use crate::utils::{
     colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with,
     inner_attributes, last_line_extendable, last_line_width, mk_sp, outer_attributes,
-    semicolon_for_expr, unicode_str_width, wrap_str,
+    semicolon_for_expr, unicode_str_width, validate_shape,
 };
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
@@ -250,12 +250,9 @@ pub(crate) fn format_expr(
         | ast::ExprKind::Await(_, _) => rewrite_chain(expr, context, shape),
         ast::ExprKind::MacCall(ref mac) => {
             rewrite_macro(mac, None, context, shape, MacroPosition::Expression).or_else(|_| {
-                wrap_str(
-                    context.snippet(expr.span).to_owned(),
-                    context.config.max_width(),
-                    shape,
-                )
-                .max_width_error(shape.width, expr.span)
+                let snippet = context.snippet(expr.span).to_owned();
+                validate_shape(&snippet, shape, context.config, expr.span)?;
+                Ok(snippet)
             })
         }
         ast::ExprKind::Ret(None) => Ok("return".to_owned()),
@@ -1276,12 +1273,11 @@ pub(crate) fn rewrite_literal(
     match token_lit.kind {
         token::LitKind::Str => rewrite_string_lit(context, span, shape),
         token::LitKind::Integer => rewrite_int_lit(context, token_lit, span, shape),
-        _ => wrap_str(
-            context.snippet(span).to_owned(),
-            context.config.max_width(),
-            shape,
-        )
-        .max_width_error(shape.width, span),
+        _ => {
+            let snippet = context.snippet(span).to_owned();
+            validate_shape(&snippet, shape, context.config, span)?;
+            Ok(snippet)
+        }
     }
 }
 
@@ -1297,8 +1293,9 @@ fn rewrite_string_lit(context: &RewriteContext<'_>, span: Span, shape: Shape) ->
         {
             return Ok(string_lit.to_owned());
         } else {
-            return wrap_str(string_lit.to_owned(), context.config.max_width(), shape)
-                .max_width_error(shape.width, span);
+            let string = string_lit.to_owned();
+            validate_shape(&string, shape, context.config, span)?;
+            return Ok(string);
         }
     }
 
@@ -1328,25 +1325,19 @@ fn rewrite_int_lit(
             HexLiteralCase::Lower => Some(symbol_stripped.to_ascii_lowercase()),
         };
         if let Some(hex_lit) = hex_lit {
-            return wrap_str(
-                format!(
-                    "0x{}{}",
-                    hex_lit,
-                    token_lit.suffix.as_ref().map_or("", |s| s.as_str())
-                ),
-                context.config.max_width(),
-                shape,
-            )
-            .max_width_error(shape.width, span);
+            let string = format!(
+                "0x{}{}",
+                hex_lit,
+                token_lit.suffix.as_ref().map_or("", |s| s.as_str())
+            );
+            validate_shape(&string, shape, context.config, span)?;
+            return Ok(string);
         }
     }
 
-    wrap_str(
-        context.snippet(span).to_owned(),
-        context.config.max_width(),
-        shape,
-    )
-    .max_width_error(shape.width, span)
+    let string = context.snippet(span).to_owned();
+    validate_shape(&string, shape, context.config, span)?;
+    Ok(string)
 }
 
 fn choose_separator_tactic(context: &RewriteContext<'_>, span: Span) -> Option<SeparatorTactic> {
