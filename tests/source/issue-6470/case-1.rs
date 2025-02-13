@@ -16,7 +16,7 @@ struct SomeStruct {
 }
 
 const THING1: ::some_crate::SomeType = ::some_crate::SomeType::default();
-const THING2: ::some_crate::SomeType = ::some_crate::SomeType::default();
+const THING2 : ::some_crate::SomeType = ::some_crate::SomeType::default();
 
 const THING3: some_crate::SomeType = some_crate::SomeType::default();
 const THING4 :some_crate::SomeType = some_crate::SomeType::default();
@@ -30,7 +30,7 @@ const THING10 : i32 = 0;
 
 fn main() {
     let x1: ::some_crate::SomeType = ::some_crate::SomeType::default();
-    let x2: ::some_crate::SomeType = ::some_crate::SomeType::default();
+    let x2 : ::some_crate::SomeType = ::some_crate::SomeType::default();
 
     let x3:some_crate::SomeType = ::some_crate::SomeType::default();
     let x4 : some_crate::SomeType = ::some_crate::SomeType::default();
