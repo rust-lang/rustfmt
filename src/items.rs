@@ -96,7 +96,8 @@ impl Rewrite for ast::Local {
             let mut infix = String::with_capacity(32);
 
             if let Some(ref ty) = self.ty {
-                let force_space_after_colon = is_ty_kind_with_global_decl(&ty.clone().into_inner().kind);
+                let force_space_after_colon =
+                    is_ty_kind_with_absolute_decl(&ty.clone().into_inner().kind);
                 let separator = type_annotation_separator(context.config, force_space_after_colon);
 
                 let ty_shape = if pat_str.contains('\n') {
@@ -1895,7 +1896,11 @@ fn rewrite_ty<R: Rewrite>(
 fn type_annotation_spacing(config: &Config, force_space_after_colon: bool) -> (&str, &str) {
     (
         if config.space_before_colon() { " " } else { "" },
-        if force_space_after_colon || config.space_after_colon() { " " } else { "" },
+        if force_space_after_colon || config.space_after_colon() {
+            " "
+        } else {
+            ""
+        },
     )
 }
 
@@ -1941,7 +1946,8 @@ pub(crate) fn rewrite_struct_field(
         return Ok(context.snippet(field.span()).to_owned());
     }
 
-    let force_space_after_colon = is_ty_kind_with_global_decl(&field.ty.clone().into_inner().kind);
+    let force_space_after_colon =
+        is_ty_kind_with_absolute_decl(&field.ty.clone().into_inner().kind);
     let type_annotation_spacing = type_annotation_spacing(context.config, force_space_after_colon);
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
@@ -2081,7 +2087,7 @@ impl<'a> StaticParts<'a> {
     }
 }
 
-fn is_ty_kind_with_global_decl(ty_kind: &ast::TyKind) -> bool {
+fn is_ty_kind_with_absolute_decl(ty_kind: &ast::TyKind) -> bool {
     match ty_kind {
         ast::TyKind::Path(None, ast_path) => {
             let segments = &ast_path.segments;
@@ -2089,7 +2095,7 @@ fn is_ty_kind_with_global_decl(ty_kind: &ast::TyKind) -> bool {
                 Some(path_segment) => path_segment.ident.name == symbol::kw::PathRoot,
                 None => false,
             }
-        },
+        }
         _ => false,
     }
 }
@@ -2109,7 +2115,7 @@ fn rewrite_static(
 
     // if after a semicolon is absolute path declaration (::) need to force
     //  space after colon, because ::: syntax cannot compile
-    let force_space_after_colon = is_ty_kind_with_global_decl(&static_parts.ty.kind);
+    let force_space_after_colon = is_ty_kind_with_absolute_decl(&static_parts.ty.kind);
     let colon = colon_spaces(context.config, force_space_after_colon);
 
     let mut prefix = format!(
