@@ -96,13 +96,9 @@ impl Rewrite for ast::Local {
             let mut infix = String::with_capacity(32);
 
             if let Some(ref ty) = self.ty {
-
-                let force_space_after_colon = match ty.clone().into_inner().kind {
-                    ast::TyKind::Path(None, _) => true,
-                    _ => false,
-                };
-
+                let force_space_after_colon = is_ty_kind_with_global_decl(&ty.clone().into_inner().kind);
                 let separator = type_annotation_separator(context.config, force_space_after_colon);
+
                 let ty_shape = if pat_str.contains('\n') {
                     shape.with_max_width(context.config)
                 } else {
@@ -1945,10 +1941,7 @@ pub(crate) fn rewrite_struct_field(
         return Ok(context.snippet(field.span()).to_owned());
     }
 
-    let force_space_after_colon = match field.ty.clone().into_inner().kind {
-        ast::TyKind::Path(None, _) => true,
-        _ => false,
-    };
+    let force_space_after_colon = is_ty_kind_with_global_decl(&field.ty.clone().into_inner().kind);
     let type_annotation_spacing = type_annotation_spacing(context.config, force_space_after_colon);
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
@@ -2088,6 +2081,19 @@ impl<'a> StaticParts<'a> {
     }
 }
 
+fn is_ty_kind_with_global_decl(ty_kind: &ast::TyKind) -> bool {
+    match ty_kind {
+        ast::TyKind::Path(None, ast_path) => {
+            let segments = &ast_path.segments;
+            match segments.first() {
+                Some(path_segment) => path_segment.ident.name == symbol::kw::PathRoot,
+                None => false,
+            }
+        },
+        _ => false,
+    }
+}
+
 fn rewrite_static(
     context: &RewriteContext<'_>,
     static_parts: &StaticParts<'_>,
@@ -2103,10 +2109,7 @@ fn rewrite_static(
 
     // if after a semicolon is absolute path declaration (::) need to force
     //  space after colon, because ::: syntax cannot compile
-    let force_space_after_colon = match static_parts.ty.kind {
-        ast::TyKind::Path(None, _) => true,
-        _ => false,
-    };
+    let force_space_after_colon = is_ty_kind_with_global_decl(&static_parts.ty.kind);
     let colon = colon_spaces(context.config, force_space_after_colon);
 
     let mut prefix = format!(
