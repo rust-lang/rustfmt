@@ -1262,7 +1262,7 @@ Control the presence of trailing zero in floating-point literal values
 
 - **Default value**: `Preserve`
 - **Possible values**: `Preserve`, `Always`, `IfNoPostfix`, `Never`
-- **Stable**: No (tracking issue: [#3187](https://github.com/rust-lang/rustfmt/issues/3187))
+- **Stable**: No (tracking issue: [#6471](https://github.com/rust-lang/rustfmt/issues/6471))
 
 #### `Preserve` (default):
 
