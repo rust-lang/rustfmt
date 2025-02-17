@@ -1256,6 +1256,56 @@ Control the case of the letters in hexadecimal literal values
 - **Possible values**: `Preserve`, `Upper`, `Lower`
 - **Stable**: No (tracking issue: [#5081](https://github.com/rust-lang/rustfmt/issues/5081))
 
+## `float_literal_trailing_zero`
+
+Control the presence of trailing zero in floating-point literal values
+
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `Always`, `IfNoPostfix`, `Never`
+- **Stable**: No (tracking issue: [#6471](https://github.com/rust-lang/rustfmt/issues/6471))
+
+#### `Preserve` (default):
+
+Leave the literal as-is.
+
+```rust
+fn main() {
+    let values = [1.0, 2., 3.0e10, 4f32];
+}
+```
+
+#### `Always`:
+
+Add a trailing zero to the literal:
+
+```rust
+fn main() {
+    let values = [1.0, 2.0, 3.0e10, 4.0f32];
+}
+```
+
+#### `IfNoPostfix`:
+
+Add a trailing zero by default. If the literal contains an exponent or a suffix, the zero
+and the preceding period are removed:
+
+```rust
+fn main() {
+    let values = [1.0, 2.0, 3e10, 4f32];
+}
+```
+
+#### `Never`:
+
+Remove the trailing zero. If the literal contains an exponent or a suffix, the preceding
+period is also removed:
+
+```rust
+fn main() {
+    let values = [1., 2., 3e10, 4f32];
+}
+```
+
 ## `hide_parse_errors`
 
 This option is deprecated and has been renamed to `show_parse_errors` to avoid confusion around the double negative default of `hide_parse_errors=false`.
