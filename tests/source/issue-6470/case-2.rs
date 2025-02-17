@@ -3,8 +3,6 @@
 struct SomeStruct {
     field1: ::some_crate::Thing,
     field2 : ::some_crate::Thing,
-    field1_enum: ::some_crate::Thing,
-    field2_enum : ::some_crate::Thing,
 
     field3:some_crate::Thing,
     field4 :some_crate::Thing,
@@ -79,12 +77,10 @@ fn main() {
     let x13: &::some_crate::SomeType = ::some_crate::SomeType::default();
     let x14 : &::some_crate::SomeType = ::some_crate::SomeType::default();
 
-    let y = SomeStruct {
+
+    let y_call = SomeStruct {
         field1: ::some_crate::Thing::default(),
         field2 : ::some_crate::Thing::default(),
-        field1_enum: ::some_crate::Thing::Enum1,
-        field2_enum : ::some_crate::Thing::Enum1,
-
 
         field3:some_crate::Thing::default(),
         field4 :some_crate::Thing::default(),
@@ -100,6 +96,82 @@ fn main() {
         field12: &::some_crate::Thing::default(),
         field13 :&::some_crate::Thing::default(),
         field14 : &::some_crate::Thing::default(),
+    };
+
+    let y_method_call = SomeStruct {
+        field1: ::some_crate::Thing::Default.call(),
+        field2 : ::some_crate::Thing::Default.call(),
+
+        ..y_call
+    };
+
+    let y_binary = SomeStruct {
+        field1: ::some_crate::Thing::Default+ 12,
+        field2 : ::some_crate::Thing::Default + 12,
+
+        ..y_call
+    };
+
+    let y_cast = SomeStruct {
+        field1: ::some_crate::Thing::Default as i32,
+        field2 : ::some_crate::Thing::Default as i32,
+
+        ..y_call
+    };
+
+    let y_type = SomeStruct {
+        field7: ::some_crate::Thing::Default,
+        field8 : ::some_crate::Thing::Default,
+
+        ..y_call
+    };
+
+    let y_field = SomeStruct {
+        field1: ::some_crate::Thing::Default.some_field,
+        field2 : ::some_crate::Thing::Default.some_field,
+
+        ..y_call
+    };
+
+    let y_index = SomeStruct {
+        field1: ::some_crate::Thing::Default[0],
+        field2 : ::some_crate::Thing::Default[0],
+
+        ..y_call
+    };
+
+    let y_range = SomeStruct {
+        field1: ::some_crate::Thing::DefaultStart..12,
+        field2 : ::some_crate::Thing::DefaultStart..12,
+
+        ..y_call
+    };
+
+    let y_path = SomeStruct {
+        field1: ::some_crate::Thing::Default,
+        field2 : ::some_crate::Thing::Default,
+
+        ..y_call
+    };
+
+    let y_mac_call = SomeStruct {
+        field1: ::some_crate::macr!(),
+        field2 : ::some_crate::macr!(),
+
+        ..y_call
+    };
+
+    let y_struct = SomeStruct {
+        field1: ::some_crate::Thing::SomeStruct{
+            fieldA1: 123,
+            fieldA2: 123,
+        },
+        field2 : ::some_crate::Thing::SomeStruct{
+            fieldA1: 123,
+            fieldA2: 123,
+        },
+
+        ..y_call
     };
 }
 
