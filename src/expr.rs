@@ -6,7 +6,6 @@ use rustc_ast::token::{Delimiter, Lit, LitKind};
 use rustc_ast::{ForLoopKind, MatchKind, ast, ptr, token};
 use rustc_span::{BytePos, Span};
 use tracing::debug;
-use tracing::field::debug;
 use crate::chains::rewrite_chain;
 use crate::closures;
 use crate::comment::{
@@ -30,7 +29,11 @@ use crate::spanned::Spanned;
 use crate::stmt;
 use crate::string::{StringFormat, rewrite_string};
 use crate::types::{PathContext, rewrite_path};
-use crate::utils::{colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with, inner_attributes, is_absolute_decl_path, last_line_extendable, last_line_width, mk_sp, outer_attributes, semicolon_for_expr, unicode_str_width, wrap_str};
+use crate::utils::{
+    colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with,
+    inner_attributes, is_absolute_decl_path, last_line_extendable, last_line_width, mk_sp, outer_attributes,
+    semicolon_for_expr, unicode_str_width, wrap_str,
+};
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
 
