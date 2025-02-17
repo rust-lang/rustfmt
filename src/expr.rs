@@ -13,8 +13,8 @@ use crate::comment::{
     CharClasses, FindUncommented, combine_strs_with_missing_comments, contains_comment,
     recover_comment_removed, rewrite_comment, rewrite_missing_comment,
 };
-use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, HexLiteralCase, IndentStyle, StyleEdition};
+use crate::config::{FloatLiteralTrailingZero, lists::*};
 use crate::lists::{
     ListFormatting, Separator, definitive_tactic, itemize_list, shape_for_tactic,
     struct_lit_formatting, struct_lit_shape, struct_lit_tactic, write_list,
@@ -54,8 +54,32 @@ pub(crate) enum ExprType {
     SubExpression,
 }
 
-pub(crate) fn lit_ends_in_dot(lit: &Lit) -> bool {
-    matches!(lit, Lit { kind: LitKind::Float, suffix: None, symbol } if symbol.as_str().ends_with('.'))
+pub(crate) fn lit_ends_in_dot(lit: &Lit, context: &RewriteContext<'_>) -> bool {
+    match lit.kind {
+        LitKind::Float => float_lit_ends_in_dot(
+            lit.symbol.as_str(),
+            lit.suffix.as_ref().map(|s| s.as_str()),
+            context.config.float_literal_trailing_zero(),
+        ),
+        _ => false,
+    }
+}
+
+pub(crate) fn float_lit_ends_in_dot(
+    symbol: &str,
+    suffix: Option<&str>,
+    float_literal_trailing_zero: FloatLiteralTrailingZero,
+) -> bool {
+    match float_literal_trailing_zero {
+        FloatLiteralTrailingZero::Preserve => symbol.ends_with('.') && suffix.is_none(),
+        FloatLiteralTrailingZero::IfNoPostfix | FloatLiteralTrailingZero::Always => false,
+        FloatLiteralTrailingZero::Never => {
+            let float_parts = parse_float_symbol(symbol).unwrap();
+            let has_postfix = float_parts.exponent.is_some() || suffix.is_some();
+            let fractional_part_zero = float_parts.is_fractional_part_zero();
+            !has_postfix && fractional_part_zero
+        }
+    }
 }
 
 pub(crate) fn format_expr(
@@ -297,7 +321,7 @@ pub(crate) fn format_expr(
 
             fn needs_space_before_range(context: &RewriteContext<'_>, lhs: &ast::Expr) -> bool {
                 match lhs.kind {
-                    ast::ExprKind::Lit(token_lit) => lit_ends_in_dot(&token_lit),
+                    ast::ExprKind::Lit(token_lit) => lit_ends_in_dot(&token_lit, context),
                     ast::ExprKind::Unary(_, ref expr) => needs_space_before_range(context, expr),
                     ast::ExprKind::Binary(_, _, ref rhs_expr) => {
                         needs_space_before_range(context, rhs_expr)
@@ -1276,6 +1300,7 @@ pub(crate) fn rewrite_literal(
     match token_lit.kind {
         token::LitKind::Str => rewrite_string_lit(context, span, shape),
         token::LitKind::Integer => rewrite_int_lit(context, token_lit, span, shape),
+        token::LitKind::Float => rewrite_float_lit(context, token_lit, span, shape),
         _ => wrap_str(
             context.snippet(span).to_owned(),
             context.config.max_width(),
@@ -1319,6 +1344,10 @@ fn rewrite_int_lit(
     span: Span,
     shape: Shape,
 ) -> RewriteResult {
+    if token_lit.is_semantic_float() {
+        return rewrite_float_lit(context, token_lit, span, shape);
+    }
+
     let symbol = token_lit.symbol.as_str();
 
     if let Some(symbol_stripped) = symbol.strip_prefix("0x") {
@@ -1343,6 +1372,72 @@ fn rewrite_int_lit(
 
     wrap_str(
         context.snippet(span).to_owned(),
+        context.config.max_width(),
+        shape,
+    )
+    .max_width_error(shape.width, span)
+}
+
+fn rewrite_float_lit(
+    context: &RewriteContext<'_>,
+    token_lit: token::Lit,
+    span: Span,
+    shape: Shape,
+) -> RewriteResult {
+    if matches!(
+        context.config.float_literal_trailing_zero(),
+        FloatLiteralTrailingZero::Preserve
+    ) {
+        return wrap_str(
+            context.snippet(span).to_owned(),
+            context.config.max_width(),
+            shape,
+        )
+        .max_width_error(shape.width, span);
+    }
+
+    let symbol = token_lit.symbol.as_str();
+    let suffix = token_lit.suffix.as_ref().map(|s| s.as_str());
+
+    let float_parts = parse_float_symbol(symbol).unwrap();
+    let FloatSymbolParts {
+        integer_part,
+        fractional_part,
+        exponent,
+    } = float_parts;
+
+    let has_postfix = exponent.is_some() || suffix.is_some();
+    let fractional_part_nonzero = !float_parts.is_fractional_part_zero();
+
+    let (include_period, include_fractional_part) =
+        match context.config.float_literal_trailing_zero() {
+            FloatLiteralTrailingZero::Preserve => unreachable!("handled above"),
+            FloatLiteralTrailingZero::Always => (true, true),
+            FloatLiteralTrailingZero::IfNoPostfix => (
+                fractional_part_nonzero || !has_postfix,
+                fractional_part_nonzero || !has_postfix,
+            ),
+            FloatLiteralTrailingZero::Never => (
+                fractional_part_nonzero || !has_postfix,
+                fractional_part_nonzero,
+            ),
+        };
+
+    let period = if include_period { "." } else { "" };
+    let fractional_part = if include_fractional_part {
+        fractional_part.unwrap_or("0")
+    } else {
+        ""
+    };
+    wrap_str(
+        format!(
+            "{}{}{}{}{}",
+            integer_part,
+            period,
+            fractional_part,
+            exponent.unwrap_or(""),
+            suffix.unwrap_or(""),
+        ),
         context.config.max_width(),
         shape,
     )
@@ -2274,9 +2369,45 @@ pub(crate) fn is_method_call(expr: &ast::Expr) -> bool {
     }
 }
 
+/// Indicates the parts of a float literal specified as a string.
+struct FloatSymbolParts<'a> {
+    /// The integer part, e.g. `123` in `123.456e789`.
+    /// Always non-empty, because in Rust `.1` is not a valid floating-point literal:
+    /// <https://doc.rust-lang.org/reference/tokens.html#floating-point-literals>
+    integer_part: &'a str,
+    /// The fractional part excluding the decimal point, e.g. `456` in `123.456e789`.
+    fractional_part: Option<&'a str>,
+    /// The exponent part including the `e` or `E`, e.g. `e789` in `123.456e789`.
+    exponent: Option<&'a str>,
+}
+
+impl FloatSymbolParts<'_> {
+    fn is_fractional_part_zero(&self) -> bool {
+        let zero_literal_regex = static_regex!(r"^[0_]+$");
+        self.fractional_part
+            .is_none_or(|s| zero_literal_regex.is_match(s))
+    }
+}
+
+/// Parses a float literal. The `symbol` must be a valid floating point literal without a type
+/// suffix. Otherwise the function may panic or return wrong result.
+fn parse_float_symbol(symbol: &str) -> Result<FloatSymbolParts<'_>, &'static str> {
+    // This regex may accept invalid float literals (such as `1`, `_` or `2.e3`). That's ok.
+    // We only use it to parse literals whose validity has already been established.
+    let float_literal_regex = static_regex!(r"^([0-9_]+)(?:\.([0-9_]+)?)?([eE][+-]?[0-9_]+)?$");
+    let caps = float_literal_regex
+        .captures(symbol)
+        .ok_or("invalid float literal")?;
+    Ok(FloatSymbolParts {
+        integer_part: caps.get(1).ok_or("missing integer part")?.as_str(),
+        fractional_part: caps.get(2).map(|m| m.as_str()),
+        exponent: caps.get(3).map(|m| m.as_str()),
+    })
+}
+
 #[cfg(test)]
 mod test {
-    use super::last_line_offsetted;
+    use super::*;
 
     #[test]
     fn test_last_line_offsetted() {
@@ -2297,5 +2428,94 @@ mod test {
         assert_eq!(last_line_offsetted(2, lines), true);
         let lines = "one\n two      three";
         assert_eq!(last_line_offsetted(2, lines), false);
+    }
+
+    #[test]
+    fn test_parse_float_symbol() {
+        let parts = parse_float_symbol("123.456e789").unwrap();
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, Some("456"));
+        assert_eq!(parts.exponent, Some("e789"));
+
+        let parts = parse_float_symbol("123.456e+789").unwrap();
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, Some("456"));
+        assert_eq!(parts.exponent, Some("e+789"));
+
+        let parts = parse_float_symbol("123.456e-789").unwrap();
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, Some("456"));
+        assert_eq!(parts.exponent, Some("e-789"));
+
+        let parts = parse_float_symbol("123e789").unwrap();
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, None);
+        assert_eq!(parts.exponent, Some("e789"));
+
+        let parts = parse_float_symbol("123E789").unwrap();
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, None);
+        assert_eq!(parts.exponent, Some("E789"));
+
+        let parts = parse_float_symbol("123.").unwrap();
+        assert_eq!(parts.integer_part, "123");
+        assert_eq!(parts.fractional_part, None);
+        assert_eq!(parts.exponent, None);
+    }
+
+    #[test]
+    fn test_parse_float_symbol_with_underscores() {
+        let parts = parse_float_symbol("_123._456e_789").unwrap();
+        assert_eq!(parts.integer_part, "_123");
+        assert_eq!(parts.fractional_part, Some("_456"));
+        assert_eq!(parts.exponent, Some("e_789"));
+
+        let parts = parse_float_symbol("123_.456_e789_").unwrap();
+        assert_eq!(parts.integer_part, "123_");
+        assert_eq!(parts.fractional_part, Some("456_"));
+        assert_eq!(parts.exponent, Some("e789_"));
+
+        let parts = parse_float_symbol("1_23.4_56e7_89").unwrap();
+        assert_eq!(parts.integer_part, "1_23");
+        assert_eq!(parts.fractional_part, Some("4_56"));
+        assert_eq!(parts.exponent, Some("e7_89"));
+
+        let parts = parse_float_symbol("_1_23_._4_56_e_7_89_").unwrap();
+        assert_eq!(parts.integer_part, "_1_23_");
+        assert_eq!(parts.fractional_part, Some("_4_56_"));
+        assert_eq!(parts.exponent, Some("e_7_89_"));
+    }
+
+    #[test]
+    fn test_float_lit_ends_in_dot() {
+        type TZ = FloatLiteralTrailingZero;
+
+        assert!(float_lit_ends_in_dot("1.", None, TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.0", None, TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.e2", None, TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.0e2", None, TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.", Some("f32"), TZ::Preserve));
+        assert!(!float_lit_ends_in_dot("1.0", Some("f32"), TZ::Preserve));
+
+        assert!(!float_lit_ends_in_dot("1.", None, TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.0", None, TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.e2", None, TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.0e2", None, TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.", Some("f32"), TZ::Always));
+        assert!(!float_lit_ends_in_dot("1.0", Some("f32"), TZ::Always));
+
+        assert!(!float_lit_ends_in_dot("1.", None, TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.0", None, TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.e2", None, TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.0e2", None, TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.", Some("f32"), TZ::IfNoPostfix));
+        assert!(!float_lit_ends_in_dot("1.0", Some("f32"), TZ::IfNoPostfix));
+
+        assert!(float_lit_ends_in_dot("1.", None, TZ::Never));
+        assert!(float_lit_ends_in_dot("1.0", None, TZ::Never));
+        assert!(!float_lit_ends_in_dot("1.e2", None, TZ::Never));
+        assert!(!float_lit_ends_in_dot("1.0e2", None, TZ::Never));
+        assert!(!float_lit_ends_in_dot("1.", Some("f32"), TZ::Never));
+        assert!(!float_lit_ends_in_dot("1.0", Some("f32"), TZ::Never));
     }
 }
