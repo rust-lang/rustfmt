@@ -582,12 +582,14 @@ impl<'a> FormatLines<'a> {
     fn char(&mut self, c: char, kind: FullCodeCharKind) {
         self.newline_count = 0;
         self.line_len += if c == '\t' {
+            self.line_buffer
+                .push_str(&" ".repeat(self.config.tab_spaces()));
             self.config.tab_spaces()
         } else {
-            1
+            self.line_buffer.push(c);
+            c.len_utf8()
         };
         self.last_was_space = c.is_whitespace();
-        self.line_buffer.push(c);
         if kind.is_string() {
             self.current_line_contains_string_literal = true;
         }
