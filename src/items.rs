@@ -1947,7 +1947,7 @@ pub(crate) fn rewrite_struct_field(
     }
 
     let force_space_after_colon =
-        is_ty_kind_with_absolute_decl(&field.ty.clone().into_inner().kind);
+        is_ty_kind_with_absolute_decl(&(*field.ty).kind);
     let type_annotation_spacing = type_annotation_spacing(context.config, force_space_after_colon);
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
