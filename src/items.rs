@@ -97,7 +97,7 @@ impl Rewrite for ast::Local {
 
             if let Some(ref ty) = self.ty {
                 let force_space_after_colon =
-                    is_ty_kind_with_absolute_decl(&ty.clone().into_inner().kind);
+                    is_ty_kind_with_absolute_decl(&(*ty).kind);
                 let separator = type_annotation_separator(context.config, force_space_after_colon);
 
                 let ty_shape = if pat_str.contains('\n') {
@@ -2084,19 +2084,6 @@ impl<'a> StaticParts<'a> {
             defaultness: Some(defaultness),
             span: ii.span,
         }
-    }
-}
-
-fn is_ty_kind_with_absolute_decl(ty_kind: &ast::TyKind) -> bool {
-    match ty_kind {
-        ast::TyKind::Path(None, ast_path) => {
-            let segments = &ast_path.segments;
-            match segments.first() {
-                Some(path_segment) => path_segment.ident.name == symbol::kw::PathRoot,
-                None => false,
-            }
-        }
-        _ => false,
     }
 }
 

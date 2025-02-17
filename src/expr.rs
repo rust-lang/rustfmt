@@ -6,7 +6,7 @@ use rustc_ast::token::{Delimiter, Lit, LitKind};
 use rustc_ast::{ForLoopKind, MatchKind, ast, ptr, token};
 use rustc_span::{BytePos, Span};
 use tracing::debug;
-
+use tracing::field::debug;
 use crate::chains::rewrite_chain;
 use crate::closures;
 use crate::comment::{
@@ -30,11 +30,7 @@ use crate::spanned::Spanned;
 use crate::stmt;
 use crate::string::{StringFormat, rewrite_string};
 use crate::types::{PathContext, rewrite_path};
-use crate::utils::{
-    colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with,
-    inner_attributes, last_line_extendable, last_line_width, mk_sp, outer_attributes,
-    semicolon_for_expr, unicode_str_width, wrap_str,
-};
+use crate::utils::{colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with, inner_attributes, is_absolute_decl_path, last_line_extendable, last_line_width, mk_sp, outer_attributes, semicolon_for_expr, unicode_str_width, wrap_str};
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
 
@@ -1880,8 +1876,27 @@ pub(crate) fn wrap_struct_field(
     }
 }
 
-pub(crate) fn struct_lit_field_separator(config: &Config) -> &str {
-    colon_spaces(config, false)
+pub(crate) fn struct_lit_field_separator(config: &Config, force_space_after_colon: bool) -> &str {
+    colon_spaces(config, force_space_after_colon)
+}
+
+fn extract_ast_path_from_expr(expr: &ast::Expr) -> Option<&ast::Path> {
+    match &expr.kind {
+        ast::ExprKind::Call(ptr_expr, ..) => extract_ast_path_from_expr(&*ptr_expr),
+        ast::ExprKind::MethodCall(box_method_call, ..) => extract_ast_path_from_expr(&*box_method_call.receiver),
+        ast::ExprKind::Binary(_, left_expr, ..) => extract_ast_path_from_expr(&*left_expr),
+        ast::ExprKind::Cast(ptr_expr, ..) => extract_ast_path_from_expr(&*ptr_expr),
+        ast::ExprKind::Type(ptr_expr, ..) => extract_ast_path_from_expr(&*ptr_expr),
+        ast::ExprKind::Field(ptr_expr, ..) => extract_ast_path_from_expr(&*ptr_expr),
+        ast::ExprKind::Index(ptr_expr, ..) => extract_ast_path_from_expr(&*ptr_expr),
+        ast::ExprKind::Range(Some(start_expr), ..) => extract_ast_path_from_expr(&*start_expr),
+        ast::ExprKind::Path(_, path, ..) => Some(&path),
+        ast::ExprKind::MacCall(mac, ..) => Some(&(*mac).path),
+        ast::ExprKind::Struct(ptr_struct_expr, ..) => {
+            Some(&(*ptr_struct_expr).path)
+        }
+        _ => None,
+    }
 }
 
 pub(crate) fn rewrite_field(
@@ -1901,7 +1916,11 @@ pub(crate) fn rewrite_field(
     if field.is_shorthand {
         Ok(attrs_str + name)
     } else {
-        let mut separator = String::from(struct_lit_field_separator(context.config));
+        let force_space_after_colon = match extract_ast_path_from_expr(&field.expr) {
+            Some(path) => is_absolute_decl_path(path),
+            _ => false,
+        };
+        let mut separator = String::from(struct_lit_field_separator(context.config, force_space_after_colon));
         for _ in 0..prefix_max_width.saturating_sub(name.len()) {
             separator.push(' ');
         }

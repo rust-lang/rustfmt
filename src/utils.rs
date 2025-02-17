@@ -6,10 +6,10 @@ use rustc_ast::ast::{
 };
 use rustc_ast::ptr;
 use rustc_ast_pretty::pprust;
-use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
+use rustc_span::{sym, symbol, BytePos, LocalExpnId, Span, Symbol, SyntaxContext};
 use unicode_width::UnicodeWidthStr;
 
-use crate::comment::{CharClasses, FullCodeCharKind, LineClasses, filter_normal_code};
+use crate::comment::{filter_normal_code, CharClasses, FullCodeCharKind, LineClasses};
 use crate::config::{Config, StyleEdition};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
@@ -713,5 +713,21 @@ mod test {
             trim_left_preserve_layout(s, indent, &config),
             Some("aaa\n    bbb\n    ccc".to_string())
         );
+    }
+}
+
+
+pub fn is_absolute_decl_path(path :&ast::Path) -> bool {
+    let segments = &path.segments;
+    match segments.first() {
+        Some(path_segment) => path_segment.ident.name == symbol::kw::PathRoot,
+        None => false,
+    }
+}
+
+pub fn is_ty_kind_with_absolute_decl(ty_kind: &ast::TyKind) -> bool {
+    match ty_kind {
+        ast::TyKind::Path(None, ast_path) => is_absolute_decl_path(ast_path),
+        _ => false,
     }
 }
