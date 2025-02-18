@@ -22,7 +22,11 @@ use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, Rew
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
-use crate::utils::{colon_spaces, extra_offset, first_line_width, format_extern, format_mutability, is_absolute_decl_path, is_ty_kind_with_absolute_decl, last_line_extendable, last_line_width, mk_sp, rewrite_ident};
+use crate::utils::{
+    colon_spaces, extra_offset, first_line_width, format_extern, format_mutability,
+    is_absolute_decl_path, is_ty_kind_with_absolute_decl, last_line_extendable, last_line_width,
+    mk_sp, rewrite_ident,
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PathContext {
