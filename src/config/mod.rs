@@ -29,7 +29,7 @@ pub(crate) mod style_edition;
 // This macro defines configuration options used in rustfmt. Each option
 // is defined as follows:
 //
-// `name: value type, default value, is stable, description;`
+// `name: value type, is stable, description;`
 create_config! {
     // Fundamental stuff
     max_width: MaxWidth, true, "Maximum width of each line";
@@ -79,6 +79,8 @@ create_config! {
     skip_macro_invocations: SkipMacroInvocations, false,
         "Skip formatting the bodies of macros invoked with the following names.";
     hex_literal_case: HexLiteralCaseConfig, false, "Format hexadecimal integer literals";
+    float_literal_trailing_zero: FloatLiteralTrailingZeroConfig, false,
+        "Add or remove trailing zero in floating-point literals";
 
     // Single line expressions and items
     empty_item_single_line: EmptyItemSingleLine, false,
@@ -149,7 +151,7 @@ create_config! {
     blank_lines_lower_bound: BlankLinesLowerBound, false,
         "Minimum number of blank lines which must be put between items";
     edition: EditionConfig, true, "The edition of the parser (RFC 2052)";
-    style_edition: StyleEditionConfig, false, "The edition of the Style Guide (RFC 3338)";
+    style_edition: StyleEditionConfig, true, "The edition of the Style Guide (RFC 3338)";
     version: VersionConfig, false, "Version of formatting rules";
     inline_attribute_width: InlineAttributeWidth, false,
         "Write an item and its attribute on the same line \
@@ -776,6 +778,7 @@ format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
+float_literal_trailing_zero = "Preserve"
 empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false
@@ -866,6 +869,7 @@ format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
+float_literal_trailing_zero = "Preserve"
 empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false

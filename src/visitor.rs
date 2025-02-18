@@ -325,7 +325,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                                 .saturating_sub(self.block_indent.width());
                             match comment_shape
                                 .visual_indent(offset_len)
-                                .sub_width(offset_len)
+                                .sub_width_opt(offset_len)
                             {
                                 Some(shp) => comment_shape = shp,
                                 None => comment_on_same_line = false,
@@ -390,7 +390,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 block = b;
                 self.rewrite_fn_before_block(
                     indent,
-                    ident,
+                    *ident,
                     &FnSig::from_fn_kind(&fk, fd, defaultness),
                     mk_sp(s.lo(), b.span.lo()),
                 )
@@ -483,24 +483,24 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 ast::ItemKind::Impl(ref iimpl) => {
                     let block_indent = self.block_indent;
                     let rw = self.with_context(|ctx| format_impl(ctx, item, iimpl, block_indent));
-                    self.push_rewrite(item.span, rw);
+                    self.push_rewrite(item.span, rw.ok());
                 }
-                ast::ItemKind::Trait(..) => {
+                ast::ItemKind::Trait(ref trait_kind) => {
                     let block_indent = self.block_indent;
-                    let rw = self.with_context(|ctx| format_trait(ctx, item, block_indent));
-                    self.push_rewrite(item.span, rw);
+                    let rw =
+                        self.with_context(|ctx| format_trait(ctx, item, trait_kind, block_indent));
+                    self.push_rewrite(item.span, rw.ok());
                 }
                 ast::ItemKind::TraitAlias(ref generics, ref generic_bounds) => {
                     let shape = Shape::indented(self.block_indent, self.config);
                     let rw = format_trait_alias(
                         &self.get_context(),
-                        item.ident,
-                        &item.vis,
+                        item,
                         generics,
                         generic_bounds,
                         shape,
                     );
-                    self.push_rewrite(item.span, rw);
+                    self.push_rewrite(item.span, rw.ok());
                 }
                 ast::ItemKind::ExternCrate(_) => {
                     let rw = rewrite_extern_crate(&self.get_context(), item, self.shape());
@@ -509,7 +509,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     } else {
                         mk_sp(attrs[0].span.lo(), item.span.hi())
                     };
-                    self.push_rewrite(span, rw);
+                    self.push_rewrite(span, rw.ok());
                 }
                 ast::ItemKind::Struct(..) | ast::ItemKind::Union(..) => {
                     self.visit_struct(&StructParts::from_item(item));
@@ -540,21 +540,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         ref generics,
                         ref body,
                     } = **fn_kind;
-                    if let Some(ref body) = body {
+                    if body.is_some() {
                         let inner_attrs = inner_attributes(&item.attrs);
                         let fn_ctxt = match sig.header.ext {
                             ast::Extern::None => visit::FnCtxt::Free,
                             _ => visit::FnCtxt::Foreign,
                         };
                         self.visit_fn(
-                            visit::FnKind::Fn(
-                                fn_ctxt,
-                                item.ident,
-                                sig,
-                                &item.vis,
-                                generics,
-                                Some(body),
-                            ),
+                            visit::FnKind::Fn(fn_ctxt, &item.ident, sig, &item.vis, generics, body),
                             &sig.decl,
                             item.span,
                             defaultness,
@@ -648,11 +641,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     ref generics,
                     ref body,
                 } = **fn_kind;
-                if let Some(ref body) = body {
+                if body.is_some() {
                     let inner_attrs = inner_attributes(&ai.attrs);
                     let fn_ctxt = visit::FnCtxt::Assoc(assoc_ctxt);
                     self.visit_fn(
-                        visit::FnKind::Fn(fn_ctxt, ai.ident, sig, &ai.vis, generics, Some(body)),
+                        visit::FnKind::Fn(fn_ctxt, &ai.ident, sig, &ai.vis, generics, body),
                         &sig.decl,
                         ai.span,
                         defaultness,
@@ -934,7 +927,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let ident_str = rewrite_ident(&self.get_context(), ident).to_owned();
         self.push_str(&ident_str);
 
-        if let ast::ModKind::Loaded(ref items, ast::Inline::Yes, ref spans) = mod_kind {
+        if let ast::ModKind::Loaded(ref items, ast::Inline::Yes, ref spans, _) = mod_kind {
             let ast::ModSpans {
                 inner_span,
                 inject_use_span: _,
@@ -995,10 +988,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
     }
 
-    pub(crate) fn with_context<F>(&mut self, f: F) -> Option<String>
-    where
-        F: Fn(&RewriteContext<'_>) -> Option<String>,
-    {
+    pub(crate) fn with_context<T>(&mut self, f: impl Fn(&RewriteContext<'_>) -> T) -> T {
         let context = self.get_context();
         let result = f(&context);
 
