@@ -1910,7 +1910,9 @@ pub(crate) fn rewrite_struct_field_prefix(
 ) -> RewriteResult {
     let vis = format_visibility(context, &field.vis);
     let safety = format_safety(field.safety);
-    let type_annotation_spacing = type_annotation_spacing(context.config, false);
+    let force_space_after_colon =
+        is_ty_kind_with_absolute_decl(&(*field.ty).kind);
+    let type_annotation_spacing = type_annotation_spacing(context.config, force_space_after_colon);
     Ok(match field.ident {
         Some(name) => format!(
             "{vis}{safety}{}{}:",
@@ -2307,7 +2309,8 @@ impl Rewrite for ast::Param {
                 let (before_comment, after_comment) =
                     get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
                 result.push_str(&before_comment);
-                result.push_str(colon_spaces(context.config, false));
+                let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*self.ty).kind);
+                result.push_str(colon_spaces(context.config, force_space_after_colon));
                 result.push_str(&after_comment);
                 let overhead = last_line_width(&result);
                 let max_width = shape
@@ -2335,7 +2338,8 @@ impl Rewrite for ast::Param {
                         !has_multiple_attr_lines,
                     )?;
                     result.push_str(&before_comment);
-                    result.push_str(colon_spaces(context.config, false));
+                    let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*self.ty).kind);
+                    result.push_str(colon_spaces(context.config, force_space_after_colon));
                     result.push_str(&after_comment);
                     let overhead = last_line_width(&result);
                     let max_width = shape

@@ -3,8 +3,6 @@
 struct SomeStruct {
     field1: ::some_crate::Thing,
     field2: ::some_crate::Thing,
-    field1_enum: ::some_crate::Thing,
-    field2_enum: ::some_crate::Thing,
 
     field3:some_crate::Thing,
     field4:some_crate::Thing,
@@ -77,11 +75,9 @@ fn main() {
     let x13:&::some_crate::SomeType = ::some_crate::SomeType::default();
     let x14:&::some_crate::SomeType = ::some_crate::SomeType::default();
 
-    let y = SomeStruct {
+    let y_call = SomeStruct {
         field1: ::some_crate::Thing::default(),
         field2: ::some_crate::Thing::default(),
-        field1_enum: ::some_crate::Thing::Enum1,
-        field2_enum: ::some_crate::Thing::Enum1,
 
         field3:some_crate::Thing::default(),
         field4:some_crate::Thing::default(),
@@ -98,10 +94,86 @@ fn main() {
         field13:&::some_crate::Thing::default(),
         field14:&::some_crate::Thing::default(),
     };
+
+    let y_method_call = SomeStruct {
+        field1: ::some_crate::Thing::Default.call(),
+        field2: ::some_crate::Thing::Default.call(),
+
+        ..y_call
+    };
+
+    let y_binary = SomeStruct {
+        field1: ::some_crate::Thing::Default + 12,
+        field2: ::some_crate::Thing::Default + 12,
+
+        ..y_call
+    };
+
+    let y_cast = SomeStruct {
+        field1: ::some_crate::Thing::Default as i32,
+        field2: ::some_crate::Thing::Default as i32,
+
+        ..y_call
+    };
+
+    let y_type = SomeStruct {
+        field7: ::some_crate::Thing::Default,
+        field8: ::some_crate::Thing::Default,
+
+        ..y_call
+    };
+
+    let y_field = SomeStruct {
+        field1: ::some_crate::Thing::Default.some_field,
+        field2: ::some_crate::Thing::Default.some_field,
+
+        ..y_call
+    };
+
+    let y_index = SomeStruct {
+        field1: ::some_crate::Thing::Default[0],
+        field2: ::some_crate::Thing::Default[0],
+
+        ..y_call
+    };
+
+    let y_range = SomeStruct {
+        field1: ::some_crate::Thing::DefaultStart..12,
+        field2: ::some_crate::Thing::DefaultStart..12,
+
+        ..y_call
+    };
+
+    let y_path = SomeStruct {
+        field1: ::some_crate::Thing::Default,
+        field2: ::some_crate::Thing::Default,
+
+        ..y_call
+    };
+
+    let y_mac_call = SomeStruct {
+        field1: ::some_crate::macr!(),
+        field2: ::some_crate::macr!(),
+
+        ..y_call
+    };
+
+    let y_struct = SomeStruct {
+        field1: ::some_crate::Thing::SomeStruct {
+            fieldA1:123,
+            fieldA2:123,
+        },
+        field2: ::some_crate::Thing::SomeStruct {
+            fieldA1:123,
+            fieldA2:123,
+        },
+
+        ..y_call
+    };
 }
 
-fn func1(x:::some_crate::SomeType) {}
-fn func2(x:::some_crate::SomeType) {}
+fn func1(x: ::some_crate::SomeType) {}
+fn func2(x: ::some_crate::SomeType) {}
 fn func3(x:some_crate::SomeType) {}
 fn func4(x:some_crate::SomeType) {}
 fn func5(x:some_crate::SomeType) {}
@@ -114,3 +186,26 @@ fn func11(x:&::some_crate::SomeType) {}
 fn func12(x:&::some_crate::SomeType) {}
 fn func13(x:&::some_crate::SomeType) {}
 fn func14(x:&::some_crate::SomeType) {}
+
+fn print_gen_with_where1<T>(item:T)
+where
+    T: ::some_crate::SomeTrait + Clone,
+{
+    println!("{}", item.to_string());
+}
+
+fn print_gen_with_where2<T>(item:T)
+where
+    T: SomeTrait + Clone,
+{
+    println!("{}", item.to_string());
+}
+
+fn print_gen_with_where3<T: ::some_crate::SomeTrait + Clone>(item:T) {
+    println!("{}", item.to_string());
+}
+
+fn print_gen_with_where4<T:some_crate::SomeTrait + Clone>(item:T) {
+    println!("{}", item.to_string());
+}
+
