@@ -716,7 +716,6 @@ mod test {
     }
 }
 
-
 pub fn is_absolute_decl_path(path: &ast::Path) -> bool {
     let segments = &path.segments;
     match segments.first() {

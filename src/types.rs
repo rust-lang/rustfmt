@@ -461,14 +461,16 @@ fn is_bound_starts_with_absolut_decl(bounds: &ast::GenericBounds) -> bool {
     } else {
         let first_bound = &bounds[0];
         match first_bound {
-            ast::GenericBound::Trait(poly_trait_ref) =>
-                poly_trait_ref.bound_generic_params.len() == 0 &&
-                    poly_trait_ref.modifiers == ast::TraitBoundModifiers{
-                        constness: ast::BoundConstness::Never,
-                        asyncness: ast::BoundAsyncness::Normal,
-                        polarity: ast::BoundPolarity::Positive,
-                    } &&
-                    is_absolute_decl_path(&poly_trait_ref.trait_ref.path),
+            ast::GenericBound::Trait(poly_trait_ref) => {
+                let plain_trait_modifiers = ast::TraitBoundModifiers {
+                    constness: ast::BoundConstness::Never,
+                    asyncness: ast::BoundAsyncness::Normal,
+                    polarity: ast::BoundPolarity::Positive,
+                };
+                poly_trait_ref.modifiers == plain_trait_modifiers
+                    && poly_trait_ref.bound_generic_params.len() == 0
+                    && is_absolute_decl_path(&poly_trait_ref.trait_ref.path)
+            }
             _ => false,
         }
     }
@@ -587,7 +589,8 @@ fn rewrite_bounded_lifetime(
     if bounds.is_empty() {
         Ok(result)
     } else {
-        // the code for this point is `x:&'a SomeType`, so, no need to force adding space after colon
+        // the code for this point is `x:&'a SomeType`,
+        // so, no need to force adding space after colon
         let colon = type_bound_colon(context, false);
         let overhead = last_line_width(&result) + colon.len();
         let shape = shape.sub_width(overhead, span)?;

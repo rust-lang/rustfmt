@@ -32,8 +32,8 @@ use crate::string::{StringFormat, rewrite_string};
 use crate::types::{PathContext, rewrite_path};
 use crate::utils::{
     colon_spaces, contains_skip, count_newlines, filtered_str_fits, first_line_ends_with,
-    inner_attributes, is_absolute_decl_path, last_line_extendable, last_line_width, mk_sp, outer_attributes,
-    semicolon_for_expr, unicode_str_width, wrap_str,
+    inner_attributes, is_absolute_decl_path, last_line_extendable, last_line_width, mk_sp,
+    outer_attributes, semicolon_for_expr, unicode_str_width, wrap_str,
 };
 use crate::vertical::rewrite_with_alignment;
 use crate::visitor::FmtVisitor;
@@ -1887,7 +1887,9 @@ pub(crate) fn struct_lit_field_separator(config: &Config, force_space_after_colo
 fn extract_ast_path_from_expr(expr: &ast::Expr) -> Option<&ast::Path> {
     match &expr.kind {
         ast::ExprKind::Call(ptr_expr, ..) => extract_ast_path_from_expr(&*ptr_expr),
-        ast::ExprKind::MethodCall(box_method_call, ..) => extract_ast_path_from_expr(&*box_method_call.receiver),
+        ast::ExprKind::MethodCall(box_method_call, ..) => {
+            extract_ast_path_from_expr(&*box_method_call.receiver)
+        }
         ast::ExprKind::Binary(_, left_expr, ..) => extract_ast_path_from_expr(&*left_expr),
         ast::ExprKind::Cast(ptr_expr, ..) => extract_ast_path_from_expr(&*ptr_expr),
         ast::ExprKind::Type(ptr_expr, ..) => extract_ast_path_from_expr(&*ptr_expr),
@@ -1896,9 +1898,7 @@ fn extract_ast_path_from_expr(expr: &ast::Expr) -> Option<&ast::Path> {
         ast::ExprKind::Range(Some(start_expr), ..) => extract_ast_path_from_expr(&*start_expr),
         ast::ExprKind::Path(_, path, ..) => Some(&path),
         ast::ExprKind::MacCall(mac, ..) => Some(&(*mac).path),
-        ast::ExprKind::Struct(ptr_struct_expr, ..) => {
-            Some(&(*ptr_struct_expr).path)
-        }
+        ast::ExprKind::Struct(ptr_struct_expr, ..) => Some(&(*ptr_struct_expr).path),
         _ => None,
     }
 }
@@ -1924,7 +1924,10 @@ pub(crate) fn rewrite_field(
             Some(path) => is_absolute_decl_path(path),
             _ => false,
         };
-        let mut separator = String::from(struct_lit_field_separator(context.config, force_space_after_colon));
+        let mut separator = String::from(struct_lit_field_separator(
+            context.config,
+            force_space_after_colon,
+        ));
         for _ in 0..prefix_max_width.saturating_sub(name.len()) {
             separator.push(' ');
         }

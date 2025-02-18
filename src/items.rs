@@ -96,8 +96,7 @@ impl Rewrite for ast::Local {
             let mut infix = String::with_capacity(32);
 
             if let Some(ref ty) = self.ty {
-                let force_space_after_colon =
-                    is_ty_kind_with_absolute_decl(&(*ty).kind);
+                let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*ty).kind);
                 let separator = type_annotation_separator(context.config, force_space_after_colon);
 
                 let ty_shape = if pat_str.contains('\n') {
@@ -1910,8 +1909,7 @@ pub(crate) fn rewrite_struct_field_prefix(
 ) -> RewriteResult {
     let vis = format_visibility(context, &field.vis);
     let safety = format_safety(field.safety);
-    let force_space_after_colon =
-        is_ty_kind_with_absolute_decl(&(*field.ty).kind);
+    let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*field.ty).kind);
     let type_annotation_spacing = type_annotation_spacing(context.config, force_space_after_colon);
     Ok(match field.ident {
         Some(name) => format!(
@@ -1948,8 +1946,7 @@ pub(crate) fn rewrite_struct_field(
         return Ok(context.snippet(field.span()).to_owned());
     }
 
-    let force_space_after_colon =
-        is_ty_kind_with_absolute_decl(&(*field.ty).kind);
+    let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*field.ty).kind);
     let type_annotation_spacing = type_annotation_spacing(context.config, force_space_after_colon);
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
