@@ -716,7 +716,7 @@ mod test {
     }
 }
 
-pub fn is_absolute_decl_path(path: &ast::Path) -> bool {
+pub(crate) fn is_absolute_decl_path(path: &ast::Path) -> bool {
     let segments = &path.segments;
     match segments.first() {
         Some(path_segment) => path_segment.ident.name == symbol::kw::PathRoot,
@@ -724,7 +724,7 @@ pub fn is_absolute_decl_path(path: &ast::Path) -> bool {
     }
 }
 
-pub fn is_ty_kind_with_absolute_decl(ty_kind: &ast::TyKind) -> bool {
+pub(crate) fn is_ty_kind_with_absolute_decl(ty_kind: &ast::TyKind) -> bool {
     match ty_kind {
         ast::TyKind::Path(None, ast_path) => is_absolute_decl_path(ast_path),
         _ => false,
