@@ -493,7 +493,6 @@ impl Rewrite for ast::WherePredicate {
                 {
                     format!("for<{binder_str}> {type_str}{colon}")
                 } else {
-                    debug!("KANCIL {:?} {}", bounds, force_space_after_colon);
                     format!("{type_str}{colon}")
                 };
 

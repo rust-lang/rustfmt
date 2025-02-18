@@ -197,36 +197,10 @@ where
     println!("{}", item.to_string());
 }
 
-fn print_gen_with_where2<T>(item: T)
-where
-    T:SomeTrait + Clone,
-{
+fn print_gen_with_where2<T: ::some_crate::SomeTrait + Clone>(item: T) {
     println!("{}", item.to_string());
 }
 
-fn print_gen_with_where3<T: ::some_crate::SomeTrait + Clone>(item: T) {
+fn print_gen_with_where3<T: some_crate::SomeTrait + Clone>(item: T) {
     println!("{}", item.to_string());
-}
-
-fn print_gen_with_where4<T: some_crate::SomeTrait + Clone>(item: T) {
-    println!("{}", item.to_string());
-}
-
-
-/// Adds two integers and returns the result.
-///
-/// # Parameters
-/// - `a`: The first integer to add.
-/// - `b`: The second integer to add.
-///
-/// # Returns
-/// The sum of `a` and `b` as an integer. The return type is `i32`.
-///
-/// # Example
-/// ```
-/// let result = add(2, 3);
-/// assert_eq!(result, 5);
-/// ```
-fn add(a: i32, b: i32) -> i32 {
-    a + b
 }

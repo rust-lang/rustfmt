@@ -194,18 +194,10 @@ where
     println!("{}", item.to_string());
 }
 
-fn print_gen_with_where2<T>(item:T)
-where
-    T: SomeTrait + Clone,
-{
+fn print_gen_with_where2<T: ::some_crate::SomeTrait + Clone>(item:T) {
     println!("{}", item.to_string());
 }
 
-fn print_gen_with_where3<T: ::some_crate::SomeTrait + Clone>(item:T) {
+fn print_gen_with_where3<T:some_crate::SomeTrait + Clone>(item:T) {
     println!("{}", item.to_string());
 }
-
-fn print_gen_with_where4<T:some_crate::SomeTrait + Clone>(item:T) {
-    println!("{}", item.to_string());
-}
-
