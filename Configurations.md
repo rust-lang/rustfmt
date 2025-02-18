@@ -2405,13 +2405,14 @@ required_version="1.0.*" # matches any version with the same major and minor ver
 
 #### Multiple versions to match:
 
-Except by `*`, any of the semver operators can be combined, being split with commas. The comparison is done using `&&` operator.
+A comma separated list of version requirements.
+The match succeeds when the current rustfmt version matches all version requirements.
 
-`*` can't be used with other comparators.
+The one notable exception is that a wildcard matching any version cannot be used in the list.
+For example, `*, <1.0.0` will always fail.
 
-Since `*` has range restrictions, any comparator will override the wildcard operator. When `*` is used alone, the comparison always fails, as that's an invalid config. `*, <1.0.0` for example is invalid.
-
-Version requirements can't contradict themselves, otherwise they'll always fail. Some examples are `"1.*, >2.0.0"`, `1.0.*, >2.0.0` and `<1.5.0, >1.10.*`, because both requirements can't be true at the same time.
+Additionally, the version match will always fail if any of the version requirements contradict themselves.
+Some examples of contradictory requirements are `1.*, >2.0.0`, `1.0.*, >2.0.0` and `<1.5.0, >1.10.*`.
 
 ```toml
 required_version=">=1.0.0, <2.0.0"
