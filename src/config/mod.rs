@@ -1676,6 +1676,13 @@ make_backup = false
             assert!(check_semver_version("^1.0.0-alpha.1", "1.0.0-alpha.beta"));
         }
 
+        // Any version is allowed when * is used
+        #[test]
+        fn test_wildcard_any() {
+            assert!(check_semver_version("*", "1.0.0"));
+            assert!(check_semver_version("*", "1.0.0+build"));
+        }
+
         // Demonstrates lexicographic ordering of alphanumeric identifiers in pre-releases
         #[test]
         fn test_pre_release_lexicographic_ordering() {
