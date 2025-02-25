@@ -2806,12 +2806,12 @@ Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338]
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
 - **Stable**: No
 
-This option is inferred from the `edition` if not specified.
+This option is inferred from the [`edition`](#edition) if not specified.
 
 See [Rust Style Editions] for details on style editions.
 Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the style edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.
 
-To ensure consistent formatting, it is recommended to specify the `edition` or `style_edition` in a `rustfmt.toml` configuration file. For example:
+To ensure consistent formatting, it is recommended to specify the [`edition`](#edition) or `style_edition` in a `rustfmt.toml` configuration file. For example:
 
 ```toml
 style_edition = "2024"
