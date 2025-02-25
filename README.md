@@ -170,12 +170,28 @@ See [GitHub page](https://rust-lang.github.io/rustfmt/) for details.
 
 ### Rust's Editions
 
-Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.
+The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [Style Editions](#style-editions)).
+By default, Rustfmt uses the `2015` edition.
 
-To ensure consistent formatting, it is recommended to specify the edition in a `rustfmt.toml` configuration file. For example:
+When running `cargo fmt`, the `edition` is automatically inferred from the `Cargo.toml` file. However, when running `rustfmt` directly, the `edition` must be explicitly set in the configuration file or via the command line.
+
+For example in your `rustfmt.toml` file:
 
 ```toml
 edition = "2024"
+```
+
+### Style Editions
+
+The option `style_edition` controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338])
+It is inferred from `edition` if not explicitly set, and defaults to the `2015` edition.
+
+Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.
+
+To ensure consistent formatting, it is recommended to specify the `edition` or `style_edition` in a `rustfmt.toml` configuration file. For example:
+
+```toml
+style_edition = "2024"
 ```
 
 ## Tips
@@ -224,7 +240,7 @@ edition = "2024"
   | checkstyle | emits in a checkstyle format | Yes |
   | json | emits diffs in a json format | Yes |
 
-* When using `rustfmt` directly in a Cargo project, set the `edition` in `rustfmt.toml` to the same value as in `Cargo.toml` to ensure consistent formatting. For more details, see the [Rust's Editions](#rusts-editions) section.
+* When using `rustfmt` directly in a Cargo project, set the `style_edition` or `edition` in `rustfmt.toml` to the same value as in `Cargo.toml` to ensure consistent formatting. For more details, see the [Style Editions](#style-editions) and [Rust's Editions](#rusts-editions) sections.
 
 ## License
 

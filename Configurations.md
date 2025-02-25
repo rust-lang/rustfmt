@@ -537,9 +537,10 @@ Specifies which edition is used by the parser.
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"`
 - **Stable**: Yes
 
-Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.
+The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [style_edition](#style_edition)).
 
-To ensure consistent formatting, it is recommended to specify the edition in a `rustfmt.toml` configuration file. For example:
+When running `cargo fmt`, the `edition` is automatically inferred from the `Cargo.toml` file. However, when running `rustfmt` directly, the `edition` must be explicitly set in the configuration file or via the command line.
+For example in your `rustfmt.toml` file:
 
 ```toml
 edition = "2018"
@@ -2804,6 +2805,17 @@ Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338]
 - **Default value**: `"2015"`
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
 - **Stable**: No
+
+This option is inferred from the `edition` if not specified.
+Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the style edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.
+
+To ensure consistent formatting, it is recommended to specify the `edition` or `style_edition` in a `rustfmt.toml` configuration file. For example:
+
+```toml
+style_edition = "2024"
+```
+
+Alternatively, you can use the `--style-edition` flag when running `rustfmt` directly.
 
 [Rust Style Guide]: https://doc.rust-lang.org/nightly/style-guide/
 [RFC 3338]: https://rust-lang.github.io/rfcs/3338-style-evolution.html
