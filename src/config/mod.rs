@@ -117,6 +117,7 @@ create_config! {
 
     // Misc.
     remove_nested_parens: RemoveNestedParens, true, "Remove nested parens";
+    remove_nested_blocks: RemoveNestedBlocks, false, "Remove nested blocks";
     combine_control_expr: CombineControlExpr, false, "Combine control expressions with function \
         calls";
     short_array_element_width_threshold: ShortArrayElementWidthThreshold, true,
@@ -796,6 +797,7 @@ space_after_colon = true
 spaces_around_ranges = false
 binop_separator = "Front"
 remove_nested_parens = true
+remove_nested_blocks = false
 combine_control_expr = true
 short_array_element_width_threshold = 10
 overflow_delimited_expr = false
@@ -887,6 +889,7 @@ space_after_colon = true
 spaces_around_ranges = false
 binop_separator = "Front"
 remove_nested_parens = true
+remove_nested_blocks = false
 combine_control_expr = true
 short_array_element_width_threshold = 10
 overflow_delimited_expr = true
