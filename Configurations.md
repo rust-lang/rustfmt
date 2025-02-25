@@ -537,13 +537,15 @@ Specifies which edition is used by the parser.
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"`
 - **Stable**: Yes
 
-Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
-through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition needs to be specified
-in your config file:
+Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.
+
+To ensure consistent formatting, it is recommended to specify the edition in a `rustfmt.toml` configuration file. For example:
 
 ```toml
 edition = "2018"
 ```
+
+Alternatively, you can use the `--edition` flag when running `rustfmt` directly.
 
 ## `empty_item_single_line`
 

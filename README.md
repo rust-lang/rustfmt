@@ -170,9 +170,13 @@ See [GitHub page](https://rust-lang.github.io/rustfmt/) for details.
 
 ### Rust's Editions
 
-Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if
-executed through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition
-needs to be specified in `rustfmt.toml`, e.g., with `edition = "2018"`.
+Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.
+
+To ensure consistent formatting, it is recommended to specify the edition in a `rustfmt.toml` configuration file. For example:
+
+```toml
+edition = "2024"
+```
 
 ## Tips
 
@@ -219,6 +223,8 @@ needs to be specified in `rustfmt.toml`, e.g., with `edition = "2018"`.
   | coverage | displays how much of the input file was processed | Yes |
   | checkstyle | emits in a checkstyle format | Yes |
   | json | emits diffs in a json format | Yes |
+
+* When using `rustfmt` directly in a Cargo project, set the `edition` in `rustfmt.toml` to the same value as in `Cargo.toml` to ensure consistent formatting. For more details, see the [Rust's Editions](#rusts-editions) section.
 
 ## License
 
