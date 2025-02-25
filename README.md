@@ -183,7 +183,7 @@ edition = "2024"
 
 ### Style Editions
 
-The option `style_edition` controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338])
+The option `style_edition` controls the edition of the [Rust Style Guide](https://doc.rust-lang.org/nightly/style-guide/editions.html?highlight=editions#rust-style-editions) to use for formatting ([RFC 3338](https://rust-lang.github.io/rfcs/3338-style-evolution.html))
 It is inferred from `edition` if not explicitly set, and defaults to the `2015` edition.
 
 Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.

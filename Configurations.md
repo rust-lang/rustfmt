@@ -2800,7 +2800,7 @@ See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuri
 
 ## `style_edition`
 
-Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338])
+Controls the edition of the [Rust Style Guide](https://doc.rust-lang.org/nightly/style-guide/editions.html?highlight=editions#rust-style-editions) to use for formatting ([RFC 3338])
 
 - **Default value**: `"2015"`
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
