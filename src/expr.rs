@@ -175,7 +175,15 @@ pub(crate) fn format_expr(
                     // not the `ast::Block` node we're about to rewrite. To prevent dropping inner
                     // attributes call `rewrite_block` directly.
                     // See https://github.com/rust-lang/rustfmt/issues/6158
-                    rewrite_block(block, Some(&expr.attrs), opt_label, context, shape)?
+                    rewrite_block_inner(
+                        block,
+                        Some(&expr.attrs),
+                        opt_label,
+                        true,
+                        context,
+                        shape,
+                        false,
+                    )?
                 }
                 _ => anon_const.rewrite_result(context, shape)?,
             };
@@ -199,6 +207,7 @@ pub(crate) fn format_expr(
                             false,
                             context,
                             shape,
+                            true,
                         )
                     }
                 }
@@ -628,7 +637,7 @@ fn rewrite_block(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> RewriteResult {
-    rewrite_block_inner(block, attrs, label, true, context, shape)
+    rewrite_block_inner(block, attrs, label, true, context, shape, true)
 }
 
 fn remove_nested_block(
@@ -638,6 +647,7 @@ fn remove_nested_block(
     inner_block: &ast::Block,
     context: &RewriteContext<'_>,
     shape: Shape,
+    can_inner_be_removed: bool,
 ) -> Option<RewriteResult> {
     let pre_inner_block_span = mk_sp(block.span.lo(), block_expr.span.lo());
     let post_inner_block_span = mk_sp(block_expr.span.hi(), block.span.hi());
@@ -647,12 +657,14 @@ fn remove_nested_block(
     if immdiately_contains_comment {
         return None;
     }
-    Some(rewrite_block(
+    Some(rewrite_block_inner(
         inner_block,
         Some(&block_expr.attrs),
         inner_label,
+        true,
         context,
         shape,
+        can_inner_be_removed,
     ))
 }
 
@@ -663,6 +675,7 @@ fn rewrite_block_inner(
     allow_single_line: bool,
     context: &RewriteContext<'_>,
     shape: Shape,
+    can_be_removed: bool,
 ) -> RewriteResult {
     debug!("rewrite_block : {:?}", context.snippet(block.span));
     let prefix = block_prefix(context, block, shape)?;
@@ -670,6 +683,8 @@ fn rewrite_block_inner(
     let no_attrs = attrs.is_none() || attrs.unwrap().is_empty();
 
     if context.config.remove_nested_blocks()
+        && can_be_removed
+        && prefix.is_empty()
         && !is_unsafe_block(block)
         && no_attrs
         && label.is_none()
@@ -685,6 +700,7 @@ fn rewrite_block_inner(
                         inner_block,
                         context,
                         shape,
+                        true,
                     ) {
                         return rw;
                     }
@@ -701,6 +717,7 @@ fn rewrite_block_inner(
                             inner_block,
                             context,
                             shape,
+                            false,
                         ) {
                             return Ok(format!("const {}", rw?));
                         }
@@ -734,7 +751,7 @@ pub(crate) fn rewrite_let_else_block(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> RewriteResult {
-    rewrite_block_inner(block, None, None, allow_single_line, context, shape)
+    rewrite_block_inner(block, None, None, allow_single_line, context, shape, false)
 }
 
 // Rewrite condition if the given expression has one.
