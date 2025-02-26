@@ -148,8 +148,8 @@
                   .map(tag => tag.name)
                   .filter(tag => tag.startsWith('v') && !excludedTagVersions.has(tag));
 
-                const latestRelease = tags.find(tag => !tag.name.includes('rc'));
-                this.viewVersion = latestRelease.name;
+                const latestRelease = tagOptions.find(tag => !tag.includes('rc'));
+                this.viewVersion = latestRelease;
                 this.versionOptions = this.versionOptions.concat(tagOptions);
               },
                 async outputHtml() {
