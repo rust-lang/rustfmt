@@ -2235,31 +2235,33 @@ Works similarly to [`remove_nested_parens`](#remove_nested_parens), but removes 
 - **Possible values**: `true`, `false`
 - **Stable**: No
 
-
-#### `true`:
-```rust
-fn main() {
-    {
-        foo();
-    }
-}
-```
+Blocks with any sort of comments or attributes, `unsafe` and `const` blocks will not be removed.
 
 #### `false` (default):
 ```rust
 fn main() {
     {
         {
+            // comment
             {
-                {
-                    foo();
-                }
+                foo();
             }
         }
     }
 }
 ```
 
+#### `true`:
+```rust
+fn main() {
+    {
+        // comment
+        {
+            foo();
+        }
+    }
+}
+```
 
 ## `reorder_impl_items`
 

@@ -676,12 +676,15 @@ fn rewrite_block_inner(
     context: &RewriteContext<'_>,
     shape: Shape,
     can_be_removed: bool,
+    // ^ this is a fix for const blocks, which are not removed, but are passed identically to blocks
 ) -> RewriteResult {
     debug!("rewrite_block : {:?}", context.snippet(block.span));
     let prefix = block_prefix(context, block, shape)?;
 
     let no_attrs = attrs.is_none() || attrs.unwrap().is_empty();
 
+    // If the option `remove_nested_blocks` is enabled, we remove all unnecessary nested blocks.
+    // Blocks with any sort of comments or attributes, unsafe and const blocks will not be removed.
     if context.config.remove_nested_blocks()
         && can_be_removed
         && prefix.is_empty()
