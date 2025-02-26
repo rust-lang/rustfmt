@@ -2412,8 +2412,61 @@ Require a specific version of rustfmt. If you want to make sure that the
 specific version of rustfmt is used in your CI, use this option.
 
 - **Default value**: `CARGO_PKG_VERSION`
-- **Possible values**: any published version (e.g. `"0.3.8"`)
+- **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/).
 - **Stable**: No (tracking issue: [#3386](https://github.com/rust-lang/rustfmt/issues/3386))
+
+#### Match on exact version:
+
+```toml
+required_version="1.0.0"
+```
+
+#### Higher or equal to:
+
+```toml
+required_version=">=1.0.0"
+```
+
+#### Lower or equal to:
+
+```toml
+required_version="<=1.0.0"
+```
+
+#### New minor or patch versions:
+
+```toml
+required_version="^1.0.0"
+```
+
+#### New patch versions:
+
+```toml
+required_version="~1.0.0"
+```
+
+#### Wildcard:
+
+```toml
+required_version="*" # matches any version.
+required_version="1.*" # matches any version with the same major version
+required_version="1.0.*" # matches any version with the same major and minor version
+```
+
+#### Multiple versions to match:
+
+A comma separated list of version requirements.
+The match succeeds when the current rustfmt version matches all version requirements.
+
+The one notable exception is that a wildcard matching any version cannot be used in the list.
+For example, `*, <1.0.0` will always fail.
+
+Additionally, the version match will always fail if any of the version requirements contradict themselves.
+Some examples of contradictory requirements are `1.*, >2.0.0`, `1.0.*, >2.0.0` and `<1.5.0, >1.10.*`.
+
+```toml
+required_version=">=1.0.0, <2.0.0"
+```
 
 ## `short_array_element_width_threshold`
 
