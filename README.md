@@ -171,25 +171,22 @@ See [GitHub page](https://rust-lang.github.io/rustfmt/) for details.
 ### Rust's Editions
 
 The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [Style Editions](#style-editions)).
-By default, Rustfmt uses the `2015` edition.
 
-When running `cargo fmt`, the `edition` is automatically inferred from the `Cargo.toml` file. However, when running `rustfmt` directly, the `edition` must be explicitly set in the configuration file or via the command line.
-
+When running `cargo fmt`, the `edition` is automatically read from the `Cargo.toml` file. However, when running `rustfmt` directly the `edition` defaults to 2015 if not explicitly configured. For consistent parsing between rustfmt and `cargo fmt` you should configure the `edition`.
 For example in your `rustfmt.toml` file:
 
 ```toml
-edition = "2024"
+edition = "2018"
 ```
 
 ### Style Editions
 
-Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338])
-It is inferred from `edition` if not explicitly set, and defaults to the `2015` edition.
+This option is inferred from the [`edition`](#rusts-editions) if not specified.
 
-See [Rust Style Editions] for details on style editions.
-Starting with the 2024 edition, Rust introduced changes to default formatting. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the edition is not explicitly configured. This is because `cargo fmt` automatically picks up the edition from `Cargo.toml`, while `rustfmt` defaults to the `2015` edition unless otherwise specified.
+See [Rust Style Editions] for details on formatting differences between style editions.
+rustfmt has a default style edition of `2015` while `cargo fmt` infers the style edition from the `edition` set in `Cargo.toml`. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the style edition is not explicitly configured.
 
-To ensure consistent formatting, it is recommended to specify the `edition` or `style_edition` in a `rustfmt.toml` configuration file. For example:
+To ensure consistent formatting, it is recommended to specify the `style_edition` in a `rustfmt.toml` configuration file. For example:
 
 ```toml
 style_edition = "2024"
