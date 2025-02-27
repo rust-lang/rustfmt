@@ -197,9 +197,8 @@ style_edition = "2024"
 
 ## Tips
 
-* When using `rustfmt` directly in a Cargo project, Cargo will determine [`edition`](#rusts-editions) from `Cargo.toml`, but rustfmt will not, as it has its own configuration file, `rustfmt.toml`.
-  To ensure consistent parsing between `cargo fmt` and `rustfmt`, you should configure the [`edition`](#rusts-editions) in your `rustfmt.toml` file.
-  To ensure consistent formatting between `cargo fmt` and `rustfmt`, you should configure the [`style_edition`](#style-editions) in your `rustfmt.toml` file.
+* To ensure consistent parsing between `cargo fmt` and `rustfmt`, you should configure the [`edition`](#rusts-editions) in your `rustfmt.toml` file.
+* To ensure consistent formatting between `cargo fmt` and `rustfmt`, you should configure the [`style_edition`](#style-editions) in your `rustfmt.toml` file.
 
 * For things you do not want rustfmt to mangle, use `#[rustfmt::skip]`
 * To prevent rustfmt from formatting a macro or an attribute,
