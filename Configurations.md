@@ -537,13 +537,16 @@ Specifies which edition is used by the parser.
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"`
 - **Stable**: Yes
 
-Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
-through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition needs to be specified
-in your config file:
+The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [style_edition](#style_edition)).
+
+When running `cargo fmt`, the `edition` is automatically read from the `Cargo.toml` file. However, when running `rustfmt` directly the `edition` defaults to 2015 if not explicitly configured. For consistent parsing between rustfmt and `cargo fmt` you should configure the `edition`.
+For example in your `rustfmt.toml` file:
 
 ```toml
 edition = "2018"
 ```
+
+Alternatively, you can use the `--edition` flag when running `rustfmt` directly.
 
 ## `empty_item_single_line`
 
@@ -2803,6 +2806,20 @@ Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338]
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
 - **Stable**: No
 
+This option is inferred from the [`edition`](#edition) if not specified.
+
+See [Rust Style Editions] for details on formatting differences between style editions.
+rustfmt has a default style edition of `2015` while `cargo fmt` infers the style edition from the `edition` set in `Cargo.toml`. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the style edition is not explicitly configured.
+
+To ensure consistent formatting, it is recommended to specify the `style_edition` in a `rustfmt.toml` configuration file. For example:
+
+```toml
+style_edition = "2024"
+```
+
+Alternatively, you can use the `--style-edition` flag when running `rustfmt` directly.
+
+[Rust Style Editions]: https://doc.rust-lang.org/nightly/style-guide/editions.html?highlight=editions#rust-style-editions
 [Rust Style Guide]: https://doc.rust-lang.org/nightly/style-guide/
 [RFC 3338]: https://rust-lang.github.io/rfcs/3338-style-evolution.html
 
