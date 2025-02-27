@@ -24,7 +24,8 @@ use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
     colon_spaces, extra_offset, first_line_width, format_extern, format_mutability,
-    last_line_extendable, last_line_width, mk_sp, rewrite_ident,
+    is_absolute_decl_path, is_ty_kind_with_absolute_decl, last_line_extendable, last_line_width,
+    mk_sp, rewrite_ident,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -434,8 +435,8 @@ where
     }
 }
 
-fn type_bound_colon(context: &RewriteContext<'_>) -> &'static str {
-    colon_spaces(context.config)
+fn type_bound_colon(context: &RewriteContext<'_>, force_space_after_colon: bool) -> &'static str {
+    colon_spaces(context.config, force_space_after_colon)
 }
 
 // If the return type is multi-lined, then force to use multiple lines for
@@ -454,6 +455,27 @@ fn get_tactics(item_vec: &[ListItem], output: &str, shape: Shape) -> DefinitiveL
     }
 }
 
+fn is_bound_starts_with_absolut_decl(bounds: &ast::GenericBounds) -> bool {
+    if bounds.len() == 0 {
+        false
+    } else {
+        let first_bound = &bounds[0];
+        match first_bound {
+            ast::GenericBound::Trait(poly_trait_ref) => {
+                let plain_trait_modifiers = ast::TraitBoundModifiers {
+                    constness: ast::BoundConstness::Never,
+                    asyncness: ast::BoundAsyncness::Normal,
+                    polarity: ast::BoundPolarity::Positive,
+                };
+                poly_trait_ref.modifiers == plain_trait_modifiers
+                    && poly_trait_ref.bound_generic_params.len() == 0
+                    && is_absolute_decl_path(&poly_trait_ref.trait_ref.path)
+            }
+            _ => false,
+        }
+    }
+}
+
 impl Rewrite for ast::WherePredicate {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
@@ -469,7 +491,9 @@ impl Rewrite for ast::WherePredicate {
                 ..
             }) => {
                 let type_str = bounded_ty.rewrite_result(context, shape)?;
-                let colon = type_bound_colon(context).trim_end();
+                let force_space_after_colon = is_bound_starts_with_absolut_decl(bounds);
+                is_ty_kind_with_absolute_decl(&(*bounded_ty).kind);
+                let colon = type_bound_colon(context, force_space_after_colon).trim_end();
                 let lhs = if let Some(binder_str) =
                     rewrite_bound_params(context, shape, bound_generic_params)
                 {
@@ -565,7 +589,9 @@ fn rewrite_bounded_lifetime(
     if bounds.is_empty() {
         Ok(result)
     } else {
-        let colon = type_bound_colon(context);
+        // the code for this point is `x:&'a SomeType`,
+        // so, no need to force adding space after colon
+        let colon = type_bound_colon(context, false);
         let overhead = last_line_width(&result) + colon.len();
         let shape = shape.sub_width(overhead, span)?;
         let result = format!(
@@ -680,7 +706,8 @@ impl Rewrite for ast::GenericParam {
         };
 
         if !self.bounds.is_empty() {
-            param.push_str(type_bound_colon(context));
+            let force_space_after_colon = is_bound_starts_with_absolut_decl(&self.bounds);
+            param.push_str(type_bound_colon(context, force_space_after_colon));
             param.push_str(&self.bounds.rewrite_result(context, shape)?)
         }
         if let ast::GenericParamKind::Type {
