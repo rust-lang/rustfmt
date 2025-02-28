@@ -658,6 +658,7 @@ config_option_with_style_edition_default!(
 
     // Misc.
     RemoveNestedParens, bool, _ => true;
+    RemoveNestedBlocks, bool, _ => false;
     CombineControlExpr, bool, _ => true;
     ShortArrayElementWidthThreshold, usize, _ => 10;
     OverflowDelimitedExpr, bool, Edition2024 => true, _ => false;
