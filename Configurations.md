@@ -537,13 +537,16 @@ Specifies which edition is used by the parser.
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"`
 - **Stable**: Yes
 
-Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
-through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition needs to be specified
-in your config file:
+The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [style_edition](#style_edition)).
+
+When running `cargo fmt`, the `edition` is automatically read from the `Cargo.toml` file. However, when running `rustfmt` directly the `edition` defaults to 2015 if not explicitly configured. For consistent parsing between rustfmt and `cargo fmt` you should configure the `edition`.
+For example in your `rustfmt.toml` file:
 
 ```toml
 edition = "2018"
 ```
+
+Alternatively, you can use the `--edition` flag when running `rustfmt` directly.
 
 ## `empty_item_single_line`
 
@@ -2412,8 +2415,61 @@ Require a specific version of rustfmt. If you want to make sure that the
 specific version of rustfmt is used in your CI, use this option.
 
 - **Default value**: `CARGO_PKG_VERSION`
-- **Possible values**: any published version (e.g. `"0.3.8"`)
+- **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/).
 - **Stable**: No (tracking issue: [#3386](https://github.com/rust-lang/rustfmt/issues/3386))
+
+#### Match on exact version:
+
+```toml
+required_version="1.0.0"
+```
+
+#### Higher or equal to:
+
+```toml
+required_version=">=1.0.0"
+```
+
+#### Lower or equal to:
+
+```toml
+required_version="<=1.0.0"
+```
+
+#### New minor or patch versions:
+
+```toml
+required_version="^1.0.0"
+```
+
+#### New patch versions:
+
+```toml
+required_version="~1.0.0"
+```
+
+#### Wildcard:
+
+```toml
+required_version="*" # matches any version.
+required_version="1.*" # matches any version with the same major version
+required_version="1.0.*" # matches any version with the same major and minor version
+```
+
+#### Multiple versions to match:
+
+A comma separated list of version requirements.
+The match succeeds when the current rustfmt version matches all version requirements.
+
+The one notable exception is that a wildcard matching any version cannot be used in the list.
+For example, `*, <1.0.0` will always fail.
+
+Additionally, the version match will always fail if any of the version requirements contradict themselves.
+Some examples of contradictory requirements are `1.*, >2.0.0`, `1.0.*, >2.0.0` and `<1.5.0, >1.10.*`.
+
+```toml
+required_version=">=1.0.0, <2.0.0"
+```
 
 ## `short_array_element_width_threshold`
 
@@ -2750,6 +2806,20 @@ Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338]
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
 - **Stable**: No
 
+This option is inferred from the [`edition`](#edition) if not specified.
+
+See [Rust Style Editions] for details on formatting differences between style editions.
+rustfmt has a default style edition of `2015` while `cargo fmt` infers the style edition from the `edition` set in `Cargo.toml`. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the style edition is not explicitly configured.
+
+To ensure consistent formatting, it is recommended to specify the `style_edition` in a `rustfmt.toml` configuration file. For example:
+
+```toml
+style_edition = "2024"
+```
+
+Alternatively, you can use the `--style-edition` flag when running `rustfmt` directly.
+
+[Rust Style Editions]: https://doc.rust-lang.org/nightly/style-guide/editions.html?highlight=editions#rust-style-editions
 [Rust Style Guide]: https://doc.rust-lang.org/nightly/style-guide/
 [RFC 3338]: https://rust-lang.github.io/rfcs/3338-style-evolution.html
 
