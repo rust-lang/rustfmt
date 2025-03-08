@@ -116,6 +116,10 @@ pub enum GroupImportsTactic {
     ///  2. other imports
     ///  3. `self` / `crate` / `super` imports
     StdExternalCrate,
+    /// Discard existing groups, and create new groups for
+    ///  1. `std` / `core` / `alloc` / other imports
+    ///  2. `self` / `crate` / `super` imports
+    ExternalCrate,
     /// Discard existing groups, and create a single group for everything
     One,
 }
