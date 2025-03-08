@@ -34,7 +34,6 @@ pub(crate) enum PathContext {
     Import,
 }
 
-// Does not wrap on simple segments.
 pub(crate) fn rewrite_path(
     context: &RewriteContext<'_>,
     path_context: PathContext,
@@ -115,24 +114,35 @@ where
         if segment.ident.name == kw::PathRoot {
             continue;
         }
-        if first {
-            first = false;
-        } else {
+
+        if !first {
             buffer.push_str("::");
         }
 
-        let extra_offset = extra_offset(&buffer, shape);
-        let new_shape = shape.shrink_left(extra_offset, mk_sp(span_lo, span_hi))?;
+        let new_shape = match shape.shrink_left_opt(extra_offset(&buffer, shape)) {
+            Some(s) => s,
+            None => {
+                buffer.push('\n');
+                shape.shrink_left(extra_offset(&buffer, shape), mk_sp(span_lo, span_hi))?
+            }
+        };
+
         let segment_string = rewrite_segment(
             path_context,
             segment,
             &mut span_lo,
             span_hi,
             context,
+            shape,
             new_shape,
+            first,
         )?;
 
         buffer.push_str(&segment_string);
+
+        if first {
+            first = false;
+        }
     }
 
     Ok(buffer)
@@ -270,16 +280,37 @@ fn rewrite_segment(
     span_hi: BytePos,
     context: &RewriteContext<'_>,
     shape: Shape,
+    new_shape: Shape,
+    first: bool,
 ) -> RewriteResult {
     let mut result = String::with_capacity(128);
     result.push_str(rewrite_ident(context, segment.ident));
 
     let ident_len = result.len();
+
     let span = mk_sp(*span_lo, span_hi);
-    let shape = if context.use_block_indent() {
-        shape.offset_left(ident_len, span)?
+
+    let new_shape = if context.use_block_indent() {
+        new_shape.offset_left(ident_len, span)
     } else {
-        shape.shrink_left(ident_len, span)?
+        new_shape.shrink_left(ident_len, span)
+    };
+
+    let shape = if first {
+        new_shape?
+    } else {
+        match new_shape {
+            Ok(s) => s,
+            Err(_) => {
+                let mut shape = shape;
+                // dbg!(&shape);
+                shape.indent = shape.indent.block_indent(context.config).block_only();
+                // dbg!(&result, shape);
+                result.insert_str(0, &shape.indent.to_string_with_newline(context.config));
+                // dbg!(&result);
+                shape
+            }
+        }
     };
 
     if let Some(ref args) = segment.args {
