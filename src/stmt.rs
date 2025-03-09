@@ -96,7 +96,7 @@ impl<'a> Rewrite for Stmt<'a> {
     fn rewrite_result(
         &self,
         context: &RewriteContext<'_>,
-        shape: Shape,
+        mut shape: Shape,
     ) -> crate::rewrite::RewriteResult {
         let expr_type =
             if context.config.style_edition() >= StyleEdition::Edition2024 && self.is_last_expr() {
@@ -104,13 +104,25 @@ impl<'a> Rewrite for Stmt<'a> {
             } else {
                 ExprType::Statement
             };
-        format_stmt(
-            context,
-            shape,
-            self.as_ast_node(),
-            expr_type,
-            self.is_last_expr(),
-        )
+
+        loop {
+            match format_stmt(
+                context,
+                shape,
+                self.as_ast_node(),
+                expr_type,
+                self.is_last_expr(),
+            ) {
+                Ok(x) => return Ok(x),
+                Err(e @ RewriteError::ExceedsMaxWidth { .. }) => {
+                    shape.width = shape.width * 3 / 2 + 1;
+                    if shape.width > 4000 {
+                        break Err(e);
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
     }
 }
 
