@@ -303,11 +303,8 @@ fn rewrite_segment(
             Ok(s) => s,
             Err(_) => {
                 let mut shape = shape;
-                // dbg!(&shape);
                 shape.indent = shape.indent.block_indent(context.config).block_only();
-                // dbg!(&result, shape);
                 result.insert_str(0, &shape.indent.to_string_with_newline(context.config));
-                // dbg!(&result);
                 shape
             }
         }
