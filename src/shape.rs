@@ -250,14 +250,14 @@ impl Shape {
         delta: usize,
         span: Span,
     ) -> Result<Shape, ExceedsMaxWidthError> {
-        self.sub_width_opt(delta)
-            .ok_or_else(|| self.exceeds_max_width_error(span))
+        Ok(self.saturating_sub_width(delta))
     }
 
     pub(crate) fn sub_width_opt(&self, delta: usize) -> Option<Shape> {
-        self.width
-            .checked_sub(delta)
-            .map(|width| Shape { width, ..*self })
+        Some(Shape {
+            width: self.width.saturating_sub(delta),
+            ..*self
+        })
     }
 
     pub(crate) fn shrink_left(
