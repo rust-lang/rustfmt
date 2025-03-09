@@ -97,7 +97,9 @@ fn unbreakable_initializer_expr_pre_formatting_let_else_length_near_max_width() 
     // The length of `(indent)let pat = init else block;` is 100 (max_width)
     // Post Formatting:
     // The formatting is left unchanged!
-    let Some(x) = some_really_really_really_really_really_really_really_long_name_A else { return };
+    let Some(x) = some_really_really_really_really_really_really_really_long_name_A else {
+        return;
+    };
 
     // Pre Formatting:
     // The length of `(indent)let pat = init else block;` is 100 (max_width)
@@ -197,7 +199,9 @@ fn unbreakable_initializer_expr_pre_formatting_length_through_initializer_expr_n
     // the `(indent)init` line has a length of 100 which == max_width of 100.
     // One might expect formatting to succeed, but I suspect the reason we hit max_width issues is
     // because the Shape is accounting for the `;` at the end of the `let-else` statement.
-    let Some(x) = some_really_really_really_really_really_really_really_really_really_really_really_long_nameJ else {return};
+    let Some(x) = some_really_really_really_really_really_really_really_really_really_really_really_long_nameJ else {
+        return;
+    };
 }
 
 fn long_patterns() {
@@ -211,7 +215,13 @@ fn long_patterns() {
     };
 
     // with version=One we don't wrap long array patterns
-    let [aaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, cccccccccccccccccc, dddddddddddddddddd] = opt else {
+    let [
+        aaaaaaaaaaaaaaaa,
+        bbbbbbbbbbbbbbb,
+        cccccccccccccccccc,
+        dddddddddddddddddd,
+    ] = opt
+    else {
         return;
     };
 
@@ -255,31 +265,20 @@ fn with_trailing_try_operator() {
 
 fn issue5901() {
     #[cfg(target_os = "linux")]
-    let Some(x) = foo
-    else {
-        todo!()
-    };
+    let Some(x) = foo else { todo!() };
 
     #[cfg(target_os = "linux")]
     // Some comments between attributes and let-else statement
-    let Some(x) = foo
-    else {
-        todo!()
-    };
+    let Some(x) = foo else { todo!() };
 
     #[cfg(target_os = "linux")]
     #[cfg(target_arch = "x86_64")]
-    let Some(x) = foo
-    else {
-        todo!()
-    };
+    let Some(x) = foo else { todo!() };
 
     // The else block will be multi-lined because attributes and comments before `let`
     // are included when calculating max width
     #[cfg(target_os = "linux")]
     #[cfg(target_arch = "x86_64")]
     // Some comments between attributes and let-else statement
-    let Some(x) = foo() else {
-        todo!()
-    };
+    let Some(x) = foo() else { todo!() };
 }

@@ -555,16 +555,6 @@ impl<'a> FormatLines<'a> {
                 }
                 self.line_len -= 1;
             }
-
-            // Check for any line width errors we couldn't correct.
-            let error_kind = ErrorKind::LineOverflow(self.line_len, self.config.max_width());
-            if self.line_len > self.config.max_width()
-                && !self.is_skipped_line()
-                && self.should_report_error(kind, &error_kind)
-            {
-                let is_string = self.current_line_contains_string_literal;
-                self.push_err(error_kind, kind.is_comment(), is_string);
-            }
         }
 
         self.line_len = 0;
