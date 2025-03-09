@@ -105,22 +105,31 @@ impl<'a> Rewrite for Stmt<'a> {
                 ExprType::Statement
             };
 
+        let mut config = context.config.clone();
+
         loop {
-            match format_stmt(
-                context,
+            let mut context = context.clone();
+            context.config = &config;
+
+            let rewrite = format_stmt(
+                &context,
                 shape,
                 self.as_ast_node(),
                 expr_type,
                 self.is_last_expr(),
-            ) {
+            );
+
+            match rewrite {
                 Ok(x) => return Ok(x),
-                Err(e @ RewriteError::ExceedsMaxWidth { .. }) => {
-                    shape.width = shape.width * 3 / 2 + 1;
+                Err(e) => {
+                    let width_delta = config.max_width() / 3 + 1;
+                    let new_width = config.max_width() + width_delta;
+                    config.set().max_width(new_width);
+                    shape.width += width_delta;
                     if shape.width > 4000 {
                         break Err(e);
                     }
                 }
-                Err(e) => return Err(e),
             }
         }
     }

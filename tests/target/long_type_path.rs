@@ -8,10 +8,8 @@ fn test2() {
         .into_iter()
         .enumerate()
         .filter_map(|(_, id)| {
-            <<Runtime as pallet_im_online::Config>::ValidatorSet as ValidatorSetWithIdentification<
-                sp_runtime::AccountId32,
-            >>::IdentificationOf::convert(id.clone())
-            .map(|full_id| (id, full_id))
+            <<Runtime as pallet_im_online::Config>::ValidatorSet as ValidatorSetWithIdentification<sp_runtime::AccountId32>>::IdentificationOf::convert(id.clone())
+                .map(|full_id| (id, full_id))
         })
         .collect::<Vec<IdentificationTuple<Runtime>>>();
 }
