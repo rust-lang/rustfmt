@@ -6,6 +6,8 @@
 
 cargo build --release
 
+export LD_LIBRARY_PATH="$(rustc --print sysroot)/lib:${LD_LIBRARY_PATH}"
+
 target/release/rustfmt src/lib.rs
 target/release/rustfmt src/bin/main.rs
 target/release/rustfmt src/cargo-fmt/main.rs
