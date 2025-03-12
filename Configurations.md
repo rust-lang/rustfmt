@@ -2230,6 +2230,41 @@ fn main() {
 }
 ```
 
+## `remove_nested_blocks`
+
+Works similarly to [`remove_nested_parens`](#remove_nested_parens), but removes nested blocks.
+
+- **Default value**: `false`,
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+Blocks with any sort of comments or attributes, `unsafe` and `const` blocks will not be removed.
+
+#### `false` (default):
+```rust
+fn main() {
+    {
+        {
+            // comment
+            {
+                foo();
+            }
+        }
+    }
+}
+```
+
+#### `true`:
+```rust
+fn main() {
+    {
+        // comment
+        {
+            foo();
+        }
+    }
+}
+```
 
 ## `reorder_impl_items`
 
