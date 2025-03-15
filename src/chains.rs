@@ -73,7 +73,6 @@ use crate::rewrite::{
 };
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
-use crate::types::SegmentParam;
 use crate::utils::{
     self, extra_offset, filtered_str_fits, first_line_width, last_line_extendable, last_line_width,
     mk_sp, rewrite_ident, trimmed_last_line_width, wrap_str,
