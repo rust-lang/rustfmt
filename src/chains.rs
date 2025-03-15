@@ -67,14 +67,16 @@ use crate::config::{IndentStyle, StyleEdition};
 use crate::expr::rewrite_call;
 use crate::lists::extract_pre_comment;
 use crate::macros::convert_try_mac;
+use crate::overflow;
 use crate::rewrite::{
     ExceedsMaxWidthError, Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult,
 };
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
+use crate::types::SegmentParam;
 use crate::utils::{
-    self, filtered_str_fits, first_line_width, last_line_extendable, last_line_width, mk_sp,
-    rewrite_ident, trimmed_last_line_width, wrap_str,
+    self, extra_offset, filtered_str_fits, first_line_width, last_line_extendable, last_line_width,
+    mk_sp, rewrite_ident, trimmed_last_line_width, wrap_str,
 };
 
 use thin_vec::ThinVec;
@@ -342,18 +344,31 @@ impl ChainItem {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> RewriteResult {
-        let type_str = if types.is_empty() {
-            String::new()
-        } else {
-            let type_list = types
-                .iter()
-                .map(|ty| ty.rewrite_result(context, shape))
-                .collect::<Result<Vec<_>, RewriteError>>()?;
+        let mut callee_str = String::with_capacity(128);
 
-            format!("::<{}>", type_list.join(", "))
-        };
-        let callee_str = format!(".{}{}", rewrite_ident(context, method_name), type_str);
-        rewrite_call(context, &callee_str, &args, span, shape)
+        // Add the method name to get the remaining space.
+        callee_str.push('.');
+        callee_str.push_str(rewrite_ident(context, method_name));
+
+        // issue 5249: Since function calls wrap their generics already, this
+        // minimcs the code found in `types::rewrite_generic_args`.
+        if !types.is_empty() {
+            callee_str.push_str("::");
+
+            // An extra offset for the opening '('.
+            let extra_offset = extra_offset(&callee_str, shape) + 1;
+            let new_shape = shape.shrink_left(extra_offset, span)?;
+
+            // This will break up the generics if needed.
+            let generics =
+                overflow::rewrite_with_angle_brackets(context, "", types.iter(), new_shape, span);
+
+            debug!("generics: {:?}", generics);
+
+            callee_str.push_str(&generics?);
+        }
+
+        rewrite_call(context, &callee_str, args, span, shape)
     }
 }
 
