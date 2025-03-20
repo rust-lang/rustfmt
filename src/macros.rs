@@ -1115,7 +1115,6 @@ fn next_space(tok: &TokenKind) -> SpaceState {
         | TokenKind::BinOp(BinOpToken::And)
         | TokenKind::Tilde
         | TokenKind::At
-        | TokenKind::Comma
         | TokenKind::Dot
         | TokenKind::DotDot
         | TokenKind::DotDotDot
