@@ -100,16 +100,21 @@ pub(crate) fn rewrite_match(
         _ => " ",
     };
 
-    let nested_indent_str = shape
-        .indent
-        .block_indent(context.config)
-        .to_string(context.config);
+    let nested_indent = if context.config.match_arm_indent() {
+        shape.indent.block_indent(context.config)
+    } else {
+        shape.indent
+    };
+    let nested_indent_str = nested_indent.to_string(context.config);
+
     // Inner attributes.
     let inner_attrs = &inner_attributes(attrs);
     let inner_attrs_str = if inner_attrs.is_empty() {
         String::new()
     } else {
-        let shape = if context.config.style_edition() <= StyleEdition::Edition2021 {
+        let shape = if context.config.style_edition() <= StyleEdition::Edition2021
+            || !context.config.match_arm_indent()
+        {
             shape
         } else {
             shape.block_indent(context.config.tab_spaces())
@@ -204,9 +209,12 @@ fn rewrite_match_arms(
     span: Span,
     open_brace_pos: BytePos,
 ) -> RewriteResult {
-    let arm_shape = shape
-        .block_indent(context.config.tab_spaces())
-        .with_max_width(context.config);
+    let arm_shape = if context.config.match_arm_indent() {
+        shape.block_indent(context.config.tab_spaces())
+    } else {
+        shape
+    }
+    .with_max_width(context.config);
 
     let arm_len = arms.len();
     let is_last_iter = repeat(false)

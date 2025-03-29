@@ -665,6 +665,7 @@ config_option_with_style_edition_default!(
     EnumDiscrimAlignThreshold, usize, _ => 0;
     MatchArmBlocks, bool, _ => true;
     MatchArmLeadingPipeConfig, MatchArmLeadingPipe, _ => MatchArmLeadingPipe::Never;
+    MatchArmIndent, bool, _ => true;
     ForceMultilineBlocks, bool, _ => false;
     FnArgsLayout, Density, _ => Density::Tall;
     FnParamsLayout, Density, _ => Density::Tall;
