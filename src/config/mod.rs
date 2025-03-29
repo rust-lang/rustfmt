@@ -131,6 +131,8 @@ create_config! {
         on the same line with the pattern of arms";
     match_arm_leading_pipes: MatchArmLeadingPipeConfig, true,
         "Determines whether leading pipes are emitted on match arms";
+    match_arm_indent: MatchArmIndent, false,
+        "Determines whether match arms are indented";
     force_multiline_blocks: ForceMultilineBlocks, false,
         "Force multiline closure bodies and match arms to be wrapped in a block";
     fn_args_layout: FnArgsLayout, true,
@@ -803,6 +805,7 @@ struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
 match_arm_leading_pipes = "Never"
+match_arm_indent = true
 force_multiline_blocks = false
 fn_params_layout = "Tall"
 brace_style = "SameLineWhere"
@@ -894,6 +897,7 @@ struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
 match_arm_leading_pipes = "Never"
+match_arm_indent = true
 force_multiline_blocks = false
 fn_params_layout = "Tall"
 brace_style = "SameLineWhere"
