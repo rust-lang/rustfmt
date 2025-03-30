@@ -90,7 +90,7 @@ pub(crate) fn format_expr(
 ) -> RewriteResult {
     skip_out_of_file_lines_range_err!(context, expr.span);
 
-    if contains_skip(&*expr.attrs) {
+    if contains_skip(&expr.attrs) {
         return Ok(context.snippet(expr.span()).to_owned());
     }
     let shape = if expr_type == ExprType::Statement && semicolon_for_expr(context, expr) {
@@ -112,12 +112,10 @@ pub(crate) fn format_expr(
         ast::ExprKind::Lit(token_lit) => {
             if let Ok(expr_rw) = rewrite_literal(context, token_lit, expr.span, shape) {
                 Ok(expr_rw)
+            } else if let LitKind::StrRaw(_) = token_lit.kind {
+                Ok(context.snippet(expr.span).trim().into())
             } else {
-                if let LitKind::StrRaw(_) = token_lit.kind {
-                    Ok(context.snippet(expr.span).trim().into())
-                } else {
-                    Err(RewriteError::Unknown)
-                }
+                Err(RewriteError::Unknown)
             }
         }
         ast::ExprKind::Call(ref callee, ref args) => {
@@ -303,7 +301,7 @@ pub(crate) fn format_expr(
             SeparatorPlace::Front,
         ),
         ast::ExprKind::Index(ref expr, ref index, _) => {
-            rewrite_index(&**expr, &**index, context, shape)
+            rewrite_index(expr, index, context, shape)
         }
         ast::ExprKind::Repeat(ref expr, ref repeats) => rewrite_pair(
             &**expr,
@@ -358,8 +356,8 @@ pub(crate) fn format_expr(
                         default_sp_delim(Some(lhs), Some(rhs))
                     };
                     rewrite_pair(
-                        &*lhs,
-                        &*rhs,
+                        lhs,
+                        rhs,
                         PairParts::infix(&sp_delim),
                         context,
                         shape,
@@ -372,7 +370,7 @@ pub(crate) fn format_expr(
                     } else {
                         default_sp_delim(None, Some(rhs))
                     };
-                    rewrite_unary_prefix(context, &sp_delim, &*rhs, shape)
+                    rewrite_unary_prefix(context, &sp_delim, rhs, shape)
                 }
                 (Some(lhs), None) => {
                     let sp_delim = if context.config.spaces_around_ranges() {
@@ -380,7 +378,7 @@ pub(crate) fn format_expr(
                     } else {
                         default_sp_delim(Some(lhs), None)
                     };
-                    rewrite_unary_suffix(context, &sp_delim, &*lhs, shape)
+                    rewrite_unary_suffix(context, &sp_delim, lhs, shape)
                 }
                 (None, None) => Ok(delim.to_owned()),
             }
@@ -502,7 +500,7 @@ fn rewrite_empty_block(
     }
 
     let label_str = rewrite_label(context, label);
-    if attrs.map_or(false, |a| !inner_attributes(a).is_empty()) {
+    if attrs.is_some_and(|a| !inner_attributes(a).is_empty()) {
         return None;
     }
 
@@ -909,7 +907,7 @@ fn last_line_offsetted(start_column: usize, pat_str: &str) -> bool {
     leading_whitespaces > start_column
 }
 
-impl<'a> ControlFlow<'a> {
+impl ControlFlow<'_> {
     fn rewrite_pat_expr(
         &self,
         context: &RewriteContext<'_>,
@@ -936,7 +934,7 @@ impl<'a> ControlFlow<'a> {
             let comments_span = mk_sp(comments_lo, expr.span.lo());
             return rewrite_assign_rhs_with_comments(
                 context,
-                &format!("{}{}{}", matcher, pat_string, self.connector),
+                format!("{}{}{}", matcher, pat_string, self.connector),
                 expr,
                 cond_shape,
                 &RhsAssignKind::Expr(&expr.kind, expr.span),
@@ -1131,7 +1129,7 @@ pub(crate) fn rewrite_else_kw_with_comments(
     )
 }
 
-impl<'a> Rewrite for ControlFlow<'a> {
+impl Rewrite for ControlFlow<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
@@ -1249,7 +1247,7 @@ pub(crate) fn is_simple_block(
     block.stmts.len() == 1
         && stmt_is_expr(&block.stmts[0])
         && !block_contains_comment(context, block)
-        && attrs.map_or(true, |a| a.is_empty())
+        && attrs.is_none_or(|a| a.is_empty())
 }
 
 /// Checks whether a block contains at most one statement or expression, and no
@@ -1261,7 +1259,7 @@ pub(crate) fn is_simple_block_stmt(
 ) -> bool {
     block.stmts.len() <= 1
         && !block_contains_comment(context, block)
-        && attrs.map_or(true, |a| a.is_empty())
+        && attrs.is_none_or(|a| a.is_empty())
 }
 
 fn block_has_statements(block: &ast::Block) -> bool {
@@ -1280,7 +1278,7 @@ pub(crate) fn is_empty_block(
 ) -> bool {
     !block_has_statements(block)
         && !block_contains_comment(context, block)
-        && attrs.map_or(true, |a| inner_attributes(a).is_empty())
+        && attrs.is_none_or(|a| inner_attributes(a).is_empty())
 }
 
 pub(crate) fn stmt_is_expr(stmt: &ast::Stmt) -> bool {
@@ -1485,7 +1483,7 @@ pub(crate) fn is_simple_expr(expr: &ast::Expr) -> bool {
         | ast::ExprKind::Unary(_, ref expr) => is_simple_expr(expr),
         ast::ExprKind::Index(ref lhs, ref rhs, _) => is_simple_expr(lhs) && is_simple_expr(rhs),
         ast::ExprKind::Repeat(ref lhs, ref rhs) => {
-            is_simple_expr(lhs) && is_simple_expr(&*rhs.value)
+            is_simple_expr(lhs) && is_simple_expr(&rhs.value)
         }
         _ => false,
     }
@@ -1719,11 +1717,11 @@ fn struct_lit_can_be_aligned(fields: &[ast::ExprField], has_base: bool) -> bool 
     !has_base && fields.iter().all(|field| !field.is_shorthand)
 }
 
-fn rewrite_struct_lit<'a>(
+fn rewrite_struct_lit(
     context: &RewriteContext<'_>,
     path: &ast::Path,
     qself: &Option<ptr::P<ast::QSelf>>,
-    fields: &'a [ast::ExprField],
+    fields: &[ast::ExprField],
     struct_rest: &ast::StructRest,
     attrs: &[ast::Attribute],
     span: Span,
@@ -1769,11 +1767,10 @@ fn rewrite_struct_lit<'a>(
     } else {
         let field_iter = fields.iter().map(StructLitField::Regular).chain(
             match struct_rest {
-                ast::StructRest::Base(expr) => Some(StructLitField::Base(&**expr)),
+                ast::StructRest::Base(expr) => Some(StructLitField::Base(expr)),
                 ast::StructRest::Rest(span) => Some(StructLitField::Rest(*span)),
                 ast::StructRest::None => None,
-            }
-            .into_iter(),
+            },
         );
 
         let span_lo = |item: &StructLitField<'_>| match *item {
@@ -2095,7 +2092,7 @@ pub(crate) enum RhsAssignKind<'ast> {
     Ty,
 }
 
-impl<'ast> RhsAssignKind<'ast> {
+impl RhsAssignKind<'_> {
     // TODO(calebcartwright)
     // Preemptive addition for handling RHS with chains, not yet utilized.
     // It may make more sense to construct the chain first and then check
@@ -2279,7 +2276,7 @@ fn choose_rhs<R: Rewrite>(
 
             match (orig_rhs, new_rhs) {
                 (Ok(ref orig_rhs), Ok(ref new_rhs))
-                    if !filtered_str_fits(&new_rhs, context.config.max_width(), new_shape) =>
+                    if !filtered_str_fits(new_rhs, context.config.max_width(), new_shape) =>
                 {
                     Ok(format!("{before_space_str}{orig_rhs}"))
                 }
@@ -2412,22 +2409,22 @@ mod test {
     #[test]
     fn test_last_line_offsetted() {
         let lines = "one\n    two";
-        assert_eq!(last_line_offsetted(2, lines), true);
-        assert_eq!(last_line_offsetted(4, lines), false);
-        assert_eq!(last_line_offsetted(6, lines), false);
+        assert!(last_line_offsetted(2, lines));
+        assert!(!last_line_offsetted(4, lines));
+        assert!(!last_line_offsetted(6, lines));
 
         let lines = "one    two";
-        assert_eq!(last_line_offsetted(2, lines), false);
-        assert_eq!(last_line_offsetted(0, lines), false);
+        assert!(!last_line_offsetted(2, lines));
+        assert!(!last_line_offsetted(0, lines));
 
         let lines = "\ntwo";
-        assert_eq!(last_line_offsetted(2, lines), false);
-        assert_eq!(last_line_offsetted(0, lines), false);
+        assert!(!last_line_offsetted(2, lines));
+        assert!(!last_line_offsetted(0, lines));
 
         let lines = "one\n    two      three";
-        assert_eq!(last_line_offsetted(2, lines), true);
+        assert!(last_line_offsetted(2, lines));
         let lines = "one\n two      three";
-        assert_eq!(last_line_offsetted(2, lines), false);
+        assert!(!last_line_offsetted(2, lines));
     }
 
     #[test]

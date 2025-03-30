@@ -146,7 +146,7 @@ pub(crate) enum SegmentParam<'a> {
     Binding(&'a ast::AssocItemConstraint),
 }
 
-impl<'a> SegmentParam<'a> {
+impl SegmentParam<'_> {
     fn from_generic_arg(arg: &ast::GenericArg) -> SegmentParam<'_> {
         match arg {
             ast::GenericArg::Lifetime(ref lt) => SegmentParam::LifeTime(lt),
@@ -156,7 +156,7 @@ impl<'a> SegmentParam<'a> {
     }
 }
 
-impl<'a> Spanned for SegmentParam<'a> {
+impl Spanned for SegmentParam<'_> {
     fn span(&self) -> Span {
         match *self {
             SegmentParam::Const(const_) => const_.value.span,
@@ -167,7 +167,7 @@ impl<'a> Spanned for SegmentParam<'a> {
     }
 }
 
-impl<'a> Rewrite for SegmentParam<'a> {
+impl Rewrite for SegmentParam<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
@@ -644,7 +644,7 @@ impl Rewrite for ast::GenericParam {
         let mut result = self
             .attrs
             .rewrite_result(context, shape)
-            .unwrap_or(String::new());
+            .unwrap_or_default();
         let has_attrs = !result.is_empty();
 
         let mut param = String::with_capacity(128);
@@ -1128,16 +1128,14 @@ fn join_bounds_inner(
             let segments = &poly_trait_ref.trait_ref.path.segments;
             if segments.len() > 1 {
                 true
+            } else if let Some(args_in) = &segments[0].args {
+                matches!(
+                    args_in.deref(),
+                    ast::GenericArgs::AngleBracketed(bracket_args)
+                        if bracket_args.args.len() > 1
+                )
             } else {
-                if let Some(args_in) = &segments[0].args {
-                    matches!(
-                        args_in.deref(),
-                        ast::GenericArgs::AngleBracketed(bracket_args)
-                            if bracket_args.args.len() > 1
-                    )
-                } else {
-                    false
-                }
+                false
             }
         }
         ast::GenericBound::Use(args, _) => args.len() > 1,
@@ -1244,7 +1242,7 @@ fn join_bounds_inner(
     //       or the single item is of type `Trait`,
     //          and any of the internal arrays contains more than one item;
     let retry_with_force_newline = match context.config.style_edition() {
-        style_edition @ _ if style_edition <= StyleEdition::Edition2021 => {
+        style_edition if style_edition <= StyleEdition::Edition2021 => {
             !force_newline
                 && items.len() > 1
                 && (result.0.contains('\n') || result.0.len() > shape.width)
@@ -1278,7 +1276,7 @@ pub(crate) fn can_be_overflowed_type(
         ast::TyKind::Tup(..) => context.use_block_indent() && len == 1,
         ast::TyKind::Ref(_, ref mutty)
         | ast::TyKind::PinnedRef(_, ref mutty)
-        | ast::TyKind::Ptr(ref mutty) => can_be_overflowed_type(context, &*mutty.ty, len),
+        | ast::TyKind::Ptr(ref mutty) => can_be_overflowed_type(context, &mutty.ty, len),
         _ => false,
     }
 }

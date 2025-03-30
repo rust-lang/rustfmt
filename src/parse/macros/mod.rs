@@ -13,7 +13,7 @@ pub(crate) mod asm;
 pub(crate) mod cfg_if;
 pub(crate) mod lazy_static;
 
-fn build_stream_parser<'a>(psess: &'a ParseSess, tokens: TokenStream) -> Parser<'a> {
+fn build_stream_parser(psess: &ParseSess, tokens: TokenStream) -> Parser<'_> {
     Parser::new(psess, tokens, MACRO_ARGUMENTS).recovery(Recovery::Forbidden)
 }
 
@@ -141,7 +141,7 @@ pub(crate) fn parse_macro_args(
                     }
                     return None;
                 }
-                _ if args.last().map_or(false, MacroArg::is_item) => continue,
+                _ if args.last().is_some_and(MacroArg::is_item) => continue,
                 _ => return None,
             }
 

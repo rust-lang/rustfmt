@@ -466,7 +466,7 @@ pub(crate) fn rewrite_macro_def(
         shape
     };
 
-    if parsed_def.branches.len() == 0 {
+    if parsed_def.branches.is_empty() {
         let lo = context.snippet_provider.span_before(span, "{");
         result += " ";
         result += &rewrite_empty_macro_def_body(context, span.with_lo(lo), shape)?;
@@ -831,7 +831,7 @@ impl MacroArgParser {
 
         // Parse '*', '+' or '?.
         for tok in iter {
-            self.set_last_tok(&tok);
+            self.set_last_tok(tok);
             if first {
                 first = false;
             }
@@ -979,7 +979,7 @@ impl MacroArgParser {
                 }
             }
 
-            self.set_last_tok(&tok);
+            self.set_last_tok(tok);
         }
 
         // We are left with some stuff in the buffer. Since there is nothing
@@ -1015,7 +1015,7 @@ fn wrap_macro_args_inner(
         result.push_str(&arg.rewrite(context, shape, use_multiple_lines)?);
 
         if use_multiple_lines
-            && (arg.kind.ends_with_space() || iter.peek().map_or(false, |a| a.kind.has_meta_var()))
+            && (arg.kind.ends_with_space() || iter.peek().is_some_and(|a| a.kind.has_meta_var()))
         {
             if arg.kind.ends_with_space() {
                 result.pop();
@@ -1284,10 +1284,8 @@ impl MacroBranch {
         let old_body = context.snippet(self.body).trim();
         let has_block_body = old_body.starts_with('{');
         let mut prefix_width = 5; // 5 = " => {"
-        if context.config.style_edition() >= StyleEdition::Edition2024 {
-            if has_block_body {
-                prefix_width = 6; // 6 = " => {{"
-            }
+        if context.config.style_edition() >= StyleEdition::Edition2024 && has_block_body {
+            prefix_width = 6; // 6 = " => {{"
         }
         let mut result = format_macro_args(
             context,
@@ -1439,7 +1437,7 @@ fn format_lazy_static(
         result.push_str(&rewrite_assign_rhs(
             context,
             stmt,
-            &*expr,
+            expr,
             &RhsAssignKind::Expr(&expr.kind, expr.span),
             nested_shape.sub_width(1, expr.span)?,
         )?);

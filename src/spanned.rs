@@ -211,7 +211,7 @@ impl Spanned for ast::PreciseCapturingArg {
     }
 }
 
-impl<'a> Spanned for RangeOperand<'a> {
+impl Spanned for RangeOperand<'_> {
     fn span(&self) -> Span {
         self.span
     }

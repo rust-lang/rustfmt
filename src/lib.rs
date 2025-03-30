@@ -387,7 +387,7 @@ fn format_code_block(
     let block_len = formatted
         .snippet
         .rfind('}')
-        .unwrap_or_else(|| formatted.snippet.len());
+        .unwrap_or(formatted.snippet.len());
 
     // It's possible that `block_len < FN_MAIN_PREFIX.len()`. This can happen if the code block was
     // formatted into the empty string, leading to the enclosing `fn main() {\n}` being formatted
@@ -518,7 +518,7 @@ impl<'b, T: Write + 'b> Session<'b, T> {
 pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
     match config.emit_mode() {
         EmitMode::Files if config.make_backup() => {
-            Box::new(emitter::FilesWithBackupEmitter::default())
+            Box::new(emitter::FilesWithBackupEmitter)
         }
         EmitMode::Files => Box::new(emitter::FilesEmitter::new(
             config.print_misformatted_file_names(),
@@ -527,8 +527,8 @@ pub(crate) fn create_emitter<'a>(config: &Config) -> Box<dyn Emitter + 'a> {
             Box::new(emitter::StdoutEmitter::new(config.verbose()))
         }
         EmitMode::Json => Box::new(emitter::JsonEmitter::default()),
-        EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter::default()),
-        EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter::default()),
+        EmitMode::ModifiedLines => Box::new(emitter::ModifiedLinesEmitter),
+        EmitMode::Checkstyle => Box::new(emitter::CheckstyleEmitter),
         EmitMode::Diff => Box::new(emitter::DiffEmitter::new(config.clone())),
     }
 }

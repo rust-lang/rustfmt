@@ -106,13 +106,13 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
     let mut files = vec![];
     if path.is_dir() {
         for entry in
-            fs::read_dir(path).expect(&format!("couldn't read directory {}", path.display()))
+            fs::read_dir(path).unwrap_or_else(|_| panic!("couldn't read directory {}", path.display()))
         {
             let entry = entry.expect("couldn't get `DirEntry`");
             let path = entry.path();
             if path.is_dir() && recursive {
                 files.append(&mut get_test_files(&path, recursive));
-            } else if path.extension().map_or(false, |f| f == "rs") && !is_file_skip(&path) {
+            } else if path.extension().is_some_and(|f| f == "rs") && !is_file_skip(&path) {
                 files.push(path);
             }
         }
@@ -121,10 +121,10 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
 }
 
 fn verify_config_used(path: &Path, config_name: &str) {
-    for entry in fs::read_dir(path).expect(&format!("couldn't read {} directory", path.display())) {
+    for entry in fs::read_dir(path).unwrap_or_else(|_| panic!("couldn't read {} directory", path.display())) {
         let entry = entry.expect("couldn't get directory entry");
         let path = entry.path();
-        if path.extension().map_or(false, |f| f == "rs") {
+        if path.extension().is_some_and(|f| f == "rs") {
             // check if "// rustfmt-<config_name>:" appears in the file.
             let filebuf = BufReader::new(
                 fs::File::open(&path)
@@ -292,7 +292,7 @@ fn assert_output(source: &Path, expected_filename: &Path) {
     let _ = source_file::write_all_files(&source_file, &mut out, &config);
     let output = String::from_utf8(out).unwrap();
 
-    let mut expected_file = fs::File::open(&expected_filename).expect("couldn't open target");
+    let mut expected_file = fs::File::open(expected_filename).expect("couldn't open target");
     let mut expected_text = String::new();
     expected_file
         .read_to_string(&mut expected_text)
@@ -319,7 +319,7 @@ fn assert_stdin_output(
     config.set().newline_style(NewlineStyle::Unix);
     config.set().emit_mode(emit_mode);
 
-    let mut source_file = fs::File::open(&source).expect("couldn't open source");
+    let mut source_file = fs::File::open(source).expect("couldn't open source");
     let mut source_text = String::new();
     source_file
         .read_to_string(&mut source_text)
@@ -338,7 +338,7 @@ fn assert_stdin_output(
         assert_eq!(session.errors, errors);
     }
 
-    let mut expected_file = fs::File::open(&expected_filename).expect("couldn't open target");
+    let mut expected_file = fs::File::open(expected_filename).expect("couldn't open target");
     let mut expected_text = String::new();
     expected_file
         .read_to_string(&mut expected_text)
@@ -687,7 +687,7 @@ fn print_mismatches_default_message(result: HashMap<PathBuf, Vec<Mismatch>>) {
     for (file_name, diff) in result {
         let mismatch_msg_formatter =
             |line_num| format!("\nMismatch at {}:{}:", file_name.display(), line_num);
-        print_diff(diff, &mismatch_msg_formatter, &Default::default());
+        print_diff(diff, mismatch_msg_formatter, &Default::default());
     }
 
     if let Some(mut t) = term::stdout() {
@@ -764,13 +764,13 @@ fn get_editions_from_comments(
     (
         comments
             .get("edition")
-            .map(|e| Edition::from_str(e).expect(&format!("invalid edition value: '{}'", e))),
+            .map(|e| Edition::from_str(e).unwrap_or_else(|_| panic!("invalid edition value: '{}'", e))),
         comments.get("style_edition").map(|se| {
-            StyleEdition::from_str(se).expect(&format!("invalid style_edition value: '{}'", se))
+            StyleEdition::from_str(se).unwrap_or_else(|_| panic!("invalid style_edition value: '{}'", se))
         }),
         comments
             .get("version")
-            .map(|v| Version::from_str(v).expect(&format!("invalid version value: '{}'", v))),
+            .map(|v| Version::from_str(v).unwrap_or_else(|_| panic!("invalid version value: '{}'", v))),
     )
 }
 
@@ -976,7 +976,7 @@ fn string_eq_ignore_newline_repr(left: &str, right: &str) -> bool {
 
 struct CharsIgnoreNewlineRepr<'a>(Peekable<Chars<'a>>);
 
-impl<'a> Iterator for CharsIgnoreNewlineRepr<'a> {
+impl Iterator for CharsIgnoreNewlineRepr<'_> {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {

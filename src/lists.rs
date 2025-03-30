@@ -136,7 +136,7 @@ impl ListItem {
         ListItem {
             pre_comment: None,
             pre_comment_style: ListItemCommentStyle::None,
-            item: item,
+            item,
             post_comment: None,
             new_lines: false,
         }
@@ -151,30 +151,25 @@ impl ListItem {
             || self.pre_comment.is_some()
             || self
                 .post_comment
-                .as_ref()
-                .map_or(false, |s| s.contains('\n'))
+                .as_ref().is_some_and(|s| s.contains('\n'))
     }
 
     pub(crate) fn is_multiline(&self) -> bool {
         self.inner_as_ref().contains('\n')
             || self
                 .pre_comment
-                .as_ref()
-                .map_or(false, |s| s.contains('\n'))
+                .as_ref().is_some_and(|s| s.contains('\n'))
             || self
                 .post_comment
-                .as_ref()
-                .map_or(false, |s| s.contains('\n'))
+                .as_ref().is_some_and(|s| s.contains('\n'))
     }
 
     pub(crate) fn has_single_line_comment(&self) -> bool {
         self.pre_comment
-            .as_ref()
-            .map_or(false, |comment| comment.trim_start().starts_with("//"))
+            .as_ref().is_some_and(|comment| comment.trim_start().starts_with("//"))
             || self
                 .post_comment
-                .as_ref()
-                .map_or(false, |comment| comment.trim_start().starts_with("//"))
+                .as_ref().is_some_and(|comment| comment.trim_start().starts_with("//"))
     }
 
     pub(crate) fn has_comment(&self) -> bool {
@@ -285,7 +280,7 @@ where
     let indent_str = &formatting.shape.indent.to_string(formatting.config);
     while let Some((i, item)) = iter.next() {
         let item = item.as_ref();
-        let inner_item = item.item.as_ref().or_else(|err| Err(err.clone()))?;
+        let inner_item = item.item.as_ref().map_err(|err| err.clone())?;
         let first = i == 0;
         let last = iter.peek().is_none();
         let mut separate = match sep_place {
@@ -589,7 +584,7 @@ pub(crate) fn extract_pre_comment(pre_snippet: &str) -> (Option<String>, ListIte
     let ends_with_block_comment = trimmed_pre_snippet.ends_with("*/");
     let starts_with_single_line_comment = trimmed_pre_snippet.starts_with("//");
     if ends_with_block_comment {
-        let comment_end = pre_snippet.rfind(|c| c == '/').unwrap();
+        let comment_end = pre_snippet.rfind('/').unwrap();
         if pre_snippet[comment_end..].contains('\n') {
             (
                 Some(trimmed_pre_snippet.to_owned()),
@@ -632,7 +627,7 @@ pub(crate) fn extract_post_comment(
         false
     };
 
-    let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
+    let post_snippet_trimmed = if post_snippet.starts_with([',', ':']) {
         post_snippet[1..].trim_matches(white_space)
     } else if let Some(stripped) = post_snippet.strip_prefix(separator) {
         stripped.trim_matches(white_space)
@@ -669,7 +664,7 @@ pub(crate) fn get_comment_end(
     if is_last {
         return post_snippet
             .find_uncommented(terminator)
-            .unwrap_or_else(|| post_snippet.len());
+            .unwrap_or(post_snippet.len());
     }
 
     let mut block_open_index = post_snippet.find("/*");
@@ -727,12 +722,12 @@ pub(crate) fn has_extra_newline(post_snippet: &str, comment_end: usize) -> bool 
     let test_snippet = &post_snippet[comment_end - len_last..];
     let first_newline = test_snippet
         .find('\n')
-        .unwrap_or_else(|| test_snippet.len());
+        .unwrap_or(test_snippet.len());
     // From the end of the first line of comments.
     let test_snippet = &test_snippet[first_newline..];
     let first = test_snippet
         .find(|c: char| !c.is_whitespace())
-        .unwrap_or_else(|| test_snippet.len());
+        .unwrap_or(test_snippet.len());
     // From the end of the first line of comments to the next non-whitespace char.
     let test_snippet = &test_snippet[..first];
 
@@ -740,7 +735,7 @@ pub(crate) fn has_extra_newline(post_snippet: &str, comment_end: usize) -> bool 
     count_newlines(test_snippet) > 1
 }
 
-impl<'a, T, I, F1, F2, F3> Iterator for ListItems<'a, I, F1, F2, F3>
+impl<T, I, F1, F2, F3> Iterator for ListItems<'_, I, F1, F2, F3>
 where
     I: Iterator<Item = T>,
     F1: Fn(&T) -> BytePos,

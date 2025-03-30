@@ -48,9 +48,8 @@ impl<'b, T: Write + 'b> Session<'b, T> {
             let config = &self.config.clone();
             let format_result = format_project(input, config, self, is_macro_def);
 
-            format_result.map(|report| {
+            format_result.inspect(|report| {
                 self.errors.add(&report.internal.borrow().1);
-                report
             })
         })
     }

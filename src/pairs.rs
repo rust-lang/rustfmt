@@ -281,7 +281,7 @@ fn is_ident_or_bool_lit(expr: &ast::Expr) -> bool {
     }
 }
 
-impl<'a, 'b> PairList<'a, 'b, ast::Expr> {
+impl PairList<'_, '_, ast::Expr> {
     fn let_chain_count(&self) -> usize {
         self.list
             .iter()

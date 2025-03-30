@@ -235,8 +235,7 @@ fn same_line_else_kw_and_brace(
         .lines()
         .last()
         .expect("initializer expression is multi-lined")
-        .strip_prefix(indent.as_ref())
-        .map_or(false, |l| !l.starts_with(char::is_whitespace))
+        .strip_prefix(indent.as_ref()).is_some_and(|l| !l.starts_with(char::is_whitespace))
 }
 
 fn allow_single_line_let_else_block(result: &str, block: &ast::Block) -> bool {
@@ -315,7 +314,7 @@ impl<'a> FnSig<'a> {
             constness: method_sig.header.constness,
             defaultness: ast::Defaultness::Final,
             ext: method_sig.header.ext,
-            decl: &*method_sig.decl,
+            decl: &method_sig.decl,
             generics,
             visibility,
         }
@@ -349,7 +348,7 @@ impl<'a> FnSig<'a> {
     fn to_str(&self, context: &RewriteContext<'_>) -> String {
         let mut result = String::with_capacity(128);
         // Vis defaultness constness unsafety abi.
-        result.push_str(&*format_visibility(context, self.visibility));
+        result.push_str(&format_visibility(context, self.visibility));
         result.push_str(format_defaultness(self.defaultness));
         result.push_str(format_constness(self.constness));
         self.coroutine_kind
@@ -363,7 +362,7 @@ impl<'a> FnSig<'a> {
     }
 }
 
-impl<'a> FmtVisitor<'a> {
+impl FmtVisitor<'_> {
     fn format_item(&mut self, item: &Item<'_>) {
         self.buffer.push_str(format_safety(item.safety));
         self.buffer.push_str(&item.abi);
@@ -480,7 +479,7 @@ impl<'a> FmtVisitor<'a> {
         block: &ast::Block,
         inner_attrs: Option<&[ast::Attribute]>,
     ) -> Option<String> {
-        if fn_str.contains('\n') || inner_attrs.map_or(false, |a| !a.is_empty()) {
+        if fn_str.contains('\n') || inner_attrs.is_some_and(|a| !a.is_empty()) {
             return None;
         }
 
@@ -768,8 +767,7 @@ impl<'a> FmtVisitor<'a> {
                 // Make sure that there are at least a single empty line between
                 // different impl items.
                 if prev_kind
-                    .as_ref()
-                    .map_or(false, |prev_kind| need_empty_line(prev_kind, &item.kind))
+                    .as_ref().is_some_and(|prev_kind| need_empty_line(prev_kind, &item.kind))
                 {
                     self.push_str("\n");
                 }
@@ -1040,7 +1038,7 @@ fn format_impl_ref_and_type(
         IndentStyle::Visual => new_line_offset + trait_ref_overhead,
         IndentStyle::Block => new_line_offset,
     };
-    result.push_str(&*self_ty.rewrite_result(context, Shape::legacy(budget, type_offset))?);
+    result.push_str(&self_ty.rewrite_result(context, Shape::legacy(budget, type_offset))?);
     Ok(result)
 }
 
@@ -1239,7 +1237,7 @@ pub(crate) fn format_trait(
         let item_snippet = context.snippet(item.span);
         if let Some(lo) = item_snippet.find('/') {
             // 1 = `{`
-            let comment_hi = if generics.params.len() > 0 {
+            let comment_hi = if !generics.params.is_empty() {
                 generics.span.lo() - BytePos(1)
             } else {
                 body_lo - BytePos(1)
@@ -1326,7 +1324,7 @@ pub(crate) struct TraitAliasBounds<'a> {
     generics: &'a ast::Generics,
 }
 
-impl<'a> Rewrite for TraitAliasBounds<'a> {
+impl Rewrite for TraitAliasBounds<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
@@ -1688,11 +1686,11 @@ struct TyAliasRewriteInfo<'c, 'g>(
     Span,
 );
 
-pub(crate) fn rewrite_type_alias<'a, 'b>(
+pub(crate) fn rewrite_type_alias(
     ty_alias_kind: &ast::TyAlias,
-    context: &RewriteContext<'a>,
+    context: &RewriteContext<'_>,
     indent: Indent,
-    visitor_kind: &ItemVisitorKind<'b>,
+    visitor_kind: &ItemVisitorKind<'_>,
     span: Span,
 ) -> RewriteResult {
     use ItemVisitorKind::*;
@@ -1864,7 +1862,7 @@ fn rewrite_ty<R: Rewrite>(
         } else {
             shape
         };
-        rewrite_assign_rhs(context, lhs, &*ty, &RhsAssignKind::Ty, shape)?
+        rewrite_assign_rhs(context, lhs, ty, &RhsAssignKind::Ty, shape)?
     } else {
         result
     };
@@ -2158,7 +2156,7 @@ struct OpaqueType<'a> {
     bounds: &'a ast::GenericBounds,
 }
 
-impl<'a> Rewrite for OpaqueType<'a> {
+impl Rewrite for OpaqueType<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         let shape = shape.offset_left_opt(5)?; // `impl `
         self.bounds
@@ -2290,7 +2288,7 @@ impl Rewrite for ast::Param {
                 !has_multiple_attr_lines && !has_doc_comments,
             )?;
 
-            if !is_empty_infer(&*self.ty, self.pat.span) {
+            if !is_empty_infer(&self.ty, self.pat.span) {
                 let (before_comment, after_comment) =
                     get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
                 result.push_str(&before_comment);
@@ -2478,15 +2476,14 @@ fn rewrite_fn_base(
     let generics_str = rewrite_generics(
         context,
         rewrite_ident(context, ident),
-        &fn_sig.generics,
+        fn_sig.generics,
         shape,
     )?;
     result.push_str(&generics_str);
 
     let snuggle_angle_bracket = generics_str
         .lines()
-        .last()
-        .map_or(false, |l| l.trim_start().len() == 1);
+        .last().is_some_and(|l| l.trim_start().len() == 1);
 
     // Note that the width and indent don't really matter, we'll re-layout the
     // return type later anyway.
@@ -2571,8 +2568,7 @@ fn rewrite_fn_base(
         // on the same line.
         params_last_line_contains_comment = param_str
             .lines()
-            .last()
-            .map_or(false, |last_line| last_line.contains("//"));
+            .last().is_some_and(|last_line| last_line.contains("//"));
 
         if context.config.style_edition() >= StyleEdition::Edition2027 {
             if closing_paren_overflow_max_width {
@@ -2680,11 +2676,9 @@ fn rewrite_fn_base(
             let snippet = context.snippet(mk_sp(snippet_lo, snippet_hi));
             // Try to preserve the layout of the original snippet.
             let original_starts_with_newline = snippet
-                .find(|c| c != ' ')
-                .map_or(false, |i| starts_with_newline(&snippet[i..]));
+                .find(|c| c != ' ').is_some_and(|i| starts_with_newline(&snippet[i..]));
             let original_ends_with_newline = snippet
-                .rfind(|c| c != ' ')
-                .map_or(false, |i| snippet[i..].ends_with('\n'));
+                .rfind(|c| c != ' ').is_some_and(|i| snippet[i..].ends_with('\n'));
             let snippet = snippet.trim();
             if !snippet.is_empty() {
                 result.push(if original_starts_with_newline {
@@ -3387,8 +3381,7 @@ fn format_generics(
     };
     // add missing comments
     let missed_line_comments = missed_comments
-        .filter(|missed_comments| !missed_comments.is_empty())
-        .map_or(false, |missed_comments| {
+        .filter(|missed_comments| !missed_comments.is_empty()).is_some_and(|missed_comments| {
             let is_block = is_last_comment_block(&missed_comments);
             let sep = if is_block { " " } else { "\n" };
             result.push_str(sep);
@@ -3557,7 +3550,7 @@ pub(crate) fn rewrite_mod(
     attrs_shape: Shape,
 ) -> RewriteResult {
     let mut result = String::with_capacity(32);
-    result.push_str(&*format_visibility(context, &item.vis));
+    result.push_str(&format_visibility(context, &item.vis));
     result.push_str("mod ");
     result.push_str(rewrite_ident(context, item.ident));
     result.push(';');

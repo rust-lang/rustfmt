@@ -89,7 +89,7 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) is_macro_def: bool,
 }
 
-impl<'a> Drop for FmtVisitor<'a> {
+impl Drop for FmtVisitor<'_> {
     fn drop(&mut self) {
         if let Some(ctx) = self.parent_context {
             if self.macro_rewrite_failure {
@@ -120,8 +120,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             // snippet preceding the semicolon is picked up.
             let snippet = self.snippet(mk_sp(self.last_pos, stmt.span().lo()));
             let original_starts_with_newline = snippet
-                .find(|c| c != ' ')
-                .map_or(false, |i| starts_with_newline(&snippet[i..]));
+                .find(|c| c != ' ').is_some_and(|i| starts_with_newline(&snippet[i..]));
             let snippet = snippet.trim();
             if !snippet.is_empty() {
                 // FIXME(calebcartwright 2021-01-03) - This exists strictly to maintain legacy
@@ -267,7 +266,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let comment_snippet = self.snippet(span);
 
         let align_to_right = if unindent_comment && contains_comment(comment_snippet) {
-            let first_lines = comment_snippet.splitn(2, '/').next().unwrap_or("");
+            let first_lines = comment_snippet.split('/').next().unwrap_or("");
             last_line_width(first_lines) > last_line_width(comment_snippet)
         } else {
             false
@@ -871,7 +870,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // Extract leading `use ...;`.
         let items: Vec<_> = stmts
             .iter()
-            .take_while(|stmt| stmt.to_item().map_or(false, is_use_item))
+            .take_while(|stmt| stmt.to_item().is_some_and(is_use_item))
             .filter_map(|stmt| stmt.to_item())
             .collect();
 
@@ -920,7 +919,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         attrs: &[ast::Attribute],
     ) {
         let vis_str = utils::format_visibility(&self.get_context(), vis);
-        self.push_str(&*vis_str);
+        self.push_str(&vis_str);
         self.push_str(format_safety(safety));
         self.push_str("mod ");
         // Calling `to_owned()` to work around borrow checker.

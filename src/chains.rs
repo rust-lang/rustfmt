@@ -213,7 +213,7 @@ impl ChainItemKind {
     fn is_tup_field_access(expr: &ast::Expr) -> bool {
         match expr.kind {
             ast::ExprKind::Field(_, ref field) => {
-                field.name.as_str().chars().all(|c| c.is_digit(10))
+                field.name.as_str().chars().all(|c| c.is_ascii_digit())
             }
             _ => false,
         }
@@ -288,7 +288,7 @@ impl Rewrite for ChainItem {
             ChainItemKind::Parent {
                 ref expr,
                 parens: true,
-            } => crate::expr::rewrite_paren(context, &expr, shape, expr.span)?,
+            } => crate::expr::rewrite_paren(context, expr, shape, expr.span)?,
             ChainItemKind::Parent {
                 ref expr,
                 parens: false,
@@ -353,7 +353,7 @@ impl ChainItem {
             format!("::<{}>", type_list.join(", "))
         };
         let callee_str = format!(".{}{}", rewrite_ident(context, method_name), type_str);
-        rewrite_call(context, &callee_str, &args, span, shape)
+        rewrite_call(context, &callee_str, args, span, shape)
     }
 }
 
@@ -843,7 +843,7 @@ impl<'a> ChainFormatterBlock<'a> {
     }
 }
 
-impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
+impl ChainFormatter for ChainFormatterBlock<'_> {
     fn format_root(
         &mut self,
         parent: &ChainItem,
@@ -931,7 +931,7 @@ impl<'a> ChainFormatterVisual<'a> {
     }
 }
 
-impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
+impl ChainFormatter for ChainFormatterVisual<'_> {
     fn format_root(
         &mut self,
         parent: &ChainItem,

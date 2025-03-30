@@ -137,7 +137,7 @@ mod tests {
             ],
         };
 
-        let _ = emitter
+        emitter
             .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
             .unwrap();
 
@@ -182,7 +182,7 @@ mod tests {
             ],
         };
 
-        let _ = emitter
+        emitter
             .add_misformatted_file(&FileName::Real(PathBuf::from(file)), vec![mismatch])
             .unwrap();
 
@@ -206,7 +206,7 @@ mod tests {
             )
             .unwrap();
         let _ = emitter.emit_footer(&mut writer);
-        assert_eq!(result.has_diff, false);
+        assert!(!result.has_diff);
         assert_eq!(&writer[..], "[]\n".as_bytes());
     }
 
@@ -279,7 +279,7 @@ mod tests {
             ],
         }])
         .unwrap();
-        assert_eq!(result.has_diff, true);
+        assert!(result.has_diff);
         assert_eq!(&writer[..], format!("{exp_json}\n").as_bytes());
     }
 

@@ -327,7 +327,7 @@ impl Config {
         style_edition: Option<StyleEdition>,
         version: Option<Version>,
     ) -> Result<Config, Error> {
-        let mut file = File::open(&file_path)?;
+        let mut file = File::open(file_path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
         Config::from_toml_for_style_edition(&toml, file_path, edition, style_edition, version)
@@ -715,8 +715,8 @@ mod test {
     fn test_was_set() {
         let config = Config::from_toml("hard_tabs = true", Path::new("./rustfmt.toml")).unwrap();
 
-        assert_eq!(config.was_set().hard_tabs(), true);
-        assert_eq!(config.was_set().verbose(), false);
+        assert!(config.was_set().hard_tabs());
+        assert!(!config.was_set().verbose());
     }
 
     const PRINT_DOCS_STABLE_OPTION: &str = "stable_option <boolean> Default: false";
@@ -732,9 +732,9 @@ mod test {
         Config::print_docs(&mut output, false);
 
         let s = str::from_utf8(&output).unwrap();
-        assert_eq!(s.contains(PRINT_DOCS_STABLE_OPTION), true);
-        assert_eq!(s.contains(PRINT_DOCS_UNSTABLE_OPTION), false);
-        assert_eq!(s.contains(PRINT_DOCS_PARTIALLY_UNSTABLE_OPTION), true);
+        assert!(s.contains(PRINT_DOCS_STABLE_OPTION));
+        assert!(!s.contains(PRINT_DOCS_UNSTABLE_OPTION));
+        assert!(s.contains(PRINT_DOCS_PARTIALLY_UNSTABLE_OPTION));
     }
 
     #[test]
@@ -745,9 +745,9 @@ mod test {
         Config::print_docs(&mut output, true);
 
         let s = str::from_utf8(&output).unwrap();
-        assert_eq!(s.contains(PRINT_DOCS_STABLE_OPTION), true);
-        assert_eq!(s.contains(PRINT_DOCS_UNSTABLE_OPTION), true);
-        assert_eq!(s.contains(PRINT_DOCS_PARTIALLY_UNSTABLE_OPTION), true);
+        assert!(s.contains(PRINT_DOCS_STABLE_OPTION));
+        assert!(s.contains(PRINT_DOCS_UNSTABLE_OPTION));
+        assert!(s.contains(PRINT_DOCS_PARTIALLY_UNSTABLE_OPTION));
     }
 
     #[test]
@@ -966,9 +966,9 @@ make_backup = false
         config.set().unstable_features(true);
         // When we don't set the config from toml or command line options it
         // doesn't get marked as set by the user.
-        assert_eq!(config.was_set().unstable_features(), false);
+        assert!(!config.was_set().unstable_features());
         config.set().unstable_features(true);
-        assert_eq!(config.unstable_features(), true);
+        assert!(config.unstable_features());
     }
 
     #[nightly_only_test]
@@ -976,22 +976,22 @@ make_backup = false
     fn test_unstable_from_toml() {
         let config =
             Config::from_toml("unstable_features = true", Path::new("./rustfmt.toml")).unwrap();
-        assert_eq!(config.was_set().unstable_features(), true);
-        assert_eq!(config.unstable_features(), true);
+        assert!(config.was_set().unstable_features());
+        assert!(config.unstable_features());
     }
 
     #[test]
     fn test_set_cli() {
         let mut config = Config::default();
-        assert_eq!(config.was_set().edition(), false);
-        assert_eq!(config.was_set_cli().edition(), false);
+        assert!(!config.was_set().edition());
+        assert!(!config.was_set_cli().edition());
         config.set().edition(Edition::Edition2021);
-        assert_eq!(config.was_set().edition(), false);
-        assert_eq!(config.was_set_cli().edition(), false);
+        assert!(!config.was_set().edition());
+        assert!(!config.was_set_cli().edition());
         config.set_cli().edition(Edition::Edition2021);
-        assert_eq!(config.was_set().edition(), false);
-        assert_eq!(config.was_set_cli().edition(), true);
-        assert_eq!(config.was_set_cli().emit_mode(), false);
+        assert!(!config.was_set().edition());
+        assert!(config.was_set_cli().edition());
+        assert!(!config.was_set_cli().emit_mode());
     }
 
     #[cfg(test)]
@@ -1365,7 +1365,7 @@ make_backup = false
             let versions = vec!["0.0.0", "0.0.1", "0.1.0"];
 
             for version in versions {
-                let toml = format!("required_version=\"{}\"", version.to_string());
+                let toml = format!("required_version=\"{}\"", version);
                 let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
                 assert!(!config.version_meets_requirement());
@@ -1389,8 +1389,8 @@ make_backup = false
             for minor in current_version.minor..0 {
                 let toml = format!(
                     "required_version=\"^{}.{}.0\"",
-                    current_version.major.to_string(),
-                    minor.to_string()
+                    current_version.major,
+                    minor
                 );
                 let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
@@ -1434,7 +1434,7 @@ make_backup = false
         #[nightly_only_test]
         #[test]
         fn test_required_version_exact_boundary() {
-            let toml = format!("required_version=\"{}\"", get_current_version().to_string());
+            let toml = format!("required_version=\"{}\"", get_current_version());
             let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
@@ -1445,7 +1445,7 @@ make_backup = false
         fn test_required_version_pre_release() {
             let toml = format!(
                 "required_version=\"^{}-alpha\"",
-                get_current_version().to_string()
+                get_current_version()
             );
             let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
@@ -1457,7 +1457,7 @@ make_backup = false
         fn test_required_version_with_build_metadata() {
             let toml = format!(
                 "required_version=\"{}+build.1\"",
-                get_current_version().to_string()
+                get_current_version()
             );
 
             let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();

@@ -14,12 +14,12 @@ impl<'a> VersionChunkIter<'a> {
 
     fn parse_numeric_chunk(
         &mut self,
-        mut chars: std::str::CharIndices<'a>,
+        chars: std::str::CharIndices<'a>,
     ) -> Option<VersionChunk<'a>> {
         let mut end = self.start;
         let mut is_end_of_chunk = false;
 
-        while let Some((idx, c)) = chars.next() {
+        for (idx, c) in chars {
             end = self.start + idx;
 
             if c.is_ascii_digit() {
@@ -52,12 +52,12 @@ impl<'a> VersionChunkIter<'a> {
 
     fn parse_str_chunk(
         &mut self,
-        mut chars: std::str::CharIndices<'a>,
+        chars: std::str::CharIndices<'a>,
     ) -> Option<VersionChunk<'a>> {
         let mut end = self.start;
         let mut is_end_of_chunk = false;
 
-        while let Some((idx, c)) = chars.next() {
+        for (idx, c) in chars {
             end = self.start + idx;
 
             if c == '_' {
@@ -95,7 +95,7 @@ impl<'a> Iterator for VersionChunkIter<'a> {
         let (_, next) = chars.next()?;
 
         if next == '_' {
-            self.start = self.start + next.len_utf8();
+            self.start += next.len_utf8();
             return Some(VersionChunk::Underscore);
         }
 
@@ -151,11 +151,11 @@ pub(crate) fn version_sort(a: &str, b: &str) -> std::cmp::Ordering {
                 (VersionChunk::Str(ca), VersionChunk::Str(cb))
                 | (VersionChunk::Str(ca), VersionChunk::Number { source: cb, .. })
                 | (VersionChunk::Number { source: ca, .. }, VersionChunk::Str(cb)) => {
-                    match ca.cmp(&cb) {
+                    match ca.cmp(cb) {
                         std::cmp::Ordering::Equal => {
                             continue;
                         }
-                        order @ _ => return order,
+                        order => return order,
                     }
                 }
                 (
@@ -182,7 +182,7 @@ pub(crate) fn version_sort(a: &str, b: &str) -> std::cmp::Ordering {
                         }
                         continue;
                     }
-                    order @ _ => return order,
+                    order => return order,
                 },
             },
         }

@@ -43,7 +43,7 @@ impl<'a> ArmWrapper<'a> {
     }
 }
 
-impl<'a> Spanned for ArmWrapper<'a> {
+impl Spanned for ArmWrapper<'_> {
     fn span(&self) -> Span {
         if let Some(lo) = self.beginning_vert {
             let lo = std::cmp::min(lo, self.arm.span().lo());
@@ -54,7 +54,7 @@ impl<'a> Spanned for ArmWrapper<'a> {
     }
 }
 
-impl<'a> Rewrite for ArmWrapper<'a> {
+impl Rewrite for ArmWrapper<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
@@ -217,7 +217,7 @@ fn rewrite_match_arms(
         context.snippet_provider,
         arms.iter()
             .zip(is_last_iter)
-            .zip(beginning_verts.into_iter())
+            .zip(beginning_verts)
             .map(|((arm, is_last), beginning_vert)| ArmWrapper::new(arm, is_last, beginning_vert)),
         "}",
         "|",
@@ -343,7 +343,7 @@ fn block_can_be_flattened<'a>(
                 && is_simple_block(context, block, Some(&expr.attrs))
                 && !stmt_is_expr_mac(&block.stmts[0]) =>
         {
-            Some(&*block)
+            Some(block)
         }
         _ => None,
     }
@@ -370,19 +370,18 @@ fn flatten_arm_body<'a>(
                 }
             } else {
                 let cond_becomes_multi_line = opt_shape
-                    .and_then(|shape| rewrite_cond(context, expr, shape))
-                    .map_or(false, |cond| cond.contains('\n'));
+                    .and_then(|shape| rewrite_cond(context, expr, shape)).is_some_and(|cond| cond.contains('\n'));
                 if cond_becomes_multi_line {
-                    (false, &*body)
+                    (false, body)
                 } else {
-                    (can_extend(expr), &*expr)
+                    (can_extend(expr), expr)
                 }
             }
         } else {
-            (false, &*body)
+            (false, body)
         }
     } else {
-        (can_extend(body), &*body)
+        (can_extend(body), body)
     }
 }
 
@@ -472,12 +471,10 @@ fn rewrite_match_body(
                 };
                 let semicolon = if context.config.style_edition() <= StyleEdition::Edition2021 {
                     ""
+                } else if semicolon_for_expr(context, body) {
+                    ";"
                 } else {
-                    if semicolon_for_expr(context, body) {
-                        ";"
-                    } else {
-                        ""
-                    }
+                    ""
                 };
                 ("{", format!("{}{}}}{}", semicolon, indent_str, comma))
             } else {

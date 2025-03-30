@@ -68,7 +68,7 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(result.has_diff, false);
+        assert!(!result.has_diff);
         assert_eq!(writer.len(), 0);
     }
 

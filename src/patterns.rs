@@ -57,7 +57,7 @@ fn is_short_pattern_inner(pat: &ast::Pat) -> bool {
         ast::PatKind::Box(ref p)
         | PatKind::Deref(ref p)
         | ast::PatKind::Ref(ref p, _)
-        | ast::PatKind::Paren(ref p) => is_short_pattern_inner(&*p),
+        | ast::PatKind::Paren(ref p) => is_short_pattern_inner(p),
         PatKind::Or(ref pats) => pats.iter().all(|p| is_short_pattern_inner(p)),
     }
 }
@@ -67,7 +67,7 @@ pub(crate) struct RangeOperand<'a> {
     pub(crate) span: Span,
 }
 
-impl<'a> Rewrite for RangeOperand<'a> {
+impl Rewrite for RangeOperand<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
@@ -408,14 +408,12 @@ fn rewrite_struct_pat(
             }
             fields_str.push('\n');
             fields_str.push_str(&nested_shape.indent.to_string(context.config));
-        } else {
-            if !fields_str.is_empty() {
-                // there are preceding struct fields being matched on
-                if has_trailing_comma {
-                    fields_str.push(' ');
-                } else {
-                    fields_str.push_str(", ");
-                }
+        } else if !fields_str.is_empty() {
+            // there are preceding struct fields being matched on
+            if has_trailing_comma {
+                fields_str.push(' ');
+            } else {
+                fields_str.push_str(", ");
             }
         }
         fields_str.push_str("..");
@@ -486,7 +484,7 @@ pub(crate) enum TuplePatField<'a> {
     Dotdot(Span),
 }
 
-impl<'a> Rewrite for TuplePatField<'a> {
+impl Rewrite for TuplePatField<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
@@ -499,7 +497,7 @@ impl<'a> Rewrite for TuplePatField<'a> {
     }
 }
 
-impl<'a> Spanned for TuplePatField<'a> {
+impl Spanned for TuplePatField<'_> {
     fn span(&self) -> Span {
         match *self {
             TuplePatField::Pat(p) => p.span(),
@@ -508,7 +506,7 @@ impl<'a> Spanned for TuplePatField<'a> {
     }
 }
 
-impl<'a> TuplePatField<'a> {
+impl TuplePatField<'_> {
     fn is_dotdot(&self) -> bool {
         match self {
             TuplePatField::Pat(pat) => matches!(pat.kind, ast::PatKind::Rest),
@@ -566,7 +564,7 @@ fn rewrite_tuple_pat(
         (&pat_vec[..], span)
     };
 
-    let is_last_pat_dotdot = pat_vec.last().map_or(false, |p| p.is_dotdot());
+    let is_last_pat_dotdot = pat_vec.last().is_some_and(|p| p.is_dotdot());
     let add_comma = path_str.is_none() && pat_vec.len() == 1 && !is_last_pat_dotdot;
     let path_str = path_str.unwrap_or_default();
 

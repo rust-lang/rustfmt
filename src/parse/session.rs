@@ -102,7 +102,7 @@ fn default_dcx(
     show_parse_errors: bool,
     color: Color,
 ) -> DiagCtxt {
-    let supports_color = term::stderr().map_or(false, |term| term.supports_color());
+    let supports_color = term::stderr().is_some_and(|term| term.supports_color());
     let emit_color = if supports_color {
         ColorConfig::from(color)
     } else {
@@ -424,7 +424,7 @@ mod tests {
             let fatal_diagnostic = build_diagnostic(DiagnosticLevel::Fatal, Some(span));
             emitter.emit_diagnostic(fatal_diagnostic, &registry);
             assert_eq!(num_emitted_errors.load(Ordering::Acquire), 1);
-            assert_eq!(can_reset_errors.load(Ordering::Acquire), false);
+            assert!(!can_reset_errors.load(Ordering::Acquire));
         }
 
         #[nightly_only_test]
@@ -450,7 +450,7 @@ mod tests {
             let non_fatal_diagnostic = build_diagnostic(DiagnosticLevel::Warning, Some(span));
             emitter.emit_diagnostic(non_fatal_diagnostic, &registry);
             assert_eq!(num_emitted_errors.load(Ordering::Acquire), 0);
-            assert_eq!(can_reset_errors.load(Ordering::Acquire), true);
+            assert!(can_reset_errors.load(Ordering::Acquire));
         }
 
         #[nightly_only_test]
@@ -475,7 +475,7 @@ mod tests {
             let non_fatal_diagnostic = build_diagnostic(DiagnosticLevel::Warning, Some(span));
             emitter.emit_diagnostic(non_fatal_diagnostic, &registry);
             assert_eq!(num_emitted_errors.load(Ordering::Acquire), 1);
-            assert_eq!(can_reset_errors.load(Ordering::Acquire), false);
+            assert!(!can_reset_errors.load(Ordering::Acquire));
         }
 
         #[nightly_only_test]
@@ -517,7 +517,7 @@ mod tests {
             emitter.emit_diagnostic(foo_diagnostic, &registry);
             emitter.emit_diagnostic(fatal_diagnostic, &registry);
             assert_eq!(num_emitted_errors.load(Ordering::Acquire), 2);
-            assert_eq!(can_reset_errors.load(Ordering::Acquire), false);
+            assert!(!can_reset_errors.load(Ordering::Acquire));
         }
     }
 }

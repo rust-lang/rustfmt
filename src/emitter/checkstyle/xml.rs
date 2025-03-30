@@ -4,7 +4,7 @@ use std::fmt::{self, Display};
 /// This is needed for checkstyle output.
 pub(super) struct XmlEscaped<'a>(pub(super) &'a str);
 
-impl<'a> Display for XmlEscaped<'a> {
+impl Display for XmlEscaped<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         for char in self.0.chars() {
             match char {

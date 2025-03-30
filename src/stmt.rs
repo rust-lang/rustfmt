@@ -15,7 +15,7 @@ pub(crate) struct Stmt<'a> {
     is_last: bool,
 }
 
-impl<'a> Spanned for Stmt<'a> {
+impl Spanned for Stmt<'_> {
     fn span(&self) -> Span {
         self.inner.span()
     }
@@ -88,7 +88,7 @@ impl<'a> Stmt<'a> {
     }
 }
 
-impl<'a> Rewrite for Stmt<'a> {
+impl Rewrite for Stmt<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }

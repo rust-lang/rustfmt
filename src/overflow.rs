@@ -87,7 +87,7 @@ pub(crate) enum OverflowableItem<'a> {
     PreciseCapturingArg(&'a ast::PreciseCapturingArg),
 }
 
-impl<'a> Rewrite for OverflowableItem<'a> {
+impl Rewrite for OverflowableItem<'_> {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.map(|item| item.rewrite(context, shape))
     }
@@ -97,7 +97,7 @@ impl<'a> Rewrite for OverflowableItem<'a> {
     }
 }
 
-impl<'a> Spanned for OverflowableItem<'a> {
+impl Spanned for OverflowableItem<'_> {
     fn span(&self) -> Span {
         self.map(|item| item.span())
     }
@@ -445,8 +445,7 @@ impl<'a> Context<'a> {
                     | ast::ExprKind::Loop(..)
                     | ast::ExprKind::While(..)
                     | ast::ExprKind::Match(..) => {
-                        let multi_line = rewrite_cond(self.context, expr, shape)
-                            .map_or(false, |cond| cond.contains('\n'));
+                        let multi_line = rewrite_cond(self.context, expr, shape).is_some_and(|cond| cond.contains('\n'));
 
                         if multi_line {
                             None
@@ -463,7 +462,7 @@ impl<'a> Context<'a> {
 
         if let Some(rewrite) = rewrite {
             // splitn(2, *).next().unwrap() is always safe.
-            let rewrite_first_line = Ok(rewrite.splitn(2, '\n').next().unwrap().to_owned());
+            let rewrite_first_line = Ok(rewrite.split('\n').next().unwrap().to_owned());
             last_list_item.item = rewrite_first_line;
             Some(rewrite)
         } else {
@@ -549,7 +548,7 @@ impl<'a> Context<'a> {
                         .items
                         .last()
                         .and_then(|last_item| last_item.rewrite(self.context, self.nested_shape));
-                    let no_newline = rw.as_ref().map_or(false, |s| !s.contains('\n'));
+                    let no_newline = rw.as_ref().is_some_and(|s| !s.contains('\n'));
                     if no_newline {
                         list_items[self.items.len() - 1].item = rw.unknown_error();
                     } else {
@@ -584,7 +583,7 @@ impl<'a> Context<'a> {
 
                     if tactic == DefinitiveListTactic::Vertical {
                         if let Some((all_simple, num_args_before)) =
-                            maybe_get_args_offset(self.ident, &self.items, &self.context.config)
+                            maybe_get_args_offset(self.ident, &self.items, self.context.config)
                         {
                             let one_line = all_simple
                                 && definitive_tactic(
@@ -739,15 +738,13 @@ impl<'a> Context<'a> {
 
 fn need_block_indent(s: &str, shape: Shape) -> bool {
     s.lines().skip(1).any(|s| {
-        s.find(|c| !char::is_whitespace(c))
-            .map_or(false, |w| w + 1 < shape.indent.width())
+        s.find(|c| !char::is_whitespace(c)).is_some_and(|w| w + 1 < shape.indent.width())
     })
 }
 
 fn can_be_overflowed(context: &RewriteContext<'_>, items: &[OverflowableItem<'_>]) -> bool {
     items
-        .last()
-        .map_or(false, |x| x.can_be_overflowed(context, items.len()))
+        .last().is_some_and(|x| x.can_be_overflowed(context, items.len()))
 }
 
 /// Returns a shape for the last argument which is going to be overflowed.
@@ -757,7 +754,7 @@ fn last_item_shape(
     shape: Shape,
     args_max_width: usize,
 ) -> Option<Shape> {
-    if items.len() == 1 && !lists.get(0)?.is_nested_call() {
+    if items.len() == 1 && !lists.first()?.is_nested_call() {
         return Some(shape);
     }
     let offset = items
@@ -807,8 +804,7 @@ pub(crate) fn maybe_get_args_offset(
     args: &[OverflowableItem<'_>],
     config: &Config,
 ) -> Option<(bool, usize)> {
-    if let Some(&(_, num_args_before)) = args
-        .get(0)?
+    if let Some(&(_, num_args_before)) = args.first()?
         .special_cases(config)
         .find(|&&(s, _)| s == callee_str)
     {

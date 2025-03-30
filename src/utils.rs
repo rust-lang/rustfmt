@@ -183,12 +183,12 @@ pub(crate) fn is_single_line(s: &str) -> bool {
 
 #[inline]
 pub(crate) fn first_line_contains_single_line_comment(s: &str) -> bool {
-    s.lines().next().map_or(false, |l| l.contains("//"))
+    s.lines().next().is_some_and(|l| l.contains("//"))
 }
 
 #[inline]
 pub(crate) fn last_line_contains_single_line_comment(s: &str) -> bool {
-    s.lines().last().map_or(false, |l| l.contains("//"))
+    s.lines().last().is_some_and(|l| l.contains("//"))
 }
 
 #[inline]
@@ -199,13 +199,13 @@ pub(crate) fn is_attributes_extendable(attrs_str: &str) -> bool {
 /// The width of the first line in s.
 #[inline]
 pub(crate) fn first_line_width(s: &str) -> usize {
-    unicode_str_width(s.splitn(2, '\n').next().unwrap_or(""))
+    unicode_str_width(s.split('\n').next().unwrap_or(""))
 }
 
 /// The width of the last line in s.
 #[inline]
 pub(crate) fn last_line_width(s: &str) -> usize {
-    unicode_str_width(s.rsplitn(2, '\n').next().unwrap_or(""))
+    unicode_str_width(s.rsplit('\n').next().unwrap_or(""))
 }
 
 /// The total used width of the last line.
@@ -268,7 +268,7 @@ fn is_skip_nested(meta_item: &MetaItemInner) -> bool {
 pub(crate) fn contains_skip(attrs: &[Attribute]) -> bool {
     attrs
         .iter()
-        .any(|a| a.meta().map_or(false, |a| is_skip(&a)))
+        .any(|a| a.meta().is_some_and(|a| is_skip(&a)))
 }
 
 #[inline]
@@ -458,7 +458,7 @@ pub(crate) fn starts_with_newline(s: &str) -> bool {
 
 #[inline]
 pub(crate) fn first_line_ends_with(s: &str, c: char) -> bool {
-    s.lines().next().map_or(false, |l| l.ends_with(c))
+    s.lines().next().is_some_and(|l| l.ends_with(c))
 }
 
 // States whether an expression's last line exclusively consists of closing

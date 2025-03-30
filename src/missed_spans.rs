@@ -30,7 +30,7 @@ impl SnippetStatus {
     }
 }
 
-impl<'a> FmtVisitor<'a> {
+impl FmtVisitor<'_> {
     fn output_at_start(&self) -> bool {
         self.buffer.is_empty()
     }
@@ -237,7 +237,7 @@ impl<'a> FmtVisitor<'a> {
             .rev()
             .find(|rev_c| ![' ', '\t'].contains(rev_c));
 
-        let fix_indent = last_char.map_or(true, |rev_c| ['{', '\n'].contains(&rev_c));
+        let fix_indent = last_char.is_none_or(|rev_c| ['{', '\n'].contains(&rev_c));
         let mut on_same_line = false;
 
         let comment_indent = if fix_indent {

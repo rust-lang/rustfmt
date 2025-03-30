@@ -35,7 +35,7 @@ fn compare_items(a: &ast::Item, b: &ast::Item, context: &RewriteContext<'_>) -> 
                 version_sort(a.ident.as_str(), b.ident.as_str())
             }
         }
-        (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
+        (ast::ItemKind::ExternCrate(a_name), ast::ItemKind::ExternCrate(b_name)) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
             let a_orig_name = a_name.unwrap_or(a.ident.name);
@@ -149,7 +149,7 @@ fn rewrite_reorderable_or_regroupable_items(
                             let item = use_tree.rewrite_top_level(context, nested_shape);
                             if let Some(list_item) = use_tree.list_item {
                                 ListItem {
-                                    item: item,
+                                    item,
                                     ..list_item
                                 }
                             } else {
@@ -288,7 +288,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let item_length = items
             .iter()
             .take_while(|ppi| {
-                item_kind.is_same_item_kind(&***ppi)
+                item_kind.is_same_item_kind(ppi)
                     && (!in_group || {
                         let current = self.psess.lookup_line_range(ppi.span());
                         let in_same_group = current.lo < last.hi + 2;
