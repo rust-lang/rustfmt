@@ -124,9 +124,10 @@ fn needs_block(
     prefix: &str,
     context: &RewriteContext<'_>,
 ) -> bool {
-    let has_attributes = block.stmts.first().is_some_and(|first_stmt| {
-        !get_attrs_from_stmt(first_stmt).is_empty()
-    });
+    let has_attributes = block
+        .stmts
+        .first()
+        .is_some_and(|first_stmt| !get_attrs_from_stmt(first_stmt).is_empty());
 
     is_unsafe_block(block)
         || block.stmts.len() > 1
@@ -434,9 +435,8 @@ pub(crate) fn rewrite_last_closure(
 
         // When overflowing the closure which consists of a single control flow expression,
         // force to use block if its condition uses multi line.
-        let is_multi_lined_cond = rewrite_cond(context, body, body_shape).is_some_and(|cond| {
-            cond.contains('\n') || cond.len() > body_shape.width
-        });
+        let is_multi_lined_cond = rewrite_cond(context, body, body_shape)
+            .is_some_and(|cond| cond.contains('\n') || cond.len() > body_shape.width);
         if is_multi_lined_cond {
             return rewrite_closure_with_block(body, &prefix, context, body_shape);
         }

@@ -266,9 +266,7 @@ fn is_skip_nested(meta_item: &MetaItemInner) -> bool {
 
 #[inline]
 pub(crate) fn contains_skip(attrs: &[Attribute]) -> bool {
-    attrs
-        .iter()
-        .any(|a| a.meta().is_some_and(|a| is_skip(&a)))
+    attrs.iter().any(|a| a.meta().is_some_and(|a| is_skip(&a)))
 }
 
 #[inline]

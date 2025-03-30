@@ -445,7 +445,8 @@ impl<'a> Context<'a> {
                     | ast::ExprKind::Loop(..)
                     | ast::ExprKind::While(..)
                     | ast::ExprKind::Match(..) => {
-                        let multi_line = rewrite_cond(self.context, expr, shape).is_some_and(|cond| cond.contains('\n'));
+                        let multi_line = rewrite_cond(self.context, expr, shape)
+                            .is_some_and(|cond| cond.contains('\n'));
 
                         if multi_line {
                             None
@@ -738,13 +739,15 @@ impl<'a> Context<'a> {
 
 fn need_block_indent(s: &str, shape: Shape) -> bool {
     s.lines().skip(1).any(|s| {
-        s.find(|c| !char::is_whitespace(c)).is_some_and(|w| w + 1 < shape.indent.width())
+        s.find(|c| !char::is_whitespace(c))
+            .is_some_and(|w| w + 1 < shape.indent.width())
     })
 }
 
 fn can_be_overflowed(context: &RewriteContext<'_>, items: &[OverflowableItem<'_>]) -> bool {
     items
-        .last().is_some_and(|x| x.can_be_overflowed(context, items.len()))
+        .last()
+        .is_some_and(|x| x.can_be_overflowed(context, items.len()))
 }
 
 /// Returns a shape for the last argument which is going to be overflowed.
@@ -804,7 +807,8 @@ pub(crate) fn maybe_get_args_offset(
     args: &[OverflowableItem<'_>],
     config: &Config,
 ) -> Option<(bool, usize)> {
-    if let Some(&(_, num_args_before)) = args.first()?
+    if let Some(&(_, num_args_before)) = args
+        .first()?
         .special_cases(config)
         .find(|&&(s, _)| s == callee_str)
     {

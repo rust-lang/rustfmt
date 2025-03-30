@@ -50,10 +50,7 @@ impl<'a> VersionChunkIter<'a> {
         })
     }
 
-    fn parse_str_chunk(
-        &mut self,
-        chars: std::str::CharIndices<'a>,
-    ) -> Option<VersionChunk<'a>> {
+    fn parse_str_chunk(&mut self, chars: std::str::CharIndices<'a>) -> Option<VersionChunk<'a>> {
         let mut end = self.start;
         let mut is_end_of_chunk = false;
 

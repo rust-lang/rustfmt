@@ -327,7 +327,6 @@ impl ::std::str::FromStr for WidthHeuristics {
     }
 }
 
-
 /// A set of directories, files and modules that rustfmt should ignore.
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct IgnoreList {
@@ -458,7 +457,6 @@ pub enum Edition {
     /// Edition 2024.
     Edition2024,
 }
-
 
 impl From<Edition> for rustc_span::edition::Edition {
     fn from(edition: Edition) -> Self {

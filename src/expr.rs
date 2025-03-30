@@ -300,9 +300,7 @@ pub(crate) fn format_expr(
             shape,
             SeparatorPlace::Front,
         ),
-        ast::ExprKind::Index(ref expr, ref index, _) => {
-            rewrite_index(expr, index, context, shape)
-        }
+        ast::ExprKind::Index(ref expr, ref index, _) => rewrite_index(expr, index, context, shape),
         ast::ExprKind::Repeat(ref expr, ref repeats) => rewrite_pair(
             &**expr,
             &*repeats.value,
@@ -1765,13 +1763,14 @@ fn rewrite_struct_lit(
         )
         .unknown_error()?
     } else {
-        let field_iter = fields.iter().map(StructLitField::Regular).chain(
-            match struct_rest {
+        let field_iter = fields
+            .iter()
+            .map(StructLitField::Regular)
+            .chain(match struct_rest {
                 ast::StructRest::Base(expr) => Some(StructLitField::Base(expr)),
                 ast::StructRest::Rest(span) => Some(StructLitField::Rest(*span)),
                 ast::StructRest::None => None,
-            },
-        );
+            });
 
         let span_lo = |item: &StructLitField<'_>| match *item {
             StructLitField::Regular(field) => field.span().lo(),

@@ -93,10 +93,7 @@ impl<T> RewriteErrorExt<T> for Option<T> {
     }
 
     fn macro_error(self, kind: MacroErrorKind, span: Span) -> Result<T, RewriteError> {
-        self.ok_or(RewriteError::MacroFailure {
-            kind,
-            span,
-        })
+        self.ok_or(RewriteError::MacroFailure { kind, span })
     }
 
     fn unknown_error(self) -> Result<T, RewriteError> {

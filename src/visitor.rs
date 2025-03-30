@@ -120,7 +120,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             // snippet preceding the semicolon is picked up.
             let snippet = self.snippet(mk_sp(self.last_pos, stmt.span().lo()));
             let original_starts_with_newline = snippet
-                .find(|c| c != ' ').is_some_and(|i| starts_with_newline(&snippet[i..]));
+                .find(|c| c != ' ')
+                .is_some_and(|i| starts_with_newline(&snippet[i..]));
             let snippet = snippet.trim();
             if !snippet.is_empty() {
                 // FIXME(calebcartwright 2021-01-03) - This exists strictly to maintain legacy

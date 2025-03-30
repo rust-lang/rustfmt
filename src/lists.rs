@@ -149,27 +149,23 @@ impl ListItem {
     pub(crate) fn is_different_group(&self) -> bool {
         self.inner_as_ref().contains('\n')
             || self.pre_comment.is_some()
-            || self
-                .post_comment
-                .as_ref().is_some_and(|s| s.contains('\n'))
+            || self.post_comment.as_ref().is_some_and(|s| s.contains('\n'))
     }
 
     pub(crate) fn is_multiline(&self) -> bool {
         self.inner_as_ref().contains('\n')
-            || self
-                .pre_comment
-                .as_ref().is_some_and(|s| s.contains('\n'))
-            || self
-                .post_comment
-                .as_ref().is_some_and(|s| s.contains('\n'))
+            || self.pre_comment.as_ref().is_some_and(|s| s.contains('\n'))
+            || self.post_comment.as_ref().is_some_and(|s| s.contains('\n'))
     }
 
     pub(crate) fn has_single_line_comment(&self) -> bool {
         self.pre_comment
-            .as_ref().is_some_and(|comment| comment.trim_start().starts_with("//"))
+            .as_ref()
+            .is_some_and(|comment| comment.trim_start().starts_with("//"))
             || self
                 .post_comment
-                .as_ref().is_some_and(|comment| comment.trim_start().starts_with("//"))
+                .as_ref()
+                .is_some_and(|comment| comment.trim_start().starts_with("//"))
     }
 
     pub(crate) fn has_comment(&self) -> bool {
@@ -720,9 +716,7 @@ pub(crate) fn has_extra_newline(post_snippet: &str, comment_end: usize) -> bool 
         .len_utf8();
     // Everything from the separator to the next item.
     let test_snippet = &post_snippet[comment_end - len_last..];
-    let first_newline = test_snippet
-        .find('\n')
-        .unwrap_or(test_snippet.len());
+    let first_newline = test_snippet.find('\n').unwrap_or(test_snippet.len());
     // From the end of the first line of comments.
     let test_snippet = &test_snippet[first_newline..];
     let first = test_snippet

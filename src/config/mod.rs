@@ -1389,8 +1389,7 @@ make_backup = false
             for minor in current_version.minor..0 {
                 let toml = format!(
                     "required_version=\"^{}.{}.0\"",
-                    current_version.major,
-                    minor
+                    current_version.major, minor
                 );
                 let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
@@ -1443,10 +1442,7 @@ make_backup = false
         #[nightly_only_test]
         #[test]
         fn test_required_version_pre_release() {
-            let toml = format!(
-                "required_version=\"^{}-alpha\"",
-                get_current_version()
-            );
+            let toml = format!("required_version=\"^{}-alpha\"", get_current_version());
             let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 
             assert!(config.version_meets_requirement());
@@ -1455,10 +1451,7 @@ make_backup = false
         #[nightly_only_test]
         #[test]
         fn test_required_version_with_build_metadata() {
-            let toml = format!(
-                "required_version=\"{}+build.1\"",
-                get_current_version()
-            );
+            let toml = format!("required_version=\"{}+build.1\"", get_current_version());
 
             let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
 

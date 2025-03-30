@@ -235,7 +235,8 @@ fn same_line_else_kw_and_brace(
         .lines()
         .last()
         .expect("initializer expression is multi-lined")
-        .strip_prefix(indent.as_ref()).is_some_and(|l| !l.starts_with(char::is_whitespace))
+        .strip_prefix(indent.as_ref())
+        .is_some_and(|l| !l.starts_with(char::is_whitespace))
 }
 
 fn allow_single_line_let_else_block(result: &str, block: &ast::Block) -> bool {
@@ -767,7 +768,8 @@ impl FmtVisitor<'_> {
                 // Make sure that there are at least a single empty line between
                 // different impl items.
                 if prev_kind
-                    .as_ref().is_some_and(|prev_kind| need_empty_line(prev_kind, &item.kind))
+                    .as_ref()
+                    .is_some_and(|prev_kind| need_empty_line(prev_kind, &item.kind))
                 {
                     self.push_str("\n");
                 }
@@ -2483,7 +2485,8 @@ fn rewrite_fn_base(
 
     let snuggle_angle_bracket = generics_str
         .lines()
-        .last().is_some_and(|l| l.trim_start().len() == 1);
+        .last()
+        .is_some_and(|l| l.trim_start().len() == 1);
 
     // Note that the width and indent don't really matter, we'll re-layout the
     // return type later anyway.
@@ -2568,7 +2571,8 @@ fn rewrite_fn_base(
         // on the same line.
         params_last_line_contains_comment = param_str
             .lines()
-            .last().is_some_and(|last_line| last_line.contains("//"));
+            .last()
+            .is_some_and(|last_line| last_line.contains("//"));
 
         if context.config.style_edition() >= StyleEdition::Edition2027 {
             if closing_paren_overflow_max_width {
@@ -2676,9 +2680,11 @@ fn rewrite_fn_base(
             let snippet = context.snippet(mk_sp(snippet_lo, snippet_hi));
             // Try to preserve the layout of the original snippet.
             let original_starts_with_newline = snippet
-                .find(|c| c != ' ').is_some_and(|i| starts_with_newline(&snippet[i..]));
+                .find(|c| c != ' ')
+                .is_some_and(|i| starts_with_newline(&snippet[i..]));
             let original_ends_with_newline = snippet
-                .rfind(|c| c != ' ').is_some_and(|i| snippet[i..].ends_with('\n'));
+                .rfind(|c| c != ' ')
+                .is_some_and(|i| snippet[i..].ends_with('\n'));
             let snippet = snippet.trim();
             if !snippet.is_empty() {
                 result.push(if original_starts_with_newline {
@@ -3381,7 +3387,8 @@ fn format_generics(
     };
     // add missing comments
     let missed_line_comments = missed_comments
-        .filter(|missed_comments| !missed_comments.is_empty()).is_some_and(|missed_comments| {
+        .filter(|missed_comments| !missed_comments.is_empty())
+        .is_some_and(|missed_comments| {
             let is_block = is_last_comment_block(&missed_comments);
             let sep = if is_block { " " } else { "\n" };
             result.push_str(sep);
