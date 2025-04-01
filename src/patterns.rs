@@ -323,7 +323,7 @@ impl Rewrite for Pat {
     }
 }
 
-pub fn rewrite_range_pat<T: Rewrite>(
+pub(crate) fn rewrite_range_pat<T: Rewrite>(
     context: &RewriteContext<'_>,
     shape: Shape,
     lhs: &Option<ptr::P<T>>,
