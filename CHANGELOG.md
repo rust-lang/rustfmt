@@ -39,7 +39,7 @@
   use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64};
   ```
   [style guide's version sorting algorithm]: https://doc.rust-lang.org/nightly/style-guide/#sorting
-- When parsing rustfmt configurations fails, rustfmt will now include the path to the toml file in the erorr message [#6302](https://github.com/rust-lang/rustfmt/issues/6302)
+- When parsing rustfmt configurations fails, rustfmt will now include the path to the toml file in the error message [#6302](https://github.com/rust-lang/rustfmt/issues/6302)
 
 ### Added
 - rustfmt now formats trailing where clauses in type aliases [#5887](https://github.com/rust-lang/rustfmt/pull/5887)
@@ -133,7 +133,7 @@
 ### Changed
 
 - `hide_parse_errors` has been soft deprecated and it's been renamed to `show_parse_errors` [#5961](https://github.com/rust-lang/rustfmt/pull/5961).
-- The diff output produced by `rustfmt --check` is more compatable with editors that support navigating directly to line numbers [#5971](https://github.com/rust-lang/rustfmt/pull/5971)
+- The diff output produced by `rustfmt --check` is more compatible with editors that support navigating directly to line numbers [#5971](https://github.com/rust-lang/rustfmt/pull/5971)
 - When using `version=Two`, the `trace!` macro from the [log crate] is now formatted similarly to `debug!`, `info!`, `warn!`, and `error!` [#5987](https://github.com/rust-lang/rustfmt/issues/5987).
 
   [log crate]: https://crates.io/crates/log
