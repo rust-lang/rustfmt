@@ -9,3 +9,5 @@ struct Foo {
 struct Bar(unsafe<'a> &'a ());
 
 impl Trait for unsafe<'a> &'a () {}
+
+fn empty() -> unsafe<> () {}

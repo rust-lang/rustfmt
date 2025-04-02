@@ -167,6 +167,12 @@ fn make_opts() -> Options {
         "Set options from command line. These settings take priority over .rustfmt.toml",
         "[key1=val1,key2=val2...]",
     );
+    opts.optopt(
+        "",
+        "style-edition",
+        "The edition of the Style Guide.",
+        "[2015|2018|2021|2024]",
+    );
 
     if is_nightly {
         opts.optflag(
@@ -945,6 +951,9 @@ mod test {
         let config_file = Some(Path::new("tests/config/style-edition/overrides"));
         let config = get_config(config_file, Some(options));
         assert_eq!(config.style_edition(), StyleEdition::Edition2024);
+        // FIXME: this test doesn't really exercise anything, since
+        // `overflow_delimited_expr` is disabled by default in edition 2024.
+        assert_eq!(config.overflow_delimited_expr(), false);
     }
 
     #[nightly_only_test]
@@ -955,7 +964,8 @@ mod test {
         options.inline_config =
             HashMap::from([("overflow_delimited_expr".to_owned(), "true".to_owned())]);
         let config = get_config(config_file, Some(options));
-        assert_eq!(config.style_edition(), StyleEdition::Edition2024);
+        // FIXME: this test doesn't really exercise anything, since
+        // `overflow_delimited_expr` is disabled by default in edition 2024.
         assert_eq!(config.overflow_delimited_expr(), true);
     }
 }

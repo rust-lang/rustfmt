@@ -161,6 +161,10 @@ pub(crate) fn format_expr(
         ast::ExprKind::Tup(ref items) => {
             rewrite_tuple(context, items.iter(), expr.span, shape, items.len() == 1)
         }
+        ast::ExprKind::Use(_, _) => {
+            // FIXME: properly implement this
+            Ok(context.snippet(expr.span()).to_owned())
+        }
         ast::ExprKind::Let(ref pat, ref expr, _span, _) => rewrite_let(context, shape, pat, expr),
         ast::ExprKind::If(..)
         | ast::ExprKind::ForLoop { .. }
@@ -249,7 +253,7 @@ pub(crate) fn format_expr(
                 Ok(format!("break{id_str}"))
             }
         }
-        ast::ExprKind::Yield(ref opt_expr) => {
+        ast::ExprKind::Yield(ast::YieldKind::Prefix(ref opt_expr)) => {
             if let Some(ref expr) = *opt_expr {
                 rewrite_unary_prefix(context, "yield ", &**expr, shape)
             } else {
@@ -271,9 +275,10 @@ pub(crate) fn format_expr(
         ast::ExprKind::Try(..)
         | ast::ExprKind::Field(..)
         | ast::ExprKind::MethodCall(..)
-        | ast::ExprKind::Await(_, _) => rewrite_chain(expr, context, shape),
+        | ast::ExprKind::Await(_, _)
+        | ast::ExprKind::Yield(ast::YieldKind::Postfix(_)) => rewrite_chain(expr, context, shape),
         ast::ExprKind::MacCall(ref mac) => {
-            rewrite_macro(mac, None, context, shape, MacroPosition::Expression).or_else(|_| {
+            rewrite_macro(mac, context, shape, MacroPosition::Expression).or_else(|_| {
                 wrap_str(
                     context.snippet(expr.span).to_owned(),
                     context.config.max_width(),

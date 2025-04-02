@@ -677,7 +677,7 @@ config_option_with_style_edition_default!(
     BlankLinesLowerBound, usize, _ => 0;
     EditionConfig, Edition, _ => Edition::Edition2015;
     StyleEditionConfig, StyleEdition,
-        Edition2024 =>  StyleEdition::Edition2024, _ => StyleEdition::Edition2015;
+        Edition2024 => StyleEdition::Edition2024, _ => StyleEdition::Edition2015;
     VersionConfig, Version, Edition2024 => Version::Two, _ => Version::One;
     InlineAttributeWidth, usize, _ => 0;
     FormatGeneratedFiles, bool, _ => true;
