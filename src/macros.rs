@@ -361,9 +361,7 @@ fn handle_vec_semi(
     };
 
     // Should we return MaxWidthError, Or Macro failure
-    let mac_shape = shape
-        .offset_left(macro_name.len())
-        .max_width_error(shape.width, span)?;
+    let mac_shape = shape.offset_left(macro_name.len(), span)?;
     // 8 = `vec![]` + `; ` or `vec!()` + `; `
     let total_overhead = 8;
     let nested_shape = mac_shape.block_indent(context.config.tab_spaces());
@@ -1291,9 +1289,7 @@ impl MacroBranch {
         let mut result = format_macro_args(
             context,
             self.args.clone(),
-            shape
-                .sub_width(prefix_width)
-                .max_width_error(shape.width, self.span)?,
+            shape.sub_width(prefix_width, self.span)?,
         )?;
 
         if multi_branch_style {
@@ -1442,9 +1438,7 @@ fn format_lazy_static(
             stmt,
             &*expr,
             &RhsAssignKind::Expr(&expr.kind, expr.span),
-            nested_shape
-                .sub_width(1)
-                .max_width_error(nested_shape.width, expr.span)?,
+            nested_shape.sub_width(1, expr.span)?,
         )?);
         result.push(';');
         if i != last {

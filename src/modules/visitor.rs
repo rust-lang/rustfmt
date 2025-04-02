@@ -1,6 +1,6 @@
 use rustc_ast::ast;
 use rustc_ast::visit::Visitor;
-use rustc_span::Symbol;
+use rustc_span::{Symbol, sym};
 use tracing::debug;
 
 use crate::attr::MetaVisitor;
@@ -90,7 +90,7 @@ impl<'ast> MetaVisitor<'ast> for PathVisitor {
         meta_item: &'ast ast::MetaItem,
         lit: &'ast ast::MetaItemLit,
     ) {
-        if meta_item.has_name(Symbol::intern("path")) && lit.kind.is_str() {
+        if meta_item.has_name(sym::path) && lit.kind.is_str() {
             self.paths.push(meta_item_lit_to_str(lit));
         }
     }
