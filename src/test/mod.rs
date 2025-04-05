@@ -501,9 +501,9 @@ fn format_files_find_new_files_via_cfg_match() {
             }
         }
         assert_eq!(
-            3,
+            6,
             write_result.len(),
-            "Should have uncovered an extra file (format_me_please.rs) via lib.rs"
+            "Should have uncovered an extra file (format_me_please_x.rs) via lib.rs"
         );
         assert!(handle_result(write_result, None).is_ok());
     });
