@@ -113,15 +113,27 @@ impl<'a> FmtVisitor<'a> {
         }
     }
 
-    fn push_vertical_spaces(&mut self, newline_count: usize) {
-        let old_count = self.buffer.chars().rev().take_while(|c| *c == '\n').count();
-        let newline_upper_bound = self.config.blank_lines_upper_bound() + 1;
-        let newline_lower_bound = self.config.blank_lines_lower_bound() + 1;
+    fn push_vertical_spaces(&mut self, mut newline_count: usize) {
+        if let [] | [.., b'\n'] = self.buffer.as_bytes() {
+            /* Already at the start of a new line */
+        } else {
+            self.push_str("\n");
+            newline_count = newline_count.saturating_sub(1);
+        }
+
+        let existing_blanks = self
+            .buffer
+            .rsplit_terminator('\n')
+            .take_while(|s| s.is_empty())
+            .count();
 
         // Clamp new total count to configuration.
-        let total = (old_count + newline_count).clamp(newline_lower_bound, newline_upper_bound);
+        let total = (existing_blanks + newline_count).clamp(
+            self.config.blank_lines_lower_bound(),
+            self.config.blank_lines_upper_bound(),
+        );
 
-        let blank_lines = "\n".repeat(total.saturating_sub(old_count));
+        let blank_lines = "\n".repeat(total.saturating_sub(existing_blanks));
         self.push_str(&blank_lines);
     }
 
