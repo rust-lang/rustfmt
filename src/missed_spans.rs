@@ -121,10 +121,17 @@ impl<'a> FmtVisitor<'a> {
             newline_count = newline_count.saturating_sub(1);
         }
 
+        let indent = if self.config.indent_blank_lines() {
+            // FIXME: Should this include the alignment as well?
+            &*self.block_indent.block_only().to_string(self.config)
+        } else {
+            ""
+        };
+
         let existing_blanks = self
             .buffer
             .rsplit_terminator('\n')
-            .take_while(|s| s.is_empty())
+            .take_while(|&line| line == indent)
             .count();
 
         // Clamp new total count to configuration.
@@ -133,7 +140,10 @@ impl<'a> FmtVisitor<'a> {
             self.config.blank_lines_upper_bound(),
         );
 
-        let blank_lines = "\n".repeat(total.saturating_sub(existing_blanks));
+        let blank_lines = std::iter::repeat(indent)
+            .take(total.saturating_sub(existing_blanks))
+            .fold(String::new(), |s, indent| s + indent + "\n");
+
         self.push_str(&blank_lines);
     }
 
