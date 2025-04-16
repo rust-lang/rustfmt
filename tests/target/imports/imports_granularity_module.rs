@@ -53,3 +53,8 @@ use b::{
     /* Before b::l group */ l::{self, m, n::o, p::*},
     q,
 };
+
+// Issue #6191: grouping of top-level modules
+use library1;
+use library2 as lib2;
+use library3;
