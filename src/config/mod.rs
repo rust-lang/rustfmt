@@ -721,6 +721,21 @@ mod test {
         assert_eq!(config.was_set().verbose(), false);
     }
 
+    #[test]
+    fn test_clamp_to_max_width() {
+        let toml = r#"
+            max_width = 100
+            struct_lit_width = 200
+        "#;
+        let mut config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        assert_eq!(config.struct_lit_width(), config.max_width());
+
+        // simulate entering a macro scope
+        let new = config.max_width() - 4;
+        config.set_clamp().max_width(new);
+        assert_eq!(config.struct_lit_width(), config.max_width());
+    }
+
     const PRINT_DOCS_STABLE_OPTION: &str = "stable_option <boolean> Default: false";
     const PRINT_DOCS_UNSTABLE_OPTION: &str = "unstable_option <boolean> Default: false (unstable)";
     const PRINT_DOCS_PARTIALLY_UNSTABLE_OPTION: &str =
@@ -1094,10 +1109,10 @@ make_backup = false
                 max_width = 100
             "#;
             let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
-            assert_eq!(config.array_width(), usize::MAX);
-            assert_eq!(config.attr_fn_like_width(), usize::MAX);
-            assert_eq!(config.chain_width(), usize::MAX);
-            assert_eq!(config.fn_call_width(), usize::MAX);
+            assert_eq!(config.array_width(), 100);
+            assert_eq!(config.attr_fn_like_width(), 100);
+            assert_eq!(config.chain_width(), 100);
+            assert_eq!(config.fn_call_width(), 100);
             assert_eq!(config.single_line_if_else_max_width(), 0);
             assert_eq!(config.struct_lit_width(), 0);
             assert_eq!(config.struct_variant_width(), 0);
