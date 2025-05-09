@@ -1862,6 +1862,42 @@ fn foo() {
 }
 ```
 
+## `match_arm_indent`
+
+Controls whether match arms are indented.  If disabled, match arms will be formatted at the same indentation level as the outer `match` statement.  Meaning that match blocks will only be indented once, not twice.
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#6533](https://github.com/rust-lang/rustfmt/issues/6533))
+
+#### `true` (default):
+
+```rust
+fn main() {
+    match value {
+        Enum::A => {
+            let mut work = first();
+            work += second();
+        }
+        Enum::B => short_work(),
+    }
+}
+```
+
+#### `false`:
+
+```rust
+fn main() {
+    match value {
+    Enum::A => {
+        let mut work = first();
+        work += second();
+    }
+    Enum::B => short_work(),
+    }
+}
+```
+
 ## `match_block_trailing_comma`
 
 Put a trailing comma after a block based match arm (non-block arms are not affected)

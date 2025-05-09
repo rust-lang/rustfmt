@@ -172,8 +172,7 @@ See [GitHub page](https://rust-lang.github.io/rustfmt/) for details.
 
 The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [Style Editions](#style-editions)).
 
-When running `cargo fmt`, the `edition` is automatically read from the `Cargo.toml` file. However, when running `rustfmt` directly the `edition` defaults to 2015 if not explicitly configured. For consistent parsing between rustfmt and `cargo fmt` you should configure the `edition`.
-For example in your `rustfmt.toml` file:
+When running `cargo fmt`, the `edition` is automatically read from the `Cargo.toml` file. However, when running `rustfmt` directly, the `edition` defaults to 2015. For consistent parsing between rustfmt and `cargo fmt`, you should configure the `edition` in your `rustfmt.toml` file:
 
 ```toml
 edition = "2018"

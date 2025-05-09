@@ -180,7 +180,6 @@ fn rewrite_closure_with_block(
             .first()
             .map(|attr| attr.span.to(body.span))
             .unwrap_or(body.span),
-        could_be_bare_literal: false,
     };
     let block = crate::expr::rewrite_block_with_visitor(
         context,
@@ -295,14 +294,14 @@ fn rewrite_closure_fn_decl(
         Some(ast::CoroutineKind::AsyncGen { .. }) => "async gen ",
         None => "",
     };
-    let mover = if matches!(capture, ast::CaptureBy::Value { .. }) {
-        "move "
-    } else {
-        ""
+    let capture_str = match capture {
+        ast::CaptureBy::Value { .. } => "move ",
+        ast::CaptureBy::Use { .. } => "use ",
+        ast::CaptureBy::Ref => "",
     };
     // 4 = "|| {".len(), which is overconservative when the closure consists of
     // a single expression.
-    let offset = binder.len() + const_.len() + immovable.len() + coro.len() + mover.len();
+    let offset = binder.len() + const_.len() + immovable.len() + coro.len() + capture_str.len();
     let nested_shape = shape.shrink_left(offset, span)?.sub_width(4, span)?;
 
     // 1 = |
@@ -340,7 +339,7 @@ fn rewrite_closure_fn_decl(
         .tactic(tactic)
         .preserve_newline(true);
     let list_str = write_list(&item_vec, &fmt)?;
-    let mut prefix = format!("{binder}{const_}{immovable}{coro}{mover}|{list_str}|");
+    let mut prefix = format!("{binder}{const_}{immovable}{coro}{capture_str}|{list_str}|");
 
     if !ret_str.is_empty() {
         if prefix.contains('\n') {

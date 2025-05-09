@@ -11,6 +11,7 @@ use crate::rewrite::RewriteContext;
 
 pub(crate) mod asm;
 pub(crate) mod cfg_if;
+pub(crate) mod cfg_match;
 pub(crate) mod lazy_static;
 
 fn build_stream_parser<'a>(psess: &'a ParseSess, tokens: TokenStream) -> Parser<'a> {
@@ -81,7 +82,7 @@ pub(crate) struct ParsedMacroArgs {
 }
 
 fn check_keyword<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
-    if parser.token.is_any_keyword()
+    if parser.token.is_reserved_ident()
         && parser.look_ahead(1, |t| *t == TokenKind::Eof || *t == TokenKind::Comma)
     {
         let keyword = parser.token.ident().unwrap().0.name;

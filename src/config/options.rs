@@ -660,11 +660,12 @@ config_option_with_style_edition_default!(
     RemoveNestedParens, bool, _ => true;
     CombineControlExpr, bool, _ => true;
     ShortArrayElementWidthThreshold, usize, _ => 10;
-    OverflowDelimitedExpr, bool, Edition2024 => true, _ => false;
+    OverflowDelimitedExpr, bool, _ => false;
     StructFieldAlignThreshold, usize, _ => 0;
     EnumDiscrimAlignThreshold, usize, _ => 0;
     MatchArmBlocks, bool, _ => true;
     MatchArmLeadingPipeConfig, MatchArmLeadingPipe, _ => MatchArmLeadingPipe::Never;
+    MatchArmIndent, bool, _ => true;
     ForceMultilineBlocks, bool, _ => false;
     FnArgsLayout, Density, _ => Density::Tall;
     FnParamsLayout, Density, _ => Density::Tall;
@@ -677,7 +678,7 @@ config_option_with_style_edition_default!(
     BlankLinesLowerBound, usize, _ => 0;
     EditionConfig, Edition, _ => Edition::Edition2015;
     StyleEditionConfig, StyleEdition,
-        Edition2024 =>  StyleEdition::Edition2024, _ => StyleEdition::Edition2015;
+        Edition2024 => StyleEdition::Edition2024, _ => StyleEdition::Edition2015;
     VersionConfig, Version, Edition2024 => Version::Two, _ => Version::One;
     InlineAttributeWidth, usize, _ => 0;
     FormatGeneratedFiles, bool, _ => true;
