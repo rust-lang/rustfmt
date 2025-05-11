@@ -3020,15 +3020,13 @@ Use field initialize shorthand if possible.
 struct Foo {
     x: u32,
     y: u32,
-    z: u32,
 }
 
 fn main() {
     let x = 1;
     let y = 2;
-    let z = 3;
-    let a = Foo { x, y, z };
-    let b = Foo { x: x, y: y, z: z };
+    let a = Foo { x, y };
+    let b = Foo { x: x, y: y };
 }
 ```
 
@@ -3038,14 +3036,13 @@ fn main() {
 struct Foo {
     x: u32,
     y: u32,
-    z: u32,
 }
 
 fn main() {
     let x = 1;
     let y = 2;
-    let z = 3;
-    let a = Foo { x, y, z };
+    let a = Foo { x, y };
+    let b = Foo { x, y };
 }
 ```
 
