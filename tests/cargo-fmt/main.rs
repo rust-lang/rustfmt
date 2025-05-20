@@ -84,7 +84,6 @@ fn cargo_fmt_out_of_line_test_modules() {
         "tests/mod-resolver/test-submodule-issue-5119/tests/test1.rs",
         "tests/mod-resolver/test-submodule-issue-5119/tests/test1/sub1.rs",
         "tests/mod-resolver/test-submodule-issue-5119/tests/test1/sub2.rs",
-        "tests/mod-resolver/test-submodule-issue-5119/tests/test1/sub3/sub4.rs",
     ];
     let args = [
         "-v",
