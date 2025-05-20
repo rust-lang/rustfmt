@@ -230,7 +230,9 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
 
         // For some reason, the source_map does not include terminating
         // newlines so we must add one on for each file. This is sad.
-        source_file::append_newline(&mut visitor.buffer);
+        if !visitor.buffer.is_empty() {
+            source_file::append_newline(&mut visitor.buffer);
+        }
 
         format_lines(
             &mut visitor.buffer,
