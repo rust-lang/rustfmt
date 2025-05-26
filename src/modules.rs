@@ -193,7 +193,7 @@ impl<'ast, 'psess, 'c> ModResolver<'ast, 'psess> {
     ) -> Result<(), ModuleResolutionError> {
         for item in items {
             if is_cfg_if(&item) {
-                self.visit_cfg_if(Cow::Owned(item.into_inner()))?;
+                self.visit_cfg_if(Cow::Owned(*item))?;
                 continue;
             }
 
