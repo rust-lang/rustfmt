@@ -1996,7 +1996,11 @@ fn rewrite_let(
     // TODO(ytmimi) comments could appear between `let` and the `pat`
 
     // 4 = "let ".len()
-    let pat_shape = shape.offset_left(4, pat.span)?;
+    let mut pat_shape = shape.offset_left(4, pat.span)?;
+    if context.config.style_edition() >= StyleEdition::Edition2027 {
+        // 2 for the length of " ="
+        pat_shape = pat_shape.sub_width(2, pat.span)?;
+    }
     let pat_str = pat.rewrite_result(context, pat_shape)?;
     result.push_str(&pat_str);
 
