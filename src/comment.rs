@@ -146,6 +146,12 @@ pub(crate) fn is_last_comment_block(s: &str) -> bool {
     s.trim_end().ends_with("*/")
 }
 
+/// Return true if a block-comment contains endline character
+pub(crate) fn is_multi_lined_block_comment(s: &str) -> bool {
+    let style = comment_style(s, false);
+    style.is_block_comment() && count_newlines(s) >= 1
+}
+
 /// Combine `prev_str` and `next_str` into a single `String`. `span` may contain
 /// comments between two strings. If there are such comments, then that will be
 /// recovered. If `allow_extend` is true and there is no comment between the two
