@@ -1322,7 +1322,7 @@ impl MacroBranch {
             shape.indent.block_indent(&config)
         };
         let new_width = config.max_width() - body_indent.width();
-        config.set().max_width(new_width);
+        config.set_clamp().max_width(new_width);
 
         // First try to format as items, then as statements.
         let new_body_snippet = match crate::format_snippet(&body_str, &config, true) {
