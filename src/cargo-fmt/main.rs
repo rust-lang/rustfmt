@@ -150,9 +150,12 @@ fn execute() -> i32 {
 }
 
 fn rustfmt_command() -> Command {
-    let rustfmt = env::current_exe()
-        .expect("current executable path invalid")
-        .with_file_name("rustfmt");
+    let rustfmt = match env::var_os("RUSTFMT") {
+        Some(rustfmt) => PathBuf::from(rustfmt),
+        None => env::current_exe()
+            .expect("current executable path invalid")
+            .with_file_name("rustfmt"),
+    };
 
     Command::new(rustfmt)
 }
