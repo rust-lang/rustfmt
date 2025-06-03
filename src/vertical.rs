@@ -11,9 +11,9 @@ use crate::config::lists::*;
 use crate::expr::rewrite_field;
 use crate::items::{rewrite_struct_field, rewrite_struct_field_prefix};
 use crate::lists::{
-    definitive_tactic, itemize_list, write_list, ListFormatting, ListItem, Separator,
+    ListFormatting, ListItem, Separator, definitive_tactic, itemize_list, write_list,
 };
-use crate::rewrite::{Rewrite, RewriteContext};
+use crate::rewrite::{Rewrite, RewriteContext, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
@@ -24,13 +24,13 @@ use crate::utils::{
 pub(crate) trait AlignedItem {
     fn skip(&self) -> bool;
     fn get_span(&self) -> Span;
-    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String>;
+    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult;
     fn rewrite_aligned_item(
         &self,
         context: &RewriteContext<'_>,
         shape: Shape,
         prefix_max_width: usize,
-    ) -> Option<String>;
+    ) -> RewriteResult;
 }
 
 impl AlignedItem for ast::FieldDef {
@@ -42,15 +42,15 @@ impl AlignedItem for ast::FieldDef {
         self.span()
     }
 
-    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        let attrs_str = self.attrs.rewrite(context, shape)?;
+    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
+        let attrs_str = self.attrs.rewrite_result(context, shape)?;
         let missing_span = if self.attrs.is_empty() {
             mk_sp(self.span.lo(), self.span.lo())
         } else {
             mk_sp(self.attrs.last().unwrap().span.hi(), self.span.lo())
         };
         let attrs_extendable = self.ident.is_none() && is_attributes_extendable(&attrs_str);
-        let field_str = rewrite_struct_field_prefix(context, self).ok()?;
+        let field_str = rewrite_struct_field_prefix(context, self)?;
         combine_strs_with_missing_comments(
             context,
             &attrs_str,
@@ -66,8 +66,8 @@ impl AlignedItem for ast::FieldDef {
         context: &RewriteContext<'_>,
         shape: Shape,
         prefix_max_width: usize,
-    ) -> Option<String> {
-        rewrite_struct_field(context, self, shape, prefix_max_width).ok()
+    ) -> RewriteResult {
+        rewrite_struct_field(context, self, shape, prefix_max_width)
     }
 }
 
@@ -80,8 +80,8 @@ impl AlignedItem for ast::ExprField {
         self.span()
     }
 
-    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        let attrs_str = self.attrs.rewrite(context, shape)?;
+    fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
+        let attrs_str = self.attrs.rewrite_result(context, shape)?;
         let name = rewrite_ident(context, self.ident);
         let missing_span = if self.attrs.is_empty() {
             mk_sp(self.span.lo(), self.span.lo())
@@ -103,7 +103,7 @@ impl AlignedItem for ast::ExprField {
         context: &RewriteContext<'_>,
         shape: Shape,
         prefix_max_width: usize,
-    ) -> Option<String> {
+    ) -> RewriteResult {
         rewrite_field(context, self, shape, prefix_max_width)
     }
 }
@@ -198,7 +198,7 @@ fn struct_field_prefix_max_min_width<T: AlignedItem>(
                 .rewrite_prefix(context, shape)
                 .map(|field_str| trimmed_last_line_width(&field_str))
         })
-        .fold_options((0, ::std::usize::MAX), |(max_len, min_len), len| {
+        .fold_ok((0, ::std::usize::MAX), |(max_len, min_len), len| {
             (cmp::max(max_len, len), cmp::min(min_len, len))
         })
         .unwrap_or((0, 0))
@@ -213,7 +213,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     force_trailing_separator: bool,
 ) -> Option<String> {
     // 1 = ","
-    let item_shape = Shape::indented(offset, context.config).sub_width(1)?;
+    let item_shape = Shape::indented(offset, context.config).sub_width_opt(1)?;
     let (mut field_prefix_max_width, field_prefix_min_width) =
         struct_field_prefix_max_min_width(context, fields, item_shape);
     let max_diff = field_prefix_max_width.saturating_sub(field_prefix_min_width);
@@ -245,12 +245,12 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     if tactic == DefinitiveListTactic::Horizontal {
         // since the items fits on a line, there is no need to align them
         let do_rewrite =
-            |field: &T| -> Option<String> { field.rewrite_aligned_item(context, item_shape, 0) };
+            |field: &T| -> RewriteResult { field.rewrite_aligned_item(context, item_shape, 0) };
         fields
             .iter()
             .zip(items.iter_mut())
             .for_each(|(field, list_item): (&T, &mut ListItem)| {
-                if list_item.item.is_some() {
+                if list_item.item.is_ok() {
                     list_item.item = do_rewrite(field);
                 }
             });
@@ -266,7 +266,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         .tactic(tactic)
         .trailing_separator(separator_tactic)
         .preserve_newline(true);
-    write_list(&items, &fmt)
+    write_list(&items, &fmt).ok()
 }
 
 /// Returns the index in `fields` up to which a field belongs to the current group.

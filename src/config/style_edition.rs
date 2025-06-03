@@ -2,7 +2,7 @@ use crate::config::StyleEdition;
 
 /// Defines the default value for the given style edition
 #[allow(dead_code)]
-pub(crate) trait StyleEditionDefault {
+pub trait StyleEditionDefault {
     type ConfigType;
     fn style_edition_default(style_edition: StyleEdition) -> Self::ConfigType;
 }
@@ -30,7 +30,9 @@ macro_rules! style_edition_default {
                     $crate::config::StyleEdition::Edition2015
                     | $crate::config::StyleEdition::Edition2018
                     | $crate::config::StyleEdition::Edition2021 => $default_2015,
-                    $crate::config::StyleEdition::Edition2024 => $default_2024,
+                    // TODO: should update macro when default_2027 becomes available
+                    $crate::config::StyleEdition::Edition2024
+                    | $crate::config::StyleEdition::Edition2027 => $default_2024,
                 }
             }
         }
@@ -52,6 +54,7 @@ mod test {
         assert_eq!(Unit::style_edition_default(StyleEdition::Edition2018), 100);
         assert_eq!(Unit::style_edition_default(StyleEdition::Edition2021), 100);
         assert_eq!(Unit::style_edition_default(StyleEdition::Edition2024), 100);
+        assert_eq!(Unit::style_edition_default(StyleEdition::Edition2027), 100);
     }
 
     #[test]
@@ -66,5 +69,6 @@ mod test {
 
         // style edition 2024
         assert_eq!(Unit::style_edition_default(StyleEdition::Edition2024), 50);
+        assert_eq!(Unit::style_edition_default(StyleEdition::Edition2027), 50);
     }
 }
