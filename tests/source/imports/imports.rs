@@ -23,8 +23,10 @@ pub use rustc_ast::ast::{Expr_, Expr, ExprAssign, ExprCall, ExprMethodCall, Expr
 
 use rustc_ast::some::{};
 
+// compilation error that will (and should) be ignored by rustfmt #6558
 use self;
 use std::io::{self};
+// compilation error that will (and should) be ignored by rustfmt #6558
 use std::io::self;
 
 mod Foo {

@@ -27,8 +27,11 @@ use rustc_ast::{self};
 use Foo::{Bar, Baz};
 use {Bar /* comment */, /* Pre-comment! */ Foo};
 
-use std::io;
+// compilation error that will (and should) be ignored by rustfmt #6558
+use self;
 use std::io::{self};
+// compilation error that will (and should) be ignored by rustfmt #6558
+use std::io::self;
 
 mod Foo {
     pub use rustc_ast::ast::{

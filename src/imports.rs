@@ -557,18 +557,7 @@ impl UseTree {
                 self.path = vec![];
                 return self;
             }
-            UseSegmentKind::Slf(None) if self.path.is_empty() && self.visibility.is_some() => {
-                self.path = vec![];
-                return self;
-            }
             _ => (),
-        }
-
-        // Normalise foo::self -> foo.
-        if let UseSegmentKind::Slf(None) = last.kind {
-            if !self.path.is_empty() {
-                return self;
-            }
         }
 
         // Normalise foo::self as bar -> foo as bar.
