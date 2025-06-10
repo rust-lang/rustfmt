@@ -270,15 +270,15 @@ impl<'a> FmtVisitor<'a> {
         if on_same_line {
             match subslice.find('\n') {
                 None => {
-                    self.push_str(subslice);
+                    self.push_str(subslice.trim_end());
                 }
                 Some(offset) if offset + 1 == subslice.len() => {
-                    self.push_str(&subslice[..offset]);
+                    self.push_str(&subslice[..offset].trim_end());
                 }
                 Some(offset) => {
                     // keep first line as is: if it were too long and wrapped, it may get mixed
                     // with the other lines.
-                    let first_line = &subslice[..offset];
+                    let first_line = &subslice[..offset].trim_end();
                     self.push_str(first_line);
                     self.push_str(&comment_indent.to_string_with_newline(self.config));
 
