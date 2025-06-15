@@ -2245,7 +2245,7 @@ fn example() {
 
 Remove nested parens.
 
-- **Default value**: `true`,
+- **Default value**: `true`
 - **Possible values**: `true`, `false`
 - **Stable**: Yes
 
