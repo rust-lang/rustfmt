@@ -2602,10 +2602,20 @@ fn rewrite_fn_base(
                 // the closing parenthesis of the param and the arrow '->' is considered.
                 let mut sig_length = result.len() + indent.width() + ret_str_len + 1;
 
-                // If there is no where-clause, take into account the space after the return type
-                // and the brace.
+                // If there is no where-clause.
                 if where_clause.predicates.is_empty() {
-                    sig_length += 2;
+                    if context.config.style_edition() >= StyleEdition::Edition2027 {
+                        let line_ending_overhead = match fn_brace_style {
+                            FnBraceStyle::NextLine => 0, // No brace to account for
+                            FnBraceStyle::SameLine => 2, // Trailing space and brace, e.g. ` {`
+                            FnBraceStyle::None => 1,     // Trailing `;`
+                        };
+                        sig_length += line_ending_overhead;
+                    } else {
+                        // Take into account the space after the return type and the brace.
+                        // 2 = ' {'
+                        sig_length += 2;
+                    }
                 }
 
                 sig_length > context.config.max_width()
