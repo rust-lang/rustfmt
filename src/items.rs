@@ -2500,6 +2500,7 @@ fn rewrite_fn_base(
         ret_str_len,
         fn_brace_style,
         multi_line_ret_str,
+        where_clause,
     );
 
     debug!(
@@ -2899,6 +2900,7 @@ fn compute_budgets_for_params(
     ret_str_len: usize,
     fn_brace_style: FnBraceStyle,
     force_vertical_layout: bool,
+    where_clause: &ast::WhereClause,
 ) -> (usize, usize, Indent) {
     debug!(
         "compute_budgets_for_params {} {:?}, {}, {:?}",
@@ -2913,7 +2915,15 @@ fn compute_budgets_for_params(
         let overhead = if ret_str_len == 0 { 2 } else { 3 };
         let mut used_space = indent.width() + result.len() + ret_str_len + overhead;
         match fn_brace_style {
-            FnBraceStyle::None => used_space += 1,     // 1 = `;`
+            _ if context.config.style_edition() >= StyleEdition::Edition2027
+                && where_clause.predicates.len() > 0 =>
+            {
+                // Don't add anything to `used_space` if we have a where clause.
+                // For all `FnBraceStyle` values if we have a where cluase that can't fit
+                // on the current line it'll be written to the next line.
+                // Therefore, we don't need to account for a trailing `;` or `{}`
+            }
+            FnBraceStyle::None => used_space += 1, // 1 = `;`
             FnBraceStyle::SameLine => used_space += 2, // 2 = `{}`
             FnBraceStyle::NextLine => (),
         }
