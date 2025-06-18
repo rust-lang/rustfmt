@@ -2379,8 +2379,8 @@ Discard existing import groups, and create three groups for:
 3. `self`, `super` and `crate` imports.
 
 ```rust
-use alloc::alloc::Layout;
 use core::f32;
+use alloc::alloc::Layout;
 use std::sync::Arc;
 
 use broker::database::PooledConnection;
