@@ -22,7 +22,7 @@ Below you find a detailed visual guide on all the supported configuration option
 Maximum width of an array literal before falling back to vertical formatting.
 
 - **Default value**: `60`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `array_width` will take precedence.
@@ -34,7 +34,7 @@ See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuri
 Maximum width of the args of a function-like attributes before falling back to vertical formatting.
 
 - **Default value**: `70`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `attr_fn_like_width` will take precedence.
@@ -300,7 +300,7 @@ where
 Maximum width of a chain to fit on one line.
 
 - **Default value**: `60`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `chain_width` will take precedence.
@@ -428,7 +428,7 @@ fn example() {
 Maximum length of comments. No effect unless `wrap_comments = true`.
 
 - **Default value**: `80`
-- **Possible values**: any positive integer
+- **Possible values**: any nonnegative integer
 - **Stable**: No (tracking issue: [#3349](https://github.com/rust-lang/rustfmt/issues/3349))
 
 **Note:** A value of `0` results in [`wrap_comments`](#wrap_comments) being applied regardless of a line's width.
@@ -586,7 +586,7 @@ Note that this is not how much whitespace is inserted, but instead the longest v
 doesn't get ignored when aligning.
 
 - **Default value** : 0
-- **Possible values**: any positive integer
+- **Possible values**: any nonnegative integer
 - **Stable**: No (tracking issue: [#3372](https://github.com/rust-lang/rustfmt/issues/3372))
 
 #### `0` (default):
@@ -764,7 +764,7 @@ See also [`fn_params_layout`](#fn_params_layout)
 Maximum width of the args of a function call before falling back to vertical formatting.
 
 - **Default value**: `60`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `fn_call_width` will take precedence.
@@ -1048,7 +1048,7 @@ fn add_one(x: i32) -> i32 {
 Max width for code snippets included in doc comments. Only used if [`format_code_in_doc_comments`](#format_code_in_doc_comments) is true.
 
 - **Default value**: `100`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: No (tracking issue: [#5359](https://github.com/rust-lang/rustfmt/issues/5359))
 
 ## `format_generated_files`
@@ -1067,7 +1067,7 @@ This option is currently ignored for stdin (`@generated` in stdin is ignored.)
 Number of lines to check for a `@generated` pragma header, starting from the top of the file. Setting this value to `0` will treat all files as non-generated. When`format_generated_files` is `true`, this option has no effect.
 
 - **Default value**: `5`
-- **Possible values**: any positive integer
+- **Possible values**: any nonnegative integer
 - **Stable**: No (tracking issue: [#5080](https://github.com/rust-lang/rustfmt/issues/5080))
 
 See also [format_generated_files](#format_generated_files) link here.
@@ -1715,7 +1715,7 @@ fn lorem<Ipsum, Dolor, Sit, Amet>() -> T
 Write an item and its attribute on the same line if their combined width is below a threshold
 
 - **Default value**: 0
-- **Possible values**: any positive integer
+- **Possible values**: any nonnegative integer
 - **Stable**: No (tracking issue: [#3343](https://github.com/rust-lang/rustfmt/issues/3343))
 
 ### Example
@@ -1939,7 +1939,7 @@ See also: [`trailing_comma`](#trailing_comma), [`match_arm_blocks`](#match_arm_b
 Maximum width of each line
 
 - **Default value**: `100`
-- **Possible values**: any positive integer
+- **Possible values**: any nonnegative integer
 - **Stable**: Yes
 
 See also [`error_on_line_overflow`](#error_on_line_overflow).
@@ -2515,7 +2515,7 @@ The layout of an array is dependent on the length of each of its elements.
 If the length of every element in an array is below this threshold (all elements are "short") then the array can be formatted in the mixed/compressed style, but if any one element has a length that exceeds this threshold then the array elements will have to be formatted vertically.
 
 - **Default value**: `10`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 #### `10` (default):
@@ -2554,7 +2554,7 @@ Don't reformat out of line modules
 Maximum line length for single line if-else expressions. A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
 
 - **Default value**: `50`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `single_line_if_else_max_width` will take precedence.
@@ -2571,7 +2571,7 @@ Note this occurs when `use_small_heuristics` is set to `Off`.
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `single_line_let_else_max_width` will take precedence.
 
 - **Default value**: `50`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 #### `50` (default):
@@ -2815,7 +2815,7 @@ See also: [`indent_style`](#indent_style).
 Maximum width in the body of a struct literal before falling back to vertical formatting. A value of `0` (zero) results in struct literals always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
 
 - **Default value**: `18`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `struct_lit_width` will take precedence.
@@ -2827,7 +2827,7 @@ See also [`max_width`](#max_width), [`use_small_heuristics`](#use_small_heuristi
 Maximum width in the body of a struct variant before falling back to vertical formatting. A value of `0` (zero) results in struct literals always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
 
 - **Default value**: `35`
-- **Possible values**: any positive integer that is less than or equal to the value specified for [`max_width`](#max_width)
+- **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `struct_variant_width` will take precedence.
@@ -2864,7 +2864,7 @@ Alternatively, you can use the `--style-edition` flag when running `rustfmt` dir
 Number of spaces per tab
 
 - **Default value**: `4`
-- **Possible values**: any positive integer
+- **Possible values**: any nonnegative integer
 - **Stable**: Yes
 
 #### `4` (default):
