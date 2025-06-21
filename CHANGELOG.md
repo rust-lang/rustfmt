@@ -17,7 +17,7 @@
 - Fix panic when sorting imports [#6333](https://github.com/rust-lang/rustfmt/issues/6333)
 
 ### Changed
-- Stabalize `style_edition=2024` and stabalize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
+- Stabilize `style_edition=2024` and stabilize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
 - Apply version sorting to module declarations when using `style_edition=2024` [#6368](https://github.com/rust-lang/rustfmt/pull/6368)
 - When users set the deprecated `version` config, rustfmt now gives a hint about which equivalent `style_edition` they should use [#6361](https://github.com/rust-lang/rustfmt/pull/6361)
 
