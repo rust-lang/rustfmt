@@ -27,7 +27,10 @@
 - Begin initial formatting for `use closures` and `use chains` (`#![feature(ergonomic_clones)]`). Previously, the closure and chain was left as the developer wrote it [#6532](https://github.com/rust-lang/rustfmt/pull/6532)
 
 ### Added
-Add `style_edition=2027` to gate unstable formatting [#6324](https://github.com/rust-lang/rustfmt/pull/6324)
+- Add `style_edition=2027` to gate unstable formatting [#6324](https://github.com/rust-lang/rustfmt/pull/6324)
+- Support discovering and formatting files via external mods imported within `cfg_match`, similar to `cfg_if` behavior [#6522](https://github.com/rust-lang/rustfmt/pull/6522)
+- Add new nightly-only `match_arm_indent` option [#6525](https://github.com/rust-lang/rustfmt/pull/6525)
+  - more details in the [configuration section for this new option](https://github.com/rust-lang/rustfmt/blob/master/Configurations.md#match_arm_indent)
 
 ### Misc
 
