@@ -32,8 +32,6 @@
 - Add new nightly-only `match_arm_indent` option [#6525](https://github.com/rust-lang/rustfmt/pull/6525)
   - more details in the [configuration section for this new option](https://github.com/rust-lang/rustfmt/blob/master/Configurations.md#match_arm_indent)
 
-### Misc
-
 
 ## [1.8.0] 2024-09-20
 
