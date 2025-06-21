@@ -26,7 +26,6 @@
 Add `style_edition=2027` to gate unstable formatting [#6324](https://github.com/rust-lang/rustfmt/pull/6324)
 
 ### Misc
-- Return `Result` from `Shape` methods [#6398](https://github.com/rust-lang/rustfmt/pull/6398)
 
 
 ## [1.8.0] 2024-09-20
