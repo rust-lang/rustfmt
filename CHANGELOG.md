@@ -15,6 +15,8 @@
   }
   ```
 - Fix panic when sorting imports [#6333](https://github.com/rust-lang/rustfmt/issues/6333)
+- Fix issue with `wrap_comments` invalidating code blocks [#6417](https://github.com/rust-lang/rustfmt/pull/6417)
+- No longer remove closure block label within a macro call [#6465](https://github.com/rust-lang/rustfmt/issues/6465)
 
 ### Changed
 - Stabilize `style_edition=2024` and stabilize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
