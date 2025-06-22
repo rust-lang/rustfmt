@@ -1,6 +1,6 @@
 // rustfmt-style_edition: 2027
-// rustfmt-brace_style: AlwaysNextLine
-// rustfmt-where_single_line: false
+// rustfmt-brace_style: PreferSameLine
+// rustfmt-where_single_line: true
 
 // Top-level functions
 

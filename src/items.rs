@@ -2758,8 +2758,13 @@ fn rewrite_fn_base(
 
     let ends_with_comment = last_line_contains_single_line_comment(&result);
     force_new_line_for_brace |= ends_with_comment;
-    force_new_line_for_brace |=
-        is_params_multi_lined && context.config.where_single_line() && !where_clause_str.is_empty();
+
+    // PreferSameLine should keep the brace on the same line as the last where predicate.
+    force_new_line_for_brace |= !where_clause_str.is_empty()
+        && context.config.where_single_line()
+        && is_params_multi_lined
+        && context.config.brace_style() != BraceStyle::PreferSameLine;
+
     Ok((result, ends_with_comment, force_new_line_for_brace))
 }
 

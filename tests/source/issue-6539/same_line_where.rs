@@ -1,5 +1,5 @@
 // rustfmt-style_edition: 2027
-// rustfmt-brace_style: AlwaysNextLine
+// rustfmt-brace_style: SameLineWhere
 // rustfmt-where_single_line: false
 
 // Top-level functions

@@ -1,6 +1,6 @@
 // rustfmt-style_edition: 2027
-// rustfmt-brace_style: AlwaysNextLine
-// rustfmt-where_single_line: true
+// rustfmt-brace_style: SameLineWhere
+// rustfmt-where_single_line: false
 
 // Top-level functions
 
@@ -17,7 +17,8 @@ fn fn_with_long_return_type(
 
 // Function with non-wrapping return type and where clause
 fn fn_with_short_where<T>(a: f64, b: T) -> f64
-where T: Debug;
+where
+    T: Debug;
 
 // Function that wraps at a simple return type
 fn fn_with_wrapping_return_type<T>(
@@ -30,7 +31,8 @@ fn fn_with_wrapping_return_type<T>(
 
 // Function that wraps at the where clause
 fn fn_with_wrapping_where_clause<T>(aaaaaa: f64, bbbbbb: T, cccccc: f64, dddddd: f64) -> f64
-where T: Debug;
+where
+    T: Debug;
 
 // Function with both wrapping return type and wrapping where clause
 fn fn_with_long_return_and_where<T, U, 'a>(
@@ -67,12 +69,12 @@ fn fn_with_long_return_type_and_body(
 ) -> Result<
     HashMap<String, Vec<(SomeLongTypeName, AnotherLongTypeName, YetAnotherType)>>,
     Box<dyn Error + Send + Sync + 'static>,
->
-{
+> {
 }
 
 fn fn_with_short_where_and_body<T>(a: f64, b: T) -> f64
-where T: Debug
+where
+    T: Debug,
 {
 }
 
@@ -82,12 +84,12 @@ fn fn_with_wrapping_return_type_and_body<T>(
     ccc: f64,
     ddd: f64,
     ee: f64,
-) -> f64
-{
+) -> f64 {
 }
 
 fn fn_with_wrapping_where_clause_and_body<T>(aaaaaa: f64, bbbbbb: T, ccc: f64, ddd: f64) -> f64
-where T: Debug
+where
+    T: Debug,
 {
 }
 
@@ -121,8 +123,7 @@ where
 }
 
 // Trait methods
-pub trait Trait
-{
+pub trait Trait {
     fn short_method(a: f64, b: f64) -> f64;
 
     fn method_with_long_return(
@@ -133,7 +134,8 @@ pub trait Trait
     >;
 
     fn method_with_short_where<T>(&self, a: f64, b: T) -> f64
-    where T: Debug;
+    where
+        T: Debug;
 
     fn method_with_wrapping_return_type<T>(
         self,
@@ -145,7 +147,8 @@ pub trait Trait
     ) -> f64;
 
     fn method_with_wrapping_where_clause<T>(aaaaaa: f64, bbbbbb: T, ccc: f64, ddd: f64) -> f64
-    where T: Debug;
+    where
+        T: Debug;
 
     fn method_with_long_return_and_where<T, U, 'a>(
         self,
@@ -180,12 +183,12 @@ pub trait Trait
     ) -> Result<
         HashMap<String, Vec<(SomeLongTypeName, AnotherLongTypeName, YetAnotherType)>>,
         Box<dyn Error + Send + Sync + 'static>,
-    >
-    {
+    > {
     }
 
     fn method_with_short_where_and_body<T>(&self, a: f64, b: T) -> f64
-    where T: Debug
+    where
+        T: Debug,
     {
     }
 
@@ -195,12 +198,12 @@ pub trait Trait
         cc: f64,
         d: f64,
         e: f64,
-    ) -> f64
-    {
+    ) -> f64 {
     }
 
     fn method_with_wrapping_where_clause_and_body<T>(aaa: f64, bb: T, cc: f64, d: f64) -> f64
-    where T: Debug
+    where
+        T: Debug,
     {
     }
 
