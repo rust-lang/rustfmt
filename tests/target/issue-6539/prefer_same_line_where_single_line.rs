@@ -111,7 +111,8 @@ fn fn_with_everything_long_and_body<T, U, 'a>(
 >
 where
     T: Debug + Display + Clone + Send + Sync + 'static,
-    U: Iterator<Item = &'a T> + ExactSizeIterator, {
+    U: Iterator<Item = &'a T> + ExactSizeIterator,
+{
 }
 
 // Trait methods
@@ -216,6 +217,7 @@ pub trait Trait {
     >
     where
         T: Debug + Display + Clone + Send + Sync + 'static,
-        U: Iterator<Item = &'a T> + ExactSizeIterator, {
+        U: Iterator<Item = &'a T> + ExactSizeIterator,
+    {
     }
 }
