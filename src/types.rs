@@ -825,10 +825,6 @@ impl Rewrite for ast::Ty {
                         let shape = shape.offset_left(4, self.span())?;
                         (shape, "dyn ")
                     }
-                    ast::TraitObjectSyntax::DynStar => {
-                        let shape = shape.offset_left(5, self.span())?;
-                        (shape, "dyn* ")
-                    }
                     ast::TraitObjectSyntax::None => (shape, ""),
                 };
                 let mut res = bounds.rewrite_result(context, shape)?;
