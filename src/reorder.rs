@@ -29,7 +29,7 @@ fn compare_items(a: &ast::Item, b: &ast::Item, context: &RewriteContext<'_>) -> 
     let style_edition = context.config.style_edition();
     match (&a.kind, &b.kind) {
         (&ast::ItemKind::Mod(_, a_ident, _), &ast::ItemKind::Mod(_, b_ident, _)) => {
-            if style_edition <= StyleEdition::Edition2021 {
+            if style_edition <= StyleEdition::Edition2024 {
                 a_ident.as_str().cmp(b_ident.as_str())
             } else {
                 version_sort(a_ident.as_str(), b_ident.as_str())
@@ -43,7 +43,7 @@ fn compare_items(a: &ast::Item, b: &ast::Item, context: &RewriteContext<'_>) -> 
             //               ^^^ Comparing this.
             let a_orig_name = a_name.unwrap_or(a_ident.name);
             let b_orig_name = b_name.unwrap_or(b_ident.name);
-            let result = if style_edition <= StyleEdition::Edition2021 {
+            let result = if style_edition <= StyleEdition::Edition2024 {
                 a_orig_name.as_str().cmp(b_orig_name.as_str())
             } else {
                 version_sort(a_orig_name.as_str(), b_orig_name.as_str())
@@ -58,7 +58,7 @@ fn compare_items(a: &ast::Item, b: &ast::Item, context: &RewriteContext<'_>) -> 
                 (Some(..), None) => Ordering::Greater,
                 (None, Some(..)) => Ordering::Less,
                 (None, None) => Ordering::Equal,
-                (Some(..), Some(..)) if style_edition <= StyleEdition::Edition2021 => {
+                (Some(..), Some(..)) if style_edition <= StyleEdition::Edition2024 => {
                     a_ident.as_str().cmp(b_ident.as_str())
                 }
                 (Some(..), Some(..)) => version_sort(a_ident.as_str(), b_ident.as_str()),

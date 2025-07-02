@@ -20,7 +20,7 @@
 
 ### Changed
 - Stabilize `style_edition=2024` and stabilize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
-- Apply version sorting to module declarations when using `style_edition=2024` [#6368](https://github.com/rust-lang/rustfmt/pull/6368)
+- Apply version sorting to module declarations when using `style_edition=2027` [#6368](https://github.com/rust-lang/rustfmt/pull/6368) and [#6594](https://github.com/rust-lang/rustfmt/pull/6594)
 - When users set the deprecated `version` config, rustfmt now gives a hint about which equivalent `style_edition` they should use [#6361](https://github.com/rust-lang/rustfmt/pull/6361)
 - Correct version chunk splitting in the internal version sort algorithm [#6407](https://github.com/rust-lang/rustfmt/pull/6407)
 - Extend support for single line let-chain formatting to include cases where the left hand side operand is a literal, in alignment with finalized style rules as part of let-chain stabilization [#6492](https://github.com/rust-lang/rustfmt/pull/6492)
