@@ -2,7 +2,7 @@
 
 set -ex
 
-: ${INTEGRATION?"The INTEGRATION environment variable must be set."}
+: "${INTEGRATION?'The INTEGRATION environment variable must be set.'}"
 
 # FIXME: this means we can get a stale cargo-fmt from a previous run.
 #
@@ -42,8 +42,12 @@ function check_fmt_with_lib_tests {
 
 function check_fmt_base {
     local test_args="$1"
-    local build=$(cargo test $test_args 2>&1)
-    if [[ "$build" =~ "build failed" ]] || [[ "$build" =~ "test result: FAILED." ]]; then
+    local build
+    # shellcheck is complaining that `$test_args` can be interpreted as multiple arguments
+    # in case it contains whitespace characters... which is exactly what we want.
+    # shellcheck disable=SC2086
+    build=$(cargo test $test_args 2>&1)
+    if [[ "$build" =~ "build failed" ]] || [[ "$build" =~ test\ result\:\ FAILED\. ]]; then
           return 0
     fi
     touch rustfmt.toml
@@ -53,67 +57,64 @@ function check_fmt_base {
         return 1
     fi
     cat rustfmt_output
-    ! cat rustfmt_output | grep -q "internal error"
-    if [[ $? != 0 ]]; then
-        return 1
-    fi
-    ! cat rustfmt_output | grep -q "warning"
-    if [[ $? != 0 ]]; then
-        return 1
-    fi
-    ! cat rustfmt_output | grep -q "Warning"
-    if [[ $? != 0 ]]; then
-        return 1
-    fi
+    grep -q "internal error" < rustfmt_output && return 1
+    grep -q "warning" < rustfmt_output && return 1
+    grep -q "Warning" < rustfmt_output && return 1
+
     cargo fmt --all -- --check |& tee rustfmt_check_output
     if [[ ${PIPESTATUS[0]} != 0 ]]; then
         cat rustfmt_check_output
         return 1
     fi
+    # shellcheck is complaining that `$test_args` can be interpreted as multiple arguments
+    # in case it contains whitespace characters... which is exactly what we want.
+    # shellcheck disable=SC2086
     cargo test $test_args
-    if [[ $? != 0 ]]; then
-        return $?
+    cargo_ret=$?
+    if [[ $cargo_ret != 0 ]]; then
+        return $cargo_ret
     fi
 }
 
 function show_head {
-    local head=$(git rev-parse HEAD)
+    local head
+    head=$(git rev-parse HEAD)
     echo "Head commit of ${INTEGRATION}: $head"
 }
 
 case ${INTEGRATION} in
     cargo)
-        git clone --depth=1 https://github.com/rust-lang/${INTEGRATION}.git
-        cd ${INTEGRATION}
+        git clone --depth=1 "https://github.com/rust-lang/${INTEGRATION}.git"
+        cd "${INTEGRATION}"
         show_head
         export CFG_DISABLE_CROSS_TESTS=1
         check_fmt_with_all_tests
         cd -
         ;;
     crater)
-        git clone --depth=1 https://github.com/rust-lang/${INTEGRATION}.git
-        cd ${INTEGRATION}
+        git clone --depth=1 "https://github.com/rust-lang/${INTEGRATION}.git"
+        cd "${INTEGRATION}"
         show_head
         check_fmt_with_lib_tests
         cd -
         ;;
     bitflags)
-        git clone --depth=1 https://github.com/bitflags/${INTEGRATION}.git
-        cd ${INTEGRATION}
+        git clone --depth=1 "https://github.com/bitflags/${INTEGRATION}.git"
+        cd "${INTEGRATION}"
         show_head
         check_fmt_with_all_tests
         cd -
         ;;
     tempdir)
-        git clone --depth=1 https://github.com/rust-lang-deprecated/${INTEGRATION}.git
-        cd ${INTEGRATION}
+        git clone --depth=1 "https://github.com/rust-lang-deprecated/${INTEGRATION}.git"
+        cd "${INTEGRATION}"
         show_head
         check_fmt_with_all_tests
         cd -
         ;;
     *)
-        git clone --depth=1 https://github.com/rust-lang/${INTEGRATION}.git
-        cd ${INTEGRATION}
+        git clone --depth=1 "https://github.com/rust-lang/${INTEGRATION}.git"
+        cd "${INTEGRATION}"
         show_head
         check_fmt_with_all_tests
         cd -
