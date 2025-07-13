@@ -1162,6 +1162,7 @@ pub(crate) fn format_trait(
     offset: Indent,
 ) -> RewriteResult {
     let ast::Trait {
+        constness,
         is_auto,
         safety,
         ident,
@@ -1172,7 +1173,8 @@ pub(crate) fn format_trait(
 
     let mut result = String::with_capacity(128);
     let header = format!(
-        "{}{}{}trait ",
+        "{}{}{}{}trait ",
+        format_constness(constness),
         format_visibility(context, &item.vis),
         format_safety(safety),
         format_auto(is_auto),
