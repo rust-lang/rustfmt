@@ -78,7 +78,7 @@
           <article class="markdown-body">
             <div class="searchCondition">
               <div>
-                <form style="display:flex;" v-on:submit.prevent>
+                <form style="display:flex;" v-on:submit.prevent> <!-- Prevent the page from reloading when Enter key is pressed -->
                   <label for="search" style="margin-right: 3px;" >search:</label>
                   <div style="position: relative;">
                     <input id="search" placeholder="Search all options" v-model="searchCondition">
