@@ -499,10 +499,12 @@ fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
             // Only return if it's a file to handle the unlikely situation of a directory named
             // `rustfmt.toml`.
             Ok(ref md) if md.is_file() => return Ok(Some(config_file.canonicalize()?)),
-            // Return the error if it's something other than `NotFound`; otherwise we didn't
-            // find the project file yet, and continue searching.
+            // We didn't find the project file yet, and continue searching if:
+            // `NotFound` => file not found
+            // `NotADirectory` => rare case where expected directory is a file
+            // Otherwise, return the error
             Err(e) => {
-                if e.kind() != ErrorKind::NotFound {
+                if !matches!(e.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) {
                     let ctx = format!("Failed to get metadata for config file {:?}", &config_file);
                     let err = anyhow::Error::new(e).context(ctx);
                     return Err(Error::new(ErrorKind::Other, err));
