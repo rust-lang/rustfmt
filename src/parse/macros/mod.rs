@@ -52,6 +52,13 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
         |parser: &mut Parser<'b>| parser.parse_expr(),
         |x: ptr::P<ast::Expr>| Some(x)
     );
+    // `parse_item` returns `Option<ptr::P<ast::Item>>`.
+    parse_macro_arg!(
+        Item,
+        NonterminalKind::Item,
+        |parser: &mut Parser<'b>| parser.parse_item(ForceCollect::No),
+        |x: Option<ptr::P<ast::Item>>| x
+    );
     parse_macro_arg!(
         Ty,
         NonterminalKind::Ty,
@@ -63,13 +70,6 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
         NonterminalKind::Pat(PatParam { inferred: false }),
         |parser: &mut Parser<'b>| parser.parse_pat_no_top_alt(None, None),
         |x: ptr::P<ast::Pat>| Some(x)
-    );
-    // `parse_item` returns `Option<ptr::P<ast::Item>>`.
-    parse_macro_arg!(
-        Item,
-        NonterminalKind::Item,
-        |parser: &mut Parser<'b>| parser.parse_item(ForceCollect::No),
-        |x: Option<ptr::P<ast::Item>>| x
     );
 
     None
