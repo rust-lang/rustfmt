@@ -29,12 +29,13 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
             if Parser::nonterminal_may_begin_with($nt_kind, &cloned_parser.token) {
                 match $try_parse(&mut cloned_parser) {
                     Ok(x) => {
-                        if parser.psess.dcx().has_errors().is_some() {
+                        let maybe_parsed = $then(x);
+                        if parser.psess.dcx().has_errors().is_some() || maybe_parsed.is_none() {
                             parser.psess.dcx().reset_err_count();
                         } else {
                             // Parsing succeeded.
                             *parser = cloned_parser;
-                            return Some(MacroArg::$macro_arg($then(x)?));
+                            return Some(MacroArg::$macro_arg(maybe_parsed?));
                         }
                     }
                     Err(e) => {
