@@ -29,7 +29,7 @@ pub(crate) mod style_edition;
 // This macro defines configuration options used in rustfmt. Each option
 // is defined as follows:
 //
-// `name: value type, default value, is stable, description;`
+// `name: value type, is stable, description;`
 create_config! {
     // Fundamental stuff
     max_width: MaxWidth, true, "Maximum width of each line";
@@ -79,6 +79,8 @@ create_config! {
     skip_macro_invocations: SkipMacroInvocations, false,
         "Skip formatting the bodies of macros invoked with the following names.";
     hex_literal_case: HexLiteralCaseConfig, false, "Format hexadecimal integer literals";
+    float_literal_trailing_zero: FloatLiteralTrailingZeroConfig, false,
+        "Add or remove trailing zero in floating-point literals";
 
     // Single line expressions and items
     empty_item_single_line: EmptyItemSingleLine, false,
@@ -129,6 +131,8 @@ create_config! {
         on the same line with the pattern of arms";
     match_arm_leading_pipes: MatchArmLeadingPipeConfig, true,
         "Determines whether leading pipes are emitted on match arms";
+    match_arm_indent: MatchArmIndent, false,
+        "Determines whether match arms are indented";
     force_multiline_blocks: ForceMultilineBlocks, false,
         "Force multiline closure bodies and match arms to be wrapped in a block";
     fn_args_layout: FnArgsLayout, true,
@@ -149,7 +153,7 @@ create_config! {
     blank_lines_lower_bound: BlankLinesLowerBound, false,
         "Minimum number of blank lines which must be put between items";
     edition: EditionConfig, true, "The edition of the parser (RFC 2052)";
-    style_edition: StyleEditionConfig, false, "The edition of the Style Guide (RFC 3338)";
+    style_edition: StyleEditionConfig, true, "The edition of the Style Guide (RFC 3338)";
     version: VersionConfig, false, "Version of formatting rules";
     inline_attribute_width: InlineAttributeWidth, false,
         "Write an item and its attribute on the same line \
@@ -234,6 +238,43 @@ impl PartialConfig {
     }
 }
 
+fn check_semver_version(range_requirement: &str, actual: &str) -> bool {
+    let mut version_req = match semver::VersionReq::parse(range_requirement) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error: failed to parse required version {range_requirement:?}: {e}");
+            return false;
+        }
+    };
+    let actual_version = match semver::Version::parse(actual) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Error: failed to parse current version {actual:?}: {e}");
+            return false;
+        }
+    };
+
+    range_requirement
+        .split(',')
+        .enumerate()
+        .for_each(|(i, label)| {
+            // the label refers to the current comparator
+            let Some(comparator) = version_req.comparators.get_mut(i) else {
+                return;
+            };
+
+            // semver crate handles "1.0.0" as "^1.0.0", and we want to treat it as "=1.0.0"
+            // because of this, we need to iterate over the comparators, and change each one
+            // that has "default caret operator" to an exact operator
+            // this condition overrides the "default caret operator" of semver create.
+            if !label.starts_with('^') && comparator.op == semver::Op::Caret {
+                comparator.op = semver::Op::Exact;
+            }
+        });
+
+    version_req.matches(&actual_version)
+}
+
 impl Config {
     pub fn default_for_possible_style_edition(
         style_edition: Option<StyleEdition>,
@@ -263,10 +304,10 @@ impl Config {
         if self.was_set().required_version() {
             let version = env!("CARGO_PKG_VERSION");
             let required_version = self.required_version();
-            if version != required_version {
-                println!(
-                    "Error: rustfmt version ({version}) doesn't match the required version \
-({required_version})"
+            if !check_semver_version(&required_version, version) {
+                eprintln!(
+                    "Error: rustfmt version ({}) doesn't match the required version ({})",
+                    version, required_version
                 );
                 return false;
             }
@@ -291,14 +332,8 @@ impl Config {
         let mut file = File::open(&file_path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
-        Config::from_toml_for_style_edition(
-            &toml,
-            file_path.parent().unwrap(),
-            edition,
-            style_edition,
-            version,
-        )
-        .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+        Config::from_toml_for_style_edition(&toml, file_path, edition, style_edition, version)
+            .map_err(|err| Error::new(ErrorKind::InvalidData, err))
     }
 
     /// Resolves the config for input in `dir`.
@@ -370,13 +405,13 @@ impl Config {
     }
 
     #[allow(dead_code)]
-    pub(super) fn from_toml(toml: &str, dir: &Path) -> Result<Config, String> {
-        Self::from_toml_for_style_edition(toml, dir, None, None, None)
+    pub(super) fn from_toml(toml: &str, file_path: &Path) -> Result<Config, String> {
+        Self::from_toml_for_style_edition(toml, file_path, None, None, None)
     }
 
     pub(crate) fn from_toml_for_style_edition(
         toml: &str,
-        dir: &Path,
+        file_path: &Path,
         edition: Option<Edition>,
         style_edition: Option<StyleEdition>,
         version: Option<Version>,
@@ -400,13 +435,19 @@ impl Config {
                 if !err.is_empty() {
                     eprint!("{err}");
                 }
+                let dir = file_path.parent().ok_or_else(|| {
+                    format!("failed to get parent directory for {}", file_path.display())
+                })?;
+
                 Ok(parsed_config.to_parsed_config(style_edition, edition, version, dir))
             }
             Err(e) => {
-                err.push_str("Error: Decoding config file failed:\n");
-                err.push_str(format!("{e}\n").as_str());
-                err.push_str("Please check your config file.");
-                Err(err)
+                let err_msg = format!(
+                    "The file `{}` failed to parse.\nError details: {e}",
+                    file_path.display()
+                );
+                err.push_str(&err_msg);
+                Err(err_msg)
             }
         }
     }
@@ -674,7 +715,7 @@ mod test {
 
     #[test]
     fn test_was_set() {
-        let config = Config::from_toml("hard_tabs = true", Path::new("")).unwrap();
+        let config = Config::from_toml("hard_tabs = true", Path::new("./rustfmt.toml")).unwrap();
 
         assert_eq!(config.was_set().hard_tabs(), true);
         assert_eq!(config.was_set().verbose(), false);
@@ -739,6 +780,7 @@ format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
+float_literal_trailing_zero = "Preserve"
 empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false
@@ -763,6 +805,7 @@ struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
 match_arm_leading_pipes = "Never"
+match_arm_indent = true
 force_multiline_blocks = false
 fn_params_layout = "Tall"
 brace_style = "SameLineWhere"
@@ -829,6 +872,7 @@ format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
 hex_literal_case = "Preserve"
+float_literal_trailing_zero = "Preserve"
 empty_item_single_line = true
 struct_lit_single_line = true
 fn_single_line = false
@@ -848,11 +892,12 @@ binop_separator = "Front"
 remove_nested_parens = true
 combine_control_expr = true
 short_array_element_width_threshold = 10
-overflow_delimited_expr = true
+overflow_delimited_expr = false
 struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
 match_arm_leading_pipes = "Never"
+match_arm_indent = true
 force_multiline_blocks = false
 fn_params_layout = "Tall"
 brace_style = "SameLineWhere"
@@ -933,7 +978,8 @@ make_backup = false
     #[nightly_only_test]
     #[test]
     fn test_unstable_from_toml() {
-        let config = Config::from_toml("unstable_features = true", Path::new("")).unwrap();
+        let config =
+            Config::from_toml("unstable_features = true", Path::new("./rustfmt.toml")).unwrap();
         assert_eq!(config.was_set().unstable_features(), true);
         assert_eq!(config.unstable_features(), true);
     }
@@ -963,7 +1009,7 @@ make_backup = false
                 unstable_features = true
                 merge_imports = true
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.imports_granularity(), ImportGranularity::Crate);
         }
 
@@ -975,7 +1021,7 @@ make_backup = false
                 merge_imports = true
                 imports_granularity = "Preserve"
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.imports_granularity(), ImportGranularity::Preserve);
         }
 
@@ -986,7 +1032,7 @@ make_backup = false
                 unstable_features = true
                 merge_imports = true
             "#;
-            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            let mut config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             config.override_value("imports_granularity", "Preserve");
             assert_eq!(config.imports_granularity(), ImportGranularity::Preserve);
         }
@@ -998,7 +1044,7 @@ make_backup = false
                 unstable_features = true
                 imports_granularity = "Module"
             "#;
-            let mut config = Config::from_toml(toml, Path::new("")).unwrap();
+            let mut config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             config.override_value("merge_imports", "true");
             // no effect: the new option always takes precedence
             assert_eq!(config.imports_granularity(), ImportGranularity::Module);
@@ -1015,7 +1061,7 @@ make_backup = false
                 use_small_heuristics = "Default"
                 max_width = 200
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.array_width(), 120);
             assert_eq!(config.attr_fn_like_width(), 140);
             assert_eq!(config.chain_width(), 120);
@@ -1031,7 +1077,7 @@ make_backup = false
                 use_small_heuristics = "Max"
                 max_width = 120
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.array_width(), 120);
             assert_eq!(config.attr_fn_like_width(), 120);
             assert_eq!(config.chain_width(), 120);
@@ -1047,11 +1093,11 @@ make_backup = false
                 use_small_heuristics = "Off"
                 max_width = 100
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
-            assert_eq!(config.array_width(), usize::max_value());
-            assert_eq!(config.attr_fn_like_width(), usize::max_value());
-            assert_eq!(config.chain_width(), usize::max_value());
-            assert_eq!(config.fn_call_width(), usize::max_value());
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+            assert_eq!(config.array_width(), usize::MAX);
+            assert_eq!(config.attr_fn_like_width(), usize::MAX);
+            assert_eq!(config.chain_width(), usize::MAX);
+            assert_eq!(config.fn_call_width(), usize::MAX);
             assert_eq!(config.single_line_if_else_max_width(), 0);
             assert_eq!(config.struct_lit_width(), 0);
             assert_eq!(config.struct_variant_width(), 0);
@@ -1069,7 +1115,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -1091,7 +1137,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -1113,7 +1159,7 @@ make_backup = false
                 struct_lit_width = 30
                 struct_variant_width = 34
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.array_width(), 20);
             assert_eq!(config.attr_fn_like_width(), 40);
             assert_eq!(config.chain_width(), 20);
@@ -1129,7 +1175,7 @@ make_backup = false
                 max_width = 90
                 fn_call_width = 95
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.fn_call_width(), 90);
         }
 
@@ -1139,7 +1185,7 @@ make_backup = false
                 max_width = 80
                 attr_fn_like_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.attr_fn_like_width(), 80);
         }
 
@@ -1149,7 +1195,7 @@ make_backup = false
                 max_width = 78
                 struct_lit_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.struct_lit_width(), 78);
         }
 
@@ -1159,7 +1205,7 @@ make_backup = false
                 max_width = 80
                 struct_variant_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.struct_variant_width(), 80);
         }
 
@@ -1169,7 +1215,7 @@ make_backup = false
                 max_width = 60
                 array_width = 80
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.array_width(), 60);
         }
 
@@ -1179,7 +1225,7 @@ make_backup = false
                 max_width = 80
                 chain_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.chain_width(), 80);
         }
 
@@ -1189,7 +1235,7 @@ make_backup = false
                 max_width = 70
                 single_line_if_else_max_width = 90
             "#;
-            let config = Config::from_toml(toml, Path::new("")).unwrap();
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
             assert_eq!(config.single_line_if_else_max_width(), 70);
         }
 
@@ -1281,5 +1327,388 @@ make_backup = false
                 MacroSelector::Name(MacroName::new("println".to_owned()))
             ])
         );
+    }
+
+    #[cfg(test)]
+    mod required_version {
+        use super::*;
+
+        #[allow(dead_code)] // Only used in tests
+        fn get_current_version() -> semver::Version {
+            semver::Version::parse(env!("CARGO_PKG_VERSION")).unwrap()
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_default() {
+            let config = Config::default();
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_current_required_version() {
+            let toml = format!("required_version=\"{}\"", env!("CARGO_PKG_VERSION"));
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_above() {
+            let toml = "required_version=\"1000.0.0\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_below() {
+            let versions = vec!["0.0.0", "0.0.1", "0.1.0"];
+
+            for version in versions {
+                let toml = format!("required_version=\"{}\"", version.to_string());
+                let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+                assert!(!config.version_meets_requirement());
+            }
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_tilde() {
+            let toml = format!("required_version=\"~{}\"", env!("CARGO_PKG_VERSION"));
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_caret() {
+            let current_version = get_current_version();
+
+            for minor in current_version.minor..0 {
+                let toml = format!(
+                    "required_version=\"^{}.{}.0\"",
+                    current_version.major.to_string(),
+                    minor.to_string()
+                );
+                let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+                assert!(!config.version_meets_requirement());
+            }
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_greater_than() {
+            let toml = "required_version=\">1.0.0\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_less_than() {
+            let toml = "required_version=\"<1.0.0\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_range() {
+            let current_version = get_current_version();
+
+            let toml = format!(
+                "required_version=\">={}.0.0, <{}.0.0\"",
+                current_version.major,
+                current_version.major + 1
+            );
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_exact_boundary() {
+            let toml = format!("required_version=\"{}\"", get_current_version().to_string());
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_pre_release() {
+            let toml = format!(
+                "required_version=\"^{}-alpha\"",
+                get_current_version().to_string()
+            );
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_with_build_metadata() {
+            let toml = format!(
+                "required_version=\"{}+build.1\"",
+                get_current_version().to_string()
+            );
+
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_invalid_specification() {
+            let toml = "required_version=\"not.a.version\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(!config.version_meets_requirement())
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_complex_range() {
+            let current_version = get_current_version();
+
+            let toml = format!(
+                "required_version=\">={}.0.0, <{}.0.0, ~{}.{}.0\"",
+                current_version.major,
+                current_version.major + 1,
+                current_version.major,
+                current_version.minor
+            );
+            let config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_wildcard_major() {
+            let toml = "required_version=\"1.x\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_wildcard_any() {
+            let toml = "required_version=\"*\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_major_version_zero() {
+            let toml = "required_version=\"0.1.0\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_future_major_version() {
+            let toml = "required_version=\"3.0.0\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+
+        #[nightly_only_test]
+        #[test]
+        fn test_required_version_fail_different_operator() {
+            // != is not supported
+            let toml = "required_version=\"!=1.0.0\"";
+            let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+
+            assert!(!config.version_meets_requirement());
+        }
+    }
+
+    #[cfg(test)]
+    mod check_semver_version {
+        use super::*;
+
+        #[test]
+        fn test_exact_version_match() {
+            assert!(check_semver_version("1.0.0", "1.0.0"));
+            assert!(!check_semver_version("1.0.0", "1.1.0"));
+            assert!(!check_semver_version("1.0.0", "1.0.1"));
+            assert!(!check_semver_version("1.0.0", "2.1.0"));
+            assert!(!check_semver_version("1.0.0", "0.1.0"));
+            assert!(!check_semver_version("1.0.0", "0.0.1"));
+        }
+
+        #[test]
+        fn test_version_mismatch() {
+            assert!(!check_semver_version("2.0.0", "1.0.0"));
+        }
+
+        #[test]
+        fn test_patch_version_greater() {
+            assert!(check_semver_version("^1.0.0", "1.0.1"));
+        }
+
+        #[test]
+        fn test_minor_version_greater() {
+            assert!(check_semver_version("^1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_major_version_less() {
+            assert!(!check_semver_version("1.0.0", "0.9.0"));
+        }
+
+        #[test]
+        fn test_prerelease_less_than_release() {
+            assert!(!check_semver_version("1.0.0", "1.0.0-alpha"));
+        }
+
+        #[test]
+        fn test_prerelease_version_specific_match() {
+            assert!(check_semver_version("1.0.0-alpha", "1.0.0-alpha"));
+        }
+
+        #[test]
+        fn test_build_metadata_ignored() {
+            assert!(check_semver_version("1.0.0", "1.0.0+build.1"));
+        }
+
+        #[test]
+        fn test_greater_than_requirement() {
+            assert!(check_semver_version(">1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_less_than_requirement_fails_when_greater() {
+            assert!(!check_semver_version("<1.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_caret_requirement_matches_minor_update() {
+            assert!(check_semver_version("^1.1.0", "1.2.0"));
+        }
+
+        #[test]
+        fn test_tilde_requirement_matches_patch_update() {
+            assert!(check_semver_version("~1.0.0", "1.0.1"));
+        }
+
+        #[test]
+        fn test_range_requirement_inclusive() {
+            assert!(check_semver_version(">=1.0.0, <2.0.0", "1.5.0"));
+        }
+
+        #[test]
+        fn test_pre_release_specific_match() {
+            assert!(check_semver_version("1.0.0-alpha.1", "1.0.0-alpha.1"));
+        }
+
+        #[test]
+        fn test_pre_release_non_match_when_requiring_release() {
+            assert!(!check_semver_version("1.0.0", "1.0.0-alpha.1"));
+        }
+
+        // That's not our choice. `semver` does not support `||` operator.
+        // Only asserting here to ensure this behavior (which match our docs).
+        #[test]
+        fn test_invalid_or() {
+            assert!(!check_semver_version("1.0.0 || 2.0.0", "1.0.0"));
+            assert!(!check_semver_version("1.0.0 || 2.0.0", "2.0.0"));
+            assert!(!check_semver_version("1.0.0 || 2.0.0", "3.0.0"));
+        }
+
+        #[test]
+        fn test_wildcard_match_minor() {
+            assert!(check_semver_version("1.*", "1.1.0"));
+            assert!(check_semver_version("1.*, <2.0.0", "1.1.0"));
+        }
+
+        #[test]
+        fn test_wildcard_mismatch() {
+            assert!(!check_semver_version("1.*, <2.0.0", "2.1.0"));
+            assert!(!check_semver_version("1.*, <2.0.0", "2.0.0"));
+            assert!(!check_semver_version("1.*, <2.*", "2.1.0"));
+            assert!(!check_semver_version("1.*, <2.*", "2.0.0"));
+
+            assert!(!check_semver_version("1.*, >2.0.0", "1.1.0"));
+            assert!(!check_semver_version("1.*, >2.0.0", "1.0.0"));
+            assert!(!check_semver_version("1.*, >2.*", "1.1.0"));
+            assert!(!check_semver_version("1.*, >2.*", "1.0.0"));
+
+            assert!(!check_semver_version("<1.5.0, >1.10.*", "1.6.0"));
+        }
+
+        #[test]
+        fn test_wildcard_match_major() {
+            assert!(check_semver_version("2.*", "2.0.0"));
+        }
+
+        #[test]
+        fn test_wildcard_match_patch() {
+            assert!(check_semver_version("1.0.*", "1.0.1"));
+        }
+
+        #[test]
+        fn test_invalid_inputs() {
+            assert!(!check_semver_version("not.a.requirement", "1.0.0"));
+            assert!(!check_semver_version("1.0.0", "not.a.version"));
+        }
+
+        #[test]
+        fn test_version_with_pre_release_and_build() {
+            assert!(check_semver_version("1.0.0-alpha", "1.0.0-alpha+001"));
+        }
+
+        // Demonstrates precedence of numeric identifiers over alphanumeric in pre-releases
+        #[test]
+        fn test_pre_release_numeric_vs_alphanumeric() {
+            assert!(!check_semver_version("^1.0.0-alpha.beta", "1.0.0-alpha.1"));
+            assert!(check_semver_version("^1.0.0-alpha.1", "1.0.0-alpha.beta"));
+        }
+
+        // Any version is allowed when * is used
+        #[test]
+        fn test_wildcard_any() {
+            assert!(check_semver_version("*", "1.0.0"));
+            assert!(check_semver_version("*", "1.0.0+build"));
+        }
+
+        // Demonstrates lexicographic ordering of alphanumeric identifiers in pre-releases
+        #[test]
+        fn test_pre_release_lexicographic_ordering() {
+            assert!(check_semver_version(
+                "^1.0.0-alpha.alpha",
+                "1.0.0-alpha.beta",
+            ));
+            assert!(!check_semver_version(
+                "^1.0.0-alpha.beta",
+                "1.0.0-alpha.alpha",
+            ));
+        }
+
+        // These are not allowed. '*' can't be used with other version specifiers.
+        #[test]
+        fn test_wildcard_any_with_range() {
+            assert!(!check_semver_version("*, <2.0.0", "1.0.0"));
+            assert!(!check_semver_version("*, 1.0.0", "1.5.0"));
+        }
     }
 }

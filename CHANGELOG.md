@@ -2,6 +2,97 @@
 
 ## [Unreleased]
 
+
+## [1.9.0] 2025-01-03
+
+### Fixed
+- No longer strip `r#` prefix from `break` and `continue` labels [#6411](https://github.com/rust-lang/rustfmt/issues/6411)
+  ```rust
+  fn main() {
+      'r#if: {
+          break 'r#if;
+      }
+  }
+  ```
+- Fix panic when sorting imports [#6333](https://github.com/rust-lang/rustfmt/issues/6333)
+- Fix issue with `wrap_comments` invalidating code blocks [#6417](https://github.com/rust-lang/rustfmt/pull/6417)
+- No longer remove closure block label within a macro call [#6465](https://github.com/rust-lang/rustfmt/issues/6465)
+
+### Changed
+- Stabilize `style_edition=2024` and stabilize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
+- Apply version sorting to module declarations when using `style_edition=2024` [#6368](https://github.com/rust-lang/rustfmt/pull/6368)
+- When users set the deprecated `version` config, rustfmt now gives a hint about which equivalent `style_edition` they should use [#6361](https://github.com/rust-lang/rustfmt/pull/6361)
+- Correct version chunk splitting in the internal version sort algorithm [#6407](https://github.com/rust-lang/rustfmt/pull/6407)
+- Extend support for single line let-chain formatting to include cases where the left hand side operand is a literal, in alignment with finalized style rules as part of let-chain stabilization [#6492](https://github.com/rust-lang/rustfmt/pull/6492)
+- Begin initial formatting for `use closures` and `use chains` (`#![feature(ergonomic_clones)]`). Previously, the closure and chain was left as the developer wrote it [#6532](https://github.com/rust-lang/rustfmt/pull/6532)
+
+### Added
+- Add `style_edition=2027` to gate unstable formatting [#6324](https://github.com/rust-lang/rustfmt/pull/6324)
+- Support discovering and formatting files via external mods imported within `cfg_match`, similar to `cfg_if` behavior [#6522](https://github.com/rust-lang/rustfmt/pull/6522)
+- Add new nightly-only `match_arm_indent` option [#6525](https://github.com/rust-lang/rustfmt/pull/6525)
+  - more details in the [configuration section for this new option](https://github.com/rust-lang/rustfmt/blob/master/Configurations.md#match_arm_indent)
+
+
+## [1.8.0] 2024-09-20
+
+### Fixed
+- Fix issue where rustfmt would crash on Windows when using the `ignore` option [#6178](https://github.com/rust-lang/rustfmt/issues/6178)
+
+### Changed
+- `rustfmt --version` now prints a commit hash that is 10 characters long [#6258](https://github.com/rust-lang/rustfmt/pull/6258)
+- `rustfmt --version` will no longer print empty git information when git information isn't available at build time.
+  For example, git information is not available when building rustfmt from a source tarball [#6266](https://github.com/rust-lang/rustfmt/pull/6266)
+- `version` has been soft deprecated and replaced by `style_edition`.
+  `style_edition=2024` is equivalent to `version=Two` and `style_edition={2015|2018|2021}`
+  are equivalent to `version=One` [#6247](https://github.com/rust-lang/rustfmt/pull/6247)
+- When `style_edition=2024` is configured `overflow_delimited_expr` will default to `true` [#6260](https://github.com/rust-lang/rustfmt/pull/6260).
+  ```rust
+  // with style_edition=2015
+  do_thing(
+      x,
+      Bar {
+          x: value,
+          y: value2,
+      },
+  );
+
+  // with style_edition=2024
+  do_thing(x, Bar {
+      x: value,
+      y: value2,
+  });
+  ```
+- When `style_edition=2024` is configured rustfmt will apply the [style guide's version sorting algorithm]
+  when sorting imports [#6284](https://github.com/rust-lang/rustfmt/pull/6284)
+  ```rust
+  // with style_edition=2015
+  use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8};
+
+  // with style_edition=2024
+  use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64};
+  ```
+  [style guide's version sorting algorithm]: https://doc.rust-lang.org/nightly/style-guide/#sorting
+- When parsing rustfmt configurations fails, rustfmt will now include the path to the toml file in the error message [#6302](https://github.com/rust-lang/rustfmt/issues/6302)
+
+### Added
+- rustfmt now formats trailing where clauses in type aliases [#5887](https://github.com/rust-lang/rustfmt/pull/5887)
+  ```rust
+  type Foo
+      = Bar
+  where
+      A: B,
+      C: D;
+  ```
+- Users can now configure which `style_edition` rustfmt uses when formatting their code as specified
+  in [RFC 3338](https://rust-lang.github.io/rfcs/3338-style-evolution.html). Users are encouraged to configure `style_edition`
+  in their `rustfmt.toml` files, but the value can also be specified via the cli with `--unstable-features --style-edition={style_edition}`.
+  When `style_edition` is not explicitly configured it will be inferred from the `edition` configuration.
+  When neither `style_edition` nor `edition` are configured `style_edition` defaults to `2015` [#6247](https://github.com/rust-lang/rustfmt/pull/6247)
+
+### Misc
+- Removed `tracing-attributes` dependency [#6208](https://github.com/rust-lang/rustfmt/pull/6208)
+- Reduced syn's features in the internal `config_proc_macro` crate [#6237](https://github.com/rust-lang/rustfmt/pull/6237)
+
 ## [1.7.1] 2024-06-24
 
 ### Fixed
@@ -75,7 +166,7 @@
 ### Changed
 
 - `hide_parse_errors` has been soft deprecated and it's been renamed to `show_parse_errors` [#5961](https://github.com/rust-lang/rustfmt/pull/5961).
-- The diff output produced by `rustfmt --check` is more compatable with editors that support navigating directly to line numbers [#5971](https://github.com/rust-lang/rustfmt/pull/5971)
+- The diff output produced by `rustfmt --check` is more compatible with editors that support navigating directly to line numbers [#5971](https://github.com/rust-lang/rustfmt/pull/5971)
 - When using `version=Two`, the `trace!` macro from the [log crate] is now formatted similarly to `debug!`, `info!`, `warn!`, and `error!` [#5987](https://github.com/rust-lang/rustfmt/issues/5987).
 
   [log crate]: https://crates.io/crates/log

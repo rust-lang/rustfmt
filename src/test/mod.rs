@@ -42,6 +42,8 @@ const FILE_SKIP_LIST: &[&str] = &[
     "issue-3253/foo.rs",
     "issue-3253/bar.rs",
     "issue-3253/paths",
+    // This directory is directly tested by format_files_find_new_files_via_cfg_match
+    "cfg_match",
     // These files and directory are a part of modules defined inside `cfg_attr(..)`.
     "cfg_mod/dir",
     "cfg_mod/bar.rs",
@@ -105,10 +107,9 @@ fn is_file_skip(path: &Path) -> bool {
 fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
     let mut files = vec![];
     if path.is_dir() {
-        for entry in fs::read_dir(path).expect(&format!(
-            "couldn't read directory {}",
-            path.to_str().unwrap()
-        )) {
+        for entry in
+            fs::read_dir(path).expect(&format!("couldn't read directory {}", path.display()))
+        {
             let entry = entry.expect("couldn't get `DirEntry`");
             let path = entry.path();
             if path.is_dir() && recursive {
@@ -122,10 +123,7 @@ fn get_test_files(path: &Path, recursive: bool) -> Vec<PathBuf> {
 }
 
 fn verify_config_used(path: &Path, config_name: &str) {
-    for entry in fs::read_dir(path).expect(&format!(
-        "couldn't read {} directory",
-        path.to_str().unwrap()
-    )) {
+    for entry in fs::read_dir(path).expect(&format!("couldn't read {} directory", path.display())) {
         let entry = entry.expect("couldn't get directory entry");
         let path = entry.path();
         if path.extension().map_or(false, |f| f == "rs") {
@@ -467,6 +465,45 @@ fn format_files_find_new_files_via_cfg_if() {
             3,
             write_result.len(),
             "Should have uncovered an extra file (format_me_please.rs) via lib.rs"
+        );
+        assert!(handle_result(write_result, None).is_ok());
+    });
+}
+
+#[test]
+fn format_files_find_new_files_via_cfg_match() {
+    init_log();
+    run_test_with(&TestSetting::default(), || {
+        // We load these two files into the same session to test cfg_match!
+        // transparent mod discovery, and to ensure that it does not suffer
+        // from a similar issue as cfg_if! support did with issue-4656.
+        let files = vec![
+            Path::new("tests/source/cfg_match/lib2.rs"),
+            Path::new("tests/source/cfg_match/lib.rs"),
+        ];
+
+        let config = Config::default();
+        let mut session = Session::<io::Stdout>::new(config, None);
+
+        let mut write_result = HashMap::new();
+        for file in files {
+            assert!(file.exists());
+            let result = session.format(Input::File(file.into())).unwrap();
+            assert!(!session.has_formatting_errors());
+            assert!(!result.has_warnings());
+            let mut source_file = SourceFile::new();
+            mem::swap(&mut session.source_file, &mut source_file);
+
+            for (filename, text) in source_file {
+                if let FileName::Real(ref filename) = filename {
+                    write_result.insert(filename.to_owned(), text);
+                }
+            }
+        }
+        assert_eq!(
+            6,
+            write_result.len(),
+            "Should have uncovered an extra file (format_me_please_x.rs) via lib.rs"
         );
         assert!(handle_result(write_result, None).is_ok());
     });

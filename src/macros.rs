@@ -12,14 +12,11 @@
 use std::collections::HashMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use rustc_ast::token::{BinOpToken, Delimiter, Token, TokenKind};
-use rustc_ast::tokenstream::{RefTokenTreeCursor, TokenStream, TokenTree};
+use rustc_ast::token::{Delimiter, Token, TokenKind};
+use rustc_ast::tokenstream::{TokenStream, TokenStreamIter, TokenTree};
 use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
-use rustc_span::{
-    BytePos, DUMMY_SP, Span, Symbol,
-    symbol::{self, kw},
-};
+use rustc_span::{BytePos, DUMMY_SP, Ident, Span, Symbol};
 use tracing::debug;
 
 use crate::comment::{
@@ -60,7 +57,7 @@ pub(crate) enum MacroArg {
     Ty(ptr::P<ast::Ty>),
     Pat(ptr::P<ast::Pat>),
     Item(ptr::P<ast::Item>),
-    Keyword(symbol::Ident, Span),
+    Keyword(Ident, Span),
 }
 
 impl MacroArg {
@@ -103,20 +100,12 @@ impl Rewrite for MacroArg {
 }
 
 /// Rewrite macro name without using pretty-printer if possible.
-fn rewrite_macro_name(
-    context: &RewriteContext<'_>,
-    path: &ast::Path,
-    extra_ident: Option<symbol::Ident>,
-) -> String {
-    let name = if path.segments.len() == 1 {
+fn rewrite_macro_name(context: &RewriteContext<'_>, path: &ast::Path) -> String {
+    if path.segments.len() == 1 {
         // Avoid using pretty-printer in the common case.
         format!("{}!", rewrite_ident(context, path.segments[0].ident))
     } else {
         format!("{}!", pprust::path_to_string(path))
-    };
-    match extra_ident {
-        Some(ident) if ident.name != kw::Empty => format!("{name} {ident}"),
-        _ => name,
     }
 }
 
@@ -165,7 +154,6 @@ fn return_macro_parse_failure_fallback(
 
 pub(crate) fn rewrite_macro(
     mac: &ast::MacCall,
-    extra_ident: Option<symbol::Ident>,
     context: &RewriteContext<'_>,
     shape: Shape,
     position: MacroPosition,
@@ -179,14 +167,7 @@ pub(crate) fn rewrite_macro(
     } else {
         let guard = context.enter_macro();
         let result = catch_unwind(AssertUnwindSafe(|| {
-            rewrite_macro_inner(
-                mac,
-                extra_ident,
-                context,
-                shape,
-                position,
-                guard.is_nested(),
-            )
+            rewrite_macro_inner(mac, context, shape, position, guard.is_nested())
         }));
         match result {
             Err(..) => {
@@ -207,7 +188,6 @@ pub(crate) fn rewrite_macro(
 
 fn rewrite_macro_inner(
     mac: &ast::MacCall,
-    extra_ident: Option<symbol::Ident>,
     context: &RewriteContext<'_>,
     shape: Shape,
     position: MacroPosition,
@@ -222,7 +202,7 @@ fn rewrite_macro_inner(
 
     let original_style = macro_style(mac, context);
 
-    let macro_name = rewrite_macro_name(context, &mac.path, extra_ident);
+    let macro_name = rewrite_macro_name(context, &mac.path);
     let is_forced_bracket = FORCED_BRACKET_MACROS.contains(&&macro_name[..]);
 
     let style = if is_forced_bracket && !is_nested_macro {
@@ -381,9 +361,7 @@ fn handle_vec_semi(
     };
 
     // Should we return MaxWidthError, Or Macro failure
-    let mac_shape = shape
-        .offset_left(macro_name.len())
-        .max_width_error(shape.width, span)?;
+    let mac_shape = shape.offset_left(macro_name.len(), span)?;
     // 8 = `vec![]` + `; ` or `vec!()` + `; `
     let total_overhead = 8;
     let nested_shape = mac_shape.block_indent(context.config.tab_spaces());
@@ -423,7 +401,6 @@ fn rewrite_empty_macro_def_body(
         rules: ast::BlockCheckMode::Default,
         span,
         tokens: None,
-        could_be_bare_literal: false,
     };
     block.rewrite_result(context, shape)
 }
@@ -433,7 +410,7 @@ pub(crate) fn rewrite_macro_def(
     shape: Shape,
     indent: Indent,
     def: &ast::MacroDef,
-    ident: symbol::Ident,
+    ident: Ident,
     vis: &ast::Visibility,
     span: Span,
 ) -> RewriteResult {
@@ -443,7 +420,7 @@ pub(crate) fn rewrite_macro_def(
     }
 
     let ts = def.body.tokens.clone();
-    let mut parser = MacroParser::new(ts.trees());
+    let mut parser = MacroParser::new(ts.iter());
     let parsed_def = match parser.parse() {
         Some(def) => def,
         None => return snippet,
@@ -620,7 +597,7 @@ fn delim_token_to_str(
                 ("{ ", " }")
             }
         }
-        Delimiter::Invisible => unreachable!(),
+        Delimiter::Invisible(_) => unreachable!(),
     };
     if use_multiple_lines {
         let indent_str = shape.indent.to_string_with_newline(context.config);
@@ -794,7 +771,7 @@ impl MacroArgParser {
         self.buf.clear();
     }
 
-    fn add_meta_variable(&mut self, iter: &mut RefTokenTreeCursor<'_>) -> Option<()> {
+    fn add_meta_variable(&mut self, iter: &mut TokenStreamIter<'_>) -> Option<()> {
         match iter.next() {
             Some(&TokenTree::Token(
                 Token {
@@ -826,7 +803,7 @@ impl MacroArgParser {
         &mut self,
         inner: Vec<ParsedMacroArg>,
         delim: Delimiter,
-        iter: &mut RefTokenTreeCursor<'_>,
+        iter: &mut TokenStreamIter<'_>,
     ) -> Option<()> {
         let mut buffer = String::new();
         let mut first = true;
@@ -841,7 +818,7 @@ impl MacroArgParser {
             match tok {
                 TokenTree::Token(
                     Token {
-                        kind: TokenKind::BinOp(BinOpToken::Plus),
+                        kind: TokenKind::Plus,
                         ..
                     },
                     _,
@@ -855,7 +832,7 @@ impl MacroArgParser {
                 )
                 | TokenTree::Token(
                     Token {
-                        kind: TokenKind::BinOp(BinOpToken::Star),
+                        kind: TokenKind::Star,
                         ..
                     },
                     _,
@@ -926,7 +903,7 @@ impl MacroArgParser {
 
     /// Returns a collection of parsed macro def's arguments.
     fn parse(mut self, tokens: TokenStream) -> Option<Vec<ParsedMacroArg>> {
-        let mut iter = tokens.trees();
+        let mut iter = tokens.iter();
 
         while let Some(tok) = iter.next() {
             match tok {
@@ -1063,7 +1040,7 @@ fn format_macro_args(
 }
 
 fn span_for_token_stream(token_stream: &TokenStream) -> Option<Span> {
-    token_stream.trees().next().map(|tt| tt.span())
+    token_stream.iter().next().map(|tt| tt.span())
 }
 
 // We should insert a space if the next token is a:
@@ -1088,14 +1065,32 @@ fn force_space_before(tok: &TokenKind) -> bool {
         | TokenKind::Gt
         | TokenKind::AndAnd
         | TokenKind::OrOr
-        | TokenKind::Not
+        | TokenKind::Bang
         | TokenKind::Tilde
-        | TokenKind::BinOpEq(_)
+        | TokenKind::PlusEq
+        | TokenKind::MinusEq
+        | TokenKind::StarEq
+        | TokenKind::SlashEq
+        | TokenKind::PercentEq
+        | TokenKind::CaretEq
+        | TokenKind::AndEq
+        | TokenKind::OrEq
+        | TokenKind::ShlEq
+        | TokenKind::ShrEq
         | TokenKind::At
         | TokenKind::RArrow
         | TokenKind::LArrow
         | TokenKind::FatArrow
-        | TokenKind::BinOp(_)
+        | TokenKind::Plus
+        | TokenKind::Minus
+        | TokenKind::Star
+        | TokenKind::Slash
+        | TokenKind::Percent
+        | TokenKind::Caret
+        | TokenKind::And
+        | TokenKind::Or
+        | TokenKind::Shl
+        | TokenKind::Shr
         | TokenKind::Pound
         | TokenKind::Dollar => true,
         _ => false,
@@ -1113,8 +1108,8 @@ fn next_space(tok: &TokenKind) -> SpaceState {
     debug!("next_space: {:?}", tok);
 
     match tok {
-        TokenKind::Not
-        | TokenKind::BinOp(BinOpToken::And)
+        TokenKind::Bang
+        | TokenKind::And
         | TokenKind::Tilde
         | TokenKind::At
         | TokenKind::Comma
@@ -1163,9 +1158,9 @@ pub(crate) fn convert_try_mac(
 
 pub(crate) fn macro_style(mac: &ast::MacCall, context: &RewriteContext<'_>) -> Delimiter {
     let snippet = context.snippet(mac.span());
-    let paren_pos = snippet.find_uncommented("(").unwrap_or(usize::max_value());
-    let bracket_pos = snippet.find_uncommented("[").unwrap_or(usize::max_value());
-    let brace_pos = snippet.find_uncommented("{").unwrap_or(usize::max_value());
+    let paren_pos = snippet.find_uncommented("(").unwrap_or(usize::MAX);
+    let bracket_pos = snippet.find_uncommented("[").unwrap_or(usize::MAX);
+    let brace_pos = snippet.find_uncommented("{").unwrap_or(usize::MAX);
 
     if paren_pos < bracket_pos && paren_pos < brace_pos {
         Delimiter::Parenthesis
@@ -1179,18 +1174,18 @@ pub(crate) fn macro_style(mac: &ast::MacCall, context: &RewriteContext<'_>) -> D
 // A very simple parser that just parses a macros 2.0 definition into its branches.
 // Currently we do not attempt to parse any further than that.
 struct MacroParser<'a> {
-    toks: RefTokenTreeCursor<'a>,
+    iter: TokenStreamIter<'a>,
 }
 
 impl<'a> MacroParser<'a> {
-    const fn new(toks: RefTokenTreeCursor<'a>) -> Self {
-        Self { toks }
+    const fn new(iter: TokenStreamIter<'a>) -> Self {
+        Self { iter }
     }
 
     // (`(` ... `)` `=>` `{` ... `}`)*
     fn parse(&mut self) -> Option<Macro> {
         let mut branches = vec![];
-        while self.toks.look_ahead(1).is_some() {
+        while self.iter.peek().is_some() {
             branches.push(self.parse_branch()?);
         }
 
@@ -1199,13 +1194,13 @@ impl<'a> MacroParser<'a> {
 
     // `(` ... `)` `=>` `{` ... `}`
     fn parse_branch(&mut self) -> Option<MacroBranch> {
-        let tok = self.toks.next()?;
+        let tok = self.iter.next()?;
         let (lo, args_paren_kind) = match tok {
             TokenTree::Token(..) => return None,
             &TokenTree::Delimited(delimited_span, _, d, _) => (delimited_span.open.lo(), d),
         };
         let args = TokenStream::new(vec![tok.clone()]);
-        match self.toks.next()? {
+        match self.iter.next()? {
             TokenTree::Token(
                 Token {
                     kind: TokenKind::FatArrow,
@@ -1215,7 +1210,7 @@ impl<'a> MacroParser<'a> {
             ) => {}
             _ => return None,
         }
-        let (mut hi, body, whole_body) = match self.toks.next()? {
+        let (mut hi, body, whole_body) = match self.iter.next()? {
             TokenTree::Token(..) => return None,
             TokenTree::Delimited(delimited_span, ..) => {
                 let data = delimited_span.entire().data();
@@ -1237,10 +1232,10 @@ impl<'a> MacroParser<'a> {
                 span,
             },
             _,
-        )) = self.toks.look_ahead(0)
+        )) = self.iter.peek()
         {
             hi = span.hi();
-            self.toks.next();
+            self.iter.next();
         }
         Some(MacroBranch {
             span: mk_sp(lo, hi),
@@ -1294,9 +1289,7 @@ impl MacroBranch {
         let mut result = format_macro_args(
             context,
             self.args.clone(),
-            shape
-                .sub_width(prefix_width)
-                .max_width_error(shape.width, self.span)?,
+            shape.sub_width(prefix_width, self.span)?,
         )?;
 
         if multi_branch_style {
@@ -1445,9 +1438,7 @@ fn format_lazy_static(
             stmt,
             &*expr,
             &RhsAssignKind::Expr(&expr.kind, expr.span),
-            nested_shape
-                .sub_width(1)
-                .max_width_error(nested_shape.width, expr.span)?,
+            nested_shape.sub_width(1, expr.span)?,
         )?);
         result.push(';');
         if i != last {

@@ -146,6 +146,21 @@ pub enum HexLiteralCase {
     Lower,
 }
 
+/// How to treat trailing zeros in floating-point literals.
+#[config_type]
+pub enum FloatLiteralTrailingZero {
+    /// Leave the literal as-is.
+    Preserve,
+    /// Add a trailing zero to the literal.
+    Always,
+    /// Add a trailing zero by default. If the literal contains an exponent or a suffix, the zero
+    /// and the preceding period are removed.
+    IfNoPostfix,
+    /// Remove the trailing zero. If the literal contains an exponent or a suffix, the preceding
+    /// period is also removed.
+    Never,
+}
+
 #[config_type]
 pub enum ReportTactic {
     Always,
@@ -255,12 +270,12 @@ impl WidthHeuristics {
     // Using this WidthHeuristics means we ignore heuristics.
     pub fn null() -> WidthHeuristics {
         WidthHeuristics {
-            fn_call_width: usize::max_value(),
-            attr_fn_like_width: usize::max_value(),
+            fn_call_width: usize::MAX,
+            attr_fn_like_width: usize::MAX,
             struct_lit_width: 0,
             struct_variant_width: 0,
-            array_width: usize::max_value(),
-            chain_width: usize::max_value(),
+            array_width: usize::MAX,
+            chain_width: usize::MAX,
             single_line_if_else_max_width: 0,
             single_line_let_else_max_width: 0,
         }
@@ -511,9 +526,13 @@ pub enum StyleEdition {
     Edition2021,
     #[value = "2024"]
     #[doc_hint = "2024"]
-    #[unstable_variant]
     /// [Edition 2024]().
     Edition2024,
+    #[value = "2027"]
+    #[doc_hint = "2027"]
+    #[unstable_variant]
+    /// [Edition 2027]().
+    Edition2027,
 }
 
 impl From<StyleEdition> for rustc_span::edition::Edition {
@@ -523,13 +542,24 @@ impl From<StyleEdition> for rustc_span::edition::Edition {
             StyleEdition::Edition2018 => Self::Edition2018,
             StyleEdition::Edition2021 => Self::Edition2021,
             StyleEdition::Edition2024 => Self::Edition2024,
+            // TODO: should update to Edition2027 when it becomes available
+            StyleEdition::Edition2027 => Self::Edition2024,
         }
     }
 }
 
 impl PartialOrd for StyleEdition {
     fn partial_cmp(&self, other: &StyleEdition) -> Option<std::cmp::Ordering> {
-        rustc_span::edition::Edition::partial_cmp(&(*self).into(), &(*other).into())
+        // FIXME(ytmimi): Update `StyleEdition::Edition2027` logic when
+        // `rustc_span::edition::Edition::Edition2027` becomes available in the compiler
+        match (self, other) {
+            (Self::Edition2027, Self::Edition2027) => Some(std::cmp::Ordering::Equal),
+            (_, Self::Edition2027) => Some(std::cmp::Ordering::Less),
+            (Self::Edition2027, _) => Some(std::cmp::Ordering::Greater),
+            (Self::Edition2015 | Self::Edition2018 | Self::Edition2021 | Self::Edition2024, _) => {
+                rustc_span::edition::Edition::partial_cmp(&(*self).into(), &(*other).into())
+            }
+        }
     }
 }
 
@@ -598,6 +628,8 @@ config_option_with_style_edition_default!(
     FormatMacroBodies, bool, _ => true;
     SkipMacroInvocations, MacroSelectors, _ => MacroSelectors::default();
     HexLiteralCaseConfig, HexLiteralCase, _ => HexLiteralCase::Preserve;
+    FloatLiteralTrailingZeroConfig, FloatLiteralTrailingZero, _ =>
+        FloatLiteralTrailingZero::Preserve;
 
     // Single line expressions and items
     EmptyItemSingleLine, bool, _ => true;
@@ -628,11 +660,12 @@ config_option_with_style_edition_default!(
     RemoveNestedParens, bool, _ => true;
     CombineControlExpr, bool, _ => true;
     ShortArrayElementWidthThreshold, usize, _ => 10;
-    OverflowDelimitedExpr, bool, Edition2024 => true, _ => false;
+    OverflowDelimitedExpr, bool, _ => false;
     StructFieldAlignThreshold, usize, _ => 0;
     EnumDiscrimAlignThreshold, usize, _ => 0;
     MatchArmBlocks, bool, _ => true;
     MatchArmLeadingPipeConfig, MatchArmLeadingPipe, _ => MatchArmLeadingPipe::Never;
+    MatchArmIndent, bool, _ => true;
     ForceMultilineBlocks, bool, _ => false;
     FnArgsLayout, Density, _ => Density::Tall;
     FnParamsLayout, Density, _ => Density::Tall;
@@ -645,7 +678,7 @@ config_option_with_style_edition_default!(
     BlankLinesLowerBound, usize, _ => 0;
     EditionConfig, Edition, _ => Edition::Edition2015;
     StyleEditionConfig, StyleEdition,
-        Edition2024 =>  StyleEdition::Edition2024, _ => StyleEdition::Edition2015;
+        Edition2024 => StyleEdition::Edition2024, _ => StyleEdition::Edition2015;
     VersionConfig, Version, Edition2024 => Version::Two, _ => Version::One;
     InlineAttributeWidth, usize, _ => 0;
     FormatGeneratedFiles, bool, _ => true;
@@ -677,3 +710,41 @@ config_option_with_style_edition_default!(
     MakeBackup, bool, _ => false;
     PrintMisformattedFileNames, bool, _ => false;
 );
+
+#[test]
+fn style_edition_comparisons() {
+    // Style Edition 2015
+    assert!(StyleEdition::Edition2015 == StyleEdition::Edition2015);
+    assert!(StyleEdition::Edition2015 < StyleEdition::Edition2018);
+    assert!(StyleEdition::Edition2015 < StyleEdition::Edition2021);
+    assert!(StyleEdition::Edition2015 < StyleEdition::Edition2024);
+    assert!(StyleEdition::Edition2015 < StyleEdition::Edition2027);
+
+    // Style Edition 2018
+    assert!(StyleEdition::Edition2018 > StyleEdition::Edition2015);
+    assert!(StyleEdition::Edition2018 == StyleEdition::Edition2018);
+    assert!(StyleEdition::Edition2018 < StyleEdition::Edition2021);
+    assert!(StyleEdition::Edition2018 < StyleEdition::Edition2024);
+    assert!(StyleEdition::Edition2018 < StyleEdition::Edition2027);
+
+    // Style Edition 2021
+    assert!(StyleEdition::Edition2021 > StyleEdition::Edition2015);
+    assert!(StyleEdition::Edition2021 > StyleEdition::Edition2018);
+    assert!(StyleEdition::Edition2021 == StyleEdition::Edition2021);
+    assert!(StyleEdition::Edition2021 < StyleEdition::Edition2024);
+    assert!(StyleEdition::Edition2021 < StyleEdition::Edition2027);
+
+    // Style Edition 2024
+    assert!(StyleEdition::Edition2024 > StyleEdition::Edition2015);
+    assert!(StyleEdition::Edition2024 > StyleEdition::Edition2018);
+    assert!(StyleEdition::Edition2024 > StyleEdition::Edition2021);
+    assert!(StyleEdition::Edition2024 == StyleEdition::Edition2024);
+    assert!(StyleEdition::Edition2024 < StyleEdition::Edition2027);
+
+    // Style Edition 2024
+    assert!(StyleEdition::Edition2027 > StyleEdition::Edition2015);
+    assert!(StyleEdition::Edition2027 > StyleEdition::Edition2018);
+    assert!(StyleEdition::Edition2027 > StyleEdition::Edition2021);
+    assert!(StyleEdition::Edition2027 > StyleEdition::Edition2024);
+    assert!(StyleEdition::Edition2027 == StyleEdition::Edition2027);
+}

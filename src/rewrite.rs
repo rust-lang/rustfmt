@@ -63,6 +63,20 @@ pub(crate) enum RewriteError {
     Unknown,
 }
 
+pub(crate) struct ExceedsMaxWidthError {
+    pub configured_width: usize,
+    pub span: Span,
+}
+
+impl From<ExceedsMaxWidthError> for RewriteError {
+    fn from(error: ExceedsMaxWidthError) -> Self {
+        RewriteError::ExceedsMaxWidth {
+            configured_width: error.configured_width,
+            span: error.span,
+        }
+    }
+}
+
 /// Extension trait used to conveniently convert to RewriteError
 pub(crate) trait RewriteErrorExt<T> {
     fn max_width_error(self, width: usize, span: Span) -> Result<T, RewriteError>;

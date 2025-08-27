@@ -56,23 +56,22 @@ fn argument_shape(
     shape: Shape,
     context: &RewriteContext<'_>,
 ) -> Option<Shape> {
-    match context.config.indent_style() {
+    let shape = match context.config.indent_style() {
         IndentStyle::Block => {
             if combine {
-                shape.offset_left(left)
+                shape.offset_left_opt(left)?
             } else {
-                Some(
-                    shape
-                        .block_indent(context.config.tab_spaces())
-                        .with_max_width(context.config),
-                )
+                shape
+                    .block_indent(context.config.tab_spaces())
+                    .with_max_width(context.config)
             }
         }
         IndentStyle::Visual => shape
             .visual_indent(0)
-            .shrink_left(left)
-            .and_then(|s| s.sub_width(right)),
-    }
+            .shrink_left_opt(left)?
+            .sub_width_opt(right)?,
+    };
+    Some(shape)
 }
 
 fn format_derive(
@@ -90,7 +89,7 @@ fn format_derive(
             let item_spans = attr.meta_item_list().map(|meta_item_list| {
                 meta_item_list
                     .into_iter()
-                    .map(|nested_meta_item| nested_meta_item.span())
+                    .map(|meta_item_inner| meta_item_inner.span())
             })?;
 
             let items = itemize_list(
@@ -127,8 +126,8 @@ fn format_derive(
         context,
     )?;
     let one_line_shape = shape
-        .offset_left("[derive()]".len() + prefix.len())?
-        .sub_width("()]".len())?;
+        .offset_left_opt("[derive()]".len() + prefix.len())?
+        .sub_width_opt("()]".len())?;
     let one_line_budget = one_line_shape.width;
 
     let tactic = definitive_tactic(
@@ -243,17 +242,15 @@ fn rewrite_initial_doc_comments(
     Ok((0, None))
 }
 
-impl Rewrite for ast::NestedMetaItem {
+impl Rewrite for ast::MetaItemInner {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
     }
 
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         match self {
-            ast::NestedMetaItem::MetaItem(ref meta_item) => {
-                meta_item.rewrite_result(context, shape)
-            }
-            ast::NestedMetaItem::Lit(ref l) => {
+            ast::MetaItemInner::MetaItem(ref meta_item) => meta_item.rewrite_result(context, shape),
+            ast::MetaItemInner::Lit(ref l) => {
                 rewrite_literal(context, l.as_token_lit(), l.span, shape)
             }
         }
@@ -297,7 +294,7 @@ impl Rewrite for ast::MetaItem {
                     &path,
                     list.iter(),
                     // 1 = "]"
-                    shape.sub_width(1).max_width_error(shape.width, self.span)?,
+                    shape.sub_width(1, self.span)?,
                     self.span,
                     context.config.attr_fn_like_width(),
                     Some(if has_trailing_comma {
@@ -310,9 +307,7 @@ impl Rewrite for ast::MetaItem {
             ast::MetaItemKind::NameValue(ref lit) => {
                 let path = rewrite_path(context, PathContext::Type, &None, &self.path, shape)?;
                 // 3 = ` = `
-                let lit_shape = shape
-                    .shrink_left(path.len() + 3)
-                    .max_width_error(shape.width, self.span)?;
+                let lit_shape = shape.shrink_left(path.len() + 3, self.span)?;
                 // `rewrite_literal` returns `None` when `lit` exceeds max
                 // width. Since a literal is basically unformattable unless it
                 // is a string literal (and only if `format_strings` is set),
@@ -369,9 +364,7 @@ impl Rewrite for ast::Attribute {
                 }
 
                 // 1 = `[`
-                let shape = shape
-                    .offset_left(prefix.len() + 1)
-                    .max_width_error(shape.width, self.span)?;
+                let shape = shape.offset_left(prefix.len() + 1, self.span)?;
                 Ok(meta.rewrite_result(context, shape).map_or_else(
                     |_| snippet.to_owned(),
                     |rw| match &self.kind {
@@ -535,10 +528,10 @@ pub(crate) trait MetaVisitor<'ast> {
     fn visit_meta_list(
         &mut self,
         _meta_item: &'ast ast::MetaItem,
-        list: &'ast [ast::NestedMetaItem],
+        list: &'ast [ast::MetaItemInner],
     ) {
         for nm in list {
-            self.visit_nested_meta_item(nm);
+            self.visit_meta_item_inner(nm);
         }
     }
 
@@ -551,10 +544,10 @@ pub(crate) trait MetaVisitor<'ast> {
     ) {
     }
 
-    fn visit_nested_meta_item(&mut self, nm: &'ast ast::NestedMetaItem) {
+    fn visit_meta_item_inner(&mut self, nm: &'ast ast::MetaItemInner) {
         match nm {
-            ast::NestedMetaItem::MetaItem(ref meta_item) => self.visit_meta_item(meta_item),
-            ast::NestedMetaItem::Lit(ref lit) => self.visit_meta_item_lit(lit),
+            ast::MetaItemInner::MetaItem(ref meta_item) => self.visit_meta_item(meta_item),
+            ast::MetaItemInner::Lit(ref lit) => self.visit_meta_item_lit(lit),
         }
     }
 

@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, iter};
 
-use itertools::{MultiPeek, multipeek};
+use itertools::{Itertools as _, MultiPeek, multipeek};
 use rustc_span::Span;
 use tracing::{debug, trace};
 
@@ -885,6 +885,9 @@ impl<'a> CommentRewrite<'a> {
                 // Remove space if this is an empty comment or a doc comment.
                 self.result.pop();
             }
+            if self.code_block_attr.is_some() && self.is_prev_line_multi_line {
+                self.result.push_str(&self.comment_line_separator);
+            }
             self.result.push_str(line);
             self.fmt.shape = Shape::legacy(self.max_width, self.fmt_indent);
             self.is_prev_line_multi_line = false;
@@ -1056,8 +1059,7 @@ fn light_rewrite_comment(
     config: &Config,
     is_doc_comment: bool,
 ) -> String {
-    let lines: Vec<&str> = orig
-        .lines()
+    orig.lines()
         .map(|l| {
             // This is basically just l.trim(), but in the case that a line starts
             // with `*` we want to leave one space before it, so it aligns with the
@@ -1075,8 +1077,7 @@ fn light_rewrite_comment(
             // Preserve markdown's double-space line break syntax in doc comment.
             trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment)
         })
-        .collect();
-    lines.join(&format!("\n{}", offset.to_string(config)))
+        .join(&format!("\n{}", offset.to_string(config)))
 }
 
 /// Trims comment characters and possibly a single space from the left of a string.

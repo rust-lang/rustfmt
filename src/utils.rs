@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
 use rustc_ast::ast::{
-    self, Attribute, MetaItem, MetaItemKind, NestedMetaItem, NodeId, Path, Visibility,
+    self, Attribute, MetaItem, MetaItemInner, MetaItemKind, NodeId, Path, Visibility,
     VisibilityKind,
 };
-use rustc_ast::ptr;
+use rustc_ast::{YieldKind, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
 use unicode_width::UnicodeWidthStr;
@@ -257,10 +257,10 @@ fn is_skip(meta_item: &MetaItem) -> bool {
 }
 
 #[inline]
-fn is_skip_nested(meta_item: &NestedMetaItem) -> bool {
+fn is_skip_nested(meta_item: &MetaItemInner) -> bool {
     match meta_item {
-        NestedMetaItem::MetaItem(ref mi) => is_skip(mi),
-        NestedMetaItem::Lit(_) => false,
+        MetaItemInner::MetaItem(ref mi) => is_skip(mi),
+        MetaItemInner::Lit(_) => false,
     }
 }
 
@@ -485,7 +485,9 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Index(_, ref expr, _)
         | ast::ExprKind::Unary(_, ref expr)
         | ast::ExprKind::Try(ref expr)
-        | ast::ExprKind::Yield(Some(ref expr)) => is_block_expr(context, expr, repr),
+        | ast::ExprKind::Yield(YieldKind::Prefix(Some(ref expr))) => {
+            is_block_expr(context, expr, repr)
+        }
         ast::ExprKind::Closure(ref closure) => is_block_expr(context, &closure.body, repr),
         // This can only be a string lit
         ast::ExprKind::Lit(_) => {
@@ -504,6 +506,7 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::IncludedBytes(..)
         | ast::ExprKind::InlineAsm(..)
         | ast::ExprKind::OffsetOf(..)
+        | ast::ExprKind::UnsafeBinderCast(..)
         | ast::ExprKind::Let(..)
         | ast::ExprKind::Path(..)
         | ast::ExprKind::Range(..)
@@ -512,8 +515,9 @@ pub(crate) fn is_block_expr(context: &RewriteContext<'_>, expr: &ast::Expr, repr
         | ast::ExprKind::Become(..)
         | ast::ExprKind::Yeet(..)
         | ast::ExprKind::Tup(..)
+        | ast::ExprKind::Use(..)
         | ast::ExprKind::Type(..)
-        | ast::ExprKind::Yield(None)
+        | ast::ExprKind::Yield(..)
         | ast::ExprKind::Underscore => false,
     }
 }
