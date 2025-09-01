@@ -1165,8 +1165,8 @@ pub(crate) fn format_trait(
     let mut result = String::with_capacity(128);
     let header = format!(
         "{}{}{}{}trait ",
-        format_constness(constness),
         format_visibility(context, &item.vis),
+        format_constness(constness),
         format_safety(safety),
         format_auto(is_auto),
     );
