@@ -16,6 +16,11 @@ macro_rules! medium {
 
 macro_rules! long {
     () => {
-        m!(aaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccc, ddddddddddddddd);
+        m!(
+            aaaaaaaaaaaaaaaa,
+            bbbbbbbbbbbbbbbb,
+            cccccccccccccccc,
+            ddddddddddddddd
+        );
     };
 }
