@@ -322,6 +322,7 @@ impl Rewrite for ast::MetaItem {
     }
 }
 
+pub(crate) mod meta2;
 impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
@@ -342,7 +343,7 @@ impl Rewrite for ast::Attribute {
                 return Ok(snippet.to_owned());
             }
 
-            if let Some(ref meta) = self.meta() {
+            if let Some(meta) = meta2::MetaItem2::from_attr(self, context) {
                 // This attribute is possibly a doc attribute needing normalization to a doc comment
                 if context.config.normalize_doc_attributes() && meta.has_name(sym::doc) {
                     if let Some(ref literal) = meta.value_str() {

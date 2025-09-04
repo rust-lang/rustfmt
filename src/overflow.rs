@@ -27,6 +27,8 @@ use crate::spanned::Spanned;
 use crate::types::{SegmentParam, can_be_overflowed_type};
 use crate::utils::{count_newlines, extra_offset, first_line_width, last_line_width, mk_sp};
 
+use crate::attr::meta2::MetaItemInner2;
+
 /// A list of `format!`-like macros, that take a long format string and a list of arguments to
 /// format.
 ///
@@ -79,6 +81,7 @@ pub(crate) enum OverflowableItem<'a> {
     GenericParam(&'a ast::GenericParam),
     MacroArg(&'a MacroArg),
     MetaItemInner(&'a ast::MetaItemInner),
+    MetaItemInner2(&'a crate::attr::meta2::MetaItemInner2),
     SegmentParam(&'a SegmentParam<'a>),
     FieldDef(&'a ast::FieldDef),
     TuplePatField(&'a TuplePatField<'a>),
@@ -124,6 +127,7 @@ impl<'a> OverflowableItem<'a> {
             OverflowableItem::GenericParam(gp) => f(*gp),
             OverflowableItem::MacroArg(macro_arg) => f(*macro_arg),
             OverflowableItem::MetaItemInner(nmi) => f(*nmi),
+            OverflowableItem::MetaItemInner2(nmi) => f(*nmi),
             OverflowableItem::SegmentParam(sp) => f(*sp),
             OverflowableItem::FieldDef(sf) => f(*sf),
             OverflowableItem::TuplePatField(pat) => f(*pat),
@@ -142,6 +146,12 @@ impl<'a> OverflowableItem<'a> {
                 ast::MetaItemInner::Lit(..) => true,
                 ast::MetaItemInner::MetaItem(ref meta_item) => {
                     matches!(meta_item.kind, ast::MetaItemKind::Word)
+                }
+            },
+            OverflowableItem::MetaItemInner2(meta_item_inner) => match meta_item_inner {
+                MetaItemInner2::Lit(..) | MetaItemInner2::Expr(..) => true,
+                MetaItemInner2::MetaItem(ref meta_item) => {
+                    matches!(meta_item.kind, crate::attr::meta2::MetaItemKind2::Word)
                 }
             },
             // FIXME: Why don't we consider `SegmentParam` to be simple?
@@ -188,6 +198,12 @@ impl<'a> OverflowableItem<'a> {
                 ast::MetaItemInner::Lit(..) => false,
                 ast::MetaItemInner::MetaItem(..) => true,
             },
+            OverflowableItem::MetaItemInner2(meta_item_inner) if len == 1 => {
+                match meta_item_inner {
+                    MetaItemInner2::Lit(..) | MetaItemInner2::Expr(..) => false,
+                    MetaItemInner2::MetaItem(..) => true,
+                }
+            }
             OverflowableItem::SegmentParam(SegmentParam::Type(ty)) => {
                 can_be_overflowed_type(context, ty, len)
             }
@@ -201,6 +217,7 @@ impl<'a> OverflowableItem<'a> {
         let base_cases = match self {
             OverflowableItem::MacroArg(..) => SPECIAL_CASE_MACROS,
             OverflowableItem::MetaItemInner(..) => SPECIAL_CASE_ATTR,
+            OverflowableItem::MetaItemInner2(..) => SPECIAL_CASE_ATTR,
             _ => &[],
         };
         let additional_cases = match self {
@@ -265,7 +282,10 @@ impl_into_overflowable_item_for_ast_node!(
     Pat,
     PreciseCapturingArg
 );
-impl_into_overflowable_item_for_rustfmt_types!([MacroArg], [SegmentParam, TuplePatField]);
+impl_into_overflowable_item_for_rustfmt_types!(
+    [MacroArg, MetaItemInner2],
+    [SegmentParam, TuplePatField]
+);
 
 pub(crate) fn into_overflowable_list<'a, T>(
     iter: impl Iterator<Item = &'a T>,
