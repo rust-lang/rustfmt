@@ -2840,7 +2840,7 @@ Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338]
 
 - **Default value**: `"2015"`
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
-- **Stable**: No
+- **Stable**: No (tracking issue: [#5720](https://github.com/rust-lang/rustfmt/issues/5720))
 
 This option is inferred from the [`edition`](#edition) if not specified.
 
