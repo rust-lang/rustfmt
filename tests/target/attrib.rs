@@ -269,3 +269,28 @@ fn issue3509() {
         }
     }
 }
+
+// #3781
+enum E {
+    #[error(
+        display = "invalid max keyframe interval {} (expected > 0, < {})",
+        _0,
+        i32::max_value() as u64
+    )]
+    InvalidMaxKeyFrameInterval(u64),
+    #[error(
+        display = "invalid max keyframe interval {} (expected > 0, < {})",
+        _0,
+        i32::max_value()
+    )]
+    InvalidMaxKeyFrameInterval(u64),
+}
+
+// #6374
+#[nutype(validate(
+    len_char_min = 5,
+    len_char_max = 20,
+    regex = EMAIL_REGEX,
+    extra_args = make_sure_this_line_is_split,
+))]
+struct Email(String);
