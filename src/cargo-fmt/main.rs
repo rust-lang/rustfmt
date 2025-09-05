@@ -42,12 +42,7 @@ pub struct Opts {
     version: bool,
 
     /// Specify package to format
-    #[arg(
-        short = 'p',
-        long = "package",
-        value_name = "package",
-        num_args = 1..
-    )]
+    #[arg(short = 'p', long = "package", value_name = "package", num_args = 1..)]
     packages: Vec<String>,
 
     /// Specify path to Cargo.toml
