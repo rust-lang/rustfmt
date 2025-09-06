@@ -566,8 +566,13 @@ impl UseTree {
 
         // Normalise foo::self -> foo.
         if let UseSegmentKind::Slf(None) = last.kind {
-            if !self.path.is_empty() {
-                return self;
+            if let Some(second_last) = self.path.pop() {
+                if matches!(second_last.kind, UseSegmentKind::Slf(_)) {
+                    self.path.push(second_last);
+                } else {
+                    self.path.push(second_last);
+                    return self;
+                }
             }
         }
 
