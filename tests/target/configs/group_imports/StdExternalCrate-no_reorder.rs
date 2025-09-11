@@ -10,6 +10,8 @@ use juniper::{FieldError, FieldResult};
 use uuid::Uuid;
 use broker::database::PooledConnection;
 
-use super::update::convert_publish_payload;
-use super::schema::{Context, Payload};
+use super::{
+    schema::{Context, Payload},
+    update::convert_publish_payload,
+};
 use crate::models::Event;

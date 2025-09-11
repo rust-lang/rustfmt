@@ -1,5 +1,3 @@
 // rustfmt-version:Two
 
-use websocket::r#async::futures::Stream;
-use websocket::client::ClientBuilder;
-use websocket::result::WebSocketError;
+use websocket::{r#async::futures::Stream, client::ClientBuilder, result::WebSocketError};
