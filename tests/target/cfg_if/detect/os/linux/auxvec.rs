@@ -190,8 +190,7 @@ mod tests {
     // using the auxv crate.
     #[cfg(feature = "std_detect_file_io")]
     fn auxv_crate_getprocfs(key: usize) -> Option<usize> {
-        use self::auxv_crate::procfs::search_procfs_auxv;
-        use self::auxv_crate::AuxvType;
+        use self::auxv_crate::{procfs::search_procfs_auxv, AuxvType};
         let k = key as AuxvType;
         match search_procfs_auxv(&[k]) {
             Ok(v) => Some(v[&k] as usize),
@@ -203,8 +202,7 @@ mod tests {
     // using the auxv crate.
     #[cfg(not(any(target_arch = "mips", target_arch = "mips64")))]
     fn auxv_crate_getauxval(key: usize) -> Option<usize> {
-        use self::auxv_crate::getauxval::Getauxval;
-        use self::auxv_crate::AuxvType;
+        use self::auxv_crate::{getauxval::Getauxval, AuxvType};
         let q = auxv_crate::getauxval::NativeGetauxval {};
         match q.getauxval(key as AuxvType) {
             Ok(v) => Some(v as usize),

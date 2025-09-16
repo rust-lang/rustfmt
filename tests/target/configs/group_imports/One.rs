@@ -1,6 +1,8 @@
 // rustfmt-group_imports: One
-use super::schema::{Context, Payload};
-use super::update::convert_publish_payload;
+use super::{
+    schema::{Context, Payload},
+    update::convert_publish_payload,
+};
 use crate::models::Event;
 use alloc::alloc::Layout;
 use broker::database::PooledConnection;

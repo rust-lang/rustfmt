@@ -6,9 +6,7 @@ use rand::{Rng, SeedableRng, StdRng};
 
 use timely::dataflow::operators::*;
 
-use differential_dataflow::input::InputSession;
-use differential_dataflow::operators::*;
-use differential_dataflow::AsCollection;
+use differential_dataflow::{input::InputSession, operators::*, AsCollection};
 
 // mod loglikelihoodratio;
 

@@ -640,7 +640,7 @@ config_option_with_style_edition_default!(
     // Imports
     ImportsIndent, IndentStyle, _ => IndentStyle::Block;
     ImportsLayout, ListTactic, _ => ListTactic::Mixed;
-    ImportsGranularityConfig, ImportGranularity, _ => ImportGranularity::Preserve;
+    ImportsGranularityConfig, ImportGranularity, _ => ImportGranularity::Crate;
     GroupImportsTacticConfig, GroupImportsTactic, _ => GroupImportsTactic::Preserve;
     MergeImports, bool, _ => false;
 
