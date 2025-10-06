@@ -631,6 +631,7 @@ impl UseTree {
         if let UseSegmentKind::List(list) = last.kind {
             let mut list = list.into_iter().map(UseTree::normalize).collect::<Vec<_>>();
             list.sort();
+            list.dedup();
             last = UseSegment {
                 kind: UseSegmentKind::List(list),
                 style_edition: last.style_edition,
@@ -827,6 +828,7 @@ fn merge_rest(
         UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
     ];
     list.sort();
+    list.dedup();
     let mut new_path = b[..len].to_vec();
     let kind = UseSegmentKind::List(list);
     let style_edition = a[0].style_edition;
@@ -891,6 +893,7 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: 
     }
     trees.push(use_tree);
     trees.sort();
+    trees.dedup();
 }
 
 impl Hash for UseTree {
