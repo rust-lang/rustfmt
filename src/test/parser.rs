@@ -19,11 +19,11 @@ fn parser_errors_in_submods_are_surfaced() {
     {
         assert_eq!(&module, exp_mod_name);
         if let ModuleResolutionErrorKind::ParseError {
-            file: unparseable_file,
+            file: unparsable_file,
         } = kind
         {
             assert_eq!(
-                unparseable_file,
+                unparsable_file,
                 PathBuf::from("tests/parser/issue-4126/invalid.rs"),
             );
         } else {
@@ -53,5 +53,19 @@ fn parser_creation_errors_on_entry_new_parser_from_file_panic() {
 fn crate_parsing_errors_on_unclosed_delims() {
     // See also https://github.com/rust-lang/rustfmt/issues/4466
     let filename = "tests/parser/unclosed-delims/issue_4466.rs";
+    assert_parser_error(filename);
+}
+
+#[test]
+fn crate_parsing_stashed_diag() {
+    // See also https://github.com/rust-lang/rust/issues/121450
+    let filename = "tests/parser/stashed-diag.rs";
+    assert_parser_error(filename);
+}
+
+#[test]
+fn crate_parsing_stashed_diag2() {
+    // See also https://github.com/rust-lang/rust/issues/121517
+    let filename = "tests/parser/stashed-diag2.rs";
     assert_parser_error(filename);
 }

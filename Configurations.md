@@ -534,16 +534,19 @@ Note that this option may be soft-deprecated in the future once the [ignore](#ig
 Specifies which edition is used by the parser.
 
 - **Default value**: `"2015"`
-- **Possible values**: `"2015"`, `"2018"`, `"2021"`
+- **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"`
 - **Stable**: Yes
 
-Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if executed
-through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition needs to be specified
-in your config file:
+The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [style_edition](#style_edition)).
+
+When running `cargo fmt`, the `edition` is automatically read from the `Cargo.toml` file. However, when running `rustfmt` directly the `edition` defaults to 2015 if not explicitly configured. For consistent parsing between rustfmt and `cargo fmt` you should configure the `edition`.
+For example in your `rustfmt.toml` file:
 
 ```toml
 edition = "2018"
 ```
+
+Alternatively, you can use the `--edition` flag when running `rustfmt` directly.
 
 ## `empty_item_single_line`
 
@@ -1256,6 +1259,56 @@ Control the case of the letters in hexadecimal literal values
 - **Possible values**: `Preserve`, `Upper`, `Lower`
 - **Stable**: No (tracking issue: [#5081](https://github.com/rust-lang/rustfmt/issues/5081))
 
+## `float_literal_trailing_zero`
+
+Control the presence of trailing zero in floating-point literal values
+
+- **Default value**: `Preserve`
+- **Possible values**: `Preserve`, `Always`, `IfNoPostfix`, `Never`
+- **Stable**: No (tracking issue: [#6471](https://github.com/rust-lang/rustfmt/issues/6471))
+
+#### `Preserve` (default):
+
+Leave the literal as-is.
+
+```rust
+fn main() {
+    let values = [1.0, 2., 3.0e10, 4f32];
+}
+```
+
+#### `Always`:
+
+Add a trailing zero to the literal:
+
+```rust
+fn main() {
+    let values = [1.0, 2.0, 3.0e10, 4.0f32];
+}
+```
+
+#### `IfNoPostfix`:
+
+Add a trailing zero by default. If the literal contains an exponent or a suffix, the zero
+and the preceding period are removed:
+
+```rust
+fn main() {
+    let values = [1.0, 2.0, 3e10, 4f32];
+}
+```
+
+#### `Never`:
+
+Remove the trailing zero. If the literal contains an exponent or a suffix, the preceding
+period is also removed:
+
+```rust
+fn main() {
+    let values = [1., 2., 3e10, 4f32];
+}
+```
+
 ## `hide_parse_errors`
 
 This option is deprecated and has been renamed to `show_parse_errors` to avoid confusion around the double negative default of `hide_parse_errors=false`.
@@ -1809,6 +1862,42 @@ fn foo() {
 }
 ```
 
+## `match_arm_indent`
+
+Controls whether match arms are indented.  If disabled, match arms will be formatted at the same indentation level as the outer `match` statement.  Meaning that match blocks will only be indented once, not twice.
+
+- **Default value**: `true`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#6533](https://github.com/rust-lang/rustfmt/issues/6533))
+
+#### `true` (default):
+
+```rust
+fn main() {
+    match value {
+        Enum::A => {
+            let mut work = first();
+            work += second();
+        }
+        Enum::B => short_work(),
+    }
+}
+```
+
+#### `false`:
+
+```rust
+fn main() {
+    match value {
+    Enum::A => {
+        let mut work = first();
+        work += second();
+    }
+    Enum::B => short_work(),
+    }
+}
+```
+
 ## `match_block_trailing_comma`
 
 Put a trailing comma after a block based match arm (non-block arms are not affected)
@@ -2156,7 +2245,7 @@ fn example() {
 
 Remove nested parens.
 
-- **Default value**: `true`,
+- **Default value**: `true`
 - **Possible values**: `true`, `false`
 - **Stable**: Yes
 
@@ -2362,8 +2451,61 @@ Require a specific version of rustfmt. If you want to make sure that the
 specific version of rustfmt is used in your CI, use this option.
 
 - **Default value**: `CARGO_PKG_VERSION`
-- **Possible values**: any published version (e.g. `"0.3.8"`)
+- **Possible values**: `semver` compliant values, such as defined on [semver.org](https://semver.org/).
 - **Stable**: No (tracking issue: [#3386](https://github.com/rust-lang/rustfmt/issues/3386))
+
+#### Match on exact version:
+
+```toml
+required_version="1.0.0"
+```
+
+#### Higher or equal to:
+
+```toml
+required_version=">=1.0.0"
+```
+
+#### Lower or equal to:
+
+```toml
+required_version="<=1.0.0"
+```
+
+#### New minor or patch versions:
+
+```toml
+required_version="^1.0.0"
+```
+
+#### New patch versions:
+
+```toml
+required_version="~1.0.0"
+```
+
+#### Wildcard:
+
+```toml
+required_version="*" # matches any version.
+required_version="1.*" # matches any version with the same major version
+required_version="1.0.*" # matches any version with the same major and minor version
+```
+
+#### Multiple versions to match:
+
+A comma separated list of version requirements.
+The match succeeds when the current rustfmt version matches all version requirements.
+
+The one notable exception is that a wildcard matching any version cannot be used in the list.
+For example, `*, <1.0.0` will always fail.
+
+Additionally, the version match will always fail if any of the version requirements contradict themselves.
+Some examples of contradictory requirements are `1.*, >2.0.0`, `1.0.*, >2.0.0` and `<1.5.0, >1.10.*`.
+
+```toml
+required_version=">=1.0.0, <2.0.0"
+```
 
 ## `short_array_element_width_threshold`
 
@@ -2692,6 +2834,31 @@ By default this option is set as a percentage of [`max_width`](#max_width) provi
 
 See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
+## `style_edition`
+
+Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338])
+
+- **Default value**: `"2015"`
+- **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
+- **Stable**: No
+
+This option is inferred from the [`edition`](#edition) if not specified.
+
+See [Rust Style Editions] for details on formatting differences between style editions.
+rustfmt has a default style edition of `2015` while `cargo fmt` infers the style edition from the `edition` set in `Cargo.toml`. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the style edition is not explicitly configured.
+
+To ensure consistent formatting, it is recommended to specify the `style_edition` in a `rustfmt.toml` configuration file. For example:
+
+```toml
+style_edition = "2024"
+```
+
+Alternatively, you can use the `--style-edition` flag when running `rustfmt` directly.
+
+[Rust Style Editions]: https://doc.rust-lang.org/nightly/style-guide/editions.html?highlight=editions#rust-style-editions
+[Rust Style Guide]: https://doc.rust-lang.org/nightly/style-guide/
+[RFC 3338]: https://rust-lang.github.io/rfcs/3338-style-evolution.html
+
 ## `tab_spaces`
 
 Number of spaces per tab
@@ -2879,6 +3046,7 @@ fn main() {
     let y = 2;
     let z = 3;
     let a = Foo { x, y, z };
+    let b = Foo { x, y, z };
 }
 ```
 
@@ -3051,9 +3219,9 @@ fn main() {
 
 ## `version`
 
-Which version of the formatting rules to use. `Version::One` is backwards-compatible
-with Rustfmt 1.0. Other versions are only backwards compatible within a major
-version number.
+This option is deprecated and has been replaced by [`style_edition`](#style_edition).
+`version = "One"` is equivalent to `style_edition = "(2015|2018|2021)"` and
+`version = "Two"` is equivalent to `style_edition = "2024"`
 
 - **Default value**: `One`
 - **Possible values**: `One`, `Two`
@@ -3103,7 +3271,7 @@ Break comments to fit on the line
 
 Note that no wrapping will happen if:
 1. The comment is the start of a markdown header doc comment
-2. An URL was found in the comment
+2. A URL was found in the comment
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
