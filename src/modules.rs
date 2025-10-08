@@ -198,7 +198,7 @@ impl<'ast, 'psess, 'c> ModResolver<'ast, 'psess> {
             }
 
             if is_cfg_match(&item) {
-                self.visit_cfg_match(Cow::Owned(item.into_inner()))?;
+                self.visit_cfg_match(Cow::Owned(*item))?;
                 continue;
             }
 
