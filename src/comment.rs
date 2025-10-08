@@ -491,7 +491,7 @@ impl ItemizedBlock {
         let mut line_start = " ".repeat(indent);
 
         // Markdown blockquote start with a "> "
-        if line.trim_start().starts_with('>') {
+        if line.trim_start().starts_with("> ") {
             // remove the original +2 indent because there might be multiple nested block quotes
             // and it's easier to reason about the final indent by just taking the length
             // of the new line_start. We update the indent because it effects the max width
@@ -499,6 +499,7 @@ impl ItemizedBlock {
             line_start = itemized_block_quote_start(line, line_start, 2);
             indent = line_start.len();
         }
+
         Some(ItemizedBlock {
             lines: vec![line[indent..].to_string()],
             indent,
@@ -551,10 +552,18 @@ impl ItemizedBlock {
 /// The original line_start likely contains indentation (whitespaces), which we'd like to
 /// replace with '> ' characters.
 fn itemized_block_quote_start(line: &str, mut line_start: String, remove_indent: usize) -> String {
-    let quote_level = line
-        .chars()
-        .take_while(|c| !c.is_alphanumeric())
-        .fold(0, |acc, c| if c == '>' { acc + 1 } else { acc });
+    let mut quote_level = 0;
+    let mut chars = line.trim_start().chars().peekable();
+
+    while chars.peek() == Some(&'>') {
+        chars.next();
+        if chars.peek() == Some(&' ') {
+            chars.next();
+            quote_level += 1;
+        } else {
+            break;
+        }
+    }
 
     for _ in 0..remove_indent {
         line_start.pop();
@@ -563,6 +572,7 @@ fn itemized_block_quote_start(line: &str, mut line_start: String, remove_indent:
     for _ in 0..quote_level {
         line_start.push_str("> ")
     }
+
     line_start
 }
 
