@@ -1,7 +1,7 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use rustc_ast::ast;
-use rustc_ast::token::{Delimiter, TokenKind};
+use rustc_ast::token::TokenKind;
 use rustc_parse::exp;
 use rustc_parse::parser::ForceCollect;
 
@@ -26,7 +26,7 @@ fn parse_cfg_match_inner<'a>(
     let ts = mac.args.tokens.clone();
     let mut parser = build_stream_parser(psess.inner(), ts);
 
-    if parser.token == TokenKind::OpenDelim(Delimiter::Brace) {
+    if parser.token == TokenKind::OpenBrace {
         return Err("Expression position cfg_match! not yet supported");
     }
 
@@ -48,11 +48,9 @@ fn parse_cfg_match_inner<'a>(
             return Err("Expected an opening brace");
         }
 
-        while parser.token != TokenKind::CloseDelim(Delimiter::Brace)
-            && parser.token.kind != TokenKind::Eof
-        {
+        while parser.token != TokenKind::CloseBrace && parser.token.kind != TokenKind::Eof {
             let item = match parser.parse_item(ForceCollect::No) {
-                Ok(Some(item_ptr)) => item_ptr.into_inner(),
+                Ok(Some(item)) => *item,
                 Ok(None) => continue,
                 Err(err) => {
                     err.cancel();

@@ -1,4 +1,4 @@
-use rustc_ast::{Label, ast, ptr};
+use rustc_ast::{Label, ast};
 use rustc_span::Span;
 use thin_vec::thin_vec;
 use tracing::debug;

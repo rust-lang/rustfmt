@@ -1,6 +1,7 @@
-// max_width = 120
-// error_on_line_overflow = true
-// style_edition = "2027"
+// rustfmt-max_width: 120
+// rustfmt-error_on_line_overflow: true
+// rustfmt-edition: 2024
+// rustfmt-style_edition: 2027
 
 impl EarlyLintPass for NeedlessContinue {
     fn check_expr(&mut self, cx: &EarlyContext<'_>, expr: &Expr) {
