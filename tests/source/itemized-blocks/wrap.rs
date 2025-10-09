@@ -87,3 +87,12 @@ fn func2() {}
 ///  * `tag` is a tag that identifies the message type
 ///  * `msg` is the (serialized) message
 fn func3() {}
+
+/// >>This is a blockquote comment that is very long and should be wrapped according to max_width setting
+/// >> This is a blockquote comment that is very long and should be wrapped according to max_width setting
+/// >   >This is a blockquote comment that is very long and should be wrapped according to max_width setting
+/// >   > This is a blockquote comment that is very long and should be wrapped according to max_width setting
+/// >   >    This is a blockquote comment that is very long and should be wrapped according to max_width setting
+/// > >= >> >>= >>> >>>= This is a blockquote comment that is very long and should be wrapped according to max_width setting
+/// > > = >> >>= >>> >>>= This is a blockquote comment that is very long and should be wrapped according to max_width setting
+fn func4() {}
