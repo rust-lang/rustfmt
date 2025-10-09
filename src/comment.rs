@@ -462,9 +462,9 @@ impl ItemizedBlock {
     fn get_marker_length(trimmed: &str) -> Option<usize> {
         // https://spec.commonmark.org/0.30/#bullet-list-marker or
         // https://spec.commonmark.org/0.30/#block-quote-marker
-        let itemized_start = ["* ", "- ", "> ", "+ "];
-        if itemized_start.iter().any(|s| trimmed.starts_with(s)) {
-            return Some(2); // All items in `itemized_start` have length 2.
+        let itemized_start = ["* ", "- ", ">", "+ "];
+        if let Some(s) = itemized_start.iter().find(|&&s| trimmed.starts_with(s)) {
+            return Some(s.len());
         }
 
         // https://spec.commonmark.org/0.30/#ordered-list-marker, where at most 2 digits are
@@ -491,12 +491,12 @@ impl ItemizedBlock {
         let mut line_start = " ".repeat(indent);
 
         // Markdown blockquote start with a "> "
-        if line.trim_start().starts_with("> ") {
-            // remove the original +2 indent because there might be multiple nested block quotes
+        if line.trim_start().starts_with('>') {
+            // remove the original +1 indent because there might be multiple nested block quotes
             // and it's easier to reason about the final indent by just taking the length
             // of the new line_start. We update the indent because it effects the max width
             // of each formatted line.
-            line_start = itemized_block_quote_start(line, line_start, 2);
+            line_start = itemized_block_quote_start(line, line_start, 1);
             indent = line_start.len();
         }
 
@@ -557,11 +557,10 @@ fn itemized_block_quote_start(line: &str, mut line_start: String, remove_indent:
 
     while chars.peek() == Some(&'>') {
         chars.next();
-        if chars.peek() == Some(&' ') {
+        quote_level += 1;
+        // Skip all spaces after '>'
+        while chars.peek() == Some(&' ') {
             chars.next();
-            quote_level += 1;
-        } else {
-            break;
         }
     }
 
@@ -570,7 +569,7 @@ fn itemized_block_quote_start(line: &str, mut line_start: String, remove_indent:
     }
 
     for _ in 0..quote_level {
-        line_start.push_str("> ")
+        line_start.push_str("> ");
     }
 
     line_start
