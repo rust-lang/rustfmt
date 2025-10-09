@@ -12,9 +12,9 @@
 use std::collections::HashMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
+use rustc_ast::ast;
 use rustc_ast::token::{Delimiter, Token, TokenKind};
 use rustc_ast::tokenstream::{TokenStream, TokenStreamIter, TokenTree};
-use rustc_ast::{ast, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_span::{BytePos, DUMMY_SP, Ident, Span, Symbol};
 use tracing::debug;
@@ -53,10 +53,10 @@ pub(crate) enum MacroPosition {
 
 #[derive(Debug)]
 pub(crate) enum MacroArg {
-    Expr(ptr::P<ast::Expr>),
-    Ty(ptr::P<ast::Ty>),
-    Pat(ptr::P<ast::Pat>),
-    Item(ptr::P<ast::Item>),
+    Expr(Box<ast::Expr>),
+    Ty(Box<ast::Ty>),
+    Pat(Box<ast::Pat>),
+    Item(Box<ast::Item>),
     Keyword(Ident, Span),
 }
 
@@ -720,7 +720,7 @@ fn last_tok(tt: &TokenTree) -> Token {
     match *tt {
         TokenTree::Token(ref t, _) => t.clone(),
         TokenTree::Delimited(delim_span, _, delim, _) => Token {
-            kind: TokenKind::CloseDelim(delim),
+            kind: delim.as_open_token_kind(),
             span: delim_span.close,
         },
     }
@@ -856,18 +856,18 @@ impl MacroArgParser {
         };
 
         self.result.push(ParsedMacroArg {
-            kind: MacroArgKind::Repeat(delim, inner, another, self.last_tok.clone()),
+            kind: MacroArgKind::Repeat(delim, inner, another, self.last_tok),
         });
         Some(())
     }
 
-    fn update_buffer(&mut self, t: &Token) {
+    fn update_buffer(&mut self, t: Token) {
         if self.buf.is_empty() {
-            self.start_tok = t.clone();
+            self.start_tok = t;
         } else {
             let needs_space = match next_space(&self.last_tok.kind) {
-                SpaceState::Ident => ident_like(t),
-                SpaceState::Punctuation => !ident_like(t),
+                SpaceState::Ident => ident_like(&t),
+                SpaceState::Punctuation => !ident_like(&t),
                 SpaceState::Always => true,
                 SpaceState::Never => false,
             };
@@ -876,7 +876,7 @@ impl MacroArgParser {
             }
         }
 
-        self.buf.push_str(&pprust::token_to_string(t));
+        self.buf.push_str(&pprust::token_to_string(&t));
     }
 
     fn need_space_prefix(&self) -> bool {
@@ -935,7 +935,7 @@ impl MacroArgParser {
                 ) if self.is_meta_var => {
                     self.add_meta_variable(&mut iter)?;
                 }
-                TokenTree::Token(ref t, _) => self.update_buffer(t),
+                &TokenTree::Token(t, _) => self.update_buffer(t),
                 &TokenTree::Delimited(_dspan, _spacing, delimited, ref tts) => {
                     if !self.buf.is_empty() {
                         if next_space(&self.last_tok.kind) == SpaceState::Always {
@@ -1122,8 +1122,14 @@ fn next_space(tok: &TokenKind) -> SpaceState {
         TokenKind::PathSep
         | TokenKind::Pound
         | TokenKind::Dollar
-        | TokenKind::OpenDelim(_)
-        | TokenKind::CloseDelim(_) => SpaceState::Never,
+        | TokenKind::OpenParen
+        | TokenKind::CloseParen
+        | TokenKind::OpenBrace
+        | TokenKind::CloseBrace
+        | TokenKind::OpenBracket
+        | TokenKind::CloseBracket
+        | TokenKind::OpenInvisible(_)
+        | TokenKind::CloseInvisible(_) => SpaceState::Never,
 
         TokenKind::Literal(..) | TokenKind::Ident(..) | TokenKind::Lifetime(..) => {
             SpaceState::Ident

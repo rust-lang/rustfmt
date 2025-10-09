@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use rustc_ast::ast::{self, FnRetTy, Mutability, Term};
-use rustc_ast::ptr;
 use rustc_span::{BytePos, Pos, Span, symbol::kw};
 use tracing::debug;
 
@@ -39,7 +38,7 @@ pub(crate) enum PathContext {
 pub(crate) fn rewrite_path(
     context: &RewriteContext<'_>,
     path_context: PathContext,
-    qself: &Option<ptr::P<ast::QSelf>>,
+    qself: &Option<Box<ast::QSelf>>,
     path: &ast::Path,
     shape: Shape,
 ) -> RewriteResult {
@@ -685,7 +684,7 @@ impl Rewrite for ast::GenericParam {
 
         let param_start = if let ast::GenericParamKind::Const {
             ref ty,
-            kw_span,
+            span,
             default,
         } = &self.kind
         {
@@ -707,7 +706,7 @@ impl Rewrite for ast::GenericParam {
                     default.rewrite_result(context, Shape::legacy(budget, shape.indent))?;
                 param.push_str(&rewrite);
             }
-            kw_span.lo()
+            span.lo()
         } else {
             param.push_str(rewrite_ident(context, self.ident));
             self.ident.span.lo()
@@ -824,10 +823,6 @@ impl Rewrite for ast::Ty {
                     ast::TraitObjectSyntax::Dyn => {
                         let shape = shape.offset_left(4, self.span())?;
                         (shape, "dyn ")
-                    }
-                    ast::TraitObjectSyntax::DynStar => {
-                        let shape = shape.offset_left(5, self.span())?;
-                        (shape, "dyn* ")
                     }
                     ast::TraitObjectSyntax::None => (shape, ""),
                 };
@@ -1003,7 +998,7 @@ impl Rewrite for ast::Ty {
                     })
                 }
             }
-            ast::TyKind::BareFn(ref bare_fn) => rewrite_bare_fn(bare_fn, self.span, context, shape),
+            ast::TyKind::FnPtr(ref fn_ptr) => rewrite_fn_ptr(fn_ptr, self.span, context, shape),
             ast::TyKind::Never => Ok(String::from("!")),
             ast::TyKind::MacCall(ref mac) => {
                 rewrite_macro(mac, context, shape, MacroPosition::Expression)
@@ -1078,13 +1073,26 @@ impl Rewrite for ast::TyPat {
             ast::TyPatKind::Range(ref lhs, ref rhs, ref end_kind) => {
                 rewrite_range_pat(context, shape, lhs, rhs, end_kind, self.span)
             }
+            ast::TyPatKind::Or(ref variants) => {
+                let mut first = true;
+                let mut s = String::new();
+                for variant in variants {
+                    if first {
+                        first = false
+                    } else {
+                        s.push_str(" | ");
+                    }
+                    s.push_str(&variant.rewrite_result(context, shape)?);
+                }
+                Ok(s)
+            }
             ast::TyPatKind::Err(_) => Err(RewriteError::Unknown),
         }
     }
 }
 
-fn rewrite_bare_fn(
-    bare_fn: &ast::BareFnTy,
+fn rewrite_fn_ptr(
+    fn_ptr: &ast::FnPtrTy,
     span: Span,
     context: &RewriteContext<'_>,
     shape: Shape,
@@ -1093,7 +1101,7 @@ fn rewrite_bare_fn(
 
     let mut result = String::with_capacity(128);
 
-    if let Some(ref lifetime_str) = rewrite_bound_params(context, shape, &bare_fn.generic_params) {
+    if let Some(ref lifetime_str) = rewrite_bound_params(context, shape, &fn_ptr.generic_params) {
         result.push_str("for<");
         // 6 = "for<> ".len(), 4 = "for<".
         // This doesn't work out so nicely for multiline situation with lots of
@@ -1102,10 +1110,10 @@ fn rewrite_bare_fn(
         result.push_str("> ");
     }
 
-    result.push_str(crate::utils::format_safety(bare_fn.safety));
+    result.push_str(crate::utils::format_safety(fn_ptr.safety));
 
     result.push_str(&format_extern(
-        bare_fn.ext,
+        fn_ptr.ext,
         context.config.force_explicit_abi(),
     ));
 
@@ -1120,9 +1128,9 @@ fn rewrite_bare_fn(
     };
 
     let rewrite = format_function_type(
-        bare_fn.decl.inputs.iter(),
-        &bare_fn.decl.output,
-        bare_fn.decl.c_variadic(),
+        fn_ptr.decl.inputs.iter(),
+        &fn_ptr.decl.output,
+        fn_ptr.decl.c_variadic(),
         span,
         context,
         func_ty_shape,
@@ -1315,7 +1323,7 @@ fn join_bounds_inner(
     }
 }
 
-pub(crate) fn opaque_ty(ty: &Option<ptr::P<ast::Ty>>) -> Option<&ast::GenericBounds> {
+pub(crate) fn opaque_ty(ty: &Option<Box<ast::Ty>>) -> Option<&ast::GenericBounds> {
     ty.as_ref().and_then(|t| match &t.kind {
         ast::TyKind::ImplTrait(_, bounds) => Some(bounds),
         _ => None,
