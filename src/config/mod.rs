@@ -416,9 +416,8 @@ impl Config {
         style_edition: Option<StyleEdition>,
         version: Option<Version>,
     ) -> Result<Config, String> {
-        let parsed: ::toml::Value = toml
-            .parse()
-            .map_err(|e| format!("Could not parse TOML: {}", e))?;
+        let parsed: ::toml::Value =
+            toml::from_str(toml).map_err(|e| format!("Could not parse TOML: {}", e))?;
         let mut err = String::new();
         let table = parsed
             .as_table()
