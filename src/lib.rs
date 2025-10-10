@@ -50,6 +50,10 @@ pub use crate::config::{
 
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
 
+pub use crate::editorconfig::{
+    EditorConfigSerializationError, EditorConfigSerializationTarget, EditorConfigSerializer,
+    UnsetBehaviour,
+};
 pub use crate::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 
 #[macro_use]
@@ -68,6 +72,7 @@ mod closures;
 mod comment;
 pub(crate) mod config;
 mod coverage;
+mod editorconfig;
 mod emitter;
 mod expr;
 mod format_report_formatter;

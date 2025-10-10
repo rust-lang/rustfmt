@@ -18,8 +18,9 @@ use std::str::FromStr;
 use getopts::{Matches, Options};
 
 use crate::rustfmt::{
-    CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
-    FormatReportFormatterBuilder, Input, Session, StyleEdition, Verbosity, Version, load_config,
+    CliOptions, Color, Config, Edition, EditorConfigSerializationTarget, EditorConfigSerializer,
+    EmitMode, FileLines, FileName, FormatReportFormatterBuilder, Input, Session, StyleEdition,
+    UnsetBehaviour, Verbosity, Version, load_config,
 };
 
 const BUG_REPORT_URL: &str = "https://github.com/rust-lang/rustfmt/issues/new?labels=bug";
@@ -67,6 +68,12 @@ enum Operation {
     ConfigOutputDefault { path: Option<String> },
     /// Output current config (as if formatting to a file) to stdout
     ConfigOutputCurrent { path: Option<String> },
+    /// Output current config as an editorconfig to a file, directory (to a .editorconfig file) or
+    /// to stdout. Defaults to stdout.
+    ConfigOutputEditorconfig {
+        editorconfig_path: Option<PathBuf>,
+        config_path: Option<PathBuf>,
+    },
     /// No file specified, read from stdin
     Stdin { input: String },
 }
@@ -90,6 +97,8 @@ pub enum OperationError {
     /// supported with standard input.
     #[error("Emit mode {0} not supported with standard output.")]
     StdinBadEmit(EmitMode),
+    #[error("Invalid argument: {0}")]
+    InvalidEditorConfigArgument(String),
 }
 
 impl From<IoError> for OperationError {
@@ -198,6 +207,12 @@ fn make_opts() -> Options {
             "skip-children",
             "Don't reformat child modules (unstable).",
         );
+        opts.optopt(
+            "",
+            "editorconfig",
+            "Generate an EditorConfig from rustfmt configuration. output(optional): PATH to a file or directory, where EditorConfig should be written to (stdout if omitted), config(optional): PATH to a rustfmt config.",
+            "output=PATH,config=PATH",
+        );
     }
 
     opts.optflag("v", "verbose", "Print verbose output");
@@ -272,7 +287,31 @@ fn execute(opts: &Options) -> Result<i32> {
             files,
             minimal_config_path,
         } => format(files, minimal_config_path, &options),
+        Operation::ConfigOutputEditorconfig {
+            editorconfig_path,
+            config_path,
+        } => output_editorconfig(
+            editorconfig_path.into(),
+            load_config(
+                config_path
+                    .map(|file| {
+                        PathBuf::from(file.canonicalize().unwrap_or(file).parent().unwrap())
+                    })
+                    .as_deref(),
+                Some(options),
+            )?
+            .0,
+        ),
     }
+}
+
+fn output_editorconfig(
+    mut tgt: EditorConfigSerializationTarget,
+    config: Config,
+) -> anyhow::Result<i32> {
+    let serializer = EditorConfigSerializer::new(config.into(), UnsetBehaviour::default());
+    serializer.write_to_target(&mut tgt)?;
+    Ok(0)
 }
 
 fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
@@ -466,6 +505,54 @@ fn print_version() {
     }
 }
 
+fn kv_map(pairs: &[(&str, &str)], designator: &str) -> Option<PathBuf> {
+    pairs
+        .iter()
+        .find_map(|(key, _val)| match **key == *designator {
+            true => Some(key),
+            false => None,
+        })
+        .map(|val| PathBuf::from_str(val).unwrap())
+}
+
+fn parse_editorconfig_args(
+    s: &[String],
+) -> std::result::Result<(Option<PathBuf>, Option<PathBuf>), String> {
+    let output_designator = "output";
+    let config_designator = "config";
+    let pairs: Option<Box<[(&str, &str)]>> = s
+        .iter()
+        .flat_map(|s| s.split(',').map(|kv| kv.split_once('=')))
+        .collect();
+    match pairs {
+        Some(pairs) => {
+            if pairs.len() <= 2
+                && pairs
+                    .iter()
+                    .all(|(key, _value)| **key == *output_designator || **key == *config_designator)
+            {
+                if pairs
+                    .iter()
+                    .all(|(key, _value)| **key == *output_designator)
+                    || pairs
+                        .iter()
+                        .all(|(key, _value)| **key == *config_designator)
+                {
+                    Err(String::from("Repeated option"))
+                } else {
+                    Ok((
+                        kv_map(&pairs, output_designator),
+                        kv_map(&pairs, config_designator),
+                    ))
+                }
+            } else {
+                Err(String::from("Unkown option arguments"))
+            }
+        }
+        None => Err(String::from("Bad format: Missing '='.")),
+    }
+}
+
 fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
     if matches.opt_present("h") {
         let Some(topic) = matches.opt_str("h") else {
@@ -478,6 +565,19 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
             _ => Err(OperationError::UnknownHelpTopic(topic)),
         };
     }
+
+    if matches.opt_present("editorconfig") {
+        let (editorconfig_path, config_path) =
+            match parse_editorconfig_args(&matches.opt_strs("editorconfig")) {
+                Ok(ok) => ok,
+                Err(err) => return Err(OperationError::InvalidEditorConfigArgument(err)),
+            };
+        return Ok(Operation::ConfigOutputEditorconfig {
+            editorconfig_path,
+            config_path,
+        });
+    }
+
     let mut free_matches = matches.free.iter();
 
     let mut minimal_config_path = None;
