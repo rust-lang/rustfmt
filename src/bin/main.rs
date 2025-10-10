@@ -207,7 +207,7 @@ fn make_opts() -> Options {
             "skip-children",
             "Don't reformat child modules (unstable).",
         );
-        opts.optopt(
+        opts.optflagopt(
             "",
             "editorconfig",
             "Generate an EditorConfig from rustfmt configuration. output(optional): \
@@ -533,20 +533,25 @@ fn parse_editorconfig_args(
                     .iter()
                     .all(|(key, _value)| **key == *output_designator || **key == *config_designator)
             {
-                if pairs
-                    .iter()
-                    .all(|(key, _value)| **key == *output_designator)
-                    || pairs
+                if !pairs.is_empty() {
+                    if pairs
+                        .iter()
+                        .all(|(key, _value)| **key == *output_designator)
+                    {
+                        println!("{:#?}", pairs);
+                        return Err(format!("Repeated '{output_designator}' option"));
+                    }
+                    if pairs
                         .iter()
                         .all(|(key, _value)| **key == *config_designator)
-                {
-                    Err(String::from("Repeated option"))
-                } else {
-                    Ok((
-                        kv_map(&pairs, output_designator),
-                        kv_map(&pairs, config_designator),
-                    ))
+                    {
+                        return Err(format!("Repeated '{config_designator}' option"));
+                    }
                 }
+                Ok((
+                    kv_map(&pairs, output_designator),
+                    kv_map(&pairs, config_designator),
+                ))
             } else {
                 Err(String::from("Unkown option arguments"))
             }
