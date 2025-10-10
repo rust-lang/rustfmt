@@ -210,7 +210,9 @@ fn make_opts() -> Options {
         opts.optopt(
             "",
             "editorconfig",
-            "Generate an EditorConfig from rustfmt configuration. output(optional): PATH to a file or directory, where EditorConfig should be written to (stdout if omitted), config(optional): PATH to a rustfmt config.",
+            "Generate an EditorConfig from rustfmt configuration. output(optional): \
+                PATH to a file or directory, where EditorConfig should be written to \
+                (stdout if omitted), config(optional): PATH to a rustfmt config.",
             "output=PATH,config=PATH",
         );
     }
