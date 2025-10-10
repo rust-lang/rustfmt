@@ -69,3 +69,10 @@ fn crate_parsing_stashed_diag2() {
     let filename = "tests/parser/stashed-diag2.rs";
     assert_parser_error(filename);
 }
+
+#[test]
+fn parser_error_const_missing_type() {
+    // See also https://github.com/rust-lang/rustfmt/issues/6099
+    let filename = "tests/parser/issue-6099.rs";
+    assert_parser_error(filename);
+}
