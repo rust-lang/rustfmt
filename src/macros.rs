@@ -226,8 +226,8 @@ fn rewrite_macro_inner(
         };
     }
     // Format well-known macros which cannot be parsed as a valid AST.
-    if macro_name == "lazy_static!" && !has_comment {
-        match format_lazy_static(context, shape, ts.clone(), mac.span()) {
+    if (macro_name == "lazy_static!" || macro_name == "lazy_static::lazy_static!") && !has_comment {
+        match format_lazy_static(context, shape, ts.clone(), mac.span(), &macro_name) {
             Ok(rw) => return Ok(rw),
             Err(err) => match err {
                 // We will move on to parsing macro args just like other macros
@@ -1394,12 +1394,20 @@ impl MacroBranch {
     }
 }
 
-/// Format `lazy_static!` from <https://crates.io/crates/lazy_static>.
+/// Format `lazy_static!` and `lazy_static::lazy_static!`
+/// from <https://crates.io/crates/lazy_static>.
 ///
 /// # Expected syntax
 ///
 /// ```text
 /// lazy_static! {
+///     [pub] static ref NAME_1: TYPE_1 = EXPR_1;
+///     [pub] static ref NAME_2: TYPE_2 = EXPR_2;
+///     ...
+///     [pub] static ref NAME_N: TYPE_N = EXPR_N;
+/// }
+///
+/// lazy_static::lazy_static! {
 ///     [pub] static ref NAME_1: TYPE_1 = EXPR_1;
 ///     [pub] static ref NAME_2: TYPE_2 = EXPR_2;
 ///     ...
@@ -1411,13 +1419,15 @@ fn format_lazy_static(
     shape: Shape,
     ts: TokenStream,
     span: Span,
+    macro_name: &str,
 ) -> RewriteResult {
     let mut result = String::with_capacity(1024);
     let nested_shape = shape
         .block_indent(context.config.tab_spaces())
         .with_max_width(context.config);
 
-    result.push_str("lazy_static! {");
+    result.push_str(macro_name);
+    result.push_str(" {");
     result.push_str(&nested_shape.indent.to_string_with_newline(context.config));
 
     let parsed_elems =
