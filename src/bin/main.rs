@@ -311,6 +311,7 @@ fn output_editorconfig(
     mut tgt: EditorConfigSerializationTarget,
     config: Config,
 ) -> anyhow::Result<i32> {
+    println!("tgt: {:#?}", tgt);
     let serializer = EditorConfigSerializer::new(config.into(), UnsetBehaviour::default());
     serializer.write_to_target(&mut tgt)?;
     Ok(0)
@@ -510,22 +511,24 @@ fn print_version() {
 fn kv_map(pairs: &[(&str, &str)], designator: &str) -> Option<PathBuf> {
     pairs
         .iter()
-        .find_map(|(key, _val)| match **key == *designator {
-            true => Some(key),
+        .find_map(|(key, val)| match **key == *designator {
+            true => Some(val),
             false => None,
         })
         .map(|val| PathBuf::from_str(val).unwrap())
 }
 
 fn parse_editorconfig_args(
-    s: &[String],
+    s: Option<&str>,
 ) -> std::result::Result<(Option<PathBuf>, Option<PathBuf>), String> {
+    let s = match s {
+        Some(s) => s,
+        None => return Ok((None, None)),
+    };
     let output_designator = "output";
     let config_designator = "config";
-    let pairs: Option<Box<[(&str, &str)]>> = s
-        .iter()
-        .flat_map(|s| s.split(',').map(|kv| kv.split_once('=')))
-        .collect();
+
+    let pairs: Option<Box<[(&str, &str)]>> = s.split(',').map(|kv| kv.split_once('=')).collect();
     match pairs {
         Some(pairs) => {
             if pairs.len() <= 2
@@ -533,7 +536,7 @@ fn parse_editorconfig_args(
                     .iter()
                     .all(|(key, _value)| **key == *output_designator || **key == *config_designator)
             {
-                if !pairs.is_empty() {
+                if pairs.len() > 1 {
                     if pairs
                         .iter()
                         .all(|(key, _value)| **key == *output_designator)
@@ -575,7 +578,7 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
 
     if matches.opt_present("editorconfig") {
         let (editorconfig_path, config_path) =
-            match parse_editorconfig_args(&matches.opt_strs("editorconfig")) {
+            match parse_editorconfig_args(matches.opt_str("editorconfig").as_deref()) {
                 Ok(ok) => ok,
                 Err(err) => return Err(OperationError::InvalidEditorConfigArgument(err)),
             };
