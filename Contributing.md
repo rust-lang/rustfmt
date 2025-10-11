@@ -2,9 +2,9 @@
 
 There are many ways to contribute to Rustfmt. This document lays out what they
 are and has information on how to get started. If you have any questions about
-contributing or need help with anything, please ask in the WG-Rustfmt channel
-on [Discord](https://discordapp.com/invite/rust-lang). Feel free to also ask questions
-on issues, or file new issues specifically to get help.
+contributing or need help with anything, please ask in the Rustfmt team [Zulip
+channel `#t-rustfmt`][rustfmt-zulip]. Feel free to also ask questions on issues,
+or file new issues specifically to get help.
 
 All contributors are expected to follow our [Code of
 Conduct](CODE_OF_CONDUCT.md).
@@ -59,7 +59,7 @@ example, the `issue-1111.rs` test file is configured by the file
 ## Debugging
 
 Some `rewrite_*` methods use the `debug!` macro for printing useful information.
-These messages can be printed by using the environment variable `RUSTFMT_LOG=rustfmt=DEBUG`.
+These messages can be printed by using the environment variable `RUSTFMT_LOG=debug`.
 These traces can be helpful in understanding which part of the code was used
 and get a better grasp on the execution flow.
 
@@ -91,17 +91,35 @@ Please try to avoid leaving `TODO`s in the code. There are a few around, but I
 wish there weren't. You can leave `FIXME`s, preferably with an issue number.
 
 
-### Version-gate formatting changes
+### Run Rustfmt from source code
 
-A change that introduces a different code-formatting should be gated on the
-`version` configuration. This is to ensure the formatting of the current major
-release is preserved, while allowing fixes to be implemented for the next
-release.
+You may want to run a version of rustfmt from source code as part of a test or
+hacking on the rustfmt codebase. It's strongly discouraged to install a version
+of rustfmt from source.
 
-This is done by conditionally guarding the change like so:
+To run `rustfmt` on a file:
+
+```
+cargo run --bin rustfmt -- path/to/file.rs
+```
+
+If you want to test modified `cargo-fmt`, or run `rustfmt` on the whole project (You may need to build rustfmt first):
+
+```
+RUSTFMT="./target/debug/rustfmt" cargo run --bin cargo-fmt -- --manifest-path path/to/project/you/want2test/Cargo.toml
+```
+
+### Gate formatting changes
+
+A change that introduces a different code-formatting must be gated on the
+`style_edition` configuration. This is to ensure rustfmt upholds its formatting
+stability guarantees and adheres to the Style Edition process set in [RFC 3338]
+
+This can be done by conditionally guarding the formatting change, e.g.:
 
 ```rust
-if config.version() == Version::One { // if the current major release is 1.x
+// if the current stable Style Edition is Edition 2024
+if config.style_edition() <= StyleEdition::Edition2024 {
     // current formatting
 } else {
     // new formatting
@@ -111,12 +129,13 @@ if config.version() == Version::One { // if the current major release is 1.x
 This allows the user to apply the next formatting explicitly via the
 configuration, while being stable by default.
 
-When the next major release is done, the code block of the previous formatting
-can be deleted, e.g., the first block in the example above when going from `1.x`
-to `2.x`.
+This can then be enhanced as needed if and when there are
+new Style Editions with differing formatting prescriptions.
 
 | Note: Only formatting changes with default options need to be gated. |
 | --- |
+
+[RFC 3338]: https://rust-lang.github.io/rfcs/3338-style-evolution.html
 
 ### A quick tour of Rustfmt
 
@@ -249,3 +268,7 @@ the config struct and parse a config file, etc. Checking an option is done by
 accessing the correct field on the config struct, e.g., `config.max_width()`. Most
 functions have a `Config`, or one can be accessed via a visitor or context of
 some kind.
+
+
+[rustfmt-zulip]:
+    https://rust-lang.zulipchat.com/#narrow/channel/357797-t-rustfmt

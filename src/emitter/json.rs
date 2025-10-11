@@ -1,8 +1,7 @@
 use super::*;
-use crate::rustfmt_diff::{make_diff, DiffLine, Mismatch};
+use crate::rustfmt_diff::{DiffLine, Mismatch, make_diff};
 use serde::Serialize;
-use serde_json::to_string as to_json_string;
-use std::io::{self, Write};
+use serde_json::to_writer as to_json_writer;
 
 #[derive(Debug, Default)]
 pub(crate) struct JsonEmitter {
@@ -27,7 +26,8 @@ struct MismatchedFile {
 
 impl Emitter for JsonEmitter {
     fn emit_footer(&self, output: &mut dyn Write) -> Result<(), io::Error> {
-        writeln!(output, "{}", &to_json_string(&self.mismatched_files)?)
+        to_json_writer(&mut *output, &self.mismatched_files)?;
+        writeln!(output)
     }
 
     fn emit_formatted_file(
@@ -57,7 +57,7 @@ impl JsonEmitter {
         filename: &FileName,
         diff: Vec<Mismatch>,
     ) -> Result<(), io::Error> {
-        let mut mismatches = vec![];
+        let mut mismatches = Vec::with_capacity(diff.len());
         for mismatch in diff {
             let original_begin_line = mismatch.line_number_orig;
             let expected_begin_line = mismatch.line_number;
@@ -96,7 +96,7 @@ impl JsonEmitter {
             });
         }
         self.mismatched_files.push(MismatchedFile {
-            name: format!("{}", filename),
+            name: format!("{filename}"),
             mismatches,
         });
         Ok(())
@@ -106,7 +106,6 @@ impl JsonEmitter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FileName;
     use std::path::PathBuf;
 
     #[test]
@@ -214,7 +213,7 @@ mod tests {
     #[test]
     fn emits_array_with_files_with_diffs() {
         let file_name = "src/bin.rs";
-        let original = vec![
+        let original = [
             "fn main() {",
             "println!(\"Hello, world!\");",
             "}",
@@ -227,7 +226,7 @@ mod tests {
             "}",
             "}",
         ];
-        let formatted = vec![
+        let formatted = [
             "fn main() {",
             "    println!(\"Hello, world!\");",
             "}",
@@ -254,7 +253,7 @@ mod tests {
             )
             .unwrap();
         let _ = emitter.emit_footer(&mut writer);
-        let exp_json = to_json_string(&vec![MismatchedFile {
+        let exp_json = serde_json::to_string(&vec![MismatchedFile {
             name: String::from(file_name),
             mismatches: vec![
                 MismatchedBlock {
@@ -281,17 +280,17 @@ mod tests {
         }])
         .unwrap();
         assert_eq!(result.has_diff, true);
-        assert_eq!(&writer[..], format!("{}\n", exp_json).as_bytes());
+        assert_eq!(&writer[..], format!("{exp_json}\n").as_bytes());
     }
 
     #[test]
     fn emits_valid_json_with_multiple_files() {
         let bin_file = "src/bin.rs";
-        let bin_original = vec!["fn main() {", "println!(\"Hello, world!\");", "}"];
-        let bin_formatted = vec!["fn main() {", "    println!(\"Hello, world!\");", "}"];
+        let bin_original = ["fn main() {", "println!(\"Hello, world!\");", "}"];
+        let bin_formatted = ["fn main() {", "    println!(\"Hello, world!\");", "}"];
         let lib_file = "src/lib.rs";
-        let lib_original = vec!["fn greet() {", "println!(\"Greetings!\");", "}"];
-        let lib_formatted = vec!["fn greet() {", "    println!(\"Greetings!\");", "}"];
+        let lib_original = ["fn greet() {", "println!(\"Greetings!\");", "}"];
+        let lib_formatted = ["fn greet() {", "    println!(\"Greetings!\");", "}"];
         let mut writer = Vec::new();
         let mut emitter = JsonEmitter::default();
         let _ = emitter.emit_header(&mut writer);
@@ -340,7 +339,7 @@ mod tests {
             }],
         };
 
-        let exp_json = to_json_string(&vec![exp_bin, exp_lib]).unwrap();
-        assert_eq!(&writer[..], format!("{}\n", exp_json).as_bytes());
+        let exp_json = serde_json::to_string(&vec![exp_bin, exp_lib]).unwrap();
+        assert_eq!(&writer[..], format!("{exp_json}\n").as_bytes());
     }
 }

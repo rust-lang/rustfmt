@@ -129,7 +129,7 @@ fn issue3117() {
 fn issue3139() {
     assert_eq!(
         to_json_value(&None::<i32>).unwrap(),
-        json!({ "test": None::<i32> })
+        json!(  { "test": None  ::  <i32> }  )
     );
 }
 
@@ -152,8 +152,6 @@ trait T: ~const Super {}
 const fn not_quite_const<S: ~const T>() -> i32 {
     <S as T>::CONST
 }
-
-struct S<T: ~const ?Sized>(std::marker::PhantomData<T>);
 
 impl ~const T {}
 

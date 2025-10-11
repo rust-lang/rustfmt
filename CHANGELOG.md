@@ -2,6 +2,320 @@
 
 ## [Unreleased]
 
+
+## [1.9.0] 2025-01-03
+
+### Fixed
+- No longer strip `r#` prefix from `break` and `continue` labels [#6411](https://github.com/rust-lang/rustfmt/issues/6411)
+  ```rust
+  fn main() {
+      'r#if: {
+          break 'r#if;
+      }
+  }
+  ```
+- Fix panic when sorting imports [#6333](https://github.com/rust-lang/rustfmt/issues/6333)
+- Fix issue with `wrap_comments` invalidating code blocks [#6417](https://github.com/rust-lang/rustfmt/pull/6417)
+- No longer remove closure block label within a macro call [#6465](https://github.com/rust-lang/rustfmt/issues/6465)
+
+### Changed
+- Stabilize `style_edition=2024` and stabilize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
+- Apply version sorting to module declarations when using `style_edition=2024` [#6368](https://github.com/rust-lang/rustfmt/pull/6368)
+- When users set the deprecated `version` config, rustfmt now gives a hint about which equivalent `style_edition` they should use [#6361](https://github.com/rust-lang/rustfmt/pull/6361)
+- Correct version chunk splitting in the internal version sort algorithm [#6407](https://github.com/rust-lang/rustfmt/pull/6407)
+- Extend support for single line let-chain formatting to include cases where the left hand side operand is a literal, in alignment with finalized style rules as part of let-chain stabilization [#6492](https://github.com/rust-lang/rustfmt/pull/6492)
+- Begin initial formatting for `use closures` and `use chains` (`#![feature(ergonomic_clones)]`). Previously, the closure and chain was left as the developer wrote it [#6532](https://github.com/rust-lang/rustfmt/pull/6532)
+
+### Added
+- Add `style_edition=2027` to gate unstable formatting [#6324](https://github.com/rust-lang/rustfmt/pull/6324)
+- Support discovering and formatting files via external mods imported within `cfg_match`, similar to `cfg_if` behavior [#6522](https://github.com/rust-lang/rustfmt/pull/6522)
+- Add new nightly-only `match_arm_indent` option [#6525](https://github.com/rust-lang/rustfmt/pull/6525)
+  - more details in the [configuration section for this new option](https://github.com/rust-lang/rustfmt/blob/master/Configurations.md#match_arm_indent)
+
+
+## [1.8.0] 2024-09-20
+
+### Fixed
+- Fix issue where rustfmt would crash on Windows when using the `ignore` option [#6178](https://github.com/rust-lang/rustfmt/issues/6178)
+
+### Changed
+- `rustfmt --version` now prints a commit hash that is 10 characters long [#6258](https://github.com/rust-lang/rustfmt/pull/6258)
+- `rustfmt --version` will no longer print empty git information when git information isn't available at build time.
+  For example, git information is not available when building rustfmt from a source tarball [#6266](https://github.com/rust-lang/rustfmt/pull/6266)
+- `version` has been soft deprecated and replaced by `style_edition`.
+  `style_edition=2024` is equivalent to `version=Two` and `style_edition={2015|2018|2021}`
+  are equivalent to `version=One` [#6247](https://github.com/rust-lang/rustfmt/pull/6247)
+- When `style_edition=2024` is configured `overflow_delimited_expr` will default to `true` [#6260](https://github.com/rust-lang/rustfmt/pull/6260).
+  ```rust
+  // with style_edition=2015
+  do_thing(
+      x,
+      Bar {
+          x: value,
+          y: value2,
+      },
+  );
+
+  // with style_edition=2024
+  do_thing(x, Bar {
+      x: value,
+      y: value2,
+  });
+  ```
+- When `style_edition=2024` is configured rustfmt will apply the [style guide's version sorting algorithm]
+  when sorting imports [#6284](https://github.com/rust-lang/rustfmt/pull/6284)
+  ```rust
+  // with style_edition=2015
+  use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8};
+
+  // with style_edition=2024
+  use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64};
+  ```
+  [style guide's version sorting algorithm]: https://doc.rust-lang.org/nightly/style-guide/#sorting
+- When parsing rustfmt configurations fails, rustfmt will now include the path to the toml file in the error message [#6302](https://github.com/rust-lang/rustfmt/issues/6302)
+
+### Added
+- rustfmt now formats trailing where clauses in type aliases [#5887](https://github.com/rust-lang/rustfmt/pull/5887)
+  ```rust
+  type Foo
+      = Bar
+  where
+      A: B,
+      C: D;
+  ```
+- Users can now configure which `style_edition` rustfmt uses when formatting their code as specified
+  in [RFC 3338](https://rust-lang.github.io/rfcs/3338-style-evolution.html). Users are encouraged to configure `style_edition`
+  in their `rustfmt.toml` files, but the value can also be specified via the cli with `--unstable-features --style-edition={style_edition}`.
+  When `style_edition` is not explicitly configured it will be inferred from the `edition` configuration.
+  When neither `style_edition` nor `edition` are configured `style_edition` defaults to `2015` [#6247](https://github.com/rust-lang/rustfmt/pull/6247)
+
+### Misc
+- Removed `tracing-attributes` dependency [#6208](https://github.com/rust-lang/rustfmt/pull/6208)
+- Reduced syn's features in the internal `config_proc_macro` crate [#6237](https://github.com/rust-lang/rustfmt/pull/6237)
+
+## [1.7.1] 2024-06-24
+
+### Fixed
+
+- Fix an idempotency issue when rewriting where clauses in which rustfmt would continuously add a trailing comma `,` to the end of trailing line comments [#5941](https://github.com/rust-lang/rustfmt/issues/5941).
+- Prevent enum variant attributes from wrapping one character early when using `version=Two` [#5801](https://github.com/rust-lang/rustfmt/issues/5801)
+- Properly wrap macro matchers at the `max_width` when using `version=Two` and `format_macro_matchers=true` [#3805](https://github.com/rust-lang/rustfmt/issues/3805)
+- Prevent panic when formatting trait declaration with non [Unicode Normalization Form] C (NFC) identifiers [#6069](https://github.com/rust-lang/rustfmt/issues/6069)
+  ```rust
+  // The ó below is two codepoints, ASCII o followed by U+0301 COMBINING ACUTE ACCENT.
+  // It NFC-normalizes to ó, U+00F3 LATIN SMALL LETTER O WITH ACUTE.
+  trait Foó: Bar {}
+  ```
+  [unicode normalization form]: https://unicode.org/reports/tr15/
+- Ensure a space is added to a range expression, when the right hand side of the range expression is a binary expression that ends with a trailing period [#6059](https://github.com/rust-lang/rustfmt/issues/6059)
+  ```rust
+  let range = 3. / 2. ..4.;
+  ```
+- When using `version=Two`, comments in match arms that contain `=>` no longer prevent formatting [#5998](https://github.com/rust-lang/rustfmt/issues/5998)
+  ```rust
+  match a {
+      _ =>
+      // comment with =>
+      {
+          println!("A")
+      }
+  }
+  ```
+- Prevent panics when formatting input that contains the expanded form of `offset_of!` [#5885](https://github.com/rust-lang/rustfmt/issues/5885) [#6105](https://github.com/rust-lang/rustfmt/issues/6105)
+  ```rust
+  const _: () = builtin # offset_of(x, x);
+  ```
+- When using `version=Two` inner attributes in `match` expressions are correctly indented [#6147](https://github.com/rust-lang/rustfmt/issues/6147)
+  ```rust
+  pub fn main() {
+      match x {
+          #![attr1]
+          #![attr2]
+          _ => (),
+      }
+  }
+  ```
+- Output correct syntax for type ascription builtin [#6159](https://github.com/rust-lang/rustfmt/issues/6159)
+  ```rust
+  fn main() {
+      builtin # type_ascribe(10, usize)
+  }
+  ```
+- rustfmt no longer removes inner attributes from inline const blocks [#6158](https://github.com/rust-lang/rustfmt/issues/6158)
+  ```rust
+  fn main() {
+      const {
+          #![allow(clippy::assertions_on_constants)]
+
+          assert!(1 < 2);
+      }
+  }
+  ```
+- rustfmt no longer removes `safe` and `unsafe` keywords from static items in extern blocks.
+  This helps support [`#![feature(unsafe_extern_blocks)]`](https://github.com/rust-lang/rust/issues/123743) [#6204](https://github.com/rust-lang/rustfmt/pull/6204)
+  ```rust
+  #![feature(unsafe_extern_blocks)]
+
+  unsafe extern "C" {
+      safe static TEST1: i32;
+      unsafe static TEST2: i32;
+  }
+  ```
+
+
+### Changed
+
+- `hide_parse_errors` has been soft deprecated and it's been renamed to `show_parse_errors` [#5961](https://github.com/rust-lang/rustfmt/pull/5961).
+- The diff output produced by `rustfmt --check` is more compatible with editors that support navigating directly to line numbers [#5971](https://github.com/rust-lang/rustfmt/pull/5971)
+- When using `version=Two`, the `trace!` macro from the [log crate] is now formatted similarly to `debug!`, `info!`, `warn!`, and `error!` [#5987](https://github.com/rust-lang/rustfmt/issues/5987).
+
+  [log crate]: https://crates.io/crates/log
+
+
+### Added
+
+- `generated_marker_line_search_limit` is a new unstable configuration option that allows users to configure how many lines to search for an `@generated` marker when `format_generated_files=false` [#5658](https://github.com/rust-lang/rustfmt/issues/5658)
+
+
+### Misc
+
+- Updating `dirs 4.0.0 -> 5.0.1` and `cargo_metadata 0.15.4 -> 0.18.0` [#6033] (https://github.com/rust-lang/rustfmt/issues/6033)
+  - For reference, here's the [dirs v5 changelog](https://github.com/dirs-dev/dirs-rs/blob/main/README.md#5)
+- Updated [itertools v0.11 -> v0.12](https://github.com/rust-itertools/itertools/blob/v0.12.1/CHANGELOG.md#0120) [#6093](https://github.com/rust-lang/rustfmt/pull/6093)
+- Addressed clap deprecations output when running `cargo check --features clap/deprecated` [#6101](https://github.com/rust-lang/rustfmt/pull/6101)
+- Bumped bytecount `0.6.4` -> `0.6.8` to fix compilation issues with the `generic-simd` feature. See [bytecount#92] and [bytecount#93]
+
+  [bytecount#92]: https://github.com/llogiq/bytecount/pull/92
+  [bytecount#93]: https://github.com/llogiq/bytecount/pull/93
+- Replace the `lazy_static` dependency with `std::sync::OnceLock` [#6154](https://github.com/rust-lang/rustfmt/pull/6154)
+
+## [1.7.0] 2023-10-22
+
+### Fixed
+
+- Sometimes when `format_code_in_doc_comments=true` was set some line comments were converted to block comments [#5533](https://github.com/rust-lang/rustfmt/issues/5533)
+- rustfmt will no longer remove the braces in match arms when the block has a labeled [#5676](https://github.com/rust-lang/rustfmt/issues/5676)
+  ```rust
+  fn main() {
+      match true {
+          true => 'a: {
+              break 'a
+          }
+          _ => (),
+      }
+  }
+  ```
+- Calling methods on float literals ending in `.` will now be wrapped in parenthesis. e.g. `0. .to_string()` will be formatted as `(0.).to_string()` [#5791](https://github.com/rust-lang/rustfmt/issues/5791)
+- Prevent ICE when formatting empty `macro_rules!` branch [#5730](https://github.com/rust-lang/rustfmt/issues/5730)
+  ```rust
+  macro_rules! statement {
+      () => {;};
+  }
+  ```
+- Prevent ICE when formatting `vec!{}` [#5735](https://github.com/rust-lang/rustfmt/issues/5735)
+- Prevent internal trailing whitespace error when formatting an empty `macro_rules!` definition e.g. `macro_rules! foo {}` [#5882](https://github.com/rust-lang/rustfmt/issues/5882)
+- Formatting doc comment lines that start with `.` or `)` won't be treated as ordered markdown lists because `.` or `)` must be preceded by a number to start an ordered markdown list [#5835](https://github.com/rust-lang/rustfmt/pull/5835)
+- Add parenthesis around closures when they're used as method receives, don't have a block body, and end with `.` [#4808](https://github.com/rust-lang/rustfmt/issues/4808)
+  ```rust
+  fn main() {
+      || (10.).method();
+      (|| ..).method();
+      (|| 1..).method();
+  }
+  ```
+- Prevent removing `for<T>` when using the [`#![feature(non_lifetime_binders)]`](https://github.com/rust-lang/rust/issues/108185) [#5721](https://github.com/rust-lang/rustfmt/issues/5721)
+  ```rust
+  #![feature(non_lifetime_binders)]
+  #![allow(incomplete_features)]
+
+  trait Other<U: ?Sized> {}
+
+  trait Trait<U>
+  where
+      for<T> U: Other<T> {}
+  ```
+- Fix various issues with comments in imports [#5852](https://github.com/rust-lang/rustfmt/issues/5852) [#4708](https://github.com/rust-lang/rustfmt/issues/4708) [#3984](https://github.com/rust-lang/rustfmt/issues/3984)
+- When setting `version = Two` newlines between where clause bounds will be removed [#5655](https://github.com/rust-lang/rustfmt/issues/5655)
+  ```rust
+  fn foo<T>(_: T)
+  where
+      T: std::fmt::Debug,
+      T: std::fmt::Display,
+  {
+  }
+  ```
+- Improve formatting of `let-else` statements that have leading attributes When setting `version = Two` [#5901](https://github.com/rust-lang/rustfmt/issues/5901)
+- Prevent comment duplication in expressions wrapped in parenthesis. [#5871](https://github.com/rust-lang/rustfmt/issues/5871)
+- Adjust the span derivation used when rewriting const generics. The incorrect span derivation lead to invalid code after reformatting. [#5935](https://github.com/rust-lang/rustfmt/issues/5935)
+
+
+### Changed
+
+- rustfmt no longer removes explicit `Rust` ABIs. e.g `extern "Rust" fn im_a_rust_fn() {}` [#5701](https://github.com/rust-lang/rustfmt/issues/5701)
+- Setting `trailing_semicolon = false` will only remove trailing `;` on the last expression in a block [#5797](https://github.com/rust-lang/rustfmt/issues/5797)
+- Update the format of `cargo help fmt` to be more consistent with other standard commands [#5908](https://github.com/rust-lang/rustfmt/pull/5908)
+
+### Added
+
+- Users can now set `skip_macro_invocations` in `rustfmt.toml` [#5816](https://github.com/rust-lang/rustfmt/issues/5816)
+- Adds initial support for formatting `let-chains`. **`let-chains` are still a nightly feature and their formatting is subject to change** [#5910](https://github.com/rust-lang/rustfmt/pull/5910). Formatting was implemented following the rules outlined in [rust-lang/rust#110568](https://github.com/rust-lang/rust/pull/110568)
+
+### Misc
+
+- Support the experimental `dyn*` syntax, enabled by `#![feature(dyn_star)]` [#5542](https://github.com/rust-lang/rustfmt/issues/5542)
+- Replace `unicode_categories` dependency with `unicode-properties` [#5864](https://github.com/rust-lang/rustfmt/pull/5864)
+
+## [1.6.0] 2023-07-02
+
+### Added
+
+- Support for formatting let-else statements [#5690]
+- New config option, `single_line_let_else_max_width`, that allows users to configure the maximum length of single line `let-else` statements. `let-else` statements that otherwise meet the requirements to be formatted on a single line will have their divergent`else` block formatted over multiple lines if they exceed this length [#5684]
+
+[#5690]: https://github.com/rust-lang/rustfmt/pull/5690
+[#5684]: https://github.com/rust-lang/rustfmt/issues/5684
+
+## [1.5.3] 2023-06-20
+
+### Fixed
+
+- When formatting doc comments with `wrap_comments = true` rustfmt will no longer wrap markdown tables [#4210](https://github.com/rust-lang/rustfmt/issues/4210)
+- Properly handle wrapping comments that include a numbered list in markdown [#5416](https://github.com/rust-lang/rustfmt/issues/5416)
+- Properly handle markdown sublists that utilize a `+` [#4041](https://github.com/rust-lang/rustfmt/issues/4041)
+- rustfmt will no longer use shorthand initialization when rewriting a tuple struct even when `use_field_init_shorthand = true` as this leads to code that could no longer compile.
+  Take the following struct as an example `struct MyStruct(u64);`. rustfmt will no longer format `MyStruct { 0: 0 }` as `MyStruct { 0 }` [#5488](https://github.com/rust-lang/rustfmt/issues/5488)
+- rustfmt no longer panics when formatting an empty code block in a doc comment with `format_code_in_doc_comments = true` [#5234](https://github.com/rust-lang/rustfmt/issues/5234). For example:
+  ```rust
+  /// ```
+  ///
+  /// ```
+  fn main() {}
+  ```
+- rustfmt no longer incorrectly duplicates the where clause bounds when using const expression in where clause bounds with feature `#![feature(generic_const_exprs)]` [#5691](https://github.com/rust-lang/rustfmt/issues/5691). e.g.:
+  ```rust
+  struct S<const C: usize>
+  where
+      [(); { num_slots!(C) }]:, {
+      // code ...
+  }
+  ```
+- Prevent ICE when parsing invalid attributes in `cfg_if!` macros [#5728](https://github.com/rust-lang/rustfmt/issues/5728), [#5729](https://github.com/rust-lang/rustfmt/issues/5729)
+- rustfmt no longer loses comments placed between a doc comment and generic params [#5320](https://github.com/rust-lang/rustfmt/issues/5320)
+- Handle explicit discriminants in enums with comments present [#5686](https://github.com/rust-lang/rustfmt/issues/5686)
+
+### Changed
+
+- Users can now control whether rustc parser errors are displayed with color using rustfmt's `--color` option. To disable colored errors pass `--color=Never` to rustfmt [#5717](https://github.com/rust-lang/rustfmt/issues/5717)
+
+
+### Added
+
+- rustfmt now recognises `+` as the start of a markdown list, and won't incorrectly wrap sublists that begin with `+` when formatting doc comments with `wrap_comments = true` [#5560](https://github.com/rust-lang/rustfmt/pull/5560)
+
+### Misc
+
+- Update various dependencies, including `syn`, `cargo_metadata`, `env_logger`, and `toml`
+
 ## [1.5.2] 2023-01-24
 
 ### Fixed
@@ -17,7 +331,7 @@
 
 ### Added
 
-- New configuration option (`skip_macro_invocations`)[https://rust-lang.github.io/rustfmt/?version=master&search=#skip_macro_invocations] [#5347](https://github.com/rust-lang/rustfmt/pull/5347) that can be used to globally define a single enumerated list of macro calls that rustfmt should skip formatting. rustfmt [currently also supports this via a custom tool attribute](https://github.com/rust-lang/rustfmt#tips), however, these cannot be used in all contexts because [custom inner attributes are unstable](https://github.com/rust-lang/rust/issues/54726)
+- New configuration option [`skip_macro_invocations`](https://rust-lang.github.io/rustfmt/?version=master&search=#skip_macro_invocations) [#5347](https://github.com/rust-lang/rustfmt/pull/5347) that can be used to globally define a single enumerated list of macro calls that rustfmt should skip formatting. rustfmt [currently also supports this via a custom tool attribute](https://github.com/rust-lang/rustfmt#tips), however, these cannot be used in all contexts because [custom inner attributes are unstable](https://github.com/rust-lang/rust/issues/54726)
 
 ### Misc
 
@@ -55,6 +369,8 @@
 ### Changed
 
 - Simplify the rustfmt help text by eliding the full path to the rustfmt binary path from the usage string when running `rustfmt --help` [#5214](https://github.com/rust-lang/rustfmt/issues/5214)
+
+- Bumped the version for several dependencies. Most notably `dirs` `v2.0.1` -> `v4.0.0`. This changed the global user config directory on macOS from `$HOME/Library/Preferences` to `$HOME/Library/Application Support` [#5237](https://github.com/rust-lang/rustfmt/pull/5237)
 
 ### Fixed
 
@@ -812,7 +1128,7 @@ from formatting an attribute #3665
 
 ### Fixed
 
-- Do not remove path disambiugator inside macro #3142
+- Do not remove path disambiguator inside macro #3142
 - Improve handling of Windows newlines #3141
 - Fix alignment of a struct's fields (`struct_field_align_threshold` option) with the Visual `indent_style` #3165
 - Fix a bug in formatting markdown lists within comments #3172
@@ -901,7 +1217,7 @@ from formatting an attribute #3665
 
 ### Changed
 
-- Replace '--conifig-help' with '--config=help' cb10e06
+- Replace '--config-help' with '--config=help' cb10e06
 - Improve formatting of slice patterns #2912
 
 ### Fixed
@@ -945,7 +1261,7 @@ from formatting an attribute #3665
 - Add max_width option for all heuristics c2ae39e
 - Add config option `format_macro_matchers` to format the metavariable matching patterns in macros 79c5ee8
 - Add config option `format_macro_bodies` to format the bodies of macros 79c5ee8
-- Format exitential type fc307ff
+- Format existential type fc307ff
 - Support raw identifiers in struct expressions f121b1a
 - Format Async block and async function 0b25f60
 
@@ -1001,7 +1317,7 @@ from formatting an attribute #3665
 
 ### Changed
 
-- Update rustc-ap-syntax to 128.0.0 and ustc-ap-rustc_target to 128.0.0 195395f
+- Update rustc-ap-syntax to 128.0.0 and rustc-ap-rustc_target to 128.0.0 195395f
 - Put operands on its own line when each fits in a single line f8439ce
 - Improve CLI options 55ac062 1869888 798bffb 4d9de48 eca7796 8396da1 5d9f5aa
 
@@ -1065,7 +1381,7 @@ from formatting an attribute #3665
 - Do not collapse block around expr with condition on match arm 5b9b7d5
 - Use vertical layout for complex attributes c77708f
 - Format array using heuristics for function calls 98c6f7b
-- Implement stable ordering for impl items with the the following item priority: type, const, macro, then method fa80ddf
+- Implement stable ordering for impl items with the following item priority: type, const, macro, then method fa80ddf
 - Reorder imports by default 164cf7d
 - Group `extern crate` by default 3a138a2
 - Make `error_on_line_overflow` false by default f146711

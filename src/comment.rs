@@ -1,32 +1,20 @@
 // Formatting and tools for comments.
 
-use std::{self, borrow::Cow, iter};
+use std::{borrow::Cow, iter};
 
-use itertools::{multipeek, MultiPeek};
-use lazy_static::lazy_static;
-use regex::Regex;
+use itertools::{Itertools as _, MultiPeek, multipeek};
 use rustc_span::Span;
+use tracing::{debug, trace};
 
 use crate::config::Config;
-use crate::rewrite::RewriteContext;
+use crate::rewrite::{RewriteContext, RewriteErrorExt, RewriteResult};
 use crate::shape::{Indent, Shape};
-use crate::string::{rewrite_string, StringFormat};
+use crate::string::{StringFormat, rewrite_string};
 use crate::utils::{
     count_newlines, first_line_width, last_line_width, trim_left_preserve_layout,
     trimmed_last_line_width, unicode_str_width,
 };
 use crate::{ErrorKind, FormattingError};
-
-lazy_static! {
-    /// A regex matching reference doc links.
-    ///
-    /// ```markdown
-    /// /// An [example].
-    /// ///
-    /// /// [example]: this::is::a::link
-    /// ```
-    static ref REFERENCE_LINK_URL: Regex = Regex::new(r"^\[.+\]\s?:").unwrap();
-}
 
 fn is_custom_comment(comment: &str) -> bool {
     if !comment.starts_with("//") {
@@ -58,25 +46,23 @@ fn custom_opener(s: &str) -> &str {
 }
 
 impl<'a> CommentStyle<'a> {
-    /// Returns `true` if the commenting style covers a line only.
+    /// Returns `true` if the commenting style cannot span multiple lines.
     pub(crate) fn is_line_comment(&self) -> bool {
-        match *self {
+        matches!(
+            self,
             CommentStyle::DoubleSlash
-            | CommentStyle::TripleSlash
-            | CommentStyle::Doc
-            | CommentStyle::Custom(_) => true,
-            _ => false,
-        }
+                | CommentStyle::TripleSlash
+                | CommentStyle::Doc
+                | CommentStyle::Custom(_)
+        )
     }
 
-    /// Returns `true` if the commenting style can span over multiple lines.
+    /// Returns `true` if the commenting style can span multiple lines.
     pub(crate) fn is_block_comment(&self) -> bool {
-        match *self {
-            CommentStyle::SingleBullet | CommentStyle::DoubleBullet | CommentStyle::Exclamation => {
-                true
-            }
-            _ => false,
-        }
+        matches!(
+            self,
+            CommentStyle::SingleBullet | CommentStyle::DoubleBullet | CommentStyle::Exclamation
+        )
     }
 
     /// Returns `true` if the commenting style is for documentation.
@@ -172,13 +158,10 @@ pub(crate) fn combine_strs_with_missing_comments(
     span: Span,
     shape: Shape,
     allow_extend: bool,
-) -> Option<String> {
+) -> RewriteResult {
     trace!(
         "combine_strs_with_missing_comments `{}` `{}` {:?} {:?}",
-        prev_str,
-        next_str,
-        span,
-        shape
+        prev_str, next_str, span, shape
     );
 
     let mut result =
@@ -205,12 +188,12 @@ pub(crate) fn combine_strs_with_missing_comments(
             result.push_str(&indent.to_string_with_newline(config))
         }
         result.push_str(next_str);
-        return Some(result);
+        return Ok(result);
     }
 
     // We have a missing comment between the first expression and the second expression.
 
-    // Peek the the original source code and find out whether there is a newline between the first
+    // Peek the original source code and find out whether there is a newline between the first
     // expression and the second expression or the missing comment. We will preserve the original
     // layout whenever possible.
     let original_snippet = context.snippet(span);
@@ -250,10 +233,10 @@ pub(crate) fn combine_strs_with_missing_comments(
     result.push_str(&second_sep);
     result.push_str(next_str);
 
-    Some(result)
+    Ok(result)
 }
 
-pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> Option<String> {
+pub(crate) fn rewrite_doc_comment(orig: &str, shape: Shape, config: &Config) -> RewriteResult {
     identify_comment(orig, false, shape, config, true)
 }
 
@@ -262,7 +245,7 @@ pub(crate) fn rewrite_comment(
     block_style: bool,
     shape: Shape,
     config: &Config,
-) -> Option<String> {
+) -> RewriteResult {
     identify_comment(orig, block_style, shape, config, false)
 }
 
@@ -272,7 +255,7 @@ fn identify_comment(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
-) -> Option<String> {
+) -> RewriteResult {
     let style = comment_style(orig, false);
 
     // Computes the byte length of line taking into account a newline if the line is part of a
@@ -364,10 +347,14 @@ fn identify_comment(
     let (first_group, rest) = orig.split_at(first_group_ending);
     let rewritten_first_group =
         if !config.normalize_comments() && has_bare_lines && style.is_block_comment() {
-            trim_left_preserve_layout(first_group, shape.indent, config)?
+            trim_left_preserve_layout(first_group, shape.indent, config).unknown_error()?
         } else if !config.normalize_comments()
             && !config.wrap_comments()
-            && !config.format_code_in_doc_comments()
+            && !(
+                // `format_code_in_doc_comments` should only take effect on doc comments,
+                // so we only consider it when this comment block is a doc comment block.
+                is_doc_comment && config.format_code_in_doc_comments()
+            )
         {
             light_rewrite_comment(first_group, shape.indent, config, is_doc_comment)
         } else {
@@ -381,7 +368,7 @@ fn identify_comment(
             )?
         };
     if rest.is_empty() {
-        Some(rewritten_first_group)
+        Ok(rewritten_first_group)
     } else {
         identify_comment(
             rest.trim_start(),
@@ -432,12 +419,18 @@ impl CodeBlockAttribute {
 
 /// Block that is formatted as an item.
 ///
-/// An item starts with either a star `*` a dash `-` a greater-than `>` or a plus '+'.
+/// An item starts with either a star `*`, a dash `-`, a greater-than `>`, a plus '+', or a number
+/// `12.` or `34)` (with at most 2 digits). An item represents CommonMark's ["list
+/// items"](https://spec.commonmark.org/0.30/#list-items) and/or ["block
+/// quotes"](https://spec.commonmark.org/0.30/#block-quotes), but note that only a subset of
+/// CommonMark is recognized - see the doc comment of [`ItemizedBlock::get_marker_length`] for more
+/// details.
+///
 /// Different level of indentation are handled by shrinking the shape accordingly.
 struct ItemizedBlock {
     /// the lines that are identified as part of an itemized block
     lines: Vec<String>,
-    /// the number of characters (typically whitespaces) up to the item sigil
+    /// the number of characters (typically whitespaces) up to the item marker
     indent: usize,
     /// the string that marks the start of an item
     opener: String,
@@ -446,37 +439,72 @@ struct ItemizedBlock {
 }
 
 impl ItemizedBlock {
-    /// Returns `true` if the line is formatted as an item
-    fn is_itemized_line(line: &str) -> bool {
-        let trimmed = line.trim_start();
+    /// Checks whether the `trimmed` line includes an item marker. Returns `None` if there is no
+    /// marker. Returns the length of the marker (in bytes) if one is present. Note that the length
+    /// includes the whitespace that follows the marker, for example the marker in `"* list item"`
+    /// has the length of 2.
+    ///
+    /// This function recognizes item markers that correspond to CommonMark's
+    /// ["bullet list marker"](https://spec.commonmark.org/0.30/#bullet-list-marker),
+    /// ["block quote marker"](https://spec.commonmark.org/0.30/#block-quote-marker), and/or
+    /// ["ordered list marker"](https://spec.commonmark.org/0.30/#ordered-list-marker).
+    ///
+    /// Compared to CommonMark specification, the number of digits that are allowed in an ["ordered
+    /// list marker"](https://spec.commonmark.org/0.30/#ordered-list-marker) is more limited (to at
+    /// most 2 digits). Limiting the length of the marker helps reduce the risk of recognizing
+    /// arbitrary numbers as markers. See also
+    /// <https://talk.commonmark.org/t/blank-lines-before-lists-revisited/1990> which gives the
+    /// following example where a number (i.e. "1868") doesn't signify an ordered list:
+    /// ```md
+    /// The Captain died in
+    /// 1868. He wes buried in...
+    /// ```
+    fn get_marker_length(trimmed: &str) -> Option<usize> {
+        // https://spec.commonmark.org/0.30/#bullet-list-marker or
+        // https://spec.commonmark.org/0.30/#block-quote-marker
         let itemized_start = ["* ", "- ", "> ", "+ "];
-        itemized_start.iter().any(|s| trimmed.starts_with(s))
+        if itemized_start.iter().any(|s| trimmed.starts_with(s)) {
+            return Some(2); // All items in `itemized_start` have length 2.
+        }
+
+        // https://spec.commonmark.org/0.30/#ordered-list-marker, where at most 2 digits are
+        // allowed.
+        for suffix in [". ", ") "] {
+            if let Some((prefix, _)) = trimmed.split_once(suffix) {
+                let has_leading_digits = (1..=2).contains(&prefix.len())
+                    && prefix.chars().all(|c| char::is_ascii_digit(&c));
+                if has_leading_digits {
+                    return Some(prefix.len() + suffix.len());
+                }
+            }
+        }
+
+        None // No markers found.
     }
 
-    /// Creates a new ItemizedBlock described with the given line.
-    /// The `is_itemized_line` needs to be called first.
-    fn new(line: &str) -> ItemizedBlock {
-        let space_to_sigil = line.chars().take_while(|c| c.is_whitespace()).count();
-        // +2 = '* ', which will add the appropriate amount of whitespace to keep itemized
-        // content formatted correctly.
-        let mut indent = space_to_sigil + 2;
+    /// Creates a new `ItemizedBlock` described with the given `line`.
+    /// Returns `None` if `line` doesn't start an item.
+    fn new(line: &str) -> Option<ItemizedBlock> {
+        let marker_length = ItemizedBlock::get_marker_length(line.trim_start())?;
+        let space_to_marker = line.chars().take_while(|c| c.is_whitespace()).count();
+        let mut indent = space_to_marker + marker_length;
         let mut line_start = " ".repeat(indent);
 
         // Markdown blockquote start with a "> "
-        if line.trim_start().starts_with(">") {
+        if line.trim_start().starts_with('>') {
             // remove the original +2 indent because there might be multiple nested block quotes
             // and it's easier to reason about the final indent by just taking the length
-            // of th new line_start. We update the indent because it effects the max width
+            // of the new line_start. We update the indent because it effects the max width
             // of each formatted line.
             line_start = itemized_block_quote_start(line, line_start, 2);
             indent = line_start.len();
         }
-        ItemizedBlock {
+        Some(ItemizedBlock {
             lines: vec![line[indent..].to_string()],
             indent,
             opener: line[..indent].to_string(),
             line_start,
-        }
+        })
     }
 
     /// Returns a `StringFormat` used for formatting the content of an item.
@@ -495,7 +523,7 @@ impl ItemizedBlock {
     /// Returns `true` if the line is part of the current itemized block.
     /// If it is, then it is added to the internal lines list.
     fn add_line(&mut self, line: &str) -> bool {
-        if !ItemizedBlock::is_itemized_line(line)
+        if ItemizedBlock::get_marker_length(line.trim_start()).is_none()
             && self.indent <= line.chars().take_while(|c| c.is_whitespace()).count()
         {
             self.lines.push(line.to_string());
@@ -506,10 +534,11 @@ impl ItemizedBlock {
 
     /// Returns the block as a string, with each line trimmed at the start.
     fn trimmed_block_as_string(&self) -> String {
-        self.lines
-            .iter()
-            .map(|line| format!("{} ", line.trim_start()))
-            .collect::<String>()
+        self.lines.iter().fold(String::new(), |mut acc, line| {
+            acc.push_str(line.trim_start());
+            acc.push(' ');
+            acc
+        })
     }
 
     /// Returns the block as a string under its original form.
@@ -584,7 +613,7 @@ impl<'a> CommentRewrite<'a> {
             is_prev_line_multi_line: false,
             code_block_attr: None,
             item_block: None,
-            comment_line_separator: format!("{}{}", indent_str, line_start),
+            comment_line_separator: format!("{indent_str}{line_start}"),
             max_width,
             indent_str,
             fmt_indent: shape.indent,
@@ -614,7 +643,7 @@ impl<'a> CommentRewrite<'a> {
         while let Some(line) = iter.next() {
             result.push_str(line);
             result.push_str(match iter.peek() {
-                Some(next_line) if next_line.is_empty() => sep.trim_end(),
+                Some(&"") => sep.trim_end(),
                 Some(..) => sep,
                 None => "",
             });
@@ -623,7 +652,7 @@ impl<'a> CommentRewrite<'a> {
     }
 
     /// Check if any characters were written to the result buffer after the start of the comment.
-    /// when calling [`CommentRewrite::new()`] the result buffer is initiazlied with the opening
+    /// when calling [`CommentRewrite::new()`] the result buffer is initialized with the opening
     /// characters for the comment.
     fn buffer_contains_comment(&self) -> bool {
         // if self.result.len() < self.opener.len() then an empty comment is in the buffer
@@ -766,10 +795,11 @@ impl<'a> CommentRewrite<'a> {
         self.item_block = None;
         if let Some(stripped) = line.strip_prefix("```") {
             self.code_block_attr = Some(CodeBlockAttribute::new(stripped))
-        } else if self.fmt.config.wrap_comments() && ItemizedBlock::is_itemized_line(line) {
-            let ib = ItemizedBlock::new(line);
-            self.item_block = Some(ib);
-            return false;
+        } else if self.fmt.config.wrap_comments() {
+            if let Some(ib) = ItemizedBlock::new(line) {
+                self.item_block = Some(ib);
+                return false;
+            }
         }
 
         if self.result == self.opener {
@@ -795,7 +825,7 @@ impl<'a> CommentRewrite<'a> {
             }
         }
 
-        let is_markdown_header_doc_comment = is_doc_comment && line.starts_with("#");
+        let is_markdown_header_doc_comment = is_doc_comment && line.starts_with('#');
 
         // We only want to wrap the comment if:
         // 1) wrap_comments = true is configured
@@ -855,6 +885,9 @@ impl<'a> CommentRewrite<'a> {
                 // Remove space if this is an empty comment or a doc comment.
                 self.result.pop();
             }
+            if self.code_block_attr.is_some() && self.is_prev_line_multi_line {
+                self.result.push_str(&self.comment_line_separator);
+            }
             self.result.push_str(line);
             self.fmt.shape = Shape::legacy(self.max_width, self.fmt_indent);
             self.is_prev_line_multi_line = false;
@@ -871,7 +904,7 @@ fn rewrite_comment_inner(
     shape: Shape,
     config: &Config,
     is_doc_comment: bool,
-) -> Option<String> {
+) -> RewriteResult {
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
     let line_breaks = count_newlines(orig.trim_end());
@@ -905,7 +938,7 @@ fn rewrite_comment_inner(
         }
     }
 
-    Some(rewriter.finish())
+    Ok(rewriter.finish())
 }
 
 const RUSTFMT_CUSTOM_COMMENT_PREFIX: &str = "//#### ";
@@ -913,7 +946,7 @@ const RUSTFMT_CUSTOM_COMMENT_PREFIX: &str = "//#### ";
 fn hide_sharp_behind_comment(s: &str) -> Cow<'_, str> {
     let s_trimmed = s.trim();
     if s_trimmed.starts_with("# ") || s_trimmed == "#" {
-        Cow::from(format!("{}{}", RUSTFMT_CUSTOM_COMMENT_PREFIX, s))
+        Cow::from(format!("{RUSTFMT_CUSTOM_COMMENT_PREFIX}{s}"))
     } else {
         Cow::from(s)
     }
@@ -935,12 +968,21 @@ fn trim_custom_comment_prefix(s: &str) -> String {
 
 /// Returns `true` if the given string MAY include URLs or alike.
 fn has_url(s: &str) -> bool {
+    // A regex matching reference doc links.
+    //
+    // ```markdown
+    // /// An [example].
+    // ///
+    // /// [example]: this::is::a::link
+    // ```
+    let reference_link_url = static_regex!(r"^\[.+\]\s?:");
+
     // This function may return false positive, but should get its job done in most cases.
     s.contains("https://")
         || s.contains("http://")
         || s.contains("ftp://")
         || s.contains("file://")
-        || REFERENCE_LINK_URL.is_match(s)
+        || reference_link_url.is_match(s)
 }
 
 /// Returns true if the given string may be part of a Markdown table.
@@ -961,7 +1003,7 @@ pub(crate) fn rewrite_missing_comment(
     span: Span,
     shape: Shape,
     context: &RewriteContext<'_>,
-) -> Option<String> {
+) -> RewriteResult {
     let missing_snippet = context.snippet(span);
     let trimmed_snippet = missing_snippet.trim();
     // check the span starts with a comment
@@ -969,7 +1011,7 @@ pub(crate) fn rewrite_missing_comment(
     if !trimmed_snippet.is_empty() && pos.is_some() {
         rewrite_comment(trimmed_snippet, false, shape, context.config)
     } else {
-        Some(String::new())
+        Ok(String::new())
     }
 }
 
@@ -981,13 +1023,13 @@ pub(crate) fn recover_missing_comment_in_span(
     shape: Shape,
     context: &RewriteContext<'_>,
     used_width: usize,
-) -> Option<String> {
+) -> RewriteResult {
     let missing_comment = rewrite_missing_comment(span, shape, context)?;
     if missing_comment.is_empty() {
-        Some(String::new())
+        Ok(String::new())
     } else {
         let missing_snippet = context.snippet(span);
-        let pos = missing_snippet.find('/')?;
+        let pos = missing_snippet.find('/').unknown_error()?;
         // 1 = ` `
         let total_width = missing_comment.len() + used_width + 1;
         let force_new_line_before_comment =
@@ -997,7 +1039,7 @@ pub(crate) fn recover_missing_comment_in_span(
         } else {
             Cow::from(" ")
         };
-        Some(format!("{}{}", sep, missing_comment))
+        Ok(format!("{sep}{missing_comment}"))
     }
 }
 
@@ -1017,8 +1059,7 @@ fn light_rewrite_comment(
     config: &Config,
     is_doc_comment: bool,
 ) -> String {
-    let lines: Vec<&str> = orig
-        .lines()
+    orig.lines()
         .map(|l| {
             // This is basically just l.trim(), but in the case that a line starts
             // with `*` we want to leave one space before it, so it aligns with the
@@ -1036,8 +1077,7 @@ fn light_rewrite_comment(
             // Preserve markdown's double-space line break syntax in doc comment.
             trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment)
         })
-        .collect();
-    lines.join(&format!("\n{}", offset.to_string(config)))
+        .join(&format!("\n{}", offset.to_string(config)))
 }
 
 /// Trims comment characters and possibly a single space from the left of a string.
@@ -1219,15 +1259,15 @@ pub(crate) enum FullCodeCharKind {
     InComment,
     /// Last character of a comment, '\n' for a line comment, '/' for a block comment.
     EndComment,
-    /// Start of a mutlitine string inside a comment
+    /// Start of a multiline string inside a comment
     StartStringCommented,
-    /// End of a mutlitine string inside a comment
+    /// End of a multiline string inside a comment
     EndStringCommented,
     /// Inside a commented string
     InStringCommented,
-    /// Start of a mutlitine string
+    /// Start of a multiline string
     StartString,
-    /// End of a mutlitine string
+    /// End of a multiline string
     EndString,
     /// Inside a string.
     InString,
@@ -1666,28 +1706,27 @@ impl<'a> Iterator for CommentCodeSlices<'a> {
 }
 
 /// Checks is `new` didn't miss any comment from `span`, if it removed any, return previous text
-/// (if it fits in the width/offset, else return `None`), else return `new`
 pub(crate) fn recover_comment_removed(
     new: String,
     span: Span,
     context: &RewriteContext<'_>,
-) -> Option<String> {
+) -> String {
     let snippet = context.snippet(span);
     if snippet != new && changed_comment_content(snippet, &new) {
         // We missed some comments. Warn and keep the original text.
         if context.config.error_on_unformatted() {
             context.report.append(
-                context.parse_sess.span_to_filename(span),
+                context.psess.span_to_filename(span),
                 vec![FormattingError::from_span(
                     span,
-                    context.parse_sess,
+                    context.psess,
                     ErrorKind::LostComment,
                 )],
             );
         }
-        Some(snippet.to_owned())
+        snippet.to_owned()
     } else {
-        Some(new)
+        new
     }
 }
 
@@ -1720,7 +1759,7 @@ fn changed_comment_content(orig: &str, new: &str) -> bool {
     let code_comment_content = |code| {
         let slices = UngroupedCommentCodeSlices::new(code);
         slices
-            .filter(|&(ref kind, _, _)| *kind == CodeCharKind::Comment)
+            .filter(|(kind, _, _)| *kind == CodeCharKind::Comment)
             .flat_map(|(_, _, s)| CommentReducer::new(s))
     };
     let res = code_comment_content(orig).ne(code_comment_content(new));
@@ -1794,8 +1833,7 @@ fn remove_comment_header(comment: &str) -> &str {
     } else {
         assert!(
             comment.starts_with("/*"),
-            "string '{}' is not a comment",
-            comment
+            "string '{comment}' is not a comment"
         );
         &comment[2..comment.len() - 2]
     }
@@ -1804,7 +1842,6 @@ fn remove_comment_header(comment: &str) -> &str {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::shape::{Indent, Shape};
 
     #[test]
     fn char_classes() {
@@ -2019,5 +2056,86 @@ fn main() {
 }
 "#;
         assert_eq!(s, filter_normal_code(s_with_comment));
+    }
+
+    #[test]
+    fn test_itemized_block_first_line_handling() {
+        fn run_test(
+            test_input: &str,
+            expected_line: &str,
+            expected_indent: usize,
+            expected_opener: &str,
+            expected_line_start: &str,
+        ) {
+            let block = ItemizedBlock::new(test_input).unwrap();
+            assert_eq!(1, block.lines.len(), "test_input: {test_input:?}");
+            assert_eq!(expected_line, &block.lines[0], "test_input: {test_input:?}");
+            assert_eq!(expected_indent, block.indent, "test_input: {test_input:?}");
+            assert_eq!(expected_opener, &block.opener, "test_input: {test_input:?}");
+            assert_eq!(
+                expected_line_start, &block.line_start,
+                "test_input: {test_input:?}"
+            );
+        }
+
+        run_test("- foo", "foo", 2, "- ", "  ");
+        run_test("* foo", "foo", 2, "* ", "  ");
+        run_test("> foo", "foo", 2, "> ", "> ");
+
+        run_test("1. foo", "foo", 3, "1. ", "   ");
+        run_test("12. foo", "foo", 4, "12. ", "    ");
+        run_test("1) foo", "foo", 3, "1) ", "   ");
+        run_test("12) foo", "foo", 4, "12) ", "    ");
+
+        run_test("    - foo", "foo", 6, "    - ", "      ");
+
+        // https://spec.commonmark.org/0.30 says: "A start number may begin with 0s":
+        run_test("0. foo", "foo", 3, "0. ", "   ");
+        run_test("01. foo", "foo", 4, "01. ", "    ");
+    }
+
+    #[test]
+    fn test_itemized_block_nonobvious_markers_are_rejected() {
+        let test_inputs = vec![
+            // Non-numeric item markers (e.g. `a.` or `iv.`) are not allowed by
+            // https://spec.commonmark.org/0.30/#ordered-list-marker. We also note that allowing
+            // them would risk misidentifying regular words as item markers. See also the
+            // discussion in https://talk.commonmark.org/t/blank-lines-before-lists-revisited/1990
+            "word.  rest of the paragraph.",
+            "a.  maybe this is a list item?  maybe not?",
+            "iv.  maybe this is a list item?  maybe not?",
+            // Numbers with 3 or more digits are not recognized as item markers, to avoid
+            // formatting the following example as a list:
+            //
+            // ```
+            // The Captain died in
+            // 1868. He was buried in...
+            // ```
+            "123.  only 2-digit numbers are recognized as item markers.",
+            // Parens:
+            "123)  giving some coverage to parens as well.",
+            "a)  giving some coverage to parens as well.",
+            // https://spec.commonmark.org/0.30 says that "at least one space or tab is needed
+            // between the list marker and any following content":
+            "1.Not a list item.",
+            "1.2.3. Not a list item.",
+            "1)Not a list item.",
+            "-Not a list item.",
+            "+Not a list item.",
+            "+1 not a list item.",
+            // https://spec.commonmark.org/0.30 says: "A start number may not be negative":
+            "-1. Not a list item.",
+            "-1 Not a list item.",
+            // Marker without prefix are not recognized as item markers:
+            ".   Not a list item.",
+            ")   Not a list item.",
+        ];
+        for line in test_inputs.iter() {
+            let maybe_block = ItemizedBlock::new(line);
+            assert!(
+                maybe_block.is_none(),
+                "The following line shouldn't be classified as a list item: {line}"
+            );
+        }
     }
 }

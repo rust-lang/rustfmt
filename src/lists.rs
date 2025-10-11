@@ -3,12 +3,12 @@
 use std::cmp;
 use std::iter::Peekable;
 
-use rustc_span::BytePos;
+use rustc_span::{BytePos, Span};
 
-use crate::comment::{find_comment_end, rewrite_comment, FindUncommented};
+use crate::comment::{FindUncommented, find_comment_end, rewrite_comment};
 use crate::config::lists::*;
 use crate::config::{Config, IndentStyle};
-use crate::rewrite::RewriteContext;
+use crate::rewrite::{ExceedsMaxWidthError, RewriteContext, RewriteError, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::utils::{
     count_newlines, first_line_width, last_line_width, mk_sp, starts_with_newline,
@@ -125,18 +125,18 @@ pub(crate) struct ListItem {
     pub(crate) pre_comment_style: ListItemCommentStyle,
     // Item should include attributes and doc comments. None indicates a failed
     // rewrite.
-    pub(crate) item: Option<String>,
+    pub(crate) item: RewriteResult,
     pub(crate) post_comment: Option<String>,
     // Whether there is extra whitespace before this item.
     pub(crate) new_lines: bool,
 }
 
 impl ListItem {
-    pub(crate) fn empty() -> ListItem {
+    pub(crate) fn from_item(item: RewriteResult) -> ListItem {
         ListItem {
             pre_comment: None,
             pre_comment_style: ListItemCommentStyle::None,
-            item: None,
+            item: item,
             post_comment: None,
             new_lines: false,
         }
@@ -185,7 +185,7 @@ impl ListItem {
         ListItem {
             pre_comment: None,
             pre_comment_style: ListItemCommentStyle::None,
-            item: Some(s.into()),
+            item: Ok(s.into()),
             post_comment: None,
             new_lines: false,
         }
@@ -197,7 +197,11 @@ impl ListItem {
             !matches!(*s, Some(ref s) if !s.is_empty())
         }
 
-        !(empty(&self.pre_comment) && empty(&self.item) && empty(&self.post_comment))
+        fn empty_result(s: &RewriteResult) -> bool {
+            !matches!(*s, Ok(ref s) if !s.is_empty())
+        }
+
+        !(empty(&self.pre_comment) && empty_result(&self.item) && empty(&self.post_comment))
     }
 }
 
@@ -257,7 +261,7 @@ where
 }
 
 // Format a list of commented items into a string.
-pub(crate) fn write_list<I, T>(items: I, formatting: &ListFormatting<'_>) -> Option<String>
+pub(crate) fn write_list<I, T>(items: I, formatting: &ListFormatting<'_>) -> RewriteResult
 where
     I: IntoIterator<Item = T> + Clone,
     T: AsRef<ListItem>,
@@ -281,7 +285,7 @@ where
     let indent_str = &formatting.shape.indent.to_string(formatting.config);
     while let Some((i, item)) = iter.next() {
         let item = item.as_ref();
-        let inner_item = item.item.as_ref()?;
+        let inner_item = item.item.as_ref().or_else(|err| Err(err.clone()))?;
         let first = i == 0;
         let last = iter.peek().is_none();
         let mut separate = match sep_place {
@@ -516,7 +520,7 @@ where
         prev_item_is_nested_import = inner_item.contains("::");
     }
 
-    Some(result)
+    Ok(result)
 }
 
 fn max_width_of_item_with_post_comment<I, T>(
@@ -637,7 +641,7 @@ pub(crate) fn extract_post_comment(
         post_snippet.trim_matches(white_space)
     }
     // not comment or over two lines
-    else if post_snippet.ends_with(',')
+    else if post_snippet.ends_with(separator)
         && (!post_snippet.trim().starts_with("//") || post_snippet.trim().contains('\n'))
     {
         post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
@@ -741,7 +745,7 @@ where
     I: Iterator<Item = T>,
     F1: Fn(&T) -> BytePos,
     F2: Fn(&T) -> BytePos,
-    F3: Fn(&T) -> Option<String>,
+    F3: Fn(&T) -> RewriteResult,
 {
     type Item = ListItem;
 
@@ -775,8 +779,9 @@ where
             ListItem {
                 pre_comment,
                 pre_comment_style,
+                // leave_last is set to true only for rewrite_items
                 item: if self.inner.peek().is_none() && self.leave_last {
-                    None
+                    Err(RewriteError::SkipFormatting)
                 } else {
                     (self.get_item_string)(&item)
                 },
@@ -805,7 +810,7 @@ where
     I: Iterator<Item = T>,
     F1: Fn(&T) -> BytePos,
     F2: Fn(&T) -> BytePos,
-    F3: Fn(&T) -> Option<String>,
+    F3: Fn(&T) -> RewriteResult,
 {
     ListItems {
         snippet_provider,
@@ -860,12 +865,13 @@ pub(crate) fn struct_lit_shape(
     context: &RewriteContext<'_>,
     prefix_width: usize,
     suffix_width: usize,
-) -> Option<(Option<Shape>, Shape)> {
+    span: Span,
+) -> Result<(Option<Shape>, Shape), ExceedsMaxWidthError> {
     let v_shape = match context.config.indent_style() {
         IndentStyle::Visual => shape
             .visual_indent(0)
-            .shrink_left(prefix_width)?
-            .sub_width(suffix_width)?,
+            .shrink_left(prefix_width, span)?
+            .sub_width(suffix_width, span)?,
         IndentStyle::Block => {
             let shape = shape.block_indent(context.config.tab_spaces());
             Shape {
@@ -874,13 +880,14 @@ pub(crate) fn struct_lit_shape(
             }
         }
     };
-    let shape_width = shape.width.checked_sub(prefix_width + suffix_width);
-    if let Some(w) = shape_width {
-        let shape_width = cmp::min(w, context.config.struct_lit_width());
-        Some((Some(Shape::legacy(shape_width, shape.indent)), v_shape))
-    } else {
-        Some((None, v_shape))
-    }
+    let h_shape = shape
+        .width
+        .checked_sub(prefix_width + suffix_width)
+        .map(|w| {
+            let shape_width = cmp::min(w, context.config.struct_lit_width());
+            Shape::legacy(shape_width, shape.indent)
+        });
+    Ok((h_shape, v_shape))
 }
 
 // Compute the tactic for the internals of a struct-lit-like thing.

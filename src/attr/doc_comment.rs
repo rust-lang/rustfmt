@@ -2,10 +2,15 @@ use crate::comment::CommentStyle;
 use std::fmt::{self, Display};
 
 /// Formats a string as a doc comment using the given [`CommentStyle`].
-#[derive(new)]
 pub(super) struct DocCommentFormatter<'a> {
     literal: &'a str,
     style: CommentStyle<'a>,
+}
+
+impl<'a> DocCommentFormatter<'a> {
+    pub(super) const fn new(literal: &'a str, style: CommentStyle<'a>) -> Self {
+        Self { literal, style }
+    }
 }
 
 impl Display for DocCommentFormatter<'_> {
@@ -15,15 +20,15 @@ impl Display for DocCommentFormatter<'_> {
 
         // Handle `#[doc = ""]`.
         if lines.peek().is_none() {
-            return write!(formatter, "{}", opener);
+            return write!(formatter, "{opener}");
         }
 
         while let Some(line) = lines.next() {
             let is_last_line = lines.peek().is_none();
             if is_last_line {
-                write!(formatter, "{}{}", opener, line)?;
+                write!(formatter, "{opener}{line}")?;
             } else {
-                writeln!(formatter, "{}{}", opener, line)?;
+                writeln!(formatter, "{opener}{line}")?;
             }
         }
         Ok(())

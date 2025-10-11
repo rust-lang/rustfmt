@@ -6,34 +6,48 @@
 
 // FIXME(#2455): Reorder trait items.
 
-use std::cmp::{Ord, Ordering};
+use std::cmp::Ordering;
 
-use rustc_ast::ast;
-use rustc_span::{symbol::sym, Span};
+use rustc_ast::{ast, attr};
+use rustc_span::{Span, symbol::sym};
 
+use crate::StyleEdition;
 use crate::config::{Config, GroupImportsTactic};
-use crate::imports::{normalize_use_trees_with_granularity, UseSegmentKind, UseTree};
+use crate::imports::{UseSegmentKind, UseTree, normalize_use_trees_with_granularity};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
-use crate::lists::{itemize_list, write_list, ListFormatting, ListItem};
-use crate::rewrite::RewriteContext;
+use crate::lists::{ListFormatting, ListItem, itemize_list, write_list};
+use crate::rewrite::{RewriteContext, RewriteError, RewriteResult};
 use crate::shape::Shape;
+use crate::sort::version_sort;
 use crate::source_map::LineRangeUtils;
 use crate::spanned::Spanned;
 use crate::utils::{contains_skip, mk_sp};
 use crate::visitor::FmtVisitor;
 
 /// Choose the ordering between the given two items.
-fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
+fn compare_items(a: &ast::Item, b: &ast::Item, context: &RewriteContext<'_>) -> Ordering {
+    let style_edition = context.config.style_edition();
     match (&a.kind, &b.kind) {
-        (&ast::ItemKind::Mod(..), &ast::ItemKind::Mod(..)) => {
-            a.ident.as_str().cmp(b.ident.as_str())
+        (&ast::ItemKind::Mod(_, a_ident, _), &ast::ItemKind::Mod(_, b_ident, _)) => {
+            if style_edition <= StyleEdition::Edition2021 {
+                a_ident.as_str().cmp(b_ident.as_str())
+            } else {
+                version_sort(a_ident.as_str(), b_ident.as_str())
+            }
         }
-        (&ast::ItemKind::ExternCrate(ref a_name), &ast::ItemKind::ExternCrate(ref b_name)) => {
+        (
+            &ast::ItemKind::ExternCrate(ref a_name, a_ident),
+            &ast::ItemKind::ExternCrate(ref b_name, b_ident),
+        ) => {
             // `extern crate foo as bar;`
             //               ^^^ Comparing this.
-            let a_orig_name = a_name.unwrap_or(a.ident.name);
-            let b_orig_name = b_name.unwrap_or(b.ident.name);
-            let result = a_orig_name.as_str().cmp(b_orig_name.as_str());
+            let a_orig_name = a_name.unwrap_or(a_ident.name);
+            let b_orig_name = b_name.unwrap_or(b_ident.name);
+            let result = if style_edition <= StyleEdition::Edition2021 {
+                a_orig_name.as_str().cmp(b_orig_name.as_str())
+            } else {
+                version_sort(a_orig_name.as_str(), b_orig_name.as_str())
+            };
             if result != Ordering::Equal {
                 return result;
             }
@@ -44,7 +58,10 @@ fn compare_items(a: &ast::Item, b: &ast::Item) -> Ordering {
                 (Some(..), None) => Ordering::Greater,
                 (None, Some(..)) => Ordering::Less,
                 (None, None) => Ordering::Equal,
-                (Some(..), Some(..)) => a.ident.as_str().cmp(b.ident.as_str()),
+                (Some(..), Some(..)) if style_edition <= StyleEdition::Edition2021 => {
+                    a_ident.as_str().cmp(b_ident.as_str())
+                }
+                (Some(..), Some(..)) => version_sort(a_ident.as_str(), b_ident.as_str()),
             }
         }
         _ => unreachable!(),
@@ -55,7 +72,7 @@ fn wrap_reorderable_items(
     context: &RewriteContext<'_>,
     list_items: &[ListItem],
     shape: Shape,
-) -> Option<String> {
+) -> RewriteResult {
     let fmt = ListFormatting::new(shape, context.config)
         .separator("")
         .align_comments(false);
@@ -66,11 +83,11 @@ fn rewrite_reorderable_item(
     context: &RewriteContext<'_>,
     item: &ast::Item,
     shape: Shape,
-) -> Option<String> {
+) -> RewriteResult {
     match item.kind {
         ast::ItemKind::ExternCrate(..) => rewrite_extern_crate(context, item, shape),
-        ast::ItemKind::Mod(..) => rewrite_mod(context, item, shape),
-        _ => None,
+        ast::ItemKind::Mod(_, ident, _) => rewrite_mod(context, item, ident, shape),
+        _ => Err(RewriteError::Unknown),
     }
 }
 
@@ -82,7 +99,7 @@ fn rewrite_reorderable_or_regroupable_items(
     reorderable_items: &[&ast::Item],
     shape: Shape,
     span: Span,
-) -> Option<String> {
+) -> RewriteResult {
     match reorderable_items[0].kind {
         // FIXME: Remove duplicated code.
         ast::ItemKind::Use(..) => {
@@ -99,7 +116,7 @@ fn rewrite_reorderable_or_regroupable_items(
                 ";",
                 |item| item.span().lo(),
                 |item| item.span().hi(),
-                |_item| Some("".to_owned()),
+                |_item| Ok("".to_owned()),
                 span.lo(),
                 span.hi(),
                 false,
@@ -124,24 +141,31 @@ fn rewrite_reorderable_or_regroupable_items(
             }
 
             // 4 = "use ", 1 = ";"
-            let nested_shape = shape.offset_left(4)?.sub_width(1)?;
+            let nested_shape = shape.offset_left(4, span)?.sub_width(1, span)?;
             let item_vec: Vec<_> = regrouped_items
                 .into_iter()
                 .filter(|use_group| !use_group.is_empty())
                 .map(|use_group| {
                     let item_vec: Vec<_> = use_group
                         .into_iter()
-                        .map(|use_tree| ListItem {
-                            item: use_tree.rewrite_top_level(context, nested_shape),
-                            ..use_tree.list_item.unwrap_or_else(ListItem::empty)
+                        .map(|use_tree| {
+                            let item = use_tree.rewrite_top_level(context, nested_shape);
+                            if let Some(list_item) = use_tree.list_item {
+                                ListItem {
+                                    item: item,
+                                    ..list_item
+                                }
+                            } else {
+                                ListItem::from_item(item)
+                            }
                         })
                         .collect();
                     wrap_reorderable_items(context, &item_vec, nested_shape)
                 })
-                .collect::<Option<Vec<_>>>()?;
+                .collect::<Result<Vec<_>, RewriteError>>()?;
 
             let join_string = format!("\n\n{}", shape.indent.to_string(context.config));
-            Some(item_vec.join(&join_string))
+            Ok(item_vec.join(&join_string))
         }
         _ => {
             let list_items = itemize_list(
@@ -158,7 +182,7 @@ fn rewrite_reorderable_or_regroupable_items(
             );
 
             let mut item_pair_vec: Vec<_> = list_items.zip(reorderable_items.iter()).collect();
-            item_pair_vec.sort_by(|a, b| compare_items(a.1, b.1));
+            item_pair_vec.sort_by(|a, b| compare_items(a.1, b.1, context));
             let item_vec: Vec<_> = item_pair_vec.into_iter().map(|pair| pair.0).collect();
 
             wrap_reorderable_items(context, &item_vec, shape)
@@ -167,7 +191,7 @@ fn rewrite_reorderable_or_regroupable_items(
 }
 
 fn contains_macro_use_attr(item: &ast::Item) -> bool {
-    crate::attr::contains_name(&item.attrs, sym::macro_use)
+    attr::contains_name(&item.attrs, sym::macro_use)
 }
 
 /// Divides imports into three groups, corresponding to standard, external
@@ -263,13 +287,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         item_kind: ReorderableItemKind,
         in_group: bool,
     ) -> usize {
-        let mut last = self.parse_sess.lookup_line_range(items[0].span());
+        let mut last = self.psess.lookup_line_range(items[0].span());
         let item_length = items
             .iter()
             .take_while(|ppi| {
                 item_kind.is_same_item_kind(&***ppi)
                     && (!in_group || {
-                        let current = self.parse_sess.lookup_line_range(ppi.span());
+                        let current = self.psess.lookup_line_range(ppi.span());
                         let in_same_group = current.lo < last.hi + 2;
                         last = current;
                         in_same_group
@@ -292,7 +316,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 self.shape(),
                 span,
             );
-            self.push_rewrite(span, rw);
+            self.push_rewrite(span, rw.ok());
         } else {
             for item in items {
                 self.push_rewrite(item.span, None);
