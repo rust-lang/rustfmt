@@ -303,6 +303,19 @@ impl fmt::Display for FormatReport {
     }
 }
 
+/// Returns the version of rustfmt in the format **`version-number`-`commit-hash`**. If a commit
+/// hash is not available only `version-number` is returned.
+pub fn version_str() -> String {
+    let version_number = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown");
+    let commit_info = include_str!(concat!(env!("OUT_DIR"), "/commit-info.txt"));
+
+    if commit_info.is_empty() {
+        format!("{version_number}")
+    } else {
+        format!("{version_number}-{commit_info}")
+    }
+}
+
 /// Format the given snippet. The snippet is expected to be *complete* code.
 /// When we cannot parse the given snippet, this function returns `None`.
 fn format_snippet(snippet: &str, config: &Config, is_macro_def: bool) -> Option<FormattedSnippet> {
