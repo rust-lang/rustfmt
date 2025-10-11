@@ -1,5 +1,6 @@
-#[macro_use]
-extern crate log;
+// We need this feature as it changes `dylib` linking behavior and allows us to link to
+// `rustc_driver`.
+#![feature(rustc_private)]
 
 use std::env;
 use std::io::stdout;
@@ -9,8 +10,12 @@ use std::str::FromStr;
 
 use getopts::{Matches, Options};
 use rustfmt_nightly as rustfmt;
+use tracing::debug;
+use tracing_subscriber::EnvFilter;
 
-use crate::rustfmt::{load_config, CliOptions, FormatReportFormatterBuilder, Input, Session};
+use crate::rustfmt::{
+    CliOptions, FormatReportFormatterBuilder, Input, Session, Version, load_config,
+};
 
 fn prune_files(files: Vec<&str>) -> Vec<&str> {
     let prefixes: Vec<_> = files
@@ -42,7 +47,7 @@ fn git_diff(commits: &str) -> String {
     let mut cmd = Command::new("git");
     cmd.arg("diff");
     if commits != "0" {
-        cmd.arg(format!("HEAD~{}", commits));
+        cmd.arg(format!("HEAD~{commits}"));
     }
     let output = cmd.output().expect("Couldn't execute `git diff`");
     String::from_utf8_lossy(&output.stdout).into_owned()
@@ -84,6 +89,15 @@ impl CliOptions for NullOptions {
     fn config_path(&self) -> Option<&Path> {
         unreachable!();
     }
+    fn edition(&self) -> Option<rustfmt_nightly::Edition> {
+        unreachable!();
+    }
+    fn style_edition(&self) -> Option<rustfmt_nightly::StyleEdition> {
+        unreachable!();
+    }
+    fn version(&self) -> Option<Version> {
+        unreachable!();
+    }
 }
 
 fn uncommitted_files() -> Vec<String> {
@@ -107,7 +121,7 @@ fn check_uncommitted() {
     if !uncommitted.is_empty() {
         println!("Found untracked changes:");
         for f in &uncommitted {
-            println!("  {}", f);
+            println!("  {f}");
         }
         println!("Commit your work, or run with `-u`.");
         println!("Exiting.");
@@ -170,7 +184,9 @@ impl Config {
 }
 
 fn main() {
-    env_logger::Builder::from_env("RUSTFMT_LOG").init();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_env("RUSTFMT_LOG"))
+        .init();
 
     let opts = make_opts();
     let matches = opts

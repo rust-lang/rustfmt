@@ -1,4 +1,4 @@
-# rustfmt [![Build Status](https://travis-ci.com/rust-lang/rustfmt.svg?branch=master)](https://travis-ci.com/rust-lang/rustfmt) [![Build Status](https://ci.appveyor.com/api/projects/status/github/rust-lang/rustfmt?svg=true)](https://ci.appveyor.com/project/rust-lang-libs/rustfmt) [![crates.io](https://img.shields.io/crates/v/rustfmt-nightly.svg)](https://crates.io/crates/rustfmt-nightly) [![Travis Configuration Status](https://img.shields.io/travis/davidalber/rustfmt-travis.svg?label=travis%20example)](https://travis-ci.org/davidalber/rustfmt-travis)
+# rustfmt [![linux](https://github.com/rust-lang/rustfmt/actions/workflows/linux.yml/badge.svg?event=push)](https://github.com/rust-lang/rustfmt/actions/workflows/linux.yml) [![mac](https://github.com/rust-lang/rustfmt/actions/workflows/mac.yml/badge.svg?event=push)](https://github.com/rust-lang/rustfmt/actions/workflows/mac.yml) [![windows](https://github.com/rust-lang/rustfmt/actions/workflows/windows.yml/badge.svg?event=push)](https://github.com/rust-lang/rustfmt/actions/workflows/windows.yml) [![crates.io](https://img.shields.io/crates/v/rustfmt-nightly.svg)](https://crates.io/crates/rustfmt-nightly)
 
 A tool for formatting Rust code according to style guidelines.
 
@@ -7,9 +7,7 @@ If you'd like to help out (and you should, it's a fun project!), see
 Conduct](CODE_OF_CONDUCT.md).
 
 You can use rustfmt in Travis CI builds. We provide a minimal Travis CI
-configuration (see [here](#checking-style-on-a-ci-server)) and verify its status
-using another repository. The status of that repository's build is reported by
-the "travis example" badge above.
+configuration (see [here](#checking-style-on-a-ci-server)).
 
 ## Quick start
 
@@ -73,24 +71,6 @@ because in the future Rustfmt might work on code where it currently does not):
   fixes to break our stability guarantees).
 
 
-## Installation
-
-```sh
-rustup component add rustfmt
-```
-
-## Installing from source
-
-To install from source (nightly required), first checkout to the tag or branch you want to install, then issue
-
-```sh
-cargo install --path .
-```
-
-This will install `rustfmt` in your `~/.cargo/bin`. Make sure to add `~/.cargo/bin` directory to
-your PATH variable.
-
-
 ## Running
 
 You can run Rustfmt by just typing `rustfmt filename` if you used `cargo
@@ -135,7 +115,7 @@ completed without error (whether or not changes were made).
 * [Emacs](https://github.com/rust-lang/rust-mode)
 * [Sublime Text 3](https://packagecontrol.io/packages/RustFmt)
 * [Atom](atom.md)
-* Visual Studio Code using [vscode-rust](https://github.com/editor-rs/vscode-rust), [vsc-rustfmt](https://github.com/Connorcpu/vsc-rustfmt) or [rls_vscode](https://github.com/jonathandturner/rls_vscode) through RLS.
+* [Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 * [IntelliJ or CLion](intellij.md)
 
 
@@ -190,11 +170,34 @@ See [GitHub page](https://rust-lang.github.io/rustfmt/) for details.
 
 ### Rust's Editions
 
-Rustfmt is able to pick up the edition used by reading the `Cargo.toml` file if
-executed through the Cargo's formatting tool `cargo fmt`. Otherwise, the edition
-needs to be specified in `rustfmt.toml`, e.g., with `edition = "2018"`.
+The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [Style Editions](#style-editions)).
+
+When running `cargo fmt`, the `edition` is automatically read from the `Cargo.toml` file. However, when running `rustfmt` directly, the `edition` defaults to 2015. For consistent parsing between rustfmt and `cargo fmt`, you should configure the `edition` in your `rustfmt.toml` file:
+
+```toml
+edition = "2018"
+```
+
+### Style Editions
+
+This option is inferred from the [`edition`](#rusts-editions) if not specified.
+
+See [Rust Style Editions] for details on formatting differences between style editions.
+rustfmt has a default style edition of `2015` while `cargo fmt` infers the style edition from the `edition` set in `Cargo.toml`. This can lead to inconsistencies between `rustfmt` and `cargo fmt` if the style edition is not explicitly configured.
+
+To ensure consistent formatting, it is recommended to specify the `style_edition` in a `rustfmt.toml` configuration file. For example:
+
+```toml
+style_edition = "2024"
+```
+[Rust Style Editions]: https://doc.rust-lang.org/nightly/style-guide/editions.html?highlight=editions#rust-style-editions
+[Rust Style Guide]: https://doc.rust-lang.org/nightly/style-guide/
+[RFC 3338]: https://rust-lang.github.io/rfcs/3338-style-evolution.html
 
 ## Tips
+
+* To ensure consistent parsing between `cargo fmt` and `rustfmt`, you should configure the [`edition`](#rusts-editions) in your `rustfmt.toml` file.
+* To ensure consistent formatting between `cargo fmt` and `rustfmt`, you should configure the [`style_edition`](#style-editions) in your `rustfmt.toml` file.
 
 * For things you do not want rustfmt to mangle, use `#[rustfmt::skip]`
 * To prevent rustfmt from formatting a macro or an attribute,
@@ -249,4 +252,4 @@ See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT](LICENSE-MIT) for details.
 
 [rust]: https://github.com/rust-lang/rust
 [fmt rfcs]: https://github.com/rust-dev-tools/fmt-rfcs
-[style guide]: https://github.com/rust-dev-tools/fmt-rfcs/blob/master/guide/guide.md
+[style guide]: https://doc.rust-lang.org/nightly/style-guide/

@@ -6,7 +6,6 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::ffi::OsStr;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
@@ -14,60 +13,62 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
 
-use clap::{AppSettings, CommandFactory, Parser};
+use cargo_metadata::Edition;
+use clap::{CommandFactory, Parser};
 
 #[path = "test/mod.rs"]
 #[cfg(test)]
 mod cargo_fmt_tests;
 
 #[derive(Parser)]
-#[clap(
-    global_setting(AppSettings::NoAutoVersion),
+#[command(
+    disable_version_flag = true,
     bin_name = "cargo fmt",
     about = "This utility formats all bin and lib files of \
              the current crate using rustfmt."
 )]
+#[command(styles = clap_cargo::style::CLAP_STYLING)]
 pub struct Opts {
     /// No output printed to stdout
-    #[clap(short = 'q', long = "quiet")]
+    #[arg(short = 'q', long = "quiet")]
     quiet: bool,
 
     /// Use verbose output
-    #[clap(short = 'v', long = "verbose")]
+    #[arg(short = 'v', long = "verbose")]
     verbose: bool,
 
     /// Print rustfmt version and exit
-    #[clap(long = "version")]
+    #[arg(long = "version")]
     version: bool,
 
     /// Specify package to format
-    #[clap(
+    #[arg(
         short = 'p',
         long = "package",
         value_name = "package",
-        multiple_values = true
+        num_args = 1..
     )]
     packages: Vec<String>,
 
     /// Specify path to Cargo.toml
-    #[clap(long = "manifest-path", value_name = "manifest-path")]
+    #[arg(long = "manifest-path", value_name = "manifest-path")]
     manifest_path: Option<String>,
 
     /// Specify message-format: short|json|human
-    #[clap(long = "message-format", value_name = "message-format")]
+    #[arg(long = "message-format", value_name = "message-format")]
     message_format: Option<String>,
 
     /// Options passed to rustfmt
     // 'raw = true' to make `--` explicit.
-    #[clap(name = "rustfmt_options", raw(true))]
+    #[arg(id = "rustfmt_options", raw = true)]
     rustfmt_options: Vec<String>,
 
     /// Format all packages, and also their local path-based dependencies
-    #[clap(long = "all")]
+    #[arg(long = "all")]
     format_all: bool,
 
     /// Run rustfmt in check mode
-    #[clap(long = "check")]
+    #[arg(long = "check")]
     check: bool,
 }
 
@@ -149,11 +150,13 @@ fn execute() -> i32 {
 }
 
 fn rustfmt_command() -> Command {
-    let rustfmt_var = env::var_os("RUSTFMT");
-    let rustfmt = match &rustfmt_var {
-        Some(rustfmt) => rustfmt,
-        None => OsStr::new("rustfmt"),
+    let rustfmt = match env::var_os("RUSTFMT") {
+        Some(rustfmt) => PathBuf::from(rustfmt),
+        None => env::current_exe()
+            .expect("current executable path invalid")
+            .with_file_name("rustfmt"),
     };
+
     Command::new(rustfmt)
 }
 
@@ -198,24 +201,20 @@ fn convert_message_format_to_rustfmt_args(
             Ok(())
         }
         "human" => Ok(()),
-        _ => {
-            return Err(format!(
-                "invalid --message-format value: {}. Allowed values are: short|json|human",
-                message_format
-            ));
-        }
+        _ => Err(format!(
+            "invalid --message-format value: {message_format}. Allowed values are: short|json|human"
+        )),
     }
 }
 
 fn print_usage_to_stderr(reason: &str) {
-    eprintln!("{}", reason);
+    eprintln!("{reason}");
     let app = Opts::command();
-    app.after_help("")
-        .write_help(&mut io::stderr())
-        .expect("failed to write to stderr");
+    let help = app.after_help("").render_help();
+    eprintln!("{help}");
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verbosity {
     Verbose,
     Normal,
@@ -272,7 +271,7 @@ pub struct Target {
     /// A kind of target (e.g., lib, bin, example, ...).
     kind: String,
     /// Rust edition for this target.
-    edition: String,
+    edition: Edition,
 }
 
 impl Target {
@@ -283,7 +282,7 @@ impl Target {
         Target {
             path: canonicalized,
             kind: target.kind[0].clone(),
-            edition: target.edition.clone(),
+            edition: target.edition,
         }
     }
 }
@@ -461,7 +460,7 @@ fn get_targets_with_hitlist(
         let package = workspace_hitlist.iter().next().unwrap();
         Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("package `{}` is not a member of the workspace", package),
+            format!("package `{package}` is not a member of the workspace"),
         ))
     }
 }
@@ -499,7 +498,7 @@ fn run_rustfmt(
 
         if verbosity == Verbosity::Verbose {
             print!("rustfmt");
-            print!(" --edition {}", edition);
+            print!(" --edition {edition}");
             fmt_args.iter().for_each(|f| print!(" {}", f));
             files.iter().for_each(|f| print!(" {}", f.display()));
             println!();
@@ -508,7 +507,7 @@ fn run_rustfmt(
         let mut command = rustfmt_command()
             .stdout(stdout)
             .args(files)
-            .args(&["--edition", edition])
+            .args(["--edition", edition.as_str()])
             .args(fmt_args)
             .spawn()
             .map_err(|e| match e.kind() {

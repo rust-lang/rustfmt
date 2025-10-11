@@ -13,7 +13,7 @@ pub enum Test {
 pub enum Foo<'a, Y: Baz> where X: Whatever
 { A, }
 
-enum EmtpyWithComment {
+enum EmptyWithComment {
     // Some comment
 }
 
@@ -36,7 +36,7 @@ enum StructLikeVariants {
     Normal(u32, String, ),
     StructLike { x: i32, // Test comment
         // Pre-comment
-        #[Attr50] y: SomeType, // Aanother Comment
+        #[Attr50] y: SomeType, // Another Comment
     }, SL { a: A }
 }
 
@@ -74,7 +74,7 @@ where I: Iterator<Item = T> {
 }
 
 
-enum EmtpyWithComment {
+enum EmptyWithComment {
     // Some comment
 }
 
@@ -94,7 +94,7 @@ fn nested_enum_test() {
     }
 }
 
-   pub  struct  EmtpyWithComment {
+   pub  struct  EmptyWithComment {
     // FIXME: Implement this struct
 }
 

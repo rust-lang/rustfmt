@@ -1,8 +1,9 @@
 use rustc_ast::ast;
 use rustc_ast::ptr::P;
-use rustc_ast::token::TokenKind;
+use rustc_ast::token;
 use rustc_ast::tokenstream::TokenStream;
-use rustc_span::symbol::{self, kw};
+use rustc_parse::exp;
+use rustc_span::symbol;
 
 use crate::rewrite::RewriteContext;
 
@@ -16,8 +17,8 @@ pub(crate) fn parse_lazy_static(
         ($method:ident $(,)* $($arg:expr),* $(,)*) => {
             match parser.$method($($arg,)*) {
                 Ok(val) => {
-                    if parser.sess.span_diagnostic.has_errors().is_some() {
-                        parser.sess.span_diagnostic.reset_err_count();
+                    if parser.psess.dcx().has_errors().is_some() {
+                        parser.psess.dcx().reset_err_count();
                         return None;
                     } else {
                         val
@@ -25,24 +26,25 @@ pub(crate) fn parse_lazy_static(
                 }
                 Err(err) => {
                     err.cancel();
-                    parser.sess.span_diagnostic.reset_err_count();
+                    parser.psess.dcx().reset_err_count();
                     return None;
                 }
             }
         }
     }
-
-    while parser.token.kind != TokenKind::Eof {
+    while parser.token.kind != token::Eof {
         // Parse a `lazy_static!` item.
+        // FIXME: These `eat_*` calls should be converted to `parse_or` to avoid
+        // silently formatting malformed lazy-statics.
         let vis = parse_or!(parse_visibility, rustc_parse::parser::FollowedByType::No);
-        parser.eat_keyword(kw::Static);
-        parser.eat_keyword(kw::Ref);
+        let _ = parser.eat_keyword(exp!(Static));
+        let _ = parser.eat_keyword(exp!(Ref));
         let id = parse_or!(parse_ident);
-        parser.eat(&TokenKind::Colon);
+        let _ = parser.eat(exp!(Colon));
         let ty = parse_or!(parse_ty);
-        parser.eat(&TokenKind::Eq);
+        let _ = parser.eat(exp!(Eq));
         let expr = parse_or!(parse_expr);
-        parser.eat(&TokenKind::Semi);
+        let _ = parser.eat(exp!(Semi));
         result.push((vis, id, ty, expr));
     }
 

@@ -2,7 +2,7 @@ This document outlines processes regarding management of rustfmt.
 
 # Stabilising an Option
 
-In this Section, we describe how to stabilise an option of the rustfmt's configration.
+In this Section, we describe how to stabilise an option of the rustfmt's configuration.
 
 ## Conditions
 
@@ -16,7 +16,7 @@ In this Section, we describe how to stabilise an option of the rustfmt's configr
 Open a pull request that closes the tracking issue. The tracking issue is listed beside the option in `Configurations.md`.
 
 - Update the `Config` enum marking the option as stable.
-- Update the the `Configuration.md` file marking the option as stable.
+- Update the `Configuration.md` file marking the option as stable.
 - Update `CHANGELOG.md` marking the option as stable.
 
 ## After the stabilisation
@@ -51,7 +51,3 @@ git tag -s v1.2.3 -m "Release 1.2.3"
 `cargo publish`
 
 ## 5. Create a PR to rust-lang/rust to update the rustfmt submodule
-
-Note that if you are updating `rustc-ap-*` crates, then you need to update **every** submodules in the rust-lang/rust repository that depend on the crates to use the same version of those.
-
-As of 2019/05, there are two such crates: `rls` and `racer` (`racer` depends on `rustc-ap-syntax` and `rls` depends on `racer`, and `rls` is one of submodules of the rust-lang/rust repository).

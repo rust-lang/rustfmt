@@ -1,7 +1,7 @@
 // Format string literals.
 
 use regex::Regex;
-use unicode_categories::UnicodeCategories;
+use unicode_properties::{GeneralCategory, UnicodeGeneralCategory};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::config::Config;
@@ -84,7 +84,7 @@ pub(crate) fn rewrite_string<'a>(
         stripped_str
             .len()
             .checked_next_power_of_two()
-            .unwrap_or(usize::max_value()),
+            .unwrap_or(usize::MAX),
     );
     result.push_str(fmt.opener);
 
@@ -366,7 +366,7 @@ fn is_whitespace(grapheme: &str) -> bool {
 fn is_punctuation(grapheme: &str) -> bool {
     grapheme
         .chars()
-        .all(UnicodeCategories::is_punctuation_other)
+        .all(|c| c.general_category() == GeneralCategory::OtherPunctuation)
 }
 
 fn graphemes_width(graphemes: &[&str]) -> usize {
@@ -375,7 +375,7 @@ fn graphemes_width(graphemes: &[&str]) -> usize {
 
 #[cfg(test)]
 mod test {
-    use super::{break_string, detect_url, rewrite_string, SnippetState, StringFormat};
+    use super::{SnippetState, StringFormat, break_string, detect_url, rewrite_string};
     use crate::config::Config;
     use crate::shape::{Indent, Shape};
     use unicode_segmentation::UnicodeSegmentation;

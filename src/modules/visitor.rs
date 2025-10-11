@@ -1,9 +1,11 @@
 use rustc_ast::ast;
 use rustc_ast::visit::Visitor;
-use rustc_span::Symbol;
+use rustc_span::{Symbol, sym};
+use tracing::debug;
 
 use crate::attr::MetaVisitor;
 use crate::parse::macros::cfg_if::parse_cfg_if;
+use crate::parse::macros::cfg_match::parse_cfg_match;
 use crate::parse::session::ParseSess;
 
 pub(crate) struct ModItem {
@@ -12,15 +14,15 @@ pub(crate) struct ModItem {
 
 /// Traverse `cfg_if!` macro and fetch modules.
 pub(crate) struct CfgIfVisitor<'a> {
-    parse_sess: &'a ParseSess,
+    psess: &'a ParseSess,
     mods: Vec<ModItem>,
 }
 
 impl<'a> CfgIfVisitor<'a> {
-    pub(crate) fn new(parse_sess: &'a ParseSess) -> CfgIfVisitor<'a> {
+    pub(crate) fn new(psess: &'a ParseSess) -> CfgIfVisitor<'a> {
         CfgIfVisitor {
             mods: vec![],
-            parse_sess,
+            psess,
         }
     }
 
@@ -62,7 +64,66 @@ impl<'a, 'ast: 'a> CfgIfVisitor<'a> {
             }
         };
 
-        let items = parse_cfg_if(self.parse_sess, mac)?;
+        let items = parse_cfg_if(self.psess, mac)?;
+        self.mods
+            .append(&mut items.into_iter().map(|item| ModItem { item }).collect());
+
+        Ok(())
+    }
+}
+
+/// Traverse `cfg_match!` macro and fetch modules.
+pub(crate) struct CfgMatchVisitor<'a> {
+    psess: &'a ParseSess,
+    mods: Vec<ModItem>,
+}
+
+impl<'a> CfgMatchVisitor<'a> {
+    pub(crate) fn new(psess: &'a ParseSess) -> CfgMatchVisitor<'a> {
+        CfgMatchVisitor {
+            mods: vec![],
+            psess,
+        }
+    }
+
+    pub(crate) fn mods(self) -> Vec<ModItem> {
+        self.mods
+    }
+}
+
+impl<'a, 'ast: 'a> Visitor<'ast> for CfgMatchVisitor<'a> {
+    fn visit_mac_call(&mut self, mac: &'ast ast::MacCall) {
+        match self.visit_mac_inner(mac) {
+            Ok(()) => (),
+            Err(e) => debug!("{}", e),
+        }
+    }
+}
+
+impl<'a, 'ast: 'a> CfgMatchVisitor<'a> {
+    fn visit_mac_inner(&mut self, mac: &'ast ast::MacCall) -> Result<(), &'static str> {
+        // Support both:
+        // ```
+        // std::cfg_match! {..}
+        // core::cfg_match! {..}
+        // ```
+        // And:
+        // ```
+        // use std::cfg_match;
+        // cfg_match! {..}
+        // ```
+        match mac.path.segments.last() {
+            Some(last_segment) => {
+                if last_segment.ident.name != Symbol::intern("cfg_match") {
+                    return Err("Expected cfg_match");
+                }
+            }
+            None => {
+                return Err("Expected cfg_match");
+            }
+        };
+
+        let items = parse_cfg_match(self.psess, mac)?;
         self.mods
             .append(&mut items.into_iter().map(|item| ModItem { item }).collect());
 
@@ -84,15 +145,19 @@ impl PathVisitor {
 }
 
 impl<'ast> MetaVisitor<'ast> for PathVisitor {
-    fn visit_meta_name_value(&mut self, meta_item: &'ast ast::MetaItem, lit: &'ast ast::Lit) {
-        if meta_item.has_name(Symbol::intern("path")) && lit.kind.is_str() {
-            self.paths.push(lit_to_str(lit));
+    fn visit_meta_name_value(
+        &mut self,
+        meta_item: &'ast ast::MetaItem,
+        lit: &'ast ast::MetaItemLit,
+    ) {
+        if meta_item.has_name(sym::path) && lit.kind.is_str() {
+            self.paths.push(meta_item_lit_to_str(lit));
         }
     }
 }
 
 #[cfg(not(windows))]
-fn lit_to_str(lit: &ast::Lit) -> String {
+fn meta_item_lit_to_str(lit: &ast::MetaItemLit) -> String {
     match lit.kind {
         ast::LitKind::Str(symbol, ..) => symbol.to_string(),
         _ => unreachable!(),
@@ -100,7 +165,7 @@ fn lit_to_str(lit: &ast::Lit) -> String {
 }
 
 #[cfg(windows)]
-fn lit_to_str(lit: &ast::Lit) -> String {
+fn meta_item_lit_to_str(lit: &ast::MetaItemLit) -> String {
     match lit.kind {
         ast::LitKind::Str(symbol, ..) => symbol.as_str().replace("/", "\\"),
         _ => unreachable!(),

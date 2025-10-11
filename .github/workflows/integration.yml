@@ -19,7 +19,6 @@ jobs:
       matrix:
         integration: [
           bitflags,
-          error-chain,
           log,
           mdbook,
           packed_simd,
@@ -27,7 +26,6 @@ jobs:
           tempdir,
           futures-rs,
           rust-clippy,
-          failure,
         ]
         include:
           # Allowed Failures
@@ -63,13 +61,10 @@ jobs:
           # Original comment was: temporal build failure due to breaking changes in the nightly compiler
           - integration: rust-semverver
             allow-failure: true
-          # Can be moved back to include section after https://github.com/rust-lang-nursery/failure/pull/298 is merged
-          - integration: failure
-            allow-failure: true
 
     steps:
     - name: checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
       # Run build
     - name: install rustup

@@ -31,7 +31,7 @@ jobs:
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
         # Run build
       - name: install rustup
@@ -46,10 +46,7 @@ jobs:
         shell: bash
 
       - name: Build release binaries
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
+        run: cargo build --release
 
       - name: Build archive
         shell: bash
