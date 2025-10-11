@@ -23,37 +23,23 @@ impl From<Option<PathBuf>> for EditorConfigSerializationTarget {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum EditorConfigSerializationError {
-    #[error("{0} is not a Directory")]
-    NotADirectory(PathBuf),
-    #[error("{0}")]
-    IO(#[from] std::io::Error),
+fn write_to_dir<S: Display>(dir: PathBuf, s: &S) {
+    let mut config = dir;
+    config.push(".editorconfig");
+    append_to_file(&config, s)
 }
 
-fn write_to_dir<S: Display>(
-    dir: PathBuf,
-    s: &S,
-) -> std::result::Result<(), EditorConfigSerializationError> {
-    match dir.is_dir() {
-        true => {
-            let mut config = dir;
-            config.push(".editorconfig");
-            append_to_file(&config, s).map_err(|err| err.into())
-        }
-        false => Err(EditorConfigSerializationError::NotADirectory(dir)),
-    }
-}
-
-fn append_to_file<S: Display>(p: &PathBuf, s: &S) -> std::io::Result<()> {
+fn append_to_file<S: Display>(p: &PathBuf, s: &S) {
     write!(
         std::fs::OpenOptions::new()
             .append(true)
             .create(true)
-            .open(p)?,
+            .open(p)
+            .unwrap(),
         "{}",
         s,
     )
+    .unwrap()
 }
 
 pub struct EditorConfigSerializer {
@@ -75,21 +61,16 @@ impl EditorConfigSerializer {
         self.unset_behaviour = UnsetBehaviour::Emit;
     }
 
-    pub fn write_to_target(
-        self,
-        target: &mut EditorConfigSerializationTarget,
-    ) -> std::result::Result<(), EditorConfigSerializationError> {
+    pub fn write_to_target(self, target: &mut EditorConfigSerializationTarget) {
         let s = self.to_string();
         match target {
             EditorConfigSerializationTarget::Stdout => {
-                write!(&mut std::io::stdout().lock(), "{s}").map_err(|err| err.into())
+                write!(&mut std::io::stdout().lock(), "{s}").unwrap()
             }
             EditorConfigSerializationTarget::Directory(path_buf) => {
                 write_to_dir(path_buf.clone(), &s)
             }
-            EditorConfigSerializationTarget::File(file) => {
-                append_to_file(file, &s).map_err(|err| err.into())
-            }
+            EditorConfigSerializationTarget::File(file) => append_to_file(file, &s),
         }
     }
 }

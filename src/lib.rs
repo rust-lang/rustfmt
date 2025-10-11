@@ -51,8 +51,7 @@ pub use crate::config::{
 pub use crate::format_report_formatter::{FormatReportFormatter, FormatReportFormatterBuilder};
 
 pub use crate::editorconfig::{
-    EditorConfigSerializationError, EditorConfigSerializationTarget, EditorConfigSerializer,
-    UnsetBehaviour,
+    EditorConfigSerializationTarget, EditorConfigSerializer, UnsetBehaviour,
 };
 pub use crate::rustfmt_diff::{ModifiedChunk, ModifiedLines};
 

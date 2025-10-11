@@ -313,7 +313,7 @@ fn output_editorconfig(
     config: Config,
 ) -> anyhow::Result<i32> {
     let serializer = EditorConfigSerializer::new(config.into(), UnsetBehaviour::default());
-    serializer.write_to_target(&mut tgt)?;
+    serializer.write_to_target(&mut tgt);
     Ok(0)
 }
 
