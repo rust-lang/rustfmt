@@ -114,7 +114,7 @@ impl EditorConfig {
 
 #[cfg(test)]
 mod unit_tests {
-    use std::path::Path;
+    use std::{path::Path, process::Command};
 
     use crate::Config;
 
@@ -145,8 +145,12 @@ mod unit_tests {
         test_config(&config);
     }
 
+    fn from_toml(toml: &str) -> Config {
+        Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap()
+    }
+
     fn test_toml(toml: &str) {
-        let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        let config = from_toml(toml);
         test_config(&config);
     }
 
@@ -158,5 +162,11 @@ mod unit_tests {
     #[test]
     fn from_config_some_custom() {
         test_toml("hard_tabs = true\ntab_spaces = 8")
+    }
+
+    #[test]
+    fn auto_newline_style() {
+        let conf: EditorConfig = from_toml("newline_style = \"Auto\"").into();
+        assert!(conf.end_of_line.is_unset());
     }
 }
