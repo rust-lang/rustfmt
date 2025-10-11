@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 use crate::NewlineStyle;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(super) enum EOFControllChar {
     Lf,
     #[allow(dead_code)]
@@ -52,6 +52,15 @@ pub(super) enum CharSet {
     UTF16_LE,
 }
 
+impl CharSet {
+    pub(super) fn is_utf8(&self) -> bool {
+        match self {
+            Self::UTF8 => true,
+            _ => false,
+        }
+    }
+}
+
 impl Display for CharSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
@@ -70,6 +79,21 @@ pub(super) enum IndentStyle {
     Space,
 }
 
+impl IndentStyle {
+    pub(super) fn is_tab(&self) -> bool {
+        match self {
+            IndentStyle::Tab => true,
+            _ => false,
+        }
+    }
+    pub(super) fn is_space(&self) -> bool {
+        match self {
+            IndentStyle::Space => true,
+            _ => false,
+        }
+    }
+}
+
 impl Display for IndentStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
@@ -84,6 +108,15 @@ pub(super) enum IndentSize {
     Tab,
     #[allow(dead_code)]
     Columns(u32),
+}
+
+impl IndentSize {
+    pub(super) fn is_tab(&self) -> bool {
+        match self {
+            IndentSize::Tab => true,
+            _ => false,
+        }
+    }
 }
 
 impl Display for IndentSize {

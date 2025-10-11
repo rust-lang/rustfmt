@@ -114,10 +114,49 @@ impl EditorConfig {
 
 #[cfg(test)]
 mod unit_tests {
+    use std::path::Path;
+
     use crate::Config;
 
+    use super::EditorConfig;
+
+    fn assert_config_eq(config: &Config, editorconfig: &EditorConfig) {
+        assert_eq!(config.hard_tabs(), editorconfig.indent_style.is_tab(),);
+        assert!(editorconfig.indent_size.is_tab(),);
+        assert_eq!(config.tab_spaces(), editorconfig.tab_width.clone().unwrap(),);
+        assert_eq!(config.newline_style(), editorconfig.end_of_line);
+        assert!(editorconfig.spelling_language.is_unset());
+        assert!(editorconfig.trim_trailing_whitespace.clone().unwrap());
+        assert!(editorconfig.insert_final_newline.clone().unwrap());
+        assert_eq!(
+            config.max_width(),
+            editorconfig.max_line_length.clone().unwrap()
+        )
+    }
+
+    fn test_config(config: &Config) {
+        let editorconfig: EditorConfig = config.into();
+        assert_config_eq(config, &editorconfig);
+    }
+
     #[test]
-    fn all_set() {
-        let mut config = Config::default();
+    fn from_config() {
+        let config = Config::default();
+        test_config(&config);
+    }
+
+    fn test_toml(toml: &str) {
+        let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        test_config(&config);
+    }
+
+    #[test]
+    fn from_config_all_custom() {
+        test_toml("hard_tabs = true\ntab_spaces = 8\nnewline_style = \"Native\"\nmax_width = 2000")
+    }
+
+    #[test]
+    fn from_config_some_custom() {
+        test_toml("hard_tabs = true\ntab_spaces = 8")
     }
 }
