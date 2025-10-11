@@ -493,14 +493,10 @@ are included as out of line modules from `src/lib.rs`."
 }
 
 fn print_version() {
-    let version_number = option_env!("CARGO_PKG_VERSION").unwrap_or("unknown");
-    let commit_info = include_str!(concat!(env!("OUT_DIR"), "/commit-info.txt"));
 
-    if commit_info.is_empty() {
-        println!("rustfmt {version_number}");
-    } else {
-        println!("rustfmt {version_number}-{commit_info}");
-    }
+    let version = rustfmt_nightly::version_str();
+    let version = rustfmt::version_str();
+    println!("rustfmt {version}");
 }
 
 fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
