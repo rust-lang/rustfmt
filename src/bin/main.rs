@@ -210,7 +210,8 @@ fn make_opts() -> Options {
             "editorconfig",
             "Generate an EditorConfig from rustfmt configuration. \
                 If specified, the configuration will be appended to the provided PATH or \
-                PATH/.editorconfig if PATH points to a directory.",
+                PATH/.editorconfig if PATH points to a directory.\n\
+                The config is not marked as root.",
             "=PATH",
         );
     }
@@ -504,7 +505,7 @@ fn print_help_editorconfig() {
 provide a PATH argument.
 `rustfmt --editorconfig=.editorconfig`
 
-When PATH is a directory, the configuration will be appended to a .editorconfig
+When PATH is a directory, the configuration will be appended to a `.editorconfig`
 file in that directory
 ```
     rustfmt --editorconfig=./my_dir/
@@ -522,8 +523,13 @@ file in that directory
     max_line_length = 100
 ```
 
-If you'd like, you can specify which directory includes the rustfmt.toml file with --config-path
+If you'd like, you can specify which directory includes the rustfmt.toml file
+with --config-path
 `rustfmt --editorconfig --config-path=/some/other/dir/or/file`
+
+The generated config is not marked as root. If this is the root configuration
+make sure to indidicate it by having `root = true` at the top of your
+`.editorconfig` file.
 "
     );
 }
