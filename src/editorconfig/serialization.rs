@@ -23,23 +23,24 @@ impl From<Option<PathBuf>> for EditorConfigSerializationTarget {
     }
 }
 
-fn write_to_dir<S: Display>(dir: PathBuf, s: &S) {
+fn write_to_dir<S: Display>(dir: PathBuf, s: &S) -> anyhow::Result<()> {
     let mut config = dir;
     config.push(".editorconfig");
     append_to_file(&config, s)
 }
 
-fn append_to_file<S: Display>(p: &PathBuf, s: &S) {
+fn append_to_file<S: Display>(p: &PathBuf, s: &S) -> anyhow::Result<()> {
     write!(
         std::fs::OpenOptions::new()
             .append(true)
             .create(true)
             .open(p)
-            .unwrap(),
+            .map_err(|err| anyhow::anyhow!("{}: {}", p.to_string_lossy(), err))?,
         "{}",
         s,
     )
-    .unwrap()
+    .unwrap();
+    Ok(())
 }
 
 pub struct EditorConfigSerializer {
@@ -61,11 +62,14 @@ impl EditorConfigSerializer {
         self.unset_behaviour = UnsetBehaviour::Emit;
     }
 
-    pub fn write_to_target(self, target: &mut EditorConfigSerializationTarget) {
+    pub fn write_to_target(
+        self,
+        target: &mut EditorConfigSerializationTarget,
+    ) -> anyhow::Result<()> {
         let s = self.to_string();
         match target {
             EditorConfigSerializationTarget::Stdout => {
-                write!(&mut std::io::stdout().lock(), "{s}").unwrap()
+                Ok(write!(&mut std::io::stdout().lock(), "{s}")?)
             }
             EditorConfigSerializationTarget::Directory(path_buf) => {
                 write_to_dir(path_buf.clone(), &s)

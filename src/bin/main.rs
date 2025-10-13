@@ -312,8 +312,7 @@ fn output_editorconfig(
     config: Config,
 ) -> anyhow::Result<i32> {
     let serializer = EditorConfigSerializer::new(config.into(), UnsetBehaviour::default());
-    serializer.write_to_target(&mut tgt);
-    Ok(0)
+    serializer.write_to_target(&mut tgt).map(|_| 0)
 }
 
 fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
