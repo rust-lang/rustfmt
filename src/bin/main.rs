@@ -94,8 +94,6 @@ pub enum OperationError {
     /// supported with standard input.
     #[error("Emit mode {0} not supported with standard output.")]
     StdinBadEmit(EmitMode),
-    #[error("Invalid argument: {0}")]
-    InvalidEditorConfigArgument(String),
 }
 
 impl From<IoError> for OperationError {
