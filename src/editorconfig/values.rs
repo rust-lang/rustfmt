@@ -65,10 +65,10 @@ impl Display for CharSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             CharSet::Latin1 => "latin1",
-            CharSet::UTF8 => "utf8",
-            CharSet::UTF8_BOM => "utf8-bom", // TODO: check for correct word separator
-            CharSet::UTF16_BE => "utf16-be",
-            CharSet::UTF16_LE => "utf16-le",
+            CharSet::UTF8 => "utf-8",
+            CharSet::UTF8_BOM => "utf-8-bom",
+            CharSet::UTF16_BE => "utf-16be",
+            CharSet::UTF16_LE => "utf-16le",
         })
     }
 }
