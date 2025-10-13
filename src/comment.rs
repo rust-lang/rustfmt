@@ -552,17 +552,7 @@ impl ItemizedBlock {
 /// The original line_start likely contains indentation (whitespaces), which we'd like to
 /// replace with '> ' characters.
 fn itemized_block_quote_start(line: &str, mut line_start: String, remove_indent: usize) -> String {
-    let mut quote_level = 0;
-    let mut chars = line.trim_start().chars().peekable();
-
-    while chars.peek() == Some(&'>') {
-        chars.next();
-        quote_level += 1;
-        // Skip all spaces after '>'
-        while chars.peek() == Some(&' ') {
-            chars.next();
-        }
-    }
+    let quote_level = line.chars().take_while(|&c| matches!(c, '>' | ' ')).filter(|&c| c == '>').count();
 
     for _ in 0..remove_indent {
         line_start.pop();
