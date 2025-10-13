@@ -127,3 +127,41 @@ impl Display for IndentSize {
         }
     }
 }
+
+#[cfg(test)]
+mod unit_tests {
+    use crate::editorconfig::{CharSet, EOFControllChar, IndentSize, IndentStyle};
+
+    #[test]
+    fn eol_controll_char() {
+        assert_eq!(EOFControllChar::Crlf.to_string(), "crlf");
+        assert_eq!(EOFControllChar::Cr.to_string(), "cr");
+        assert_eq!(EOFControllChar::Lf.to_string(), "lf");
+    }
+
+    #[test]
+    fn char_set() {
+        assert_eq!(CharSet::Latin1.to_string(), "latin1");
+        assert_eq!(CharSet::UTF8.to_string(), "utf-8");
+        assert_eq!(CharSet::UTF16_BE.to_string(), "utf-16be");
+        assert_eq!(CharSet::UTF16_LE.to_string(), "utf-16le");
+        assert_eq!(CharSet::UTF8_BOM.to_string(), "utf-8-bom");
+    }
+
+    #[test]
+    fn indent_style() {
+        assert_eq!(IndentStyle::Tab.to_string(), "tab");
+        assert_eq!(IndentStyle::Space.to_string(), "space");
+    }
+
+    #[test]
+    fn indent_size() {
+        assert_eq!(IndentSize::Tab.to_string(), "tab");
+        assert_eq!(IndentSize::Columns(1).to_string(), "1");
+        assert_eq!(IndentSize::Columns(3265444).to_string(), "3265444");
+        assert_eq!(
+            IndentSize::Columns(u32::MAX).to_string(),
+            u32::MAX.to_string()
+        );
+    }
+}
