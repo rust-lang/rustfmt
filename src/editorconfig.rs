@@ -66,7 +66,7 @@ fn write_pair<W: Write, V: Display>(
     match val {
         MaybeUnset::Unset => match b {
             UnsetBehaviour::Omit => Ok(()),
-            UnsetBehaviour::Emit => writeln!(target, "{}", MaybeUnset::<V>::UNSET_VAL),
+            UnsetBehaviour::Emit => writeln!(target, "{key} = {}", MaybeUnset::<V>::UNSET_VAL),
         },
         MaybeUnset::Set(val) => writeln!(target, "{key} = {val}"),
     }
@@ -114,7 +114,7 @@ impl EditorConfig {
 
 #[cfg(test)]
 mod unit_tests {
-    use std::{path::Path, process::Command};
+    use std::path::Path;
 
     use crate::Config;
 
