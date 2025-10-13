@@ -127,7 +127,6 @@ mod unit_tests {
                         tab_width: 4.into(),
                         end_of_line: EOFControllChar::Lf.into(),
                         charset: CharSet::UTF8.into(),
-                        spelling_language: MaybeUnset::Unset,
                         trim_trailing_whitespace: true.into(),
                         insert_final_newline: true.into(),
                         max_line_length: 100.into(),
@@ -154,7 +153,6 @@ mod unit_tests {
                         tab_width: MaybeUnset::Unset,
                         end_of_line: MaybeUnset::Unset,
                         charset: MaybeUnset::Unset,
-                        spelling_language: MaybeUnset::Unset,
                         trim_trailing_whitespace: MaybeUnset::Unset,
                         insert_final_newline: MaybeUnset::Unset,
                         max_line_length: MaybeUnset::Unset,
@@ -172,7 +170,6 @@ mod unit_tests {
                         tab_width: 1.into(),
                         end_of_line: EOFControllChar::Crlf.into(),
                         charset: CharSet::UTF16_LE.into(),
-                        spelling_language: "eng".to_string().to_string().into(),
                         trim_trailing_whitespace: false.into(),
                         insert_final_newline: false.into(),
                         max_line_length: 1.into(),
@@ -185,7 +182,6 @@ mod unit_tests {
                     ("tab_width", "1"),
                     ("end_of_line", "crlf"),
                     ("charset", "utf-16le"),
-                    ("spelling_language", "eng"),
                     ("trim_trailing_whitespace", "false"),
                     ("insert_final_newline", "false"),
                     ("max_line_length", "1"),
@@ -194,14 +190,13 @@ mod unit_tests {
         ];
         if unset_behaviour == UnsetBehaviour::Emit {
             let unset_keys = [
-                vec!["spelling_language"],
+                vec![],
                 vec![
                     "indent_style",
                     "indent_size",
                     "tab_width",
                     "end_of_line",
                     "charset",
-                    "spelling_language",
                     "trim_trailing_whitespace",
                     "insert_final_newline",
                     "max_line_length",

@@ -19,7 +19,6 @@ pub struct EditorConfig {
     tab_width: MaybeUnset<usize>,
     end_of_line: MaybeUnset<EOFControllChar>,
     charset: MaybeUnset<CharSet>,
-    spelling_language: MaybeUnset<String>,
     trim_trailing_whitespace: MaybeUnset<bool>,
     insert_final_newline: MaybeUnset<bool>,
     // Not universsally supported options
@@ -37,9 +36,8 @@ impl<'a> From<&'a Config> for EditorConfig {
             tab_width: MaybeUnset::Set(value.tab_spaces()),
             end_of_line: EOFControllChar::from_newline_style(&value.newline_style()).into(),
             charset: MaybeUnset::Set(CharSet::UTF8), // All rust files are UTF-8
-            spelling_language: MaybeUnset::Unset,
             trim_trailing_whitespace: MaybeUnset::Set(true), // I think rustfmt always does this
-            insert_final_newline: MaybeUnset::Set(true),     // I think rustfmt always does this
+            insert_final_newline: MaybeUnset::Set(true), // I think rustfmt always does this
             max_line_length: MaybeUnset::Set(value.max_width()),
         }
     }
@@ -103,7 +101,6 @@ impl EditorConfig {
             tab_width,
             end_of_line,
             charset,
-            spelling_language,
             trim_trailing_whitespace,
             insert_final_newline,
             max_line_length
@@ -125,7 +122,6 @@ mod unit_tests {
         assert!(editorconfig.indent_size.is_tab(),);
         assert_eq!(config.tab_spaces(), editorconfig.tab_width.clone().unwrap(),);
         assert_eq!(config.newline_style(), editorconfig.end_of_line);
-        assert!(editorconfig.spelling_language.is_unset());
         assert!(editorconfig.trim_trailing_whitespace.clone().unwrap());
         assert!(editorconfig.insert_final_newline.clone().unwrap());
         assert_eq!(
