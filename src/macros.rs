@@ -226,7 +226,11 @@ fn rewrite_macro_inner(
         };
     }
     // Format well-known macros which cannot be parsed as a valid AST.
-    if (macro_name == "lazy_static!" || macro_name == "lazy_static::lazy_static!") && !has_comment {
+    if (macro_name == "lazy_static!"
+        || (context.config.style_edition() >= StyleEdition::Edition2027
+            && macro_name == "lazy_static::lazy_static!"))
+        && !has_comment
+    {
         match format_lazy_static(context, shape, ts.clone(), mac.span(), &macro_name) {
             Ok(rw) => return Ok(rw),
             Err(err) => match err {
