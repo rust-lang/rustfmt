@@ -111,6 +111,12 @@ impl<T> From<Option<T>> for MaybeUnset<T> {
     }
 }
 
+impl<T> From<T> for MaybeUnset<T> {
+    fn from(value: T) -> Self {
+        Self::Set(value)
+    }
+}
+
 impl<T: Display> Display for MaybeUnset<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -120,7 +126,7 @@ impl<T: Display> Display for MaybeUnset<T> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum UnsetBehaviour {
     Omit,
     Emit,

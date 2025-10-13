@@ -98,3 +98,158 @@ impl Display for EditorConfigSerializer {
         self.config.write_to(f, self.unset_behaviour)
     }
 }
+
+#[cfg(test)]
+mod unit_tests {
+    use std::collections::HashMap;
+
+    use itertools::Itertools;
+
+    use crate::{
+        UnsetBehaviour,
+        editorconfig::{
+            CharSet, EOFControllChar, EditorConfig, IndentSize, IndentStyle, MaybeUnset,
+        },
+    };
+
+    use super::EditorConfigSerializer;
+
+    // (serializers, expected_resulting_kv_pairs)
+    fn get_test_config_serializers(
+        unset_behaviour: UnsetBehaviour,
+    ) -> Vec<(EditorConfigSerializer, HashMap<&'static str, &'static str>)> {
+        let mut out = vec![(
+            EditorConfigSerializer {
+                config: EditorConfig {
+                    indent_style: IndentStyle::Tab.into(),
+                    indent_size: IndentSize::Tab.into(),
+                    tab_width: 4.into(),
+                    end_of_line: EOFControllChar::Lf.into(),
+                    charset: CharSet::UTF8.into(),
+                    spelling_language: MaybeUnset::Unset,
+                    trim_trailing_whitespace: true.into(),
+                    insert_final_newline: true.into(),
+                    max_line_length: 100.into(),
+                },
+                unset_behaviour,
+            },
+            HashMap::from([
+                ("indent_style", "tab"),
+                ("indent_size", "tab"),
+                ("tab_width", "4"),
+                ("end_of_line", "lf"),
+                ("charset", "utf8"),
+                ("trim_trailing_whitespace", "true"),
+                ("insert_final_newline", "true"),
+                ("max_line_length", "100"),
+            ]),
+        )];
+        if unset_behaviour == UnsetBehaviour::Emit {
+            let unset_keys = [["spelling_language"]];
+            out.iter_mut()
+                .zip_eq(unset_keys)
+                .for_each(|((_serializer, expected), unset_keys)| {
+                    unset_keys.into_iter().for_each(|unset_key| {
+                        assert!(
+                            expected.insert(unset_key, "unset").is_none(),
+                            "value already set"
+                        )
+                    });
+                });
+        }
+        out
+    }
+
+    #[test]
+    fn all_set_format_validity() {
+        let serialized_test_configs = {
+            let mut serializers = get_test_config_serializers(UnsetBehaviour::Omit);
+            serializers.append(&mut get_test_config_serializers(UnsetBehaviour::Emit));
+            serializers
+                .into_iter()
+                .map(|(serializer, _expected)| serializer.to_string())
+        };
+        for serialized_config in serialized_test_configs {
+            let is_serialization_valid = serialized_config.lines().all(|line| {
+                let lines = line.trim();
+                let mut chars = line.chars();
+                let first = chars.next();
+
+                // blank line
+                if lines.is_empty() {
+                    return true;
+                }
+                // Comment line
+                if first.unwrap() == '#' {
+                    return true;
+                }
+                // Key value line
+                let kv_pair = lines.split_once('=');
+                if let Some((key, _val)) = kv_pair {
+                    return !key.is_empty();
+                }
+
+                // Section header
+                if first.unwrap() == '[' && chars.last().unwrap() == ']' {
+                    return true;
+                }
+                false
+            });
+            assert!(is_serialization_valid);
+        }
+    }
+
+    // Checks if the generated keynames are known to editorconfig. Should be removed/modified if
+    // external keys are added to the generated config.
+    #[test]
+    fn key_validity() {
+        let serialized_test_configs = {
+            let mut serializers = get_test_config_serializers(UnsetBehaviour::Omit);
+            serializers.append(&mut get_test_config_serializers(UnsetBehaviour::Emit));
+            serializers
+                .into_iter()
+                .map(|(serializer, expected)| (serializer.to_string(), expected))
+        };
+
+        let kv_pairs = serialized_test_configs.map(|(serialized_config, expected)| {
+            (
+                Box::from_iter(serialized_config.lines().filter_map(|line| {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with('#') || line.starts_with('[') {
+                        return None;
+                    }
+                    line.split_once('=')
+                        .map(|(k, v)| (Box::from(k.trim()), Box::from(v.trim())))
+                })),
+                expected,
+            )
+        });
+
+        for (pairs, expected) in kv_pairs {
+            let all_correct_pairs = pairs.iter().all(|(key, val): &(Box<str>, Box<str>)| {
+                **expected.get(key.as_ref()).unwrap_or_else(|| {
+                    panic!(
+                        "Unkown key: {key} = {val}.\n Known keys {:?}",
+                        expected.keys()
+                    )
+                }) == **val
+            });
+            assert!(all_correct_pairs, "Not all pairs had the expected values");
+            // Matches the expected number of entries
+            assert_eq!(
+                pairs.len(),
+                expected.len(),
+                "The number of expected pairs ({}) did not match the found number of pairs ({})",
+                expected.len(),
+                pairs.len()
+            );
+            let unique_keys = pairs.iter().unique_by(|(key, _val)| key).count();
+            assert_eq!(
+                pairs.len(),
+                unique_keys,
+                "Not all keys were unique. Expected: {}, Unique: {unique_keys}",
+                pairs.len()
+            );
+        }
+    }
+}
