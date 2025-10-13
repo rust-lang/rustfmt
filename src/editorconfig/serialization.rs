@@ -118,34 +118,96 @@ mod unit_tests {
     fn get_test_config_serializers(
         unset_behaviour: UnsetBehaviour,
     ) -> Vec<(EditorConfigSerializer, HashMap<&'static str, &'static str>)> {
-        let mut out = vec![(
-            EditorConfigSerializer {
-                config: EditorConfig {
-                    indent_style: IndentStyle::Tab.into(),
-                    indent_size: IndentSize::Tab.into(),
-                    tab_width: 4.into(),
-                    end_of_line: EOFControllChar::Lf.into(),
-                    charset: CharSet::UTF8.into(),
-                    spelling_language: MaybeUnset::Unset,
-                    trim_trailing_whitespace: true.into(),
-                    insert_final_newline: true.into(),
-                    max_line_length: 100.into(),
+        let mut out = vec![
+            (
+                EditorConfigSerializer {
+                    config: EditorConfig {
+                        indent_style: IndentStyle::Tab.into(),
+                        indent_size: IndentSize::Tab.into(),
+                        tab_width: 4.into(),
+                        end_of_line: EOFControllChar::Lf.into(),
+                        charset: CharSet::UTF8.into(),
+                        spelling_language: MaybeUnset::Unset,
+                        trim_trailing_whitespace: true.into(),
+                        insert_final_newline: true.into(),
+                        max_line_length: 100.into(),
+                    },
+                    unset_behaviour,
                 },
-                unset_behaviour,
-            },
-            HashMap::from([
-                ("indent_style", "tab"),
-                ("indent_size", "tab"),
-                ("tab_width", "4"),
-                ("end_of_line", "lf"),
-                ("charset", "utf8"),
-                ("trim_trailing_whitespace", "true"),
-                ("insert_final_newline", "true"),
-                ("max_line_length", "100"),
-            ]),
-        )];
+                HashMap::from([
+                    ("indent_style", "tab"),
+                    ("indent_size", "tab"),
+                    ("tab_width", "4"),
+                    ("end_of_line", "lf"),
+                    ("charset", "utf-8"),
+                    ("trim_trailing_whitespace", "true"),
+                    ("insert_final_newline", "true"),
+                    ("max_line_length", "100"),
+                ]),
+            ),
+            // Everything is left unset
+            (
+                EditorConfigSerializer {
+                    config: EditorConfig {
+                        indent_style: MaybeUnset::Unset,
+                        indent_size: MaybeUnset::Unset,
+                        tab_width: MaybeUnset::Unset,
+                        end_of_line: MaybeUnset::Unset,
+                        charset: MaybeUnset::Unset,
+                        spelling_language: MaybeUnset::Unset,
+                        trim_trailing_whitespace: MaybeUnset::Unset,
+                        insert_final_newline: MaybeUnset::Unset,
+                        max_line_length: MaybeUnset::Unset,
+                    },
+                    unset_behaviour,
+                },
+                HashMap::from([]),
+            ),
+            // All set
+            (
+                EditorConfigSerializer {
+                    config: EditorConfig {
+                        indent_style: IndentStyle::Space.into(),
+                        indent_size: IndentSize::Columns(4).into(),
+                        tab_width: 1.into(),
+                        end_of_line: EOFControllChar::Crlf.into(),
+                        charset: CharSet::UTF16_LE.into(),
+                        spelling_language: "eng".to_string().to_string().into(),
+                        trim_trailing_whitespace: false.into(),
+                        insert_final_newline: false.into(),
+                        max_line_length: 1.into(),
+                    },
+                    unset_behaviour,
+                },
+                HashMap::from([
+                    ("indent_style", "space"),
+                    ("indent_size", "4"),
+                    ("tab_width", "1"),
+                    ("end_of_line", "crlf"),
+                    ("charset", "utf-16le"),
+                    ("spelling_language", "eng"),
+                    ("trim_trailing_whitespace", "false"),
+                    ("insert_final_newline", "false"),
+                    ("max_line_length", "1"),
+                ]),
+            ),
+        ];
         if unset_behaviour == UnsetBehaviour::Emit {
-            let unset_keys = [["spelling_language"]];
+            let unset_keys = [
+                vec!["spelling_language"],
+                vec![
+                    "indent_style",
+                    "indent_size",
+                    "tab_width",
+                    "end_of_line",
+                    "charset",
+                    "spelling_language",
+                    "trim_trailing_whitespace",
+                    "insert_final_newline",
+                    "max_line_length",
+                ],
+                vec![],
+            ];
             out.iter_mut()
                 .zip_eq(unset_keys)
                 .for_each(|((_serializer, expected), unset_keys)| {
@@ -227,6 +289,7 @@ mod unit_tests {
 
         for (pairs, expected) in kv_pairs {
             let all_correct_pairs = pairs.iter().all(|(key, val): &(Box<str>, Box<str>)| {
+                println!("{key} = {val}");
                 **expected.get(key.as_ref()).unwrap_or_else(|| {
                     panic!(
                         "Unkown key: {key} = {val}.\n Known keys {:?}",
