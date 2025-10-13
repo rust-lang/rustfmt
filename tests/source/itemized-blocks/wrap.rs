@@ -96,3 +96,8 @@ fn func3() {}
 /// > >= >> >>= >>> >>>= This is a blockquote comment that is very long and should be wrapped according to max_width setting
 /// > > = >> >>= >>> >>>= This is a blockquote comment that is very long and should be wrapped according to max_width setting
 fn func4() {}
+
+/// >     >This is a blockquote comment that is very long and should be wrapped according to max_width setting
+/// >    >          This is a blockquote comment that is very long and should be wrapped according to max_width setting
+fn func5() {}
+
