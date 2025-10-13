@@ -5,14 +5,14 @@ use std::fmt::Display;
 use crate::NewlineStyle;
 
 #[derive(Clone, Debug)]
-pub(super) enum EOFControllChar {
+pub(super) enum EOLControllChar {
     Lf,
     #[allow(dead_code)]
     Cr,
     Crlf,
 }
 
-impl EOFControllChar {
+impl EOLControllChar {
     pub(super) fn from_newline_style(value: &NewlineStyle) -> Option<Self> {
         match value {
             NewlineStyle::Auto => None,
@@ -26,12 +26,12 @@ impl EOFControllChar {
     }
 }
 
-impl Display for EOFControllChar {
+impl Display for EOLControllChar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            EOFControllChar::Lf => "lf",
-            EOFControllChar::Cr => "cr",
-            EOFControllChar::Crlf => "crlf",
+            EOLControllChar::Lf => "lf",
+            EOLControllChar::Cr => "cr",
+            EOLControllChar::Crlf => "crlf",
         })
     }
 }
@@ -130,13 +130,13 @@ impl Display for IndentSize {
 
 #[cfg(test)]
 mod unit_tests {
-    use crate::editorconfig::{CharSet, EOFControllChar, IndentSize, IndentStyle};
+    use crate::editorconfig::{CharSet, EOLControllChar, IndentSize, IndentStyle};
 
     #[test]
     fn eol_controll_char() {
-        assert_eq!(EOFControllChar::Crlf.to_string(), "crlf");
-        assert_eq!(EOFControllChar::Cr.to_string(), "cr");
-        assert_eq!(EOFControllChar::Lf.to_string(), "lf");
+        assert_eq!(EOLControllChar::Crlf.to_string(), "crlf");
+        assert_eq!(EOLControllChar::Cr.to_string(), "cr");
+        assert_eq!(EOLControllChar::Lf.to_string(), "lf");
     }
 
     #[test]

@@ -108,7 +108,7 @@ mod unit_tests {
     use crate::{
         UnsetBehaviour,
         editorconfig::{
-            CharSet, EOFControllChar, EditorConfig, IndentSize, IndentStyle, MaybeUnset,
+            CharSet, EOLControllChar, EditorConfig, IndentSize, IndentStyle, MaybeUnset,
         },
     };
 
@@ -125,7 +125,7 @@ mod unit_tests {
                         indent_style: IndentStyle::Tab.into(),
                         indent_size: IndentSize::Tab.into(),
                         tab_width: 4.into(),
-                        end_of_line: EOFControllChar::Lf.into(),
+                        end_of_line: EOLControllChar::Lf.into(),
                         charset: CharSet::UTF8.into(),
                         trim_trailing_whitespace: true.into(),
                         insert_final_newline: true.into(),
@@ -168,7 +168,7 @@ mod unit_tests {
                         indent_style: IndentStyle::Space.into(),
                         indent_size: IndentSize::Columns(4).into(),
                         tab_width: 1.into(),
-                        end_of_line: EOFControllChar::Crlf.into(),
+                        end_of_line: EOLControllChar::Crlf.into(),
                         charset: CharSet::UTF16_LE.into(),
                         trim_trailing_whitespace: false.into(),
                         insert_final_newline: false.into(),

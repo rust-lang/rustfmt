@@ -5,7 +5,7 @@ mod values;
 use std::fmt::{Display, Write};
 
 use maybe_unset::MaybeUnset;
-use values::{CharSet, EOFControllChar, IndentSize, IndentStyle};
+use values::{CharSet, EOLControllChar, IndentSize, IndentStyle};
 
 pub use maybe_unset::UnsetBehaviour;
 pub use serialization::*;
@@ -17,7 +17,7 @@ pub struct EditorConfig {
     indent_style: MaybeUnset<IndentStyle>,
     indent_size: MaybeUnset<IndentSize>,
     tab_width: MaybeUnset<usize>,
-    end_of_line: MaybeUnset<EOFControllChar>,
+    end_of_line: MaybeUnset<EOLControllChar>,
     charset: MaybeUnset<CharSet>,
     trim_trailing_whitespace: MaybeUnset<bool>,
     insert_final_newline: MaybeUnset<bool>,
@@ -34,7 +34,7 @@ impl<'a> From<&'a Config> for EditorConfig {
             }),
             indent_size: MaybeUnset::Set(IndentSize::Tab), // Always use tab width for indent_size
             tab_width: MaybeUnset::Set(value.tab_spaces()),
-            end_of_line: EOFControllChar::from_newline_style(&value.newline_style()).into(),
+            end_of_line: EOLControllChar::from_newline_style(&value.newline_style()).into(),
             charset: MaybeUnset::Set(CharSet::UTF8), // All rust files are UTF-8
             trim_trailing_whitespace: MaybeUnset::Set(true), // I think rustfmt always does this
             insert_final_newline: MaybeUnset::Set(true), // I think rustfmt always does this

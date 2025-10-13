@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::NewlineStyle;
 
-use super::{CharSet, EOFControllChar, IndentSize, IndentStyle};
+use super::{CharSet, EOLControllChar, IndentSize, IndentStyle};
 
 /// The EditorConfig equivalent of Option<T>
 #[derive(Clone, PartialEq, Debug)]
@@ -48,7 +48,7 @@ impl MaybeUnset<IndentStyle> {
     }
 }
 
-impl PartialEq<NewlineStyle> for MaybeUnset<EOFControllChar> {
+impl PartialEq<NewlineStyle> for MaybeUnset<EOLControllChar> {
     fn eq(&self, other: &NewlineStyle) -> bool {
         match self {
             MaybeUnset::Unset => match other {
@@ -56,13 +56,13 @@ impl PartialEq<NewlineStyle> for MaybeUnset<EOFControllChar> {
                 _ => false,
             },
             MaybeUnset::Set(val) => match val {
-                EOFControllChar::Lf => match other {
+                EOLControllChar::Lf => match other {
                     NewlineStyle::Unix => true,
                     NewlineStyle::Native => !cfg!(windows),
                     _ => false,
                 },
-                EOFControllChar::Cr => false,
-                EOFControllChar::Crlf => match other {
+                EOLControllChar::Cr => false,
+                EOLControllChar::Crlf => match other {
                     NewlineStyle::Windows => true,
                     NewlineStyle::Native => cfg!(windows),
                     _ => false,
@@ -71,8 +71,8 @@ impl PartialEq<NewlineStyle> for MaybeUnset<EOFControllChar> {
         }
     }
 }
-impl PartialEq<MaybeUnset<EOFControllChar>> for NewlineStyle {
-    fn eq(&self, other: &MaybeUnset<EOFControllChar>) -> bool {
+impl PartialEq<MaybeUnset<EOLControllChar>> for NewlineStyle {
+    fn eq(&self, other: &MaybeUnset<EOLControllChar>) -> bool {
         other == self
     }
 }
