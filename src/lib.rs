@@ -309,7 +309,10 @@ pub fn version_str() -> String {
     let commit_info = include_str!(concat!(env!("OUT_DIR"), "/commit-info.txt"));
 
     if commit_info.is_empty() {
-        format!("{version_number}")
+        #[allow(clippy::useless_format)] // More readable this way.
+        {
+            format!("{version_number}")
+        }
     } else {
         format!("{version_number}-{commit_info}")
     }
