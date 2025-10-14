@@ -78,7 +78,7 @@
           <article class="markdown-body">
             <div class="searchCondition">
               <div>
-                <form style="display:flex;">
+                <form v-on:submit.prevent style="display:flex;">
                   <label for="search" style="margin-right: 3px;" >search:</label>
                   <div style="position: relative;">
                     <input id="search" placeholder="Search all options" v-model="searchCondition">
