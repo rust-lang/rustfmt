@@ -59,6 +59,9 @@ unicode-properties = { version = "0.1", default-features = false, features = ["g
 rustfmt-config_proc_macro = { version = "0.3", path = "config_proc_macro" }
 semver = "1.0.21"
 
+[dev-dependencies]
+tempfile = "3.23.0"
+
 # Rustc dependencies are loaded from the sysroot, Cargo doesn't know about them.
 
 [package.metadata.rust-analyzer]
