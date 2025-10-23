@@ -628,8 +628,21 @@ impl UseTree {
         }
 
         // Recursively normalize elements of a list use (including sorting the list).
+        let mut should_renormalize = false;
         if let UseSegmentKind::List(list) = last.kind {
-            let mut list = list.into_iter().map(UseTree::normalize).collect::<Vec<_>>();
+            let original_size = list.len();
+            let mut list = list
+                .into_iter()
+                .map(UseTree::normalize)
+                // Filter away empty elements
+                .filter(|elem| !elem.path.is_empty())
+                .collect::<Vec<_>>();
+
+            // We need to normalize again if list length is reduced to
+            // 0 (may remove) or 1 (may extract the element)
+            should_renormalize =
+                original_size != list.len() && (list.len() == 0 || list.len() == 1);
+
             list.sort();
             last = UseSegment {
                 kind: UseSegmentKind::List(list),
@@ -638,7 +651,12 @@ impl UseTree {
         }
 
         self.path.push(last);
-        self
+
+        if should_renormalize {
+            self.normalize()
+        } else {
+            self
+        }
     }
 
     fn has_comment(&self) -> bool {
