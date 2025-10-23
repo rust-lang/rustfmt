@@ -596,6 +596,7 @@ pub(crate) fn rewrite_block_with_visitor(
     let mut visitor = FmtVisitor::from_context(context);
     visitor.block_indent = shape.indent;
     visitor.is_if_else_block = context.is_if_else_block();
+    visitor.is_loop_block = context.is_loop_block();
     match (block.rules, label) {
         (ast::BlockCheckMode::Unsafe(..), _) | (ast::BlockCheckMode::Default, Some(_)) => {
             let snippet = context.snippet(block.span);
@@ -713,6 +714,7 @@ struct ControlFlow<'a> {
     allow_single_line: bool,
     // HACK: `true` if this is an `if` expression in an `else if`.
     nested_if: bool,
+    is_loop: bool,
     span: Span,
 }
 
@@ -784,6 +786,7 @@ impl<'a> ControlFlow<'a> {
             connector: " =",
             allow_single_line,
             nested_if,
+            is_loop: false,
             span,
         }
     }
@@ -800,6 +803,7 @@ impl<'a> ControlFlow<'a> {
             connector: "",
             allow_single_line: false,
             nested_if: false,
+            is_loop: true,
             span,
         }
     }
@@ -823,6 +827,7 @@ impl<'a> ControlFlow<'a> {
             connector: " =",
             allow_single_line: false,
             nested_if: false,
+            is_loop: true,
             span,
         }
     }
@@ -849,6 +854,7 @@ impl<'a> ControlFlow<'a> {
             connector: " in",
             allow_single_line: false,
             nested_if: false,
+            is_loop: true,
             span,
         }
     }
@@ -1162,8 +1168,10 @@ impl<'a> Rewrite for ControlFlow<'a> {
         };
         let block_str = {
             let old_val = context.is_if_else_block.replace(self.else_block.is_some());
+            let old_is_loop = context.is_loop_block.replace(self.is_loop);
             let result =
                 rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true);
+            context.is_loop_block.replace(old_is_loop);
             context.is_if_else_block.replace(old_val);
             result?
         };
