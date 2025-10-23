@@ -184,7 +184,7 @@ impl UseSegment {
         modsep: bool,
     ) -> Option<UseSegment> {
         let name = rewrite_ident(context, path_seg.ident);
-        if name.is_empty() {
+        if name.is_empty() || name == "{{root}}" {
             return None;
         }
         let kind = match name {
