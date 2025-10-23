@@ -216,7 +216,7 @@ macro_rules! binary {
                     op,
                     rhs,
                 },
-            }
+            };
         }
     };
 }
