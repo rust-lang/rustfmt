@@ -5,8 +5,19 @@
 # Labels
 # ------------------------------------------------------------------------------
 
+[relabel]
+allow-unauthenticated = [
+    "needs-triage",
+]
+
 [autolabel."pr-not-reviewed"]
 new_pr = true
+
+[autolabel."needs-triage"]
+new_issue = true
+exclude_labels = [
+    "C-tracking-issue",
+]
 
 # ------------------------------------------------------------------------------
 # PR assignments
