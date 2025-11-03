@@ -569,7 +569,7 @@ impl<'ast, 'psess, 'c> ModResolver<'ast, 'psess> {
                     Cow::Owned(items),
                     Cow::Owned(attrs),
                 ),
-            ))
+            ));
         }
         result
     }
