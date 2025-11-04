@@ -114,11 +114,11 @@
             const searchTerm = null !== searchParam ? searchParam : '';
             const versionParam = queryParams.get('version');
             const parseVersionParam = (version) => {
-              if (version === 'master') return 'master';
+              if (version === 'main') return 'main';
               if (version.startsWith('v')) return version;
               return `v${version}`;
             };
-            const versionNumber = null !== versionParam ? parseVersionParam(versionParam) : 'master';
+            const versionNumber = null !== versionParam ? parseVersionParam(versionParam) : 'main';
             new Vue({
               el: '#app',
               data: {
@@ -129,7 +129,7 @@
                 shouldStable: false,
                 viewVersion: versionNumber,
                 oldViewVersion: undefined,
-                versionOptions: ['master'],
+                versionOptions: ['main'],
                 scrolledOnce: false,
               },
               asyncComputed: {
