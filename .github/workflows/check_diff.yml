@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       clone_url:
-        description: 'Git url of a rustfmt fork to compare against the latest master rustfmt'
+        description: 'Git url of a rustfmt fork to compare against the latest rustfmt'
         required: true
       branch_name:
         description: 'Name of the feature branch on the forked repo'

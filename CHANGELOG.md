@@ -30,7 +30,7 @@
 - Add `style_edition=2027` to gate unstable formatting [#6324](https://github.com/rust-lang/rustfmt/pull/6324)
 - Support discovering and formatting files via external mods imported within `cfg_match`, similar to `cfg_if` behavior [#6522](https://github.com/rust-lang/rustfmt/pull/6522)
 - Add new nightly-only `match_arm_indent` option [#6525](https://github.com/rust-lang/rustfmt/pull/6525)
-  - more details in the [configuration section for this new option](https://github.com/rust-lang/rustfmt/blob/master/Configurations.md#match_arm_indent)
+  - more details in the [configuration section for this new option](https://github.com/rust-lang/rustfmt/blob/HEAD/Configurations.md#match_arm_indent)
 
 
 ## [1.8.0] 2024-09-20
@@ -331,7 +331,7 @@
 
 ### Added
 
-- New configuration option [`skip_macro_invocations`](https://rust-lang.github.io/rustfmt/?version=master&search=#skip_macro_invocations) [#5347](https://github.com/rust-lang/rustfmt/pull/5347) that can be used to globally define a single enumerated list of macro calls that rustfmt should skip formatting. rustfmt [currently also supports this via a custom tool attribute](https://github.com/rust-lang/rustfmt#tips), however, these cannot be used in all contexts because [custom inner attributes are unstable](https://github.com/rust-lang/rust/issues/54726)
+- New configuration option [`skip_macro_invocations`](https://rust-lang.github.io/rustfmt/?version=main&search=#skip_macro_invocations) [#5347](https://github.com/rust-lang/rustfmt/pull/5347) that can be used to globally define a single enumerated list of macro calls that rustfmt should skip formatting. rustfmt [currently also supports this via a custom tool attribute](https://github.com/rust-lang/rustfmt#tips), however, these cannot be used in all contexts because [custom inner attributes are unstable](https://github.com/rust-lang/rust/issues/54726)
 
 ### Misc
 

@@ -325,7 +325,7 @@ pub fn build_rustfmt_from_src(
     //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
     // binary can find it's runtime dependencies.
     // See https://github.com/rust-lang/rustfmt/issues/5675
-    // This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
+    // This will prepend the `LD_LIBRARY_PATH` for the main rustfmt binary
     let ld_lib_path = get_ld_library_path(&dir)?;
 
     info!("Building rustfmt from source");
@@ -348,7 +348,7 @@ pub fn build_rustfmt_from_src(
 }
 
 // Compiles and produces two rustfmt binaries.
-// One for the current master, and another for the feature branch
+// One for the current main branch, and another for the feature branch
 // Parameters:
 // dest: Directory where rustfmt will be cloned
 pub fn compile_rustfmt(

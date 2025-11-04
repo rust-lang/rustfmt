@@ -6,7 +6,7 @@ use tracing::info;
 /// Inputs for the check_diff script
 #[derive(Parser)]
 struct CliInputs {
-    /// Git url of a rustfmt fork to compare against the latest master rustfmt
+    /// Git url of a rustfmt fork to compare against the latest main rustfmt
     remote_repo_url: String,
     /// Name of the feature branch on the forked repo
     feature_branch: String,
