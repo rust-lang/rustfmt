@@ -1,6 +1,6 @@
-use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
+use std::{borrow::Cow, vec};
 
 use core::hash::{Hash, Hasher};
 
@@ -130,7 +130,7 @@ pub(crate) struct UseTree {
 
 impl PartialEq for UseTree {
     fn eq(&self, other: &UseTree) -> bool {
-        self.path == other.path
+        self.path == other.path && !self.has_attrs() && !other.has_attrs()
     }
 }
 impl Eq for UseTree {}
@@ -233,13 +233,19 @@ pub(crate) fn normalize_use_trees_with_granularity(
 
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
-        if use_tree.contains_comment() || use_tree.attrs.is_some() {
+        if use_tree.contains_comment() || use_tree.has_attrs_disallow_outer_style() {
             result.push(use_tree);
             continue;
         }
+        let attrs = use_tree.attrs.clone();
+        let result_buf = if attrs.is_some() {
+            &mut vec![]
+        } else {
+            &mut result
+        };
 
         for mut flattened in use_tree.flatten(import_granularity) {
-            if let Some(tree) = result
+            if let Some(tree) = result_buf
                 .iter_mut()
                 .find(|tree| tree.share_prefix(&flattened, merge_by))
             {
@@ -249,8 +255,18 @@ pub(crate) fn normalize_use_trees_with_granularity(
                 if merge_by == SharedPrefix::Module {
                     flattened = flattened.nest_trailing_self();
                 }
-                result.push(flattened);
+                result_buf.push(flattened);
             }
+        }
+        if let Some(attrs) = attrs {
+            let result_buf: Vec<_> = result_buf
+                .drain(..)
+                .map(|mut use_tree| {
+                    use_tree.attrs = Some(attrs.clone());
+                    use_tree
+                })
+                .collect();
+            result.extend(result_buf);
         }
     }
     result
@@ -559,7 +575,7 @@ impl UseTree {
 
         // Remove foo::{} or self without attributes.
         match last.kind {
-            _ if self.attrs.is_some() => (),
+            _ if self.has_attrs() => (),
             UseSegmentKind::List(ref list) if list.is_empty() => {
                 self.path = vec![];
                 return self;
@@ -657,6 +673,17 @@ impl UseTree {
         self.has_comment() || self.path.iter().any(|path| path.contains_comment())
     }
 
+    fn has_attrs(&self) -> bool {
+        self.attrs.is_some()
+    }
+
+    fn has_attrs_disallow_outer_style(&self) -> bool {
+        !self.attrs.iter().flatten().all(|attr| match &attr.kind {
+            ast::AttrKind::Normal(attr) => attr.item.is_valid_for_outer_style(),
+            ast::AttrKind::DocComment(..) => false,
+        })
+    }
+
     fn same_visibility(&self, other: &UseTree) -> bool {
         match (&self.visibility, &other.visibility) {
             (
@@ -682,7 +709,8 @@ impl UseTree {
     fn share_prefix(&self, other: &UseTree, shared_prefix: SharedPrefix) -> bool {
         if self.path.is_empty()
             || other.path.is_empty()
-            || self.attrs.is_some()
+            || self.has_attrs()
+            || other.has_attrs()
             || self.contains_comment()
             || !self.same_visibility(other)
         {
@@ -697,7 +725,8 @@ impl UseTree {
     }
 
     fn flatten(self, import_granularity: ImportGranularity) -> Vec<UseTree> {
-        if self.path.is_empty() || self.contains_comment() {
+        if self.path.is_empty() || self.contains_comment() || self.has_attrs_disallow_outer_style()
+        {
             return vec![self];
         }
         match &self.path.clone().last().unwrap().kind {
