@@ -1,6 +1,6 @@
-use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
+use std::{borrow::Cow, vec};
 
 use core::hash::{Hash, Hasher};
 
@@ -212,6 +212,15 @@ impl UseSegment {
     }
 }
 
+fn attrs_disallow_outer_style(attrs: &ast::AttrVec) -> bool {
+    !attrs.iter().all(|attr| {
+        let ast::AttrKind::Normal(attr) = &attr.kind else {
+            return false;
+        };
+        attr.item.is_valid_for_outer_style()
+    })
+}
+
 pub(crate) fn normalize_use_trees_with_granularity(
     use_trees: Vec<UseTree>,
     import_granularity: ImportGranularity,
@@ -226,13 +235,24 @@ pub(crate) fn normalize_use_trees_with_granularity(
 
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
-        if use_tree.contains_comment() || use_tree.attrs.is_some() {
+        if use_tree.contains_comment()
+            || use_tree
+                .attrs
+                .as_ref()
+                .map_or(false, attrs_disallow_outer_style)
+        {
             result.push(use_tree);
             continue;
         }
+        let attrs = use_tree.attrs.clone();
+        let result_buf = if attrs.is_some() {
+            &mut vec![]
+        } else {
+            &mut result
+        };
 
         for mut flattened in use_tree.flatten(import_granularity) {
-            if let Some(tree) = result
+            if let Some(tree) = result_buf
                 .iter_mut()
                 .find(|tree| tree.share_prefix(&flattened, merge_by))
             {
@@ -242,8 +262,18 @@ pub(crate) fn normalize_use_trees_with_granularity(
                 if merge_by == SharedPrefix::Module {
                     flattened = flattened.nest_trailing_self();
                 }
-                result.push(flattened);
+                result_buf.push(flattened);
             }
+        }
+        if let Some(attrs) = attrs {
+            let result_buf: Vec<_> = result_buf
+                .drain(..)
+                .map(|mut use_tree| {
+                    use_tree.attrs = Some(attrs.clone());
+                    use_tree
+                })
+                .collect();
+            result.extend(result_buf);
         }
     }
     result
