@@ -150,8 +150,8 @@ pub(crate) enum SegmentParam<'a> {
 impl<'a> SegmentParam<'a> {
     fn from_generic_arg(arg: &ast::GenericArg) -> SegmentParam<'_> {
         match arg {
-            ast::GenericArg::Lifetime(ref lt) => SegmentParam::LifeTime(lt),
-            ast::GenericArg::Type(ref ty) => SegmentParam::Type(ty),
+            ast::GenericArg::Lifetime(lt) => SegmentParam::LifeTime(lt),
+            ast::GenericArg::Type(ty) => SegmentParam::Type(ty),
             ast::GenericArg::Const(const_) => SegmentParam::Const(const_),
         }
     }
@@ -555,7 +555,7 @@ fn rewrite_generic_args(
     span: Span,
 ) -> RewriteResult {
     match gen_args {
-        ast::GenericArgs::AngleBracketed(ref data) => {
+        ast::GenericArgs::AngleBracketed(data) => {
             if data.args.is_empty() {
                 Ok("".to_owned())
             } else {
@@ -575,7 +575,7 @@ fn rewrite_generic_args(
                 overflow::rewrite_with_angle_brackets(context, "", args.iter(), shape, span)
             }
         }
-        ast::GenericArgs::Parenthesized(ref data) => format_function_type(
+        ast::GenericArgs::Parenthesized(data) => format_function_type(
             data.inputs.iter().map(|x| &**x),
             &data.output,
             false,
@@ -684,7 +684,7 @@ impl Rewrite for ast::GenericParam {
         let mut param = String::with_capacity(128);
 
         let param_start = if let ast::GenericParamKind::Const {
-            ref ty,
+            ty,
             kw_span,
             default,
         } = &self.kind
@@ -1177,7 +1177,7 @@ fn join_bounds_inner(
     // Whether a GenericBound item is a PathSegment segment that includes internal array
     // that contains more than one item
     let is_item_with_multi_items_array = |item: &ast::GenericBound| match item {
-        ast::GenericBound::Trait(ref poly_trait_ref, ..) => {
+        ast::GenericBound::Trait(poly_trait_ref, ..) => {
             let segments = &poly_trait_ref.trait_ref.path.segments;
             if segments.len() > 1 {
                 true

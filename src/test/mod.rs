@@ -820,7 +820,7 @@ fn idempotent_check(
     opt_config: &Option<PathBuf>,
 ) -> Result<FormatReport, IdempotentCheckError> {
     let sig_comments = read_significant_comments(filename);
-    let config = if let Some(ref config_file_path) = opt_config {
+    let config = if let Some(config_file_path) = opt_config {
         let (edition, style_edition, version) = get_editions_from_comments(&sig_comments);
         Config::from_toml_path(config_file_path, edition, style_edition, version)
             .expect("`rustfmt.toml` not found")

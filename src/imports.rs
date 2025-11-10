@@ -158,12 +158,12 @@ impl UseSegment {
     // Check if self == other with their aliases removed.
     fn equal_except_alias(&self, other: &Self) -> bool {
         match (&self.kind, &other.kind) {
-            (UseSegmentKind::Ident(ref s1, _), UseSegmentKind::Ident(ref s2, _)) => s1 == s2,
+            (UseSegmentKind::Ident(s1, _), UseSegmentKind::Ident(s2, _)) => s1 == s2,
             (UseSegmentKind::Slf(_), UseSegmentKind::Slf(_))
             | (UseSegmentKind::Super(_), UseSegmentKind::Super(_))
             | (UseSegmentKind::Crate(_), UseSegmentKind::Crate(_))
             | (UseSegmentKind::Glob, UseSegmentKind::Glob) => true,
-            (UseSegmentKind::List(ref list1), UseSegmentKind::List(ref list2)) => list1 == list2,
+            (UseSegmentKind::List(list1), UseSegmentKind::List(list2)) => list1 == list2,
             _ => false,
         }
     }
@@ -591,7 +591,7 @@ impl UseTree {
         if aliased_self {
             match self.path.last_mut() {
                 Some(UseSegment {
-                    kind: UseSegmentKind::Ident(_, ref mut old_rename),
+                    kind: UseSegmentKind::Ident(_, old_rename),
                     ..
                 }) => {
                     assert!(old_rename.is_none());
@@ -667,7 +667,7 @@ impl UseTree {
                 }),
             )
             | (None, None) => true,
-            (Some(ref a), Some(ref b)) => is_same_visibility(a, b),
+            (Some(a), Some(b)) => is_same_visibility(a, b),
             _ => false,
         }
     }
@@ -922,9 +922,7 @@ impl Ord for UseSegment {
         }
 
         match (&self.kind, &other.kind) {
-            (Slf(ref a), Slf(ref b))
-            | (Super(ref a), Super(ref b))
-            | (Crate(ref a), Crate(ref b)) => match (a, b) {
+            (Slf(a), Slf(b)) | (Super(a), Super(b)) | (Crate(a), Crate(b)) => match (a, b) {
                 (Some(sa), Some(sb)) => {
                     if self.style_edition >= StyleEdition::Edition2024 {
                         version_sort(sa.trim_start_matches("r#"), sb.trim_start_matches("r#"))
@@ -935,7 +933,7 @@ impl Ord for UseSegment {
                 (_, _) => a.cmp(b),
             },
             (Glob, Glob) => Ordering::Equal,
-            (Ident(ref pia, ref aa), Ident(ref pib, ref ab)) => {
+            (Ident(pia, aa), Ident(pib, ab)) => {
                 let (ia, ib) = if self.style_edition >= StyleEdition::Edition2024 {
                     (pia.trim_start_matches("r#"), pib.trim_start_matches("r#"))
                 } else {
@@ -977,7 +975,7 @@ impl Ord for UseSegment {
                     (None, None) => Ordering::Equal,
                 }
             }
-            (List(ref a), List(ref b)) => {
+            (List(a), List(b)) => {
                 for (a, b) in a.iter().zip(b.iter()) {
                     let ord = a.cmp(b);
                     if ord != Ordering::Equal {

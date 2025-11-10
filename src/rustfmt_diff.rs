@@ -162,7 +162,7 @@ impl OutputWriter {
     // Terminal in its `terminal` field.
     pub(crate) fn writeln(&mut self, msg: &str, color: Option<term::color::Color>) {
         match &mut self.terminal {
-            Some(ref mut t) => {
+            Some(t) => {
                 if let Some(color) = color {
                     t.fg(color).unwrap();
                 }

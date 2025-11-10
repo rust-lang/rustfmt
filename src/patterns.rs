@@ -56,22 +56,22 @@ fn is_short_pattern_inner(context: &RewriteContext<'_>, pat: &ast::Pat) -> bool 
             }
             _ => unreachable!(),
         },
-        ast::PatKind::Ident(_, _, ref pat) => pat.is_none(),
+        ast::PatKind::Ident(_, _, pat) => pat.is_none(),
         ast::PatKind::Struct(..)
         | ast::PatKind::MacCall(..)
         | ast::PatKind::Slice(..)
         | ast::PatKind::Path(..)
         | ast::PatKind::Range(..)
         | ast::PatKind::Guard(..) => false,
-        ast::PatKind::Tuple(ref subpats) => subpats.len() <= 1,
-        ast::PatKind::TupleStruct(_, ref path, ref subpats) => {
+        ast::PatKind::Tuple(subpats) => subpats.len() <= 1,
+        ast::PatKind::TupleStruct(_, path, subpats) => {
             path.segments.len() <= 1 && subpats.len() <= 1
         }
-        ast::PatKind::Box(ref p)
-        | PatKind::Deref(ref p)
-        | ast::PatKind::Ref(ref p, _)
-        | ast::PatKind::Paren(ref p) => is_short_pattern_inner(context, &*p),
-        PatKind::Or(ref pats) => pats.iter().all(|p| is_short_pattern_inner(context, p)),
+        ast::PatKind::Box(p)
+        | PatKind::Deref(p)
+        | ast::PatKind::Ref(p, _)
+        | ast::PatKind::Paren(p) => is_short_pattern_inner(context, &*p),
+        PatKind::Or(pats) => pats.iter().all(|p| is_short_pattern_inner(context, p)),
     }
 }
 
@@ -88,7 +88,7 @@ impl<'a, T: Rewrite> Rewrite for RangeOperand<'a, T> {
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         match &self.operand {
             None => Ok("".to_owned()),
-            Some(ref exp) => exp.rewrite_result(context, shape),
+            Some(exp) => exp.rewrite_result(context, shape),
         }
     }
 }

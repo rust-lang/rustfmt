@@ -156,14 +156,13 @@ impl<'a> Parser<'a> {
 
     fn parse_crate_mod(&mut self) -> Result<ast::Crate, ParserError> {
         let mut parser = AssertUnwindSafe(&mut self.parser);
-        let err = Err(ParserError::ParsePanicError);
         match catch_unwind(move || parser.parse_crate_mod()) {
             Ok(Ok(k)) => Ok(k),
             Ok(Err(db)) => {
                 db.emit();
-                err
+                Err(ParserError::ParsePanicError)
             }
-            Err(_) => err,
+            Err(_) => Err(ParserError::ParsePanicError),
         }
     }
 }

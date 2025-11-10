@@ -2273,30 +2273,61 @@ impl Rewrite for ast::Param {
         };
 
         if let Some(ref explicit_self) = self.to_self() {
-            rewrite_explicit_self(
+            return rewrite_explicit_self(
                 context,
                 explicit_self,
                 &param_attrs_result,
                 span,
                 shape,
                 has_multiple_attr_lines,
-            )
-        } else if is_named_param(self) {
-            let param_name = &self
-                .pat
-                .rewrite_result(context, Shape::legacy(shape.width, shape.indent))?;
-            let mut result = combine_strs_with_missing_comments(
-                context,
-                &param_attrs_result,
-                param_name,
-                span,
-                shape,
-                !has_multiple_attr_lines && !has_doc_comments,
-            )?;
+            );
+        }
+        if !is_named_param(self) {
+            return self.ty.rewrite_result(context, shape);
+        }
+        let param_name = &self
+            .pat
+            .rewrite_result(context, Shape::legacy(shape.width, shape.indent))?;
+        let mut result = combine_strs_with_missing_comments(
+            context,
+            &param_attrs_result,
+            param_name,
+            span,
+            shape,
+            !has_multiple_attr_lines && !has_doc_comments,
+        )?;
 
-            if !is_empty_infer(&*self.ty, self.pat.span) {
-                let (before_comment, after_comment) =
-                    get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
+        if !is_empty_infer(&*self.ty, self.pat.span) {
+            let (before_comment, after_comment) =
+                get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
+            result.push_str(&before_comment);
+            result.push_str(colon_spaces(context.config));
+            result.push_str(&after_comment);
+            let overhead = last_line_width(&result);
+            let max_width = shape
+                .width
+                .checked_sub(overhead)
+                .max_width_error(shape.width, self.span())?;
+            if let Ok(ty_str) = self
+                .ty
+                .rewrite_result(context, Shape::legacy(max_width, shape.indent))
+            {
+                result.push_str(&ty_str);
+            } else {
+                let prev_str = if param_attrs_result.is_empty() {
+                    param_attrs_result
+                } else {
+                    param_attrs_result + &shape.to_string_with_newline(context.config)
+                };
+
+                result = combine_strs_with_missing_comments(
+                    context,
+                    &prev_str,
+                    param_name,
+                    span,
+                    shape,
+                    !has_multiple_attr_lines,
+                )?;
                 result.push_str(&before_comment);
                 result.push_str(colon_spaces(context.config));
                 result.push_str(&after_comment);
@@ -2305,45 +2336,14 @@ impl Rewrite for ast::Param {
                     .width
                     .checked_sub(overhead)
                     .max_width_error(shape.width, self.span())?;
-                if let Ok(ty_str) = self
+                let ty_str = self
                     .ty
-                    .rewrite_result(context, Shape::legacy(max_width, shape.indent))
-                {
-                    result.push_str(&ty_str);
-                } else {
-                    let prev_str = if param_attrs_result.is_empty() {
-                        param_attrs_result
-                    } else {
-                        param_attrs_result + &shape.to_string_with_newline(context.config)
-                    };
-
-                    result = combine_strs_with_missing_comments(
-                        context,
-                        &prev_str,
-                        param_name,
-                        span,
-                        shape,
-                        !has_multiple_attr_lines,
-                    )?;
-                    result.push_str(&before_comment);
-                    result.push_str(colon_spaces(context.config));
-                    result.push_str(&after_comment);
-                    let overhead = last_line_width(&result);
-                    let max_width = shape
-                        .width
-                        .checked_sub(overhead)
-                        .max_width_error(shape.width, self.span())?;
-                    let ty_str = self
-                        .ty
-                        .rewrite_result(context, Shape::legacy(max_width, shape.indent))?;
-                    result.push_str(&ty_str);
-                }
+                    .rewrite_result(context, Shape::legacy(max_width, shape.indent))?;
+                result.push_str(&ty_str);
             }
-
-            Ok(result)
-        } else {
-            self.ty.rewrite_result(context, shape)
         }
+
+        Ok(result)
     }
 }
 

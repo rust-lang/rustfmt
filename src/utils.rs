@@ -259,7 +259,7 @@ fn is_skip(meta_item: &MetaItem) -> bool {
 #[inline]
 fn is_skip_nested(meta_item: &MetaItemInner) -> bool {
     match meta_item {
-        MetaItemInner::MetaItem(ref mi) => is_skip(mi),
+        MetaItemInner::MetaItem(mi) => is_skip(mi),
         MetaItemInner::Lit(_) => false,
     }
 }

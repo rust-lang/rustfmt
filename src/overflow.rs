@@ -140,7 +140,7 @@ impl<'a> OverflowableItem<'a> {
             OverflowableItem::MacroArg(MacroArg::Expr(expr)) => is_simple_expr(expr),
             OverflowableItem::MetaItemInner(meta_item_inner) => match meta_item_inner {
                 ast::MetaItemInner::Lit(..) => true,
-                ast::MetaItemInner::MetaItem(ref meta_item) => {
+                ast::MetaItemInner::MetaItem(meta_item) => {
                     matches!(meta_item.kind, ast::MetaItemKind::Word)
                 }
             },
@@ -169,7 +169,7 @@ impl<'a> OverflowableItem<'a> {
     pub(crate) fn to_expr(&self) -> Option<&'a ast::Expr> {
         match self {
             OverflowableItem::Expr(expr) => Some(expr),
-            OverflowableItem::MacroArg(MacroArg::Expr(ref expr)) => Some(expr),
+            OverflowableItem::MacroArg(MacroArg::Expr(expr)) => Some(expr),
             _ => None,
         }
     }
@@ -178,8 +178,8 @@ impl<'a> OverflowableItem<'a> {
         match self {
             OverflowableItem::Expr(expr) => can_be_overflowed_expr(context, expr, len),
             OverflowableItem::MacroArg(macro_arg) => match macro_arg {
-                MacroArg::Expr(ref expr) => can_be_overflowed_expr(context, expr, len),
-                MacroArg::Ty(ref ty) => can_be_overflowed_type(context, ty, len),
+                MacroArg::Expr(expr) => can_be_overflowed_expr(context, expr, len),
+                MacroArg::Ty(ty) => can_be_overflowed_type(context, ty, len),
                 MacroArg::Pat(..) => false,
                 MacroArg::Item(..) => len == 1,
                 MacroArg::Keyword(..) => false,
@@ -197,7 +197,10 @@ impl<'a> OverflowableItem<'a> {
         }
     }
 
-    fn special_cases(&self, config: &Config) -> impl Iterator<Item = &(&'static str, usize)> {
+    fn special_cases(
+        &self,
+        config: &Config,
+    ) -> impl Iterator<Item = &(&'static str, usize)> + use<'_> {
         let base_cases = match self {
             OverflowableItem::MacroArg(..) => SPECIAL_CASE_MACROS,
             OverflowableItem::MetaItemInner(..) => SPECIAL_CASE_ATTR,

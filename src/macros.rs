@@ -843,7 +843,7 @@ impl MacroArgParser {
                 ) => {
                     break;
                 }
-                TokenTree::Token(ref t, _) => {
+                TokenTree::Token(t, _) => {
                     buffer.push_str(&pprust::token_to_string(t));
                 }
                 _ => return None,
@@ -939,7 +939,7 @@ impl MacroArgParser {
                 ) if self.is_meta_var => {
                     self.add_meta_variable(&mut iter)?;
                 }
-                TokenTree::Token(ref t, _) => self.update_buffer(t),
+                TokenTree::Token(t, _) => self.update_buffer(t),
                 &TokenTree::Delimited(_dspan, _spacing, delimited, ref tts) => {
                     if !self.buf.is_empty() {
                         if next_space(&self.last_tok.kind) == SpaceState::Always {

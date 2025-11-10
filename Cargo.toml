@@ -8,7 +8,7 @@ readme = "README.md"
 license = "Apache-2.0 OR MIT"
 build = "build.rs"
 categories = ["development-tools"]
-edition = "2021"
+edition = "2024"
 
 [[bin]]
 name = "rustfmt"
@@ -54,7 +54,9 @@ tracing = { version = "0.1.37", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 unicode-segmentation = "1.9"
 unicode-width = "0.1"
-unicode-properties = { version = "0.1", default-features = false, features = ["general-category"] }
+unicode-properties = { version = "0.1", default-features = false, features = [
+    "general-category",
+] }
 
 rustfmt-config_proc_macro = { version = "0.3", path = "config_proc_macro" }
 semver = "1.0.21"

@@ -387,13 +387,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let indent = self.block_indent;
         let block;
         let rewrite = match fk {
-            visit::FnKind::Fn(
-                _,
-                _,
-                ast::Fn {
-                    body: Some(ref b), ..
-                },
-            ) => {
+            visit::FnKind::Fn(_, _, ast::Fn { body: Some(b), .. }) => {
                 block = b;
                 self.rewrite_fn_before_block(
                     indent,
@@ -647,7 +641,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             (ast::AssocItemKind::Const(c), AssocImplItem) => {
                 self.visit_static(&StaticParts::from_impl_item(ai, c.ident))
             }
-            (ast::AssocItemKind::Fn(ref fn_kind), _) => {
+            (ast::AssocItemKind::Fn(fn_kind), _) => {
                 let ast::Fn {
                     defaultness,
                     ref sig,
@@ -675,10 +669,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.push_rewrite(ai.span, rewrite);
                 }
             }
-            (ast::AssocItemKind::Type(ref ty_alias), _) => {
+            (ast::AssocItemKind::Type(ty_alias), _) => {
                 self.visit_ty_alias_kind(ty_alias, &ai.vis, visitor_kind, ai.span);
             }
-            (ast::AssocItemKind::MacCall(ref mac), _) => {
+            (ast::AssocItemKind::MacCall(mac), _) => {
                 self.visit_mac(mac, MacroPosition::Item);
             }
             _ => unreachable!(),
@@ -835,7 +829,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 );
             } else {
                 match &attr.kind {
-                    ast::AttrKind::Normal(ref normal)
+                    ast::AttrKind::Normal(normal)
                         if self.is_unknown_rustfmt_attr(&normal.item.path.segments) =>
                     {
                         let file_name = self.psess.span_to_filename(attr.span);
@@ -943,7 +937,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let ident_str = rewrite_ident(&self.get_context(), ident).to_owned();
         self.push_str(&ident_str);
 
-        if let ast::ModKind::Loaded(ref items, ast::Inline::Yes, ref spans, _) = mod_kind {
+        if let ast::ModKind::Loaded(items, ast::Inline::Yes, spans, _) = mod_kind {
             let ast::ModSpans {
                 inner_span,
                 inject_use_span: _,

@@ -249,10 +249,8 @@ impl Rewrite for ast::MetaItemInner {
 
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         match self {
-            ast::MetaItemInner::MetaItem(ref meta_item) => meta_item.rewrite_result(context, shape),
-            ast::MetaItemInner::Lit(ref l) => {
-                rewrite_literal(context, l.as_token_lit(), l.span, shape)
-            }
+            ast::MetaItemInner::MetaItem(meta_item) => meta_item.rewrite_result(context, shape),
+            ast::MetaItemInner::Lit(l) => rewrite_literal(context, l.as_token_lit(), l.span, shape),
         }
     }
 }
@@ -342,7 +340,7 @@ impl Rewrite for ast::Attribute {
                 return Ok(snippet.to_owned());
             }
 
-            if let Some(ref meta) = self.meta() {
+            if let Some(meta) = self.meta() {
                 // This attribute is possibly a doc attribute needing normalization to a doc comment
                 if context.config.normalize_doc_attributes() && meta.has_name(sym::doc) {
                     if let Some(ref literal) = meta.value_str() {
@@ -546,8 +544,8 @@ pub(crate) trait MetaVisitor<'ast> {
 
     fn visit_meta_item_inner(&mut self, nm: &'ast ast::MetaItemInner) {
         match nm {
-            ast::MetaItemInner::MetaItem(ref meta_item) => self.visit_meta_item(meta_item),
-            ast::MetaItemInner::Lit(ref lit) => self.visit_meta_item_lit(lit),
+            ast::MetaItemInner::MetaItem(meta_item) => self.visit_meta_item(meta_item),
+            ast::MetaItemInner::Lit(lit) => self.visit_meta_item_lit(lit),
         }
     }
 

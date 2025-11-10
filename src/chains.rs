@@ -235,7 +235,7 @@ impl ChainItemKind {
                         data.args
                             .iter()
                             .filter_map(|x| match x {
-                                ast::AngleBracketedArg::Arg(ref generic_arg) => {
+                                ast::AngleBracketedArg::Arg(generic_arg) => {
                                     Some(generic_arg.clone())
                                 }
                                 _ => None,

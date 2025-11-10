@@ -556,7 +556,7 @@ impl Input {
 
     fn to_directory_ownership(&self) -> Option<DirectoryOwnership> {
         match self {
-            Input::File(ref file) => {
+            Input::File(file) => {
                 // If there exists a directory with the same name as an input,
                 // then the input should be parsed as a sub module.
                 let file_stem = file.file_stem()?;
