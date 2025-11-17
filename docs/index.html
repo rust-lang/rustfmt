@@ -114,7 +114,8 @@
             const searchTerm = null !== searchParam ? searchParam : '';
             const versionParam = queryParams.get('version');
             const parseVersionParam = (version) => {
-              if (version === 'main') return 'main';
+              // master is kept for backwards compatibility with old branch name
+              if (version === 'master' || version === 'main') return 'main';
               if (version.startsWith('v')) return version;
               return `v${version}`;
             };
