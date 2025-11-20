@@ -59,17 +59,17 @@ function create_diff() {
     done
 }
 
-# Run the master rustfmt binary and the feature branch binary in the current directory and compare the diffs
+# Run the main rustfmt binary and the feature branch binary in the current directory and compare the diffs
 #
 # Parameters
 # $1: Name of the repository (used for logging)
 #
 # Globals:
-# $RUSFMT_BIN: Path to the rustfmt master binary. Created when running `compile_rustfmt`
+# $RUSFMT_BIN: Path to the rustfmt main binary. Created when running `compile_rustfmt`
 # $FEATURE_BIN: Path to the rustfmt feature binary. Created when running `compile_rustfmt`
 # $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script from $4
 function check_diff() {
-    echo "running rustfmt (master) on $1"
+    echo "running rustfmt (main) on $1"
     create_diff $RUSFMT_BIN rustfmt_diff.txt
 
     echo "running rustfmt (feature) on $1"
@@ -96,7 +96,7 @@ function check_diff() {
 }
 
 # Compiles and produces two rustfmt binaries.
-# One for the current master, and another for the feature branch
+# One for the current main branch, and another for the feature branch
 #
 # Parameters:
 # $1: Directory where rustfmt will be cloned
@@ -116,7 +116,7 @@ function compile_rustfmt() {
 
     # Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
     # binary can find it's runtime dependencies. See https://github.com/rust-lang/rustfmt/issues/5675
-    # This will prepend the `LD_LIBRARY_PATH` for the master rustfmt binary
+    # This will prepend the `LD_LIBRARY_PATH` for the main rustfmt binary
     export LD_LIBRARY_PATH=$(rustc --print sysroot)/lib:$LD_LIBRARY_PATH
 
     echo "Building rustfmt from src"
@@ -171,7 +171,7 @@ function check_repo() {
 
 
     # rustfmt --check returns 1 if a diff was found
-    # Also check_diff returns 1 if there was a diff between master rustfmt and the feature branch
+    # Also check_diff returns 1 if there was a diff between main rustfmt and the feature branch
     # so we want to ignore the exit status check
     set +e
     check_diff $REPO_NAME
