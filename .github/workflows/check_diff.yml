@@ -8,6 +8,24 @@ on:
       branch_name:
         description: 'Name of the feature branch on the forked repo'
         required: true
+      edition:
+        description: 'Which rust `edition` to use when parsing code'
+        required: true
+        type: choice
+        options:
+          - '2015'
+          - '2018'
+          - '2021'
+          - '2024'
+        default: '2015'
+      style_edition:
+        description: 'Which rustfmt `style_edition` to use when formatting'
+        required: true
+        type: choice
+        options:
+          - '2021' # 2015, 2018, and 2021 are all the same for `style_edition`
+          - '2024'
+        default: '2021'
       commit_hash:
         description: 'Optional commit hash from the feature branch'
         required: false
@@ -30,4 +48,4 @@ jobs:
         rustup target add x86_64-unknown-linux-gnu
 
     - name: check diff
-      run: bash ${GITHUB_WORKSPACE}/ci/check_diff.sh ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} ${{ github.event.inputs.commit_hash || github.event.inputs.branch_name }} ${{ github.event.inputs.rustfmt_configs }}
+      run: bash ${GITHUB_WORKSPACE}/ci/check_diff.sh ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} ${{ github.event.inputs.edition }} ${{ github.event.inputs.style_edition }} ${{ github.event.inputs.commit_hash || github.event.inputs.branch_name }} ${{ github.event.inputs.rustfmt_configs }}

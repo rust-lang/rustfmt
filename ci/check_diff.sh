@@ -3,7 +3,7 @@
 set -e
 
 function print_usage() {
-    echo "usage check_diff REMOTE_REPO FEATURE_BRANCH [COMMIT_HASH] [OPTIONAL_RUSTFMT_CONFIGS]"
+    echo "usage check_diff REMOTE_REPO FEATURE_BRANCH EDITION STYLE_EDITION [COMMIT_HASH] [OPTIONAL_RUSTFMT_CONFIGS]"
 }
 
 if [ $# -le 1 ]; then
@@ -13,8 +13,10 @@ fi
 
 REMOTE_REPO=$1
 FEATURE_BRANCH=$2
-OPTIONAL_COMMIT_HASH=$3
-OPTIONAL_RUSTFMT_CONFIGS=$4
+EDITION=${3:-2015}
+STYLE_EDITION=${4:-2021}
+OPTIONAL_COMMIT_HASH=$5
+OPTIONAL_RUSTFMT_CONFIGS=$6
 
 # OUTPUT array used to collect all the status of running diffs on various repos
 STATUSES=()
@@ -55,7 +57,7 @@ function create_diff() {
 
     for i in `find . | grep "\.rs$"`
     do
-        $1 --unstable-features --skip-children --check --color=always $config $i >> $2 2>/dev/null
+        $1 --edition=$EDITION --style-edition $STYLE_EDITION --unstable-features --skip-children --check --color=always $config $i >> $2 2>/dev/null
     done
 }
 
@@ -189,6 +191,7 @@ function main() {
     echo Created tmp_dir $tmp_dir
 
     compile_rustfmt $tmp_dir
+    echo Parsing code with rust edition $EDITION and formatting code with style_edition $STYLE_EDITION
 
     # run checks
     check_repo "https://github.com/rust-lang/rust.git" rust-lang-rust
