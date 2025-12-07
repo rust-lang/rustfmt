@@ -3,7 +3,7 @@
 set -e
 
 function print_usage() {
-    echo "usage check_diff REMOTE_REPO FEATURE_BRANCH [COMMIT_HASH] [OPTIONAL_RUSTFMT_CONFIGS]"
+    echo "usage check_diff REMOTE_REPO FEATURE_BRANCH STYLE_EDITION [COMMIT_HASH] [OPTIONAL_RUSTFMT_CONFIGS]"
 }
 
 if [ $# -le 1 ]; then
@@ -13,8 +13,12 @@ fi
 
 REMOTE_REPO=$1
 FEATURE_BRANCH=$2
-OPTIONAL_COMMIT_HASH=$3
-OPTIONAL_RUSTFMT_CONFIGS=$4
+# Can still be overridden by style edition configuration in `OPTIONAL_RUSTFMT_CONFIGS`. This is a
+# separate arg mostly to make sure it's not forgotten when manually dispatching the Diff Check
+# workflow.
+STYLE_EDITION=$3
+OPTIONAL_COMMIT_HASH=$4
+OPTIONAL_RUSTFMT_CONFIGS=$5
 
 # OUTPUT array used to collect all the status of running diffs on various repos
 STATUSES=()
@@ -44,13 +48,19 @@ function init_submodules() {
 # $3: Any additional configuration options to pass to rustfmt
 #
 # Globals:
-# $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script from $4
+# $STYLE_EDITION: Style edition; can be overridden by style edition specified in
+#     `$OPTIONAL_RUSTFMT_CONFIGS`.
+# $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script
 function create_diff() {
     local config;
+    # Unconditionally set
+    config="--config=error_on_line_overflow=false,error_on_unformatted=false"
+    # Can still be overridden by later `style_edition` configurations in
+    # `$OPTIONAL_RUSTFMT_CONFIGS`.
+    config="$config,style_edition=$STYLE_EDITION"
+
     if [ -z "$3" ]; then
-        config="--config=error_on_line_overflow=false,error_on_unformatted=false"
-    else
-        config="--config=error_on_line_overflow=false,error_on_unformatted=false,$OPTIONAL_RUSTFMT_CONFIGS"
+        config="$config,$OPTIONAL_RUSTFMT_CONFIGS"
     fi
 
     for i in `find . | grep "\.rs$"`
@@ -191,6 +201,8 @@ function log_inputs() {
     echo "$REMOTE_REPO"
     echo "Feature branch:"
     echo "$FEATURE_BRANCH"
+    echo "Style edition:"
+    echo "$STYLE_EDITION"
     echo "(Optional) Commit hash:"
     echo "$OPTIONAL_COMMIT_HASH"
     echo "(Optional) Rustfmt configs:"
