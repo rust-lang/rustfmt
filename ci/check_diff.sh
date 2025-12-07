@@ -36,7 +36,7 @@ function init_submodules() {
     git submodule update --init $1
 }
 
-# Run rusfmt with the --check flag to see if a diff is produced.
+# Run rustfmt with the --check flag to see if a diff is produced.
 #
 # Parameters:
 # $1: Path to a rustfmt binary
@@ -65,12 +65,12 @@ function create_diff() {
 # $1: Name of the repository (used for logging)
 #
 # Globals:
-# $RUSFMT_BIN: Path to the rustfmt main binary. Created when running `compile_rustfmt`
+# $RUSTFMT_BIN: Path to the rustfmt main binary. Created when running `compile_rustfmt`
 # $FEATURE_BIN: Path to the rustfmt feature binary. Created when running `compile_rustfmt`
 # $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script from $4
 function check_diff() {
     echo "running rustfmt (main) on $1"
-    create_diff $RUSFMT_BIN rustfmt_diff.txt
+    create_diff $RUSTFMT_BIN rustfmt_diff.txt
 
     echo "running rustfmt (feature) on $1"
     create_diff $FEATURE_BIN feature_diff.txt $OPTIONAL_RUSTFMT_CONFIGS
@@ -140,9 +140,9 @@ function compile_rustfmt() {
 
     echo -e "\nRuntime dependencies for rustfmt -- LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 
-    RUSFMT_BIN=$1/rustfmt
-    RUSTFMT_VERSION=$($RUSFMT_BIN --version)
-    echo -e "\nRUSFMT_BIN $RUSTFMT_VERSION\n"
+    RUSTFMT_BIN=$1/rustfmt
+    RUSTFMT_VERSION=$($RUSTFMT_BIN --version)
+    echo -e "\nRUSTFMT_BIN $RUSTFMT_VERSION\n"
 
     FEATURE_BIN=$1/feature_rustfmt
     FEATURE_VERSION=$($FEATURE_BIN --version)
