@@ -269,6 +269,10 @@ accessing the correct field on the config struct, e.g., `config.max_width()`. Mo
 functions have a `Config`, or one can be accessed via a visitor or context of
 some kind.
 
+## Subtree syncs
+
+Refer to [*Subtree sync procedure*](./Subtree%20sync%20procedure.md).
+
 
 [rustfmt-zulip]:
     https://rust-lang.zulipchat.com/#narrow/channel/357797-t-rustfmt
