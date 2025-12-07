@@ -9,17 +9,13 @@ use rustfmt_config_proc_macro::{nightly_only_test, rustfmt_only_ci_test};
 
 /// Run the rustfmt executable and return its output.
 fn rustfmt(args: &[&str]) -> (String, String) {
-    let mut bin_dir = env::current_exe().unwrap();
-    bin_dir.pop(); // chop off test exe name
-    if bin_dir.ends_with("deps") {
-        bin_dir.pop();
-    }
-    let cmd = bin_dir.join(format!("rustfmt{}", env::consts::EXE_SUFFIX));
+    let cmd = env!("CARGO_BIN_EXE_rustfmt");
+    let bin_dir = Path::new(cmd).parent().unwrap();
 
     // Ensure the rustfmt binary runs from the local target dir.
     let path = env::var_os("PATH").unwrap_or_default();
     let mut paths = env::split_paths(&path).collect::<Vec<_>>();
-    paths.insert(0, bin_dir);
+    paths.insert(0, bin_dir.to_owned());
     let new_path = env::join_paths(paths).unwrap();
 
     match Command::new(&cmd).args(args).env("PATH", new_path).output() {
