@@ -57,3 +57,10 @@ use b::{
     /* Before b::l group */ l::{self, m, n::o, p::*},
     q,
 };
+
+// https://github.com/rust-lang/rustfmt/issues/6666
+#[cfg(true)]
+use a::{
+    b::c,
+    d::{e, f},
+};

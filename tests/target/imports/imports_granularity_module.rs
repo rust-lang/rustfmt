@@ -13,9 +13,11 @@ pub use a::t;
 use b::c::d;
 use b::{self};
 
-use foo::e;
 #[cfg(test)]
-use foo::{a::b, c::d};
+use foo::a::b;
+#[cfg(test)]
+use foo::c::d;
+use foo::e;
 
 use bar::{
     // comment
