@@ -3,7 +3,7 @@
 set -e
 
 function print_usage() {
-    echo "usage check_diff REMOTE_REPO FEATURE_BRANCH STYLE_EDITION [COMMIT_HASH] [OPTIONAL_RUSTFMT_CONFIGS]"
+    echo "usage check_diff REMOTE_REPO FEATURE_BRANCH LANGUAGE_EDITION STYLE_EDITION [COMMIT_HASH] [OPTIONAL_RUSTFMT_CONFIGS]"
 }
 
 if [ $# -le 1 ]; then
@@ -13,12 +13,17 @@ fi
 
 REMOTE_REPO=$1
 FEATURE_BRANCH=$2
-# Can still be overridden by style edition configuration in `OPTIONAL_RUSTFMT_CONFIGS`. This is a
-# separate arg mostly to make sure it's not forgotten when manually dispatching the Diff Check
+
+# Required language edition and style edition inputs.
+#
+# Can still be overridden by configuration in `OPTIONAL_RUSTFMT_CONFIGS`. They are
+# separate arg mostly to make sure they are not forgotten when manually dispatching the Diff Check
 # workflow.
-STYLE_EDITION=$3
-OPTIONAL_COMMIT_HASH=$4
-OPTIONAL_RUSTFMT_CONFIGS=$5
+LANGUAGE_EDITION=$3
+STYLE_EDITION=$4
+
+OPTIONAL_COMMIT_HASH=$5
+OPTIONAL_RUSTFMT_CONFIGS=$6
 
 # OUTPUT array used to collect all the status of running diffs on various repos
 STATUSES=()
@@ -48,6 +53,11 @@ function init_submodules() {
 # $3: Any additional configuration options to pass to rustfmt
 #
 # Globals:
+# $LANGUAGE_EDITION: Language edition. When not specified, `rustfmt` (like
+#     `rustc`) will default to Edition 2015, which for the projects being
+#     compared will likely cause parse errors since they tend to be on
+#     Edition 2024 (or later). Can still be override by language edition
+#     specified in `$OPTIONAL_RUSTFMT_CONFIGS`.
 # $STYLE_EDITION: Style edition; can be overridden by style edition specified in
 #     `$OPTIONAL_RUSTFMT_CONFIGS`.
 # $OPTIONAL_RUSTFMT_CONFIGS: Optional configs passed to the script
@@ -55,6 +65,10 @@ function create_diff() {
     local config;
     # Unconditionally set
     config="--config=error_on_line_overflow=false,error_on_unformatted=false"
+    # Can still be overridden by later `edition` configurations in
+    # `$OPTIONAL_RUSTFMT_CONFIGS`.
+    config="$config,edition=$LANGUAGE_EDITION"
+
     # Can still be overridden by later `style_edition` configurations in
     # `$OPTIONAL_RUSTFMT_CONFIGS`.
     config="$config,style_edition=$STYLE_EDITION"
@@ -201,6 +215,8 @@ function log_inputs() {
     echo "$REMOTE_REPO"
     echo "Feature branch:"
     echo "$FEATURE_BRANCH"
+    echo "Language edition:"
+    echo "$LANGUAGE_EDITION"
     echo "Style edition:"
     echo "$STYLE_EDITION"
     echo "(Optional) Commit hash:"

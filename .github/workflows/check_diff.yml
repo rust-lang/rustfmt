@@ -8,6 +8,9 @@ on:
       branch_name:
         description: 'Name of the feature branch on the forked repo'
         required: true
+      language_edition:
+        description: 'Language edition to run both rustfmt with; can be overridden by language edition settings in `rustfmt_configs`'
+        required: true
       style_edition:
         description: 'Style edition to run both rustfmt with; can be overridden by style edition settings in `rustfmt_configs`'
         required: true
@@ -33,4 +36,4 @@ jobs:
         rustup target add x86_64-unknown-linux-gnu
 
     - name: check diff
-      run: bash ${GITHUB_WORKSPACE}/ci/check_diff.sh ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} ${{ github.events.inputs.style_edition }} ${{ github.event.inputs.commit_hash || github.event.inputs.branch_name }} ${{ github.event.inputs.rustfmt_configs }}
+      run: bash ${GITHUB_WORKSPACE}/ci/check_diff.sh ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} ${{ github.events.inputs.language_edition }} ${{ github.events.inputs.style_edition }} ${{ github.event.inputs.commit_hash || github.event.inputs.branch_name }} ${{ github.event.inputs.rustfmt_configs }}
