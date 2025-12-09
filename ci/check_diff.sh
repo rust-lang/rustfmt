@@ -184,7 +184,23 @@ function check_repo() {
     cd $WORKDIR
 }
 
+# Log the inputs the script was invoked with in CI to aid diagnosing Diff Check failures.
+function log_inputs() {
+    echo "::group::Diff Check inputs"
+    echo "Remote repo:"
+    echo "$REMOTE_REPO"
+    echo "Feature branch:"
+    echo "$FEATURE_BRANCH"
+    echo "(Optional) Commit hash:"
+    echo "$OPTIONAL_COMMIT_HASH"
+    echo "(Optional) Rustfmt configs:"
+    echo "$OPTIONAL_RUSTFMT_CONFIGS"
+    echo "::endgroup::"
+}
+
 function main() {
+    log_inputs
+
     tmp_dir=$(mktemp -d -t rustfmt-XXXXXXXX)
     echo Created tmp_dir $tmp_dir
 
