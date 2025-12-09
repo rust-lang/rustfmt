@@ -91,10 +91,10 @@ impl Indent {
                 indent.push('\n');
             }
             for _ in 0..num_tabs {
-                indent.push('\t')
+                indent.push('\t');
             }
             for _ in 0..num_spaces {
-                indent.push(' ')
+                indent.push(' ');
             }
             Cow::from(indent)
         }

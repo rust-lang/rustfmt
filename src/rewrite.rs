@@ -114,6 +114,9 @@ pub(crate) struct RewriteContext<'a> {
     // When `is_if_else_block` is true, unindent the comment on top
     // of the `else` or `else if`.
     pub(crate) is_if_else_block: Cell<bool>,
+    // When `is_loop_block` is true, we can more aggressively end the
+    // last statement of the block with a semicolon.
+    pub(crate) is_loop_block: Cell<bool>,
     // When rewriting chain, veto going multi line except the last element
     pub(crate) force_one_line_chain: Cell<bool>,
     pub(crate) snippet_provider: &'a SnippetProvider,
@@ -174,5 +177,9 @@ impl<'a> RewriteContext<'a> {
 
     pub(crate) fn is_if_else_block(&self) -> bool {
         self.is_if_else_block.get()
+    }
+
+    pub(crate) fn is_loop_block(&self) -> bool {
+        self.is_loop_block.get()
     }
 }
