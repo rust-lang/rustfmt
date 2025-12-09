@@ -18,3 +18,32 @@ impl Foo {
 mut self) {}
     fn i(&pin      mut   self) {}
 }
+
+fn borrows() {
+    let mut foo = 0_i32;
+    let x: Pin<&mut _> = & pin 
+    mut    foo;
+
+    let x: Pin<&_> = &
+    pin                const 
+    foo;
+}
+
+fn patterns<'a>(
+    &pin         mut     x: &pin 
+    mut 
+    i32,
+    &
+    pin         
+         const
+         y: &
+    'a pin 
+    const 
+    i32,
+    ref      pin      mut      z: i32,
+    mut 
+    ref      
+       pin     
+    const
+          w: i32,
+) {}
