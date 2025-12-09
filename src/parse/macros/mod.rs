@@ -28,12 +28,13 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
             if Parser::nonterminal_may_begin_with($nt_kind, &cloned_parser.token) {
                 match $try_parse(&mut cloned_parser) {
                     Ok(x) => {
-                        if parser.psess.dcx().has_errors().is_some() {
+                        let maybe_parsed = $then(x);
+                        if parser.psess.dcx().has_errors().is_some() || maybe_parsed.is_none() {
                             parser.psess.dcx().reset_err_count();
                         } else {
                             // Parsing succeeded.
                             *parser = cloned_parser;
-                            return Some(MacroArg::$macro_arg($then(x)?));
+                            return Some(MacroArg::$macro_arg(maybe_parsed?));
                         }
                     }
                     Err(e) => {
@@ -51,6 +52,13 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
         |parser: &mut Parser<'b>| parser.parse_expr(),
         |x: ptr::P<ast::Expr>| Some(x)
     );
+    // `parse_item` returns `Option<ptr::P<ast::Item>>`.
+    parse_macro_arg!(
+        Item,
+        NonterminalKind::Item,
+        |parser: &mut Parser<'b>| parser.parse_item(ForceCollect::No),
+        |x: Option<ptr::P<ast::Item>>| x
+    );
     parse_macro_arg!(
         Ty,
         NonterminalKind::Ty,
@@ -62,13 +70,6 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
         NonterminalKind::Pat(PatParam { inferred: false }),
         |parser: &mut Parser<'b>| parser.parse_pat_no_top_alt(None, None),
         |x: ptr::P<ast::Pat>| Some(x)
-    );
-    // `parse_item` returns `Option<ptr::P<ast::Item>>`.
-    parse_macro_arg!(
-        Item,
-        NonterminalKind::Item,
-        |parser: &mut Parser<'b>| parser.parse_item(ForceCollect::No),
-        |x: Option<ptr::P<ast::Item>>| x
     );
 
     None
