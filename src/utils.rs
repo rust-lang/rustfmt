@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
+use rustc_ast::YieldKind;
 use rustc_ast::ast::{
     self, Attribute, MetaItem, MetaItemInner, MetaItemKind, NodeId, Path, Visibility,
     VisibilityKind,
 };
-use rustc_ast::{YieldKind, ptr};
 use rustc_ast_pretty::pprust;
 use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
 use unicode_width::UnicodeWidthStr;
@@ -133,6 +133,19 @@ pub(crate) fn format_mutability(mutability: ast::Mutability) -> &'static str {
 }
 
 #[inline]
+pub(crate) fn format_pinnedness_and_mutability(
+    pinnedness: ast::Pinnedness,
+    mutability: ast::Mutability,
+) -> (&'static str, &'static str) {
+    match (pinnedness, mutability) {
+        (ast::Pinnedness::Pinned, ast::Mutability::Mut) => ("pin ", "mut "),
+        (ast::Pinnedness::Pinned, ast::Mutability::Not) => ("pin ", "const "),
+        (ast::Pinnedness::Not, ast::Mutability::Mut) => ("", "mut "),
+        (ast::Pinnedness::Not, ast::Mutability::Not) => ("", ""),
+    }
+}
+
+#[inline]
 pub(crate) fn format_extern(ext: ast::Extern, explicit_abi: bool) -> Cow<'static, str> {
     match ext {
         ast::Extern::None => Cow::from(""),
@@ -149,8 +162,8 @@ pub(crate) fn format_extern(ext: ast::Extern, explicit_abi: bool) -> Cow<'static
 }
 
 #[inline]
-// Transform `Vec<rustc_ast::ptr::P<T>>` into `Vec<&T>`
-pub(crate) fn ptr_vec_to_ref_vec<T>(vec: &[ptr::P<T>]) -> Vec<&T> {
+// Transform `Vec<Box<T>>` into `Vec<&T>`
+pub(crate) fn ptr_vec_to_ref_vec<T>(vec: &[Box<T>]) -> Vec<&T> {
     vec.iter().map(|x| &**x).collect::<Vec<_>>()
 }
 

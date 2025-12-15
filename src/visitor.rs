@@ -492,20 +492,20 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     let rw = self.with_context(|ctx| format_impl(ctx, item, iimpl, block_indent));
                     self.push_rewrite(item.span, rw.ok());
                 }
-                ast::ItemKind::Trait(ref trait_kind) => {
+                ast::ItemKind::Trait(..) => {
                     let block_indent = self.block_indent;
-                    let rw =
-                        self.with_context(|ctx| format_trait(ctx, item, trait_kind, block_indent));
+                    let rw = self.with_context(|ctx| format_trait(ctx, item, block_indent));
                     self.push_rewrite(item.span, rw.ok());
                 }
-                ast::ItemKind::TraitAlias(ident, ref generics, ref generic_bounds) => {
+                ast::ItemKind::TraitAlias(ref ta) => {
                     let shape = Shape::indented(self.block_indent, self.config);
                     let rw = format_trait_alias(
                         &self.get_context(),
-                        ident,
+                        ta.ident,
                         item,
-                        generics,
-                        generic_bounds,
+                        ta.constness,
+                        &ta.generics,
+                        &ta.bounds,
                         shape,
                     );
                     self.push_rewrite(item.span, rw.ok());
@@ -522,7 +522,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 ast::ItemKind::Struct(..) | ast::ItemKind::Union(..) => {
                     self.visit_struct(&StructParts::from_item(item));
                 }
-                ast::ItemKind::Enum(ident, ref def, ref generics) => {
+                ast::ItemKind::Enum(ident, ref generics, ref def) => {
                     self.format_missing_with_indent(source!(self, item.span).lo());
                     self.visit_enum(ident, &item.vis, def, generics, item.span);
                     self.last_pos = source!(self, item.span).hi();
@@ -875,7 +875,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         !is_skip_attr(segments)
     }
 
-    fn walk_mod_items(&mut self, items: &[rustc_ast::ptr::P<ast::Item>]) {
+    fn walk_mod_items(&mut self, items: &[Box<ast::Item>]) {
         self.visit_items_with_reordering(&ptr_vec_to_ref_vec(items));
     }
 
@@ -943,7 +943,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let ident_str = rewrite_ident(&self.get_context(), ident).to_owned();
         self.push_str(&ident_str);
 
-        if let ast::ModKind::Loaded(ref items, ast::Inline::Yes, ref spans, _) = mod_kind {
+        if let ast::ModKind::Loaded(ref items, ast::Inline::Yes, ref spans) = mod_kind {
             let ast::ModSpans {
                 inner_span,
                 inject_use_span: _,
