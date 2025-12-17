@@ -702,6 +702,7 @@ pub(crate) fn rewrite_cond(
 // Abstraction over control flow expressions
 #[derive(Debug)]
 struct ControlFlow<'a> {
+    inner_attributes: Option<Vec<ast::Attribute>>,
     cond: Option<&'a ast::Expr>,
     block: &'a ast::Block,
     else_block: Option<&'a ast::Expr>,
@@ -725,6 +726,7 @@ fn extract_pats_and_cond(expr: &ast::Expr) -> (Option<&ast::Pat>, &ast::Expr) {
 
 // FIXME: Refactor this.
 fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow<'_>> {
+    let inner_attributes = inner_attributes(&expr.attrs);
     match expr.kind {
         ast::ExprKind::If(ref cond, ref if_block, ref else_block) => {
             let (pat, cond) = extract_pats_and_cond(cond);
@@ -745,14 +747,30 @@ fn to_control_flow(expr: &ast::Expr, expr_type: ExprType) -> Option<ControlFlow<
             label,
             kind,
         } => Some(ControlFlow::new_for(
-            pat, iter, body, label, expr.span, kind,
+            inner_attributes,
+            pat,
+            iter,
+            body,
+            label,
+            expr.span,
+            kind,
         )),
-        ast::ExprKind::Loop(ref block, label, _) => {
-            Some(ControlFlow::new_loop(block, label, expr.span))
-        }
+        ast::ExprKind::Loop(ref block, label, _) => Some(ControlFlow::new_loop(
+            inner_attributes,
+            block,
+            label,
+            expr.span,
+        )),
         ast::ExprKind::While(ref cond, ref block, label) => {
             let (pat, cond) = extract_pats_and_cond(cond);
-            Some(ControlFlow::new_while(pat, cond, block, label, expr.span))
+            Some(ControlFlow::new_while(
+                inner_attributes,
+                pat,
+                cond,
+                block,
+                label,
+                expr.span,
+            ))
         }
         _ => None,
     }
@@ -774,6 +792,7 @@ impl<'a> ControlFlow<'a> {
     ) -> ControlFlow<'a> {
         let matcher = choose_matcher(pat);
         ControlFlow {
+            inner_attributes: None,
             cond: Some(cond),
             block,
             else_block,
@@ -788,8 +807,14 @@ impl<'a> ControlFlow<'a> {
         }
     }
 
-    fn new_loop(block: &'a ast::Block, label: Option<ast::Label>, span: Span) -> ControlFlow<'a> {
+    fn new_loop(
+        inner_attributes: Vec<ast::Attribute>,
+        block: &'a ast::Block,
+        label: Option<ast::Label>,
+        span: Span,
+    ) -> ControlFlow<'a> {
         ControlFlow {
+            inner_attributes: Some(inner_attributes),
             cond: None,
             block,
             else_block: None,
@@ -805,6 +830,7 @@ impl<'a> ControlFlow<'a> {
     }
 
     fn new_while(
+        inner_attributes: Vec<ast::Attribute>,
         pat: Option<&'a ast::Pat>,
         cond: &'a ast::Expr,
         block: &'a ast::Block,
@@ -813,6 +839,7 @@ impl<'a> ControlFlow<'a> {
     ) -> ControlFlow<'a> {
         let matcher = choose_matcher(pat);
         ControlFlow {
+            inner_attributes: Some(inner_attributes),
             cond: Some(cond),
             block,
             else_block: None,
@@ -828,6 +855,7 @@ impl<'a> ControlFlow<'a> {
     }
 
     fn new_for(
+        inner_attributes: Vec<ast::Attribute>,
         pat: &'a ast::Pat,
         cond: &'a ast::Expr,
         block: &'a ast::Block,
@@ -836,6 +864,7 @@ impl<'a> ControlFlow<'a> {
         kind: ForLoopKind,
     ) -> ControlFlow<'a> {
         ControlFlow {
+            inner_attributes: Some(inner_attributes),
             cond: Some(cond),
             block,
             else_block: None,
@@ -1162,8 +1191,15 @@ impl<'a> Rewrite for ControlFlow<'a> {
         };
         let block_str = {
             let old_val = context.is_if_else_block.replace(self.else_block.is_some());
-            let result =
-                rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true);
+            let result = rewrite_block_with_visitor(
+                context,
+                "",
+                self.block,
+                self.inner_attributes.as_deref(),
+                None,
+                block_shape,
+                true,
+            );
             context.is_if_else_block.replace(old_val);
             result?
         };
