@@ -20,7 +20,7 @@ use crate::utils::rewrite_ident;
 pub(crate) fn format_header(
     context: &RewriteContext<'_>,
     shape: Shape,
-    parts: Vec<HeaderPart>,
+    parts: Vec<HeaderPart<'_>>,
 ) -> String {
     debug!(?parts, "format_header");
     let shape = shape.infinite_width();
@@ -61,25 +61,22 @@ pub(crate) fn format_header(
 }
 
 #[derive(Debug)]
-pub(crate) struct HeaderPart {
+pub(crate) struct HeaderPart<'a> {
     /// snippet of this part without surrounding space
-    snippet: Cow<'static, str>,
+    snippet: Cow<'a, str>,
     span: Span,
 }
 
-impl HeaderPart {
-    pub(crate) fn new(snippet: impl Into<Cow<'static, str>>, span: Span) -> Self {
+impl<'a> HeaderPart<'a> {
+    pub(crate) fn new(snippet: impl Into<Cow<'a, str>>, span: Span) -> Self {
         Self {
             snippet: snippet.into(),
             span,
         }
     }
 
-    pub(crate) fn ident(context: &RewriteContext<'_>, ident: Ident) -> Self {
-        Self {
-            snippet: rewrite_ident(context, ident).to_owned().into(),
-            span: ident.span,
-        }
+    pub(crate) fn ident(context: &'a RewriteContext<'_>, ident: Ident) -> Self {
+        Self::new(rewrite_ident(context, ident), ident.span)
     }
 
     pub(crate) fn visibility(context: &RewriteContext<'_>, vis: &ast::Visibility) -> Self {
@@ -99,13 +96,11 @@ impl HeaderPart {
                 let path = segments_iter.collect::<Vec<_>>().join("::");
                 let in_str = if is_keyword(&path) { "" } else { "in " };
 
+                // FIXME(fee1-dead): comments around parens
                 Cow::from(format!("pub({}{})", in_str, path))
             }
         };
 
-        HeaderPart {
-            snippet,
-            span: vis.span,
-        }
+        Self::new(snippet, vis.span)
     }
 }
