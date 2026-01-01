@@ -725,13 +725,46 @@ impl Rewrite for ast::GenericParam {
                 TypeDensity::Compressed => "=",
                 TypeDensity::Wide => " = ",
             };
-            param.push_str(eq_str);
-            let budget = shape
+            // Need to allow the space required for the rewrite instead of bailing
+            // regardless of if the line overflows. If it doesn't overflow, it's split.
+            // If it still overflows, then the identifier is too long,
+            // which the user will have to deal with.
+            let rewrite = def.rewrite_result(
+                context,
+                Shape::legacy(usize::MAX, shape.indent + param.len()),
+            )?;
+            let can_fit_in_line = shape
                 .width
-                .checked_sub(param.len())
-                .max_width_error(shape.width, self.span())?;
-            let rewrite =
-                def.rewrite_result(context, Shape::legacy(budget, shape.indent + param.len()))?;
+                .saturating_sub(param.len())
+                .saturating_sub(eq_str.len())
+                .checked_sub(rewrite.len())
+                .is_some();
+            if can_fit_in_line {
+                param.push_str(eq_str);
+            } else {
+                // Begin a new line
+                param.push('\n');
+                for _ in 0..shape.indent.block_indent {
+                    param.push(' ');
+                }
+                let can_fit_in_line_with_eq_str = shape
+                    .width
+                    .saturating_sub(eq_str.len().min(2))
+                    .checked_sub(rewrite.len())
+                    .is_some();
+                if can_fit_in_line_with_eq_str {
+                    // Fits together with eq, remove leading whitespace
+                    param.push_str(eq_str.trim_start());
+                } else {
+                    // Split into three lines, might fit, might not, remove all whitespace,
+                    // eq goes on its own line
+                    param.push_str(eq_str.trim());
+                    param.push('\n');
+                    for _ in 0..shape.indent.block_indent {
+                        param.push(' ');
+                    }
+                }
+            }
             param.push_str(&rewrite);
         }
 
