@@ -460,11 +460,15 @@ impl ItemizedBlock {
     /// 1868. He wes buried in...
     /// ```
     fn get_marker_length(trimmed: &str) -> Option<usize> {
+        if trimmed.starts_with('>') {
+            return Some(0);
+        }
+
         // https://spec.commonmark.org/0.30/#bullet-list-marker or
         // https://spec.commonmark.org/0.30/#block-quote-marker
-        let itemized_start = ["* ", "- ", "> ", "+ "];
-        if itemized_start.iter().any(|s| trimmed.starts_with(s)) {
-            return Some(2); // All items in `itemized_start` have length 2.
+        let itemized_start = ["* ", "- ", "+ "];
+        if itemized_start.iter().any(|&s| trimmed.starts_with(s)) {
+            return Some(2);
         }
 
         // https://spec.commonmark.org/0.30/#ordered-list-marker, where at most 2 digits are
@@ -485,24 +489,47 @@ impl ItemizedBlock {
     /// Creates a new `ItemizedBlock` described with the given `line`.
     /// Returns `None` if `line` doesn't start an item.
     fn new(line: &str) -> Option<ItemizedBlock> {
-        let marker_length = ItemizedBlock::get_marker_length(line.trim_start())?;
-        let space_to_marker = line.chars().take_while(|c| c.is_whitespace()).count();
-        let mut indent = space_to_marker + marker_length;
-        let mut line_start = " ".repeat(indent);
+        let trimmed = line.trim_start();
+        let marker_length = ItemizedBlock::get_marker_length(trimmed)?;
+        let space_to_marker = line
+            .chars()
+            .take_while(|&c| c == ' ' || c == '\t')
+            .fold(0, |acc, c| acc + if c == ' ' { 1 } else { 4 });
 
-        // Markdown blockquote start with a "> "
-        if line.trim_start().starts_with('>') {
-            // remove the original +2 indent because there might be multiple nested block quotes
-            // and it's easier to reason about the final indent by just taking the length
-            // of the new line_start. We update the indent because it effects the max width
-            // of each formatted line.
-            line_start = itemized_block_quote_start(line, line_start, 2);
-            indent = line_start.len();
+        let mut line_start = " ".repeat(space_to_marker + marker_length);
+        let mut i = line.len() - trimmed.len() + marker_length;
+
+        // Markdown blockquote start with a '>'
+        if trimmed.starts_with('>') {
+            // Determine the line_start when formatting markdown block quotes.
+            // The original line_start likely contains indentation (whitespaces),
+            // which we'd like to replace with '> ' characters.
+            let mut quote_level = 0;
+
+            let bytes = line.as_bytes();
+            while i < bytes.len() && bytes[i] == b'>' {
+                i += 1;
+                quote_level += 1;
+
+                let mut whitespace_width = 0;
+                while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t') {
+                    whitespace_width += if bytes[i] == b' ' { 1 } else { 4 };
+                    if whitespace_width > 4 {
+                        break;
+                    }
+                    i += 1;
+                }
+            }
+
+            for _ in 0..quote_level {
+                line_start.push_str("> ");
+            }
         }
+
         Some(ItemizedBlock {
-            lines: vec![line[indent..].to_string()],
-            indent,
-            opener: line[..indent].to_string(),
+            lines: vec![line[i..].to_string()],
+            indent: line_start.len(),
+            opener: line[..i].to_string(),
             line_start,
         })
     }
@@ -545,25 +572,6 @@ impl ItemizedBlock {
     fn original_block_as_string(&self) -> String {
         self.lines.join("\n")
     }
-}
-
-/// Determine the line_start when formatting markdown block quotes.
-/// The original line_start likely contains indentation (whitespaces), which we'd like to
-/// replace with '> ' characters.
-fn itemized_block_quote_start(line: &str, mut line_start: String, remove_indent: usize) -> String {
-    let quote_level = line
-        .chars()
-        .take_while(|c| !c.is_alphanumeric())
-        .fold(0, |acc, c| if c == '>' { acc + 1 } else { acc });
-
-    for _ in 0..remove_indent {
-        line_start.pop();
-    }
-
-    for _ in 0..quote_level {
-        line_start.push_str("> ")
-    }
-    line_start
 }
 
 struct CommentRewrite<'a> {
