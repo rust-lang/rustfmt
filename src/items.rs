@@ -144,7 +144,8 @@ impl Rewrite for ast::Local {
                     result.as_str()
                 };
                 let force_newline_else = pat_str.contains('\n')
-                    || !same_line_else_kw_and_brace(init_str, context, else_kw_span, nested_shape);
+                    || !same_line_else_kw_and_brace(init_str, context, else_kw_span, nested_shape)
+                    || context.config.let_else_force_newline();
                 let else_kw = rewrite_else_kw_with_comments(
                     force_newline_else,
                     true,
