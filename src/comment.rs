@@ -561,7 +561,7 @@ fn itemized_block_quote_start(line: &str, mut line_start: String, remove_indent:
     }
 
     for _ in 0..quote_level {
-        line_start.push_str("> ")
+        line_start.push_str("> ");
     }
     line_start
 }
