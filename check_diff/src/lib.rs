@@ -91,7 +91,7 @@ pub trait CodeFormatter {
 }
 
 pub struct RustfmtRunner {
-    ld_library_path: String,
+    dynamic_library_path: String,
     binary_path: PathBuf,
 }
 
@@ -128,7 +128,10 @@ where
 impl RustfmtRunner {
     fn get_binary_version(&self) -> Result<String, CheckDiffError> {
         let Ok(command) = Command::new(&self.binary_path)
-            .env("LD_LIBRARY_PATH", &self.ld_library_path)
+            .env(
+                dynamic_library_path_env_var_name(),
+                &self.dynamic_library_path,
+            )
             .args(["--version"])
             .output()
         else {
@@ -139,6 +142,18 @@ impl RustfmtRunner {
 
         let binary_version = std::str::from_utf8(&command.stdout)?.trim();
         return Ok(binary_version.to_string());
+
+/// Returns the name of the environment variable used to search for dynamic libraries.
+/// This is the same logic that cargo uses when setting these environment variables
+fn dynamic_library_path_env_var_name() -> &'static str {
+    if cfg!(windows) {
+        "PATH"
+    } else if cfg!(target_os = "macos") {
+        "DYLD_FALLBACK_LIBRARY_PATH"
+    } else if cfg!(target_os = "aix") {
+        "LIBPATH"
+    } else {
+        "LD_LIBRARY_PATH"
     }
 }
 
@@ -156,7 +171,10 @@ impl CodeFormatter for RustfmtRunner {
     ) -> Result<String, CheckDiffError> {
         let config = create_config_arg(config);
         let mut command = Command::new(&self.binary_path)
-            .env("LD_LIBRARY_PATH", &self.ld_library_path)
+            .env(
+                dynamic_library_path_env_var_name(),
+                &self.dynamic_library_path,
+            )
             .args([
                 "--unstable-features",
                 "--skip-children",
@@ -292,7 +310,7 @@ pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     return Ok(());
 }
 
-pub fn get_ld_library_path(dir: &Path) -> Result<String, CheckDiffError> {
+pub fn get_dynamic_library_path(dir: &Path) -> Result<String, CheckDiffError> {
     let Ok(command) = Command::new("rustc")
         .current_dir(dir)
         .args(["--print", "sysroot"])
@@ -301,8 +319,7 @@ pub fn get_ld_library_path(dir: &Path) -> Result<String, CheckDiffError> {
         return Err(CheckDiffError::FailedCommand("Error getting sysroot"));
     };
     let sysroot = std::str::from_utf8(&command.stdout)?.trim_end();
-    let ld_lib_path = format!("{}/lib", sysroot);
-    return Ok(ld_lib_path);
+    Ok(format!("{}/lib", sysroot))
 }
 
 pub fn get_cargo_version() -> Result<String, CheckDiffError> {
@@ -322,11 +339,9 @@ pub fn build_rustfmt_from_src(
     binary_path: PathBuf,
     dir: &Path,
 ) -> Result<RustfmtRunner, CheckDiffError> {
-    //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
-    // binary can find it's runtime dependencies.
-    // See https://github.com/rust-lang/rustfmt/issues/5675
-    // This will prepend the `LD_LIBRARY_PATH` for the main rustfmt binary
-    let ld_lib_path = get_ld_library_path(&dir)?;
+    // Because we're building standalone binaries we need to set the dynamic library path
+    // so each rustfmt binary can find it's runtime dependencies.
+    let dynamic_library_path = get_dynamic_library_path(dir)?;
 
     info!("Building rustfmt from source");
     let Ok(_) = Command::new("cargo")
@@ -341,10 +356,10 @@ pub fn build_rustfmt_from_src(
 
     std::fs::copy(dir.join("target/release/rustfmt"), &binary_path)?;
 
-    return Ok(RustfmtRunner {
-        ld_library_path: ld_lib_path,
+    Ok(RustfmtRunner {
+        dynamic_library_path,
         binary_path,
-    });
+    })
 }
 
 // Compiles and produces two rustfmt binaries.
@@ -369,20 +384,21 @@ pub fn compile_rustfmt(
     let src_runner = build_rustfmt_from_src(dest.join("src_rustfmt"), dest)?;
     let should_detach = commit_hash.is_some();
     git_switch(
-        commit_hash.unwrap_or(feature_branch).as_str(),
+        commit_hash.as_ref().unwrap_or(&feature_branch),
         should_detach,
     )?;
 
     let feature_runner = build_rustfmt_from_src(dest.join("feature_rustfmt"), dest)?;
     info!("RUSFMT_BIN {}", src_runner.get_binary_version()?);
+    let dynamic_library_path_env_var = dynamic_library_path_env_var_name();
     info!(
-        "Runtime dependencies for (src) rustfmt -- LD_LIBRARY_PATH: {}",
-        src_runner.ld_library_path
+        "Runtime dependencies for (main) rustfmt -- {}: {}",
+        dynamic_library_path_env_var, src_runner.dynamic_library_path
     );
     info!("FEATURE_BIN {}", feature_runner.get_binary_version()?);
     info!(
-        "Runtime dependencies for (feature) rustfmt -- LD_LIBRARY_PATH: {}",
-        feature_runner.ld_library_path
+        "Runtime dependencies for ({}) rustfmt -- {}: {}",
+        feature_branch, dynamic_library_path_env_var, feature_runner.dynamic_library_path
     );
 
     return Ok(CheckDiffRunners {
