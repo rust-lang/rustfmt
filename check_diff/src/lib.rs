@@ -7,6 +7,31 @@ use std::process::{Command, Stdio};
 use tracing::info;
 use walkdir::WalkDir;
 
+pub enum FormatCodeError {
+    // IO Error when running code formatter
+    Io(std::io::Error),
+    /// An error occured that prevents code formatting. For example, a parse error.
+    CodeNotFormatted(Vec<u8>),
+}
+
+impl From<std::io::Error> for FormatCodeError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+impl std::fmt::Debug for FormatCodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => std::fmt::Debug::fmt(e, f),
+            Self::CodeNotFormatted(e) => {
+                let data = String::from_utf8_lossy(e);
+                f.write_str(&data)
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum CheckDiffError {
     /// Git related errors
@@ -78,7 +103,7 @@ pub trait CodeFormatter {
         &self,
         code: &str,
         config: Option<&[T]>,
-    ) -> Result<String, CheckDiffError>;
+    ) -> Result<String, FormatCodeError>;
 }
 
 pub struct RustfmtRunner {
@@ -170,7 +195,7 @@ impl CodeFormatter for RustfmtRunner {
         &self,
         code: &str,
         config: Option<&[T]>,
-    ) -> Result<String, CheckDiffError> {
+    ) -> Result<String, FormatCodeError> {
         let config = create_config_arg(config);
         let mut command = Command::new(&self.binary_path)
             .env(
@@ -190,7 +215,18 @@ impl CodeFormatter for RustfmtRunner {
 
         command.stdin.as_mut().unwrap().write_all(code.as_bytes())?;
         let output = command.wait_with_output()?;
-        Ok(buffer_into_utf8_lossy(output.stdout))
+        let formatted_code = buffer_into_utf8_lossy(output.stdout);
+
+        match output.status.code() {
+            Some(0) => Ok(formatted_code),
+            Some(_) | None => {
+                if !formatted_code.is_empty() {
+                    Ok(formatted_code)
+                } else {
+                    Err(FormatCodeError::CodeNotFormatted(output.stderr))
+                }
+            }
+        }
     }
 }
 

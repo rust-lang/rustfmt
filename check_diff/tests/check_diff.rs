@@ -1,5 +1,6 @@
 use check_diff::{
-    CheckDiffError, CheckDiffRunners, CodeFormatter, check_diff, search_for_rs_files,
+    CheckDiffError, CheckDiffRunners, CodeFormatter, FormatCodeError, check_diff,
+    search_for_rs_files,
 };
 use std::fs::File;
 use tempfile::Builder;
@@ -11,7 +12,7 @@ impl CodeFormatter for DoNothingFormatter {
         &self,
         _code: &str,
         _config: Option<&[T]>,
-    ) -> Result<String, CheckDiffError> {
+    ) -> Result<String, FormatCodeError> {
         Ok(String::new())
     }
 }
@@ -24,7 +25,7 @@ impl CodeFormatter for AddWhiteSpaceFormatter {
         &self,
         code: &str,
         _config: Option<&[T]>,
-    ) -> Result<String, CheckDiffError> {
+    ) -> Result<String, FormatCodeError> {
         let result = code.to_string() + " ";
         Ok(result)
     }
