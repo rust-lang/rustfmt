@@ -21,7 +21,7 @@ use crate::lists::{
 };
 use crate::macros::{MacroPosition, rewrite_macro};
 use crate::matches::rewrite_match;
-use crate::overflow::{self, IntoOverflowableItem, OverflowableItem};
+use crate::overflow::{self, OverflowableItem, ToOverflowableItem};
 use crate::pairs::{PairParts, rewrite_all_pairs, rewrite_pair};
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::{Indent, Shape};
@@ -471,7 +471,7 @@ pub(crate) fn format_expr(
         })
 }
 
-pub(crate) fn rewrite_array<'a, T: 'a + IntoOverflowableItem<'a>>(
+pub(crate) fn rewrite_array<'a, T: 'a + ToOverflowableItem<'a>>(
     name: &'a str,
     exprs: impl Iterator<Item = &'a T>,
     span: Span,
@@ -1937,7 +1937,7 @@ pub(crate) fn rewrite_field(
     }
 }
 
-fn rewrite_tuple_in_visual_indent_style<'a, T: 'a + IntoOverflowableItem<'a>>(
+fn rewrite_tuple_in_visual_indent_style<'a, T: 'a + ToOverflowableItem<'a>>(
     context: &RewriteContext<'_>,
     mut items: impl Iterator<Item = &'a T>,
     span: Span,
@@ -2023,7 +2023,7 @@ fn rewrite_let(
     )
 }
 
-pub(crate) fn rewrite_tuple<'a, T: 'a + IntoOverflowableItem<'a>>(
+pub(crate) fn rewrite_tuple<'a, T: 'a + ToOverflowableItem<'a>>(
     context: &'a RewriteContext<'_>,
     items: impl Iterator<Item = &'a T>,
     span: Span,
