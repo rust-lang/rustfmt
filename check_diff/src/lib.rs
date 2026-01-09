@@ -4,7 +4,6 @@ use std::fmt::{Debug, Display};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::str::Utf8Error;
 use tracing::info;
 use walkdir::WalkDir;
 
@@ -14,8 +13,6 @@ pub enum CheckDiffError {
     FailedGit(GitError),
     /// Error for generic commands
     FailedCommand(&'static str),
-    /// UTF8 related errors
-    FailedUtf8(Utf8Error),
     /// Error for building rustfmt from source
     FailedSourceBuild(&'static str),
     /// Error when obtaining binary version
@@ -34,12 +31,6 @@ impl From<io::Error> for CheckDiffError {
 impl From<GitError> for CheckDiffError {
     fn from(error: GitError) -> Self {
         CheckDiffError::FailedGit(error)
-    }
-}
-
-impl From<Utf8Error> for CheckDiffError {
-    fn from(error: Utf8Error) -> Self {
-        CheckDiffError::FailedUtf8(error)
     }
 }
 
@@ -140,9 +131,18 @@ impl RustfmtRunner {
             ));
         };
 
-        let binary_version = std::str::from_utf8(&command.stdout)?.trim();
-        return Ok(binary_version.to_string());
+        Ok(buffer_into_utf8_lossy(command.stdout))
     }
+}
+
+/// Convert a buffer of u8 into a String.
+fn buffer_into_utf8_lossy(buffer: Vec<u8>) -> String {
+    let mut s = match String::from_utf8(buffer) {
+        Ok(s) => s,
+        Err(e) => String::from_utf8_lossy(e.as_bytes()).to_string(),
+    };
+    s.truncate(s.trim_end().len());
+    s
 }
 
 /// Returns the name of the environment variable used to search for dynamic libraries.
@@ -190,7 +190,7 @@ impl CodeFormatter for RustfmtRunner {
 
         command.stdin.as_mut().unwrap().write_all(code.as_bytes())?;
         let output = command.wait_with_output()?;
-        Ok(std::str::from_utf8(&output.stdout)?.to_string())
+        Ok(buffer_into_utf8_lossy(output.stdout))
     }
 }
 
@@ -320,8 +320,9 @@ pub fn get_dynamic_library_path(dir: &Path) -> Result<String, CheckDiffError> {
     else {
         return Err(CheckDiffError::FailedCommand("Error getting sysroot"));
     };
-    let sysroot = std::str::from_utf8(&command.stdout)?.trim_end();
-    Ok(format!("{}/lib", sysroot))
+    let mut sysroot = buffer_into_utf8_lossy(command.stdout);
+    sysroot.push_str("/lib");
+    Ok(sysroot)
 }
 
 pub fn get_cargo_version() -> Result<String, CheckDiffError> {
@@ -331,8 +332,7 @@ pub fn get_cargo_version() -> Result<String, CheckDiffError> {
         ));
     };
 
-    let cargo_version = std::str::from_utf8(&command.stdout)?.trim_end();
-    return Ok(cargo_version.to_string());
+    Ok(buffer_into_utf8_lossy(command.stdout))
 }
 
 /// Obtains the ld_lib path and then builds rustfmt from source
