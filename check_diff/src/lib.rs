@@ -3,8 +3,77 @@ use std::fmt::{Debug, Display};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::str::FromStr;
 use tracing::{debug, error, info, trace};
 use walkdir::WalkDir;
+
+#[derive(Debug, Clone, Copy)]
+pub enum Edition {
+    /// rust edition 2015
+    Edition2015,
+    /// rust edition 2018
+    Edition2018,
+    /// rust edition 2021
+    Edition2021,
+    /// rust edition 2024
+    Edition2024,
+}
+
+impl Edition {
+    fn as_str(&self) -> &str {
+        match self {
+            Edition::Edition2015 => "2015",
+            Edition::Edition2018 => "2018",
+            Edition::Edition2021 => "2021",
+            Edition::Edition2024 => "2024",
+        }
+    }
+}
+
+impl FromStr for Edition {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "2015" => Ok(Edition::Edition2015),
+            "2018" => Ok(Edition::Edition2018),
+            "2021" => Ok(Edition::Edition2021),
+            "2024" => Ok(Edition::Edition2024),
+            _ => Err(format!("Invalid rust language edition {s}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum StyleEdition {
+    // rustfmt style_edition 2021. Also equivaluent to 2015 and 2018.
+    Edition2021,
+    // rustfmt style_edition 2024
+    Edition2024,
+}
+
+impl StyleEdition {
+    fn as_str(&self) -> &str {
+        match self {
+            StyleEdition::Edition2021 => "2021",
+            StyleEdition::Edition2024 => "2024",
+        }
+    }
+}
+
+impl FromStr for StyleEdition {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "2015" => Ok(StyleEdition::Edition2021),
+            "2018" => Ok(StyleEdition::Edition2021),
+            "2021" => Ok(StyleEdition::Edition2021),
+            "2024" => Ok(StyleEdition::Edition2024),
+            _ => Err(format!("Invalid rustfmt style edition {s}")),
+        }
+    }
+}
 
 pub enum FormatCodeError {
     // IO Error when running code formatter
@@ -131,6 +200,8 @@ pub trait CodeFormatter {
 pub struct RustfmtRunner {
     dynamic_library_path: String,
     binary_path: PathBuf,
+    edition: Edition,
+    style_edition: StyleEdition,
 }
 
 impl<F, S> CheckDiffRunners<F, S> {
@@ -288,6 +359,10 @@ impl CodeFormatter for RustfmtRunner {
                 &self.dynamic_library_path,
             )
             .args([
+                "--edition",
+                self.edition.as_str(),
+                "--style-edition",
+                self.style_edition.as_str(),
                 "--unstable-features",
                 "--skip-children",
                 "--emit=stdout",
@@ -461,6 +536,8 @@ pub fn get_cargo_version() -> Result<String, CheckDiffError> {
 pub fn build_rustfmt_from_src(
     binary_path: PathBuf,
     dir: &Path,
+    edition: Edition,
+    style_edition: StyleEdition,
 ) -> Result<RustfmtRunner, CheckDiffError> {
     // Because we're building standalone binaries we need to set the dynamic library path
     // so each rustfmt binary can find it's runtime dependencies.
@@ -482,6 +559,8 @@ pub fn build_rustfmt_from_src(
     Ok(RustfmtRunner {
         dynamic_library_path,
         binary_path,
+        edition,
+        style_edition,
     })
 }
 
@@ -493,6 +572,8 @@ pub fn compile_rustfmt(
     dest: &Path,
     remote_repo_url: String,
     feature_branch: String,
+    edition: Edition,
+    style_edition: StyleEdition,
     commit_hash: Option<String>,
 ) -> Result<CheckDiffRunners<RustfmtRunner, RustfmtRunner>, CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
@@ -504,14 +585,16 @@ pub fn compile_rustfmt(
 
     let cargo_version = get_cargo_version()?;
     info!("Compiling with {}", cargo_version);
-    let src_runner = build_rustfmt_from_src(dest.join("src_rustfmt"), dest)?;
+    let src_runner =
+        build_rustfmt_from_src(dest.join("src_rustfmt"), dest, edition, style_edition)?;
     let should_detach = commit_hash.is_some();
     git_switch(
         commit_hash.as_ref().unwrap_or(&feature_branch),
         should_detach,
     )?;
 
-    let feature_runner = build_rustfmt_from_src(dest.join("feature_rustfmt"), dest)?;
+    let feature_runner =
+        build_rustfmt_from_src(dest.join("feature_rustfmt"), dest, edition, style_edition)?;
     info!("RUSFMT_BIN {}", src_runner.get_binary_version()?);
     let dynamic_library_path_env_var = dynamic_library_path_env_var_name();
     info!(

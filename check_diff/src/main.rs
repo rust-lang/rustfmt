@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
 use check_diff::{
-    check_diff, clone_git_repo, compile_rustfmt, get_repo_name,
+    Edition, StyleEdition, check_diff, clone_git_repo, compile_rustfmt, get_repo_name,
 };
 use clap::Parser;
 use tempfile::tempdir;
@@ -44,6 +44,12 @@ struct CliInputs {
     remote_repo_url: String,
     /// Name of the feature branch on the forked repo
     feature_branch: String,
+    /// Rust language `edition` used to parse code. Possible values {2015, 2018, 2021, 2024}
+    #[arg(short, long, default_value = "2015")]
+    edition: Edition,
+    /// rustfmt `style_edition` used when formatting code. Possible vales {2015, 2018, 2021, 2024}.
+    #[arg(short, long, default_value = "2021")]
+    style_edition: StyleEdition,
     /// Optional commit hash from the feature branch
     #[arg(short, long)]
     commit_hash: Option<String>,
@@ -64,6 +70,8 @@ fn main() -> Result<ExitCode, Error> {
         tmp_dir.path(),
         args.remote_repo_url,
         args.feature_branch,
+        args.edition,
+        args.style_edition,
         args.commit_hash,
     ) else {
         error!("Failed to compile rustfmt");
