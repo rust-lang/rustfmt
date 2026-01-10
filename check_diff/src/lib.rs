@@ -551,8 +551,8 @@ pub fn check_diff<T: AsRef<str>, P: AsRef<Path>>(
     runners: &CheckDiffRunners<impl CodeFormatter, impl CodeFormatter>,
     repo: P,
     repo_url: &str,
-) -> i32 {
-    let mut errors = 0;
+) -> u8 {
+    let mut errors: u8 = 0;
     let repo = repo.as_ref();
     let iter = search_for_rs_files(repo);
     for file in iter {
@@ -574,7 +574,7 @@ pub fn check_diff<T: AsRef<str>, P: AsRef<Path>>(
                         relative_path.display(),
                         diff,
                     );
-                    errors += 1;
+                    errors = errors.saturating_add(1);
                 } else {
                     trace!(
                         "No diff found in '{0}' when formatting {0}/{1}",
