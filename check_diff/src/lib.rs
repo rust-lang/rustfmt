@@ -1,4 +1,3 @@
-use diffy;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::io::{self, Write};
@@ -384,7 +383,7 @@ pub fn git_remote_add(url: &str) -> Result<(), GitError> {
     }
 
     info!("Successfully added remote: {url}");
-    return Ok(());
+    Ok(())
 }
 
 pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
@@ -403,7 +402,7 @@ pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
     }
 
     info!("Successfully fetched: {branch_name}");
-    return Ok(());
+    Ok(())
 }
 
 pub fn git_switch(git_ref: &str, should_detach: bool) -> Result<(), GitError> {
@@ -421,17 +420,17 @@ pub fn git_switch(git_ref: &str, should_detach: bool) -> Result<(), GitError> {
         return Err(error);
     }
     info!("Successfully switched to {git_ref}");
-    return Ok(());
+    Ok(())
 }
 
 pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     let dest_path = Path::new(&dest);
-    env::set_current_dir(&dest_path)?;
+    env::set_current_dir(dest_path)?;
     info!(
         "Setting current directory to: {}",
         env::current_dir().unwrap().display()
     );
-    return Ok(());
+    Ok(())
 }
 
 pub fn get_dynamic_library_path(dir: &Path) -> Result<String, CheckDiffError> {
@@ -525,24 +524,24 @@ pub fn compile_rustfmt(
         feature_branch, dynamic_library_path_env_var, feature_runner.dynamic_library_path
     );
 
-    return Ok(CheckDiffRunners {
+    Ok(CheckDiffRunners {
         src_runner,
         feature_runner,
-    });
+    })
 }
 
 /// Searches for rust files in the particular path and returns an iterator to them.
 pub fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
-    return WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
+    WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
         Some(entry) => {
             let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "rs") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
                 return Some(entry.into_path());
             }
-            return None;
+            None
         }
         None => None,
-    });
+    })
 }
 
 /// Calculates the number of errors when running the compiled binary and the feature binary on the
