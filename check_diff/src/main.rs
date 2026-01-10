@@ -3,6 +3,32 @@ use clap::Parser;
 use tempfile::Builder;
 use tracing::info;
 
+const REPOS: &[&str] = &[
+    "https://github.com/rust-lang/rust.git",
+    "https://github.com/rust-lang/cargo.git",
+    "https://github.com/rust-lang/miri.git",
+    "https://github.com/rust-lang/rust-analyzer.git",
+    "https://github.com/bitflags/bitflags.git",
+    "https://github.com/rust-lang/log.git",
+    "https://github.com/rust-lang/mdBook.git",
+    "https://github.com/rust-lang/packed_simd.git",
+    "https://github.com/rust-lang/rust-semverver.git",
+    "https://github.com/Stebalien/tempfile.git",
+    "https://github.com/rust-lang/futures-rs.git",
+    "https://github.com/dtolnay/anyhow.git",
+    "https://github.com/dtolnay/thiserror.git",
+    "https://github.com/dtolnay/syn.git",
+    "https://github.com/serde-rs/serde.git",
+    "https://github.com/rust-lang/rustlings.git",
+    "https://github.com/rust-lang/rustup.git",
+    "https://github.com/SergioBenitez/Rocket.git",
+    "https://github.com/rustls/rustls.git",
+    "https://github.com/rust-lang/rust-bindgen.git",
+    "https://github.com/hyperium/hyper.git",
+    "https://github.com/actix/actix.git",
+    "https://github.com/denoland/deno.git",
+];
+
 /// Inputs for the check_diff script
 #[derive(Parser)]
 struct CliInputs {
