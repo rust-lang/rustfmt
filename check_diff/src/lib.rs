@@ -32,6 +32,20 @@ impl std::fmt::Debug for FormatCodeError {
     }
 }
 
+pub enum CreateDiffError {
+    /// Couldn't create a diff because the rustfmt binary compiled from the `main` branch
+    /// failed to format the input.
+    MainRustfmtFailed(FormatCodeError),
+    /// Couldn't create a diff because the rustfmt binary compiled from the `feature` branch
+    /// failed to format the input.
+    FeatureRustfmtFailed(FormatCodeError),
+    /// Couldn't create a diff because both rustfmt binaries failed to format the input
+    BothRustfmtFailed {
+        src: FormatCodeError,
+        feature: FormatCodeError,
+    },
+}
+
 #[derive(Debug)]
 pub enum CheckDiffError {
     /// Git related errors
@@ -130,14 +144,32 @@ where
         &self,
         path: &Path,
         additional_configs: Option<&[T]>,
-    ) -> Result<Diff, CheckDiffError> {
-        let code = std::fs::read_to_string(path)?;
-        let src_format = self.src_runner.format_code(&code, additional_configs)?;
-        let feature_format = self.feature_runner.format_code(&code, additional_configs)?;
-        Ok(Diff {
-            src_format,
-            feature_format,
-        })
+    ) -> Result<Diff, CreateDiffError> {
+        let code = std::fs::read_to_string(path).expect("we can read the file");
+        let src_format = self.src_runner.format_code(&code, additional_configs);
+        let feature_format = self.feature_runner.format_code(&code, additional_configs);
+
+        match (src_format, feature_format) {
+            (Ok(s), Ok(f)) => Ok(Diff {
+                src_format: s,
+                feature_format: f,
+            }),
+            (Err(error), Ok(_)) => {
+                // main formatting failed.
+                Err(CreateDiffError::MainRustfmtFailed(error))
+            }
+            (Ok(_), Err(error)) => {
+                // feature formatting failed
+                Err(CreateDiffError::FeatureRustfmtFailed(error))
+            }
+            (Err(src_error), Err(feature_error)) => {
+                // Both main formatting and feature formatting failed
+                Err(CreateDiffError::BothRustfmtFailed {
+                    src: src_error,
+                    feature: feature_error,
+                })
+            }
+        }
     }
 }
 
@@ -476,13 +508,14 @@ pub fn check_diff<T: AsRef<str>>(
                     errors += 1;
                 }
             }
-            Err(e) => {
-                eprintln!(
-                    "Error creating diff for {:?}: {:?}",
-                    file.as_path().display(),
-                    e
-                );
-                errors += 1;
+            Err(CreateDiffError::MainRustfmtFailed(_)) => {
+                continue;
+            }
+            Err(CreateDiffError::FeatureRustfmtFailed(_)) => {
+                continue;
+            }
+            Err(CreateDiffError::BothRustfmtFailed { .. }) => {
+                continue;
             }
         }
     }
