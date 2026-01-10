@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use tracing::info;
+use tracing::{debug, error, info, trace};
 use walkdir::WalkDir;
 
 pub enum FormatCodeError {
@@ -310,8 +310,8 @@ pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitError> {
         return Err(error);
     }
 
-    info!("Successfully clone repository.");
-    return Ok(());
+    info!("Successfully cloned repository {url} to {}", dest.display());
+    Ok(())
 }
 
 pub fn git_remote_add(url: &str) -> Result<(), GitError> {
@@ -374,7 +374,7 @@ pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     let dest_path = Path::new(&dest);
     env::set_current_dir(&dest_path)?;
     info!(
-        "Current directory: {}",
+        "Setting current directory to: {}",
         env::current_dir().unwrap().display()
     );
     return Ok(());
@@ -497,28 +497,77 @@ pub fn check_diff<T: AsRef<str>>(
     config: Option<&[T]>,
     runners: &CheckDiffRunners<impl CodeFormatter, impl CodeFormatter>,
     repo: &Path,
+    repo_url: &str,
 ) -> i32 {
     let mut errors = 0;
     let iter = search_for_rs_files(repo);
     for file in iter {
+        let relative_path = file.strip_prefix(repo).unwrap_or(&file);
+        let repo_name = get_repo_name(repo_url);
+
+        trace!(
+            "Formatting '{0}' file {0}/{1}",
+            repo_name,
+            relative_path.display()
+        );
+
         match runners.create_diff(file.as_path(), config) {
             Ok(diff) => {
                 if !diff.is_empty() {
-                    eprint!("{diff}");
+                    error!(
+                        "Diff found in '{0}' when formatting {0}/{1}\n{2}",
+                        repo_name,
+                        relative_path.display(),
+                        diff,
+                    );
                     errors += 1;
+                } else {
+                    trace!(
+                        "No diff found in '{0}' when formatting {0}/{1}",
+                        repo_name,
+                        relative_path.display(),
+                    )
                 }
             }
-            Err(CreateDiffError::MainRustfmtFailed(_)) => {
+            Err(CreateDiffError::MainRustfmtFailed(e)) => {
+                debug!(
+                    "`main` rustfmt failed to format {}/{}\n{:?}",
+                    repo_name,
+                    relative_path.display(),
+                    e,
+                );
                 continue;
             }
-            Err(CreateDiffError::FeatureRustfmtFailed(_)) => {
+            Err(CreateDiffError::FeatureRustfmtFailed(e)) => {
+                debug!(
+                    "`feature` rustfmt failed to format {}/{}\n{:?}",
+                    repo_name,
+                    relative_path.display(),
+                    e,
+                );
                 continue;
             }
-            Err(CreateDiffError::BothRustfmtFailed { .. }) => {
+            Err(CreateDiffError::BothRustfmtFailed { src, feature }) => {
+                debug!(
+                    "Both rustfmt binaries failed to format {}/{}\n{:?}\n{:?}",
+                    repo_name,
+                    relative_path.display(),
+                    src,
+                    feature,
+                );
                 continue;
             }
         }
     }
 
-    return errors;
+    errors
+}
+
+/// parse out the repository name from a GitHub Repository name.
+pub fn get_repo_name(git_url: &str) -> &str {
+    let strip_git_prefix = git_url.strip_suffix(".git").unwrap_or(git_url);
+    let (_, repo_name) = strip_git_prefix
+        .rsplit_once('/')
+        .unwrap_or(("", strip_git_prefix));
+    repo_name
 }
