@@ -1,5 +1,6 @@
 use check_diff::{
-    CheckDiffError, CheckDiffRunners, CodeFormatter, check_diff, search_for_rs_files,
+    CheckDiffError, CheckDiffRunners, CodeFormatter, FormatCodeError, check_diff,
+    search_for_rs_files,
 };
 use std::fs::File;
 use tempfile::Builder;
@@ -7,11 +8,11 @@ use tempfile::Builder;
 struct DoNothingFormatter;
 
 impl CodeFormatter for DoNothingFormatter {
-    fn format_code<'a>(
+    fn format_code<T: AsRef<str>>(
         &self,
-        _code: &'a str,
-        _config: &Option<Vec<String>>,
-    ) -> Result<String, CheckDiffError> {
+        _code: &str,
+        _config: Option<&[T]>,
+    ) -> Result<String, FormatCodeError> {
         Ok(String::new())
     }
 }
@@ -20,11 +21,11 @@ impl CodeFormatter for DoNothingFormatter {
 struct AddWhiteSpaceFormatter;
 
 impl CodeFormatter for AddWhiteSpaceFormatter {
-    fn format_code<'a>(
+    fn format_code<T: AsRef<str>>(
         &self,
-        code: &'a str,
-        _config: &Option<Vec<String>>,
-    ) -> Result<String, CheckDiffError> {
+        code: &str,
+        _config: Option<&[T]>,
+    ) -> Result<String, FormatCodeError> {
         let result = code.to_string() + " ";
         Ok(result)
     }
@@ -77,8 +78,9 @@ fn check_diff_test_no_formatting_difference() -> Result<(), CheckDiffError> {
     let dir = Builder::new().tempdir_in("").unwrap();
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
+    let repo_url = "https://github.com/rust-lang/rustfmt.git";
 
-    let errors = check_diff(None, runners, dir.path());
+    let errors = check_diff(None::<&[&str]>, &runners, dir.path(), repo_url);
     assert_eq!(errors, 0);
     Ok(())
 }
@@ -89,8 +91,9 @@ fn check_diff_test_formatting_difference() -> Result<(), CheckDiffError> {
     let dir = Builder::new().tempdir_in("").unwrap();
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
+    let repo_url = "https://github.com/rust-lang/rustfmt.git";
 
-    let errors = check_diff(None, runners, dir.path());
+    let errors = check_diff(None::<&[&str]>, &runners, dir.path(), repo_url);
     assert_ne!(errors, 0);
     Ok(())
 }
