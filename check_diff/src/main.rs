@@ -69,16 +69,22 @@ fn main() -> Result<ExitCode, Error> {
     let args = CliInputs::parse();
     let tmp_dir = tempdir()?;
     info!("Created tmp_dir {:?}", tmp_dir);
-    let Ok(check_diff_runners) = compile_rustfmt(
+
+    let compilation_result = compile_rustfmt(
         tmp_dir.path(),
         args.remote_repo_url,
         args.feature_branch,
         args.edition,
         args.style_edition,
         args.commit_hash,
-    ) else {
-        error!("Failed to compile rustfmt");
-        return Ok(ExitCode::FAILURE);
+    );
+
+    let check_diff_runners = match compilation_result {
+        Ok(runner) => runner,
+        Err(e) => {
+            error!("Failed to compile rustfmt:\n{e:?}");
+            return Ok(ExitCode::FAILURE);
+        }
     };
 
     let errors = Arc::new(AtomicUsize::new(0));
