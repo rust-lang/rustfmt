@@ -299,6 +299,10 @@ fn dynamic_library_path_env_var_name() -> &'static str {
 }
 
 impl CodeFormatter for RustfmtRunner {
+    // When rustfmt knows the file path it's able to skip formatting for files listed in the repo's
+    // rustfmt.toml `ignore` list. For example, this helps us skip files in r-l/rust that have
+    // been explicitly skipped because trying to format them causes rustfmt to hang or rustfmt.
+    // doesn't do a good job at formatting those files.
     fn format_code_from_path<T: AsRef<str>, P: AsRef<Path>>(
         &self,
         path: P,
