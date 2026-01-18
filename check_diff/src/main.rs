@@ -131,8 +131,8 @@ fn main() -> Result<ExitCode, Error> {
         .expect("All other threads are done")
         .load(Ordering::Relaxed);
     if error_count > 0 {
-        error!("Formatting diff found 💔");
-        Ok(ExitCode::from(u8::try_from(error_count).unwrap_or(u8::MAX)))
+        error!("{error_count} formatting diffs found 💔");
+        Ok(ExitCode::FAILURE)
     } else {
         info!("No diff found 😊");
         Ok(ExitCode::SUCCESS)
