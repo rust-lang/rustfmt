@@ -23,11 +23,25 @@ jobs:
     - name: checkout
       uses: actions/checkout@v4
 
-    - name: install rustup
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup-init.sh
-        sh rustup-init.sh -y --default-toolchain none
-        rustup target add x86_64-unknown-linux-gnu
+    - name: Build check_diff binary
+      working-directory: ./check_diff
+      run: cargo build --release
 
-    - name: check diff
-      run: bash ${GITHUB_WORKSPACE}/ci/check_diff.sh ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} ${{ github.event.inputs.commit_hash || github.event.inputs.branch_name }} ${{ github.event.inputs.rustfmt_configs }}
+    - name: Run Diff Check
+      working-directory: ./check_diff
+      env:
+        CHECK_DIFF_LOG: info
+      shell: bash
+      run: |
+        OPTIONS=""
+
+        if [[ -n "${{ github.event.inputs.commit_hash }}" ]]; then
+          OPTIONS+="--commit-hash ${{ github.event.inputs.commit_hash }} "
+        fi
+
+        if [[ -n "${{ github.event.inputs.rustfmt_configs }}" ]]; then
+          OPTIONS+="--rustfmt-config ${{ github.event.inputs.rustfmt_configs }} "
+        fi
+
+        target/release/check_diff ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} \
+          $OPTIONS
