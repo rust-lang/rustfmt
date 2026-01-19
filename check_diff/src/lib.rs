@@ -1,12 +1,118 @@
-use diffy;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::str::Utf8Error;
-use tracing::info;
+use std::str::FromStr;
+use tracing::{debug, error, info, trace};
 use walkdir::WalkDir;
+
+#[derive(Debug, Clone, Copy)]
+pub enum Edition {
+    /// rust edition 2015
+    Edition2015,
+    /// rust edition 2018
+    Edition2018,
+    /// rust edition 2021
+    Edition2021,
+    /// rust edition 2024
+    Edition2024,
+}
+
+impl Edition {
+    fn as_str(&self) -> &str {
+        match self {
+            Edition::Edition2015 => "2015",
+            Edition::Edition2018 => "2018",
+            Edition::Edition2021 => "2021",
+            Edition::Edition2024 => "2024",
+        }
+    }
+}
+
+impl FromStr for Edition {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "2015" => Ok(Edition::Edition2015),
+            "2018" => Ok(Edition::Edition2018),
+            "2021" => Ok(Edition::Edition2021),
+            "2024" => Ok(Edition::Edition2024),
+            _ => Err(format!("Invalid rust language edition {s}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum StyleEdition {
+    // rustfmt style_edition 2021. Also equivaluent to 2015 and 2018.
+    Edition2021,
+    // rustfmt style_edition 2024
+    Edition2024,
+}
+
+impl StyleEdition {
+    fn as_str(&self) -> &str {
+        match self {
+            StyleEdition::Edition2021 => "2021",
+            StyleEdition::Edition2024 => "2024",
+        }
+    }
+}
+
+impl FromStr for StyleEdition {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "2015" => Ok(StyleEdition::Edition2021),
+            "2018" => Ok(StyleEdition::Edition2021),
+            "2021" => Ok(StyleEdition::Edition2021),
+            "2024" => Ok(StyleEdition::Edition2024),
+            _ => Err(format!("Invalid rustfmt style edition {s}")),
+        }
+    }
+}
+
+pub enum FormatCodeError {
+    // IO Error when running code formatter
+    Io(std::io::Error),
+    /// An error occured that prevents code formatting. For example, a parse error.
+    CodeNotFormatted(Vec<u8>),
+}
+
+impl From<std::io::Error> for FormatCodeError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+impl std::fmt::Debug for FormatCodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => std::fmt::Debug::fmt(e, f),
+            Self::CodeNotFormatted(e) => {
+                let data = String::from_utf8_lossy(e);
+                f.write_str(&data)
+            }
+        }
+    }
+}
+
+pub enum CreateDiffError {
+    /// Couldn't create a diff because the rustfmt binary compiled from the `main` branch
+    /// failed to format the input.
+    MainRustfmtFailed(FormatCodeError),
+    /// Couldn't create a diff because the rustfmt binary compiled from the `feature` branch
+    /// failed to format the input.
+    FeatureRustfmtFailed(FormatCodeError),
+    /// Couldn't create a diff because both rustfmt binaries failed to format the input
+    BothRustfmtFailed {
+        src: FormatCodeError,
+        feature: FormatCodeError,
+    },
+}
 
 #[derive(Debug)]
 pub enum CheckDiffError {
@@ -14,8 +120,6 @@ pub enum CheckDiffError {
     FailedGit(GitError),
     /// Error for generic commands
     FailedCommand(&'static str),
-    /// UTF8 related errors
-    FailedUtf8(Utf8Error),
     /// Error for building rustfmt from source
     FailedSourceBuild(&'static str),
     /// Error when obtaining binary version
@@ -34,12 +138,6 @@ impl From<io::Error> for CheckDiffError {
 impl From<GitError> for CheckDiffError {
     fn from(error: GitError) -> Self {
         CheckDiffError::FailedGit(error)
-    }
-}
-
-impl From<Utf8Error> for CheckDiffError {
-    fn from(error: Utf8Error) -> Self {
-        CheckDiffError::FailedUtf8(error)
     }
 }
 
@@ -83,16 +181,27 @@ pub struct CheckDiffRunners<F, S> {
 }
 
 pub trait CodeFormatter {
-    fn format_code<'a>(
+    fn format_code<T: AsRef<str>>(
         &self,
-        code: &'a str,
-        config: &Option<Vec<String>>,
-    ) -> Result<String, CheckDiffError>;
+        code: &str,
+        config: Option<&[T]>,
+    ) -> Result<String, FormatCodeError>;
+
+    fn format_code_from_path<T: AsRef<str>, P: AsRef<Path>>(
+        &self,
+        path: P,
+        config: Option<&[T]>,
+    ) -> Result<String, FormatCodeError> {
+        let code = std::fs::read_to_string(path)?;
+        self.format_code(&code, config)
+    }
 }
 
 pub struct RustfmtRunner {
-    ld_library_path: String,
+    dynamic_library_path: String,
     binary_path: PathBuf,
+    edition: Edition,
+    style_edition: StyleEdition,
 }
 
 impl<F, S> CheckDiffRunners<F, S> {
@@ -110,25 +219,49 @@ where
     S: CodeFormatter,
 {
     /// Creates a diff generated by running the source and feature binaries on the same file path
-    pub fn create_diff(
+    pub fn create_diff<T: AsRef<str>, P: AsRef<Path>>(
         &self,
-        path: &Path,
-        additional_configs: &Option<Vec<String>>,
-    ) -> Result<Diff, CheckDiffError> {
-        let code = std::fs::read_to_string(path)?;
-        let src_format = self.src_runner.format_code(&code, additional_configs)?;
-        let feature_format = self.feature_runner.format_code(&code, additional_configs)?;
-        Ok(Diff {
-            src_format,
-            feature_format,
-        })
+        path: P,
+        additional_configs: Option<&[T]>,
+    ) -> Result<Diff, CreateDiffError> {
+        let src_format = self
+            .src_runner
+            .format_code_from_path(&path, additional_configs);
+        let feature_format = self
+            .feature_runner
+            .format_code_from_path(&path, additional_configs);
+
+        match (src_format, feature_format) {
+            (Ok(s), Ok(f)) => Ok(Diff {
+                src_format: s,
+                feature_format: f,
+            }),
+            (Err(error), Ok(_)) => {
+                // main formatting failed.
+                Err(CreateDiffError::MainRustfmtFailed(error))
+            }
+            (Ok(_), Err(error)) => {
+                // feature formatting failed
+                Err(CreateDiffError::FeatureRustfmtFailed(error))
+            }
+            (Err(src_error), Err(feature_error)) => {
+                // Both main formatting and feature formatting failed
+                Err(CreateDiffError::BothRustfmtFailed {
+                    src: src_error,
+                    feature: feature_error,
+                })
+            }
+        }
     }
 }
 
 impl RustfmtRunner {
     fn get_binary_version(&self) -> Result<String, CheckDiffError> {
         let Ok(command) = Command::new(&self.binary_path)
-            .env("LD_LIBRARY_PATH", &self.ld_library_path)
+            .env(
+                dynamic_library_path_env_var_name(),
+                &self.dynamic_library_path,
+            )
             .args(["--version"])
             .output()
         else {
@@ -137,27 +270,103 @@ impl RustfmtRunner {
             ));
         };
 
-        let binary_version = std::str::from_utf8(&command.stdout)?.trim();
-        return Ok(binary_version.to_string());
+        Ok(buffer_into_utf8_lossy(command.stdout))
+    }
+}
+
+/// Convert a buffer of u8 into a String.
+fn buffer_into_utf8_lossy(buffer: Vec<u8>) -> String {
+    let mut s = match String::from_utf8(buffer) {
+        Ok(s) => s,
+        Err(e) => String::from_utf8_lossy(e.as_bytes()).to_string(),
+    };
+    s.truncate(s.trim_end().len());
+    s
+}
+
+/// Returns the name of the environment variable used to search for dynamic libraries.
+/// This is the same logic that cargo uses when setting these environment variables
+fn dynamic_library_path_env_var_name() -> &'static str {
+    if cfg!(windows) {
+        "PATH"
+    } else if cfg!(target_os = "macos") {
+        "DYLD_FALLBACK_LIBRARY_PATH"
+    } else if cfg!(target_os = "aix") {
+        "LIBPATH"
+    } else {
+        "LD_LIBRARY_PATH"
     }
 }
 
 impl CodeFormatter for RustfmtRunner {
+    // When rustfmt knows the file path it's able to skip formatting for files listed in the repo's
+    // rustfmt.toml `ignore` list. For example, this helps us skip files in r-l/rust that have
+    // been explicitly skipped because trying to format them causes rustfmt to hang or rustfmt.
+    // doesn't do a good job at formatting those files.
+    fn format_code_from_path<T: AsRef<str>, P: AsRef<Path>>(
+        &self,
+        path: P,
+        config: Option<&[T]>,
+    ) -> Result<String, FormatCodeError> {
+        let config = create_config_arg(config);
+        let command = Command::new(&self.binary_path)
+            .env(
+                dynamic_library_path_env_var_name(),
+                &self.dynamic_library_path,
+            )
+            .args([
+                "--edition",
+                self.edition.as_str(),
+                "--style-edition",
+                self.style_edition.as_str(),
+                "--unstable-features",
+                "--skip-children",
+                "--emit=stdout",
+                config.as_str(),
+            ])
+            .arg(path.as_ref())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+
+        let output = command.wait_with_output()?;
+        let formatted_code = buffer_into_utf8_lossy(output.stdout);
+
+        match output.status.code() {
+            Some(0) => Ok(formatted_code),
+            Some(_) | None => {
+                if !formatted_code.is_empty() {
+                    Ok(formatted_code)
+                } else {
+                    Err(FormatCodeError::CodeNotFormatted(output.stderr))
+                }
+            }
+        }
+    }
+
     //  Run rusfmt to see if a diff is produced. Runs on the code specified
     //
     // Parameters:
     // code: Code to run the binary on
     // config: Any additional configuration options to pass to rustfmt
     //
-    fn format_code<'a>(
+    fn format_code<T: AsRef<str>>(
         &self,
-        code: &'a str,
-        config: &Option<Vec<String>>,
-    ) -> Result<String, CheckDiffError> {
+        code: &str,
+        config: Option<&[T]>,
+    ) -> Result<String, FormatCodeError> {
         let config = create_config_arg(config);
         let mut command = Command::new(&self.binary_path)
-            .env("LD_LIBRARY_PATH", &self.ld_library_path)
+            .env(
+                dynamic_library_path_env_var_name(),
+                &self.dynamic_library_path,
+            )
             .args([
+                "--edition",
+                self.edition.as_str(),
+                "--style-edition",
+                self.style_edition.as_str(),
                 "--unstable-features",
                 "--skip-children",
                 "--emit=stdout",
@@ -170,19 +379,30 @@ impl CodeFormatter for RustfmtRunner {
 
         command.stdin.as_mut().unwrap().write_all(code.as_bytes())?;
         let output = command.wait_with_output()?;
-        Ok(std::str::from_utf8(&output.stdout)?.to_string())
+        let formatted_code = buffer_into_utf8_lossy(output.stdout);
+
+        match output.status.code() {
+            Some(0) => Ok(formatted_code),
+            Some(_) | None => {
+                if !formatted_code.is_empty() {
+                    Ok(formatted_code)
+                } else {
+                    Err(FormatCodeError::CodeNotFormatted(output.stderr))
+                }
+            }
+        }
     }
 }
 
 /// Creates a configuration in the following form:
 /// <config_name>=<config_val>, <config_name>=<config_val>, ...
-fn create_config_arg(config: &Option<Vec<String>>) -> String {
+fn create_config_arg<T: AsRef<str>>(config: Option<&[T]>) -> String {
     let config_arg: String = match config {
         Some(configs) => {
             let mut result = String::new();
             for arg in configs.iter() {
                 result.push(',');
-                result.push_str(arg.as_str());
+                result.push_str(arg.as_ref());
             }
             result
         }
@@ -222,8 +442,8 @@ pub fn clone_git_repo(url: &str, dest: &Path) -> Result<(), GitError> {
         return Err(error);
     }
 
-    info!("Successfully clone repository.");
-    return Ok(());
+    info!("Successfully cloned repository {url} to {}", dest.display());
+    Ok(())
 }
 
 pub fn git_remote_add(url: &str) -> Result<(), GitError> {
@@ -242,7 +462,7 @@ pub fn git_remote_add(url: &str) -> Result<(), GitError> {
     }
 
     info!("Successfully added remote: {url}");
-    return Ok(());
+    Ok(())
 }
 
 pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
@@ -261,7 +481,7 @@ pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
     }
 
     info!("Successfully fetched: {branch_name}");
-    return Ok(());
+    Ok(())
 }
 
 pub fn git_switch(git_ref: &str, should_detach: bool) -> Result<(), GitError> {
@@ -279,20 +499,20 @@ pub fn git_switch(git_ref: &str, should_detach: bool) -> Result<(), GitError> {
         return Err(error);
     }
     info!("Successfully switched to {git_ref}");
-    return Ok(());
+    Ok(())
 }
 
 pub fn change_directory_to_path(dest: &Path) -> io::Result<()> {
     let dest_path = Path::new(&dest);
-    env::set_current_dir(&dest_path)?;
+    env::set_current_dir(dest_path)?;
     info!(
-        "Current directory: {}",
+        "Setting current directory to: {}",
         env::current_dir().unwrap().display()
     );
-    return Ok(());
+    Ok(())
 }
 
-pub fn get_ld_library_path(dir: &Path) -> Result<String, CheckDiffError> {
+pub fn get_dynamic_library_path(dir: &Path) -> Result<String, CheckDiffError> {
     let Ok(command) = Command::new("rustc")
         .current_dir(dir)
         .args(["--print", "sysroot"])
@@ -300,9 +520,9 @@ pub fn get_ld_library_path(dir: &Path) -> Result<String, CheckDiffError> {
     else {
         return Err(CheckDiffError::FailedCommand("Error getting sysroot"));
     };
-    let sysroot = std::str::from_utf8(&command.stdout)?.trim_end();
-    let ld_lib_path = format!("{}/lib", sysroot);
-    return Ok(ld_lib_path);
+    let mut sysroot = buffer_into_utf8_lossy(command.stdout);
+    sysroot.push_str("/lib");
+    Ok(sysroot)
 }
 
 pub fn get_cargo_version() -> Result<String, CheckDiffError> {
@@ -312,8 +532,7 @@ pub fn get_cargo_version() -> Result<String, CheckDiffError> {
         ));
     };
 
-    let cargo_version = std::str::from_utf8(&command.stdout)?.trim_end();
-    return Ok(cargo_version.to_string());
+    Ok(buffer_into_utf8_lossy(command.stdout))
 }
 
 /// Obtains the ld_lib path and then builds rustfmt from source
@@ -321,12 +540,12 @@ pub fn get_cargo_version() -> Result<String, CheckDiffError> {
 pub fn build_rustfmt_from_src(
     binary_path: PathBuf,
     dir: &Path,
+    edition: Edition,
+    style_edition: StyleEdition,
 ) -> Result<RustfmtRunner, CheckDiffError> {
-    //Because we're building standalone binaries we need to set `LD_LIBRARY_PATH` so each
-    // binary can find it's runtime dependencies.
-    // See https://github.com/rust-lang/rustfmt/issues/5675
-    // This will prepend the `LD_LIBRARY_PATH` for the main rustfmt binary
-    let ld_lib_path = get_ld_library_path(&dir)?;
+    // Because we're building standalone binaries we need to set the dynamic library path
+    // so each rustfmt binary can find it's runtime dependencies.
+    let dynamic_library_path = get_dynamic_library_path(dir)?;
 
     info!("Building rustfmt from source");
     let Ok(_) = Command::new("cargo")
@@ -341,10 +560,12 @@ pub fn build_rustfmt_from_src(
 
     std::fs::copy(dir.join("target/release/rustfmt"), &binary_path)?;
 
-    return Ok(RustfmtRunner {
-        ld_library_path: ld_lib_path,
+    Ok(RustfmtRunner {
+        dynamic_library_path,
         binary_path,
-    });
+        edition,
+        style_edition,
+    })
 }
 
 // Compiles and produces two rustfmt binaries.
@@ -355,6 +576,8 @@ pub fn compile_rustfmt(
     dest: &Path,
     remote_repo_url: String,
     feature_branch: String,
+    edition: Edition,
+    style_edition: StyleEdition,
     commit_hash: Option<String>,
 ) -> Result<CheckDiffRunners<RustfmtRunner, RustfmtRunner>, CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
@@ -366,72 +589,126 @@ pub fn compile_rustfmt(
 
     let cargo_version = get_cargo_version()?;
     info!("Compiling with {}", cargo_version);
-    let src_runner = build_rustfmt_from_src(dest.join("src_rustfmt"), dest)?;
+    let src_runner =
+        build_rustfmt_from_src(dest.join("src_rustfmt"), dest, edition, style_edition)?;
     let should_detach = commit_hash.is_some();
     git_switch(
-        commit_hash.unwrap_or(feature_branch).as_str(),
+        commit_hash.as_ref().unwrap_or(&feature_branch),
         should_detach,
     )?;
 
-    let feature_runner = build_rustfmt_from_src(dest.join("feature_rustfmt"), dest)?;
+    let feature_runner =
+        build_rustfmt_from_src(dest.join("feature_rustfmt"), dest, edition, style_edition)?;
     info!("RUSFMT_BIN {}", src_runner.get_binary_version()?);
+    let dynamic_library_path_env_var = dynamic_library_path_env_var_name();
     info!(
-        "Runtime dependencies for (src) rustfmt -- LD_LIBRARY_PATH: {}",
-        src_runner.ld_library_path
+        "Runtime dependencies for (main) rustfmt -- {}: {}",
+        dynamic_library_path_env_var, src_runner.dynamic_library_path
     );
     info!("FEATURE_BIN {}", feature_runner.get_binary_version()?);
     info!(
-        "Runtime dependencies for (feature) rustfmt -- LD_LIBRARY_PATH: {}",
-        feature_runner.ld_library_path
+        "Runtime dependencies for ({}) rustfmt -- {}: {}",
+        feature_branch, dynamic_library_path_env_var, feature_runner.dynamic_library_path
     );
 
-    return Ok(CheckDiffRunners {
+    Ok(CheckDiffRunners {
         src_runner,
         feature_runner,
-    });
+    })
 }
 
 /// Searches for rust files in the particular path and returns an iterator to them.
 pub fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
-    return WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
+    WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
         Some(entry) => {
             let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "rs") {
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
                 return Some(entry.into_path());
             }
-            return None;
+            None
         }
         None => None,
-    });
+    })
 }
 
 /// Calculates the number of errors when running the compiled binary and the feature binary on the
 /// repo specified with the specific configs.
-pub fn check_diff(
-    config: Option<Vec<String>>,
-    runners: CheckDiffRunners<impl CodeFormatter, impl CodeFormatter>,
-    repo: &Path,
-) -> i32 {
-    let mut errors = 0;
+pub fn check_diff<T: AsRef<str>, P: AsRef<Path>>(
+    config: Option<&[T]>,
+    runners: &CheckDiffRunners<impl CodeFormatter, impl CodeFormatter>,
+    repo: P,
+    repo_url: &str,
+) -> u8 {
+    let mut errors: u8 = 0;
+    let repo = repo.as_ref();
     let iter = search_for_rs_files(repo);
     for file in iter {
-        match runners.create_diff(file.as_path(), &config) {
+        let relative_path = file.strip_prefix(repo).unwrap_or(&file);
+        let repo_name = get_repo_name(repo_url);
+
+        trace!(
+            "Formatting '{0}' file {0}/{1}",
+            repo_name,
+            relative_path.display()
+        );
+
+        match runners.create_diff(file.as_path(), config) {
             Ok(diff) => {
                 if !diff.is_empty() {
-                    eprint!("{diff}");
-                    errors += 1;
+                    error!(
+                        "Diff found in '{0}' when formatting {0}/{1}\n{2}",
+                        repo_name,
+                        relative_path.display(),
+                        diff,
+                    );
+                    errors = errors.saturating_add(1);
+                } else {
+                    trace!(
+                        "No diff found in '{0}' when formatting {0}/{1}",
+                        repo_name,
+                        relative_path.display(),
+                    )
                 }
             }
-            Err(e) => {
-                eprintln!(
-                    "Error creating diff for {:?}: {:?}",
-                    file.as_path().display(),
-                    e
+            Err(CreateDiffError::MainRustfmtFailed(e)) => {
+                debug!(
+                    "`main` rustfmt failed to format {}/{}\n{:?}",
+                    repo_name,
+                    relative_path.display(),
+                    e,
                 );
-                errors += 1;
+                continue;
+            }
+            Err(CreateDiffError::FeatureRustfmtFailed(e)) => {
+                debug!(
+                    "`feature` rustfmt failed to format {}/{}\n{:?}",
+                    repo_name,
+                    relative_path.display(),
+                    e,
+                );
+                continue;
+            }
+            Err(CreateDiffError::BothRustfmtFailed { src, feature }) => {
+                debug!(
+                    "Both rustfmt binaries failed to format {}/{}\n{:?}\n{:?}",
+                    repo_name,
+                    relative_path.display(),
+                    src,
+                    feature,
+                );
+                continue;
             }
         }
     }
 
-    return errors;
+    errors
+}
+
+/// parse out the repository name from a GitHub Repository name.
+pub fn get_repo_name(git_url: &str) -> &str {
+    let strip_git_prefix = git_url.strip_suffix(".git").unwrap_or(git_url);
+    let (_, repo_name) = strip_git_prefix
+        .rsplit_once('/')
+        .unwrap_or(("", strip_git_prefix));
+    repo_name
 }
