@@ -12,3 +12,4 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 tempfile = "3"
 walkdir = "2.5.0"
 diffy = "0.4.0"
+crossbeam-channel = "0.5.15"
