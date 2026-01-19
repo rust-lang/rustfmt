@@ -8,6 +8,24 @@ on:
       branch_name:
         description: 'Name of the feature branch on the forked repo'
         required: true
+      language_edition:
+        description: 'Rust language `edition` used to parse code'
+        required: true
+        default: 2015
+        type: choice
+        options:
+          - 2015
+          - 2018
+          - 2021
+          - 2024
+      style_edition:
+        description: 'rustfmt `style_edition` used when formatting code.'
+        required: true
+        default: 2021
+        type: choice
+        options:
+          - 2021 # 2015, 2018, and 2021 are all formatted the same since `style_edition` was added between 2021 and 2024
+          - 2024
       commit_hash:
         description: 'Optional commit hash from the feature branch'
         required: false
@@ -44,4 +62,6 @@ jobs:
         fi
 
         target/release/check_diff ${{ github.event.inputs.clone_url }} ${{ github.event.inputs.branch_name }} \
+          --edition ${{ github.event.inputs.language_edition }} \
+          --style-edition ${{ github.event.inputs.style_edition }} \
           $OPTIONS
