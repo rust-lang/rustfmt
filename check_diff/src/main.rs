@@ -77,6 +77,7 @@ fn main() -> Result<ExitCode, Error> {
         args.edition,
         args.style_edition,
         args.commit_hash,
+        args.rustfmt_config.as_deref(),
     );
 
     let check_diff_runners = match compilation_result {
@@ -88,13 +89,11 @@ fn main() -> Result<ExitCode, Error> {
     };
 
     let errors = Arc::new(AtomicUsize::new(0));
-    let rustfmt_config = Arc::new(args.rustfmt_config);
     let check_diff_runners = Arc::new(check_diff_runners);
 
     thread::scope(|s| {
         for url in REPOS {
             let errors = Arc::clone(&errors);
-            let rustfmt_config = Arc::clone(&rustfmt_config);
             let check_diff_runners = Arc::clone(&check_diff_runners);
             s.spawn(move || {
                 let repo_name = get_repo_name(url);
@@ -115,12 +114,7 @@ fn main() -> Result<ExitCode, Error> {
                     return;
                 };
 
-                let error_count = check_diff(
-                    rustfmt_config.as_deref(),
-                    &check_diff_runners,
-                    tmp_dir.path(),
-                    url,
-                );
+                let error_count = check_diff(&check_diff_runners, tmp_dir.path(), url);
 
                 errors.fetch_add(error_count as usize, Ordering::Relaxed);
             });

@@ -8,11 +8,7 @@ use tempfile::Builder;
 struct DoNothingFormatter;
 
 impl CodeFormatter for DoNothingFormatter {
-    fn format_code<T: AsRef<str>>(
-        &self,
-        _code: &str,
-        _config: Option<&[T]>,
-    ) -> Result<String, FormatCodeError> {
+    fn format_code(&self, _code: &str) -> Result<String, FormatCodeError> {
         Ok(String::new())
     }
 }
@@ -21,11 +17,7 @@ impl CodeFormatter for DoNothingFormatter {
 struct AddWhiteSpaceFormatter;
 
 impl CodeFormatter for AddWhiteSpaceFormatter {
-    fn format_code<T: AsRef<str>>(
-        &self,
-        code: &str,
-        _config: Option<&[T]>,
-    ) -> Result<String, FormatCodeError> {
+    fn format_code(&self, code: &str) -> Result<String, FormatCodeError> {
         let result = code.to_string() + " ";
         Ok(result)
     }
@@ -80,7 +72,7 @@ fn check_diff_test_no_formatting_difference() -> Result<(), CheckDiffError> {
     let _tmp_file = File::create(file_path)?;
     let repo_url = "https://github.com/rust-lang/rustfmt.git";
 
-    let errors = check_diff(None::<&[&str]>, &runners, dir.path(), repo_url);
+    let errors = check_diff(&runners, dir.path(), repo_url);
     assert_eq!(errors, 0);
     Ok(())
 }
@@ -93,7 +85,7 @@ fn check_diff_test_formatting_difference() -> Result<(), CheckDiffError> {
     let _tmp_file = File::create(file_path)?;
     let repo_url = "https://github.com/rust-lang/rustfmt.git";
 
-    let errors = check_diff(None::<&[&str]>, &runners, dir.path(), repo_url);
+    let errors = check_diff(&runners, dir.path(), repo_url);
     assert_ne!(errors, 0);
     Ok(())
 }
