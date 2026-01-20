@@ -24,14 +24,14 @@ exclude_labels = [
 
 [autolabel."A-CI"]
 trigger_files = [
-    "/.github/",
-    "/check_diff/",
-    "/ci/",
+    ".github/workflows",
+    "check_diff",
+    "ci",
 ]
 
 [autolabel."A-meta"]
 trigger_files = [
-    "/triagebot.toml",
+    "triagebot.toml",
 ]
 
 # ------------------------------------------------------------------------------
