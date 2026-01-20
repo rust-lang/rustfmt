@@ -51,7 +51,7 @@ term = "1.1"
 thiserror = "1.0.40"
 toml = "0.9.5"
 tracing = { version = "0.1.37", default-features = false, features = ["std"] }
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 unicode-segmentation = "1.9"
 unicode-width = "0.1"
 unicode-properties = { version = "0.1", default-features = false, features = ["general-category"] }
