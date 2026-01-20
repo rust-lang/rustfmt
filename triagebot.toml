@@ -44,6 +44,11 @@ remove_labels = ["S-waiting-on-author"]
 # Those labels are added when PR author requests a review from an assignee
 add_labels = ["S-waiting-on-review"]
 
+# Adds at the end of a review body a link to view the changes that happened
+# since the review
+# Documentation at: https://forge.rust-lang.org/triagebot/review-changes-since.html
+[review-changes-since]
+
 # ------------------------------------------------------------------------------
 # PR assignments
 # ------------------------------------------------------------------------------
