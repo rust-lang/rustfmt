@@ -22,6 +22,18 @@ exclude_labels = [
     "C-tracking-issue",
 ]
 
+[autolabel."A-CI"]
+trigger_files = [
+    "/.github/",
+    "/check_diff/",
+    "/ci/",
+]
+
+[autolabel."A-meta"]
+trigger_files = [
+    "/triagebot.toml",
+]
+
 # ------------------------------------------------------------------------------
 # PR review
 # ------------------------------------------------------------------------------
