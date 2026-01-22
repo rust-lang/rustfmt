@@ -411,6 +411,46 @@ fn create_config_arg<T: AsRef<str>>(configs: Option<&[T]>) -> Cow<'static, str> 
 
     Cow::Owned(result)
 }
+
+pub struct Repository<P> {
+    /// Name of the repository
+    name: String,
+    /// Path to the repository on the local file system
+    dir_path: P,
+}
+
+impl<P> Repository<P> {
+    /// Initialize a new Repository
+    pub fn new(git_url: &str, dir_path: P) -> Self {
+        let name = get_repo_name(git_url).to_string();
+        Self { name, dir_path }
+    }
+
+    /// Get the `name` of the repository
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Get the absolute path to where this repository was cloned
+    pub fn path(&self) -> &Path
+    where
+        P: AsRef<Path>,
+    {
+        self.dir_path.as_ref()
+    }
+
+    /// Get the relative path of a file contained in this repository
+    pub fn relative_path<'f, F>(&self, file: &'f F) -> &'f Path
+    where
+        P: AsRef<Path>,
+        F: AsRef<Path>,
+    {
+        file.as_ref()
+            .strip_prefix(self.dir_path.as_ref())
+            .unwrap_or(file.as_ref())
+    }
+}
+
 /// Clone a git repository
 ///
 /// Parameters:
