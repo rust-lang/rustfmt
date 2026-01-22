@@ -1,11 +1,14 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
-use tracing::{debug, error, info, trace};
+use std::sync::{Arc, Mutex};
+use tempfile::tempdir;
+use tracing::{debug, error, info, trace, warn};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Copy)]
@@ -681,19 +684,64 @@ pub fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
     })
 }
 
+/// Encapsulate the logic used to clone repositories for the diff check
+pub fn clone_repositories_for_diff_check(
+    repositories: &[&str],
+) -> Vec<Repository<tempfile::TempDir>> {
+    // Use a Hashmap to deduplicate any repositories
+    let map = Arc::new(Mutex::new(HashMap::new()));
+
+    std::thread::scope(|s| {
+        for url in repositories {
+            let map = Arc::clone(&map);
+
+            s.spawn(move || {
+                let repo_name = get_repo_name(url);
+                info!("Processing repo: {repo_name}");
+                let Ok(tmp_dir) = tempdir() else {
+                    warn!(
+                        "Failed to create a tempdir for {}. Can't check formatting diff for {}",
+                        &url, repo_name
+                    );
+                    return;
+                };
+
+                let Ok(_) = clone_git_repo(url, tmp_dir.path()) else {
+                    warn!(
+                        "Failed to clone repo {}. Can't check formatting diff for {}",
+                        &url, repo_name
+                    );
+                    return;
+                };
+
+                let repo = Repository::new(url, tmp_dir);
+                map.lock().unwrap().insert(repo_name.to_string(), repo);
+            });
+        }
+    });
+
+    let map = match Arc::into_inner(map)
+        .expect("All other threads are done")
+        .into_inner()
+    {
+        Ok(map) => map,
+        Err(e) => e.into_inner(),
+    };
+
+    map.into_values().collect()
+}
+
 /// Calculates the number of errors when running the compiled binary and the feature binary on the
 /// repo specified with the specific configs.
 pub fn check_diff<P: AsRef<Path>>(
     runners: &CheckDiffRunners<impl CodeFormatter, impl CodeFormatter>,
-    repo: P,
-    repo_url: &str,
+    repo: &Repository<P>,
 ) -> u8 {
     let mut errors: u8 = 0;
-    let repo = repo.as_ref();
-    let iter = search_for_rs_files(repo);
+    let iter = search_for_rs_files(repo.path());
     for file in iter {
-        let relative_path = file.strip_prefix(repo).unwrap_or(&file);
-        let repo_name = get_repo_name(repo_url);
+        let relative_path = repo.relative_path(&file);
+        let repo_name = repo.name();
 
         trace!(
             "Formatting '{0}' file {0}/{1}",

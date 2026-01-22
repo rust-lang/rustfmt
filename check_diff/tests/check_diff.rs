@@ -1,5 +1,5 @@
 use check_diff::{
-    CheckDiffError, CheckDiffRunners, CodeFormatter, FormatCodeError, check_diff,
+    CheckDiffError, CheckDiffRunners, CodeFormatter, FormatCodeError, Repository, check_diff,
     search_for_rs_files,
 };
 use std::fs::File;
@@ -70,9 +70,9 @@ fn check_diff_test_no_formatting_difference() -> Result<(), CheckDiffError> {
     let dir = Builder::new().tempdir_in("").unwrap();
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
-    let repo_url = "https://github.com/rust-lang/rustfmt.git";
+    let repo = Repository::new("https://github.com/rust-lang/rustfmt.git", dir);
 
-    let errors = check_diff(&runners, dir.path(), repo_url);
+    let errors = check_diff(&runners, &repo);
     assert_eq!(errors, 0);
     Ok(())
 }
@@ -83,9 +83,9 @@ fn check_diff_test_formatting_difference() -> Result<(), CheckDiffError> {
     let dir = Builder::new().tempdir_in("").unwrap();
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
-    let repo_url = "https://github.com/rust-lang/rustfmt.git";
+    let repo = Repository::new("https://github.com/rust-lang/rustfmt.git", dir);
 
-    let errors = check_diff(&runners, dir.path(), repo_url);
+    let errors = check_diff(&runners, &repo);
     assert_ne!(errors, 0);
     Ok(())
 }
