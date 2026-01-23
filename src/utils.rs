@@ -402,14 +402,18 @@ pub(crate) fn filtered_str_fits(snippet: &str, max_width: usize, shape: Shape) -
         // Collect line classifications to check for string content.
         let line_classes: Vec<_> = LineClasses::new(snippet).collect();
 
-        // First line must fit with `shape.width`, unless it's a string literal
-        // that starts on this line (StartString) - string content cannot be shortened.
+        // First line must fit with `shape.width`, unless it's a multi-line string
+        // literal that starts on this line - string content cannot be shortened.
         let first_line_width = first_line_width(snippet);
         if first_line_width > shape.width {
-            let first_is_string = line_classes
-                .first()
-                .is_some_and(|(kind, _)| kind.is_string() || *kind == FullCodeCharKind::StartString);
-            if !first_is_string {
+            // Only allow the exception for multi-line strings (StartString indicates
+            // the string continues on subsequent lines).
+            let is_multiline = line_classes.len() > 1;
+            let first_is_multiline_string = is_multiline
+                && line_classes
+                    .first()
+                    .is_some_and(|(kind, _)| *kind == FullCodeCharKind::StartString);
+            if !first_is_multiline_string {
                 return false;
             }
         }
