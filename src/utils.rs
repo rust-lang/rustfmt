@@ -395,27 +395,55 @@ pub(crate) fn wrap_str(s: String, max_width: usize, shape: Shape) -> Option<Stri
 }
 
 pub(crate) fn filtered_str_fits(snippet: &str, max_width: usize, shape: Shape) -> bool {
+    use crate::comment::{FullCodeCharKind, LineClasses};
+
     let snippet = &filter_normal_code(snippet);
     if !snippet.is_empty() {
-        // First line must fits with `shape.width`.
-        if first_line_width(snippet) > shape.width {
-            return false;
+        // Collect line classifications to check for string content.
+        let line_classes: Vec<_> = LineClasses::new(snippet).collect();
+
+        // First line must fit with `shape.width`, unless it's a string literal
+        // that starts on this line (StartString) - string content cannot be shortened.
+        let first_line_width = first_line_width(snippet);
+        if first_line_width > shape.width {
+            let first_is_string = line_classes
+                .first()
+                .is_some_and(|(kind, _)| kind.is_string() || *kind == FullCodeCharKind::StartString);
+            if !first_is_string {
+                return false;
+            }
         }
+
         // If the snippet does not include newline, we are done.
         if is_single_line(snippet) {
             return true;
         }
+
         // The other lines must fit within the maximum width.
-        if snippet
-            .lines()
-            .skip(1)
-            .any(|line| unicode_str_width(line) > max_width)
-        {
-            return false;
+        // Exception: lines that are inside or end a multi-line string literal
+        // may exceed max_width since string content cannot be reformatted.
+        let mut last_line_is_string = false;
+        for (i, (kind, line)) in line_classes.iter().enumerate() {
+            if i == 0 {
+                continue; // First line already checked above
+            }
+            // Track if the last line is string content
+            last_line_is_string =
+                *kind == FullCodeCharKind::InString || *kind == FullCodeCharKind::EndString;
+
+            if unicode_str_width(line) > max_width {
+                // Allow lines that are string continuations (InString) or
+                // end a string (EndString) to exceed max_width.
+                if !last_line_is_string {
+                    return false;
+                }
+            }
         }
+
         // A special check for the last line, since the caller may
-        // place trailing characters on this line.
-        if last_line_width(snippet) > shape.used_width() + shape.width {
+        // place trailing characters on this line. Skip this check if the
+        // last line is string content (which cannot be reformatted).
+        if !last_line_is_string && last_line_width(snippet) > shape.used_width() + shape.width {
             return false;
         }
     }
