@@ -354,6 +354,7 @@
 ### Changed
 
 - Properly sort imports containing raw identifiers [#3791](https://github.com/rust-lang/rustfmt/issues/3791) (note this is change version gated, and not applied by default)
+- `binop_separator` is now stable ([#3368](https://github.com/rust-lang/rustfmt/issues/3368)).
 
 ### Added
 
