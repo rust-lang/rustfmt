@@ -664,11 +664,9 @@ impl<'a> CommentRewrite<'a> {
         if !self.code_block_buffer.is_empty() {
             // There is a code block that is not properly enclosed by backticks.
             // We will leave them untouched.
-            self.result.push_str(&self.comment_line_separator);
-            self.result.push_str(&Self::join_block(
-                &trim_custom_comment_prefix(&self.code_block_buffer),
-                &self.comment_line_separator,
-            ));
+            self.result.push_str(
+                &self.finish_code_block(&trim_custom_comment_prefix(&self.code_block_buffer)),
+            );
         }
 
         if let Some(ref ib) = self.item_block {
@@ -705,6 +703,23 @@ impl<'a> CommentRewrite<'a> {
         }
 
         self.result
+    }
+
+    fn finish_code_block(&self, code_block: &str) -> String {
+        let result = match code_block.lines().next() {
+            None | Some("") => self.comment_line_separator.trim_end().to_string(),
+            _ => self.comment_line_separator.clone(),
+        };
+
+        result
+            + &Self::join_block(
+                // preserve trailing newline:
+                // block is non-empty, so it must end with "\n",
+                // and join_block calls: str.lines().collect().join("\n"),
+                // which will strip a trailing newline
+                &format!("{code_block}\n"),
+                &self.comment_line_separator,
+            )
     }
 
     fn handle_line(
@@ -775,9 +790,7 @@ impl<'a> CommentRewrite<'a> {
                     _ => trim_custom_comment_prefix(&self.code_block_buffer),
                 };
                 if !code_block.is_empty() {
-                    self.result.push_str(&self.comment_line_separator);
-                    self.result
-                        .push_str(&Self::join_block(&code_block, &self.comment_line_separator));
+                    self.result.push_str(&self.finish_code_block(&code_block));
                 }
                 self.code_block_buffer.clear();
                 self.result.push_str(&self.comment_line_separator);
