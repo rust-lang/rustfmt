@@ -1,8 +1,5 @@
 use std::io::Error;
 use std::process::ExitCode;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
 
 use check_diff::{
     Edition, StyleEdition, check_diff, clone_repositories_for_diff_check, compile_rustfmt,
@@ -88,31 +85,29 @@ fn main() -> Result<ExitCode, Error> {
         }
     };
 
-    let errors = Arc::new(AtomicUsize::new(0));
-    let check_diff_runners = Arc::new(check_diff_runners);
-
     // Clone all repositories we plan to check
     let repositories = clone_repositories_for_diff_check(REPOS);
 
-    thread::scope(|s| {
-        for repo in repositories {
-            let errors = Arc::clone(&errors);
-            let check_diff_runners = Arc::clone(&check_diff_runners);
-            s.spawn(move || {
-                let error_count = check_diff(&check_diff_runners, &repo);
-                errors.fetch_add(error_count as usize, Ordering::Relaxed);
-            });
-        }
-    });
+    info!("Starting the Diff Check");
+    let errors = check_diff(&check_diff_runners, &repositories);
 
-    let error_count = Arc::into_inner(errors)
-        .expect("All other threads are done")
-        .load(Ordering::Relaxed);
-    if error_count > 0 {
-        error!("{error_count} formatting diffs found 💔");
-        Ok(ExitCode::FAILURE)
-    } else {
+    if errors.is_empty() {
         info!("No diff found 😊");
-        Ok(ExitCode::SUCCESS)
+        return Ok(ExitCode::SUCCESS);
     }
+
+    for (diff, file, repo) in errors.iter() {
+        let repo_name = repo.name();
+        let relative_path = repo.relative_path(&file);
+
+        error!(
+            "Diff found in '{0}' when formatting {0}/{1}\n{2}",
+            repo_name,
+            relative_path.display(),
+            diff,
+        );
+    }
+
+    error!("{} formatting diffs found 💔", errors.len());
+    Ok(ExitCode::FAILURE)
 }

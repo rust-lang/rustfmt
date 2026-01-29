@@ -799,3 +799,59 @@ pub fn get_repo_name(git_url: &str) -> &str {
         .unwrap_or(("", strip_git_prefix));
     repo_name
 }
+
+pub fn check_diff<'repo, P, F, M>(
+    runners: &CheckDiffRunners<F, M>,
+    repositories: &'repo [Repository<P>],
+) -> Vec<(Diff, PathBuf, &'repo Repository<P>)>
+where
+    P: AsRef<Path> + Sync + Send,
+    F: CodeFormatter + Sync,
+    M: CodeFormatter + Sync,
+{
+    let (tx, rx) = crossbeam_channel::unbounded();
+
+    let errors = std::thread::scope(|s| {
+        // Spawn producer threads that find files to check
+        for repo in repositories.iter() {
+            let tx = tx.clone();
+            s.spawn(move || {
+                for file in search_for_rs_files(repo.path()) {
+                    let _ = tx.send((file, repo));
+                }
+            });
+        }
+
+        // Drop the first `tx` we created. Now there's exactly one `tx` per producer thread so when
+        // each producer thread finishes the receiving threads will start to get Err(RecvError)
+        // when calling `rx.recv()` and they'll know to stop processing files.
+        // When all scoped threads end we'll know we're done with processing and we can return
+        // any errors we found to the caller.
+        drop(tx);
+
+        let errors = Arc::new(Mutex::new(Vec::with_capacity(10)));
+
+        // spawn receiver threads used to process all files:
+        for _ in 0..10 {
+            let errors = Arc::clone(&errors);
+            let rx = rx.clone();
+            s.spawn(move || {
+                while let Ok((file, repo)) = rx.recv() {
+                    if let Err(e) = check_diff_for_file(runners, repo, file) {
+                        // Push errors to report on later
+                        errors.lock().unwrap().push(e);
+                    }
+                }
+            });
+        }
+        errors
+    });
+
+    match Arc::into_inner(errors)
+        .expect("All other threads are done")
+        .into_inner()
+    {
+        Ok(e) => e,
+        Err(e) => e.into_inner(),
+    }
+}

@@ -71,9 +71,10 @@ fn check_diff_test_no_formatting_difference() -> Result<(), CheckDiffError> {
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
     let repo = Repository::new("https://github.com/rust-lang/rustfmt.git", dir);
+    let repos = [repo];
 
-    let errors = check_diff(&runners, &repo);
-    assert_eq!(errors, 0);
+    let errors = check_diff(&runners, &repos);
+    assert_eq!(errors.len(), 0);
     Ok(())
 }
 
@@ -84,8 +85,9 @@ fn check_diff_test_formatting_difference() -> Result<(), CheckDiffError> {
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
     let repo = Repository::new("https://github.com/rust-lang/rustfmt.git", dir);
+    let repos = [repo];
 
-    let errors = check_diff(&runners, &repo);
-    assert_ne!(errors, 0);
+    let errors = check_diff(&runners, &repos);
+    assert_ne!(errors.len(), 0);
     Ok(())
 }
