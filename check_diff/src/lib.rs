@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, info, trace, warn};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Copy)]
@@ -733,72 +733,62 @@ pub fn clone_repositories_for_diff_check(
 
 /// Calculates the number of errors when running the compiled binary and the feature binary on the
 /// repo specified with the specific configs.
-pub fn check_diff<P: AsRef<Path>>(
+pub fn check_diff_for_file<'repo, P: AsRef<Path>, F: AsRef<Path>>(
     runners: &CheckDiffRunners<impl CodeFormatter, impl CodeFormatter>,
-    repo: &Repository<P>,
-) -> u8 {
-    let mut errors: u8 = 0;
-    let iter = search_for_rs_files(repo.path());
-    for file in iter {
-        let relative_path = repo.relative_path(&file);
-        let repo_name = repo.name();
+    repo: &'repo Repository<P>,
+    file: F,
+) -> Result<(), (Diff, F, &'repo Repository<P>)> {
+    let relative_path = repo.relative_path(&file);
+    let repo_name = repo.name();
 
-        trace!(
-            "Formatting '{0}' file {0}/{1}",
-            repo_name,
-            relative_path.display()
-        );
+    trace!(
+        "Formatting '{0}' file {0}/{1}",
+        repo_name,
+        relative_path.display()
+    );
 
-        match runners.create_diff(file.as_path()) {
-            Ok(diff) => {
-                if !diff.is_empty() {
-                    error!(
-                        "Diff found in '{0}' when formatting {0}/{1}\n{2}",
-                        repo_name,
-                        relative_path.display(),
-                        diff,
-                    );
-                    errors = errors.saturating_add(1);
-                } else {
-                    trace!(
-                        "No diff found in '{0}' when formatting {0}/{1}",
-                        repo_name,
-                        relative_path.display(),
-                    )
-                }
-            }
-            Err(CreateDiffError::MainRustfmtFailed(e)) => {
-                debug!(
-                    "`main` rustfmt failed to format {}/{}\n{:?}",
+    match runners.create_diff(file.as_ref()) {
+        Ok(diff) => {
+            if !diff.is_empty() {
+                Err((diff, file, repo))
+            } else {
+                trace!(
+                    "No diff found in '{0}' when formatting {0}/{1}",
                     repo_name,
                     relative_path.display(),
-                    e,
                 );
-                continue;
-            }
-            Err(CreateDiffError::FeatureRustfmtFailed(e)) => {
-                debug!(
-                    "`feature` rustfmt failed to format {}/{}\n{:?}",
-                    repo_name,
-                    relative_path.display(),
-                    e,
-                );
-                continue;
-            }
-            Err(CreateDiffError::BothRustfmtFailed { src, feature }) => {
-                debug!(
-                    "Both rustfmt binaries failed to format {}/{}\n{:?}\n{:?}",
-                    repo_name,
-                    relative_path.display(),
-                    src,
-                    feature,
-                );
-                continue;
+                Ok(())
             }
         }
+        Err(CreateDiffError::MainRustfmtFailed(e)) => {
+            debug!(
+                "`main` rustfmt failed to format {}/{}\n{:?}",
+                repo_name,
+                relative_path.display(),
+                e,
+            );
+            Ok(())
+        }
+        Err(CreateDiffError::FeatureRustfmtFailed(e)) => {
+            debug!(
+                "`feature` rustfmt failed to format {}/{}\n{:?}",
+                repo_name,
+                relative_path.display(),
+                e,
+            );
+            Ok(())
+        }
+        Err(CreateDiffError::BothRustfmtFailed { src, feature }) => {
+            debug!(
+                "Both rustfmt binaries failed to format {}/{}\n{:?}\n{:?}",
+                repo_name,
+                relative_path.display(),
+                src,
+                feature,
+            );
+            Ok(())
+        }
     }
-
-    errors
 }
 
 /// parse out the repository name from a GitHub Repository name.
