@@ -57,6 +57,10 @@ struct CliInputs {
     /// pass when running the feature branch
     #[arg(value_delimiter = ',', short, long, num_args = 1..)]
     rustfmt_config: Option<Vec<String>>,
+    /// How many threads should check for formatting diffs.
+    // Choosing 16 as the default since that's a common multiple of available CPU cores.
+    #[arg(short, long, default_value_t = std::num::NonZeroU8::new(16).unwrap())]
+    worker_threads: std::num::NonZeroU8,
 }
 
 fn main() -> Result<ExitCode, Error> {
@@ -89,7 +93,7 @@ fn main() -> Result<ExitCode, Error> {
     let repositories = clone_repositories_for_diff_check(REPOS);
 
     info!("Starting the Diff Check");
-    let errors = check_diff(&check_diff_runners, &repositories);
+    let errors = check_diff(&check_diff_runners, &repositories, args.worker_threads);
 
     if errors.is_empty() {
         info!("No diff found 😊");

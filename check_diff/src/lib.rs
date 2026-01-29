@@ -803,6 +803,7 @@ pub fn get_repo_name(git_url: &str) -> &str {
 pub fn check_diff<'repo, P, F, M>(
     runners: &CheckDiffRunners<F, M>,
     repositories: &'repo [Repository<P>],
+    worker_threads: std::num::NonZeroU8,
 ) -> Vec<(Diff, PathBuf, &'repo Repository<P>)>
 where
     P: AsRef<Path> + Sync + Send,
@@ -832,7 +833,7 @@ where
         let errors = Arc::new(Mutex::new(Vec::with_capacity(10)));
 
         // spawn receiver threads used to process all files:
-        for _ in 0..10 {
+        for _ in 0..u8::from(worker_threads) {
             let errors = Arc::clone(&errors);
             let rx = rx.clone();
             s.spawn(move || {
