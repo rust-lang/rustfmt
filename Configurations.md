@@ -2012,6 +2012,7 @@ use qux::{h, i};
 #### `Module`:
 
 Merge imports from the same module into a single `use` statement. Conversely, imports from different modules are split into separate statements.
+Does not merge top-level modules.
 
 ```rust
 use foo::b::{f, g};
