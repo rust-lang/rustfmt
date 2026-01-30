@@ -33,6 +33,10 @@ pub(crate) fn path_to_imported_ident(path: &ast::Path) -> symbol::Ident {
     path.segments.last().unwrap().ident
 }
 
+fn module_prefix(path: &[UseSegment]) -> &[UseSegment] {
+    &path[..(path.len() - 1).max(1)]
+}
+
 impl<'a> FmtVisitor<'a> {
     pub(crate) fn format_import(&mut self, item: &ast::Item, tree: &ast::UseTree) {
         let span = item.span();
@@ -683,9 +687,7 @@ impl UseTree {
         } else {
             match shared_prefix {
                 SharedPrefix::Crate => self.path[0] == other.path[0],
-                SharedPrefix::Module => {
-                    self.path[..self.path.len() - 1] == other.path[..other.path.len() - 1]
-                }
+                SharedPrefix::Module => module_prefix(&self.path) == module_prefix(&other.path),
                 SharedPrefix::One => true,
             }
         }
