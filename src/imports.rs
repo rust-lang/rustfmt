@@ -33,6 +33,9 @@ pub(crate) fn path_to_imported_ident(path: &ast::Path) -> symbol::Ident {
     path.segments.last().unwrap().ident
 }
 
+/// Returns all but the last portion of the module path, except in the case of
+/// top-level modules (length 1), which remain unchanged. Used for Module-level
+/// imports_granularity.
 fn module_prefix(path: &[UseSegment]) -> &[UseSegment] {
     &path[..(path.len() - 1).max(1)]
 }
