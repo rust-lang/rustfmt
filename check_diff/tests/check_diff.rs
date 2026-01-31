@@ -1,6 +1,6 @@
 use check_diff::{
-    CheckDiffError, CheckDiffRunners, CodeFormatter, FormatCodeError, Repository, check_diff,
-    search_for_rs_files,
+    CheckDiffError, CheckDiffRunners, CodeFormatter, FormatCodeError, Repository,
+    RustFmtFileFinder, check_diff,
 };
 use std::fs::File;
 use tempfile::Builder;
@@ -29,10 +29,11 @@ fn search_for_files_correctly_non_nested() -> Result<(), Box<dyn std::error::Err
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
 
-    let iter = search_for_rs_files(dir.path());
+    let repo = Repository::new("", dir.path());
+    let file_finder = RustFmtFileFinder::from_repository(&repo);
 
     let mut count = 0;
-    for _ in iter {
+    for _ in file_finder.iter() {
         count += 1;
     }
 
@@ -51,10 +52,11 @@ fn search_for_files_correctly_nested() -> Result<(), Box<dyn std::error::Error>>
     let nested_file_path = nested_dir.path().join("nested.rs");
     let _ = File::create(nested_file_path)?;
 
-    let iter = search_for_rs_files(dir.path());
+    let repo = Repository::new("", dir.path());
+    let file_finder = RustFmtFileFinder::from_repository(&repo);
 
     let mut count = 0;
-    for _ in iter {
+    for _ in file_finder.iter() {
         count += 1;
     }
 
