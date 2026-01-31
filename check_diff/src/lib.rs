@@ -670,18 +670,79 @@ pub fn compile_rustfmt<T: AsRef<str>>(
     })
 }
 
-/// Searches for rust files in the particular path and returns an iterator to them.
-pub fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
-    WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
-        Some(entry) => {
-            let path = entry.path();
-            if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
-                return Some(entry.into_path());
+fn read_rustfmt_ignore_list(rustfmt_toml_path: &Path) -> Vec<String> {
+    let Ok(file_content) = std::fs::read_to_string(rustfmt_toml_path) else {
+        return Vec::new();
+    };
+
+    let Ok(mut data) = file_content.parse::<toml::Table>() else {
+        return Vec::new();
+    };
+
+    let Some(toml::Value::Array(ignore_list)) = data.remove("ignore") else {
+        return Vec::new();
+    };
+
+    ignore_list
+        .into_iter()
+        .map(toml::Value::try_into)
+        .collect::<Result<_, _>>()
+        .unwrap_or_default()
+}
+
+// Iterator over all rust files in a directory.
+//
+// Ignores files list in the root `.rustfmt.toml` or `rustfmt.toml` configuration files.
+pub struct RustFmtFileFinder<'a, P> {
+    ignore_set: ignore::gitignore::Gitignore,
+    repo: &'a Repository<P>,
+}
+
+impl<'a, P> RustFmtFileFinder<'a, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn from_repository(repo: &'a Repository<P>) -> Self {
+        let root = repo.path();
+        let mut ignore_builder = ignore::gitignore::GitignoreBuilder::new(root);
+
+        let repo_name = repo.name();
+        for rustfmt_config_file in [".rustfmt.toml", "rustfmt.toml"] {
+            let rustfmt_toml_path = root.join(rustfmt_config_file);
+            for ignore_path in read_rustfmt_ignore_list(&rustfmt_toml_path) {
+                debug!("Adding {ignore_path} to the set of ignored files for '{repo_name}'");
+                let _ = ignore_builder.add_line(None, &ignore_path);
             }
-            None
         }
-        None => None,
-    })
+
+        Self {
+            repo,
+            ignore_set: ignore_builder
+                .build()
+                .unwrap_or(ignore::gitignore::Gitignore::empty()),
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = PathBuf> + use<'_, P> {
+        WalkDir::new(self.repo.path())
+            .into_iter()
+            .filter_map(|e| match e.ok() {
+                Some(entry) => {
+                    let path = entry.path();
+                    if path.is_file()
+                        && path.extension().is_some_and(|ext| ext == "rs")
+                        && !self
+                            .ignore_set
+                            .matched_path_or_any_parents(path, false)
+                            .is_ignore()
+                    {
+                        return Some(entry.into_path());
+                    }
+                    None
+                }
+                None => None,
+            })
+    }
 }
 
 /// Encapsulate the logic used to clone repositories for the diff check
@@ -817,7 +878,8 @@ where
         for repo in repositories.iter() {
             let tx = tx.clone();
             s.spawn(move || {
-                for file in search_for_rs_files(repo.path()) {
+                let file_finder = RustFmtFileFinder::from_repository(repo);
+                for file in file_finder.iter() {
                     let _ = tx.send((file, repo));
                 }
             });
