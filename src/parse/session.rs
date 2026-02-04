@@ -401,7 +401,7 @@ mod tests {
             let source =
                 String::from(r#"extern "system" fn jni_symbol!( funcName ) ( ... ) -> {} "#);
             source_map.new_source_file(filename(&source_map, "foo.rs"), source);
-            let registry = Registry::new(&[]);
+            let registry = Registry::new();
             let mut emitter = build_emitter(
                 Arc::clone(&num_emitted_errors),
                 Arc::clone(&can_reset_errors),
@@ -424,7 +424,7 @@ mod tests {
             let source_map = Arc::new(SourceMap::new(FilePathMapping::empty()));
             let source = String::from(r#"pub fn bar() { 1x; }"#);
             source_map.new_source_file(filename(&source_map, "foo.rs"), source);
-            let registry = Registry::new(&[]);
+            let registry = Registry::new();
             let mut emitter = build_emitter(
                 Arc::clone(&num_emitted_errors),
                 Arc::clone(&can_reset_errors),
@@ -446,7 +446,7 @@ mod tests {
             let source_map = Arc::new(SourceMap::new(FilePathMapping::empty()));
             let source = String::from(r#"pub fn bar() { 1x; }"#);
             source_map.new_source_file(filename(&source_map, "foo.rs"), source);
-            let registry = Registry::new(&[]);
+            let registry = Registry::new();
             let mut emitter = build_emitter(
                 Arc::clone(&num_emitted_errors),
                 Arc::clone(&can_reset_errors),
@@ -474,7 +474,7 @@ mod tests {
             source_map.new_source_file(filename(&source_map, "bar.rs"), bar_source);
             source_map.new_source_file(filename(&source_map, "foo.rs"), foo_source);
             source_map.new_source_file(filename(&source_map, "fatal.rs"), fatal_source);
-            let registry = Registry::new(&[]);
+            let registry = Registry::new();
             let mut emitter = build_emitter(
                 Arc::clone(&num_emitted_errors),
                 Arc::clone(&can_reset_errors),
