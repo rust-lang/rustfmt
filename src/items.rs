@@ -2028,12 +2028,16 @@ impl<'a> StaticParts<'a> {
                 ),
                 ast::ItemKind::Const(c) => (
                     Some(c.defaultness),
-                    "const",
+                    if c.rhs_kind.is_type_const() {
+                        "type const"
+                    } else {
+                        "const"
+                    },
                     ast::Safety::Default,
                     c.ident,
                     &c.ty,
                     ast::Mutability::Not,
-                    c.rhs.as_ref().map(|rhs| rhs.expr()),
+                    c.rhs_kind.expr(),
                     Some(&c.generics),
                 ),
                 _ => unreachable!(),
@@ -2053,17 +2057,25 @@ impl<'a> StaticParts<'a> {
     }
 
     pub(crate) fn from_trait_item(ti: &'a ast::AssocItem, ident: Ident) -> Self {
-        let (defaultness, ty, expr_opt, generics) = match &ti.kind {
-            ast::AssocItemKind::Const(c) => (
-                c.defaultness,
-                &c.ty,
-                c.rhs.as_ref().map(|rhs| rhs.expr()),
-                Some(&c.generics),
-            ),
+        let (defaultness, ty, expr_opt, generics, prefix) = match &ti.kind {
+            ast::AssocItemKind::Const(c) => {
+                let prefix = if c.rhs_kind.is_type_const() {
+                    "type const"
+                } else {
+                    "const"
+                };
+                (
+                    c.defaultness,
+                    &c.ty,
+                    c.rhs_kind.expr(),
+                    Some(&c.generics),
+                    prefix,
+                )
+            }
             _ => unreachable!(),
         };
         StaticParts {
-            prefix: "const",
+            prefix,
             safety: ast::Safety::Default,
             vis: &ti.vis,
             ident,
@@ -2077,17 +2089,25 @@ impl<'a> StaticParts<'a> {
     }
 
     pub(crate) fn from_impl_item(ii: &'a ast::AssocItem, ident: Ident) -> Self {
-        let (defaultness, ty, expr_opt, generics) = match &ii.kind {
-            ast::AssocItemKind::Const(c) => (
-                c.defaultness,
-                &c.ty,
-                c.rhs.as_ref().map(|rhs| rhs.expr()),
-                Some(&c.generics),
-            ),
+        let (defaultness, ty, expr_opt, generics, prefix) = match &ii.kind {
+            ast::AssocItemKind::Const(c) => {
+                let prefix = if c.rhs_kind.is_type_const() {
+                    "type const"
+                } else {
+                    "const"
+                };
+                (
+                    c.defaultness,
+                    &c.ty,
+                    c.rhs_kind.expr(),
+                    Some(&c.generics),
+                    prefix,
+                )
+            }
             _ => unreachable!(),
         };
         StaticParts {
-            prefix: "const",
+            prefix,
             safety: ast::Safety::Default,
             vis: &ii.vis,
             ident,
