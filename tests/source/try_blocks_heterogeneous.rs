@@ -1,4 +1,5 @@
 // rustfmt-edition: 2018
+#![feature(try_blocks_heterogeneous)]
 
 fn main() -> Result<(), !> {
     let _x = try bikeshed Option<_> {
@@ -23,6 +24,10 @@ fn baz() -> Option<i32> {
     let y = try bikeshed Option<i32> {
         6
     }; // comment
+
+    let x = try /* Invisible comment */ bikeshed Option<()> {};
+    let x = try bikeshed /* Invisible comment */ Option<()> {};
+    let x = try bikeshed Option<()> /* Invisible comment */ {};
 
     let x = try bikeshed Option<i32> { baz()?; baz()?; baz()?; 7 };
 
