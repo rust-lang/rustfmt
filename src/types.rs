@@ -1016,9 +1016,14 @@ impl Rewrite for ast::Ty {
                 }
                 let rw = if context.config.style_edition() <= StyleEdition::Edition2021 {
                     it.rewrite_result(context, shape)
+                } else if context.config.style_edition() == StyleEdition::Edition2024 {
+                    join_bounds(context, shape, it, false)
                 } else {
+                    let offset = "impl ".len();
+                    let shape = shape.offset_left(offset, self.span())?;
                     join_bounds(context, shape, it, false)
                 };
+
                 rw.map(|it_str| {
                     let space = if it_str.is_empty() { "" } else { " " };
                     format!("impl{}{}", space, it_str)
