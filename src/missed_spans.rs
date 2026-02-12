@@ -263,7 +263,7 @@ impl<'a> FmtVisitor<'a> {
         };
 
         let comment_width = ::std::cmp::min(
-            self.config.comment_width(),
+            self.config.comment_width() - self.block_indent.width(),
             self.config.max_width() - self.block_indent.width(),
         );
         let comment_shape = Shape::legacy(comment_width, comment_indent);
