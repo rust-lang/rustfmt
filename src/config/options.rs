@@ -621,6 +621,7 @@ config_option_with_style_edition_default!(
     FormatCodeInDocComments, bool, _ => false;
     DocCommentCodeBlockWidth, usize, _ => 100;
     CommentWidth, usize, _ => 80;
+    StrictLineCommentWrap, bool, _ => false;
     NormalizeComments, bool, _ => false;
     NormalizeDocAttributes, bool, _ => false;
     FormatStrings, bool, _ => false;

@@ -67,6 +67,8 @@ create_config! {
         snippets in doc comments. No effect unless format_code_in_doc_comments = true";
     comment_width: CommentWidth, false,
         "Maximum length of comments. No effect unless wrap_comments = true";
+    strict_line_comment_wrap: StrictLineCommentWrap, false,
+        "Strict wrapping for plain // comments preserving original indentation";
     normalize_comments: NormalizeComments, false, "Convert /* */ comments to // comments where \
         possible";
     normalize_doc_attributes: NormalizeDocAttributes, false, "Normalize doc attributes as doc \

@@ -2,3 +2,6 @@ error_on_line_overflow = true
 error_on_unformatted = true
 style_edition = "2024"
 overflow_delimited_expr = false
+wrap_comments = true
+strict_line_comment_wrap = true
+comment_width = 40
