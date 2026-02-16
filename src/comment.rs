@@ -840,6 +840,50 @@ impl<'a> CommentRewrite<'a> {
             && !has_url(line)
             && !is_table_item(line);
 
+        if self.fmt.config.wrap_comments()
+            && self.fmt.config.strict_line_comment_wrap()
+            && matches!(self.style, CommentStyle::DoubleSlash)
+            && should_wrap_comment
+        {
+            println!("condition passed");
+            let available_width = self.max_width;
+            let indent_str = &self.indent_str;
+
+            let mut wrapped = String::new();
+            let mut current = String::new();
+
+            for word in line.split_whitespace() {
+                if !current.is_empty()
+                    && current.len() + 1 + word.len() > available_width
+                {
+                    if !wrapped.is_empty() {
+                        wrapped.push_str(indent_str);
+                        wrapped.push_str(&self.line_start);
+                    }
+                    wrapped.push_str(current.trim_end());
+                    wrapped.push('\n');
+                    current.clear();
+                }
+
+                if !current.is_empty() {
+                    current.push(' ');
+                }
+                current.push_str(word);
+            }
+
+            if !current.is_empty() {
+                if !wrapped.is_empty() {
+                    wrapped.push_str(indent_str);
+                    wrapped.push_str(&self.line_start);
+                }
+                wrapped.push_str(current.trim_end());
+            }
+
+            self.result.push_str(&wrapped);
+            self.is_prev_line_multi_line = wrapped.contains('\n');
+            return false;
+        }
+
         if should_wrap_comment {
             match rewrite_string(line, &self.fmt, self.max_width) {
                 Some(ref s) => {
