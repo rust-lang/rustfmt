@@ -861,7 +861,6 @@ impl<'a> CommentRewrite<'a> {
                         wrapped.push_str(&self.line_start);
                     }
                     wrapped.push_str(current.trim_end());
-                    wrapped.push('\n');
                     current.clear();
                 }
 
