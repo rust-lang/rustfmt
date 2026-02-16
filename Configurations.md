@@ -2754,6 +2754,44 @@ fn main() {
 }
 ```
 
+## `strict_line_comment_wrap`
+
+Wrap long line comments (`//`) that exceed the maximum width, even if they are not markdown headers. This option works in combination with `wrap_comments`.
+
+- **Default value**: `false`  
+- **Possible values**: `true`, `false`  
+- **Stable**: No (tracking issue: [#6726](https://github.com/rust-lang/rustfmt/issues/6726))  
+
+#### `false` (default):
+
+Long line comments may remain unwrapped:
+
+```rust
+// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+fn foo() {
+    println!("Lorem");
+}
+```
+#### `true`:
+
+Long line comments are automatically wrapped to fit within the configured maximum width, preserving indentation and // prefixes, without introducing blank lines between segments:
+
+```rust
+// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
+// tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim
+// veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex
+// ea commodo consequat.
+fn main() {
+    println!("Hello, world!");
+}
+```
+
+- Works with `wrap_comments = true`.  
+- Inline comments attached to code (`println!("Hello"); // comment`) are also wrapped correctly.  
+- Markdown header doc comments (`/// # Header`) are **not wrapped**.
+
+See also: [`wrap_comments`](#wrap_comments).
+
 ## `struct_field_align_threshold`
 
 The maximum diff of width between struct fields to be aligned with each other.
