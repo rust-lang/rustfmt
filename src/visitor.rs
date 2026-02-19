@@ -6,7 +6,10 @@ use rustc_ast::{ast, token::Delimiter, visit};
 use rustc_span::{BytePos, Ident, Pos, Span, symbol};
 use tracing::debug;
 
-use crate::comment::{CodeCharKind, CommentCodeSlices, contains_comment, rewrite_comment};
+use crate::attr::*;
+use crate::comment::{
+    CodeCharKind, CommentCodeSlices, contains_comment, recover_comment_removed, rewrite_comment,
+};
 use crate::config::{BraceStyle, Config, MacroSelector, StyleEdition};
 use crate::coverage::transform_missing_snippet;
 use crate::items::{
@@ -26,8 +29,7 @@ use crate::utils::{
     self, contains_skip, count_newlines, depr_skip_annotation, format_safety, inner_attributes,
     last_line_width, mk_sp, ptr_vec_to_ref_vec, rewrite_ident, starts_with_newline,
 };
-use crate::{Edition, attr::*};
-use crate::{ErrorKind, FormatReport, FormattingError};
+use crate::{Edition, ErrorKind, FormatReport, FormattingError};
 
 /// Creates a string slice corresponding to the specified span.
 pub(crate) struct SnippetProvider {
@@ -497,16 +499,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                         self.with_context(|ctx| format_trait(ctx, item, trait_kind, block_indent));
                     self.push_rewrite(item.span, rw.ok());
                 }
-                ast::ItemKind::TraitAlias(ident, ref generics, ref generic_bounds) => {
+                ast::ItemKind::TraitAlias(ref ta) => {
                     let shape = Shape::indented(self.block_indent, self.config);
-                    let rw = format_trait_alias(
-                        &self.get_context(),
-                        ident,
-                        item,
-                        generics,
-                        generic_bounds,
-                        shape,
-                    );
+                    let rw =
+                        format_trait_alias(&self.get_context(), ta, &item.vis, item.span, shape);
                     self.push_rewrite(item.span, rw.ok());
                 }
                 ast::ItemKind::ExternCrate(..) => {
@@ -521,7 +517,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 ast::ItemKind::Struct(..) | ast::ItemKind::Union(..) => {
                     self.visit_struct(&StructParts::from_item(item));
                 }
-                ast::ItemKind::Enum(ident, ref def, ref generics) => {
+                ast::ItemKind::Enum(ident, ref generics, ref def) => {
                     self.format_missing_with_indent(source!(self, item.span).lo());
                     self.visit_enum(ident, &item.vis, def, generics, item.span);
                     self.last_pos = source!(self, item.span).hi();
@@ -539,6 +535,28 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 }
                 ast::ItemKind::Static(..) | ast::ItemKind::Const(..) => {
                     self.visit_static(&StaticParts::from_item(item));
+                }
+                ast::ItemKind::ConstBlock(ast::ConstBlockItem {
+                    id: _,
+                    span,
+                    ref block,
+                }) => {
+                    let context = &self.get_context();
+                    let offset = self.block_indent;
+                    self.push_rewrite(
+                        item.span,
+                        block
+                            .rewrite(
+                                context,
+                                Shape::legacy(
+                                    context.budget(offset.block_indent),
+                                    offset.block_only(),
+                                ),
+                            )
+                            .map(|rhs| {
+                                recover_comment_removed(format!("const {rhs}"), span, context)
+                            }),
+                    );
                 }
                 ast::ItemKind::Fn(ref fn_kind) => {
                     let ast::Fn {
@@ -566,7 +584,15 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     } else {
                         let indent = self.block_indent;
                         let rewrite = self
-                            .rewrite_required_fn(indent, ident, sig, &item.vis, generics, item.span)
+                            .rewrite_required_fn(
+                                indent,
+                                ident,
+                                sig,
+                                &item.vis,
+                                generics,
+                                defaultness,
+                                item.span,
+                            )
                             .ok();
                         self.push_rewrite(item.span, rewrite);
                     }
@@ -669,7 +695,15 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 } else {
                     let indent = self.block_indent;
                     let rewrite = self
-                        .rewrite_required_fn(indent, fn_kind.ident, sig, &ai.vis, generics, ai.span)
+                        .rewrite_required_fn(
+                            indent,
+                            fn_kind.ident,
+                            sig,
+                            &ai.vis,
+                            generics,
+                            defaultness,
+                            ai.span,
+                        )
                         .ok();
                     self.push_rewrite(ai.span, rewrite);
                 }
@@ -875,7 +909,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         !is_skip_attr(segments)
     }
 
-    fn walk_mod_items(&mut self, items: &[rustc_ast::ptr::P<ast::Item>]) {
+    fn walk_mod_items(&mut self, items: &[Box<ast::Item>]) {
         self.visit_items_with_reordering(&ptr_vec_to_ref_vec(items));
     }
 
@@ -943,7 +977,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let ident_str = rewrite_ident(&self.get_context(), ident).to_owned();
         self.push_str(&ident_str);
 
-        if let ast::ModKind::Loaded(ref items, ast::Inline::Yes, ref spans, _) = mod_kind {
+        if let ast::ModKind::Loaded(ref items, ast::Inline::Yes, ref spans) = mod_kind {
             let ast::ModSpans {
                 inner_span,
                 inject_use_span: _,
