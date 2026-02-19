@@ -1,0 +1,40 @@
+name: Git Subtree Push
+on:
+  workflow_dispatch:
+    inputs:
+      rustlang_rust_url:
+        description: 'rust-lang/rust repository URL'
+        default: 'https://github.com/rust-lang/rust'
+        required: true
+
+jobs:
+  subtree-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4
+      with:
+        # 0 indicates all history for all branches and tags.
+        # https://github.com/actions/checkout?tab=readme-ov-file#fetch-all-history-for-all-tags-and-branches
+        # Grabbing everything should help us avoid issues where `git commit --no-ff` complains that
+        # it can't merge unrelated histories.
+        fetch-depth: 0
+
+    # Based on https://github.com/rust-lang/rustup/issues/3409
+    # rustup should already be installed in GitHub Actions.
+    - name: install current toolchain with rustup
+      run: |
+        CURRENT_TOOLCHAIN=$(cut -d ' ' -f3 <<< $(cat rust-toolchain | grep "channel =") | tr -d '"')
+        rustup install $CURRENT_TOOLCHAIN --no-self-update
+
+    - name: Setup Rustfmt Bot Git Details
+      run: |
+        git config user.name "rustfmt bot"
+        git config user.email "rustfmt@sync.bot"
+
+    - name: subtree-push
+      env:
+        # Need to set the `GH_TOKEN` env variable so we can use the GitHub CLI in `/ci/subtree_sync.sh`
+        GH_TOKEN: ${{ github.token }}
+      run: ${GITHUB_WORKSPACE}/ci/subtree_sync.sh subtree-push ${{ inputs.rustlang_rust_url }}
