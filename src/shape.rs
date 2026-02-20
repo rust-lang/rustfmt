@@ -286,8 +286,19 @@ impl Shape {
             .ok_or_else(|| self.exceeds_max_width_error(span))
     }
 
+    pub(crate) fn add_width(&self, width: usize) -> Shape {
+        Shape {
+            width: self.width + width,
+            ..*self
+        }
+    }
+
     pub(crate) fn offset_left_opt(&self, delta: usize) -> Option<Shape> {
         self.add_offset(delta).sub_width_opt(delta)
+    }
+
+    pub(crate) fn offset_left_maybe_overflow(&self, width: usize) -> Shape {
+        self.add_offset(width).saturating_sub_width(width)
     }
 
     pub(crate) fn used_width(&self) -> usize {
