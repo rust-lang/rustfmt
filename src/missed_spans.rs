@@ -114,25 +114,36 @@ impl<'a> FmtVisitor<'a> {
     }
 
     fn push_vertical_spaces(&mut self, mut newline_count: usize) {
-        let offset = self.buffer.chars().rev().take_while(|c| *c == '\n').count();
-        let newline_upper_bound = self.config.blank_lines_upper_bound() + 1;
-        let newline_lower_bound = self.config.blank_lines_lower_bound() + 1;
-
-        if newline_count + offset > newline_upper_bound {
-            if offset >= newline_upper_bound {
-                newline_count = 0;
-            } else {
-                newline_count = newline_upper_bound - offset;
-            }
-        } else if newline_count + offset < newline_lower_bound {
-            if offset >= newline_lower_bound {
-                newline_count = 0;
-            } else {
-                newline_count = newline_lower_bound - offset;
-            }
+        if let [] | [.., b'\n'] = self.buffer.as_bytes() {
+            /* Already at the start of a new line */
+        } else {
+            self.push_str("\n");
+            newline_count = newline_count.saturating_sub(1);
         }
 
-        let blank_lines = "\n".repeat(newline_count);
+        let indent = if self.config.indent_blank_lines() {
+            // FIXME: Should this include the alignment as well?
+            &*self.block_indent.block_only().to_string(self.config)
+        } else {
+            ""
+        };
+
+        let existing_blanks = self
+            .buffer
+            .rsplit_terminator('\n')
+            .take_while(|&line| line == indent)
+            .count();
+
+        // Clamp new total count to configuration.
+        let total = (existing_blanks + newline_count).clamp(
+            self.config.blank_lines_lower_bound(),
+            self.config.blank_lines_upper_bound(),
+        );
+
+        let blank_lines = std::iter::repeat(indent)
+            .take(total.saturating_sub(existing_blanks))
+            .fold(String::new(), |s, indent| s + indent + "\n");
+
         self.push_str(&blank_lines);
     }
 

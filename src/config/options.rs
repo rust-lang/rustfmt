@@ -676,6 +676,7 @@ config_option_with_style_edition_default!(
     MatchBlockTrailingComma, bool, _ => false;
     BlankLinesUpperBound, usize, _ => 1;
     BlankLinesLowerBound, usize, _ => 0;
+    IndentBlankLines, bool, _ => false;
     EditionConfig, Edition, _ => Edition::Edition2015;
     StyleEditionConfig, StyleEdition,
         Edition2024 => StyleEdition::Edition2024, _ => StyleEdition::Edition2015;
