@@ -780,7 +780,7 @@ where
                 pre_comment,
                 pre_comment_style,
                 // leave_last is set to true only for rewrite_items
-                item: if self.inner.peek().is_none() && self.leave_last {
+                item: if is_last && self.leave_last {
                     Err(RewriteError::SkipFormatting)
                 } else {
                     (self.get_item_string)(&item)
