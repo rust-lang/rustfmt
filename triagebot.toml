@@ -7,9 +7,10 @@
 
 [relabel]
 allow-unauthenticated = [
-    "needs-triage",
-    "S-*",
     "C-*",
+    "needs-triage",
+    "regression-*",
+    "S-*",
 ]
 
 # ------------------------------------------------------------------------------
