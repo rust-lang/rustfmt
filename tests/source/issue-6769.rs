@@ -1,3 +1,5 @@
+// rustfmt-style_edition: 2027
+
 fn test() {
     let foo = [
         (b"Welcome to Ringboard!" as &[u8], &em),
