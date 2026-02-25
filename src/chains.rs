@@ -566,8 +566,13 @@ impl Rewrite for Chain {
 
         formatter.format_root(&self.parent, context, shape)?;
         if let Some(result) = formatter.pure_root() {
-            return wrap_str(result, context.config.max_width(), shape)
-                .max_width_error(shape.width, self.parent.span);
+            return wrap_str(
+                context.config.style_edition(),
+                result,
+                context.config.max_width(),
+                shape,
+            )
+            .max_width_error(shape.width, self.parent.span);
         }
 
         let first = self.children.first().unwrap_or(&self.parent);
@@ -582,7 +587,13 @@ impl Rewrite for Chain {
         formatter.format_last_child(context, shape, child_shape)?;
 
         let result = formatter.join_rewrites(context, child_shape)?;
-        wrap_str(result, context.config.max_width(), shape).max_width_error(shape.width, full_span)
+        wrap_str(
+            context.config.style_edition(),
+            result,
+            context.config.max_width(),
+            shape,
+        )
+        .max_width_error(shape.width, full_span)
     }
 }
 
@@ -973,7 +984,12 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
                 .visual_indent(self.offset)
                 .sub_width(self.offset, item.span)?;
             let rewrite = item.rewrite_result(context, child_shape)?;
-            if filtered_str_fits(&rewrite, context.config.max_width(), shape) {
+            if filtered_str_fits(
+                context.config.style_edition(),
+                &rewrite,
+                context.config.max_width(),
+                shape,
+            ) {
                 root_rewrite.push_str(&rewrite);
             } else {
                 // We couldn't fit in at the visual indent, try the last
