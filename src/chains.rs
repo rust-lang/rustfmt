@@ -571,6 +571,7 @@ impl Rewrite for Chain {
         formatter.format_root(&self.parent, context, shape)?;
         if let Some(result) = formatter.pure_root() {
             return wrap_str(
+                context.config.style_edition(),
                 result,
                 context.config.max_width(),
                 context.config.tab_spaces(),
@@ -592,6 +593,7 @@ impl Rewrite for Chain {
 
         let result = formatter.join_rewrites(context, child_shape)?;
         wrap_str(
+            context.config.style_edition(),
             result,
             context.config.max_width(),
             context.config.tab_spaces(),
@@ -992,6 +994,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
                 .sub_width(self.offset, item.span)?;
             let rewrite = item.rewrite_result(context, child_shape)?;
             if filtered_str_fits(
+                context.config.style_edition(),
                 &rewrite,
                 context.config.max_width(),
                 context.config.tab_spaces(),

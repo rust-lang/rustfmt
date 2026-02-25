@@ -453,12 +453,13 @@ macro_rules! skip_out_of_file_lines_range_visitor {
 // Wraps String in an Option. Returns Some when the string adheres to the
 // Rewrite constraints defined for the Rewrite trait and None otherwise.
 pub(crate) fn wrap_str(
+    style_edition: StyleEdition,
     s: String,
     max_width: usize,
     tab_spaces: usize,
     shape: Shape,
 ) -> Option<String> {
-    if filtered_str_fits(&s, max_width, tab_spaces, shape) {
+    if filtered_str_fits(style_edition, &s, max_width, tab_spaces, shape) {
         Some(s)
     } else {
         None
@@ -466,6 +467,7 @@ pub(crate) fn wrap_str(
 }
 
 pub(crate) fn filtered_str_fits(
+    _style_edition: StyleEdition,
     snippet: &str,
     max_width: usize,
     tab_spaces: usize,
