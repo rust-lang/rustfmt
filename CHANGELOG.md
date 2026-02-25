@@ -44,6 +44,10 @@
 - Add new nightly-only `float_literal_trailing_zero` option [#3187](https://github.com/rust-lang/rustfmt/issues/3187)
   - See the [`float_literal_trailing_zero` configuration documentation](https://rust-lang.github.io/rustfmt/?version=v1.9.0&search=#float_literal_trailing_zero) for more details
 
+### Misc
+- Update `term` dependency to 1.1 [#6628](https://github.com/rust-lang/rustfmt/pull/6628)
+- Update `toml` dependency to 0.9.5 [#6652](https://github.com/rust-lang/rustfmt/pull/6652)
+
 
 ## [1.8.0] 2024-09-20
 
