@@ -18,6 +18,7 @@
 - Fix issue with `wrap_comments` invalidating code blocks [#6417](https://github.com/rust-lang/rustfmt/pull/6417)
 - No longer remove closure block label within a macro call [#6465](https://github.com/rust-lang/rustfmt/issues/6465)
 - Fix idempotency issue when normalizing imports [#6558](https://github.com/rust-lang/rustfmt/issues/6558)
+- Properly split long pattern in `if-let` at the `max_width` when setting `style_edition=2027` [#6202](https://github.com/rust-lang/rustfmt/issues/6202)
 
 ### Changed
 - Stabilize `style_edition=2024` and stabilize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
