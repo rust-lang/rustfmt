@@ -3,7 +3,7 @@ use std::cmp::min;
 
 use itertools::Itertools;
 use rustc_ast::token::{Delimiter, Lit, LitKind};
-use rustc_ast::{ForLoopKind, MatchKind, ast, ptr, token};
+use rustc_ast::{ForLoopKind, MatchKind, ast, token};
 use rustc_span::{BytePos, Span};
 use tracing::debug;
 
@@ -393,17 +393,45 @@ pub(crate) fn format_expr(
         // Style Guide RFC for InlineAsm variant pending
         // https://github.com/rust-dev-tools/fmt-rfcs/issues/152
         ast::ExprKind::InlineAsm(..) => Ok(context.snippet(expr.span).to_owned()),
-        ast::ExprKind::TryBlock(ref block) => {
+        ast::ExprKind::TryBlock(ref block, None) => {
             if let rw @ Ok(_) =
                 rewrite_single_line_block(context, "try ", block, Some(&expr.attrs), None, shape)
             {
                 rw
             } else {
+                // FIXME: 9 sounds like `"do catch ".len()`, so may predate the rename
                 // 9 = `try `
                 let budget = shape.width.saturating_sub(9);
                 Ok(format!(
                     "{}{}",
                     "try ",
+                    rewrite_block(
+                        block,
+                        Some(&expr.attrs),
+                        None,
+                        context,
+                        Shape::legacy(budget, shape.indent)
+                    )?
+                ))
+            }
+        }
+        ast::ExprKind::TryBlock(ref block, Some(ref ty)) => {
+            let keyword = "try bikeshed ";
+            // 2 = " {".len()
+            let ty_shape = shape
+                .shrink_left(keyword.len(), expr.span)
+                .and_then(|shape| shape.sub_width(2, expr.span))?;
+
+            let ty_str = ty.rewrite_result(context, ty_shape)?;
+            let prefix = format!("{keyword}{ty_str} ");
+            if let rw @ Ok(_) =
+                rewrite_single_line_block(context, &prefix, block, Some(&expr.attrs), None, shape)
+            {
+                rw
+            } else {
+                let budget = shape.width.saturating_sub(prefix.len());
+                Ok(format!(
+                    "{prefix}{}",
                     rewrite_block(
                         block,
                         Some(&expr.attrs),
@@ -597,6 +625,7 @@ pub(crate) fn rewrite_block_with_visitor(
     let mut visitor = FmtVisitor::from_context(context);
     visitor.block_indent = shape.indent;
     visitor.is_if_else_block = context.is_if_else_block();
+    visitor.is_loop_block = context.is_loop_block();
     match (block.rules, label) {
         (ast::BlockCheckMode::Unsafe(..), _) | (ast::BlockCheckMode::Default, Some(_)) => {
             let snippet = context.snippet(block.span);
@@ -714,6 +743,7 @@ struct ControlFlow<'a> {
     allow_single_line: bool,
     // HACK: `true` if this is an `if` expression in an `else if`.
     nested_if: bool,
+    is_loop: bool,
     span: Span,
 }
 
@@ -785,6 +815,7 @@ impl<'a> ControlFlow<'a> {
             connector: " =",
             allow_single_line,
             nested_if,
+            is_loop: false,
             span,
         }
     }
@@ -801,6 +832,7 @@ impl<'a> ControlFlow<'a> {
             connector: "",
             allow_single_line: false,
             nested_if: false,
+            is_loop: true,
             span,
         }
     }
@@ -824,6 +856,7 @@ impl<'a> ControlFlow<'a> {
             connector: " =",
             allow_single_line: false,
             nested_if: false,
+            is_loop: true,
             span,
         }
     }
@@ -850,6 +883,7 @@ impl<'a> ControlFlow<'a> {
             connector: " in",
             allow_single_line: false,
             nested_if: false,
+            is_loop: true,
             span,
         }
     }
@@ -1163,8 +1197,10 @@ impl<'a> Rewrite for ControlFlow<'a> {
         };
         let block_str = {
             let old_val = context.is_if_else_block.replace(self.else_block.is_some());
+            let old_is_loop = context.is_loop_block.replace(self.is_loop);
             let result =
                 rewrite_block_with_visitor(context, "", self.block, None, None, block_shape, true);
+            context.is_loop_block.replace(old_is_loop);
             context.is_if_else_block.replace(old_val);
             result?
         };
@@ -1472,7 +1508,7 @@ fn choose_separator_tactic(context: &RewriteContext<'_>, span: Span) -> Option<S
 pub(crate) fn rewrite_call(
     context: &RewriteContext<'_>,
     callee: &str,
-    args: &[ptr::P<ast::Expr>],
+    args: &[Box<ast::Expr>],
     span: Span,
     shape: Shape,
 ) -> RewriteResult {
@@ -1735,7 +1771,7 @@ fn struct_lit_can_be_aligned(fields: &[ast::ExprField], has_base: bool) -> bool 
 fn rewrite_struct_lit<'a>(
     context: &RewriteContext<'_>,
     path: &ast::Path,
-    qself: &Option<ptr::P<ast::QSelf>>,
+    qself: &Option<Box<ast::QSelf>>,
     fields: &'a [ast::ExprField],
     struct_rest: &ast::StructRest,
     attrs: &[ast::Attribute],
@@ -2138,7 +2174,7 @@ fn rewrite_assignment(
     context: &RewriteContext<'_>,
     lhs: &ast::Expr,
     rhs: &ast::Expr,
-    op: Option<&ast::BinOp>,
+    op: Option<&ast::AssignOp>,
     shape: Shape,
 ) -> RewriteResult {
     let operator_str = match op {
@@ -2373,8 +2409,10 @@ fn rewrite_expr_addrof(
 ) -> RewriteResult {
     let operator_str = match (mutability, borrow_kind) {
         (ast::Mutability::Not, ast::BorrowKind::Ref) => "&",
+        (ast::Mutability::Not, ast::BorrowKind::Pin) => "&pin const ",
         (ast::Mutability::Not, ast::BorrowKind::Raw) => "&raw const ",
         (ast::Mutability::Mut, ast::BorrowKind::Ref) => "&mut ",
+        (ast::Mutability::Mut, ast::BorrowKind::Pin) => "&pin mut ",
         (ast::Mutability::Mut, ast::BorrowKind::Raw) => "&raw mut ",
     };
     rewrite_unary_prefix(context, operator_str, expr, shape)

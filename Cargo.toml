@@ -30,17 +30,20 @@ path = "src/git-rustfmt/main.rs"
 default = ["cargo-fmt", "rustfmt-format-diff"]
 cargo-fmt = []
 rustfmt-format-diff = []
-generic-simd = ["bytecount/generic-simd"]
+# FIXME(ytmimi) re-enable "bytecount/generic-simd" to the `generic-simd` features
+# once bytecount releases a fix. rustfmt's `generic-simd` features is breaking CI
+# and interfering with the next subtree-sync
+generic-simd = []
 
 [dependencies]
 annotate-snippets = { version = "0.11" }
 anyhow = "1.0"
-bytecount = "0.6.8"
+bytecount = "0.6.9"
 cargo_metadata = "0.18"
 clap = { version = "4.4.2", features = ["derive"] }
 clap-cargo = "0.12.0"
 diff = "0.1"
-dirs = "5.0"
+dirs = "6.0"
 getopts = "0.2"
 ignore = "0.4"
 itertools = "0.12"

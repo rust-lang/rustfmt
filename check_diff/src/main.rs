@@ -1,15 +1,12 @@
 use std::io::Error;
 use std::process::ExitCode;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
 
 use check_diff::{
-    Edition, StyleEdition, check_diff, clone_git_repo, compile_rustfmt, get_repo_name,
+    Edition, StyleEdition, check_diff, clone_repositories_for_diff_check, compile_rustfmt,
 };
 use clap::Parser;
 use tempfile::tempdir;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 /// A curated set of `rust-lang/*` and popular ecosystem repositories to compare `rustfmt`s against.
 const REPOS: &[&str] = &[
@@ -22,7 +19,9 @@ const REPOS: &[&str] = &[
     "https://github.com/rust-lang/packed_simd.git",
     "https://github.com/rust-lang/rust-analyzer.git",
     "https://github.com/rust-lang/rust-bindgen.git",
+    "https://github.com/rust-lang/rust-clippy.git",
     "https://github.com/rust-lang/rust-semverver.git",
+    "https://github.com/rust-lang/rustfmt.git",
     "https://github.com/rust-lang/rust.git",
     "https://github.com/rust-lang/rustlings.git",
     "https://github.com/rust-lang/rustup.git",
@@ -60,6 +59,10 @@ struct CliInputs {
     /// pass when running the feature branch
     #[arg(value_delimiter = ',', short, long, num_args = 1..)]
     rustfmt_config: Option<Vec<String>>,
+    /// How many threads should check for formatting diffs.
+    // Choosing 16 as the default since that's a common multiple of available CPU cores.
+    #[arg(short, long, default_value_t = std::num::NonZeroU8::new(16).unwrap())]
+    worker_threads: std::num::NonZeroU8,
 }
 
 fn main() -> Result<ExitCode, Error> {
@@ -88,47 +91,29 @@ fn main() -> Result<ExitCode, Error> {
         }
     };
 
-    let errors = Arc::new(AtomicUsize::new(0));
-    let check_diff_runners = Arc::new(check_diff_runners);
+    // Clone all repositories we plan to check
+    let repositories = clone_repositories_for_diff_check(REPOS);
 
-    thread::scope(|s| {
-        for url in REPOS {
-            let errors = Arc::clone(&errors);
-            let check_diff_runners = Arc::clone(&check_diff_runners);
-            s.spawn(move || {
-                let repo_name = get_repo_name(url);
-                info!("Processing repo: {repo_name}");
-                let Ok(tmp_dir) = tempdir() else {
-                    warn!(
-                        "Failed to create a tempdir for {}. Can't check formatting diff for {}",
-                        &url, repo_name
-                    );
-                    return;
-                };
+    info!("Starting the Diff Check");
+    let errors = check_diff(&check_diff_runners, &repositories, args.worker_threads);
 
-                let Ok(_) = clone_git_repo(url, tmp_dir.path()) else {
-                    warn!(
-                        "Failed to clone repo {}. Can't check formatting diff for {}",
-                        &url, repo_name
-                    );
-                    return;
-                };
-
-                let error_count = check_diff(&check_diff_runners, tmp_dir.path(), url);
-
-                errors.fetch_add(error_count as usize, Ordering::Relaxed);
-            });
-        }
-    });
-
-    let error_count = Arc::into_inner(errors)
-        .expect("All other threads are done")
-        .load(Ordering::Relaxed);
-    if error_count > 0 {
-        error!("{error_count} formatting diffs found 💔");
-        Ok(ExitCode::FAILURE)
-    } else {
+    if errors.is_empty() {
         info!("No diff found 😊");
-        Ok(ExitCode::SUCCESS)
+        return Ok(ExitCode::SUCCESS);
     }
+
+    for (diff, file, repo) in errors.iter() {
+        let repo_name = repo.name();
+        let relative_path = repo.relative_path(&file);
+
+        error!(
+            "Diff found in '{0}' when formatting {0}/{1}\n{2}",
+            repo_name,
+            relative_path.display(),
+            diff,
+        );
+    }
+
+    error!("{} formatting diffs found 💔", errors.len());
+    Ok(ExitCode::FAILURE)
 }

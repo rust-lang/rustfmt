@@ -4,8 +4,8 @@ use std::borrow::Cow;
 use std::cmp::{Ordering, max, min};
 
 use regex::Regex;
+use rustc_ast::ast;
 use rustc_ast::visit;
-use rustc_ast::{ast, ptr};
 use rustc_span::{BytePos, DUMMY_SP, Ident, Span, symbol};
 use tracing::debug;
 
@@ -62,6 +62,11 @@ impl Rewrite for ast::Local {
         skip_out_of_file_lines_range_err!(context, self.span);
 
         if contains_skip(&self.attrs) {
+            return Err(RewriteError::SkipFormatting);
+        }
+
+        // FIXME(super_let): Implement formatting
+        if self.super_.is_some() {
             return Err(RewriteError::SkipFormatting);
         }
 
@@ -308,12 +313,13 @@ impl<'a> FnSig<'a> {
         method_sig: &'a ast::FnSig,
         generics: &'a ast::Generics,
         visibility: &'a ast::Visibility,
+        defaultness: ast::Defaultness,
     ) -> FnSig<'a> {
         FnSig {
             safety: method_sig.header.safety,
             coroutine_kind: Cow::Borrowed(&method_sig.header.coroutine_kind),
             constness: method_sig.header.constness,
-            defaultness: ast::Defaultness::Final,
+            defaultness,
             ext: method_sig.header.ext,
             decl: &*method_sig.decl,
             generics,
@@ -328,9 +334,7 @@ impl<'a> FnSig<'a> {
     ) -> FnSig<'a> {
         match *fn_kind {
             visit::FnKind::Fn(visit::FnCtxt::Assoc(..), vis, ast::Fn { sig, generics, .. }) => {
-                let mut fn_sig = FnSig::from_method_sig(sig, generics, vis);
-                fn_sig.defaultness = defaultness;
-                fn_sig
+                FnSig::from_method_sig(sig, generics, vis, defaultness)
             }
             visit::FnKind::Fn(_, vis, ast::Fn { sig, generics, .. }) => FnSig {
                 decl,
@@ -448,6 +452,7 @@ impl<'a> FmtVisitor<'a> {
         sig: &ast::FnSig,
         vis: &ast::Visibility,
         generics: &ast::Generics,
+        defaultness: ast::Defaultness,
         span: Span,
     ) -> RewriteResult {
         // Drop semicolon or it will be interpreted as comment.
@@ -458,7 +463,7 @@ impl<'a> FmtVisitor<'a> {
             &context,
             indent,
             ident,
-            &FnSig::from_method_sig(sig, generics, vis),
+            &FnSig::from_method_sig(sig, generics, vis, defaultness),
             span,
             FnBraceStyle::None,
         )?;
@@ -714,9 +719,9 @@ impl<'a> FmtVisitor<'a> {
             .ok()
     }
 
-    fn visit_impl_items(&mut self, items: &[ptr::P<ast::AssocItem>]) {
+    fn visit_impl_items(&mut self, items: &[Box<ast::AssocItem>]) {
         if self.get_context().config.reorder_impl_items() {
-            type TyOpt = Option<ptr::P<ast::Ty>>;
+            type TyOpt = Option<Box<ast::Ty>>;
             use crate::ast::AssocItemKind::*;
             let is_type = |ty: &TyOpt| opaque_ty(ty).is_none();
             let is_opaque = |ty: &TyOpt| opaque_ty(ty).is_some();
@@ -825,8 +830,7 @@ pub(crate) fn format_impl(
     let where_span_end = context.snippet_provider.opt_span_before(missing_span, "{");
     let where_clause_str = rewrite_where_clause(
         context,
-        &generics.where_clause.predicates,
-        generics.where_clause.span,
+        &generics.where_clause,
         context.config.brace_style(),
         Shape::legacy(where_budget, offset.block_only()),
         false,
@@ -922,7 +926,7 @@ pub(crate) fn format_impl(
 
 fn is_impl_single_line(
     context: &RewriteContext<'_>,
-    items: &[ptr::P<ast::AssocItem>],
+    items: &[Box<ast::AssocItem>],
     result: &str,
     where_clause_str: &str,
     item: &ast::Item,
@@ -944,20 +948,22 @@ fn format_impl_ref_and_type(
     offset: Indent,
 ) -> RewriteResult {
     let ast::Impl {
-        safety,
-        polarity,
-        defaultness,
+        generics,
+        of_trait,
+        self_ty,
+        items: _,
         constness,
-        ref generics,
-        of_trait: ref trait_ref,
-        ref self_ty,
-        ..
-    } = *iimpl;
+    } = iimpl;
     let mut result = String::with_capacity(128);
 
     result.push_str(&format_visibility(context, &item.vis));
-    result.push_str(format_defaultness(defaultness));
-    result.push_str(format_safety(safety));
+
+    if let Some(of_trait) = of_trait.as_deref() {
+        result.push_str(format_defaultness(of_trait.defaultness));
+        result.push_str(format_safety(of_trait.safety));
+    } else {
+        result.push_str(format_constness(*constness));
+    }
 
     let shape = if context.config.style_edition() >= StyleEdition::Edition2024 {
         Shape::indented(offset + last_line_width(&result), context.config)
@@ -971,28 +977,24 @@ fn format_impl_ref_and_type(
     };
     let generics_str = rewrite_generics(context, "impl", generics, shape)?;
     result.push_str(&generics_str);
-    result.push_str(format_constness_right(constness));
 
-    let polarity_str = match polarity {
-        ast::ImplPolarity::Negative(_) => "!",
-        ast::ImplPolarity::Positive => "",
-    };
-
-    let polarity_overhead;
     let trait_ref_overhead;
-    if let Some(ref trait_ref) = *trait_ref {
+    if let Some(of_trait) = of_trait.as_deref() {
+        result.push_str(format_constness_right(*constness));
+        let polarity_str = match of_trait.polarity {
+            ast::ImplPolarity::Negative(_) => "!",
+            ast::ImplPolarity::Positive => "",
+        };
         let result_len = last_line_width(&result);
         result.push_str(&rewrite_trait_ref(
             context,
-            trait_ref,
+            &of_trait.trait_ref,
             offset,
             polarity_str,
             result_len,
         )?);
-        polarity_overhead = 0; // already written
         trait_ref_overhead = " for".len();
     } else {
-        polarity_overhead = polarity_str.len();
         trait_ref_overhead = 0;
     }
 
@@ -1007,17 +1009,15 @@ fn format_impl_ref_and_type(
     } else {
         0
     };
-    let used_space =
-        last_line_width(&result) + polarity_overhead + trait_ref_overhead + curly_brace_overhead;
+    let used_space = last_line_width(&result) + trait_ref_overhead + curly_brace_overhead;
     // 1 = space before the type.
     let budget = context.budget(used_space + 1);
     if let Some(self_ty_str) = self_ty.rewrite(context, Shape::legacy(budget, offset)) {
         if !self_ty_str.contains('\n') {
-            if trait_ref.is_some() {
+            if of_trait.is_some() {
                 result.push_str(" for ");
             } else {
                 result.push(' ');
-                result.push_str(polarity_str);
             }
             result.push_str(&self_ty_str);
             return Ok(result);
@@ -1029,12 +1029,10 @@ fn format_impl_ref_and_type(
     // Add indentation of one additional tab.
     let new_line_offset = offset.block_indent(context.config);
     result.push_str(&new_line_offset.to_string(context.config));
-    if trait_ref.is_some() {
+    if of_trait.is_some() {
         result.push_str("for ");
-    } else {
-        result.push_str(polarity_str);
     }
-    let budget = context.budget(last_line_width(&result) + polarity_overhead);
+    let budget = context.budget(last_line_width(&result));
     let type_offset = match context.config.indent_style() {
         IndentStyle::Visual => new_line_offset + trait_ref_overhead,
         IndentStyle::Block => new_line_offset,
@@ -1097,10 +1095,10 @@ impl<'a> StructParts<'a> {
 
     pub(crate) fn from_item(item: &'a ast::Item) -> Self {
         let (prefix, def, ident, generics) = match item.kind {
-            ast::ItemKind::Struct(ident, ref def, ref generics) => {
+            ast::ItemKind::Struct(ident, ref generics, ref def) => {
                 ("struct ", def, ident, generics)
             }
-            ast::ItemKind::Union(ident, ref def, ref generics) => ("union ", def, ident, generics),
+            ast::ItemKind::Union(ident, ref generics, ref def) => ("union ", def, ident, generics),
             _ => unreachable!(),
         };
         StructParts {
@@ -1157,6 +1155,7 @@ pub(crate) fn format_trait(
     offset: Indent,
 ) -> RewriteResult {
     let ast::Trait {
+        constness,
         is_auto,
         safety,
         ident,
@@ -1167,8 +1166,9 @@ pub(crate) fn format_trait(
 
     let mut result = String::with_capacity(128);
     let header = format!(
-        "{}{}{}trait ",
+        "{}{}{}{}trait ",
         format_visibility(context, &item.vis),
+        format_constness(constness),
         format_safety(safety),
         format_auto(is_auto),
     );
@@ -1214,8 +1214,7 @@ pub(crate) fn format_trait(
         let option = WhereClauseOption::snuggled(&generics_str);
         let where_clause_str = rewrite_where_clause(
             context,
-            &generics.where_clause.predicates,
-            generics.where_clause.span,
+            &generics.where_clause,
             context.config.brace_style(),
             Shape::legacy(where_budget, offset.block_only()),
             where_on_new_line,
@@ -1340,8 +1339,7 @@ impl<'a> Rewrite for TraitAliasBounds<'a> {
 
         let where_str = rewrite_where_clause(
             context,
-            &self.generics.where_clause.predicates,
-            self.generics.where_clause.span,
+            &self.generics.where_clause,
             context.config.brace_style(),
             shape,
             false,
@@ -1368,30 +1366,29 @@ impl<'a> Rewrite for TraitAliasBounds<'a> {
 
 pub(crate) fn format_trait_alias(
     context: &RewriteContext<'_>,
-    ident: Ident,
-    item: &ast::Item,
-    generics: &ast::Generics,
-    generic_bounds: &ast::GenericBounds,
+    ta: &ast::TraitAlias,
+    vis: &ast::Visibility,
+    span: Span,
     shape: Shape,
 ) -> RewriteResult {
-    let ast::Item { ref vis, span, .. } = *item;
-    let alias = rewrite_ident(context, ident);
+    let alias = rewrite_ident(context, ta.ident);
     // 6 = "trait ", 2 = " ="
     let g_shape = shape.offset_left(6, span)?.sub_width(2, span)?;
-    let generics_str = rewrite_generics(context, alias, generics, g_shape)?;
+    let generics_str = rewrite_generics(context, alias, &ta.generics, g_shape)?;
     let vis_str = format_visibility(context, vis);
-    let lhs = format!("{vis_str}trait {generics_str} =");
+    let constness = format_constness(ta.constness);
+    let lhs = format!("{vis_str}{constness}trait {generics_str} =");
     // 1 = ";"
     let trait_alias_bounds = TraitAliasBounds {
-        generic_bounds,
-        generics,
+        generic_bounds: &ta.bounds,
+        generics: &ta.generics,
     };
     let result = rewrite_assign_rhs(
         context,
         lhs,
         &trait_alias_bounds,
         &RhsAssignKind::Bounds,
-        shape.sub_width(1, generics.span)?,
+        shape.sub_width(1, ta.generics.span)?,
     )?;
     Ok(result + ";")
 }
@@ -1611,8 +1608,7 @@ fn format_tuple_struct(
             let option = WhereClauseOption::new(true, WhereClauseSpace::Newline);
             rewrite_where_clause(
                 context,
-                &generics.where_clause.predicates,
-                generics.where_clause.span,
+                &generics.where_clause,
                 context.config.brace_style(),
                 Shape::legacy(where_budget, offset.block_only()),
                 false,
@@ -1681,7 +1677,7 @@ struct TyAliasRewriteInfo<'c, 'g>(
     &'c RewriteContext<'c>,
     Indent,
     &'g ast::Generics,
-    ast::TyAliasWhereClauses,
+    &'g ast::WhereClause,
     symbol::Ident,
     Span,
 );
@@ -1702,13 +1698,13 @@ pub(crate) fn rewrite_type_alias<'a>(
         ref generics,
         ref bounds,
         ref ty,
-        where_clauses,
+        ref after_where_clause,
     } = *ty_alias_kind;
     let ty_opt = ty.as_ref();
     let rhs_hi = ty
         .as_ref()
-        .map_or(where_clauses.before.span.hi(), |ty| ty.span.hi());
-    let rw_info = &TyAliasRewriteInfo(context, indent, generics, where_clauses, ident, span);
+        .map_or(generics.where_clause.span.hi(), |ty| ty.span.hi());
+    let rw_info = &TyAliasRewriteInfo(context, indent, generics, after_where_clause, ident, span);
     let op_ty = opaque_ty(ty);
     // Type Aliases are formatted slightly differently depending on the context
     // in which they appear, whether they are opaque, and whether they are associated.
@@ -1752,11 +1748,7 @@ fn rewrite_ty<R: Rewrite>(
     vis: &ast::Visibility,
 ) -> RewriteResult {
     let mut result = String::with_capacity(128);
-    let TyAliasRewriteInfo(context, indent, generics, where_clauses, ident, span) = *rw_info;
-    let (before_where_predicates, after_where_predicates) = generics
-        .where_clause
-        .predicates
-        .split_at(where_clauses.split);
+    let TyAliasRewriteInfo(context, indent, generics, after_where_clause, ident, span) = *rw_info;
     result.push_str(&format!("{}type ", format_visibility(context, vis)));
     let ident_str = rewrite_ident(context, ident);
 
@@ -1791,8 +1783,7 @@ fn rewrite_ty<R: Rewrite>(
     }
     let before_where_clause_str = rewrite_where_clause(
         context,
-        before_where_predicates,
-        where_clauses.before.span,
+        &generics.where_clause,
         context.config.brace_style(),
         Shape::legacy(where_budget, indent),
         false,
@@ -1807,9 +1798,9 @@ fn rewrite_ty<R: Rewrite>(
         // If there are any where clauses, add a newline before the assignment.
         // If there is a before where clause, do not indent, but if there is
         // only an after where clause, additionally indent the type.
-        if !before_where_predicates.is_empty() {
+        if !generics.where_clause.predicates.is_empty() {
             result.push_str(&indent.to_string_with_newline(context.config));
-        } else if !after_where_predicates.is_empty() {
+        } else if !after_where_clause.predicates.is_empty() {
             result.push_str(
                 &indent
                     .block_indent(context.config)
@@ -1822,7 +1813,7 @@ fn rewrite_ty<R: Rewrite>(
         let comment_span = context
             .snippet_provider
             .opt_span_before(span, "=")
-            .map(|op_lo| mk_sp(where_clauses.before.span.hi(), op_lo));
+            .map(|op_lo| mk_sp(generics.where_clause.span.hi(), op_lo));
 
         let lhs = match comment_span {
             Some(comment_span)
@@ -1833,7 +1824,7 @@ fn rewrite_ty<R: Rewrite>(
                         .unknown_error()?,
                 ) =>
             {
-                let comment_shape = if !before_where_predicates.is_empty() {
+                let comment_shape = if !generics.where_clause.predicates.is_empty() {
                     Shape::indented(indent, context.config)
                 } else {
                     let shape = Shape::indented(indent, context.config);
@@ -1854,7 +1845,7 @@ fn rewrite_ty<R: Rewrite>(
 
         // 1 = `;` unless there's a trailing where clause
         let shape = Shape::indented(indent, context.config);
-        let shape = if after_where_predicates.is_empty() {
+        let shape = if after_where_clause.predicates.is_empty() {
             Shape::indented(indent, context.config).sub_width(1, span)?
         } else {
             shape
@@ -1864,12 +1855,11 @@ fn rewrite_ty<R: Rewrite>(
         result
     };
 
-    if !after_where_predicates.is_empty() {
+    if !after_where_clause.predicates.is_empty() {
         let option = WhereClauseOption::new(true, WhereClauseSpace::Newline);
         let after_where_clause_str = rewrite_where_clause(
             context,
-            after_where_predicates,
-            where_clauses.after.span,
+            &after_where_clause,
             context.config.brace_style(),
             Shape::indented(indent, context.config),
             false,
@@ -1998,37 +1988,41 @@ pub(crate) struct StaticParts<'a> {
     generics: Option<&'a ast::Generics>,
     ty: &'a ast::Ty,
     mutability: ast::Mutability,
-    expr_opt: Option<&'a ptr::P<ast::Expr>>,
+    expr_opt: Option<&'a ast::Expr>,
     defaultness: Option<ast::Defaultness>,
     span: Span,
 }
 
 impl<'a> StaticParts<'a> {
     pub(crate) fn from_item(item: &'a ast::Item) -> Self {
-        let (defaultness, prefix, safety, ident, ty, mutability, expr, generics) = match &item.kind
-        {
-            ast::ItemKind::Static(s) => (
-                None,
-                "static",
-                s.safety,
-                s.ident,
-                &s.ty,
-                s.mutability,
-                &s.expr,
-                None,
-            ),
-            ast::ItemKind::Const(c) => (
-                Some(c.defaultness),
-                "const",
-                ast::Safety::Default,
-                c.ident,
-                &c.ty,
-                ast::Mutability::Not,
-                &c.expr,
-                Some(&c.generics),
-            ),
-            _ => unreachable!(),
-        };
+        let (defaultness, prefix, safety, ident, ty, mutability, expr_opt, generics) =
+            match &item.kind {
+                ast::ItemKind::Static(s) => (
+                    None,
+                    "static",
+                    s.safety,
+                    s.ident,
+                    &s.ty,
+                    s.mutability,
+                    s.expr.as_deref(),
+                    None,
+                ),
+                ast::ItemKind::Const(c) => (
+                    Some(c.defaultness),
+                    if c.rhs_kind.is_type_const() {
+                        "type const"
+                    } else {
+                        "const"
+                    },
+                    ast::Safety::Default,
+                    c.ident,
+                    &c.ty,
+                    ast::Mutability::Not,
+                    c.rhs_kind.expr(),
+                    Some(&c.generics),
+                ),
+                _ => unreachable!(),
+            };
         StaticParts {
             prefix,
             safety,
@@ -2037,45 +2031,71 @@ impl<'a> StaticParts<'a> {
             generics,
             ty,
             mutability,
-            expr_opt: expr.as_ref(),
+            expr_opt,
             defaultness,
             span: item.span,
         }
     }
 
     pub(crate) fn from_trait_item(ti: &'a ast::AssocItem, ident: Ident) -> Self {
-        let (defaultness, ty, expr_opt, generics) = match &ti.kind {
-            ast::AssocItemKind::Const(c) => (c.defaultness, &c.ty, &c.expr, Some(&c.generics)),
+        let (defaultness, ty, expr_opt, generics, prefix) = match &ti.kind {
+            ast::AssocItemKind::Const(c) => {
+                let prefix = if c.rhs_kind.is_type_const() {
+                    "type const"
+                } else {
+                    "const"
+                };
+                (
+                    c.defaultness,
+                    &c.ty,
+                    c.rhs_kind.expr(),
+                    Some(&c.generics),
+                    prefix,
+                )
+            }
             _ => unreachable!(),
         };
         StaticParts {
-            prefix: "const",
+            prefix,
             safety: ast::Safety::Default,
             vis: &ti.vis,
             ident,
             generics,
             ty,
             mutability: ast::Mutability::Not,
-            expr_opt: expr_opt.as_ref(),
+            expr_opt,
             defaultness: Some(defaultness),
             span: ti.span,
         }
     }
 
     pub(crate) fn from_impl_item(ii: &'a ast::AssocItem, ident: Ident) -> Self {
-        let (defaultness, ty, expr, generics) = match &ii.kind {
-            ast::AssocItemKind::Const(c) => (c.defaultness, &c.ty, &c.expr, Some(&c.generics)),
+        let (defaultness, ty, expr_opt, generics, prefix) = match &ii.kind {
+            ast::AssocItemKind::Const(c) => {
+                let prefix = if c.rhs_kind.is_type_const() {
+                    "type const"
+                } else {
+                    "const"
+                };
+                (
+                    c.defaultness,
+                    &c.ty,
+                    c.rhs_kind.expr(),
+                    Some(&c.generics),
+                    prefix,
+                )
+            }
             _ => unreachable!(),
         };
         StaticParts {
-            prefix: "const",
+            prefix,
             safety: ast::Safety::Default,
             vis: &ii.vis,
             ident,
             generics,
             ty,
             mutability: ast::Mutability::Not,
-            expr_opt: expr.as_ref(),
+            expr_opt,
             defaultness: Some(defaultness),
             span: ii.span,
         }
@@ -2138,7 +2158,7 @@ fn rewrite_static(
         rewrite_assign_rhs_with_comments(
             context,
             &lhs,
-            &**expr,
+            expr,
             Shape::legacy(remaining_width, offset.block_only()),
             &RhsAssignKind::Expr(&expr.kind, expr.span),
             RhsTactics::Default,
@@ -2421,11 +2441,7 @@ pub(crate) fn span_hi_for_param(context: &RewriteContext<'_>, param: &ast::Param
 }
 
 pub(crate) fn is_named_param(param: &ast::Param) -> bool {
-    if let ast::PatKind::Ident(_, ident, _) = param.pat.kind {
-        ident.name != symbol::kw::Empty
-    } else {
-        true
-    }
+    !matches!(param.pat.kind, ast::PatKind::Missing)
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -2569,7 +2585,7 @@ fn rewrite_fn_base(
             .last()
             .map_or(false, |last_line| last_line.contains("//"));
 
-        if context.config.style_edition() >= StyleEdition::Edition2027 {
+        if context.config.style_edition() >= StyleEdition::Edition2024 {
             if closing_paren_overflow_max_width {
                 result.push(')');
                 result.push_str(&indent.to_string_with_newline(context.config));
@@ -2713,8 +2729,7 @@ fn rewrite_fn_base(
     }
     let where_clause_str = rewrite_where_clause(
         context,
-        &where_clause.predicates,
-        where_clause.span,
+        &where_clause,
         context.config.brace_style(),
         Shape::indented(indent, context.config),
         true,
@@ -3146,8 +3161,7 @@ fn rewrite_bounds_on_where_clause(
 
 fn rewrite_where_clause(
     context: &RewriteContext<'_>,
-    predicates: &[ast::WherePredicate],
-    where_span: Span,
+    where_clause: &ast::WhereClause,
     brace_style: BraceStyle,
     shape: Shape,
     on_new_line: bool,
@@ -3156,6 +3170,12 @@ fn rewrite_where_clause(
     span_end_before_where: BytePos,
     where_clause_option: WhereClauseOption,
 ) -> RewriteResult {
+    let ast::WhereClause {
+        ref predicates,
+        span: where_span,
+        has_where_token: _,
+    } = *where_clause;
+
     if predicates.is_empty() {
         return Ok(String::new());
     }
@@ -3342,8 +3362,7 @@ fn format_generics(
         }
         let where_clause_str = rewrite_where_clause(
             context,
-            &generics.where_clause.predicates,
-            generics.where_clause.span,
+            &generics.where_clause,
             brace_style,
             Shape::legacy(budget, offset.block_only()),
             true,
@@ -3458,7 +3477,7 @@ impl Rewrite for ast::ForeignItem {
                         context,
                         shape.indent,
                         ident,
-                        &FnSig::from_method_sig(sig, generics, &self.vis),
+                        &FnSig::from_method_sig(sig, generics, &self.vis, defaultness),
                         span,
                         FnBraceStyle::None,
                     )
@@ -3585,7 +3604,7 @@ pub(crate) fn rewrite_extern_crate(
 pub(crate) fn is_mod_decl(item: &ast::Item) -> bool {
     !matches!(
         item.kind,
-        ast::ItemKind::Mod(_, _, ast::ModKind::Loaded(_, ast::Inline::Yes, _, _))
+        ast::ItemKind::Mod(_, _, ast::ModKind::Loaded(_, ast::Inline::Yes, _))
     )
 }
 

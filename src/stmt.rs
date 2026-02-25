@@ -62,7 +62,7 @@ impl<'a> Stmt<'a> {
             result.push(Stmt {
                 inner: iter.next().unwrap(),
                 is_last: iter.peek().is_none(),
-            })
+            });
         }
         result
     }

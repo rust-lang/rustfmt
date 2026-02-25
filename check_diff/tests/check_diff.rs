@@ -1,6 +1,6 @@
 use check_diff::{
-    CheckDiffError, CheckDiffRunners, CodeFormatter, FormatCodeError, check_diff,
-    search_for_rs_files,
+    CheckDiffError, CheckDiffRunners, CodeFormatter, FormatCodeError, Repository,
+    RustFmtFileFinder, check_diff,
 };
 use std::fs::File;
 use tempfile::Builder;
@@ -29,10 +29,11 @@ fn search_for_files_correctly_non_nested() -> Result<(), Box<dyn std::error::Err
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
 
-    let iter = search_for_rs_files(dir.path());
+    let repo = Repository::new("", dir.path());
+    let file_finder = RustFmtFileFinder::from_repository(&repo);
 
     let mut count = 0;
-    for _ in iter {
+    for _ in file_finder.iter() {
         count += 1;
     }
 
@@ -51,10 +52,11 @@ fn search_for_files_correctly_nested() -> Result<(), Box<dyn std::error::Error>>
     let nested_file_path = nested_dir.path().join("nested.rs");
     let _ = File::create(nested_file_path)?;
 
-    let iter = search_for_rs_files(dir.path());
+    let repo = Repository::new("", dir.path());
+    let file_finder = RustFmtFileFinder::from_repository(&repo);
 
     let mut count = 0;
-    for _ in iter {
+    for _ in file_finder.iter() {
         count += 1;
     }
 
@@ -70,10 +72,12 @@ fn check_diff_test_no_formatting_difference() -> Result<(), CheckDiffError> {
     let dir = Builder::new().tempdir_in("").unwrap();
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
-    let repo_url = "https://github.com/rust-lang/rustfmt.git";
+    let repo = Repository::new("https://github.com/rust-lang/rustfmt.git", dir);
+    let repos = [repo];
+    let workers = std::num::NonZeroU8::new(1).unwrap();
 
-    let errors = check_diff(&runners, dir.path(), repo_url);
-    assert_eq!(errors, 0);
+    let errors = check_diff(&runners, &repos, workers);
+    assert_eq!(errors.len(), 0);
     Ok(())
 }
 
@@ -83,9 +87,11 @@ fn check_diff_test_formatting_difference() -> Result<(), CheckDiffError> {
     let dir = Builder::new().tempdir_in("").unwrap();
     let file_path = dir.path().join("test.rs");
     let _tmp_file = File::create(file_path)?;
-    let repo_url = "https://github.com/rust-lang/rustfmt.git";
+    let repo = Repository::new("https://github.com/rust-lang/rustfmt.git", dir);
+    let repos = [repo];
+    let workers = std::num::NonZeroU8::new(1).unwrap();
 
-    let errors = check_diff(&runners, dir.path(), repo_url);
-    assert_ne!(errors, 0);
+    let errors = check_diff(&runners, &repos, workers);
+    assert_ne!(errors.len(), 0);
     Ok(())
 }

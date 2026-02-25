@@ -1,11 +1,14 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::env;
 use std::fmt::{Debug, Display};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
-use tracing::{debug, error, info, trace};
+use std::sync::{Arc, Mutex};
+use tempfile::tempdir;
+use tracing::{debug, info, trace, warn};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Copy)]
@@ -411,6 +414,46 @@ fn create_config_arg<T: AsRef<str>>(configs: Option<&[T]>) -> Cow<'static, str> 
 
     Cow::Owned(result)
 }
+
+pub struct Repository<P> {
+    /// Name of the repository
+    name: String,
+    /// Path to the repository on the local file system
+    dir_path: P,
+}
+
+impl<P> Repository<P> {
+    /// Initialize a new Repository
+    pub fn new(git_url: &str, dir_path: P) -> Self {
+        let name = get_repo_name(git_url).to_string();
+        Self { name, dir_path }
+    }
+
+    /// Get the `name` of the repository
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Get the absolute path to where this repository was cloned
+    pub fn path(&self) -> &Path
+    where
+        P: AsRef<Path>,
+    {
+        self.dir_path.as_ref()
+    }
+
+    /// Get the relative path of a file contained in this repository
+    pub fn relative_path<'f, F>(&self, file: &'f F) -> &'f Path
+    where
+        P: AsRef<Path>,
+        F: AsRef<Path>,
+    {
+        file.as_ref()
+            .strip_prefix(self.dir_path.as_ref())
+            .unwrap_or(file.as_ref())
+    }
+}
+
 /// Clone a git repository
 ///
 /// Parameters:
@@ -627,90 +670,186 @@ pub fn compile_rustfmt<T: AsRef<str>>(
     })
 }
 
-/// Searches for rust files in the particular path and returns an iterator to them.
-pub fn search_for_rs_files(repo: &Path) -> impl Iterator<Item = PathBuf> {
-    WalkDir::new(repo).into_iter().filter_map(|e| match e.ok() {
-        Some(entry) => {
-            let path = entry.path();
-            if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
-                return Some(entry.into_path());
+fn read_rustfmt_ignore_list(rustfmt_toml_path: &Path) -> Vec<String> {
+    let Ok(file_content) = std::fs::read_to_string(rustfmt_toml_path) else {
+        return Vec::new();
+    };
+
+    let Ok(mut data) = file_content.parse::<toml::Table>() else {
+        return Vec::new();
+    };
+
+    let Some(toml::Value::Array(ignore_list)) = data.remove("ignore") else {
+        return Vec::new();
+    };
+
+    ignore_list
+        .into_iter()
+        .map(toml::Value::try_into)
+        .collect::<Result<_, _>>()
+        .unwrap_or_default()
+}
+
+// Iterator over all rust files in a directory.
+//
+// Ignores files list in the root `.rustfmt.toml` or `rustfmt.toml` configuration files.
+pub struct RustFmtFileFinder<'a, P> {
+    ignore_set: ignore::gitignore::Gitignore,
+    repo: &'a Repository<P>,
+}
+
+impl<'a, P> RustFmtFileFinder<'a, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn from_repository(repo: &'a Repository<P>) -> Self {
+        let root = repo.path();
+        let mut ignore_builder = ignore::gitignore::GitignoreBuilder::new(root);
+
+        let repo_name = repo.name();
+        for rustfmt_config_file in [".rustfmt.toml", "rustfmt.toml"] {
+            let rustfmt_toml_path = root.join(rustfmt_config_file);
+            for ignore_path in read_rustfmt_ignore_list(&rustfmt_toml_path) {
+                debug!("Adding {ignore_path} to the set of ignored files for '{repo_name}'");
+                let _ = ignore_builder.add_line(None, &ignore_path);
             }
-            None
         }
-        None => None,
-    })
+
+        Self {
+            repo,
+            ignore_set: ignore_builder
+                .build()
+                .unwrap_or(ignore::gitignore::Gitignore::empty()),
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = PathBuf> + use<'_, P> {
+        WalkDir::new(self.repo.path())
+            .into_iter()
+            .filter_map(|e| match e.ok() {
+                Some(entry) => {
+                    let path = entry.path();
+                    if path.is_file()
+                        && path.extension().is_some_and(|ext| ext == "rs")
+                        && !self
+                            .ignore_set
+                            .matched_path_or_any_parents(path, false)
+                            .is_ignore()
+                    {
+                        return Some(entry.into_path());
+                    }
+                    None
+                }
+                None => None,
+            })
+    }
+}
+
+/// Encapsulate the logic used to clone repositories for the diff check
+pub fn clone_repositories_for_diff_check(
+    repositories: &[&str],
+) -> Vec<Repository<tempfile::TempDir>> {
+    // Use a Hashmap to deduplicate any repositories
+    let map = Arc::new(Mutex::new(HashMap::new()));
+
+    std::thread::scope(|s| {
+        for url in repositories {
+            let map = Arc::clone(&map);
+
+            s.spawn(move || {
+                let repo_name = get_repo_name(url);
+                info!("Processing repo: {repo_name}");
+                let Ok(tmp_dir) = tempdir() else {
+                    warn!(
+                        "Failed to create a tempdir for {}. Can't check formatting diff for {}",
+                        &url, repo_name
+                    );
+                    return;
+                };
+
+                let Ok(_) = clone_git_repo(url, tmp_dir.path()) else {
+                    warn!(
+                        "Failed to clone repo {}. Can't check formatting diff for {}",
+                        &url, repo_name
+                    );
+                    return;
+                };
+
+                let repo = Repository::new(url, tmp_dir);
+                map.lock().unwrap().insert(repo_name.to_string(), repo);
+            });
+        }
+    });
+
+    let map = match Arc::into_inner(map)
+        .expect("All other threads are done")
+        .into_inner()
+    {
+        Ok(map) => map,
+        Err(e) => e.into_inner(),
+    };
+
+    map.into_values().collect()
 }
 
 /// Calculates the number of errors when running the compiled binary and the feature binary on the
 /// repo specified with the specific configs.
-pub fn check_diff<P: AsRef<Path>>(
+pub fn check_diff_for_file<'repo, P: AsRef<Path>, F: AsRef<Path>>(
     runners: &CheckDiffRunners<impl CodeFormatter, impl CodeFormatter>,
-    repo: P,
-    repo_url: &str,
-) -> u8 {
-    let mut errors: u8 = 0;
-    let repo = repo.as_ref();
-    let iter = search_for_rs_files(repo);
-    for file in iter {
-        let relative_path = file.strip_prefix(repo).unwrap_or(&file);
-        let repo_name = get_repo_name(repo_url);
+    repo: &'repo Repository<P>,
+    file: F,
+) -> Result<(), (Diff, F, &'repo Repository<P>)> {
+    let relative_path = repo.relative_path(&file);
+    let repo_name = repo.name();
 
-        trace!(
-            "Formatting '{0}' file {0}/{1}",
-            repo_name,
-            relative_path.display()
-        );
+    trace!(
+        "Formatting '{0}' file {0}/{1}",
+        repo_name,
+        relative_path.display()
+    );
 
-        match runners.create_diff(file.as_path()) {
-            Ok(diff) => {
-                if !diff.is_empty() {
-                    error!(
-                        "Diff found in '{0}' when formatting {0}/{1}\n{2}",
-                        repo_name,
-                        relative_path.display(),
-                        diff,
-                    );
-                    errors = errors.saturating_add(1);
-                } else {
-                    trace!(
-                        "No diff found in '{0}' when formatting {0}/{1}",
-                        repo_name,
-                        relative_path.display(),
-                    )
-                }
-            }
-            Err(CreateDiffError::MainRustfmtFailed(e)) => {
-                debug!(
-                    "`main` rustfmt failed to format {}/{}\n{:?}",
+    match runners.create_diff(file.as_ref()) {
+        Ok(diff) => {
+            if !diff.is_empty() {
+                Err((diff, file, repo))
+            } else {
+                trace!(
+                    "No diff found in '{0}' when formatting {0}/{1}",
                     repo_name,
                     relative_path.display(),
-                    e,
                 );
-                continue;
-            }
-            Err(CreateDiffError::FeatureRustfmtFailed(e)) => {
-                debug!(
-                    "`feature` rustfmt failed to format {}/{}\n{:?}",
-                    repo_name,
-                    relative_path.display(),
-                    e,
-                );
-                continue;
-            }
-            Err(CreateDiffError::BothRustfmtFailed { src, feature }) => {
-                debug!(
-                    "Both rustfmt binaries failed to format {}/{}\n{:?}\n{:?}",
-                    repo_name,
-                    relative_path.display(),
-                    src,
-                    feature,
-                );
-                continue;
+                Ok(())
             }
         }
+        Err(CreateDiffError::MainRustfmtFailed(e)) => {
+            debug!(
+                "`main` rustfmt failed to format {}/{}\n{:?}",
+                repo_name,
+                relative_path.display(),
+                e,
+            );
+            Ok(())
+        }
+        Err(CreateDiffError::FeatureRustfmtFailed(e)) => {
+            debug!(
+                "`feature` rustfmt failed to format {}/{}\n{:?}",
+                repo_name,
+                relative_path.display(),
+                e,
+            );
+            Ok(())
+        }
+        Err(CreateDiffError::BothRustfmtFailed { src, feature }) => {
+            debug!(
+                "Both rustfmt binaries failed to format {}/{}\n{:?}\n{:?}",
+                repo_name,
+                relative_path.display(),
+                src,
+                feature,
+            );
+            Ok(())
+        }
     }
-
-    errors
 }
 
 /// parse out the repository name from a GitHub Repository name.
@@ -720,4 +859,62 @@ pub fn get_repo_name(git_url: &str) -> &str {
         .rsplit_once('/')
         .unwrap_or(("", strip_git_prefix));
     repo_name
+}
+
+pub fn check_diff<'repo, P, F, M>(
+    runners: &CheckDiffRunners<F, M>,
+    repositories: &'repo [Repository<P>],
+    worker_threads: std::num::NonZeroU8,
+) -> Vec<(Diff, PathBuf, &'repo Repository<P>)>
+where
+    P: AsRef<Path> + Sync + Send,
+    F: CodeFormatter + Sync,
+    M: CodeFormatter + Sync,
+{
+    let (tx, rx) = crossbeam_channel::unbounded();
+
+    let errors = std::thread::scope(|s| {
+        // Spawn producer threads that find files to check
+        for repo in repositories.iter() {
+            let tx = tx.clone();
+            s.spawn(move || {
+                let file_finder = RustFmtFileFinder::from_repository(repo);
+                for file in file_finder.iter() {
+                    let _ = tx.send((file, repo));
+                }
+            });
+        }
+
+        // Drop the first `tx` we created. Now there's exactly one `tx` per producer thread so when
+        // each producer thread finishes the receiving threads will start to get Err(RecvError)
+        // when calling `rx.recv()` and they'll know to stop processing files.
+        // When all scoped threads end we'll know we're done with processing and we can return
+        // any errors we found to the caller.
+        drop(tx);
+
+        let errors = Arc::new(Mutex::new(Vec::with_capacity(10)));
+
+        // spawn receiver threads used to process all files:
+        for _ in 0..u8::from(worker_threads) {
+            let errors = Arc::clone(&errors);
+            let rx = rx.clone();
+            s.spawn(move || {
+                while let Ok((file, repo)) = rx.recv() {
+                    if let Err(e) = check_diff_for_file(runners, repo, file) {
+                        // Push errors to report on later
+                        errors.lock().unwrap().push(e);
+                    }
+                }
+            });
+        }
+        errors
+    });
+
+    match Arc::into_inner(errors)
+        .expect("All other threads are done")
+        .into_inner()
+    {
+        Ok(e) => e,
+        Err(e) => e.into_inner(),
+    }
 }
