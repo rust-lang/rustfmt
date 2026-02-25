@@ -35,6 +35,14 @@
 - The unstable `required_version` configuration option now support cargo flavored semantic versioning using the `semver` crate [#6063](https://github.com/rust-lang/rustfmt/issues/6063)
 - Top-level imports are no longer merged when setting `imports_granularity=Module`. Note that `imports_granularity=Module` is still an unstable configuration [#6191](https://github.com/rust-lang/rustfmt/issues/6191)
 - Disable the `bytecount/generic-simd` optional dependency when using the `generic-simd` feature. The dependency was preventing rustfmt from building on nightly. simd support will be re-enabled once the issue has been fixed [#6807](https://github.com/rust-lang/rustfmt/pull/6807) [llogiq/bytecount#100](https://github.com/llogiq/bytecount/pull/100)
+- The `trailing_semicolon` configuration option will add a trailing semicolon to the last expression in a loop body when enabled along with `edition >= 2024` and `style_edition >= 2027` [#6711](https://github.com/rust-lang/rustfmt/pull/6711)
+  ```rust
+  fn main() {
+      for x in 0..10 {
+          println!("{x}");
+      }
+  }
+  ```
 
 
 ### Added
