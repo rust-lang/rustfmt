@@ -20,6 +20,7 @@
 - Fix idempotency issue when normalizing imports [#6558](https://github.com/rust-lang/rustfmt/issues/6558)
 - Properly split long pattern in `if-let` at the `max_width` when setting `style_edition=2027` [#6202](https://github.com/rust-lang/rustfmt/issues/6202)
 - Format `lazy_static::lazy_static!` like `lazy_static!` when setting `style_edition=2027` [#6287](https://github.com/rust-lang/rustfmt/issues/6287)
+- Prevent panic when rewriting missing spans that contain unicode whitespace chars [#5739](https://github.com/rust-lang/rustfmt/issues/5739)
 
 ### Changed
 - Stabilize `style_edition=2024` and stabilize the `style_edition` command line option [#6431](https://github.com/rust-lang/rustfmt/pull/6431) [rust-lang/rust#134929](https://github.com/rust-lang/rust/pull/134929)
