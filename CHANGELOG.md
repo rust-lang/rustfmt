@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 
-## [1.9.0] 2025-01-03
+## [1.9.0] 2026-02-26
 
 ### Fixed
 - No longer strip `r#` prefix from `break` and `continue` labels [#6411](https://github.com/rust-lang/rustfmt/issues/6411)
