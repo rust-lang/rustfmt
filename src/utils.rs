@@ -400,7 +400,7 @@ pub(crate) fn wrap_str(
 }
 
 pub(crate) fn filtered_str_fits(
-    _style_edition: StyleEdition,
+    style_edition: StyleEdition,
     snippet: &str,
     max_width: usize,
     shape: Shape,
@@ -409,24 +409,35 @@ pub(crate) fn filtered_str_fits(
 
     let snippet = &filter_normal_code(snippet);
     if !snippet.is_empty() {
-        // Collect line classifications to check for string content.
-        let line_classes: Vec<_> = LineClasses::new(snippet).collect();
+        let line_classes = {
+            if style_edition >= StyleEdition::Edition2027 {
+                // Collect line classifications to check for string content.
+                let line_classes: Vec<_> = LineClasses::new(snippet).collect();
 
-        // First line must fit with `shape.width`, unless it's a multi-line string
-        // literal that starts on this line - string content cannot be shortened.
-        let first_line_width = first_line_width(snippet);
-        if first_line_width > shape.width {
-            // Only allow the exception for multi-line strings (StartString indicates
-            // the string continues on subsequent lines).
-            let is_multiline = line_classes.len() > 1;
-            let first_is_multiline_string = is_multiline
-                && line_classes
-                    .first()
-                    .is_some_and(|(kind, _)| *kind == FullCodeCharKind::StartString);
-            if !first_is_multiline_string {
-                return false;
+                // First line must fit with `shape.width`, unless it's a multi-line string
+                // literal that starts on this line - string content cannot be shortened.
+                let first_line_width = first_line_width(snippet);
+                if first_line_width > shape.width {
+                    // Only allow the exception for multi-line strings (StartString indicates
+                    // the string continues on subsequent lines).
+                    let is_multiline = line_classes.len() > 1;
+                    let first_is_multiline_string = is_multiline
+                        && line_classes
+                            .first()
+                            .is_some_and(|(kind, _)| *kind == FullCodeCharKind::StartString);
+                    if !first_is_multiline_string {
+                        return false;
+                    }
+                }
+                line_classes
+            } else {
+                // First line must fits with `shape.width`.
+                if first_line_width(snippet) > shape.width {
+                    return false;
+                }
+                vec![]
             }
-        }
+        };
 
         // If the snippet does not include newline, we are done.
         if is_single_line(snippet) {
@@ -434,6 +445,16 @@ pub(crate) fn filtered_str_fits(
         }
 
         // The other lines must fit within the maximum width.
+        if style_edition < StyleEdition::Edition2027 {
+            if snippet
+                .lines()
+                .skip(1)
+                .any(|line| unicode_str_width(line) > max_width)
+            {
+                return false;
+            }
+        }
+
         // Exception: lines that are inside or end a multi-line string literal
         // may exceed max_width since string content cannot be reformatted.
         let mut last_line_is_string = false;
