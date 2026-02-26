@@ -11,8 +11,9 @@ use tracing::debug;
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
-    FindUncommented, combine_strs_with_missing_comments, contains_comment, is_last_comment_block,
-    recover_comment_removed, recover_missing_comment_in_span, rewrite_missing_comment,
+    FindUncommented, combine_strs_with_missing_comments, comment_reaches_end_of_line,
+    contains_comment, is_last_comment_block, recover_comment_removed,
+    recover_missing_comment_in_span, rewrite_missing_comment,
 };
 use crate::config::lists::*;
 use crate::config::{BraceStyle, Config, IndentStyle, StyleEdition};
@@ -2232,6 +2233,17 @@ fn is_empty_infer(ty: &ast::Ty, pat_span: Span) -> bool {
     }
 }
 
+struct CommentAfterColon {
+    content: Option<String>,
+    reaches_end_of_line: bool,
+}
+
+impl CommentAfterColon {
+    fn content(&self) -> &str {
+        self.content.as_deref().unwrap_or("")
+    }
+}
+
 /// Recover any missing comments between the param and the type.
 ///
 /// # Returns
@@ -2243,7 +2255,7 @@ fn get_missing_param_comments(
     pat_span: Span,
     ty_span: Span,
     shape: Shape,
-) -> (String, String) {
+) -> (String, CommentAfterColon) {
     let missing_comment_span = mk_sp(pat_span.hi(), ty_span.lo());
 
     let span_before_colon = {
@@ -2266,7 +2278,25 @@ fn get_missing_param_comments(
     let comment_after_colon = rewrite_missing_comment(span_after_colon, shape, context)
         .ok()
         .filter(|comment| !comment.is_empty())
-        .map_or(String::new(), |comment| format!("{} ", comment));
+        .map_or(
+            CommentAfterColon {
+                content: None,
+                reaches_end_of_line: false,
+            },
+            |comment| {
+                let reaches_end_of_line =
+                    comment_reaches_end_of_line(span_after_colon, context, false);
+                let content = if reaches_end_of_line {
+                    comment
+                } else {
+                    format!("{} ", comment)
+                };
+                CommentAfterColon {
+                    content: Some(content),
+                    reaches_end_of_line,
+                }
+            },
+        );
     (comment_before_colon, comment_after_colon)
 }
 
@@ -2317,9 +2347,21 @@ impl Rewrite for ast::Param {
             if !is_empty_infer(&*self.ty, self.pat.span) {
                 let (before_comment, after_comment) =
                     get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
-                result.push_str(&before_comment);
-                result.push_str(colon_spaces(context.config));
-                result.push_str(&after_comment);
+
+                // In the specific case of comment after line reaching the end of that line,
+                // put the comment on-top to keep it from obscuring the following type
+                if after_comment.reaches_end_of_line {
+                    let mut reordered = after_comment.content().to_string();
+                    reordered.push_str(&shape.indent.to_string_with_newline(context.config));
+                    reordered.push_str(&result);
+                    result = reordered;
+                    result.push_str(&before_comment);
+                    result.push_str(colon_spaces(context.config));
+                } else {
+                    result.push_str(&before_comment);
+                    result.push_str(colon_spaces(context.config));
+                    result.push_str(after_comment.content());
+                }
                 let overhead = last_line_width(&result);
                 let max_width = shape
                     .width
@@ -2347,7 +2389,7 @@ impl Rewrite for ast::Param {
                     )?;
                     result.push_str(&before_comment);
                     result.push_str(colon_spaces(context.config));
-                    result.push_str(&after_comment);
+                    result.push_str(after_comment.content());
                     let overhead = last_line_width(&result);
                     let max_width = shape
                         .width

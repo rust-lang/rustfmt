@@ -1015,6 +1015,18 @@ pub(crate) fn rewrite_missing_comment(
     }
 }
 
+pub(crate) fn comment_reaches_end_of_line(
+    span: Span,
+    context: &RewriteContext<'_>,
+    normalize_comments: bool,
+) -> bool {
+    let missing_snippet = context.snippet(span);
+    let trimmed_snippet = missing_snippet.trim();
+    comment_style(trimmed_snippet, normalize_comments)
+        .closer()
+        .is_empty()
+}
+
 /// Recover the missing comments in the specified span, if available.
 /// The layout of the comments will be preserved as long as it does not break the code
 /// and its total width does not exceed the max width.
