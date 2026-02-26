@@ -311,6 +311,9 @@ pub(crate) struct FormattingError {
     is_comment: bool,
     is_string: bool,
     pub(crate) line_buffer: String,
+    // Number of spaces a tab represents when computing visual columns.
+    // Needed to translate visual column based overflow ranges into byte indices.
+    tab_spaces: usize,
 }
 
 impl FormattingError {
@@ -321,6 +324,8 @@ impl FormattingError {
             kind,
             is_string: false,
             line_buffer: psess.span_to_first_line_string(span),
+            // Default; actual value only matters for LineOverflow emitted via push_err
+            tab_spaces: 4,
         }
     }
 
@@ -347,7 +352,7 @@ impl FormattingError {
     // (space, target)
     pub(crate) fn format_len(&self) -> (usize, usize) {
         match self.kind {
-            ErrorKind::LineOverflow(found, max) => (max, found - max),
+            ErrorKind::LineOverflow(found, max) => self.line_overflow_byte_range(found, max),
             ErrorKind::TrailingWhitespace
             | ErrorKind::DeprecatedAttr
             | ErrorKind::BadAttr
@@ -364,6 +369,40 @@ impl FormattingError {
             }
             _ => unreachable!(),
         }
+    }
+
+    // Compute (start_byte, length) tuple for a LineOverflow error converting visual columns
+    // (tabs expanded to `tab_spaces`) into byte indices within the stored line buffer.
+    fn line_overflow_byte_range(&self, found: usize, max: usize) -> (usize, usize) {
+        if max >= found || self.line_buffer.is_empty() {
+            return (0, 0);
+        }
+
+        let mut visual_col = 0;
+        let mut start_byte = None;
+        let mut end_byte = None;
+        for (idx, ch) in self.line_buffer.char_indices() {
+            let ch_width = if ch == '\t' { self.tab_spaces } else { 1 };
+            let next_col = visual_col + ch_width;
+            if start_byte.is_none() && next_col > max {
+                start_byte = Some(idx);
+            } else if start_byte.is_none() && next_col == max {
+                // Start will be at next character (if any)
+            }
+
+            if end_byte.is_none() && next_col >= found {
+                end_byte = Some(idx + ch.len_utf8());
+                break;
+            }
+
+            visual_col = next_col;
+        }
+
+        let start = start_byte.unwrap_or_else(|| self.line_buffer.len().saturating_sub(1));
+        let end = end_byte.unwrap_or(self.line_buffer.len());
+        let len = end.saturating_sub(start).max(1);
+
+        (start.min(self.line_buffer.len().saturating_sub(1)), len)
     }
 }
 
@@ -600,6 +639,7 @@ impl<'a> FormatLines<'a> {
             is_comment,
             is_string,
             line_buffer: self.line_buffer.clone(),
+            tab_spaces: self.config.tab_spaces(),
         });
     }
 
