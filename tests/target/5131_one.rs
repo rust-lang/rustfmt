@@ -4,9 +4,9 @@ pub use foo::{x, x as x2, y};
 use {
     bar::{
         a,
-        b::{self, f, g},
+        b::{self, f, f as f2, g},
         c,
         d::{e, e as e2},
     },
-    qux::{h, i},
+    qux::{h, i, i as j},
 };
