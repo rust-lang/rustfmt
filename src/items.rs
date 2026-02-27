@@ -1928,7 +1928,19 @@ pub(crate) fn rewrite_struct_field(
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
     let attrs_str = field.attrs.rewrite_result(context, shape)?;
-    let attrs_extendable = field.ident.is_none() && is_attributes_extendable(&attrs_str);
+    let ty_str = field.ty.rewrite_result(context, shape)?;
+
+    let allow_extend = extend_inline_attr(
+        &field.attrs,
+        shape,
+        &attrs_str,
+        // +1 = " ", +1 = ","
+        prefix.len() + 1 + ty_str.len() + 1,
+        context,
+    );
+
+    let attrs_extendable =
+        (field.ident.is_none() && is_attributes_extendable(&attrs_str)) || allow_extend;
     let missing_span = if field.attrs.is_empty() {
         mk_sp(field.span.lo(), field.span.lo())
     } else {
@@ -3521,13 +3533,17 @@ impl Rewrite for ast::ForeignItem {
         } else {
             mk_sp(self.attrs[self.attrs.len() - 1].span.hi(), self.span.lo())
         };
+
+        let allow_extend =
+            extend_inline_attr(&self.attrs, shape, &attrs_str, item_str.len(), context);
+
         combine_strs_with_missing_comments(
             context,
             &attrs_str,
             &item_str,
             missing_span,
             shape,
-            false,
+            allow_extend,
         )
     }
 }
@@ -3548,13 +3564,7 @@ fn rewrite_attrs(
         mk_sp(attrs[attrs.len() - 1].span.hi(), item.span.lo())
     };
 
-    let allow_extend = if attrs.len() == 1 {
-        let line_len = attrs_str.len() + 1 + item_str.len();
-        !attrs.first().unwrap().is_doc_comment()
-            && context.config.inline_attribute_width() >= line_len
-    } else {
-        false
-    };
+    let allow_extend = extend_inline_attr(&item.attrs, shape, &attrs_str, item_str.len(), context);
 
     combine_strs_with_missing_comments(
         context,
