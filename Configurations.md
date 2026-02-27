@@ -2059,6 +2059,7 @@ This option is deprecated. Use `imports_granularity = "Crate"` instead.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: [#3362](https://github.com/rust-lang/rustfmt/issues/3362))
 
 #### `false` (default):
 
@@ -2073,7 +2074,6 @@ use foo::{e, f};
 ```rust
 use foo::{a, b, c, d, e, f, g};
 ```
-
 
 ## `newline_style`
 
@@ -2841,7 +2841,7 @@ Controls the edition of the [Rust Style Guide] to use for formatting ([RFC 3338]
 
 - **Default value**: `"2015"`
 - **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"` (unstable variant)
-- **Stable**: No
+- **Stable**: No (tracking issue: [#5720](https://github.com/rust-lang/rustfmt/issues/5720))
 
 This option is inferred from the [`edition`](#edition) if not specified.
 
