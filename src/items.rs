@@ -42,8 +42,8 @@ const DEFAULT_VISIBILITY: ast::Visibility = ast::Visibility {
     tokens: None,
 };
 
-fn type_annotation_separator(config: &Config) -> &str {
-    colon_spaces(config)
+fn type_annotation_separator(config: &Config, force_space_after_colon: bool) -> &str {
+    colon_spaces(config, force_space_after_colon)
 }
 
 // Statements of the form
@@ -101,7 +101,9 @@ impl Rewrite for ast::Local {
             let mut infix = String::with_capacity(32);
 
             if let Some(ref ty) = self.ty {
-                let separator = type_annotation_separator(context.config);
+                let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*ty).kind);
+                let separator = type_annotation_separator(context.config, force_space_after_colon);
+
                 let ty_shape = if pat_str.contains('\n') {
                     shape.with_max_width(context.config)
                 } else {
@@ -1875,10 +1877,14 @@ fn rewrite_ty<R: Rewrite>(
     Ok(result)
 }
 
-fn type_annotation_spacing(config: &Config) -> (&str, &str) {
+fn type_annotation_spacing(config: &Config, force_space_after_colon: bool) -> (&str, &str) {
     (
         if config.space_before_colon() { " " } else { "" },
-        if config.space_after_colon() { " " } else { "" },
+        if force_space_after_colon || config.space_after_colon() {
+            " "
+        } else {
+            ""
+        },
     )
 }
 
@@ -1888,7 +1894,8 @@ pub(crate) fn rewrite_struct_field_prefix(
 ) -> RewriteResult {
     let vis = format_visibility(context, &field.vis);
     let safety = format_safety(field.safety);
-    let type_annotation_spacing = type_annotation_spacing(context.config);
+    let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*field.ty).kind);
+    let type_annotation_spacing = type_annotation_spacing(context.config, force_space_after_colon);
     Ok(match field.ident {
         Some(name) => format!(
             "{vis}{safety}{}{}:",
@@ -1924,7 +1931,8 @@ pub(crate) fn rewrite_struct_field(
         return Ok(context.snippet(field.span()).to_owned());
     }
 
-    let type_annotation_spacing = type_annotation_spacing(context.config);
+    let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*field.ty).kind);
+    let type_annotation_spacing = type_annotation_spacing(context.config, force_space_after_colon);
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
     let attrs_str = field.attrs.rewrite_result(context, shape)?;
@@ -2115,7 +2123,11 @@ fn rewrite_static(
         return None;
     }
 
-    let colon = colon_spaces(context.config);
+    // if after a semicolon is absolute path declaration (::) need to force
+    //  space after colon, because ::: syntax cannot compile
+    let force_space_after_colon = is_ty_kind_with_absolute_decl(&static_parts.ty.kind);
+    let colon = colon_spaces(context.config, force_space_after_colon);
+
     let mut prefix = format!(
         "{}{}{}{} {}{}{}",
         format_visibility(context, static_parts.vis),
@@ -2318,7 +2330,8 @@ impl Rewrite for ast::Param {
                 let (before_comment, after_comment) =
                     get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
                 result.push_str(&before_comment);
-                result.push_str(colon_spaces(context.config));
+                let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*self.ty).kind);
+                result.push_str(colon_spaces(context.config, force_space_after_colon));
                 result.push_str(&after_comment);
                 let overhead = last_line_width(&result);
                 let max_width = shape
@@ -2346,7 +2359,8 @@ impl Rewrite for ast::Param {
                         !has_multiple_attr_lines,
                     )?;
                     result.push_str(&before_comment);
-                    result.push_str(colon_spaces(context.config));
+                    let force_space_after_colon = is_ty_kind_with_absolute_decl(&(*self.ty).kind);
+                    result.push_str(colon_spaces(context.config, force_space_after_colon));
                     result.push_str(&after_comment);
                     let overhead = last_line_width(&result);
                     let max_width = shape

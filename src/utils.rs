@@ -437,9 +437,9 @@ pub(crate) fn filtered_str_fits(snippet: &str, max_width: usize, shape: Shape) -
 }
 
 #[inline]
-pub(crate) fn colon_spaces(config: &Config) -> &'static str {
+pub(crate) fn colon_spaces(config: &Config, force_space_after_colon: bool) -> &'static str {
     let before = config.space_before_colon();
-    let after = config.space_after_colon();
+    let after = force_space_after_colon || config.space_after_colon();
     match (before, after) {
         (true, true) => " : ",
         (true, false) => " :",
@@ -730,5 +730,20 @@ mod test {
             trim_left_preserve_layout(s, indent, &config),
             Some("aaa\n    bbb\n    ccc".to_string())
         );
+    }
+}
+
+pub(crate) fn is_absolute_decl_path(path: &ast::Path) -> bool {
+    let segments = &path.segments;
+    match segments.first() {
+        Some(path_segment) => path_segment.ident.name == symbol::kw::PathRoot,
+        None => false,
+    }
+}
+
+pub(crate) fn is_ty_kind_with_absolute_decl(ty_kind: &ast::TyKind) -> bool {
+    match ty_kind {
+        ast::TyKind::Path(None, ast_path) => is_absolute_decl_path(ast_path),
+        _ => false,
     }
 }
