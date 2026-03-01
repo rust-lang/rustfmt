@@ -1191,14 +1191,9 @@ pub(crate) fn format_trait(
             return Err(RewriteError::Unknown);
         }
 
-        result = rewrite_assign_rhs_with(
-            context,
-            result + ":",
-            bounds,
-            shape,
-            &RhsAssignKind::Bounds,
-            RhsTactics::ForceNextLineWithoutIndent,
-        )?;
+        let lhs = result + ":";
+        let bounds_shape = Shape::indented(offset, context.config);
+        result = rewrite_assign_rhs(context, lhs, bounds, &RhsAssignKind::Bounds, bounds_shape)?;
     }
 
     // Rewrite where-clause.
