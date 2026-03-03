@@ -1,3 +1,4 @@
+// rustfmt-style_edition: 2027
 // rustfmt-max_width: 100
 
 // line below is 80 chars

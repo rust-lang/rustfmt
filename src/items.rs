@@ -1190,9 +1190,13 @@ pub(crate) fn format_trait(
         if contains_comment(snippet) {
             return Err(RewriteError::Unknown);
         }
+        let bounds_shape = if context.config.style_edition() >= StyleEdition::Edition2027 {
+            Shape::indented(offset, context.config)
+        } else {
+            Shape::indented(offset, context.config).sub_width(result.len(), ident.span)?
+        };
 
         let lhs = result + ":";
-        let bounds_shape = Shape::indented(offset, context.config);
         result = rewrite_assign_rhs(context, lhs, bounds, &RhsAssignKind::Bounds, bounds_shape)?;
     }
 
