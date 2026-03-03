@@ -494,6 +494,7 @@ struct FormatLines<'a> {
     name: &'a FileName,
     skipped_range: &'a [(usize, usize)],
     last_was_space: bool,
+    line_all_space: bool,
     line_len: usize,
     cur_line: usize,
     newline_count: usize,
@@ -514,6 +515,7 @@ impl<'a> FormatLines<'a> {
             name,
             skipped_range,
             last_was_space: false,
+            line_all_space: true,
             line_len: 0,
             cur_line: 1,
             newline_count: 0,
@@ -546,6 +548,7 @@ impl<'a> FormatLines<'a> {
             if self.last_was_space {
                 if self.should_report_error(kind, &ErrorKind::TrailingWhitespace)
                     && !self.is_skipped_line()
+                    && !(self.line_all_space && self.config.indent_blank_lines())
                 {
                     self.push_err(
                         ErrorKind::TrailingWhitespace,
@@ -575,6 +578,7 @@ impl<'a> FormatLines<'a> {
             .contains_line(self.name, self.cur_line);
         self.newline_count += 1;
         self.last_was_space = false;
+        self.line_all_space = true;
         self.line_buffer.clear();
         self.current_line_contains_string_literal = false;
     }
@@ -587,6 +591,7 @@ impl<'a> FormatLines<'a> {
             1
         };
         self.last_was_space = c.is_whitespace();
+        self.line_all_space &= self.last_was_space;
         self.line_buffer.push(c);
         if kind.is_string() {
             self.current_line_contains_string_literal = true;
