@@ -33,6 +33,13 @@ pub(crate) fn path_to_imported_ident(path: &ast::Path) -> symbol::Ident {
     path.segments.last().unwrap().ident
 }
 
+/// Returns all but the last portion of the module path, except in the case of
+/// top-level modules (length 1), which remain unchanged. Used for Module-level
+/// imports_granularity.
+fn module_prefix(path: &[UseSegment]) -> &[UseSegment] {
+    &path[..(path.len() - 1).max(1)]
+}
+
 impl<'a> FmtVisitor<'a> {
     pub(crate) fn format_import(&mut self, item: &ast::Item, tree: &ast::UseTree) {
         let span = item.span();
@@ -184,7 +191,7 @@ impl UseSegment {
         modsep: bool,
     ) -> Option<UseSegment> {
         let name = rewrite_ident(context, path_seg.ident);
-        if name.is_empty() || name == "{{root}}" {
+        if name.is_empty() {
             return None;
         }
         let kind = match name {
@@ -683,9 +690,7 @@ impl UseTree {
         } else {
             match shared_prefix {
                 SharedPrefix::Crate => self.path[0] == other.path[0],
-                SharedPrefix::Module => {
-                    self.path[..self.path.len() - 1] == other.path[..other.path.len() - 1]
-                }
+                SharedPrefix::Module => module_prefix(&self.path) == module_prefix(&other.path),
                 SharedPrefix::One => true,
             }
         }
@@ -945,20 +950,16 @@ impl Ord for UseSegment {
                 let ident_ord = if self.style_edition >= StyleEdition::Edition2024 {
                     version_sort(ia, ib)
                 } else {
-                    // snake_case < CamelCase < UPPER_SNAKE_CASE
-                    if ia.starts_with(char::is_uppercase) && !ib.starts_with(char::is_uppercase) {
-                        return Ordering::Greater;
+                    fn sorting_key(ident: &str) -> (bool, bool, &str) {
+                        // snake_case < CamelCase < UPPER_SNAKE_CASE
+                        (
+                            is_upper_snake_case(ident),
+                            ident.starts_with(char::is_uppercase),
+                            ident,
+                        )
                     }
-                    if !ia.starts_with(char::is_uppercase) && ib.starts_with(char::is_uppercase) {
-                        return Ordering::Less;
-                    }
-                    if is_upper_snake_case(ia) && !is_upper_snake_case(ib) {
-                        return Ordering::Greater;
-                    }
-                    if !is_upper_snake_case(ia) && is_upper_snake_case(ib) {
-                        return Ordering::Less;
-                    }
-                    ia.cmp(ib)
+
+                    sorting_key(ia).cmp(&sorting_key(ib))
                 };
 
                 if ident_ord != Ordering::Equal {
@@ -977,16 +978,7 @@ impl Ord for UseSegment {
                     (None, None) => Ordering::Equal,
                 }
             }
-            (List(ref a), List(ref b)) => {
-                for (a, b) in a.iter().zip(b.iter()) {
-                    let ord = a.cmp(b);
-                    if ord != Ordering::Equal {
-                        return ord;
-                    }
-                }
-
-                a.len().cmp(&b.len())
-            }
+            (List(ref a), List(ref b)) => a.iter().cmp(b.iter()),
             (Slf(_), _) => Ordering::Less,
             (_, Slf(_)) => Ordering::Greater,
             (Super(_), _) => Ordering::Less,
@@ -1517,6 +1509,10 @@ mod test {
         assert!(parse_use_tree("a").normalize() < parse_use_tree("*").normalize());
         assert!(parse_use_tree("a").normalize() < parse_use_tree("{a, b}").normalize());
         assert!(parse_use_tree("*").normalize() < parse_use_tree("{a, b}").normalize());
+
+        assert!(parse_use_tree("A").normalize() > parse_use_tree("a").normalize());
+        assert!(parse_use_tree("A").normalize() > parse_use_tree("_b").normalize());
+        assert!(parse_use_tree("a").normalize() > parse_use_tree("_b").normalize());
 
         assert!(
             parse_use_tree("aaaaaaaaaaaaaaa::{bb, cc, dddddddd}").normalize()

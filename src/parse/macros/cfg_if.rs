@@ -1,9 +1,9 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use rustc_ast::ast;
-use rustc_ast::token::{Delimiter, TokenKind};
+use rustc_ast::token::TokenKind;
 use rustc_parse::exp;
-use rustc_parse::parser::ForceCollect;
+use rustc_parse::parser::{AllowConstBlockItems, ForceCollect};
 use rustc_span::symbol::kw;
 
 use crate::parse::macros::build_stream_parser;
@@ -60,11 +60,9 @@ fn parse_cfg_if_inner<'a>(
             return Err("Expected an opening brace");
         }
 
-        while parser.token != TokenKind::CloseDelim(Delimiter::Brace)
-            && parser.token.kind != TokenKind::Eof
-        {
-            let item = match parser.parse_item(ForceCollect::No) {
-                Ok(Some(item_ptr)) => item_ptr.into_inner(),
+        while parser.token != TokenKind::CloseBrace && parser.token.kind != TokenKind::Eof {
+            let item = match parser.parse_item(ForceCollect::No, AllowConstBlockItems::Yes) {
+                Ok(Some(item_ptr)) => *item_ptr,
                 Ok(None) => continue,
                 Err(err) => {
                     err.cancel();
