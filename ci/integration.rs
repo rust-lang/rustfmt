@@ -4,15 +4,6 @@ use std::ffi::OsStr;
 use std::path::Path;
 use std::process::Command;
 
-macro_rules! map {
-    ($($key:expr => $value:expr),* $(,)?) => {{
-        let mut __map: HashMap<String, String> = HashMap::new();
-
-        $(__map.insert($key.into(), $value.into());)*
-        __map
-    }}
-}
-
 fn write_file(file_path: impl AsRef<Path>, content: &str) -> Result<(), String> {
     std::fs::write(&file_path, content).map_err(|error| {
         format!(
@@ -26,7 +17,7 @@ fn run_command_with_env<I, S>(
     bin: &str,
     args: I,
     current_dir: &str,
-    env: &HashMap<String, String>,
+    env: &HashMap<&str, &str>,
 ) -> Result<(), String>
 where
     I: IntoIterator<Item = S>,
@@ -59,7 +50,7 @@ fn run_command_with_output_and_env<I, S>(
     bin: &str,
     args: I,
     current_dir: &str,
-    env: &HashMap<String, String>,
+    env: &HashMap<&str, &str>,
 ) -> Result<String, String>
 where
     I: IntoIterator<Item = S>,
@@ -89,7 +80,7 @@ where
 // * `cargo fmt --all` succeeds without any warnings or errors
 // * `cargo fmt --all -- --check` after formatting returns success
 // * `cargo test --all` still passes (formatting did not break the build)
-fn check_fmt_with_all_tests(env: HashMap<String, String>, current_dir: &str) -> Result<(), String> {
+fn check_fmt_with_all_tests(env: HashMap<&str, &str>, current_dir: &str) -> Result<(), String> {
     check_fmt_base("--all", env, current_dir)
 }
 
@@ -98,13 +89,13 @@ fn check_fmt_with_all_tests(env: HashMap<String, String>, current_dir: &str) -> 
 // * `cargo fmt --all` succeeds without any warnings or errors
 // * `cargo fmt --all -- --check` after formatting returns success
 // * `cargo test --lib` still passes (formatting did not break the build)
-fn check_fmt_with_lib_tests(env: HashMap<String, String>, current_dir: &str) -> Result<(), String> {
+fn check_fmt_with_lib_tests(env: HashMap<&str, &str>, current_dir: &str) -> Result<(), String> {
     check_fmt_base("--lib", env, current_dir)
 }
 
 fn check_fmt_base(
     test_args: &str,
-    env: HashMap<String, String>,
+    env: HashMap<&str, &str>,
     current_dir: &str,
 ) -> Result<(), String> {
     fn check_output_does_not_contain(output: &str, needle: &str) -> Result<(), String> {
@@ -151,10 +142,10 @@ fn show_head(integration: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn run_test<F: FnOnce(HashMap<String, String>, &str) -> Result<(), String>>(
+fn run_test<F: FnOnce(HashMap<&str, &str>, &str) -> Result<(), String>>(
     integration: &str,
     git_repository: String,
-    env: HashMap<String, String>,
+    env: HashMap<&str, &str>,
     test_fn: F,
 ) -> Result<(), String> {
     run_command_with_output("git", &["clone", "--depth=1", git_repository.as_str()], ".")?;
@@ -185,10 +176,10 @@ fn runner() -> Result<(), String> {
         "cargo",
         &["install", "--path", ".", "--force", "--locked"],
         ".",
-        &map!(
-            "CFG_RELEASE" => "nightly",
-            "CFG_RELEASE_CHANNEL" => "nightly",
-        ),
+        &HashMap::from([
+            ("CFG_RELEASE", "nightly"),
+            ("CFG_RELEASE_CHANNEL", "nightly"),
+        ]),
     )?;
 
     println!("Integration tests for {integration}");
@@ -199,31 +190,31 @@ fn runner() -> Result<(), String> {
         "cargo" => run_test(
             &integration,
             format!("https://github.com/rust-lang/{integration}.git"),
-            map!("CFG_DISABLE_CROSS_TESTS" => "1"),
+            HashMap::from([("CFG_DISABLE_CROSS_TESTS", "1")]),
             check_fmt_with_all_tests,
         ),
         "crater" => run_test(
             &integration,
             format!("https://github.com/rust-lang/{integration}.git"),
-            map!(),
+            HashMap::new(),
             check_fmt_with_lib_tests,
         ),
         "bitflags" => run_test(
             &integration,
             format!("https://github.com/bitflags/{integration}.git"),
-            map!(),
+            HashMap::new(),
             check_fmt_with_all_tests,
         ),
         "tempdir" => run_test(
             &integration,
             format!("https://github.com/rust-lang-deprecated/{integration}.git"),
-            map!(),
+            HashMap::new(),
             check_fmt_with_all_tests,
         ),
         _ => run_test(
             &integration,
             format!("https://github.com/rust-lang/{integration}.git"),
-            map!(),
+            HashMap::new(),
             check_fmt_with_all_tests,
         ),
     }
