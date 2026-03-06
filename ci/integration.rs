@@ -114,7 +114,10 @@ fn check_fmt_base(
         return Ok(());
     }
 
-    write_file(Path::new(current_dir).join("rustfmt.toml"), "")?;
+    let rustfmt_toml = Path::new(current_dir).join("rustfmt.toml");
+    if !rustfmt_toml.is_file() {
+        write_file(rustfmt_toml, "")?;
+    }
 
     let output =
         run_command_with_output_and_env("cargo", &["fmt", "--all", "-v"], current_dir, &env)?;
