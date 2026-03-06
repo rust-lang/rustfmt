@@ -23,7 +23,14 @@ to create regressions. Any tests you can add are very much appreciated.
 The tests can be run with `cargo test`. This does a number of things:
 * runs the unit tests for a number of internal functions;
 * makes sure that rustfmt run on every file in `./tests/source/` is equal to its
-  associated file in `./tests/target/`;
+  associated file in `./tests/target/`; this catches
+  * unexpected formatting differences from changes to rustfmt
+  * non-idempotency in formatting even when the file copy in `target/` is
+    already in the canonical expected format. That is, if `source_start` is
+    the starting formatting and `source_canonical` is the expected canonical
+    formatting, catch cases where there is a converging sequence
+    `source_start -> source_1 -> ... -> source_canonical` that takes multiple
+    rustfmt runs.
 * runs idempotence tests on the files in `./tests/target/`. These files should
   not be changed by rustfmt;
 * checks that rustfmt's code is not changed by running on itself. This ensures
