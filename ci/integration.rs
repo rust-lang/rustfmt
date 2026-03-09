@@ -46,12 +46,17 @@ where
     run_command_with_env(bin, args, current_dir, &HashMap::new())
 }
 
+struct CommandOutput {
+    output: String,
+    exited_successfully: bool,
+}
+
 fn run_command_with_output_and_env<I, S>(
     bin: &str,
     args: I,
     current_dir: &str,
     env: &HashMap<&str, &str>,
-) -> Result<String, String>
+) -> Result<CommandOutput, String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
@@ -64,10 +69,17 @@ where
         .map_err(|error| format!("Failed to spawn command `{bin}`: {error:?}"))?;
     let mut output = String::from_utf8_lossy(&cmd_output.stdout).into_owned();
     output.push_str(&String::from_utf8_lossy(&cmd_output.stderr));
-    Ok(output)
+    Ok(CommandOutput {
+        output,
+        exited_successfully: cmd_output.status.success(),
+    })
 }
 
-fn run_command_with_output<I, S>(bin: &str, args: I, current_dir: &str) -> Result<String, String>
+fn run_command_with_output<I, S>(
+    bin: &str,
+    args: I,
+    current_dir: &str,
+) -> Result<CommandOutput, String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
@@ -109,7 +121,7 @@ fn check_fmt_base(
     let output = run_command_with_output_and_env("cargo", &["test", test_args], current_dir, &env)?;
     if ["build failed", "test result: FAILED."]
         .iter()
-        .any(|needle| output.contains(needle))
+        .any(|needle| output.output.contains(needle))
     {
         return Ok(());
     }
@@ -121,12 +133,16 @@ fn check_fmt_base(
 
     let output =
         run_command_with_output_and_env("cargo", &["fmt", "--all", "-v"], current_dir, &env)?;
+    println!("{}", output.output);
 
-    println!("{output}");
+    if !output.exited_successfully {
+        return Err("`cargo fmt --all -v` failed".to_string());
+    }
 
-    check_output_does_not_contain(&output, "internal error")?;
-    check_output_does_not_contain(&output, "warning")?;
-    check_output_does_not_contain(&output, "Warning")?;
+    let output = &output.output;
+    check_output_does_not_contain(output, "internal error")?;
+    check_output_does_not_contain(output, "warning")?;
+    check_output_does_not_contain(output, "Warning")?;
 
     let output = run_command_with_output_and_env(
         "cargo",
@@ -134,13 +150,21 @@ fn check_fmt_base(
         current_dir,
         &env,
     )?;
-    write_file(Path::new(current_dir).join("rustfmt_check_output"), &output)?;
+
+    if !output.exited_successfully {
+        return Err("`cargo fmt --all -- -v --check` failed".to_string());
+    }
+    let output = &output.output;
+    if let Err(error) = write_file(Path::new(current_dir).join("rustfmt_check_output"), output) {
+        println!("{output}");
+        return Err(error);
+    }
 
     run_command_with_env("cargo", &["test", test_args], current_dir, &env)
 }
 
 fn show_head(integration: &str) -> Result<(), String> {
-    let head = run_command_with_output("git", &["rev-parse", "HEAD"], integration)?;
+    let head = run_command_with_output("git", &["rev-parse", "HEAD"], integration)?.output;
     println!("Head commit of {integration}: {head}");
     Ok(())
 }
