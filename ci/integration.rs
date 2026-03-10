@@ -118,11 +118,13 @@ fn check_fmt_base(
         }
     }
 
-    let output = run_command_with_output_and_env("cargo", &["test", test_args], current_dir, &env)?;
+    let output =
+        run_command_with_output_and_env("cargo", &["test", test_args], current_dir, &env)?.output;
     if ["build failed", "test result: FAILED."]
         .iter()
-        .any(|needle| output.output.contains(needle))
+        .any(|needle| output.contains(needle))
     {
+        println!("`cargo test {test_args}` failed: {output}");
         return Ok(());
     }
 
@@ -141,6 +143,7 @@ fn check_fmt_base(
 
     let output = &output.output;
     check_output_does_not_contain(output, "internal error")?;
+    check_output_does_not_contain(output, "internal compiler error")?;
     check_output_does_not_contain(output, "warning")?;
     check_output_does_not_contain(output, "Warning")?;
 
@@ -160,6 +163,7 @@ fn check_fmt_base(
         return Err(error);
     }
 
+    // This command allows to ensure that no source file was modified while running the tests.
     run_command_with_env("cargo", &["test", test_args], current_dir, &env)
 }
 
@@ -188,17 +192,6 @@ fn runner() -> Result<(), String> {
         }
     };
 
-    // FIXME: this means we can get a stale cargo-fmt from a previous run.
-    //
-    // `which rustfmt` fails if rustfmt is not found. Since we don't install
-    // `rustfmt` via `rustup`, this is the case unless we manually install it. Once
-    // that happens, `cargo install --force` will be called, which installs
-    // `rustfmt`, `cargo-fmt`, etc to `~/.cargo/bin`. This directory is cached by
-    // travis (see `.travis.yml`'s "cache" key), such that build-bots that arrive
-    // here after the first installation will find `rustfmt` and won't need to build
-    // it again.
-    //
-    //which cargo-fmt || cargo install --force
     run_command_with_env(
         "cargo",
         &["install", "--path", ".", "--force", "--locked"],
