@@ -2059,6 +2059,7 @@ This option is deprecated. Use `imports_granularity = "Crate"` instead.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
+- **Stable**: No
 
 #### `false` (default):
 
@@ -2073,7 +2074,6 @@ use foo::{e, f};
 ```rust
 use foo::{a, b, c, d, e, f, g};
 ```
-
 
 ## `newline_style`
 
