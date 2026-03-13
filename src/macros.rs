@@ -260,7 +260,8 @@ fn rewrite_macro_inner(
         }
     };
 
-    if !arg_vec.is_empty() && arg_vec.iter().all(MacroArg::is_item) {
+    let has_item = arg_vec.iter().any(MacroArg::is_item);
+    if has_item && arg_vec.iter().all(MacroArg::is_item) {
         return rewrite_macro_with_items(
             context,
             &arg_vec,
@@ -271,6 +272,9 @@ fn rewrite_macro_inner(
             position,
             mac.span(),
         );
+    }
+    if has_item {
+        return return_macro_parse_failure_fallback(context, shape.indent, position, mac.span());
     }
 
     match style {
