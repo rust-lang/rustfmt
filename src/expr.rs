@@ -2220,6 +2220,24 @@ pub(crate) fn rewrite_assign_rhs_expr<R: Rewrite>(
     rhs_kind: &RhsAssignKind<'_>,
     rhs_tactics: RhsTactics,
 ) -> RewriteResult {
+    let get_rhs_shape = || {
+        let last_line = lhs.lines().last().unwrap_or_default();
+        let tab_spaces = context.config.tab_spaces();
+        let new_shape = shape
+            .block_indent(tab_spaces)
+            .saturating_sub_width(tab_spaces);
+        let extra_indent_string = new_shape.to_string(&context.config);
+        if last_line.starts_with(extra_indent_string.as_ref()) {
+            new_shape
+        } else {
+            shape
+        }
+    };
+    let shape = if context.config.style_edition() >= StyleEdition::Edition2024 {
+        get_rhs_shape()
+    } else {
+        shape
+    };
     let last_line_width = last_line_width(lhs).saturating_sub(if lhs.contains('\n') {
         shape.indent.width()
     } else {
