@@ -20,6 +20,19 @@ use clap::{CommandFactory, Parser};
 #[cfg(test)]
 mod cargo_fmt_tests;
 
+const fn is_nightly() -> bool {
+    match option_env!("CFG_RELEASE_CHANNEL") {
+        None => true,
+        Some(c) => matches!(c.as_bytes(), b"nightly" | b"dev"),
+    }
+}
+
+const MESSAGE_FORMATS: &str = if is_nightly() {
+    "short|json|human"
+} else {
+    "short|human"
+};
+
 #[derive(Parser)]
 #[command(
     disable_version_flag = true,
@@ -54,8 +67,11 @@ pub struct Opts {
     #[arg(long = "manifest-path", value_name = "manifest-path")]
     manifest_path: Option<String>,
 
-    /// Specify message-format: short|json|human
-    #[arg(long = "message-format", value_name = "message-format")]
+    #[arg(
+        long = "message-format",
+        value_name = "message-format",
+        help = format!("Specify message-format: {MESSAGE_FORMATS}")
+    )]
     message_format: Option<String>,
 
     /// Options passed to rustfmt
@@ -186,6 +202,11 @@ fn convert_message_format_to_rustfmt_args(
             Ok(())
         }
         "json" => {
+            if !is_nightly() {
+                return Err(String::from(
+                    "--message-format json is only supported in nightly builds",
+                ));
+            }
             if contains_emit_mode {
                 return Err(String::from(
                     "cannot include --emit arg when --message-format is set to json",
@@ -202,7 +223,8 @@ fn convert_message_format_to_rustfmt_args(
         }
         "human" => Ok(()),
         _ => Err(format!(
-            "invalid --message-format value: {message_format}. Allowed values are: short|json|human"
+            "invalid --message-format value: {message_format}. Allowed values are: \
+                {MESSAGE_FORMATS}"
         )),
     }
 }
