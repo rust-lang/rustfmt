@@ -2554,11 +2554,73 @@ Don't reformat out of line modules
 
 Maximum line length for single line if-else expressions. A value of `0` (zero) results in if-else expressions always being broken into multiple lines. Note this occurs when `use_small_heuristics` is set to `Off`.
 
+Common if-else expressions that may be formatted on a single line are:
+* Expressions on the right hand side of an equals (`=`) sign. e.g. `let x = if y == 1 { 0 } else { 1 };`
+* Conditional expression in function calls. e.g. `f(if x== 0 { 10 } else { 0 })`
+* Single expression closures. e.g. `let x = |y| if y == 0 { 0 } else { 10 };` 
+
+In the following scenarios the if-else expression will be formatted over multiple lines.
+* Empty if-else blocks.
+* An outer if-else expression when if-else expression are nested.
+* If-else blocks that contain statements (e.g. `let x = a;`), comments, or attributes (e.g. `let _ = if true { #[must_use] 1 } else { 2 };`).
+
+When `version=One` is set (the default) an if-else expression at the end of a block is treated as a statement and is not formatted on a single line. When using `version=Two` the if-else expression may be formatted on a single line if it meets the criteria described above.
+
 - **Default value**: `50`
 - **Possible values**: any nonnegative integer that is less than or equal to the value specified for [`max_width`](#max_width)
 - **Stable**: Yes
 
 By default this option is set as a percentage of [`max_width`](#max_width) provided by [`use_small_heuristics`](#use_small_heuristics), but a value set directly for `single_line_if_else_max_width` will take precedence.
+
+#### `50` (default):
+
+```rust
+fn foo() -> usize {
+    fun(if some_long_name && some_other_long_name {
+        0
+    } else {
+        10
+    });
+
+    closure(|super_long_closure_variable| {
+        if super_long_closure_variable == 0 {
+            0
+        } else {
+            10
+        }
+    });
+
+    let bar = if some_long_name && some_other_long_name {
+        baz()
+    } else {
+        buzz()
+    };
+
+    if some_long_name && some_other_long_name {
+        1
+    } else {
+        2
+    }
+}
+```
+
+#### `70`:
+
+```rust
+fn foo() -> usize {
+    fun(if some_long_name && some_other_long_name { 0 } else { 10 });
+
+    closure(|super_long_closure_variable| if super_long_closure_variable == 0 { 0 } else { 10 });
+
+    let bar = if some_long_name && some_other_long_name { baz() } else { buzz() };
+
+    if some_long_name && some_other_long_name {
+        1
+    } else {
+        2
+    }
+}
+```
 
 See also [`max_width`](#max_width) and [`use_small_heuristics`](#use_small_heuristics)
 
