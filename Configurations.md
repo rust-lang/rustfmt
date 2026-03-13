@@ -2059,7 +2059,7 @@ This option is deprecated. Use `imports_granularity = "Crate"` instead.
 
 - **Default value**: `false`
 - **Possible values**: `true`, `false`
-- **Stable**: No
+- **Stable**: No (tracking issue: [#3362](https://github.com/rust-lang/rustfmt/issues/3362))
 
 #### `false` (default):
 
@@ -2074,7 +2074,6 @@ use foo::{e, f};
 ```rust
 use foo::{a, b, c, d, e, f, g};
 ```
-
 ## `newline_style`
 
 Unix or Windows line endings
