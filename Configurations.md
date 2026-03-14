@@ -2074,6 +2074,8 @@ use foo::{e, f};
 ```rust
 use foo::{a, b, c, d, e, f, g};
 ```
+
+
 ## `newline_style`
 
 Unix or Windows line endings
