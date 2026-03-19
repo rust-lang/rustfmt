@@ -75,6 +75,9 @@ impl SpanUtils for SnippetProvider {
 
     fn opt_span_before(&self, original: Span, needle: &str) -> Option<BytePos> {
         let snippet = self.span_to_snippet(original)?;
+        if snippet.is_empty() {
+            return Some(original.lo());
+        }
         let offset = snippet.find_uncommented(needle)?;
 
         Some(original.lo() + BytePos(offset as u32))
