@@ -137,8 +137,29 @@ trait FooBar = Foo
 
 // #2637
 auto trait Example {}
+
+auto /* post auto comment */ trait AutoExampleWithComments {}
+
 pub auto trait PubExample {}
+
+pub /* post pub comment */ auto /* post auto comment */ trait PubAutoExampleWithComments {}
+
 pub unsafe auto trait PubUnsafeExample {}
+
+pub // post pub comment
+unsafe
+/* post unsafe comment */
+auto /* post auto comment */ trait PubUnsafeAutoExampleWithComments
+{
+}
+
+pub // post pub comment
+const /* post const comment */
+unsafe
+/* post unsafe comment */
+auto /* post auto comment */ trait PubConstUnsafeAutoExampleWithComments
+{
+}
 
 // #3006
 trait Foo<'a> {
