@@ -435,11 +435,9 @@ pub(crate) fn rewrite_macro_def(
         let pos = context.snippet_provider.span_after(span, "macro_rules!");
         vec![HeaderPart::new("macro_rules!", span.with_hi(pos))]
     } else {
-        let macro_lo = context.snippet_provider.span_before(span, "macro");
-        let macro_hi = macro_lo + BytePos("macro".len() as u32);
         vec![
             HeaderPart::visibility(context, vis),
-            HeaderPart::new("macro", mk_sp(macro_lo, macro_hi)),
+            HeaderPart::keyword(context, span, "macro"),
         ]
     };
 
