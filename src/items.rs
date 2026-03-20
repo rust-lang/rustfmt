@@ -21,6 +21,7 @@ use crate::expr::{
     rewrite_assign_rhs_with, rewrite_assign_rhs_with_comments, rewrite_else_kw_with_comments,
     rewrite_let_else_block,
 };
+use crate::header::HeaderPart;
 use crate::lists::{ListFormatting, Separator, definitive_tactic, itemize_list, write_list};
 use crate::macros::{MacroPosition, rewrite_macro};
 use crate::overflow;
@@ -1165,18 +1166,23 @@ pub(crate) fn format_trait(
     } = *trait_;
 
     let mut result = String::with_capacity(128);
-    let header = format!(
-        "{}{}{}{}trait ",
-        format_visibility(context, &item.vis),
-        format_constness(constness),
-        format_safety(safety),
-        format_auto(is_auto),
-    );
-    result.push_str(&header);
+    let header = vec![
+        HeaderPart::visibility(context, &item.vis),
+        HeaderPart::constness(constness),
+        HeaderPart::safety(safety),
+        HeaderPart::auto(context, item.span, is_auto),
+        HeaderPart::keyword(context, item.span, "trait"),
+    ];
+
+    let shape = Shape::indented(offset, context.config);
+    let header_rewrite = crate::header::format_header(context, shape, header);
 
     let body_lo = context.snippet_provider.span_after(item.span, "{");
+    result.push_str(&header_rewrite);
+    result.push(' ');
 
-    let shape = Shape::indented(offset, context.config).offset_left(result.len(), item.span)?;
+    let shape =
+        Shape::indented(offset, context.config).offset_left(last_line_width(&result), item.span)?;
     let generics_str = rewrite_generics(context, rewrite_ident(context, ident), generics, shape)?;
     result.push_str(&generics_str);
 
