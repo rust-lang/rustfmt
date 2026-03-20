@@ -15,6 +15,7 @@ use tracing::debug;
 use crate::comment::{combine_strs_with_missing_comments, contains_comment};
 use crate::rewrite::RewriteContext;
 use crate::shape::Shape;
+use crate::source_map::SpanUtils;
 use crate::utils::rewrite_ident;
 
 pub(crate) fn format_header(
@@ -68,6 +69,17 @@ pub(crate) struct HeaderPart<'a> {
 }
 
 impl<'a> HeaderPart<'a> {
+    /// Find the `keyword` for the header within the give `span`
+    pub(crate) fn keyword(
+        context: &RewriteContext<'_>,
+        span: Span,
+        keyword: impl Into<Cow<'a, str>>,
+    ) -> Self {
+        let snippet = keyword.into();
+        let span = context.snippet_provider.span(span, &snippet);
+        Self::new(snippet, span)
+    }
+
     pub(crate) fn new(snippet: impl Into<Cow<'a, str>>, span: Span) -> Self {
         Self {
             snippet: snippet.into(),
