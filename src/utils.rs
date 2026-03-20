@@ -117,6 +117,8 @@ pub(crate) fn format_safety(unsafety: ast::Safety) -> &'static str {
     }
 }
 
+// FIXME(ytmimi) might want to get rid of `format_auto` since we now have `HeaderPart::auto`
+#[allow(unused)]
 #[inline]
 pub(crate) fn format_auto(is_auto: ast::IsAuto) -> &'static str {
     match is_auto {
