@@ -3345,7 +3345,20 @@ fn format_generics(
     used_width: usize,
 ) -> Option<String> {
     let shape = Shape::legacy(context.budget(used_width + offset.width()), offset);
-    let mut result = rewrite_generics(context, "", generics, shape).ok()?;
+    let mut result = match rewrite_generics(context, "", generics, shape) {
+        Ok(r) => r,
+        Err(_) => {
+            // First attempt failed, try with infinite width for complex generics
+            let wide_shape = shape.infinite_width();
+            match rewrite_generics(context, "", generics, wide_shape) {
+                Ok(r) => r,
+                Err(_) => {
+                    // If even that fails, preserve original formatting from source
+                    context.snippet(generics.span).to_string()
+                }
+            }
+        }
+    };
 
     // If the generics are not parameterized then generics.span.hi() == 0,
     // so we use span.lo(), which is the position after `struct Foo`.
