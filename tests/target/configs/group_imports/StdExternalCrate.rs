@@ -1,6 +1,6 @@
 // rustfmt-group_imports: StdExternalCrate
-use alloc::alloc::Layout;
 use core::f32;
+use alloc::alloc::Layout;
 use std::sync::Arc;
 
 use broker::database::PooledConnection;
