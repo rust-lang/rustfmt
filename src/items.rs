@@ -1177,7 +1177,6 @@ pub(crate) fn format_trait(
     let shape = Shape::indented(offset, context.config);
     let header_rewrite = crate::header::format_header(context, shape, header);
 
-    let body_lo = context.snippet_provider.span_after(item.span, "{");
     result.push_str(&header_rewrite);
     result.push(' ');
 
@@ -1185,6 +1184,9 @@ pub(crate) fn format_trait(
         Shape::indented(offset, context.config).offset_left(last_line_width(&result), item.span)?;
     let generics_str = rewrite_generics(context, rewrite_ident(context, ident), generics, shape)?;
     result.push_str(&generics_str);
+
+    // Keep track of the last position that we've written. This will help us recover comments
+    let mut current_rewite_lo = generics.span.hi();
 
     // FIXME(#2055): rustfmt fails to format when there are comments between trait bounds.
     if !bounds.is_empty() {
@@ -1205,6 +1207,8 @@ pub(crate) fn format_trait(
             &RhsAssignKind::Bounds,
             RhsTactics::ForceNextLineWithoutIndent,
         )?;
+
+        current_rewite_lo = bound_hi;
     }
 
     // Rewrite where-clause.
@@ -1212,11 +1216,6 @@ pub(crate) fn format_trait(
         let where_on_new_line = context.config.indent_style() != IndentStyle::Block;
 
         let where_budget = context.budget(last_line_width(&result));
-        let pos_before_where = if bounds.is_empty() {
-            generics.where_clause.span.lo()
-        } else {
-            bounds[bounds.len() - 1].span().hi()
-        };
         let option = WhereClauseOption::snuggled(&generics_str);
         let where_clause_str = rewrite_where_clause(
             context,
@@ -1226,7 +1225,7 @@ pub(crate) fn format_trait(
             where_on_new_line,
             "{",
             None,
-            pos_before_where,
+            current_rewite_lo,
             option,
         )?;
 
@@ -1242,27 +1241,23 @@ pub(crate) fn format_trait(
         }
         result.push_str(&where_clause_str);
     } else {
-        let item_snippet = context.snippet(item.span);
-        if let Some(lo) = item_snippet.find('/') {
-            // 1 = `{`
-            let comment_hi = if generics.params.len() > 0 {
-                generics.span.lo() - BytePos(1)
-            } else {
-                body_lo - BytePos(1)
-            };
-            let comment_lo = item.span.lo() + BytePos(lo as u32);
-            if comment_lo < comment_hi {
-                match recover_missing_comment_in_span(
-                    mk_sp(comment_lo, comment_hi),
-                    Shape::indented(offset, context.config),
-                    context,
-                    last_line_width(&result),
-                ) {
-                    Ok(ref missing_comment) if !missing_comment.is_empty() => {
-                        result.push_str(missing_comment);
-                    }
-                    _ => (),
+        let span_rest = mk_sp(current_rewite_lo, item.span.hi());
+        let body_lo = context.snippet_provider.span_before(span_rest, "{");
+        let comment_span = span_rest.with_hi(body_lo);
+        let snippet = context.snippet(comment_span);
+
+        if let Some(lo) = snippet.find('/') {
+            let comment_span = comment_span.with_lo(comment_span.lo() + BytePos(lo as u32));
+            match recover_missing_comment_in_span(
+                comment_span,
+                Shape::indented(offset, context.config),
+                context,
+                last_line_width(&result),
+            ) {
+                Ok(ref missing_comment) if !missing_comment.is_empty() => {
+                    result.push_str(missing_comment);
                 }
+                _ => (),
             }
         }
     }
