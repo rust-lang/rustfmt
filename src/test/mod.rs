@@ -49,6 +49,7 @@ const FILE_SKIP_LIST: &[&str] = &[
     "cfg_mod/bar.rs",
     "cfg_mod/foo.rs",
     "cfg_mod/wasm32.rs",
+    "reorder_modules_2027",
     "skip/foo.rs",
 ];
 
