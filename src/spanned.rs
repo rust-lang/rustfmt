@@ -126,7 +126,8 @@ impl Spanned for ast::GenericParam {
             _ => self.ident.span.lo(),
         };
         let hi = if self.bounds.is_empty() {
-            self.ident.span.hi()
+            self.colon_span
+                .map_or(self.ident.span.hi(), |colon_span| colon_span.hi())
         } else {
             self.bounds.last().unwrap().span().hi()
         };
