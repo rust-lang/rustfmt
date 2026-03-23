@@ -75,7 +75,7 @@ impl<'a> HeaderPart<'a> {
         Self::new("", DUMMY_SP)
     }
 
-    /// Find the `keyword` for the header within the give `span`
+    /// Find the `keyword` for the header within the given `span`
     pub(crate) fn keyword(
         context: &RewriteContext<'_>,
         span: Span,
