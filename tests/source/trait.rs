@@ -122,6 +122,8 @@ unsafe
 /* post unsafe comment */
 auto /* post auto comment */ trait PubConstUnsafeAutoExampleWithComments {}
 
+pub /* first */ trait /* second */ MyTrait /* third */ {}
+
 // #3006
 trait Foo<'a> {
     type Bar<  'a  >;
