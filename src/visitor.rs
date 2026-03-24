@@ -1028,12 +1028,16 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             .snippet_provider
             .opt_span_after(self.next_span(end_pos), "\n")
         {
+            let span = self.next_span(pos);
             if let Some(snippet) = self.opt_snippet(self.next_span(pos)) {
-                if snippet.trim().is_empty() {
-                    self.last_pos = pos;
-                } else {
+                if !snippet.trim().is_empty() {
                     return;
                 }
+
+                if out_of_file_lines_range!(self, span) {
+                    return;
+                }
+                self.last_pos = pos;
             }
         }
     }
