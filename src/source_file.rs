@@ -23,6 +23,20 @@ pub(crate) fn append_newline(s: &mut String, style_edition: StyleEdition) {
     s.push('\n');
 }
 
+#[test]
+fn append_newline_adds_newlines_before_2027() {
+    let mut text = String::new();
+    append_newline(&mut text, StyleEdition::Edition2024);
+    assert_eq!(text, "\n");
+}
+
+#[test]
+fn append_newline_leaves_empty_files_empty_in_2027() {
+    let mut text = String::new();
+    append_newline(&mut text, StyleEdition::Edition2027);
+    assert!(text.is_empty());
+}
+
 #[cfg(test)]
 pub(crate) fn write_all_files<T>(
     source_file: &[FileRecord],
