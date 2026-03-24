@@ -17,11 +17,10 @@ use crate::formatting::FileRecord;
 
 // Append a newline to the end of each file.
 pub(crate) fn append_newline(s: &mut String, style_edition: StyleEdition) {
-    if style_edition <= StyleEdition::Edition2024
-        || style_edition >= StyleEdition::Edition2027 && !s.is_empty()
-    {
-        s.push('\n');
+    if style_edition >= StyleEdition::Edition2027 && s.is_empty() {
+        return;
     }
+    s.push('\n');
 }
 
 #[cfg(test)]
