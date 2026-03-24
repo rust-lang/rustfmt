@@ -1178,12 +1178,24 @@ pub(crate) fn format_trait(
     let header_rewrite = crate::header::format_header(context, shape, header);
 
     result.push_str(&header_rewrite);
-    result.push(' ');
 
-    let shape =
-        Shape::indented(offset, context.config).offset_left(last_line_width(&result), item.span)?;
+    // +1 to account for space between `trait` and the `ident`
+    let offset_left = last_line_width(&result) + 1;
+    let shape = Shape::indented(offset, context.config).offset_left(offset_left, item.span)?;
     let generics_str = rewrite_generics(context, rewrite_ident(context, ident), generics, shape)?;
-    result.push_str(&generics_str);
+
+    let comment_span_lo = context.snippet_provider.span_after(item.span, "trait");
+    let comment_span = mk_sp(comment_span_lo, ident.span.lo() - BytePos(1));
+
+    result = combine_strs_with_missing_comments(
+        context,
+        &result,
+        &generics_str,
+        comment_span,
+        // infinite_width so we don't put the `ident + generics_str` on the next line
+        shape.infinite_width(),
+        true,
+    )?;
 
     // Keep track of the last position that we've written. This will help us recover comments
     let mut current_rewite_lo = generics.span.hi();
