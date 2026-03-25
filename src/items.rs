@@ -2586,13 +2586,13 @@ fn rewrite_fn_base(
             .map_or(false, |last_line| last_line.contains("//"));
 
         if context.config.style_edition() >= StyleEdition::Edition2024 {
-            if closing_paren_overflow_max_width {
-                result.push(')');
+            if params_last_line_contains_comment {
                 result.push_str(&indent.to_string_with_newline(context.config));
+                result.push(')');
                 no_params_and_over_max_width = true;
-            } else if params_last_line_contains_comment {
-                result.push_str(&indent.to_string_with_newline(context.config));
+            } else if closing_paren_overflow_max_width {
                 result.push(')');
+                result.push_str(&indent.to_string_with_newline(context.config));
                 no_params_and_over_max_width = true;
             } else {
                 result.push(')');
