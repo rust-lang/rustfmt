@@ -895,8 +895,12 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             return false;
         }
 
-        let rewrite = attrs.rewrite(&self.get_context(), self.shape());
         let span = mk_sp(attrs[0].span.lo(), attrs[attrs.len() - 1].span.hi());
+        if out_of_file_lines_range!(self, span) {
+            return false;
+        }
+
+        let rewrite = attrs.rewrite(&self.get_context(), self.shape());
         self.push_rewrite(span, rewrite);
 
         false

@@ -364,11 +364,20 @@ impl<'a> FmtVisitor<'a> {
             }
         }
 
-        let remaining = snippet[status.line_start..subslice.len() + offset].trim();
-        if !remaining.is_empty() {
-            self.push_str(&self.block_indent.to_string(self.config));
-            self.push_str(remaining);
-            status.line_start = subslice.len() + offset;
+        let mut remaining = &snippet[status.line_start..subslice.len() + offset];
+        status.line_start = subslice.len() + offset;
+
+        let skip_this_line = !self
+            .config
+            .file_lines()
+            .contains_line(file_name, status.cur_line);
+        if !skip_this_line {
+            remaining = remaining.trim();
+            if !remaining.is_empty() {
+                self.push_str(&self.block_indent.to_string(self.config));
+            }
         }
+
+        self.push_str(remaining);
     }
 }
