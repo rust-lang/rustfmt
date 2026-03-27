@@ -593,13 +593,22 @@ impl<'a> FormatLines<'a> {
         }
     }
 
+    fn line_buffer_with_leading_spaces(&self) -> String {
+        if self.config.hard_tabs() {
+            let leading_tabs = self.line_buffer.chars().take_while(|&c| c == '\t').count();
+            " ".repeat(self.config.tab_spaces() * leading_tabs) + &self.line_buffer[leading_tabs..]
+        } else {
+            self.line_buffer.clone()
+        }
+    }
+
     fn push_err(&mut self, kind: ErrorKind, is_comment: bool, is_string: bool) {
         self.errors.push(FormattingError {
             line: self.cur_line,
             kind,
             is_comment,
             is_string,
-            line_buffer: self.line_buffer.clone(),
+            line_buffer: self.line_buffer_with_leading_spaces(),
         });
     }
 
