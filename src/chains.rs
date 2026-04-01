@@ -116,6 +116,15 @@ fn rewrite_chain_item(
     context: &RewriteContext<'_>,
     rewrite_shape: Shape,
 ) -> RewriteResult {
+    if !context.config.file_lines().is_all()
+        && !context
+            .config
+            .file_lines()
+            .intersects(&context.psess.lookup_line_range(item.span))
+    {
+        return Ok(context.snippet(item.span).to_owned());
+    }
+
     item.rewrite_result(context, rewrite_shape)
         .or_else(|err| match err {
             RewriteError::SkipFormatting => Ok(context.snippet(item.span).to_owned()),
@@ -571,6 +580,11 @@ impl Rewrite for Chain {
         let last = self.children.last().unwrap_or(&self.parent);
         let children_span = mk_sp(first.span.lo(), last.span.hi());
         let full_span = self.parent.span.with_hi(children_span.hi());
+        let partial_chain = !context.config.file_lines().is_all()
+            && !context
+                .config
+                .file_lines()
+                .contains(&context.psess.lookup_line_range(full_span));
         let allow_single_line = context.config.file_lines().is_all()
             || context
                 .config
@@ -578,26 +592,36 @@ impl Rewrite for Chain {
                 .contains(&context.psess.lookup_line_range(full_span));
 
         let mut formatter = match context.config.indent_style() {
-            IndentStyle::Block => Box::new(ChainFormatterBlock::new(self, allow_single_line))
-                as Box<dyn ChainFormatter>,
-            IndentStyle::Visual => Box::new(ChainFormatterVisual::new(self, allow_single_line))
-                as Box<dyn ChainFormatter>,
+            IndentStyle::Block => Box::new(ChainFormatterBlock::new(
+                self,
+                allow_single_line,
+                partial_chain,
+            )) as Box<dyn ChainFormatter>,
+            IndentStyle::Visual => Box::new(ChainFormatterVisual::new(
+                self,
+                allow_single_line,
+                partial_chain,
+            )) as Box<dyn ChainFormatter>,
         };
 
-        formatter.format_root(&self.parent, context, shape)?;
-        if let Some(result) = formatter.pure_root() {
-            return wrap_str(result, context.config.max_width(), shape)
-                .max_width_error(shape.width, self.parent.span);
-        }
+        let rewrite = (|| {
+            formatter.format_root(&self.parent, context, shape)?;
+            if let Some(result) = formatter.pure_root() {
+                return wrap_str(result, context.config.max_width(), shape)
+                    .max_width_error(shape.width, self.parent.span);
+            }
 
-        // Decide how to layout the rest of the chain.
-        let child_shape = formatter.child_shape(context, shape, children_span)?;
+            // Decide how to layout the rest of the chain.
+            let child_shape = formatter.child_shape(context, shape, children_span)?;
 
-        formatter.format_children(context, child_shape)?;
-        formatter.format_last_child(context, shape, child_shape)?;
+            formatter.format_children(context, child_shape)?;
+            formatter.format_last_child(context, shape, child_shape)?;
 
-        let result = formatter.join_rewrites(context, child_shape)?;
-        wrap_str(result, context.config.max_width(), shape).max_width_error(shape.width, full_span)
+            let result = formatter.join_rewrites(context, child_shape)?;
+            wrap_str(result, context.config.max_width(), shape)
+                .max_width_error(shape.width, full_span)
+        })();
+        rewrite
     }
 }
 
@@ -659,10 +683,19 @@ struct ChainFormatterShared<'a> {
     allow_overflow: bool,
     // Whether the chain is allowed to collapse back onto a single line.
     allow_single_line: bool,
+    // Whether we are formatting only part of the chain and should preserve
+    // the original grouping of unselected items.
+    partial_chain: bool,
+    // End position of the current root rewrite in the original source.
+    root_span_end: BytePos,
 }
 
 impl<'a> ChainFormatterShared<'a> {
-    fn new(chain: &'a Chain, allow_single_line: bool) -> ChainFormatterShared<'a> {
+    fn new(
+        chain: &'a Chain,
+        allow_single_line: bool,
+        partial_chain: bool,
+    ) -> ChainFormatterShared<'a> {
         ChainFormatterShared {
             children: &chain.children,
             rewrites: Vec::with_capacity(chain.children.len() + 1),
@@ -671,6 +704,8 @@ impl<'a> ChainFormatterShared<'a> {
             // TODO(calebcartwright)
             allow_overflow: false,
             allow_single_line,
+            partial_chain,
+            root_span_end: chain.parent.span.hi(),
         }
     }
 
@@ -849,14 +884,28 @@ impl<'a> ChainFormatterShared<'a> {
         let mut result = rewrite_iter.next().unwrap().clone();
         let children_iter = self.children.iter();
         let iter = rewrite_iter.zip(children_iter);
+        let mut prev_span_end = Some(self.root_span_end);
 
         for (rewrite, chain_item) in iter {
             match chain_item.kind {
                 ChainItemKind::Comment(_, CommentPosition::Back) => result.push(' '),
                 ChainItemKind::Comment(_, CommentPosition::Top) => result.push_str(&connector),
+                _ if self.partial_chain && !self.fits_single_line => {
+                    let current_range = context.psess.lookup_line_range(chain_item.span);
+                    let item_is_selected = context.config.file_lines().intersects(&current_range);
+                    let original_gap = prev_span_end
+                        .map(|prev_end| context.snippet(mk_sp(prev_end, chain_item.span.lo())))
+                        .unwrap_or("\n");
+                    if item_is_selected {
+                        result.push_str(&connector);
+                    } else if original_gap.contains('\n') {
+                        result.push_str(original_gap);
+                    }
+                }
                 _ => result.push_str(&connector),
             }
             result.push_str(rewrite);
+            prev_span_end = Some(chain_item.span.hi());
         }
 
         Ok(result)
@@ -870,9 +919,13 @@ struct ChainFormatterBlock<'a> {
 }
 
 impl<'a> ChainFormatterBlock<'a> {
-    fn new(chain: &'a Chain, allow_single_line: bool) -> ChainFormatterBlock<'a> {
+    fn new(
+        chain: &'a Chain,
+        allow_single_line: bool,
+        partial_chain: bool,
+    ) -> ChainFormatterBlock<'a> {
         ChainFormatterBlock {
-            shared: ChainFormatterShared::new(chain, allow_single_line),
+            shared: ChainFormatterShared::new(chain, allow_single_line, partial_chain),
             root_ends_with_block: false,
         }
     }
@@ -906,6 +959,7 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
 
             root_ends_with_block = last_line_extendable(&root_rewrite);
 
+            self.shared.root_span_end = item.span.hi();
             self.shared.children = &self.shared.children[1..];
             if self.shared.children.is_empty() {
                 break;
@@ -961,9 +1015,13 @@ struct ChainFormatterVisual<'a> {
 }
 
 impl<'a> ChainFormatterVisual<'a> {
-    fn new(chain: &'a Chain, allow_single_line: bool) -> ChainFormatterVisual<'a> {
+    fn new(
+        chain: &'a Chain,
+        allow_single_line: bool,
+        partial_chain: bool,
+    ) -> ChainFormatterVisual<'a> {
         ChainFormatterVisual {
-            shared: ChainFormatterShared::new(chain, allow_single_line),
+            shared: ChainFormatterShared::new(chain, allow_single_line, partial_chain),
             offset: 0,
         }
     }
@@ -1007,6 +1065,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
                 self.offset = 0;
             }
 
+            self.shared.root_span_end = item.span.hi();
             self.shared.children = &self.shared.children[1..];
         }
 
