@@ -382,6 +382,22 @@ fn format_code_block(
     // Remove wrapping main block
     formatted.unwrap_code_block();
 
+    // If wrapper collapsed to a single line like `fn main() { stmt }`,
+    // extract the body directly so the wrapper's space before `}`
+    // does not leak into final snippet.
+    if let Some(body) = formatted
+        .snippet
+        .trim_end_matches('\n')
+        .strip_prefix(FN_MAIN_PREFIX.trim_end())
+        .and_then(|s| s.strip_prefix(' '))
+        .and_then(|s| s.strip_suffix(" }"))
+    {
+        return Some(FormattedSnippet {
+            snippet: body.to_owned(),
+            non_formatted_ranges: formatted.non_formatted_ranges,
+        });
+    }
+
     // Trim "fn main() {" on the first line and "}" on the last line,
     // then unindent the whole code block.
     let block_len = formatted
