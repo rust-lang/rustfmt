@@ -580,16 +580,11 @@ impl Rewrite for Chain {
         let last = self.children.last().unwrap_or(&self.parent);
         let children_span = mk_sp(first.span.lo(), last.span.hi());
         let full_span = self.parent.span.with_hi(children_span.hi());
-        let partial_chain = !context.config.file_lines().is_all()
-            && !context
-                .config
-                .file_lines()
-                .contains(&context.psess.lookup_line_range(full_span));
-        let allow_single_line = context.config.file_lines().is_all()
-            || context
-                .config
-                .file_lines()
-                .contains(&context.psess.lookup_line_range(full_span));
+        let partial_chain = !context
+            .config
+            .file_lines()
+            .contains(&context.psess.lookup_line_range(full_span));
+        let allow_single_line = !partial_chain;
 
         let mut formatter = match context.config.indent_style() {
             IndentStyle::Block => Box::new(ChainFormatterBlock::new(
@@ -604,24 +599,20 @@ impl Rewrite for Chain {
             )) as Box<dyn ChainFormatter>,
         };
 
-        let rewrite = (|| {
-            formatter.format_root(&self.parent, context, shape)?;
-            if let Some(result) = formatter.pure_root() {
-                return wrap_str(result, context.config.max_width(), shape)
-                    .max_width_error(shape.width, self.parent.span);
-            }
+        formatter.format_root(&self.parent, context, shape)?;
+        if let Some(result) = formatter.pure_root() {
+            return wrap_str(result, context.config.max_width(), shape)
+                .max_width_error(shape.width, self.parent.span);
+        }
 
-            // Decide how to layout the rest of the chain.
-            let child_shape = formatter.child_shape(context, shape, children_span)?;
+        // Decide how to layout the rest of the chain.
+        let child_shape = formatter.child_shape(context, shape, children_span)?;
 
-            formatter.format_children(context, child_shape)?;
-            formatter.format_last_child(context, shape, child_shape)?;
+        formatter.format_children(context, child_shape)?;
+        formatter.format_last_child(context, shape, child_shape)?;
 
-            let result = formatter.join_rewrites(context, child_shape)?;
-            wrap_str(result, context.config.max_width(), shape)
-                .max_width_error(shape.width, full_span)
-        })();
-        rewrite
+        let result = formatter.join_rewrites(context, child_shape)?;
+        wrap_str(result, context.config.max_width(), shape).max_width_error(shape.width, full_span)
     }
 }
 
