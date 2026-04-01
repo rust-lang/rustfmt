@@ -111,25 +111,24 @@ fn format_chain_item(
     }
 }
 
+/// Attempts to rewrite the chain item if it is covered by the selected file lines.
 fn rewrite_chain_item(
     item: &ChainItem,
     context: &RewriteContext<'_>,
     rewrite_shape: Shape,
 ) -> RewriteResult {
-    if !context.config.file_lines().is_all()
-        && !context
-            .config
-            .file_lines()
-            .intersects(&context.psess.lookup_line_range(item.span))
+    // Don't attempt to format the item if its outside the selected range of lines,
+    // since doing so will cause `rewrite_result` to produce an error that will then
+    // cause us to bail out of rewriting the chain as a whole.
+    if !context
+        .config
+        .file_lines()
+        .intersects(&context.psess.lookup_line_range(item.span))
     {
         return Ok(context.snippet(item.span).to_owned());
     }
 
     item.rewrite_result(context, rewrite_shape)
-        .or_else(|err| match err {
-            RewriteError::SkipFormatting => Ok(context.snippet(item.span).to_owned()),
-            _ => Err(err),
-        })
 }
 
 fn get_block_child_shape(
