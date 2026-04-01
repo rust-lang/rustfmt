@@ -76,5 +76,5 @@ jobs:
       env:
         INTEGRATION: ${{ matrix.integration }}
         TARGET: x86_64-unknown-linux-gnu
-      run: ./ci/integration.sh
+      run: cargo run --bin ci-integration
       continue-on-error: ${{ matrix.allow-failure == true }}
