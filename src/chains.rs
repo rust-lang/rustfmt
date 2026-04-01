@@ -874,28 +874,30 @@ impl<'a> ChainFormatterShared<'a> {
         let mut result = rewrite_iter.next().unwrap().clone();
         let children_iter = self.children.iter();
         let iter = rewrite_iter.zip(children_iter);
-        let mut prev_span_end = Some(self.root_span_end);
+        let mut prev_span_end = self.root_span_end;
 
         for (rewrite, chain_item) in iter {
             match chain_item.kind {
                 ChainItemKind::Comment(_, CommentPosition::Back) => result.push(' '),
                 ChainItemKind::Comment(_, CommentPosition::Top) => result.push_str(&connector),
-                _ if self.partial_chain && !self.fits_single_line => {
+
+                // If we're only formatting part of the chain, we need to preserve the layout of
+                // any items not covered by the selected lines.
+                _ if self.partial_chain => {
                     let current_range = context.psess.lookup_line_range(chain_item.span);
                     let item_is_selected = context.config.file_lines().intersects(&current_range);
-                    let original_gap = prev_span_end
-                        .map(|prev_end| context.snippet(mk_sp(prev_end, chain_item.span.lo())))
-                        .unwrap_or("\n");
+                    let original_gap = context.snippet(mk_sp(prev_span_end, chain_item.span.lo()));
                     if item_is_selected {
                         result.push_str(&connector);
                     } else if original_gap.contains('\n') {
                         result.push_str(original_gap);
                     }
                 }
+
                 _ => result.push_str(&connector),
             }
             result.push_str(rewrite);
-            prev_span_end = Some(chain_item.span.hi());
+            prev_span_end = chain_item.span.hi();
         }
 
         Ok(result)
