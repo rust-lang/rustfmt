@@ -8,7 +8,7 @@ use crate::config::file_lines::FileLines;
 use crate::coverage::transform_missing_snippet;
 use crate::shape::{Indent, Shape};
 use crate::source_map::LineRangeUtils;
-use crate::utils::{count_lf_crlf, count_newlines, last_line_width, mk_sp};
+use crate::utils::{count_lf_crlf, count_newlines, is_empty_stmt_snippet, last_line_width, mk_sp};
 use crate::visitor::FmtVisitor;
 
 struct SnippetStatus {
@@ -113,7 +113,7 @@ impl<'a> FmtVisitor<'a> {
         }
     }
 
-    fn push_vertical_spaces(&mut self, mut newline_count: usize) {
+    pub(crate) fn push_vertical_spaces(&mut self, mut newline_count: usize) {
         let offset = self.buffer.chars().rev().take_while(|c| *c == '\n').count();
         let newline_upper_bound = self.config.blank_lines_upper_bound() + 1;
         let newline_lower_bound = self.config.blank_lines_lower_bound() + 1;
@@ -237,8 +237,11 @@ impl<'a> FmtVisitor<'a> {
             .chars()
             .rev()
             .find(|rev_c| ![' ', '\t'].contains(rev_c));
+        // A removed empty statement should not make the following comment look same-line.
+        let preceded_by_empty_stmt = is_empty_stmt_snippet(&snippet[..offset]);
 
-        let fix_indent = last_char.map_or(true, |rev_c| ['{', '\n'].contains(&rev_c));
+        let fix_indent =
+            preceded_by_empty_stmt || last_char.map_or(true, |rev_c| ['{', '\n'].contains(&rev_c));
         let mut on_same_line = false;
 
         let comment_indent = if fix_indent {
@@ -249,6 +252,7 @@ impl<'a> FmtVisitor<'a> {
             self.push_str(&indent_str);
             self.block_indent
         } else if self.config.style_edition() >= StyleEdition::Edition2024
+            && !preceded_by_empty_stmt
             && !snippet.starts_with('\n')
         {
             // The comment appears on the same line as the previous formatted code.
