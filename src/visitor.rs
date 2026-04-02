@@ -27,8 +27,8 @@ use crate::spanned::Spanned;
 use crate::stmt::Stmt;
 use crate::utils::{
     self, comment_after_empty_stmt, contains_skip, count_newlines, depr_skip_annotation,
-    format_safety, inner_attributes, is_empty_stmt_snippet, last_line_width, mk_sp,
-    ptr_vec_to_ref_vec, rewrite_ident, starts_with_newline,
+    format_safety, inner_attributes, last_line_width, mk_sp, ptr_vec_to_ref_vec, rewrite_ident,
+    starts_with_newline,
 };
 use crate::{Edition, ErrorKind, FormatReport, FormattingError};
 
@@ -122,12 +122,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if stmt.is_empty() {
             // If the statement is empty, just skip over it. Before that, make sure any comment
             // snippet preceding the semicolon is picked up.
-            let prefix = self.snippet(mk_sp(self.last_pos, stmt.span().lo()));
-            let original_starts_with_newline = prefix
+            let snippet = self.snippet(mk_sp(self.last_pos, stmt.span().lo()));
+            let original_starts_with_newline = snippet
                 .find(|c| c != ' ')
-                .map_or(false, |i| starts_with_newline(&prefix[i..]));
-            let trimmed_prefix = prefix.trim();
-            if !trimmed_prefix.is_empty() {
+                .map_or(false, |i| starts_with_newline(&snippet[i..]));
+            let newline_count = count_newlines(snippet);
+            let snippet = snippet.trim();
+            if !snippet.is_empty() {
                 // FIXME(calebcartwright 2021-01-03) - This exists strictly to maintain legacy
                 // formatting where rustfmt would preserve redundant semicolons on Items in a
                 // statement position.
@@ -140,12 +141,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     }
 
                     self.push_str(&self.block_indent.to_string(self.config));
-                    self.push_str(trimmed_prefix);
+                    self.push_str(snippet);
                 }
             } else if include_empty_semi {
                 self.push_str(";");
             } else {
-                let prefix_newlines = count_newlines(prefix);
                 let line_suffix = self
                     .snippet_provider
                     .span_to_snippet(mk_sp(stmt.span().hi(), self.snippet_provider.end_pos()))
@@ -156,7 +156,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     .unwrap_or("");
 
                 if let Some(comment) = comment_after_empty_stmt(line_suffix) {
-                    self.push_vertical_spaces(prefix_newlines);
+                    self.push_vertical_spaces(newline_count);
                     self.push_str(&self.block_indent.to_string(self.config));
                     self.push_str(comment);
 
@@ -165,7 +165,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     return;
                 }
 
-                let blank_lines = prefix_newlines.saturating_sub(1);
+                let blank_lines = newline_count.saturating_sub(1);
                 if blank_lines > 0 {
                     self.push_str(&"\n".repeat(blank_lines));
                 }
@@ -313,8 +313,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     }
                     let span_in_between = mk_sp(last_hi, span.lo() + BytePos::from_usize(offset));
                     let snippet_in_between = self.snippet(span_in_between);
-                    let mut comment_on_same_line = !snippet_in_between.contains('\n')
-                        && !is_empty_stmt_snippet(snippet_in_between);
+                    let mut comment_on_same_line = !snippet_in_between.contains('\n');
 
                     let mut comment_shape =
                         Shape::indented(self.block_indent, config).comment(config);
@@ -377,8 +376,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     }
                 }
                 CodeCharKind::Normal if skip_normal(&sub_slice) => {
-                    extra_newline = count_newlines(&sub_slice) >= 2
-                        || (prev_ends_with_newline && sub_slice.contains('\n'));
+                    extra_newline = prev_ends_with_newline && sub_slice.contains('\n');
                     continue;
                 }
                 CodeCharKind::Normal => {
