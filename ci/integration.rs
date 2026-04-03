@@ -1,13 +1,11 @@
-use std::collections::HashMap;
-use std::env::var;
-use std::path::Path;
-
 use crate::common::{
     run_command, run_command_with_env, run_command_with_output, run_command_with_output_and_env,
     write_file,
 };
 
-mod common;
+use std::collections::HashMap;
+use std::env::var;
+use std::path::Path;
 
 // Checks that:
 //
@@ -106,7 +104,7 @@ fn run_test<F: FnOnce(HashMap<&str, &str>, &str) -> Result<(), String>>(
     test_fn(env, integration)
 }
 
-fn runner() -> Result<(), String> {
+pub fn runner() -> Result<(), String> {
     let integration = match var("INTEGRATION") {
         Ok(value) if !value.is_empty() => value,
         _ => {
@@ -159,12 +157,5 @@ fn runner() -> Result<(), String> {
             HashMap::new(),
             check_fmt_with_all_tests,
         ),
-    }
-}
-
-fn main() {
-    if let Err(error) = runner() {
-        eprintln!("{error}");
-        std::process::exit(1);
     }
 }

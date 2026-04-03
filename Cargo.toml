@@ -28,7 +28,7 @@ path = "src/git-rustfmt/main.rs"
 
 [[bin]]
 name = "ci-integration"
-path = "ci/integration.rs"
+path = "ci/main.rs"
 
 [features]
 default = ["cargo-fmt", "rustfmt-format-diff"]
