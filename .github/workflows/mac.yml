@@ -32,4 +32,6 @@ jobs:
         rustup target add ${{ matrix.target }}
 
     - name: Build and Test
+      env:
+        RUSTFLAGS: -D warnings
       run: cargo run --bin ci-integration build-and-test

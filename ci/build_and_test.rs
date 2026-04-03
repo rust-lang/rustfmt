@@ -8,7 +8,24 @@ fn run_tests_in_dir(env: &HashMap<&str, &str>, dir: &str) -> Result<(), String> 
 }
 
 pub fn runner() -> Result<(), String> {
-    let env = HashMap::from([("RUSTFLAGS", "-D warnings"), ("RUSTFMT_CI", "1")]);
+    let Ok(rustflags) = std::env::var("RUSTFLAGS") else {
+        return Err(
+            "`RUSTFLAGS` environment variable must be set to run `build-and-test`".to_string(),
+        );
+    };
+    if !rustflags.contains("-D warnings") && !rustflags.contains("-Dwarnings") {
+        return Err(
+            "`RUSTFLAGS` environment variable must contain `-Dwarnings` to run `build-and-test`"
+                .to_string(),
+        );
+    }
+
+    let mut env = HashMap::from([("RUSTFLAGS", "-D warnings"), ("RUSTFMT_CI", "1")]);
+    let value_holder;
+    if let Ok(cfg_release_channel) = std::env::var("CFG_RELEASE_CHANNEL") {
+        value_holder = cfg_release_channel;
+        env.insert("CFG_RELEASE_CHANNEL", value_holder.as_str());
+    }
 
     // Print version information
     run_command_with_env("rustc", &["-Vv"], ".", &env)?;
