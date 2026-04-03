@@ -4,7 +4,6 @@ use crate::common::{
 };
 
 use std::collections::HashMap;
-use std::env::var;
 use std::path::Path;
 
 // Checks that:
@@ -104,12 +103,9 @@ fn run_test<F: FnOnce(HashMap<&str, &str>, &str) -> Result<(), String>>(
     test_fn(env, integration)
 }
 
-pub fn runner() -> Result<(), String> {
-    let integration = match var("INTEGRATION") {
-        Ok(value) if !value.is_empty() => value,
-        _ => {
-            return Err("The INTEGRATION environment variable must be set.".into());
-        }
+pub fn runner(args: &mut impl Iterator<Item = String>) -> Result<(), String> {
+    let Some(integration) = args.next() else {
+        return Err("missing command line argument for `integration` checks".to_string());
     };
 
     run_command_with_env(
