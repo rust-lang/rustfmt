@@ -36,4 +36,4 @@ jobs:
         rustup target add ${{ matrix.target }}
 
     - name: Build and Test
-      run: ./ci/build_and_test.sh
+      run: cargo run --bin ci-integration build-and-test

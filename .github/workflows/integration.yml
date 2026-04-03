@@ -74,7 +74,6 @@ jobs:
 
     - name: run integration tests
       env:
-        INTEGRATION: ${{ matrix.integration }}
         TARGET: x86_64-unknown-linux-gnu
-      run: cargo run --bin ci-integration
+      run: cargo run --bin ci-integration integration ${{ matrix.integration }}
       continue-on-error: ${{ matrix.allow-failure == true }}
