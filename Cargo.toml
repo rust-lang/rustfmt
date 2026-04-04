@@ -1,5 +1,4 @@
 [package]
-
 name = "rustfmt-nightly"
 version = "1.9.0"
 description = "Tool to find and fix Rust formatting issues"
@@ -25,10 +24,6 @@ path = "src/format-diff/main.rs"
 [[bin]]
 name = "git-rustfmt"
 path = "src/git-rustfmt/main.rs"
-
-[[bin]]
-name = "ci-integration"
-path = "ci/main.rs"
 
 [features]
 default = ["cargo-fmt", "rustfmt-format-diff"]
@@ -74,4 +69,3 @@ tempfile = "3.23.0"
 [package.metadata.rust-analyzer]
 # This package uses #[feature(rustc_private)]
 rustc_private = true
-

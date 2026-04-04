@@ -60,4 +60,4 @@ jobs:
     - name: Build and Test
       env:
         RUSTFLAGS: -D warnings
-      run: cargo run --bin ci-integration build-and-test
+      run: cargo run --manifest-path ci/Cargo.toml build-and-test
