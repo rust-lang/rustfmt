@@ -73,7 +73,7 @@ pub(crate) fn rewrite_string<'a>(
 
     // Strip line breaks.
     // With this regex applied, all remaining whitespaces are significant
-    let strip_line_breaks_re = Regex::new(r"([^\\](\\\\)*)\\[\n\r][[:space:]]*").unwrap();
+    let strip_line_breaks_re = Regex::new(r"([^\\](\\\\)*)\\[\n\r][ \t\n\r\x0B\x0C]*").unwrap();
     let stripped_str = strip_line_breaks_re.replace_all(orig, "$1");
 
     let graphemes = UnicodeSegmentation::graphemes(&*stripped_str, false).collect::<Vec<&str>>();
@@ -360,7 +360,7 @@ fn is_new_line(grapheme: &str) -> bool {
 }
 
 fn is_whitespace(grapheme: &str) -> bool {
-    grapheme.chars().all(char::is_whitespace)
+    grapheme.chars().all(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0B' | '\x0C'))
 }
 
 fn is_punctuation(grapheme: &str) -> bool {
