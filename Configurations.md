@@ -1731,6 +1731,58 @@ use core::slice;
 #[cfg(feature = "alloc")] use core::slice;
 ```
 
+## `let_else_force_newline`
+
+Force `else` branch of a `let_else` expression to always come after a newline.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (Tracking issue: [TODO](todo))
+
+#### `false` (default):
+
+```rust
+fn main() {
+    let Some(w) = opt else { return Ok(()) };
+
+    let Some(x) = opt else { return };
+
+    let Some(y) = opt else {
+        return;
+    };
+
+    let Some(z) = some_very_very_very_very_long_name else {
+        return;
+    };
+}
+```
+
+#### `true`:
+
+```rust
+fn main() {
+    let Some(w) = opt
+    else {
+        return Ok(());
+    };
+
+    let Some(x) = opt
+    else {
+        return;
+    };
+
+    let Some(y) = opt
+    else {
+        return;
+    };
+
+    let Some(z) = some_very_very_very_very_long_name
+    else {
+        return;
+    };
+}
+```
+
 ## `match_arm_blocks`
 
 Controls whether arm bodies are wrapped in cases where the first line of the body cannot fit on the same line as the `=>` operator.
