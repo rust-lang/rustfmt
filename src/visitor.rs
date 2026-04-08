@@ -26,8 +26,9 @@ use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::spanned::Spanned;
 use crate::stmt::Stmt;
 use crate::utils::{
-    self, contains_skip, count_newlines, depr_skip_annotation, format_safety, inner_attributes,
-    last_line_width, mk_sp, ptr_vec_to_ref_vec, rewrite_ident, starts_with_newline,
+    self, comment_after_empty_stmt, contains_skip, count_newlines, depr_skip_annotation,
+    format_safety, inner_attributes, last_line_width, mk_sp, ptr_vec_to_ref_vec, rewrite_ident,
+    starts_with_newline,
 };
 use crate::{Edition, ErrorKind, FormatReport, FormattingError};
 
@@ -125,6 +126,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             let original_starts_with_newline = snippet
                 .find(|c| c != ' ')
                 .map_or(false, |i| starts_with_newline(&snippet[i..]));
+            let newline_count = count_newlines(snippet);
             let snippet = snippet.trim();
             if !snippet.is_empty() {
                 // FIXME(calebcartwright 2021-01-03) - This exists strictly to maintain legacy
@@ -143,6 +145,30 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 }
             } else if include_empty_semi {
                 self.push_str(";");
+            } else {
+                let line_suffix = self
+                    .snippet_provider
+                    .span_to_snippet(mk_sp(stmt.span().hi(), self.snippet_provider.end_pos()))
+                    .map(|s| match s.find('\n') {
+                        Some(newline) => &s[..=newline],
+                        None => s,
+                    })
+                    .unwrap_or("");
+
+                if let Some(comment) = comment_after_empty_stmt(line_suffix) {
+                    self.push_vertical_spaces(newline_count);
+                    self.push_str(&self.block_indent.to_string(self.config));
+                    self.push_str(comment);
+
+                    let consumed_len = line_suffix.trim_end_matches(['\n', '\r']).len();
+                    self.last_pos = stmt.span().hi() + BytePos::from_usize(consumed_len);
+                    return;
+                }
+
+                let blank_lines = newline_count.saturating_sub(1);
+                if blank_lines > 0 {
+                    self.push_str(&"\n".repeat(blank_lines));
+                }
             }
             self.last_pos = stmt.span().hi();
             return;
