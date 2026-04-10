@@ -32,4 +32,6 @@ jobs:
         rustup target add ${{ matrix.target }}
 
     - name: Build and Test
-      run: ./ci/build_and_test.sh
+      env:
+        RUSTFLAGS: -D warnings
+      run: cargo run --manifest-path ci/Cargo.toml build-and-test
