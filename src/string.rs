@@ -360,7 +360,9 @@ fn is_new_line(grapheme: &str) -> bool {
 }
 
 fn is_whitespace(grapheme: &str) -> bool {
-    grapheme.chars().all(char::is_whitespace)
+    grapheme
+        .chars()
+        .all(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0B' | '\x0C'))
 }
 
 fn is_punctuation(grapheme: &str) -> bool {
