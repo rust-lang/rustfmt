@@ -877,16 +877,20 @@ impl<'a> ChainFormatterShared<'a> {
         let mut prev_span_end = self.root_span_end;
 
         for (rewrite, chain_item) in iter {
+            let original_gap = context.snippet(mk_sp(prev_span_end, chain_item.span.lo()));
+            let item_is_selected = context
+                .config
+                .file_lines()
+                .intersects(&context.psess.lookup_line_range(chain_item.span));
+
             match chain_item.kind {
+                ChainItemKind::Comment(..) if self.partial_chain && !item_is_selected => {}
                 ChainItemKind::Comment(_, CommentPosition::Back) => result.push(' '),
                 ChainItemKind::Comment(_, CommentPosition::Top) => result.push_str(&connector),
 
                 // If we're only formatting part of the chain, we need to preserve the layout of
                 // any items not covered by the selected lines.
                 _ if self.partial_chain => {
-                    let current_range = context.psess.lookup_line_range(chain_item.span);
-                    let item_is_selected = context.config.file_lines().intersects(&current_range);
-                    let original_gap = context.snippet(mk_sp(prev_span_end, chain_item.span.lo()));
                     if item_is_selected {
                         result.push_str(&connector);
                     } else if original_gap.contains('\n') {
