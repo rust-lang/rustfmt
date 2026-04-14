@@ -893,7 +893,7 @@ impl<'a> ChainFormatterShared<'a> {
                 _ if self.partial_chain => {
                     if item_is_selected {
                         result.push_str(&connector);
-                    } else if original_gap.contains('\n') {
+                    } else {
                         result.push_str(original_gap);
                     }
                 }
