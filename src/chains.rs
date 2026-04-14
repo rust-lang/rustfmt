@@ -872,7 +872,7 @@ impl<'a> ChainFormatterShared<'a> {
                 .intersects(&context.psess.lookup_line_range(chain_item.span));
 
             match chain_item.kind {
-                ChainItemKind::Comment(..) if self.partial_chain && !item_is_selected => {}
+                ChainItemKind::Comment(..) if !item_is_selected => {}
                 ChainItemKind::Comment(_, CommentPosition::Back) => result.push(' '),
                 ChainItemKind::Comment(_, CommentPosition::Top) => result.push_str(&connector),
 
@@ -939,7 +939,6 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
 
             root_ends_with_block = last_line_extendable(&root_rewrite);
 
-            self.shared.root_span_end = item.span.hi();
             self.shared.children = &self.shared.children[1..];
             if self.shared.children.is_empty() {
                 break;
@@ -1041,7 +1040,6 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
                 self.offset = 0;
             }
 
-            self.shared.root_span_end = item.span.hi();
             self.shared.children = &self.shared.children[1..];
         }
 
