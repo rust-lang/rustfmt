@@ -579,24 +579,19 @@ impl Rewrite for Chain {
         let last = self.children.last().unwrap_or(&self.parent);
         let children_span = mk_sp(first.span.lo(), last.span.hi());
         let full_span = self.parent.span.with_hi(children_span.hi());
+
         let partial_chain = !context
             .config
             .file_lines()
             .contains(&context.psess.lookup_line_range(full_span));
-        let allow_single_line = !partial_chain;
 
-        let mut formatter = match context.config.indent_style() {
-            IndentStyle::Block => Box::new(ChainFormatterBlock::new(
-                self,
-                allow_single_line,
-                partial_chain,
-            )) as Box<dyn ChainFormatter>,
-            IndentStyle::Visual => Box::new(ChainFormatterVisual::new(
-                self,
-                allow_single_line,
-                partial_chain,
-            )) as Box<dyn ChainFormatter>,
-        };
+        let mut formatter =
+            match context.config.indent_style() {
+                IndentStyle::Block => Box::new(ChainFormatterBlock::new(self, partial_chain))
+                    as Box<dyn ChainFormatter>,
+                IndentStyle::Visual => Box::new(ChainFormatterVisual::new(self, partial_chain))
+                    as Box<dyn ChainFormatter>,
+            };
 
         formatter.format_root(&self.parent, context, shape)?;
         if let Some(result) = formatter.pure_root() {
@@ -671,8 +666,6 @@ struct ChainFormatterShared<'a> {
     child_count: usize,
     // Whether elements are allowed to overflow past the max_width limit
     allow_overflow: bool,
-    // Whether the chain is allowed to collapse back onto a single line.
-    allow_single_line: bool,
     // Whether we are formatting only part of the chain and should preserve
     // the original grouping of unselected items.
     partial_chain: bool,
@@ -681,11 +674,7 @@ struct ChainFormatterShared<'a> {
 }
 
 impl<'a> ChainFormatterShared<'a> {
-    fn new(
-        chain: &'a Chain,
-        allow_single_line: bool,
-        partial_chain: bool,
-    ) -> ChainFormatterShared<'a> {
+    fn new(chain: &'a Chain, partial_chain: bool) -> ChainFormatterShared<'a> {
         ChainFormatterShared {
             children: &chain.children,
             rewrites: Vec::with_capacity(chain.children.len() + 1),
@@ -693,7 +682,6 @@ impl<'a> ChainFormatterShared<'a> {
             child_count: chain.children.len(),
             // TODO(calebcartwright)
             allow_overflow: false,
-            allow_single_line,
             partial_chain,
             root_span_end: chain.parent.span.hi(),
         }
@@ -779,20 +767,20 @@ impl<'a> ChainFormatterShared<'a> {
         }
         .saturating_sub(almost_total);
 
-        let all_in_one_line = self.allow_single_line
+        let all_in_one_line = !self.partial_chain
             && !self.children.iter().any(ChainItem::is_comment)
             && self.rewrites.iter().all(|s| !s.contains('\n'))
             && one_line_budget > 0;
         let last_shape = if all_in_one_line {
             shape.sub_width(last.tries, last.span)?
-        } else if extendable && self.allow_single_line {
+        } else if extendable && !self.partial_chain {
             child_shape.sub_width(last.tries, last.span)?
         } else {
             child_shape.sub_width(shape.rhs_overhead(context.config) + last.tries, last.span)?
         };
 
         let mut last_subexpr_str = None;
-        if all_in_one_line || (extendable && self.allow_single_line) {
+        if all_in_one_line || (extendable && !self.partial_chain) {
             // First we try to 'overflow' the last child and see if it looks better than using
             // vertical layout.
             let one_line_shape = if context.use_block_indent() {
@@ -915,13 +903,9 @@ struct ChainFormatterBlock<'a> {
 }
 
 impl<'a> ChainFormatterBlock<'a> {
-    fn new(
-        chain: &'a Chain,
-        allow_single_line: bool,
-        partial_chain: bool,
-    ) -> ChainFormatterBlock<'a> {
+    fn new(chain: &'a Chain, partial_chain: bool) -> ChainFormatterBlock<'a> {
         ChainFormatterBlock {
-            shared: ChainFormatterShared::new(chain, allow_single_line, partial_chain),
+            shared: ChainFormatterShared::new(chain, partial_chain),
             root_ends_with_block: false,
         }
     }
@@ -939,7 +923,7 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
         let mut root_ends_with_block = parent.kind.is_block_like(context, &root_rewrite);
         let tab_width = context.config.tab_spaces().saturating_sub(shape.offset);
 
-        while self.shared.allow_single_line
+        while !self.shared.partial_chain
             && root_rewrite.len() <= tab_width
             && !root_rewrite.contains('\n')
         {
@@ -1011,13 +995,9 @@ struct ChainFormatterVisual<'a> {
 }
 
 impl<'a> ChainFormatterVisual<'a> {
-    fn new(
-        chain: &'a Chain,
-        allow_single_line: bool,
-        partial_chain: bool,
-    ) -> ChainFormatterVisual<'a> {
+    fn new(chain: &'a Chain, partial_chain: bool) -> ChainFormatterVisual<'a> {
         ChainFormatterVisual {
-            shared: ChainFormatterShared::new(chain, allow_single_line, partial_chain),
+            shared: ChainFormatterShared::new(chain, partial_chain),
             offset: 0,
         }
     }
@@ -1039,7 +1019,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
             trimmed_last_line_width(&root_rewrite)
         };
 
-        if self.shared.allow_single_line
+        if !self.shared.partial_chain
             && (!multiline || parent.kind.is_block_like(context, &root_rewrite))
         {
             let item = &self.shared.children[0];
