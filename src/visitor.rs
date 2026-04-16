@@ -148,6 +148,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             return;
         }
 
+        // Preserve original source snippet if the statement isn't in the selected file lines.
+        if out_of_file_lines_range!(self, stmt.span()) {
+            let stmt_span = source!(self, stmt.span());
+            self.push_str(self.snippet(mk_sp(self.last_pos, stmt_span.hi())));
+            self.last_pos = stmt_span.hi();
+            return;
+        }
+
         match stmt.as_ast_node().kind {
             ast::StmtKind::Item(ref item) => {
                 self.visit_item(item);
