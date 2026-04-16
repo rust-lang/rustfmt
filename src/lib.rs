@@ -387,6 +387,7 @@ fn format_code_block(
     let block_len = formatted
         .snippet
         .rfind('}')
+        // trim and trailing whitespace we added, e.g. if we format to fn main { some_func(); }
         .map(|i| formatted.snippet[..i].strip_suffix(' ').map_or(i, str::len))
         .unwrap_or_else(|| formatted.snippet.len());
 
