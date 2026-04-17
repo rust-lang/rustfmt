@@ -118,6 +118,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &Stmt<'_>, include_empty_semi: bool) {
         debug!("visit_stmt: {}", self.psess.span_to_debug_info(stmt.span()));
 
+        // Preserve original source snippet if the statement isn't in the selected file lines.
+        if out_of_file_lines_range!(self, stmt.span()) {
+            let stmt_span = source!(self, stmt.span());
+            self.push_str(self.snippet(mk_sp(self.last_pos, stmt_span.hi())));
+            self.last_pos = stmt_span.hi();
+            return;
+        }
+
         if stmt.is_empty() {
             // If the statement is empty, just skip over it. Before that, make sure any comment
             // snippet preceding the semicolon is picked up.
