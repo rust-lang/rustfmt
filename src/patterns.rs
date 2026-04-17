@@ -12,13 +12,15 @@ use crate::lists::{
 use crate::macros::{MacroPosition, rewrite_macro};
 use crate::overflow;
 use crate::pairs::{PairParts, rewrite_pair};
+use crate::range::rewrite_range;
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::types::{PathContext, rewrite_path};
 use crate::utils::{
-    format_mutability, format_pinnedness_and_mutability, mk_sp, mk_sp_lo_plus_one, rewrite_ident,
+    format_mutability, format_pinnedness_and_mutability, format_range_end, mk_sp,
+    mk_sp_lo_plus_one, rewrite_ident,
 };
 
 /// Returns `true` if the given pattern is "short".
@@ -291,9 +293,13 @@ impl Rewrite for Pat {
                 }
             }
             PatKind::Never => Err(RewriteError::Unknown),
-            PatKind::Range(ref lhs, ref rhs, ref end_kind) => {
-                rewrite_range_pat(context, shape, lhs, rhs, end_kind, self.span)
-            }
+            PatKind::Range(ref lhs, ref rhs, ref end_kind) => rewrite_range(
+                context,
+                shape,
+                lhs.as_deref(),
+                rhs.as_deref(),
+                format_range_end(end_kind.node),
+            ),
             PatKind::Ref(ref pat, pinnedness, mutability) => {
                 let (pin_prefix, mut_prefix) =
                     format_pinnedness_and_mutability(pinnedness, mutability);
