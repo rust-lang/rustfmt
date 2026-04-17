@@ -16,7 +16,6 @@ use crate::lists::{
 use crate::macros::{MacroPosition, rewrite_macro};
 use crate::overflow;
 use crate::pairs::{PairParts, rewrite_pair};
-use crate::patterns::rewrite_range_pat;
 use crate::range::rewrite_range;
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::Shape;

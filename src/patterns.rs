@@ -1,4 +1,4 @@
-use rustc_ast::ast::{self, BindingMode, ByRef, Pat, PatField, PatKind, RangeEnd, RangeSyntax};
+use rustc_ast::ast::{self, BindingMode, ByRef, Pat, PatField, PatKind};
 use rustc_span::{BytePos, Span};
 
 use crate::comment::{FindUncommented, combine_strs_with_missing_comments};
@@ -11,7 +11,6 @@ use crate::lists::{
 };
 use crate::macros::{MacroPosition, rewrite_macro};
 use crate::overflow;
-use crate::pairs::{PairParts, rewrite_pair};
 use crate::range::rewrite_range;
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::Shape;
@@ -76,24 +75,6 @@ fn is_short_pattern_inner(context: &RewriteContext<'_>, pat: &ast::Pat) -> bool 
         | ast::PatKind::Ref(ref p, _, _)
         | ast::PatKind::Paren(ref p) => is_short_pattern_inner(context, &*p),
         PatKind::Or(ref pats) => pats.iter().all(|p| is_short_pattern_inner(context, p)),
-    }
-}
-
-pub(crate) struct RangeOperand<'a, T> {
-    pub operand: &'a Option<Box<T>>,
-    pub span: Span,
-}
-
-impl<'a, T: Rewrite> Rewrite for RangeOperand<'a, T> {
-    fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
-        self.rewrite_result(context, shape).ok()
-    }
-
-    fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
-        match &self.operand {
-            None => Ok("".to_owned()),
-            Some(ref exp) => exp.rewrite_result(context, shape),
-        }
     }
 }
 
@@ -360,50 +341,6 @@ impl Rewrite for Pat {
             PatKind::Err(_) => Err(RewriteError::Unknown),
         }
     }
-}
-
-pub(crate) fn rewrite_range_pat<T: Rewrite>(
-    context: &RewriteContext<'_>,
-    shape: Shape,
-    lhs: &Option<Box<T>>,
-    rhs: &Option<Box<T>>,
-    end_kind: &rustc_span::source_map::Spanned<RangeEnd>,
-    span: Span,
-) -> RewriteResult {
-    let infix = match end_kind.node {
-        RangeEnd::Included(RangeSyntax::DotDotDot) => "...",
-        RangeEnd::Included(RangeSyntax::DotDotEq) => "..=",
-        RangeEnd::Excluded => "..",
-    };
-    let infix = if context.config.spaces_around_ranges() {
-        let lhs_spacing = match lhs {
-            None => "",
-            Some(_) => " ",
-        };
-        let rhs_spacing = match rhs {
-            None => "",
-            Some(_) => " ",
-        };
-        format!("{lhs_spacing}{infix}{rhs_spacing}")
-    } else {
-        infix.to_owned()
-    };
-    let lspan = span.with_hi(end_kind.span.lo());
-    let rspan = span.with_lo(end_kind.span.hi());
-    rewrite_pair(
-        &RangeOperand {
-            operand: lhs,
-            span: lspan,
-        },
-        &RangeOperand {
-            operand: rhs,
-            span: rspan,
-        },
-        PairParts::infix(&infix),
-        context,
-        shape,
-        SeparatorPlace::Front,
-    )
 }
 
 fn rewrite_struct_pat(
