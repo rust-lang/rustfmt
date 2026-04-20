@@ -281,7 +281,7 @@ impl Target {
 
         Target {
             path: canonicalized,
-            kind: target.kind[0].clone(),
+            kind: target.kind[0].to_string(),
             edition: target.edition,
         }
     }
@@ -444,10 +444,11 @@ fn get_targets_with_hitlist(
     targets: &mut BTreeSet<Target>,
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path)?;
-    let mut workspace_hitlist: BTreeSet<&String> = BTreeSet::from_iter(hitlist);
+    let mut workspace_hitlist: BTreeSet<&str> =
+        BTreeSet::from_iter(hitlist.into_iter().map(|s| s.as_str()));
 
     for package in metadata.packages {
-        if workspace_hitlist.remove(&package.name) {
+        if workspace_hitlist.remove(package.name.as_ref()) {
             for target in package.targets {
                 targets.insert(Target::from_target(&target));
             }
