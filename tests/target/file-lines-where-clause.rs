@@ -3,7 +3,7 @@
 fn foo<T, U, V>()
 where
     T: Clone + Debug,
-    U:  Copy,
-    V: Default,
+    U    :       Copy,
+    V   :        Default,
 {
 }
