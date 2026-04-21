@@ -3186,6 +3186,12 @@ fn rewrite_where_clause(
         return Ok(String::new());
     }
 
+    if !context.config.file_lines().is_all() && out_of_file_lines_range!(context, where_span) {
+        return Ok(context
+            .snippet(mk_sp(span_end_before_where, where_span.hi()))
+            .to_owned());
+    }
+
     if context.config.indent_style() == IndentStyle::Block {
         return rewrite_where_clause_rfc_style(
             context,
