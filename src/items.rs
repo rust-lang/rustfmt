@@ -3136,7 +3136,13 @@ fn rewrite_bounds_on_where_clause(
         ",",
         |pred| pred.span().lo(),
         |pred| pred.span().hi(),
-        |pred| pred.rewrite_result(context, shape),
+        |pred| {
+            if out_of_file_lines_range!(context, pred.span()) {
+                Ok(context.snippet(pred.span()).to_owned())
+            } else {
+                pred.rewrite_result(context, shape)
+            }
+        },
         span_start,
         span_end,
         false,
@@ -3222,7 +3228,13 @@ fn rewrite_where_clause(
         ",",
         |pred| pred.span().lo(),
         |pred| pred.span().hi(),
-        |pred| pred.rewrite_result(context, Shape::legacy(budget, offset)),
+        |pred| {
+            if out_of_file_lines_range!(context, pred.span()) {
+                Ok(context.snippet(pred.span()).to_owned())
+            } else {
+                pred.rewrite_result(context, Shape::legacy(budget, offset))
+            }
+        },
         span_start,
         span_end,
         false,
