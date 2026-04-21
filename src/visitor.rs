@@ -396,13 +396,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         let indent = self.block_indent;
         let block;
         let rewrite = match fk {
-            visit::FnKind::Fn(
-                _,
-                _,
-                ast::Fn {
-                    body: Some(ref b), ..
-                },
-            ) => {
+            visit::FnKind::Fn(_, _, ast::Fn { body: Some(ref b), .. }) => {
                 block = b;
                 self.rewrite_fn_before_block(
                     indent,

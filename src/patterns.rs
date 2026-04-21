@@ -478,8 +478,22 @@ fn rewrite_struct_pat(
         fields_str.push_str("..");
     }
 
+    // one_line_width was reduced by ellipsis_str.len() via struct_lit_shape,
+    // but fields_str now includes those chars after the ellipsis block above.
+    let adjusted_one_line_width = if ellipsis {
+        one_line_width + ellipsis_str.len()
+    } else {
+        one_line_width
+    };
     // ast::Pat doesn't have attrs so use &[]
-    let fields_str = wrap_struct_field(context, &[], &fields_str, shape, v_shape, one_line_width)?;
+    let fields_str = wrap_struct_field(
+        context,
+        &[],
+        &fields_str,
+        shape,
+        v_shape,
+        adjusted_one_line_width,
+    )?;
     Ok(format!("{path_str} {{{fields_str}}}"))
 }
 
