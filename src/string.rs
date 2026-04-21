@@ -367,7 +367,6 @@ fn is_whitespace(grapheme: &str) -> bool {
     // (form feed) are included here because the Rust language defines them
     // as whitespace, but is_ascii_whitespace excludes them.
 
-
     grapheme
         .chars()
         .all(|c| matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0B' | '\x0C'))
