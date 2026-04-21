@@ -614,9 +614,10 @@ impl<'a> FmtVisitor<'a> {
             .max()
             .unwrap_or(&0);
 
+        let enum_context = self.get_context();
         let itemize_list_with = |one_line_width: usize| {
             itemize_list(
-                self.snippet_provider,
+                &enum_context,
                 enum_def.variants.iter(),
                 "}",
                 ",",
@@ -2852,7 +2853,7 @@ fn rewrite_params(
         return Ok(comment.to_owned());
     }
     let param_items: Vec<_> = itemize_list(
-        context.snippet_provider,
+        context,
         params.iter(),
         ")",
         ",",
@@ -3130,19 +3131,13 @@ fn rewrite_bounds_on_where_clause(
     let end_of_preds = predicates[len - 1].span().hi();
     let span_end = span_end.unwrap_or(end_of_preds);
     let items = itemize_list(
-        context.snippet_provider,
+        context,
         predicates.iter(),
         terminator,
         ",",
         |pred| pred.span().lo(),
         |pred| pred.span().hi(),
-        |pred| {
-            if out_of_file_lines_range!(context, pred.span()) {
-                Ok(context.snippet(pred.span()).to_owned())
-            } else {
-                pred.rewrite_result(context, shape)
-            }
-        },
+        |pred| pred.rewrite_result(context, shape),
         span_start,
         span_end,
         false,
@@ -3222,19 +3217,13 @@ fn rewrite_where_clause(
     let end_of_preds = predicates[len - 1].span().hi();
     let span_end = span_end.unwrap_or(end_of_preds);
     let items = itemize_list(
-        context.snippet_provider,
+        context,
         predicates.iter(),
         terminator,
         ",",
         |pred| pred.span().lo(),
         |pred| pred.span().hi(),
-        |pred| {
-            if out_of_file_lines_range!(context, pred.span()) {
-                Ok(context.snippet(pred.span()).to_owned())
-            } else {
-                pred.rewrite_result(context, Shape::legacy(budget, offset))
-            }
-        },
+        |pred| pred.rewrite_result(context, Shape::legacy(budget, offset)),
         span_start,
         span_end,
         false,

@@ -429,7 +429,7 @@ fn rewrite_struct_pat(
     )?;
 
     let items = itemize_list(
-        context.snippet_provider,
+        context,
         fields.iter(),
         terminator,
         ",",
@@ -651,7 +651,7 @@ fn count_wildcard_suffix_len(
     let mut suffix_len = 0;
 
     let items: Vec<_> = itemize_list(
-        context.snippet_provider,
+        context,
         patterns.iter(),
         ")",
         ",",
