@@ -4,4 +4,9 @@
 /// ```rust
 /// let font = String::from("hello");
 /// ```
-fn main() {}
+fn ascii_string() {}
+
+/// ```rust
+/// let font = String::from("hello 👋😁");
+/// ```
+fn unicode_chars() {}
