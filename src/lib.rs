@@ -388,8 +388,11 @@ fn format_code_block(
         .snippet
         .rfind('}')
         // trim whitespace when using `fn_single_line=true`
-        // 
-        .map(|i| formatted.snippet[..i].strip_suffix(char::is_whitespace).map_or(i, str::len))
+        .map(|i| {
+            formatted.snippet[..i]
+                .strip_suffix(char::is_whitespace)
+                .map_or(i, str::len)
+        })
         .unwrap_or_else(|| formatted.snippet.len());
 
     // It's possible that `block_len < FN_MAIN_PREFIX.len()`. This can happen if the code block was
