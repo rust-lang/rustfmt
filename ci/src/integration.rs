@@ -1,91 +1,10 @@
+use crate::common::{
+    run_command, run_command_with_env, run_command_with_output, run_command_with_output_and_env,
+    write_file,
+};
+
 use std::collections::HashMap;
-use std::env::var;
-use std::ffi::OsStr;
 use std::path::Path;
-use std::process::Command;
-
-fn write_file(file_path: impl AsRef<Path>, content: &str) -> Result<(), String> {
-    std::fs::write(&file_path, content).map_err(|error| {
-        format!(
-            "Failed to create empty `{}` file: {error:?}",
-            file_path.as_ref().display(),
-        )
-    })
-}
-
-fn run_command_with_env<I, S>(
-    bin: &str,
-    args: I,
-    current_dir: &str,
-    env: &HashMap<&str, &str>,
-) -> Result<(), String>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let exit_status = Command::new(bin)
-        .args(args)
-        .envs(env)
-        .current_dir(current_dir)
-        .spawn()
-        .map_err(|error| format!("Failed to spawn command `{bin}`: {error:?}"))?
-        .wait()
-        .map_err(|error| format!("Failed to wait command `{bin}`: {error:?}"))?;
-    if exit_status.success() {
-        Ok(())
-    } else {
-        Err(format!("Command `{bin}` failed"))
-    }
-}
-
-fn run_command<I, S>(bin: &str, args: I, current_dir: &str) -> Result<(), String>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    run_command_with_env(bin, args, current_dir, &HashMap::new())
-}
-
-struct CommandOutput {
-    output: String,
-    exited_successfully: bool,
-}
-
-fn run_command_with_output_and_env<I, S>(
-    bin: &str,
-    args: I,
-    current_dir: &str,
-    env: &HashMap<&str, &str>,
-) -> Result<CommandOutput, String>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let cmd_output = Command::new(bin)
-        .args(args)
-        .envs(env)
-        .current_dir(current_dir)
-        .output()
-        .map_err(|error| format!("Failed to spawn command `{bin}`: {error:?}"))?;
-    let mut output = String::from_utf8_lossy(&cmd_output.stdout).into_owned();
-    output.push_str(&String::from_utf8_lossy(&cmd_output.stderr));
-    Ok(CommandOutput {
-        output,
-        exited_successfully: cmd_output.status.success(),
-    })
-}
-
-fn run_command_with_output<I, S>(
-    bin: &str,
-    args: I,
-    current_dir: &str,
-) -> Result<CommandOutput, String>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    run_command_with_output_and_env(bin, args, current_dir, &HashMap::new())
-}
 
 // Checks that:
 //
@@ -184,12 +103,9 @@ fn run_test<F: FnOnce(HashMap<&str, &str>, &str) -> Result<(), String>>(
     test_fn(env, integration)
 }
 
-fn runner() -> Result<(), String> {
-    let integration = match var("INTEGRATION") {
-        Ok(value) if !value.is_empty() => value,
-        _ => {
-            return Err("The INTEGRATION environment variable must be set.".into());
-        }
+pub fn runner(args: &mut impl Iterator<Item = String>) -> Result<(), String> {
+    let Some(integration) = args.next() else {
+        return Err("missing command line argument for `integration` checks".to_string());
     };
 
     run_command_with_env(
@@ -237,12 +153,5 @@ fn runner() -> Result<(), String> {
             HashMap::new(),
             check_fmt_with_all_tests,
         ),
-    }
-}
-
-fn main() {
-    if let Err(error) = runner() {
-        eprintln!("{error}");
-        std::process::exit(1);
     }
 }

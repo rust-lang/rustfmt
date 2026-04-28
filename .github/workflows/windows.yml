@@ -58,5 +58,6 @@ jobs:
       shell: bash
 
     - name: Build and Test
-      shell: cmd
-      run: ci\build_and_test.bat
+      env:
+        RUSTFLAGS: -D warnings
+      run: cargo run --manifest-path ci/Cargo.toml build-and-test
