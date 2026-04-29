@@ -1124,7 +1124,6 @@ fn next_space(tok: &TokenKind) -> SpaceState {
         | TokenKind::And
         | TokenKind::Tilde
         | TokenKind::At
-        | TokenKind::Comma
         | TokenKind::Dot
         | TokenKind::DotDot
         | TokenKind::DotDotDot
