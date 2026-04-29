@@ -21,6 +21,7 @@ use crate::expr::{
     rewrite_assign_rhs_with, rewrite_assign_rhs_with_comments, rewrite_else_kw_with_comments,
     rewrite_let_else_block,
 };
+use crate::header::HeaderPart;
 use crate::lists::{ListFormatting, Separator, definitive_tactic, itemize_list, write_list};
 use crate::macros::{MacroPosition, rewrite_macro};
 use crate::overflow;
@@ -1165,20 +1166,39 @@ pub(crate) fn format_trait(
     } = *trait_;
 
     let mut result = String::with_capacity(128);
-    let header = format!(
-        "{}{}{}{}trait ",
-        format_visibility(context, &item.vis),
-        format_constness(constness),
-        format_safety(safety),
-        format_auto(is_auto),
-    );
-    result.push_str(&header);
+    let header = vec![
+        HeaderPart::visibility(context, &item.vis),
+        HeaderPart::constness(constness),
+        HeaderPart::safety(safety),
+        HeaderPart::auto(context, item.span, is_auto),
+        HeaderPart::keyword(context, item.span, "trait"),
+    ];
 
-    let body_lo = context.snippet_provider.span_after(item.span, "{");
+    let shape = Shape::indented(offset, context.config);
+    let header_rewrite = crate::header::format_header(context, shape, header);
 
-    let shape = Shape::indented(offset, context.config).offset_left(result.len(), item.span)?;
+    result.push_str(&header_rewrite);
+
+    // +1 to account for space between `trait` and the `ident`
+    let offset_left = last_line_width(&result) + 1;
+    let shape = Shape::indented(offset, context.config).offset_left(offset_left, item.span)?;
     let generics_str = rewrite_generics(context, rewrite_ident(context, ident), generics, shape)?;
-    result.push_str(&generics_str);
+
+    let comment_span_lo = context.snippet_provider.span_after(item.span, "trait");
+    let comment_span = mk_sp(comment_span_lo, ident.span.lo() - BytePos(1));
+
+    result = combine_strs_with_missing_comments(
+        context,
+        &result,
+        &generics_str,
+        comment_span,
+        // infinite_width so we don't put the `ident + generics_str` on the next line
+        shape.infinite_width(),
+        true,
+    )?;
+
+    // Keep track of the last position that we've written. This will help us recover comments
+    let mut current_rewite_lo = generics.span.hi();
 
     // FIXME(#2055): rustfmt fails to format when there are comments between trait bounds.
     if !bounds.is_empty() {
@@ -1199,6 +1219,8 @@ pub(crate) fn format_trait(
             &RhsAssignKind::Bounds,
             RhsTactics::ForceNextLineWithoutIndent,
         )?;
+
+        current_rewite_lo = bound_hi;
     }
 
     // Rewrite where-clause.
@@ -1206,11 +1228,6 @@ pub(crate) fn format_trait(
         let where_on_new_line = context.config.indent_style() != IndentStyle::Block;
 
         let where_budget = context.budget(last_line_width(&result));
-        let pos_before_where = if bounds.is_empty() {
-            generics.where_clause.span.lo()
-        } else {
-            bounds[bounds.len() - 1].span().hi()
-        };
         let option = WhereClauseOption::snuggled(&generics_str);
         let where_clause_str = rewrite_where_clause(
             context,
@@ -1220,7 +1237,7 @@ pub(crate) fn format_trait(
             where_on_new_line,
             "{",
             None,
-            pos_before_where,
+            current_rewite_lo,
             option,
         )?;
 
@@ -1236,27 +1253,23 @@ pub(crate) fn format_trait(
         }
         result.push_str(&where_clause_str);
     } else {
-        let item_snippet = context.snippet(item.span);
-        if let Some(lo) = item_snippet.find('/') {
-            // 1 = `{`
-            let comment_hi = if generics.params.len() > 0 {
-                generics.span.lo() - BytePos(1)
-            } else {
-                body_lo - BytePos(1)
-            };
-            let comment_lo = item.span.lo() + BytePos(lo as u32);
-            if comment_lo < comment_hi {
-                match recover_missing_comment_in_span(
-                    mk_sp(comment_lo, comment_hi),
-                    Shape::indented(offset, context.config),
-                    context,
-                    last_line_width(&result),
-                ) {
-                    Ok(ref missing_comment) if !missing_comment.is_empty() => {
-                        result.push_str(missing_comment);
-                    }
-                    _ => (),
+        let span_rest = mk_sp(current_rewite_lo, item.span.hi());
+        let body_lo = context.snippet_provider.span_before(span_rest, "{");
+        let comment_span = span_rest.with_hi(body_lo);
+        let snippet = context.snippet(comment_span);
+
+        if let Some(lo) = snippet.find('/') {
+            let comment_span = comment_span.with_lo(comment_span.lo() + BytePos(lo as u32));
+            match recover_missing_comment_in_span(
+                comment_span,
+                Shape::indented(offset, context.config),
+                context,
+                last_line_width(&result),
+            ) {
+                Ok(ref missing_comment) if !missing_comment.is_empty() => {
+                    result.push_str(missing_comment);
                 }
+                _ => (),
             }
         }
     }
