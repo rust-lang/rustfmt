@@ -9,7 +9,9 @@ use rustc_ast_pretty::pprust;
 use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
 use unicode_width::UnicodeWidthStr;
 
-use crate::comment::{CharClasses, FullCodeCharKind, LineClasses, filter_normal_code};
+use crate::comment::{
+    CharClasses, FullCodeCharKind, LineClasses, filter_normal_code, find_comment_end,
+};
 use crate::config::{Config, StyleEdition};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
@@ -352,6 +354,29 @@ pub(crate) fn count_lf_crlf(input: &str) -> (usize, usize) {
 pub(crate) fn count_newlines(input: &str) -> usize {
     // Using bytes to omit UTF-8 decoding
     bytecount::count(input.as_bytes(), b'\n')
+}
+
+pub(crate) fn is_empty_stmt_snippet(snippet: &str) -> bool {
+    let trimmed = snippet.trim();
+    !trimmed.is_empty() && trimmed.chars().all(|c| c == ';')
+}
+
+pub(crate) fn comment_after_empty_stmt(line_suffix: &str) -> Option<&str> {
+    let trimmed_suffix = line_suffix.trim_start();
+
+    if trimmed_suffix.starts_with("//") {
+        return Some(trimmed_suffix.trim_end());
+    }
+
+    if trimmed_suffix.starts_with("/*") {
+        let comment_len = find_comment_end(trimmed_suffix)?;
+        let (comment, suffix) = trimmed_suffix.split_at(comment_len);
+        if suffix.trim().is_empty() || is_empty_stmt_snippet(suffix) {
+            return Some(comment.trim_end());
+        }
+    }
+
+    None
 }
 
 // For format_missing and last_pos, need to use the source callsite (if applicable).
