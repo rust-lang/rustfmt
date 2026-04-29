@@ -476,7 +476,7 @@ impl UseTree {
                 // Extract comments between nested use items.
                 // This needs to be done before sorting use items.
                 let items = itemize_list(
-                    context.snippet_provider,
+                    context,
                     list.iter().map(|(tree, _)| tree),
                     "}",
                     ",",

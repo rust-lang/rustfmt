@@ -1843,7 +1843,7 @@ fn rewrite_struct_lit<'a>(
         };
 
         let items = itemize_list(
-            context.snippet_provider,
+            context,
             field_iter,
             "}",
             ",",
@@ -1995,7 +1995,7 @@ fn rewrite_tuple_in_visual_indent_style<'a, T: 'a + IntoOverflowableItem<'a>>(
     let list_lo = context.snippet_provider.span_after(span, "(");
     let nested_shape = shape.sub_width(2, span)?.visual_indent(1);
     let items = itemize_list(
-        context.snippet_provider,
+        context,
         items,
         ")",
         ",",

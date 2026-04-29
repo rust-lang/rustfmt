@@ -465,7 +465,7 @@ pub(crate) fn rewrite_macro_def(
     }
 
     let branch_items = itemize_list(
-        context.snippet_provider,
+        context,
         parsed_def.branches.iter(),
         "}",
         ";",

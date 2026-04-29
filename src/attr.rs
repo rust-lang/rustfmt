@@ -93,7 +93,7 @@ fn format_derive(
             })?;
 
             let items = itemize_list(
-                context.snippet_provider,
+                context,
                 item_spans,
                 ")",
                 ",",
