@@ -38,4 +38,5 @@ jobs:
     - name: Build and Test
       env:
         RUSTFLAGS: -D warnings
+        CARGO_UNSTABLE_BUILD_DIR_NEW_LAYOUT: true
       run: cargo run --manifest-path ci/Cargo.toml build-and-test
