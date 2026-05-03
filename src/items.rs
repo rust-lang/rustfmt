@@ -353,7 +353,11 @@ impl<'a> FnSig<'a> {
     fn to_str(&self, context: &RewriteContext<'_>) -> String {
         let mut result = String::with_capacity(128);
         // Vis defaultness constness unsafety abi.
-        result.push_str(&*format_visibility(context, self.visibility));
+        let vis = format_visibility(context, self.visibility);
+        result.push_str(&*vis);
+        if !vis.is_empty() {
+            result.push(' ');
+        }
         result.push_str(format_defaultness(self.defaultness));
         result.push_str(format_constness(self.constness));
         self.coroutine_kind
@@ -956,7 +960,11 @@ fn format_impl_ref_and_type(
     } = iimpl;
     let mut result = String::with_capacity(128);
 
-    result.push_str(&format_visibility(context, &item.vis));
+    let vis = format_visibility(context, &item.vis);
+    result.push_str(&vis);
+    if !vis.is_empty() {
+        result.push(' ');
+    }
 
     if let Some(of_trait) = of_trait.as_deref() {
         result.push_str(format_defaultness(of_trait.defaultness));
@@ -1165,9 +1173,10 @@ pub(crate) fn format_trait(
     } = *trait_;
 
     let mut result = String::with_capacity(128);
+    let vis = format_visibility(context, &item.vis);
+    let vis_separator = if vis.is_empty() { "" } else { " " };
     let header = format!(
-        "{}{}{}{}trait ",
-        format_visibility(context, &item.vis),
+        "{vis}{vis_separator}{}{}{}trait ",
         format_constness(constness),
         format_safety(safety),
         format_auto(is_auto),
@@ -1376,8 +1385,9 @@ pub(crate) fn format_trait_alias(
     let g_shape = shape.offset_left(6, span)?.sub_width(2, span)?;
     let generics_str = rewrite_generics(context, alias, &ta.generics, g_shape)?;
     let vis_str = format_visibility(context, vis);
+    let vis_separator = if vis_str.is_empty() { "" } else { " " };
     let constness = format_constness(ta.constness);
-    let lhs = format!("{vis_str}{constness}trait {generics_str} =");
+    let lhs = format!("{vis_str}{vis_separator}{constness}trait {generics_str} =");
     // 1 = ";"
     let trait_alias_bounds = TraitAliasBounds {
         generic_bounds: &ta.bounds,
@@ -1749,7 +1759,12 @@ fn rewrite_ty<R: Rewrite>(
 ) -> RewriteResult {
     let mut result = String::with_capacity(128);
     let TyAliasRewriteInfo(context, indent, generics, after_where_clause, ident, span) = *rw_info;
-    result.push_str(&format!("{}type ", format_visibility(context, vis)));
+    let vis = format_visibility(context, vis);
+    if !vis.is_empty() {
+        result.push_str(&format!("{vis} type "));
+    } else {
+        result.push_str("type ");
+    }
     let ident_str = rewrite_ident(context, ident);
 
     if generics.params.is_empty() {
@@ -1887,15 +1902,18 @@ pub(crate) fn rewrite_struct_field_prefix(
     field: &ast::FieldDef,
 ) -> RewriteResult {
     let vis = format_visibility(context, &field.vis);
+    let vis_separator = if vis.is_empty() { "" } else { " " };
     let safety = format_safety(field.safety);
     let type_annotation_spacing = type_annotation_spacing(context.config);
     Ok(match field.ident {
         Some(name) => format!(
-            "{vis}{safety}{}{}:",
+            "{vis}{vis_separator}{safety}{}{}:",
             rewrite_ident(context, name),
             type_annotation_spacing.0
         ),
-        None => format!("{vis}{safety}"),
+        None => format!("{vis}{vis_separator}{safety}")
+            .trim_end()
+            .to_string(),
     })
 }
 
@@ -1936,6 +1954,8 @@ pub(crate) fn rewrite_struct_field(
     };
     let mut spacing = String::from(if field.ident.is_some() {
         type_annotation_spacing.1
+    } else if !prefix.is_empty() {
+        " "
     } else {
         ""
     });
@@ -1970,6 +1990,13 @@ pub(crate) fn rewrite_struct_field(
 
     let is_prefix_empty = prefix.is_empty();
     // We must use multiline. We are going to put attributes and a field on different lines.
+    // Trim trailing whitespace from the prefix for tuple struct fields to avoid leaving it
+    // behind when the type wraps to the next line (e.g. "pub(crate) " -> "pub(crate)").
+    let prefix = if field.ident.is_none() {
+        prefix.trim_end().to_string()
+    } else {
+        prefix
+    };
     let field_str = rewrite_assign_rhs(context, prefix, &*field.ty, &RhsAssignKind::Ty, shape)?;
     // Remove a leading white-space from `rewrite_assign_rhs()` when rewriting a tuple struct.
     let field_str = if is_prefix_empty {
@@ -2116,9 +2143,10 @@ fn rewrite_static(
     }
 
     let colon = colon_spaces(context.config);
+    let vis = format_visibility(context, static_parts.vis);
+    let vis_separator = if vis.is_empty() { "" } else { " " };
     let mut prefix = format!(
-        "{}{}{}{} {}{}{}",
-        format_visibility(context, static_parts.vis),
+        "{vis}{vis_separator}{}{}{} {}{}{}",
         static_parts.defaultness.map_or("", format_defaultness),
         format_safety(static_parts.safety),
         static_parts.prefix,
@@ -3307,7 +3335,7 @@ fn format_header(
     let mut result = String::with_capacity(128);
     let shape = Shape::indented(offset, context.config);
 
-    result.push_str(format_visibility(context, vis).trim());
+    result.push_str(&format_visibility(context, vis));
 
     // Check for a missing comment between the visibility and the item name.
     let after_vis = vis.span.hi();
@@ -3493,11 +3521,11 @@ impl Rewrite for ast::ForeignItem {
                 // FIXME(#21): we're dropping potential comments in between the
                 // function kw here.
                 let vis = format_visibility(context, &self.vis);
+                let vis_separator = if vis.is_empty() { "" } else { " " };
                 let safety = format_safety(static_foreign_item.safety);
                 let mut_str = format_mutability(static_foreign_item.mutability);
                 let prefix = format!(
-                    "{}{}static {}{}:",
-                    vis,
+                    "{vis}{vis_separator}{}static {}{}:",
                     safety,
                     mut_str,
                     rewrite_ident(context, static_foreign_item.ident)
@@ -3580,7 +3608,11 @@ pub(crate) fn rewrite_mod(
     attrs_shape: Shape,
 ) -> RewriteResult {
     let mut result = String::with_capacity(32);
-    result.push_str(&*format_visibility(context, &item.vis));
+    let vis = format_visibility(context, &item.vis);
+    result.push_str(&*vis);
+    if !vis.is_empty() {
+        result.push(' ');
+    }
     result.push_str("mod ");
     result.push_str(rewrite_ident(context, ident));
     result.push(';');
