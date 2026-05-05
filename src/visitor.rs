@@ -429,7 +429,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 FnBraceStyle::NextLine => {
                     self.push_str(&self.block_indent.to_string_with_newline(self.config))
                 }
-                FnBraceStyle::None => {},
+                FnBraceStyle::None => {}
             }
             self.last_pos = source!(self, block.span).lo();
         } else {
