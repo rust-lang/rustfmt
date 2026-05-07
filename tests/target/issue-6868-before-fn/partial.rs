@@ -8,5 +8,6 @@ const
 unsafe
 extern
 "C"
-fn foo() {
+fn
+foo() {
 }
