@@ -2465,6 +2465,7 @@ fn rewrite_fn_base(
     let where_clause = &fn_sig.generics.where_clause;
 
     let mut result = String::with_capacity(1024);
+    let file_lines = context.config.file_lines();
 
     // Everything before `fn`
     let before_ident_span = mk_sp(span.lo(), ident.span.lo());
@@ -2473,11 +2474,7 @@ fn rewrite_fn_base(
         .span_before_last(before_ident_span, "fn");
     let span_before_fn = mk_sp(span.lo(), fn_lo);
 
-    if context
-        .config
-        .file_lines()
-        .contains(&context.psess.lookup_line_range(span_before_fn))
-    {
+    if file_lines.contains_span(context, span_before_fn) {
         result.push_str(&fn_sig.to_str(context));
     } else {
         result.push_str(context.snippet(mk_sp(span_before_fn.lo(), fn_lo)));
@@ -2488,11 +2485,7 @@ fn rewrite_fn_base(
     // If both `fn` and the ident are selected, put them both on the same line.
     // Otherwise, preserve the snippet between `fn` and the ident.
     let fn_ident_span = mk_sp(fn_lo, ident.span.hi());
-    if context
-        .config
-        .file_lines()
-        .contains(&context.psess.lookup_line_range(fn_ident_span))
-    {
+    if file_lines.contains_span(context, fn_ident_span) {
         result.push(' ');
     } else {
         let fn_hi = fn_lo + BytePos(2);
