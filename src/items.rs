@@ -365,22 +365,6 @@ impl<'a> FnSig<'a> {
         ));
         result
     }
-
-    /// Calculates the span for the parts of the signature before the `fn`
-    /// keyword.
-    fn span_before_fn(
-        &self,
-        context: &RewriteContext<'_>,
-        span: Span,
-        ident: symbol::Ident,
-    ) -> Span {
-        let before_ident_span = mk_sp(span.lo(), ident.span.lo());
-        let fn_lo = context
-            .snippet_provider
-            .span_before_last(before_ident_span, "fn");
-
-        mk_sp(span.lo(), fn_lo)
-    }
 }
 
 impl<'a> FmtVisitor<'a> {
@@ -2483,7 +2467,12 @@ fn rewrite_fn_base(
     let mut result = String::with_capacity(1024);
 
     // Everything before `fn`
-    let span_before_fn = fn_sig.span_before_fn(context, span, ident);
+    let before_ident_span = mk_sp(span.lo(), ident.span.lo());
+    let fn_lo = context
+        .snippet_provider
+        .span_before_last(before_ident_span, "fn");
+    let span_before_fn = mk_sp(span.lo(), fn_lo);
+
     if context
         .config
         .file_lines()
@@ -2491,10 +2480,6 @@ fn rewrite_fn_base(
     {
         result.push_str(&fn_sig.to_str(context));
     } else {
-        let before_ident_span = mk_sp(span_before_fn.hi(), ident.span.lo());
-        let fn_lo = context
-            .snippet_provider
-            .span_before_last(before_ident_span, "fn");
         result.push_str(context.snippet(mk_sp(span_before_fn.lo(), fn_lo)));
     }
 
