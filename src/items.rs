@@ -366,47 +366,40 @@ impl<'a> FnSig<'a> {
         result
     }
 
-    /// Calculates the span for the parts of the signature before the `fn` keyword.
-    fn span_before_fn(&self) -> Span {
-        let mut lo = None;
-        let mut hi = None;
+    /// Calculates the span for the parts of the signature before the `fn`
+    /// keyword.
+    ///
+    /// The returned span does not include the whitespace between the last
+    /// non-`fn` keyword and `fn`. If there are no keywords before `fn` then the
+    /// returned span is empty.
+    fn span_before_fn(
+        &self,
+        context: &RewriteContext<'_>,
+        span: Span,
+        ident: symbol::Ident,
+    ) -> Span {
+        // Get the span for everything up to the `fn` keyword.
+        let before_ident_span = mk_sp(span.lo(), ident.span.lo());
+        let fn_lo = context
+            .snippet_provider
+            .span_before_last(before_ident_span, "fn");
+        let before_fn_span = mk_sp(span.lo(), fn_lo);
 
-        let mut extend_span = |span: Span| {
-            lo = Some(lo.map_or(span.lo(), |lo| min(lo, span.lo())));
-            hi = Some(hi.map_or(span.hi(), |hi| max(hi, span.hi())));
-        };
-
-        if !matches!(self.visibility.kind, ast::VisibilityKind::Inherited) {
-            extend_span(self.visibility.span);
-        }
-
-        match self.defaultness {
-            ast::Defaultness::Default(span) | ast::Defaultness::Final(span) => extend_span(span),
-            ast::Defaultness::Implicit => {}
-        }
-
-        if let ast::Const::Yes(span) = self.constness {
-            extend_span(span);
-        }
-
-        if let Some(coroutine_kind) = self.coroutine_kind.as_ref() {
-            extend_span(coroutine_kind.span());
-        }
-
-        match self.safety {
-            ast::Safety::Unsafe(span) | ast::Safety::Safe(span) => extend_span(span),
-            ast::Safety::Default => {}
-        }
-
-        match self.ext {
-            ast::Extern::Implicit(span) | ast::Extern::Explicit(_, span) => extend_span(span),
-            ast::Extern::None => {}
-        }
-
-        let lo = lo.unwrap_or_else(|| self.visibility.span.lo());
-        let hi = hi.unwrap_or(lo);
-
-        mk_sp(lo, hi)
+        // Scan backwards from `fn` to find the last non-whitespace character.
+        context
+            .snippet(before_fn_span)
+            .char_indices()
+            .rev()
+            .find(|(_, c)| !c.is_whitespace())
+            .map_or_else(
+                || mk_sp(fn_lo, fn_lo),
+                |(idx, c)| {
+                    mk_sp(
+                        before_fn_span.lo(),
+                        before_fn_span.lo() + BytePos((idx + c.len_utf8()) as u32),
+                    )
+                },
+            )
     }
 }
 
@@ -2510,7 +2503,7 @@ fn rewrite_fn_base(
     let mut result = String::with_capacity(1024);
 
     // Everything before `fn`
-    let span_before_fn = fn_sig.span_before_fn();
+    let span_before_fn = fn_sig.span_before_fn(context, span, ident);
     if context
         .config
         .file_lines()
