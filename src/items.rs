@@ -368,38 +368,18 @@ impl<'a> FnSig<'a> {
 
     /// Calculates the span for the parts of the signature before the `fn`
     /// keyword.
-    ///
-    /// The returned span does not include the whitespace between the last
-    /// non-`fn` keyword and `fn`. If there are no keywords before `fn` then the
-    /// returned span is empty.
     fn span_before_fn(
         &self,
         context: &RewriteContext<'_>,
         span: Span,
         ident: symbol::Ident,
     ) -> Span {
-        // Get the span for everything up to the `fn` keyword.
         let before_ident_span = mk_sp(span.lo(), ident.span.lo());
         let fn_lo = context
             .snippet_provider
             .span_before_last(before_ident_span, "fn");
-        let before_fn_span = mk_sp(span.lo(), fn_lo);
 
-        // Scan backwards from `fn` to find the last non-whitespace character.
-        context
-            .snippet(before_fn_span)
-            .char_indices()
-            .rev()
-            .find(|(_, c)| !c.is_whitespace())
-            .map_or_else(
-                || mk_sp(fn_lo, fn_lo),
-                |(idx, c)| {
-                    mk_sp(
-                        before_fn_span.lo(),
-                        before_fn_span.lo() + BytePos((idx + c.len_utf8()) as u32),
-                    )
-                },
-            )
+        mk_sp(span.lo(), fn_lo)
     }
 }
 
