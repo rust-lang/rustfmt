@@ -6,13 +6,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::{cmp, fmt, iter, str};
 
-use rustc_span::{SourceFile, Span};
+use rustc_span::SourceFile;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser};
 use serde_json as json;
 use thiserror::Error;
-
-use crate::rewrite::RewriteContext;
-use crate::source_map::LineRangeUtils;
 
 /// A range of lines in a file, inclusive of both ends.
 pub struct LineRange {
@@ -278,10 +275,6 @@ impl FileLines {
     /// Returns `true` if all the lines between `lo` and `hi` from `file_name` are in `self`.
     pub(crate) fn contains_range(&self, file_name: &FileName, lo: usize, hi: usize) -> bool {
         self.file_range_matches(file_name, |r| r.contains(Range::new(lo, hi)))
-    }
-
-    pub(crate) fn contains_span(&self, context: &RewriteContext<'_>, span: Span) -> bool {
-        self.contains(&context.psess.lookup_line_range(span))
     }
 }
 
