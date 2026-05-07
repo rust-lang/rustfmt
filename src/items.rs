@@ -365,6 +365,49 @@ impl<'a> FnSig<'a> {
         ));
         result
     }
+
+    /// Calculates the span for the parts of the signature before the `fn` keyword.
+    fn span_before_fn(&self) -> Span {
+        let mut lo = None;
+        let mut hi = None;
+
+        let mut extend_span = |span: Span| {
+            lo = Some(lo.map_or(span.lo(), |lo| min(lo, span.lo())));
+            hi = Some(hi.map_or(span.hi(), |hi| max(hi, span.hi())));
+        };
+
+        if !matches!(self.visibility.kind, ast::VisibilityKind::Inherited) {
+            extend_span(self.visibility.span);
+        }
+
+        match self.defaultness {
+            ast::Defaultness::Default(span) | ast::Defaultness::Final(span) => extend_span(span),
+            ast::Defaultness::Implicit => {}
+        }
+
+        if let ast::Const::Yes(span) = self.constness {
+            extend_span(span);
+        }
+
+        if let Some(coroutine_kind) = self.coroutine_kind.as_ref() {
+            extend_span(coroutine_kind.span());
+        }
+
+        match self.safety {
+            ast::Safety::Unsafe(span) | ast::Safety::Safe(span) => extend_span(span),
+            ast::Safety::Default => {}
+        }
+
+        match self.ext {
+            ast::Extern::Implicit(span) | ast::Extern::Explicit(_, span) => extend_span(span),
+            ast::Extern::None => {}
+        }
+
+        let lo = lo.unwrap_or_else(|| self.visibility.span.lo());
+        let hi = hi.unwrap_or(lo);
+
+        mk_sp(lo, hi)
+    }
 }
 
 impl<'a> FmtVisitor<'a> {
@@ -2465,7 +2508,22 @@ fn rewrite_fn_base(
     let where_clause = &fn_sig.generics.where_clause;
 
     let mut result = String::with_capacity(1024);
-    result.push_str(&fn_sig.to_str(context));
+
+    // Everything before `fn`
+    let span_before_fn = fn_sig.span_before_fn();
+    if context
+        .config
+        .file_lines()
+        .contains(&context.psess.lookup_line_range(span_before_fn))
+    {
+        result.push_str(&fn_sig.to_str(context));
+    } else {
+        let before_ident_span = mk_sp(span_before_fn.hi(), ident.span.lo());
+        let fn_lo = context
+            .snippet_provider
+            .span_before_last(before_ident_span, "fn");
+        result.push_str(context.snippet(mk_sp(span_before_fn.lo(), fn_lo)));
+    }
 
     // fn foo
     result.push_str("fn ");
