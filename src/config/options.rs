@@ -96,11 +96,17 @@ pub enum Heuristics {
 }
 
 impl Density {
-    pub fn to_list_tactic(self, len: usize) -> ListTactic {
+    pub fn to_list_tactic(self, style_edition: StyleEdition, len: usize) -> ListTactic {
         match self {
             Density::Compressed => ListTactic::Mixed,
             Density::Tall => ListTactic::HorizontalVertical,
-            Density::Vertical if len == 1 => ListTactic::Horizontal,
+            Density::Vertical if len == 1 => {
+                if style_edition <= StyleEdition::Edition2024 {
+                    ListTactic::Horizontal
+                } else {
+                    ListTactic::HorizontalVertical
+                }
+            }
             Density::Vertical => ListTactic::Vertical,
         }
     }
