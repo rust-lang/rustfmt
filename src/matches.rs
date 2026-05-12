@@ -6,7 +6,9 @@ use rustc_ast::{MatchKind, ast};
 use rustc_span::{BytePos, Span};
 use tracing::debug;
 
-use crate::comment::{FindUncommented, combine_strs_with_missing_comments, rewrite_comment};
+use crate::comment::{
+    FindUncommented, combine_strs_with_missing_comments, recover_comment_removed, rewrite_comment,
+};
 use crate::config::lists::*;
 use crate::config::{Config, ControlBraceStyle, IndentStyle, MatchArmLeadingPipe, StyleEdition};
 use crate::expr::{
@@ -293,7 +295,13 @@ fn rewrite_match_arm(
                 .offset_left(pipe_offset, arm.span)?
         }
     };
-    let pats_str = arm.pat.rewrite_result(context, pat_shape)?;
+    let pats_str_rewritten = arm.pat.rewrite_result(context, pat_shape)?;
+    // FIXME: if the original pattern span is multiline, then we should at least try to reindent
+    // it, but for now we leave it as it was before.
+    let pats_str = recover_comment_removed(pats_str_rewritten.clone(), arm.pat.span, context);
+    // We will continue formatting all other elements of of the `match`, but will still signal the
+    // error.
+    let inline_comment = pats_str != pats_str_rewritten;
 
     // Guard
     let block_like_pat = trimmed_last_line_width(&pats_str) <= context.config.tab_spaces();
@@ -319,7 +327,7 @@ fn rewrite_match_arm(
         arm.pat.span.hi(),
         arm.body.as_ref().unknown_error()?.span().lo(),
     );
-    rewrite_match_body(
+    let body = rewrite_match_body(
         context,
         arm.body.as_ref().unknown_error()?,
         &lhs_str,
@@ -327,7 +335,11 @@ fn rewrite_match_arm(
         guard_str.contains('\n'),
         arrow_span,
         is_last,
-    )
+    );
+    match (body, inline_comment) {
+        (Ok(body), true) => Err(RewriteError::InlineComment(body)),
+        (body, _) => body,
+    }
 }
 
 fn stmt_is_expr_mac(stmt: &ast::Stmt) -> bool {

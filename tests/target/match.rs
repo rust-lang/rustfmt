@@ -638,12 +638,11 @@ fn issue_4109() {
 
 fn issue_4119() {
     match () {
+        () => {}
         () // Comment
-        | _ => {
-{
-println!("Foo");
-}
-}
-_=> {}
-}
+| () => {
+            println!("Foo");
+        }
+        () => {}
+    }
 }

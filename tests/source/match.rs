@@ -593,12 +593,13 @@ unsafe {}
 
 fn issue_4119() {
     match () {
-        () // Comment
-        | _ => {
+()=> {}
+() // Comment
+| () => {
 {
 println!("Foo");
 }
 }
-_=> {}
+()=> {}
 }
 }
