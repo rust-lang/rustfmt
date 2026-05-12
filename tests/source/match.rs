@@ -590,3 +590,15 @@ unsafe {}
 }
 }
 }
+
+fn issue_4119() {
+    match () {
+        () // Comment
+        | _ => {
+{
+println!("Foo");
+}
+}
+_=> {}
+}
+}
