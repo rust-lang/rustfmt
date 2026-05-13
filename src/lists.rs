@@ -291,6 +291,8 @@ where
                 // Keep the original contents and recover, allowing the subsequent items to be
                 // formatted while keeping the original formatting of this item.
                 // This is currently only relevant to or-patterns with comments in between patterns.
+                // We gate this under future edition 2027 because the amount of code that needs to
+                // be reformatted in the wild is quite high.
                 item
             }
             Err(err) => return Err(err.clone()),

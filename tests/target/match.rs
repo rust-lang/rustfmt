@@ -1,3 +1,4 @@
+// rustfmt-edition: 2027
 // rustfmt-normalize_comments: true
 // Match expressions.
 

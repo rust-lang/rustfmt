@@ -139,7 +139,7 @@ fn make_opts() -> Options {
         "",
         "style-edition",
         "The edition of the Style Guide (unstable).",
-        "[2015|2018|2021|2024]",
+        "[2015|2018|2021|2024|2027]",
     );
     opts.optopt(
         "",

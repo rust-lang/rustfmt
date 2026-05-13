@@ -335,11 +335,11 @@ fn rewrite_match_arm(
         guard_str.contains('\n'),
         arrow_span,
         is_last,
-    );
-    match (body, inline_comment) {
-        (Ok(body), true) => Err(RewriteError::InlineComment(body)),
-        (body, _) => body,
+    )?;
+    if inline_comment && context.config.style_edition() >= StyleEdition::Edition2027 {
+        return Err(RewriteError::InlineComment(body));
     }
+    Ok(body)
 }
 
 fn stmt_is_expr_mac(stmt: &ast::Stmt) -> bool {
