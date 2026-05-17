@@ -218,13 +218,29 @@ fn rewrite_closure_expr(
         }
     }
 
+    // Check if the expression is a chain that starts with a block call,
+    // e.g. `{ ... }().method()`. In this case the body of the closure is a
+    // method call chain on a block expression, which should be allowed to
+    // span multiple lines without being wrapped in a block.
+    // See: https://github.com/rust-lang/rustfmt/issues/4050
+    fn is_chain_on_block_call(expr: &ast::Expr) -> bool {
+        match expr.kind {
+            ast::ExprKind::MethodCall(ref call) => is_chain_on_block_call(&call.receiver),
+            ast::ExprKind::Field(ref subexpr, _) => is_chain_on_block_call(subexpr),
+            ast::ExprKind::Call(ref callee, _) => {
+                matches!(callee.kind, ast::ExprKind::Block(..))
+            }
+            _ => false,
+        }
+    }
+
     // When rewriting closure's body without block, we require it to fit in a single line
     // unless it is a block-like expression or we are inside macro call.
     let veto_multiline = (!allow_multi_line(expr) && !context.inside_macro())
         || context.config.force_multiline_blocks();
     expr.rewrite_result(context, shape)
         .and_then(|rw| {
-            if veto_multiline && rw.contains('\n') {
+            if veto_multiline && rw.contains('\n') && !is_chain_on_block_call(expr) {
                 Err(RewriteError::Unknown)
             } else {
                 Ok(rw)

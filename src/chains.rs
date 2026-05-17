@@ -1071,6 +1071,11 @@ fn should_add_parens(expr: &ast::Expr, context: &RewriteContext<'_>) -> bool {
         ast::ExprKind::Closure(ref cl) => match cl.body.kind {
             ast::ExprKind::Range(_, _, ast::RangeLimits::HalfOpen) => true,
             ast::ExprKind::Lit(ref lit) => crate::expr::lit_ends_in_dot(lit, context),
+            // Closures with block bodies need parens when followed by method calls,
+            // otherwise the chain formatter can incorrectly associate the method call
+            // with the inner expression instead of the closure call result.
+            // See: https://github.com/rust-lang/rustfmt/issues/4050
+            ast::ExprKind::Block(..) => true,
             _ => false,
         },
         _ => false,
