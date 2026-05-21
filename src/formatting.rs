@@ -312,12 +312,35 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
     }
 }
 
+/// Converts a column (display width) offset to a byte offset in the given string.
+///
+/// This function walks through the string, accumulating the display width of each
+/// character, and returns the byte offset where the cumulative display width reaches
+/// the target column. This is necessary because multi-byte UTF-8 characters and
+/// characters with display width != 1 (e.g., CJK) cause column offsets and byte
+/// offsets to diverge.
+fn column_to_byte_offset(s: &str, target_col: usize, tab_spaces: usize) -> usize {
+    let mut col = 0;
+    for (byte_idx, c) in s.char_indices() {
+        if col >= target_col {
+            return byte_idx;
+        }
+        col += if c == '\t' {
+            tab_spaces
+        } else {
+            unicode_width::UnicodeWidthChar::width(c).unwrap_or(0)
+        };
+    }
+    s.len()
+}
+
 pub(crate) struct FormattingError {
     pub(crate) line: usize,
     pub(crate) kind: ErrorKind,
     is_comment: bool,
     is_string: bool,
     pub(crate) line_buffer: String,
+    tab_spaces: usize,
 }
 
 impl FormattingError {
@@ -328,6 +351,7 @@ impl FormattingError {
             kind,
             is_string: false,
             line_buffer: psess.span_to_first_line_string(span),
+            tab_spaces: 4,
         }
     }
 
@@ -354,7 +378,11 @@ impl FormattingError {
     // (space, target)
     pub(crate) fn format_len(&self) -> (usize, usize) {
         match self.kind {
-            ErrorKind::LineOverflow(found, max) => (max, found - max),
+            ErrorKind::LineOverflow(found, max) => {
+                let start = column_to_byte_offset(&self.line_buffer, max, self.tab_spaces);
+                let end = column_to_byte_offset(&self.line_buffer, found, self.tab_spaces);
+                (start, end - start)
+            }
             ErrorKind::TrailingWhitespace
             | ErrorKind::DeprecatedAttr
             | ErrorKind::BadAttr
@@ -607,6 +635,7 @@ impl<'a> FormatLines<'a> {
             is_comment,
             is_string,
             line_buffer: self.line_buffer.clone(),
+            tab_spaces: self.config.tab_spaces(),
         });
     }
 

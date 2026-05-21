@@ -739,6 +739,21 @@ fn format_lines_errors_are_reported_with_tabs() {
 
 // For each file, run rustfmt and collect the output.
 // Returns the number of files checked and the number of failures.
+#[test]
+fn format_lines_errors_with_unicode_do_not_ice() {
+    init_log();
+    // 120 snowmen (each 3 bytes) in a string literal, exceeding max_width=100
+    let snowmen: String = std::iter::repeat('☃').take(120).collect();
+    let input = Input::Text(format!("fn main() {{\n    \"{snowmen}\"\n}}"));
+    let mut config = Config::default();
+    config.set().error_on_line_overflow(true);
+    config.set().error_on_unformatted(true);
+    let mut session = Session::<io::Stdout>::new(config, None);
+    // Should not panic with an ICE about char boundaries
+    session.format(input).unwrap();
+    assert!(session.has_formatting_errors());
+}
+
 fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<FormatReport>, u32, u32) {
     let mut count = 0;
     let mut fails = 0;
