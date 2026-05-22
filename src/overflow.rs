@@ -757,7 +757,7 @@ fn last_item_shape(
     shape: Shape,
     args_max_width: usize,
 ) -> Option<Shape> {
-    if items.len() == 1 && !lists.get(0)?.is_nested_call() {
+    if items.len() == 1 && !lists.first()?.is_nested_call() {
         return Some(shape);
     }
     let offset = items
@@ -808,7 +808,7 @@ pub(crate) fn maybe_get_args_offset(
     config: &Config,
 ) -> Option<(bool, usize)> {
     if let Some(&(_, num_args_before)) = args
-        .get(0)?
+        .first()?
         .special_cases(config)
         .find(|&&(s, _)| s == callee_str)
     {
