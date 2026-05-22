@@ -106,7 +106,7 @@ impl<'a> CommentStyle<'a> {
         }
     }
 
-    pub(crate) fn to_str_tuplet(&self) -> (&'a str, &'a str, &'a str) {
+    pub(crate) fn to_str_tuplet(self) -> (&'a str, &'a str, &'a str) {
         (self.opener(), self.closer(), self.line_start())
     }
 }

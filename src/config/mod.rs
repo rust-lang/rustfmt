@@ -222,7 +222,7 @@ impl PartialConfig {
         ::toml::to_string(&cloned).map_err(ToTomlError)
     }
 
-    pub(super) fn to_parsed_config(
+    pub(super) fn into_parsed_config(
         self,
         style_edition_override: Option<StyleEdition>,
         edition_override: Option<Edition>,
@@ -438,7 +438,7 @@ impl Config {
                     format!("failed to get parent directory for {}", file_path.display())
                 })?;
 
-                Ok(parsed_config.to_parsed_config(style_edition, edition, version, dir))
+                Ok(parsed_config.into_parsed_config(style_edition, edition, version, dir))
             }
             Err(e) => {
                 let err_msg = format!(
