@@ -1336,7 +1336,7 @@ pub(crate) fn can_be_overflowed_type(
         ast::TyKind::Tup(..) => context.use_block_indent() && len == 1,
         ast::TyKind::Ref(_, ref mutty)
         | ast::TyKind::PinnedRef(_, ref mutty)
-        | ast::TyKind::Ptr(ref mutty) => can_be_overflowed_type(context, &*mutty.ty, len),
+        | ast::TyKind::Ptr(ref mutty) => can_be_overflowed_type(context, &mutty.ty, len),
         _ => false,
     }
 }

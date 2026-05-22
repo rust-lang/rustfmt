@@ -321,7 +321,7 @@ impl<'a> FnSig<'a> {
             constness: method_sig.header.constness,
             defaultness,
             ext: method_sig.header.ext,
-            decl: &*method_sig.decl,
+            decl: &method_sig.decl,
             generics,
             visibility,
         }
@@ -353,7 +353,7 @@ impl<'a> FnSig<'a> {
     fn to_str(&self, context: &RewriteContext<'_>) -> String {
         let mut result = String::with_capacity(128);
         // Vis defaultness constness unsafety abi.
-        result.push_str(&*format_visibility(context, self.visibility));
+        result.push_str(&format_visibility(context, self.visibility));
         result.push_str(format_defaultness(self.defaultness));
         result.push_str(format_constness(self.constness));
         self.coroutine_kind
@@ -1037,7 +1037,7 @@ fn format_impl_ref_and_type(
         IndentStyle::Visual => new_line_offset + trait_ref_overhead,
         IndentStyle::Block => new_line_offset,
     };
-    result.push_str(&*self_ty.rewrite_result(context, Shape::legacy(budget, type_offset))?);
+    result.push_str(&self_ty.rewrite_result(context, Shape::legacy(budget, type_offset))?);
     Ok(result)
 }
 
@@ -2314,7 +2314,7 @@ impl Rewrite for ast::Param {
                 !has_multiple_attr_lines && !has_doc_comments,
             )?;
 
-            if !is_empty_infer(&*self.ty, self.pat.span) {
+            if !is_empty_infer(&self.ty, self.pat.span) {
                 let (before_comment, after_comment) =
                     get_missing_param_comments(context, self.pat.span, self.ty.span, shape);
                 result.push_str(&before_comment);
@@ -3580,7 +3580,7 @@ pub(crate) fn rewrite_mod(
     attrs_shape: Shape,
 ) -> RewriteResult {
     let mut result = String::with_capacity(32);
-    result.push_str(&*format_visibility(context, &item.vis));
+    result.push_str(&format_visibility(context, &item.vis));
     result.push_str("mod ");
     result.push_str(rewrite_ident(context, ident));
     result.push(';');
