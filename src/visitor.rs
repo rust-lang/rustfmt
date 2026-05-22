@@ -132,7 +132,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             let snippet = self.snippet(mk_sp(self.last_pos, stmt.span().lo()));
             let original_starts_with_newline = snippet
                 .find(|c| c != ' ')
-                .map_or(false, |i| starts_with_newline(&snippet[i..]));
+                .is_some_and(|i| starts_with_newline(&snippet[i..]));
             let snippet = snippet.trim();
             if !snippet.is_empty() {
                 // FIXME(calebcartwright 2021-01-03) - This exists strictly to maintain legacy
@@ -933,7 +933,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // Extract leading `use ...;`.
         let items: Vec<_> = stmts
             .iter()
-            .take_while(|stmt| stmt.to_item().map_or(false, is_use_item))
+            .take_while(|stmt| stmt.to_item().is_some_and(is_use_item))
             .filter_map(|stmt| stmt.to_item())
             .collect();
 

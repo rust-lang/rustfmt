@@ -149,32 +149,23 @@ impl ListItem {
     pub(crate) fn is_different_group(&self) -> bool {
         self.inner_as_ref().contains('\n')
             || self.pre_comment.is_some()
-            || self
-                .post_comment
-                .as_ref()
-                .map_or(false, |s| s.contains('\n'))
+            || self.post_comment.as_ref().is_some_and(|s| s.contains('\n'))
     }
 
     pub(crate) fn is_multiline(&self) -> bool {
         self.inner_as_ref().contains('\n')
-            || self
-                .pre_comment
-                .as_ref()
-                .map_or(false, |s| s.contains('\n'))
-            || self
-                .post_comment
-                .as_ref()
-                .map_or(false, |s| s.contains('\n'))
+            || self.pre_comment.as_ref().is_some_and(|s| s.contains('\n'))
+            || self.post_comment.as_ref().is_some_and(|s| s.contains('\n'))
     }
 
     pub(crate) fn has_single_line_comment(&self) -> bool {
         self.pre_comment
             .as_ref()
-            .map_or(false, |comment| comment.trim_start().starts_with("//"))
+            .is_some_and(|comment| comment.trim_start().starts_with("//"))
             || self
                 .post_comment
                 .as_ref()
-                .map_or(false, |comment| comment.trim_start().starts_with("//"))
+                .is_some_and(|comment| comment.trim_start().starts_with("//"))
     }
 
     pub(crate) fn has_comment(&self) -> bool {

@@ -119,7 +119,7 @@ pub(crate) fn comment_style(orig: &str, normalize_comments: bool) -> CommentStyl
             CommentStyle::Exclamation
         } else if orig.starts_with("/*") {
             CommentStyle::SingleBullet
-        } else if orig.starts_with("///") && orig.chars().nth(3).map_or(true, |c| c != '/') {
+        } else if orig.starts_with("///") && (orig.chars().nth(3) != Some('/')) {
             CommentStyle::TripleSlash
         } else if orig.starts_with("//!") {
             CommentStyle::Doc
@@ -128,7 +128,7 @@ pub(crate) fn comment_style(orig: &str, normalize_comments: bool) -> CommentStyl
         } else {
             CommentStyle::DoubleSlash
         }
-    } else if (orig.starts_with("///") && orig.chars().nth(3).map_or(true, |c| c != '/'))
+    } else if (orig.starts_with("///") && (orig.chars().nth(3) != Some('/')))
         || (orig.starts_with("/**") && !orig.starts_with("/**/"))
     {
         CommentStyle::TripleSlash

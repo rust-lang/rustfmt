@@ -1006,7 +1006,7 @@ fn wrap_macro_args_inner(
         result.push_str(&arg.rewrite(context, shape, use_multiple_lines)?);
 
         if use_multiple_lines
-            && (arg.kind.ends_with_space() || iter.peek().map_or(false, |a| a.kind.has_meta_var()))
+            && (arg.kind.ends_with_space() || iter.peek().is_some_and(|a| a.kind.has_meta_var()))
         {
             if arg.kind.ends_with_space() {
                 result.pop();

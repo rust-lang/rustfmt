@@ -97,7 +97,7 @@ fn default_dcx(
     show_parse_errors: bool,
     color: Color,
 ) -> DiagCtxt {
-    let supports_color = term::stderr().map_or(false, |term| term.supports_color());
+    let supports_color = term::stderr().is_some_and(|term| term.supports_color());
     let emit_color = if supports_color {
         ColorConfig::from(color)
     } else {

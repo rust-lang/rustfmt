@@ -650,7 +650,7 @@ impl UseTree {
     }
 
     fn has_comment(&self) -> bool {
-        self.list_item.as_ref().map_or(false, ListItem::has_comment)
+        self.list_item.as_ref().is_some_and(ListItem::has_comment)
     }
 
     fn contains_comment(&self) -> bool {
@@ -1034,9 +1034,10 @@ fn rewrite_nested_use_tree(
         }
     }
     let has_nested_list = use_tree_list.iter().any(|use_segment| {
-        use_segment.path.last().map_or(false, |last_segment| {
-            matches!(last_segment.kind, UseSegmentKind::List(..))
-        })
+        use_segment
+            .path
+            .last()
+            .is_some_and(|last_segment| matches!(last_segment.kind, UseSegmentKind::List(..)))
     });
 
     let remaining_width = if has_nested_list {

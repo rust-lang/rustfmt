@@ -532,7 +532,7 @@ fn rewrite_empty_block(
     }
 
     let label_str = rewrite_label(context, label);
-    if attrs.map_or(false, |a| !inner_attributes(a).is_empty()) {
+    if attrs.is_some_and(|a| !inner_attributes(a).is_empty()) {
         return None;
     }
 
@@ -1287,7 +1287,7 @@ pub(crate) fn is_simple_block(
     block.stmts.len() == 1
         && stmt_is_expr(&block.stmts[0])
         && !block_contains_comment(context, block)
-        && attrs.map_or(true, |a| a.is_empty())
+        && attrs.is_none_or(|a| a.is_empty())
 }
 
 /// Checks whether a block contains at most one statement or expression, and no
@@ -1299,7 +1299,7 @@ pub(crate) fn is_simple_block_stmt(
 ) -> bool {
     block.stmts.len() <= 1
         && !block_contains_comment(context, block)
-        && attrs.map_or(true, |a| a.is_empty())
+        && attrs.is_none_or(|a| a.is_empty())
 }
 
 fn block_has_statements(block: &ast::Block) -> bool {
@@ -1318,7 +1318,7 @@ pub(crate) fn is_empty_block(
 ) -> bool {
     !block_has_statements(block)
         && !block_contains_comment(context, block)
-        && attrs.map_or(true, |a| inner_attributes(a).is_empty())
+        && attrs.is_none_or(|a| inner_attributes(a).is_empty())
 }
 
 pub(crate) fn stmt_is_expr(stmt: &ast::Stmt) -> bool {

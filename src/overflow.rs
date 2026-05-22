@@ -446,7 +446,7 @@ impl<'a> Context<'a> {
                     | ast::ExprKind::While(..)
                     | ast::ExprKind::Match(..) => {
                         let multi_line = rewrite_cond(self.context, expr, shape)
-                            .map_or(false, |cond| cond.contains('\n'));
+                            .is_some_and(|cond| cond.contains('\n'));
 
                         if multi_line {
                             None
@@ -549,7 +549,7 @@ impl<'a> Context<'a> {
                         .items
                         .last()
                         .and_then(|last_item| last_item.rewrite(self.context, self.nested_shape));
-                    let no_newline = rw.as_ref().map_or(false, |s| !s.contains('\n'));
+                    let no_newline = rw.as_ref().is_some_and(|s| !s.contains('\n'));
                     if no_newline {
                         list_items[self.items.len() - 1].item = rw.unknown_error();
                     } else {
@@ -740,14 +740,14 @@ impl<'a> Context<'a> {
 fn need_block_indent(s: &str, shape: Shape) -> bool {
     s.lines().skip(1).any(|s| {
         s.find(|c| !char::is_whitespace(c))
-            .map_or(false, |w| w + 1 < shape.indent.width())
+            .is_some_and(|w| w + 1 < shape.indent.width())
     })
 }
 
 fn can_be_overflowed(context: &RewriteContext<'_>, items: &[OverflowableItem<'_>]) -> bool {
     items
         .last()
-        .map_or(false, |x| x.can_be_overflowed(context, items.len()))
+        .is_some_and(|x| x.can_be_overflowed(context, items.len()))
 }
 
 /// Returns a shape for the last argument which is going to be overflowed.

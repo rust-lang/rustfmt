@@ -197,12 +197,12 @@ pub(crate) fn is_single_line(s: &str) -> bool {
 
 #[inline]
 pub(crate) fn first_line_contains_single_line_comment(s: &str) -> bool {
-    s.lines().next().map_or(false, |l| l.contains("//"))
+    s.lines().next().is_some_and(|l| l.contains("//"))
 }
 
 #[inline]
 pub(crate) fn last_line_contains_single_line_comment(s: &str) -> bool {
-    s.lines().last().map_or(false, |l| l.contains("//"))
+    s.lines().last().is_some_and(|l| l.contains("//"))
 }
 
 #[inline]
@@ -280,9 +280,7 @@ fn is_skip_nested(meta_item: &MetaItemInner) -> bool {
 
 #[inline]
 pub(crate) fn contains_skip(attrs: &[Attribute]) -> bool {
-    attrs
-        .iter()
-        .any(|a| a.meta().map_or(false, |a| is_skip(&a)))
+    attrs.iter().any(|a| a.meta().is_some_and(|a| is_skip(&a)))
 }
 
 #[inline]
@@ -472,7 +470,7 @@ pub(crate) fn starts_with_newline(s: &str) -> bool {
 
 #[inline]
 pub(crate) fn first_line_ends_with(s: &str, c: char) -> bool {
-    s.lines().next().map_or(false, |l| l.ends_with(c))
+    s.lines().next().is_some_and(|l| l.ends_with(c))
 }
 
 // States whether an expression's last line exclusively consists of closing

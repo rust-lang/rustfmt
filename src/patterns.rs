@@ -623,7 +623,7 @@ fn rewrite_tuple_pat(
         (&pat_vec[..], span)
     };
 
-    let is_last_pat_dotdot = pat_vec.last().map_or(false, |p| p.is_dotdot());
+    let is_last_pat_dotdot = pat_vec.last().is_some_and(|p| p.is_dotdot());
     let add_comma = path_str.is_none() && pat_vec.len() == 1 && !is_last_pat_dotdot;
     let path_str = path_str.unwrap_or_default();
 
