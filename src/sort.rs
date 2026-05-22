@@ -151,7 +151,7 @@ pub(crate) fn version_sort(a: &str, b: &str) -> std::cmp::Ordering {
                 (VersionChunk::Str(ca), VersionChunk::Str(cb))
                 | (VersionChunk::Str(ca), VersionChunk::Number { source: cb, .. })
                 | (VersionChunk::Number { source: ca, .. }, VersionChunk::Str(cb)) => {
-                    match ca.cmp(&cb) {
+                    match ca.cmp(cb) {
                         std::cmp::Ordering::Equal => {
                             continue;
                         }

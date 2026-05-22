@@ -499,14 +499,14 @@ impl Rewrite for ast::WherePredicate {
         let mut result = String::with_capacity(attrs_str.len() + pred_str.len() + 1);
         result.push_str(&attrs_str);
         let pred_start = self.span.lo();
-        let line_len = last_line_width(&attrs_str) + 1 + first_line_width(&pred_str);
+        let line_len = last_line_width(&attrs_str) + 1 + first_line_width(pred_str);
         if let Some(last_attr) = self.attrs.last().filter(|last_attr| {
             contains_comment(context.snippet(mk_sp(last_attr.span.hi(), pred_start)))
         }) {
             result = combine_strs_with_missing_comments(
                 context,
                 &result,
-                &pred_str,
+                pred_str,
                 mk_sp(last_attr.span.hi(), pred_start),
                 Shape {
                     width: shape.width.min(context.config.inline_attribute_width()),
@@ -525,7 +525,7 @@ impl Rewrite for ast::WherePredicate {
                     result.push(' ');
                 }
             }
-            result.push_str(&pred_str);
+            result.push_str(pred_str);
         }
 
         Ok(result)

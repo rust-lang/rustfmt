@@ -1859,7 +1859,7 @@ fn rewrite_ty<R: Rewrite>(
         let option = WhereClauseOption::new(true, WhereClauseSpace::Newline);
         let after_where_clause_str = rewrite_where_clause(
             context,
-            &after_where_clause,
+            after_where_clause,
             context.config.brace_style(),
             Shape::indented(indent, context.config),
             false,
@@ -2489,7 +2489,7 @@ fn rewrite_fn_base(
     let generics_str = rewrite_generics(
         context,
         rewrite_ident(context, ident),
-        &fn_sig.generics,
+        fn_sig.generics,
         shape,
     )?;
     result.push_str(&generics_str);
@@ -2734,7 +2734,7 @@ fn rewrite_fn_base(
     }
     let where_clause_str = rewrite_where_clause(
         context,
-        &where_clause,
+        where_clause,
         context.config.brace_style(),
         Shape::indented(indent, context.config),
         true,

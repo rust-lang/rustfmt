@@ -2321,7 +2321,7 @@ fn choose_rhs<R: Rewrite>(
 
             match (orig_rhs, new_rhs) {
                 (Ok(ref orig_rhs), Ok(ref new_rhs))
-                    if !filtered_str_fits(&new_rhs, context.config.max_width(), new_shape) =>
+                    if !filtered_str_fits(new_rhs, context.config.max_width(), new_shape) =>
                 {
                     Ok(format!("{before_space_str}{orig_rhs}"))
                 }

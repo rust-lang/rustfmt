@@ -65,7 +65,7 @@ impl<'a> Display for FormatReportFormatter<'a> {
 
                 let message_suffix = error.msg_suffix();
                 if !message_suffix.is_empty() {
-                    message = message.footer(Level::Note.title(&message_suffix));
+                    message = message.footer(Level::Note.title(message_suffix));
                 }
 
                 let origin = format!("{}:{}", file, error.line);
