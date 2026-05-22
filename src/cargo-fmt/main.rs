@@ -259,10 +259,9 @@ fn get_rustfmt_info(args: &[String]) -> Result<i32, io::Error> {
         .args(args)
         .spawn()
         .map_err(|e| match e.kind() {
-            io::ErrorKind::NotFound => io::Error::new(
-                io::ErrorKind::Other,
-                "Could not run rustfmt, please make sure it is in your PATH.",
-            ),
+            io::ErrorKind::NotFound => {
+                io::Error::other("Could not run rustfmt, please make sure it is in your PATH.")
+            }
             _ => e,
         })?;
     let result = command.wait()?;
@@ -373,10 +372,7 @@ fn get_targets(
     }
 
     if targets.is_empty() {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Failed to find targets".to_owned(),
-        ))
+        Err(io::Error::other("Failed to find targets".to_owned()))
     } else {
         Ok(targets)
     }
@@ -534,10 +530,9 @@ fn run_rustfmt(
             .args(fmt_args)
             .spawn()
             .map_err(|e| match e.kind() {
-                io::ErrorKind::NotFound => io::Error::new(
-                    io::ErrorKind::Other,
-                    "Could not run rustfmt, please make sure it is in your PATH.",
-                ),
+                io::ErrorKind::NotFound => {
+                    io::Error::other("Could not run rustfmt, please make sure it is in your PATH.")
+                }
                 _ => e,
             })?;
 
@@ -565,7 +560,7 @@ fn get_cargo_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Me
             cmd.other_options(vec![]);
             match cmd.exec() {
                 Ok(metadata) => Ok(metadata),
-                Err(error) => Err(io::Error::new(io::ErrorKind::Other, error.to_string())),
+                Err(error) => Err(io::Error::other(error.to_string())),
             }
         }
     }

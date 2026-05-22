@@ -109,10 +109,9 @@ fn run_rustfmt(files: &HashSet<String>, ranges: &[Range]) -> Result<(), FormatDi
         .status()?;
 
     if !exit_status.success() {
-        return Err(FormatDiffError::IoError(io::Error::new(
-            io::ErrorKind::Other,
-            format!("rustfmt failed with {exit_status}"),
-        )));
+        return Err(FormatDiffError::IoError(io::Error::other(format!(
+            "rustfmt failed with {exit_status}"
+        ))));
     }
     Ok(())
 }
