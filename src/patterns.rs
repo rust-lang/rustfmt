@@ -72,7 +72,7 @@ fn is_short_pattern_inner(context: &RewriteContext<'_>, pat: &ast::Pat) -> bool 
         ast::PatKind::Box(ref p)
         | PatKind::Deref(ref p)
         | ast::PatKind::Ref(ref p, _, _)
-        | ast::PatKind::Paren(ref p) => is_short_pattern_inner(context, &*p),
+        | ast::PatKind::Paren(ref p) => is_short_pattern_inner(context, p),
         PatKind::Or(ref pats) => pats.iter().all(|p| is_short_pattern_inner(context, p)),
     }
 }

@@ -351,7 +351,7 @@ fn block_can_be_flattened<'a>(
                 && is_simple_block(context, block, Some(&expr.attrs))
                 && !stmt_is_expr_mac(&block.stmts[0]) =>
         {
-            Some(&*block)
+            Some(block)
         }
         _ => None,
     }
@@ -381,16 +381,16 @@ fn flatten_arm_body<'a>(
                     .and_then(|shape| rewrite_cond(context, expr, shape))
                     .map_or(false, |cond| cond.contains('\n'));
                 if cond_becomes_multi_line {
-                    (false, &*body)
+                    (false, body)
                 } else {
-                    (can_extend(expr), &*expr)
+                    (can_extend(expr), expr)
                 }
             }
         } else {
-            (false, &*body)
+            (false, body)
         }
     } else {
-        (can_extend(body), &*body)
+        (can_extend(body), body)
     }
 }
 

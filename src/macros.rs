@@ -1464,7 +1464,7 @@ fn format_lazy_static(
         result.push_str(&rewrite_assign_rhs(
             context,
             stmt,
-            &*expr,
+            expr,
             &RhsAssignKind::Expr(&expr.kind, expr.span),
             nested_shape.sub_width(1, expr.span)?,
         )?);

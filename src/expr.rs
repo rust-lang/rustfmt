@@ -360,8 +360,8 @@ pub(crate) fn format_expr(
                         default_sp_delim(Some(lhs), Some(rhs))
                     };
                     rewrite_pair(
-                        &*lhs,
-                        &*rhs,
+                        lhs,
+                        rhs,
                         PairParts::infix(&sp_delim),
                         context,
                         shape,
@@ -374,7 +374,7 @@ pub(crate) fn format_expr(
                     } else {
                         default_sp_delim(None, Some(rhs))
                     };
-                    rewrite_unary_prefix(context, &sp_delim, &*rhs, shape)
+                    rewrite_unary_prefix(context, &sp_delim, rhs, shape)
                 }
                 (Some(lhs), None) => {
                     let sp_delim = if context.config.spaces_around_ranges() {
@@ -382,7 +382,7 @@ pub(crate) fn format_expr(
                     } else {
                         default_sp_delim(Some(lhs), None)
                     };
-                    rewrite_unary_suffix(context, &sp_delim, &*lhs, shape)
+                    rewrite_unary_suffix(context, &sp_delim, lhs, shape)
                 }
                 (None, None) => Ok(delim.to_owned()),
             }

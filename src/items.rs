@@ -1850,7 +1850,7 @@ fn rewrite_ty<R: Rewrite>(
         } else {
             shape
         };
-        rewrite_assign_rhs(context, lhs, &*ty, &RhsAssignKind::Ty, shape)?
+        rewrite_assign_rhs(context, lhs, ty, &RhsAssignKind::Ty, shape)?
     } else {
         result
     };
