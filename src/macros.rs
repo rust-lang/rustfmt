@@ -237,8 +237,10 @@ fn rewrite_macro_inner(
             Err(err) => match err {
                 // We will move on to parsing macro args just like other macros
                 // if we could not parse lazy_static! with known syntax
-                RewriteError::MacroFailure { kind, span: _ }
-                    if kind == MacroErrorKind::ParseFailure => {}
+                RewriteError::MacroFailure {
+                    kind: MacroErrorKind::ParseFailure,
+                    span: _,
+                } => {}
                 // If formatting fails even though parsing succeeds, return the err early
                 _ => return Err(err),
             },
