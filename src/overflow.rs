@@ -463,7 +463,7 @@ impl<'a> Context<'a> {
 
         if let Some(rewrite) = rewrite {
             // splitn(2, *).next().unwrap() is always safe.
-            let rewrite_first_line = Ok(rewrite.splitn(2, '\n').next().unwrap().to_owned());
+            let rewrite_first_line = Ok(rewrite.split('\n').next().unwrap().to_owned());
             last_list_item.item = rewrite_first_line;
             Some(rewrite)
         } else {
