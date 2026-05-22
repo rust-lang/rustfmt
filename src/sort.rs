@@ -95,7 +95,7 @@ impl<'a> Iterator for VersionChunkIter<'a> {
         let (_, next) = chars.next()?;
 
         if next == '_' {
-            self.start = self.start + next.len_utf8();
+            self.start += next.len_utf8();
             return Some(VersionChunk::Underscore);
         }
 
