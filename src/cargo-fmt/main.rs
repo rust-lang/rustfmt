@@ -467,7 +467,7 @@ fn get_targets_with_hitlist(
 ) -> Result<(), io::Error> {
     let metadata = get_cargo_metadata(manifest_path)?;
     let mut workspace_hitlist: BTreeSet<&str> =
-        BTreeSet::from_iter(hitlist.into_iter().map(|s| s.as_str()));
+        BTreeSet::from_iter(hitlist.iter().map(|s| s.as_str()));
 
     for package in metadata.packages {
         if workspace_hitlist.remove(package.name.as_ref()) {
