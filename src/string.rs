@@ -317,16 +317,14 @@ fn break_string(max_width: usize, trim_end: bool, line_end: &str, input: &[&str]
         // No whitespace found, try looking for a punctuation instead
         _ => match (0..max_width_index_in_input)
             .rev()
-            .skip_while(|pos| !is_valid_linebreak(input, *pos))
-            .next()
+            .find(|pos| is_valid_linebreak(input, *pos))
         {
             // Found a punctuation and what is on its left side is big enough.
             Some(index) if index >= MIN_STRING => break_at(index),
             // Either no boundary character was found to the left of `input[max_chars]`, or the line
             // got too small. We try searching for a boundary character to the right.
             _ => match (max_width_index_in_input..input.len())
-                .skip_while(|pos| !is_valid_linebreak(input, *pos))
-                .next()
+                .find(|pos| is_valid_linebreak(input, *pos))
             {
                 // A boundary was found after the line limit
                 Some(index) => break_at(index),
