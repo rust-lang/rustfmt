@@ -315,15 +315,15 @@ impl PartialEq for Target {
     }
 }
 
-impl PartialOrd for Target {
-    fn partial_cmp(&self, other: &Target) -> Option<Ordering> {
-        Some(self.path.cmp(&other.path))
-    }
-}
-
 impl Ord for Target {
     fn cmp(&self, other: &Target) -> Ordering {
         self.path.cmp(&other.path)
+    }
+}
+
+impl PartialOrd for Target {
+    fn partial_cmp(&self, other: &Target) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
