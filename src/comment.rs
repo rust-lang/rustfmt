@@ -11,7 +11,7 @@ use crate::rewrite::{RewriteContext, RewriteErrorExt, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::string::{StringFormat, rewrite_string};
 use crate::utils::{
-    count_newlines, first_line_width, last_line_width, trim_left_preserve_layout,
+    CodeBlockTracker, count_newlines, first_line_width, last_line_width, trim_left_preserve_layout,
     trimmed_last_line_width, unicode_str_width,
 };
 use crate::{ErrorKind, FormattingError};
@@ -908,7 +908,7 @@ fn rewrite_comment_inner(
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
     let line_breaks = count_newlines(orig.trim_end());
-    let mut is_in_code_block = false;
+    let mut code_blocker_tracker = CodeBlockTracker::default();
     let lines = orig
         .lines()
         .enumerate()
@@ -919,14 +919,16 @@ fn rewrite_comment_inner(
                 line = line[..(line.len() - 2)].trim_end();
             }
 
-            let code_block_matches = line.matches("```").count();
-            if code_block_matches != 0 && code_block_matches % 2 == 1 {
-                is_in_code_block = !is_in_code_block;
-                left_trim_comment_line(line, &style)
-            } else if is_in_code_block {
-                left_trim_comment_code_line(line, &style)
-            } else {
-                left_trim_comment_line(line, &style)
+            line
+        })
+        .map(move |line| {
+            code_blocker_tracker = code_blocker_tracker.next_line(line);
+            match code_blocker_tracker {
+                CodeBlockTracker::Outside
+                | CodeBlockTracker::Opener
+                | CodeBlockTracker::Closer
+                | CodeBlockTracker::SingleLineCodeBlock => left_trim_comment_line(line, &style),
+                CodeBlockTracker::Inside => left_trim_comment_code_line(line, &style),
             }
         })
         .map(|(line, has_leading_whitespace)| {
