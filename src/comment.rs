@@ -908,6 +908,7 @@ fn rewrite_comment_inner(
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
     let line_breaks = count_newlines(orig.trim_end());
+    let mut is_in_code_block = false;
     let lines = orig
         .lines()
         .enumerate()
@@ -918,9 +919,16 @@ fn rewrite_comment_inner(
                 line = line[..(line.len() - 2)].trim_end();
             }
 
-            line
+            let code_block_matches = line.matches("```").count();
+            if code_block_matches != 0 && code_block_matches % 2 == 1 {
+                is_in_code_block = !is_in_code_block;
+                left_trim_comment_line(line, &style)
+            } else if is_in_code_block {
+                left_trim_doc_comment_code_line(line, &style)
+            } else {
+                left_trim_comment_line(line, &style)
+            }
         })
-        .map(|s| left_trim_comment_line(s, &style))
         .map(|(line, has_leading_whitespace)| {
             if orig.starts_with("/*") && line_breaks == 0 {
                 (
@@ -1115,6 +1123,59 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
         (stripped, false)
     } else {
         (line, line.starts_with(' '))
+    }
+}
+
+/// Trims a single comment character and possibly a single space from the left of a string.
+/// Does not trim all whitespace. If at least one space is trimmed from the left of the string,
+/// this function returns true.
+fn left_trim_doc_comment_code_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
+    enum TrimLeftDocCode<'a> {
+        Trimmed(&'a str),
+        Unmodified(&'a str),
+    }
+    fn trim_left_doc_code<'a>(line: &'a str, pat: &'_ str) -> TrimLeftDocCode<'a> {
+        if let Some(new_line_segment) = line.strip_prefix(pat) {
+            TrimLeftDocCode::Trimmed(new_line_segment)
+        } else {
+            TrimLeftDocCode::Unmodified(line)
+        }
+    }
+    let opener = style.opener();
+    match style {
+        CommentStyle::DoubleSlash | CommentStyle::TripleSlash | CommentStyle::Doc => {
+            match trim_left_doc_code(line, opener) {
+                TrimLeftDocCode::Trimmed(line) => (line, true),
+                TrimLeftDocCode::Unmodified(line) => {
+                    match trim_left_doc_code(line, opener.trim_end()) {
+                        TrimLeftDocCode::Trimmed(line) | TrimLeftDocCode::Unmodified(line) => {
+                            (line, false)
+                        }
+                    }
+                }
+            }
+        }
+        CommentStyle::SingleBullet | CommentStyle::DoubleBullet | CommentStyle::Exclamation => {
+            match trim_left_doc_code(line, opener) {
+                TrimLeftDocCode::Trimmed(line) => (line, true),
+                TrimLeftDocCode::Unmodified(line) => {
+                    match trim_left_doc_code(line, style.line_start().trim_start()) {
+                        TrimLeftDocCode::Trimmed(line) => (line, true),
+                        TrimLeftDocCode::Unmodified(line) => (line, false),
+                    }
+                }
+            }
+        }
+        CommentStyle::Custom(_) => match trim_left_doc_code(line, opener) {
+            TrimLeftDocCode::Trimmed(line) => (line, opener.ends_with(' ')),
+            TrimLeftDocCode::Unmodified(line) => {
+                match trim_left_doc_code(line, opener.trim_end()) {
+                    TrimLeftDocCode::Trimmed(line) | TrimLeftDocCode::Unmodified(line) => {
+                        (line, false)
+                    }
+                }
+            }
+        },
     }
 }
 
