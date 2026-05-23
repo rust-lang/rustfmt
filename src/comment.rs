@@ -924,7 +924,7 @@ fn rewrite_comment_inner(
                 is_in_code_block = !is_in_code_block;
                 left_trim_comment_line(line, &style)
             } else if is_in_code_block {
-                left_trim_doc_comment_code_line(line, &style)
+                left_trim_comment_code_line(line, &style)
             } else {
                 left_trim_comment_line(line, &style)
             }
@@ -1129,7 +1129,7 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
 /// Trims a single comment character and possibly a single space from the left of a string.
 /// Does not trim all whitespace. If at least one space is trimmed from the left of the string,
 /// this function returns true.
-fn left_trim_doc_comment_code_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
+fn left_trim_comment_code_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
     enum TrimLeftDocCode<'a> {
         Trimmed(&'a str),
         Unmodified(&'a str),
