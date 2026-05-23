@@ -1126,9 +1126,9 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
     }
 }
 
-/// Trims a single comment character and possibly a single space from the left of a string.
-/// Does not trim all whitespace. If at least one space is trimmed from the left of the string,
-/// this function returns true.
+/// Trims the beginning of a comment's opener or line start, leaving the rest untouched.
+/// If at least one whitespace is trimmed, the second element of the tuple is true.
+/// Will only ever trim one whitespace unless a custom comment style is used.
 fn left_trim_comment_code_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
     enum TrimLeftDocCode<'a> {
         Trimmed(&'a str),
