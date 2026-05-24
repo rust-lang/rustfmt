@@ -1132,25 +1132,25 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
 /// If at least one whitespace is trimmed, the second element of the tuple is true.
 /// Will only ever trim one whitespace unless a custom comment style is used.
 fn left_trim_comment_code_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
-    enum TrimLeftDocCode<'a> {
+    enum TrimLeftCodeLine<'a> {
         Trimmed(&'a str),
         Unmodified(&'a str),
     }
-    fn trim_left_doc_code<'a>(line: &'a str, pat: &'_ str) -> TrimLeftDocCode<'a> {
+    fn trim_left_doc_code<'a>(line: &'a str, pat: &'_ str) -> TrimLeftCodeLine<'a> {
         if let Some(new_line_segment) = line.strip_prefix(pat) {
-            TrimLeftDocCode::Trimmed(new_line_segment)
+            TrimLeftCodeLine::Trimmed(new_line_segment)
         } else {
-            TrimLeftDocCode::Unmodified(line)
+            TrimLeftCodeLine::Unmodified(line)
         }
     }
     let opener = style.opener();
     match style {
         CommentStyle::DoubleSlash | CommentStyle::TripleSlash | CommentStyle::Doc => {
             match trim_left_doc_code(line, opener) {
-                TrimLeftDocCode::Trimmed(line) => (line, true),
-                TrimLeftDocCode::Unmodified(line) => {
+                TrimLeftCodeLine::Trimmed(line) => (line, true),
+                TrimLeftCodeLine::Unmodified(line) => {
                     match trim_left_doc_code(line, opener.trim_end()) {
-                        TrimLeftDocCode::Trimmed(line) | TrimLeftDocCode::Unmodified(line) => {
+                        TrimLeftCodeLine::Trimmed(line) | TrimLeftCodeLine::Unmodified(line) => {
                             (line, false)
                         }
                     }
@@ -1159,20 +1159,20 @@ fn left_trim_comment_code_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (
         }
         CommentStyle::SingleBullet | CommentStyle::DoubleBullet | CommentStyle::Exclamation => {
             match trim_left_doc_code(line, opener) {
-                TrimLeftDocCode::Trimmed(line) => (line, true),
-                TrimLeftDocCode::Unmodified(line) => {
+                TrimLeftCodeLine::Trimmed(line) => (line, true),
+                TrimLeftCodeLine::Unmodified(line) => {
                     match trim_left_doc_code(line, style.line_start().trim_start()) {
-                        TrimLeftDocCode::Trimmed(line) => (line, true),
-                        TrimLeftDocCode::Unmodified(line) => (line, false),
+                        TrimLeftCodeLine::Trimmed(line) => (line, true),
+                        TrimLeftCodeLine::Unmodified(line) => (line, false),
                     }
                 }
             }
         }
         CommentStyle::Custom(_) => match trim_left_doc_code(line, opener) {
-            TrimLeftDocCode::Trimmed(line) => (line, opener.ends_with(' ')),
-            TrimLeftDocCode::Unmodified(line) => {
+            TrimLeftCodeLine::Trimmed(line) => (line, opener.ends_with(' ')),
+            TrimLeftCodeLine::Unmodified(line) => {
                 match trim_left_doc_code(line, opener.trim_end()) {
-                    TrimLeftDocCode::Trimmed(line) | TrimLeftDocCode::Unmodified(line) => {
+                    TrimLeftCodeLine::Trimmed(line) | TrimLeftCodeLine::Unmodified(line) => {
                         (line, false)
                     }
                 }
