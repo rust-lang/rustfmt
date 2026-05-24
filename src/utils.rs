@@ -721,7 +721,7 @@ pub(crate) enum CodeBlockTracker {
     /// Code block opener and closer are on the same line.
     ///
     /// Ex.
-    /// ```
+    /// ```text
     /// // ```type SomeType = usize;```
     /// ```
     SingleLineCodeBlock,
