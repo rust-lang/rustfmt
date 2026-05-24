@@ -135,6 +135,17 @@ pub enum ImportGranularity {
     One,
 }
 
+#[config_type]
+/// How to insert blank lines around documented struct fields.
+pub enum DocumentedStructFieldBlankLines {
+    /// Keep existing spacing.
+    Preserve,
+    /// Always insert blank lines around documented struct field sections.
+    Always,
+    /// Insert blank lines when the struct has at least the configured number of fields.
+    Threshold,
+}
+
 /// Controls how rustfmt should handle case in hexadecimal literals.
 #[config_type]
 pub enum HexLiteralCase {
@@ -661,6 +672,9 @@ config_option_with_style_edition_default!(
     CombineControlExpr, bool, _ => true;
     ShortArrayElementWidthThreshold, usize, _ => 10;
     OverflowDelimitedExpr, bool, _ => false;
+    DocumentedStructFieldBlankLinesConfig, DocumentedStructFieldBlankLines, _ =>
+        DocumentedStructFieldBlankLines::Preserve;
+    DocumentedStructFieldBlankLinesThreshold, usize, _ => 4;
     StructFieldAlignThreshold, usize, _ => 0;
     EnumDiscrimAlignThreshold, usize, _ => 0;
     MatchArmBlocks, bool, _ => true;

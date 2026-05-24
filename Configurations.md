@@ -2783,6 +2783,81 @@ struct Foo {
 }
 ```
 
+## `documented_struct_field_blank_lines`
+
+Whether rustfmt inserts blank lines around documented struct field sections.
+
+- **Default value**: `"Preserve"`
+- **Possible values**: `"Preserve"`, `"Always"`, `"Threshold"`
+- **Stable**: No (tracking issue: [#6925](https://github.com/rust-lang/rustfmt/issues/6925))
+
+#### `"Preserve"` (default):
+
+```rust
+struct Foo {
+    a: u32,
+    /// Beta.
+    b: u32,
+    /// Gamma.
+    c: u32,
+}
+```
+
+#### `"Always"`:
+
+```rust
+struct Foo {
+    a: u32,
+
+    /// Beta.
+    b: u32,
+
+    /// Gamma.
+    c: u32,
+}
+```
+
+#### `"Threshold"`:
+
+Use [`documented_struct_field_blank_lines_threshold`](#documented_struct_field_blank_lines_threshold)
+to decide when to apply the spacing.
+
+## `documented_struct_field_blank_lines_threshold`
+
+Minimum total number of fields in a struct before rustfmt inserts blank lines around documented
+struct field sections when `documented_struct_field_blank_lines = "Threshold"`.
+Spacing is applied to each contiguous section of documented fields within a qualifying struct.
+
+- **Default value**: `4`
+- **Possible values**: any non-negative integer
+- **Stable**: No (tracking issue: [#6925](https://github.com/rust-lang/rustfmt/issues/6925))
+
+#### `4` (default):
+
+```rust
+// rustfmt-documented_struct_field_blank_lines: "Threshold"
+// rustfmt-documented_struct_field_blank_lines_threshold: 4
+
+struct Foo {
+    a: u32,
+    /// Beta.
+    b: u32,
+    /// Gamma.
+    c: u32,
+}
+
+struct Bar {
+    a: u32,
+
+    /// Beta.
+    b: u32,
+
+    /// Gamma.
+    c: u32,
+    d: u32,
+}
+```
+
 ## `struct_lit_single_line`
 
 Put small struct literals on a single line

@@ -8,6 +8,7 @@ use rustc_span::{BytePos, Span};
 
 use crate::comment::combine_strs_with_missing_comments;
 use crate::config::lists::*;
+use crate::config::DocumentedStructFieldBlankLines;
 use crate::expr::rewrite_field;
 use crate::items::{rewrite_struct_field, rewrite_struct_field_prefix};
 use crate::lists::{
@@ -31,6 +32,9 @@ pub(crate) trait AlignedItem {
         shape: Shape,
         prefix_max_width: usize,
     ) -> RewriteResult;
+    fn is_documented(&self) -> bool {
+        false
+    }
 }
 
 impl AlignedItem for ast::FieldDef {
@@ -68,6 +72,10 @@ impl AlignedItem for ast::FieldDef {
         prefix_max_width: usize,
     ) -> RewriteResult {
         rewrite_struct_field(context, self, shape, prefix_max_width)
+    }
+
+    fn is_documented(&self) -> bool {
+        self.attrs.iter().any(|attr| attr.is_doc_comment())
     }
 }
 
@@ -235,6 +243,8 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     )
     .collect::<Vec<_>>();
 
+    insert_blank_lines_between_documented_fields(context, fields, &mut items);
+
     let tactic = definitive_tactic(
         &items,
         ListTactic::HorizontalVertical,
@@ -267,6 +277,61 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
         .trailing_separator(separator_tactic)
         .preserve_newline(true);
     write_list(&items, &fmt).ok()
+}
+
+fn insert_blank_lines_between_documented_fields<T: AlignedItem>(
+    context: &RewriteContext<'_>,
+    fields: &[T],
+    items: &mut [ListItem],
+) {
+    if !should_insert_documented_field_blank_lines(context, fields) {
+        return;
+    }
+
+    let mut run_start = None;
+    for (index, field) in fields.iter().enumerate() {
+        if field.is_documented() {
+            run_start.get_or_insert(index);
+            continue;
+        }
+
+        mark_documented_field_run(items, run_start.take(), index);
+    }
+
+    mark_documented_field_run(items, run_start, fields.len());
+}
+
+fn should_insert_documented_field_blank_lines<T: AlignedItem>(
+    context: &RewriteContext<'_>,
+    fields: &[T],
+) -> bool {
+    match context.config.documented_struct_field_blank_lines() {
+        DocumentedStructFieldBlankLines::Preserve => false,
+        DocumentedStructFieldBlankLines::Always => true,
+        DocumentedStructFieldBlankLines::Threshold => {
+            fields.len() >= context.config.documented_struct_field_blank_lines_threshold()
+        }
+    }
+}
+
+fn mark_documented_field_run(
+    items: &mut [ListItem],
+    run_start: Option<usize>,
+    run_end: usize,
+) {
+    let Some(run_start) = run_start else {
+        return;
+    };
+
+    // `ListItem::new_lines` inserts an extra blank line after the current item,
+    // so a documented section break is represented by marking the preceding item.
+    if run_start > 0 {
+        items[run_start - 1].new_lines = true;
+    }
+
+    for item in &mut items[run_start..run_end.saturating_sub(1)] {
+        item.new_lines = true;
+    }
 }
 
 /// Returns the index in `fields` up to which a field belongs to the current group.

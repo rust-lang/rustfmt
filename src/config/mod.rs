@@ -123,6 +123,11 @@ create_config! {
         "Width threshold for an array element to be considered short";
     overflow_delimited_expr: OverflowDelimitedExpr, false,
         "Allow trailing bracket/brace delimited expressions to overflow";
+    documented_struct_field_blank_lines: DocumentedStructFieldBlankLinesConfig, false,
+        "Whether to insert blank lines around documented struct field sections";
+    documented_struct_field_blank_lines_threshold: DocumentedStructFieldBlankLinesThreshold, false,
+        "Minimum total number of struct fields required before documented field section spacing \
+        is inserted when documented_struct_field_blank_lines = \"Threshold\"";
     struct_field_align_threshold: StructFieldAlignThreshold, false,
         "Align struct fields if their diffs fits within threshold";
     enum_discrim_align_threshold: EnumDiscrimAlignThreshold, false,
@@ -801,6 +806,8 @@ remove_nested_parens = true
 combine_control_expr = true
 short_array_element_width_threshold = 10
 overflow_delimited_expr = false
+documented_struct_field_blank_lines = "Preserve"
+documented_struct_field_blank_lines_threshold = 4
 struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
@@ -893,6 +900,8 @@ remove_nested_parens = true
 combine_control_expr = true
 short_array_element_width_threshold = 10
 overflow_delimited_expr = false
+documented_struct_field_blank_lines = "Preserve"
+documented_struct_field_blank_lines_threshold = 4
 struct_field_align_threshold = 0
 enum_discrim_align_threshold = 0
 match_arm_blocks = true
