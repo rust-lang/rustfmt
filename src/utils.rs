@@ -738,8 +738,8 @@ impl CodeBlockTracker {
     /// ```text
     /// "```let i = 1;``` ```let i = 2;``` ```"
     /// ```
-    /// The above line will be considered an opener because
-    /// the last code blocker opener/closer is an opener to a new code block.
+    /// The above line will be considered an opener and not single line code block
+    /// because the last code block opener/closer is an opener to a new code block.
     pub(crate) fn next_line(self, line: &str) -> Self {
         let code_block_matches = line.matches("```").count();
         // Check if a code block is opened or closed,
