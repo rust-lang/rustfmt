@@ -732,6 +732,14 @@ pub(crate) enum CodeBlockTracker {
 impl CodeBlockTracker {
     /// Reads the next line of a comment and
     /// updates the code block tracker accordingly.
+    ///
+    /// This function only cares about the last state of the line,
+    /// for example:
+    /// ```text
+    /// "```let i = 1;``` ```let i = 2;``` ```"
+    /// ```
+    /// The above line will be considered an opener because
+    /// the last code blocker opener/closer is an opener to a new code block.
     pub(crate) fn next_line(self, line: &str) -> Self {
         let code_block_matches = line.matches("```").count();
         // Check if a code block is opened or closed,
@@ -774,8 +782,8 @@ impl CodeBlockTracker {
                     CodeBlockTracker::Closer => {
                         // If previously detected a code block closer,
                         // and now we detect an opener and closer,
-                        // then the last code block opener/closer is a closer.
-                        CodeBlockTracker::Closer
+                        // then this is a single line code block.
+                        CodeBlockTracker::SingleLineCodeBlock
                     }
                 }
             }
@@ -862,6 +870,53 @@ mod test {
         code_block_tracker =
             code_block_tracker.next_line("/// Ex. ``````// ```type SomeType = usize;``` ``````");
         assert_eq!(code_block_tracker, CodeBlockTracker::SingleLineCodeBlock);
+
+        code_block_tracker =
+            code_block_tracker.next_line("/// This is a comment after a code block!");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Outside);
+    }
+
+    #[test]
+    fn test_code_block_tracker_multiple_code_blocks() {
+        let mut code_block_tracker = CodeBlockTracker::default();
+
+        code_block_tracker =
+            code_block_tracker.next_line("/// This is a comment before a code block!");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Outside);
+
+        code_block_tracker = code_block_tracker.next_line("/// ```type SomeType = usize;```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::SingleLineCodeBlock);
+
+        code_block_tracker = code_block_tracker.next_line("/// ```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Opener);
+
+        code_block_tracker = code_block_tracker.next_line("/// ``` In between code blocks! ```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Opener);
+
+        code_block_tracker = code_block_tracker.next_line("/// type Meow = f32;");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Inside);
+
+        code_block_tracker = code_block_tracker.next_line("/// ```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Closer);
+
+        code_block_tracker = code_block_tracker.next_line("/// ```type CatsOuttaTheBag = f64;```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::SingleLineCodeBlock);
+
+        code_block_tracker = code_block_tracker.next_line("/// ```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Opener);
+
+        code_block_tracker = code_block_tracker.next_line("/// ```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Closer);
+
+        code_block_tracker = code_block_tracker
+            .next_line("/// ```type CatsOuttaTheHome = bool;``` ```type DogsInTheHouse = i64");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Opener);
+
+        code_block_tracker = code_block_tracker.next_line("/// ``` ```let me = \"YOU\";``` ```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Opener);
+
+        code_block_tracker = code_block_tracker.next_line("/// ```");
+        assert_eq!(code_block_tracker, CodeBlockTracker::Closer);
 
         code_block_tracker =
             code_block_tracker.next_line("/// This is a comment after a code block!");
