@@ -2,9 +2,7 @@
 
 /// rustdoc comment
 use a::a;
-/// rustdoc comment
 use a::b;
-/// rustdoc comment
 use a::c;
 
 // standard comment

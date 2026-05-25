@@ -700,6 +700,12 @@ impl UseTree {
         if self.path.is_empty() || self.contains_comment() {
             return vec![self];
         }
+        let (mut doc_comments, attributes): (ast::AttrVec, ast::AttrVec) = self
+            .attrs
+            .iter()
+            .cloned()
+            .flat_map(|attrs| attrs.into_iter())
+            .partition(|attr| attr.is_doc_comment());
         match &self.path.clone().last().unwrap().kind {
             UseSegmentKind::List(list) => {
                 if list.len() == 1 && list[0].path.len() == 1 {
@@ -720,7 +726,12 @@ impl UseTree {
                             visibility: self.visibility.clone(),
                             // only retain attributes for `ImportGranularity::Item`
                             attrs: match import_granularity {
-                                ImportGranularity::Item => self.attrs.clone(),
+                                ImportGranularity::Item => Some(
+                                    doc_comments
+                                        .drain(..)
+                                        .chain(attributes.iter().cloned())
+                                        .collect(),
+                                ),
                                 _ => None,
                             },
                         });
