@@ -920,7 +920,7 @@ fn rewrite_comment_inner(
 
             line
         })
-        .map(move |line| left_trim_comment_line(line, &style))
+        .map(|line| left_trim_comment_line(line, &style))
         .map(|(line, has_leading_whitespace)| {
             if orig.starts_with("/*") && line_breaks == 0 {
                 (
