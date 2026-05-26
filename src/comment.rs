@@ -11,7 +11,7 @@ use crate::rewrite::{RewriteContext, RewriteErrorExt, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::string::{StringFormat, rewrite_string};
 use crate::utils::{
-    CodeBlockTracker, count_newlines, first_line_width, last_line_width, trim_left_preserve_layout,
+    count_newlines, first_line_width, last_line_width, trim_left_preserve_layout,
     trimmed_last_line_width, unicode_str_width,
 };
 use crate::{ErrorKind, FormattingError};
@@ -908,7 +908,6 @@ fn rewrite_comment_inner(
     let mut rewriter = CommentRewrite::new(orig, block_style, shape, config);
 
     let line_breaks = count_newlines(orig.trim_end());
-    let mut code_blocker_tracker = CodeBlockTracker::default();
     let lines = orig
         .lines()
         .enumerate()
@@ -921,16 +920,7 @@ fn rewrite_comment_inner(
 
             line
         })
-        .map(move |line| {
-            code_blocker_tracker = code_blocker_tracker.next_line(line);
-            match code_blocker_tracker {
-                CodeBlockTracker::Outside
-                | CodeBlockTracker::Opener
-                | CodeBlockTracker::Closer
-                | CodeBlockTracker::SingleLineCodeBlock => left_trim_comment_line(line, &style),
-                CodeBlockTracker::Inside => left_trim_comment_code_line(line, &style),
-            }
-        })
+        .map(move |line| left_trim_comment_line(line, &style))
         .map(|(line, has_leading_whitespace)| {
             if orig.starts_with("/*") && line_breaks == 0 {
                 (
@@ -1090,94 +1080,43 @@ fn light_rewrite_comment(
         .join(&format!("\n{}", offset.to_string(config)))
 }
 
-/// Trims comment characters and possibly a single space from the left of a string.
-/// Does not trim all whitespace. If a single space is trimmed from the left of the string,
-/// this function returns true.
-fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
-    if line.starts_with("//! ")
-        || line.starts_with("/// ")
-        || line.starts_with("/*! ")
-        || line.starts_with("/** ")
-    {
-        (&line[4..], true)
-    } else if let CommentStyle::Custom(opener) = *style {
-        if let Some(stripped) = line.strip_prefix(opener) {
-            (stripped, true)
-        } else {
-            (&line[opener.trim_end().len()..], false)
-        }
-    } else if line.starts_with("/* ")
-        || line.starts_with("// ")
-        || line.starts_with("//!")
-        || line.starts_with("///")
-        || line.starts_with("** ")
-        || line.starts_with("/*!")
-        || (line.starts_with("/**") && !line.starts_with("/**/"))
-    {
-        (&line[3..], line.chars().nth(2).unwrap() == ' ')
-    } else if line.starts_with("/*")
-        || line.starts_with("* ")
-        || line.starts_with("//")
-        || line.starts_with("**")
-    {
-        (&line[2..], line.chars().nth(1).unwrap() == ' ')
-    } else if let Some(stripped) = line.strip_prefix('*') {
-        (stripped, false)
-    } else {
-        (line, line.starts_with(' '))
-    }
-}
-
 /// Trims the beginning of a comment's opener or line start, leaving the rest untouched.
 /// If at least one whitespace is trimmed, the second element of the tuple is true.
 /// Will only ever trim one whitespace unless a custom comment style is used.
-fn left_trim_comment_code_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
-    enum TrimLeftCodeLine<'a> {
-        Trimmed(&'a str),
-        Unmodified(&'a str),
-    }
-    fn trim_left_doc_code<'a>(line: &'a str, pat: &'_ str) -> TrimLeftCodeLine<'a> {
-        if let Some(new_line_segment) = line.strip_prefix(pat) {
-            TrimLeftCodeLine::Trimmed(new_line_segment)
-        } else {
-            TrimLeftCodeLine::Unmodified(line)
-        }
-    }
+fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
     let opener = style.opener();
     match style {
         CommentStyle::DoubleSlash | CommentStyle::TripleSlash | CommentStyle::Doc => {
-            match trim_left_doc_code(line, opener) {
-                TrimLeftCodeLine::Trimmed(line) => (line, true),
-                TrimLeftCodeLine::Unmodified(line) => {
-                    match trim_left_doc_code(line, opener.trim_end()) {
-                        TrimLeftCodeLine::Trimmed(line) | TrimLeftCodeLine::Unmodified(line) => {
-                            (line, false)
-                        }
-                    }
-                }
+            if let Some(line) = line.strip_prefix(opener) {
+                (line, true)
+            } else if let Some(line) = line.strip_prefix(opener.trim_end()) {
+                (line, false)
+            } else {
+                (line, false)
             }
         }
         CommentStyle::SingleBullet | CommentStyle::DoubleBullet | CommentStyle::Exclamation => {
-            match trim_left_doc_code(line, opener) {
-                TrimLeftCodeLine::Trimmed(line) => (line, true),
-                TrimLeftCodeLine::Unmodified(line) => {
-                    match trim_left_doc_code(line, style.line_start().trim_start()) {
-                        TrimLeftCodeLine::Trimmed(line) => (line, true),
-                        TrimLeftCodeLine::Unmodified(line) => (line, false),
-                    }
-                }
+            if let Some(line) = line.strip_prefix(opener) {
+                (line, true)
+            } else if let Some(line) = line.strip_prefix(opener.trim_end()) {
+                (line, false)
+            } else if let Some(line) = line.strip_prefix(style.line_start()) {
+                (line, true)
+            } else if let Some(line) = line.strip_prefix(style.line_start().trim_start()) {
+                (line, true)
+            } else {
+                (line, false)
             }
         }
-        CommentStyle::Custom(_) => match trim_left_doc_code(line, opener) {
-            TrimLeftCodeLine::Trimmed(line) => (line, opener.ends_with(' ')),
-            TrimLeftCodeLine::Unmodified(line) => {
-                match trim_left_doc_code(line, opener.trim_end()) {
-                    TrimLeftCodeLine::Trimmed(line) | TrimLeftCodeLine::Unmodified(line) => {
-                        (line, false)
-                    }
-                }
+        CommentStyle::Custom(_) => {
+            if let Some(line) = line.strip_prefix(opener) {
+                (line, line.ends_with(' '))
+            } else if let Some(line) = line.strip_prefix(opener.trim_end()) {
+                (line, false)
+            } else {
+                (line, false)
             }
-        },
+        }
     }
 }
 
