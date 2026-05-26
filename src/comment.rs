@@ -920,7 +920,7 @@ fn rewrite_comment_inner(
 
             line
         })
-        .map(|line| left_trim_comment_line(line, &style))
+        .map(|s| left_trim_comment_line(s, &style))
         .map(|(line, has_leading_whitespace)| {
             if orig.starts_with("/*") && line_breaks == 0 {
                 (
@@ -1110,7 +1110,7 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
         }
         CommentStyle::Custom(_) => {
             if let Some(line) = line.strip_prefix(opener) {
-                (line, line.ends_with(' '))
+                (line, opener.ends_with(' '))
             } else if let Some(line) = line.strip_prefix(opener.trim_end()) {
                 (line, false)
             } else {
