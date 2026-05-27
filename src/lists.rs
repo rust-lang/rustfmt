@@ -6,8 +6,8 @@ use std::iter::Peekable;
 use rustc_span::{BytePos, Span};
 
 use crate::comment::{FindUncommented, find_comment_end, rewrite_comment};
-use crate::config::lists::*;
 use crate::config::{Config, IndentStyle};
+use crate::config::{PostCommentAlignment, lists::*};
 use crate::rewrite::{ExceedsMaxWidthError, RewriteContext, RewriteError, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::utils::{
@@ -261,7 +261,11 @@ where
 }
 
 // Format a list of commented items into a string.
-pub(crate) fn write_list<I, T>(items: I, formatting: &ListFormatting<'_>) -> RewriteResult
+pub(crate) fn write_list<I, T>(
+    items: I,
+    formatting: &ListFormatting<'_>,
+    post_comment_alignment_config: PostCommentAlignment,
+) -> RewriteResult
 where
     I: IntoIterator<Item = T> + Clone,
     T: AsRef<ListItem>,
@@ -467,33 +471,44 @@ where
             let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
 
             if !starts_with_newline(comment) {
-                if formatting.align_comments {
-                    let mut comment_alignment =
-                        post_comment_alignment(item_max_width, unicode_str_width(inner_item));
-                    if first_line_width(&formatted_comment)
-                        + last_line_width(&result)
-                        + comment_alignment
-                        + 1
-                        > formatting.config.max_width()
-                    {
-                        item_max_width = None;
-                        formatted_comment = rewrite_post_comment(&mut item_max_width)?;
-                        comment_alignment =
-                            post_comment_alignment(item_max_width, unicode_str_width(inner_item));
+                match post_comment_alignment_config {
+                    PostCommentAlignment::SameIndent => {
+                        if formatting.align_comments {
+                            let mut comment_alignment = post_comment_alignment(
+                                item_max_width,
+                                unicode_str_width(inner_item),
+                            );
+                            if first_line_width(&formatted_comment)
+                                + last_line_width(&result)
+                                + comment_alignment
+                                + 1
+                                > formatting.config.max_width()
+                            {
+                                item_max_width = None;
+                                formatted_comment = rewrite_post_comment(&mut item_max_width)?;
+                                comment_alignment = post_comment_alignment(
+                                    item_max_width,
+                                    unicode_str_width(inner_item),
+                                );
+                            }
+                            for _ in 0..=comment_alignment {
+                                result.push(' ');
+                            }
+                        }
+                        // An additional space for the missing trailing separator (or
+                        // if we skipped alignment above).
+                        if !formatting.align_comments
+                            || (last
+                                && item_max_width.is_some()
+                                && !separate
+                                && !formatting.separator.is_empty())
+                        {
+                            result.push(' ');
+                        }
                     }
-                    for _ in 0..=comment_alignment {
+                    PostCommentAlignment::SingleSpace => {
                         result.push(' ');
                     }
-                }
-                // An additional space for the missing trailing separator (or
-                // if we skipped alignment above).
-                if !formatting.align_comments
-                    || (last
-                        && item_max_width.is_some()
-                        && !separate
-                        && !formatting.separator.is_empty())
-                {
-                    result.push(' ');
                 }
             } else {
                 result.push('\n');

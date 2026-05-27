@@ -663,8 +663,12 @@ impl<'a> Context<'a> {
             .trailing_separator(trailing_separator)
             .ends_with_newline(ends_with_newline);
 
-        write_list(&list_items, &fmt)
-            .map(|items_str| (tactic == DefinitiveListTactic::Horizontal, items_str))
+        write_list(
+            &list_items,
+            &fmt,
+            crate::config::PostCommentAlignment::SameIndent,
+        )
+        .map(|items_str| (tactic == DefinitiveListTactic::Horizontal, items_str))
     }
 
     fn wrap_items(&self, items_str: &str, shape: Shape, is_extendable: bool) -> String {

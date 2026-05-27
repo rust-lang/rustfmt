@@ -242,7 +242,11 @@ fn rewrite_match_arms(
         .separator("")
         .preserve_newline(true);
 
-    write_list(&arms_vec, &fmt)
+    write_list(
+        &arms_vec,
+        &fmt,
+        crate::config::PostCommentAlignment::SameIndent,
+    )
 }
 
 fn rewrite_match_arm(

@@ -1259,6 +1259,40 @@ fn lorem() -> usize {
 
 See also: [`tab_spaces`](#tab_spaces).
 
+## `fn_parameter_post_comment_alignment`
+
+Alignment of comments after function parameters
+
+- **Default value**: `SameIndent`
+- **Possible values**: `SameIndent`, `SingleSpace`
+- **Stable**: No
+
+#### `SameIndent` (default):
+
+Each comment has the same indentation.
+
+```rust
+fn foo(
+    a: usize, // Cat
+    b: usize, // Dog
+    c: f32,   // Bird
+) {
+}
+```
+
+#### `SingleSpace`:
+
+One space between the code and comment.
+
+```rust
+fn foo(
+    a: usize, // Cat
+    b: usize, // Dog
+    c: f32, // Bird
+) {
+}
+```
+
 ## `hex_literal_case`
 
 Control the case of the letters in hexadecimal literal values
