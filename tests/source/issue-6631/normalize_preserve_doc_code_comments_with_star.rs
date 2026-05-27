@@ -18,3 +18,8 @@ struct Bar;
  * // baz
  * ```
  */
+
+/*
+ *
+ * boop
+ */

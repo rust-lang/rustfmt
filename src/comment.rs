@@ -1083,6 +1083,8 @@ fn light_rewrite_comment(
 /// Trims the beginning of a comment's opener or line start, leaving the rest untouched.
 /// If at least one whitespace is trimmed, the second element of the tuple is true.
 /// Will only ever trim one whitespace unless a custom comment style is used.
+///
+/// **NOTE**: this function assumes the beginning of the line is trimmed.
 fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
     let opener = style.opener();
     match style {
@@ -1104,6 +1106,8 @@ fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a s
                 (line, true)
             } else if let Some(line) = line.strip_prefix(style.line_start().trim_start()) {
                 (line, true)
+            } else if let Some(line) = line.strip_prefix(style.line_start().trim()) {
+                (line, false)
             } else {
                 (line, false)
             }

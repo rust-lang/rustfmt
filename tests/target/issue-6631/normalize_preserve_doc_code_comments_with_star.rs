@@ -12,3 +12,5 @@ struct Bar;
 // ```
 // // baz
 // ```
+
+// boop
