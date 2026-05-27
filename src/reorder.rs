@@ -76,7 +76,11 @@ fn wrap_reorderable_items(
     let fmt = ListFormatting::new(shape, context.config)
         .separator("")
         .align_comments(false);
-    write_list(list_items, &fmt)
+    write_list(
+        list_items,
+        &fmt,
+        crate::config::PostCommentAlignment::SameIndent,
+    )
 }
 
 fn rewrite_reorderable_item(

@@ -652,7 +652,12 @@ impl<'a> FmtVisitor<'a> {
             .trailing_separator(self.config.trailing_comma())
             .preserve_newline(true);
 
-        let list = write_list(&items, &fmt).ok()?;
+        let list = write_list(
+            &items,
+            &fmt,
+            crate::config::PostCommentAlignment::SameIndent,
+        )
+        .ok()?;
         result.push_str(&list);
         result.push_str(&original_offset.to_string_with_newline(self.config));
         result.push('}');
@@ -2899,7 +2904,11 @@ fn rewrite_params(
         .trailing_separator(trailing_separator)
         .ends_with_newline(tactic.ends_with_newline(context.config.indent_style()))
         .preserve_newline(true);
-    write_list(&param_items, &fmt)
+    write_list(
+        &param_items,
+        &fmt,
+        context.config.fn_parameter_post_comment_alignment(),
+    )
 }
 
 fn compute_budgets_for_params(
@@ -3161,7 +3170,11 @@ fn rewrite_bounds_on_where_clause(
         .tactic(shape_tactic)
         .trailing_separator(comma_tactic)
         .preserve_newline(preserve_newline);
-    write_list(&items.collect::<Vec<_>>(), &fmt)
+    write_list(
+        &items.collect::<Vec<_>>(),
+        &fmt,
+        crate::config::PostCommentAlignment::SameIndent,
+    )
 }
 
 fn rewrite_where_clause(
@@ -3242,7 +3255,11 @@ fn rewrite_where_clause(
         .trailing_separator(comma_tactic)
         .ends_with_newline(tactic.ends_with_newline(context.config.indent_style()))
         .preserve_newline(true);
-    let preds_str = write_list(&item_vec, &fmt)?;
+    let preds_str = write_list(
+        &item_vec,
+        &fmt,
+        crate::config::PostCommentAlignment::SameIndent,
+    )?;
 
     let end_length = if terminator == "{" {
         // If the brace is on the next line we don't need to count it otherwise it needs two

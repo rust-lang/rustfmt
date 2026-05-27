@@ -1869,7 +1869,11 @@ fn rewrite_struct_lit<'a>(
             force_no_trailing_comma || has_base_or_rest || !context.use_block_indent(),
         );
 
-        write_list(&item_vec, &fmt)?
+        write_list(
+            &item_vec,
+            &fmt,
+            crate::config::PostCommentAlignment::SameIndent,
+        )?
     };
 
     let fields_str =
@@ -2016,7 +2020,11 @@ fn rewrite_tuple_in_visual_indent_style<'a, T: 'a + IntoOverflowableItem<'a>>(
     let fmt = ListFormatting::new(nested_shape, context.config)
         .tactic(tactic)
         .ends_with_newline(false);
-    let list_str = write_list(&item_vec, &fmt)?;
+    let list_str = write_list(
+        &item_vec,
+        &fmt,
+        crate::config::PostCommentAlignment::SameIndent,
+    )?;
 
     Ok(format!("({list_str})"))
 }

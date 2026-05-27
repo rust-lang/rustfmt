@@ -147,7 +147,12 @@ fn format_derive(
         .tactic(tactic)
         .trailing_separator(trailing_separator)
         .ends_with_newline(false);
-    let item_str = write_list(&all_items, &fmt).ok()?;
+    let item_str = write_list(
+        &all_items,
+        &fmt,
+        crate::config::PostCommentAlignment::SameIndent,
+    )
+    .ok()?;
 
     debug!("item_str: '{}'", item_str);
 
