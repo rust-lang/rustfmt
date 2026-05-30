@@ -151,6 +151,29 @@ for more info.
 To run rustfmt after this, use `cargo run --bin rustfmt -- filename`. See the
 notes above on running rustfmt.
 
+### Troubleshooting the toolchain
+
+This project uses a pinned toolchain with specific components, as indicated in 
+[`rust-toolchain`](https://github.com/rust-lang/rustfmt/blob/master/rust-toolchain).
+The toolchain hat the name 'nightly-YYYY-MM-DD'.
+
+If your compiler complains that it cannot find dependencies like `rustc_*`, you might have
+a wrong or corrupted toolchain. Here's what you can do:
+
+Check the active toolchain by running `rustup show` in the project directory. It should
+list all installed toolchains, including the one indicated in `rust-toolchain`. The same
+should be given as 'active toolchain' with the hint that it was overridden by the
+`rust-toolchain` file.
+
+Make sure that you don't have a directory override. You can remove it with
+`rustup override unset`.
+
+If the build still fails, try to completly remove the given toolchain with 
+`rustup toolchain uninstall nightly-YYYY-MM-DD`. The next `cargo build` should 
+download and install it correctly.
+
+Additional documentation can be found here:
+[Rustup Book, Chapter Overrides](https://rust-lang.github.io/rustup/overrides.html).
 
 ## Configuring Rustfmt
 
