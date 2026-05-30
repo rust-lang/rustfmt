@@ -381,6 +381,16 @@ macro_rules! out_of_file_lines_range {
     };
 }
 
+/// Returns `true` if the given span is fully contained by the selected file lines.
+macro_rules! file_lines_contains {
+    ($self:ident, $span:expr) => {
+        $self
+            .config
+            .file_lines()
+            .contains(&$self.psess.lookup_line_range($span))
+    };
+}
+
 macro_rules! skip_out_of_file_lines_range_err {
     ($self:ident, $span:expr) => {
         if out_of_file_lines_range!($self, $span) {
