@@ -1080,41 +1080,47 @@ fn light_rewrite_comment(
         .join(&format!("\n{}", offset.to_string(config)))
 }
 
-/// Trims comment characters and possibly a single space from the left of a string.
-/// Does not trim all whitespace. If a single space is trimmed from the left of the string,
-/// this function returns true.
+/// Trims the beginning of a comment's opener or line start, leaving the rest untouched.
+/// If at least one whitespace is trimmed, the second element of the tuple is true.
+/// Will only ever trim one whitespace unless a custom comment style is used.
+///
+/// **NOTE**: this function assumes the beginning of the line is trimmed.
 fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
-    if line.starts_with("//! ")
-        || line.starts_with("/// ")
-        || line.starts_with("/*! ")
-        || line.starts_with("/** ")
-    {
-        (&line[4..], true)
-    } else if let CommentStyle::Custom(opener) = *style {
-        if let Some(stripped) = line.strip_prefix(opener) {
-            (stripped, true)
-        } else {
-            (&line[opener.trim_end().len()..], false)
+    let opener = style.opener();
+    match style {
+        CommentStyle::DoubleSlash | CommentStyle::TripleSlash | CommentStyle::Doc => {
+            if let Some(line) = line.strip_prefix(opener) {
+                (line, true)
+            } else if let Some(line) = line.strip_prefix(opener.trim_end()) {
+                (line, false)
+            } else {
+                (line, false)
+            }
         }
-    } else if line.starts_with("/* ")
-        || line.starts_with("// ")
-        || line.starts_with("//!")
-        || line.starts_with("///")
-        || line.starts_with("** ")
-        || line.starts_with("/*!")
-        || (line.starts_with("/**") && !line.starts_with("/**/"))
-    {
-        (&line[3..], line.chars().nth(2).unwrap() == ' ')
-    } else if line.starts_with("/*")
-        || line.starts_with("* ")
-        || line.starts_with("//")
-        || line.starts_with("**")
-    {
-        (&line[2..], line.chars().nth(1).unwrap() == ' ')
-    } else if let Some(stripped) = line.strip_prefix('*') {
-        (stripped, false)
-    } else {
-        (line, line.starts_with(' '))
+        CommentStyle::SingleBullet | CommentStyle::DoubleBullet | CommentStyle::Exclamation => {
+            if let Some(line) = line.strip_prefix(opener) {
+                (line, true)
+            } else if let Some(line) = line.strip_prefix(opener.trim_end()) {
+                (line, false)
+            } else if let Some(line) = line.strip_prefix(style.line_start()) {
+                (line, true)
+            } else if let Some(line) = line.strip_prefix(style.line_start().trim_start()) {
+                (line, true)
+            } else if let Some(line) = line.strip_prefix(style.line_start().trim()) {
+                (line, false)
+            } else {
+                (line, false)
+            }
+        }
+        CommentStyle::Custom(_) => {
+            if let Some(line) = line.strip_prefix(opener) {
+                (line, opener.ends_with(' '))
+            } else if let Some(line) = line.strip_prefix(opener.trim_end()) {
+                (line, false)
+            } else {
+                (line, false)
+            }
+        }
     }
 }
 
