@@ -614,9 +614,10 @@ impl<'a> FmtVisitor<'a> {
             .max()
             .unwrap_or(&0);
 
+        let enum_context = self.get_context();
         let itemize_list_with = |one_line_width: usize| {
             itemize_list(
-                self.snippet_provider,
+                &enum_context,
                 enum_def.variants.iter(),
                 "}",
                 ",",
@@ -2852,7 +2853,7 @@ fn rewrite_params(
         return Ok(comment.to_owned());
     }
     let param_items: Vec<_> = itemize_list(
-        context.snippet_provider,
+        context,
         params.iter(),
         ")",
         ",",
@@ -3130,7 +3131,7 @@ fn rewrite_bounds_on_where_clause(
     let end_of_preds = predicates[len - 1].span().hi();
     let span_end = span_end.unwrap_or(end_of_preds);
     let items = itemize_list(
-        context.snippet_provider,
+        context,
         predicates.iter(),
         terminator,
         ",",
@@ -3185,6 +3186,12 @@ fn rewrite_where_clause(
         return Ok(String::new());
     }
 
+    if out_of_file_lines_range!(context, where_span) {
+        return Ok(context
+            .snippet(mk_sp(span_end_before_where, where_span.hi()))
+            .to_owned());
+    }
+
     if context.config.indent_style() == IndentStyle::Block {
         return rewrite_where_clause_rfc_style(
             context,
@@ -3216,7 +3223,7 @@ fn rewrite_where_clause(
     let end_of_preds = predicates[len - 1].span().hi();
     let span_end = span_end.unwrap_or(end_of_preds);
     let items = itemize_list(
-        context.snippet_provider,
+        context,
         predicates.iter(),
         terminator,
         ",",
