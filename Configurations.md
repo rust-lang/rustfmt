@@ -180,6 +180,56 @@ fn bar() {
 
 See also: [`blank_lines_lower_bound`](#blank_lines_lower_bound)
 
+
+## `indent_blank_lines`
+
+Empty lines are indented like items in the same block.
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No (tracking issue: TBD)
+
+### Example
+
+#### `false` (default):
+```rust
+fn foo() {
+    println!("a");
+
+    if true {
+        println!("b");
+
+        let Some(x) = Some(x) else {
+            println!("c");
+
+            println!("d");
+        };
+
+        println!("e");
+    }
+}
+```
+
+#### `true`:
+```rust
+fn foo() {
+    println!("a");
+    
+    if true {
+        println!("b");
+        
+        let Some(x) = Some(x) else {
+            println!("c");
+            
+            println!("d");
+        };
+        
+        println!("e");
+    }
+}
+```
+
+
 ## `brace_style`
 
 Brace style for items
