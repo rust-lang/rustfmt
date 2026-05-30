@@ -100,7 +100,7 @@ impl Density {
         match self {
             Density::Compressed => ListTactic::Mixed,
             Density::Tall => ListTactic::HorizontalVertical,
-            Density::Vertical if len == 1 => ListTactic::Horizontal,
+            Density::Vertical if len == 1 => ListTactic::HorizontalVertical,
             Density::Vertical => ListTactic::Vertical,
         }
     }
