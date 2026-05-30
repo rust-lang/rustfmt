@@ -106,12 +106,16 @@ pub(crate) mod visitor;
 /// these can currently be propagated to clients.
 #[derive(Error, Debug)]
 pub enum ErrorKind {
-    /// Line has exceeded character limit (found, maximum).
+    /// A line exceeded the configured maximum width.
     #[error(
         "line formatted, but exceeded maximum width \
-         (maximum: {1} (see `max_width` option), found: {0})"
+         (maximum: {max_width} (see `max_width` option), found: {total_line_width})"
     )]
-    LineOverflow(usize, usize),
+    LineOverflow {
+        total_line_width: usize,
+        max_width: usize,
+        overflow_start_byte: usize,
+    },
     /// Line ends in whitespace.
     #[error("left behind trailing whitespace")]
     TrailingWhitespace,
@@ -225,7 +229,7 @@ impl FormatReport {
         }
         for err in new_errors {
             match err.kind {
-                ErrorKind::LineOverflow(..) => {
+                ErrorKind::LineOverflow { .. } => {
                     errs.has_operational_errors = true;
                 }
                 ErrorKind::TrailingWhitespace => {

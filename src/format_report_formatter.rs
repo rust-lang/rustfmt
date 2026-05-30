@@ -106,7 +106,7 @@ fn annotation(error: &FormattingError) -> Option<Annotation<'_>> {
 
 fn error_kind_to_snippet_annotation_level(error_kind: &ErrorKind) -> Level {
     match error_kind {
-        ErrorKind::LineOverflow(..)
+        ErrorKind::LineOverflow { .. }
         | ErrorKind::TrailingWhitespace
         | ErrorKind::IoError(_)
         | ErrorKind::ModuleResolutionError(_)
