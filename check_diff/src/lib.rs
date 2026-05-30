@@ -21,6 +21,8 @@ pub enum Edition {
     Edition2021,
     /// rust edition 2024
     Edition2024,
+    /// rust edition 2027
+    Edition2027,
 }
 
 impl Edition {
@@ -30,6 +32,7 @@ impl Edition {
             Edition::Edition2018 => "2018",
             Edition::Edition2021 => "2021",
             Edition::Edition2024 => "2024",
+            Edition::Edition2027 => "2027",
         }
     }
 }
@@ -43,6 +46,7 @@ impl FromStr for Edition {
             "2018" => Ok(Edition::Edition2018),
             "2021" => Ok(Edition::Edition2021),
             "2024" => Ok(Edition::Edition2024),
+            "2027" => Ok(Edition::Edition2027),
             _ => Err(format!("Invalid rust language edition {s}")),
         }
     }
@@ -54,6 +58,8 @@ pub enum StyleEdition {
     Edition2021,
     // rustfmt style_edition 2024
     Edition2024,
+    // rustfmt style_edition 2027
+    Edition2027,
 }
 
 impl StyleEdition {
@@ -61,6 +67,7 @@ impl StyleEdition {
         match self {
             StyleEdition::Edition2021 => "2021",
             StyleEdition::Edition2024 => "2024",
+            StyleEdition::Edition2027 => "2027",
         }
     }
 }
@@ -74,6 +81,7 @@ impl FromStr for StyleEdition {
             "2018" => Ok(StyleEdition::Edition2021),
             "2021" => Ok(StyleEdition::Edition2021),
             "2024" => Ok(StyleEdition::Edition2024),
+            "2027" => Ok(StyleEdition::Edition2027),
             _ => Err(format!("Invalid rustfmt style edition {s}")),
         }
     }
