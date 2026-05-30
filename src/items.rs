@@ -1190,15 +1190,14 @@ pub(crate) fn format_trait(
         if contains_comment(snippet) {
             return Err(RewriteError::Unknown);
         }
+        let bounds_shape = if context.config.style_edition() >= StyleEdition::Edition2027 {
+            Shape::indented(offset, context.config)
+        } else {
+            Shape::indented(offset, context.config).sub_width(result.len(), ident.span)?
+        };
 
-        result = rewrite_assign_rhs_with(
-            context,
-            result + ":",
-            bounds,
-            shape,
-            &RhsAssignKind::Bounds,
-            RhsTactics::ForceNextLineWithoutIndent,
-        )?;
+        let lhs = result + ":";
+        result = rewrite_assign_rhs(context, lhs, bounds, &RhsAssignKind::Bounds, bounds_shape)?;
     }
 
     // Rewrite where-clause.
