@@ -683,6 +683,7 @@ config_option_with_style_edition_default!(
     InlineAttributeWidth, usize, _ => 0;
     FormatGeneratedFiles, bool, _ => true;
     GeneratedMarkerLineSearchLimit, usize, _ => 5;
+    LetElseForceNewline, bool, _ => false;
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     MergeDerives, bool, _ => true;

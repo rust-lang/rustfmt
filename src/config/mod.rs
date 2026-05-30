@@ -161,6 +161,8 @@ create_config! {
     format_generated_files: FormatGeneratedFiles, false, "Format generated files";
     generated_marker_line_search_limit: GeneratedMarkerLineSearchLimit, false, "Number of lines to \
         check for a `@generated` marker when `format_generated_files` is enabled";
+    let_else_force_newline: LetElseForceNewline, true, "Always put the else branch of let_else \
+        statements on a new line.";
 
     // Options that can change the source code beyond whitespace/blocks (somewhat linty things)
     merge_derives: MergeDerives, true, "Merge multiple `#[derive(...)]` into a single one";
@@ -821,6 +823,7 @@ version = "One"
 inline_attribute_width = 0
 format_generated_files = true
 generated_marker_line_search_limit = 5
+let_else_force_newline = false
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false
@@ -913,6 +916,7 @@ version = "Two"
 inline_attribute_width = 0
 format_generated_files = true
 generated_marker_line_search_limit = 5
+let_else_force_newline = false
 merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false
