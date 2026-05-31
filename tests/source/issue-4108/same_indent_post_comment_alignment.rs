@@ -1,5 +1,11 @@
 // rustfmt-post_comment_alignment: SameIndent
 
+use std::collections::{
+    HashSet, // I am a hash set!
+    HashMap,
+    BTreeMap, // I am a TREE!!!!!!
+};
+
 fn foo(
     a: usize,          // Chirp
     b: usize, // Bark
@@ -7,11 +13,23 @@ fn foo(
 ) {
 }
 
+enum Animal {
+    Cat,// THIS IS A BUTTERFLY!
+    Dog, // THIS IS ME.
+    Bird, /* OKOKOKOKOKOKOK */
+}
+
 fn bar(
     a: usize,/* Chirp */
     b: usize,   // Bark
     c: f32,        /* Meow */
-) {
+    animal: Animal,
+) -> &str {
+    match animal {
+        Animal::Cat => "meow",// Is this a bird?
+        Animal::Dog => "bark",                   // Is this a cat?
+        Animal::Bird => "chirp",// Is this a dog?
+    }
 }
 
 trait EvalContextExtPrivate<'mir, 'tcx: 'mir>: crate::MiriEvalContextExt<'mir, 'tcx> {
