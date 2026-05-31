@@ -1083,7 +1083,10 @@ fn light_rewrite_comment(
 /// Trims comment characters and possibly a single space from the left of a string.
 /// Does not trim all whitespace. If a single space is trimmed from the left of the string,
 /// this function returns true.
-fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
+pub(crate) fn left_trim_comment_line<'a>(
+    line: &'a str,
+    style: &CommentStyle<'_>,
+) -> (&'a str, bool) {
     if line.starts_with("//! ")
         || line.starts_with("/// ")
         || line.starts_with("/*! ")

@@ -1066,7 +1066,7 @@ fn rewrite_nested_use_tree(
         .preserve_newline(true)
         .nested(has_nested_list);
 
-    let list_str = write_list(&list_items, &fmt)?;
+    let list_str = write_list(list_items, &fmt)?;
 
     let result = if (list_str.contains('\n')
         || list_str.len() > remaining_width

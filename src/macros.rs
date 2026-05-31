@@ -497,7 +497,7 @@ pub(crate) fn rewrite_macro_def(
         result += &arm_shape.indent.to_string_with_newline(context.config);
     }
 
-    match write_list(&branch_items, &fmt) {
+    match write_list(branch_items, &fmt) {
         Ok(ref s) => result += s,
         Err(_) => return snippet,
     }

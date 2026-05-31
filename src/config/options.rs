@@ -135,6 +135,15 @@ pub enum ImportGranularity {
     One,
 }
 
+/// Controls how rustfmt should align post comments.
+#[config_type]
+pub enum PostCommentAlignment {
+    /// Insert one space between the code and comment.
+    SingleSpace,
+    /// List each comment with the same indentation from the previous.
+    SameIndent,
+}
+
 /// Controls how rustfmt should handle case in hexadecimal literals.
 #[config_type]
 pub enum HexLiteralCase {
@@ -627,6 +636,8 @@ config_option_with_style_edition_default!(
     FormatMacroMatchers, bool, _ => false;
     FormatMacroBodies, bool, _ => true;
     SkipMacroInvocations, MacroSelectors, _ => MacroSelectors::default();
+    PostCommentAlignmentConfig, PostCommentAlignment, _ =>
+        PostCommentAlignment::SingleSpace;
     HexLiteralCaseConfig, HexLiteralCase, _ => HexLiteralCase::Preserve;
     FloatLiteralTrailingZeroConfig, FloatLiteralTrailingZero, _ =>
         FloatLiteralTrailingZero::Preserve;
