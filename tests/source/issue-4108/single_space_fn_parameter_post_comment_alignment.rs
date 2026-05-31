@@ -1,4 +1,4 @@
-// rustfmt-fn_parameter_post_comment_alignment: SingleSpace
+// rustfmt-post_comment_alignment: SingleSpace
 
 fn foo(
     a: usize,          // Chirp
@@ -12,11 +12,9 @@ fn bar(
     b: usize,   // Bark
     c: f32,        /* Meow */
 ) {
-    // `fn_parameter_post_comment_alignment` should not
-    // affect post comments for match statements.
     match 0 {
-        0 => todo!(), // IIIS
-        1 => todo!(), // ASD
+        0 => todo!(), // Beep
+        1 => todo!(), // Boop
         _ => {} // Meep
     }
 }

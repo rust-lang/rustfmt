@@ -652,12 +652,7 @@ impl<'a> FmtVisitor<'a> {
             .trailing_separator(self.config.trailing_comma())
             .preserve_newline(true);
 
-        let list = write_list(
-            &items,
-            &fmt,
-            crate::config::PostCommentAlignment::SameIndent,
-        )
-        .ok()?;
+        let list = write_list(items, &fmt).ok()?;
         result.push_str(&list);
         result.push_str(&original_offset.to_string_with_newline(self.config));
         result.push('}');
@@ -2793,7 +2788,7 @@ struct WhereClauseOption {
     suppress_comma: bool, // Force no trailing comma
     snuggle: WhereClauseSpace,
     allow_single_line: bool, // Try single line where-clause instead of vertical layout
-    veto_single_line: bool,  // Disallow a single-line where-clause.
+    veto_single_line: bool, // Disallow a single-line where-clause.
 }
 
 impl WhereClauseOption {
@@ -2904,11 +2899,7 @@ fn rewrite_params(
         .trailing_separator(trailing_separator)
         .ends_with_newline(tactic.ends_with_newline(context.config.indent_style()))
         .preserve_newline(true);
-    write_list(
-        &param_items,
-        &fmt,
-        context.config.fn_parameter_post_comment_alignment(),
-    )
+    write_list(param_items, &fmt)
 }
 
 fn compute_budgets_for_params(
@@ -2932,7 +2923,7 @@ fn compute_budgets_for_params(
         let overhead = if ret_str_len == 0 { 2 } else { 3 };
         let mut used_space = indent.width() + result.len() + ret_str_len + overhead;
         match fn_brace_style {
-            FnBraceStyle::None => used_space += 1,     // 1 = `;`
+            FnBraceStyle::None => used_space += 1, // 1 = `;`
             FnBraceStyle::SameLine => used_space += 2, // 2 = `{}`
             FnBraceStyle::NextLine => (),
         }
@@ -3170,11 +3161,7 @@ fn rewrite_bounds_on_where_clause(
         .tactic(shape_tactic)
         .trailing_separator(comma_tactic)
         .preserve_newline(preserve_newline);
-    write_list(
-        &items.collect::<Vec<_>>(),
-        &fmt,
-        crate::config::PostCommentAlignment::SameIndent,
-    )
+    write_list(items.collect::<Vec<_>>(), &fmt)
 }
 
 fn rewrite_where_clause(
@@ -3255,11 +3242,7 @@ fn rewrite_where_clause(
         .trailing_separator(comma_tactic)
         .ends_with_newline(tactic.ends_with_newline(context.config.indent_style()))
         .preserve_newline(true);
-    let preds_str = write_list(
-        &item_vec,
-        &fmt,
-        crate::config::PostCommentAlignment::SameIndent,
-    )?;
+    let preds_str = write_list(item_vec, &fmt)?;
 
     let end_length = if terminator == "{" {
         // If the brace is on the next line we don't need to count it otherwise it needs two

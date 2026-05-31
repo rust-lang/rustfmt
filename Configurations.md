@@ -1251,26 +1251,13 @@ fn lorem() -> usize {
 
 See also: [`tab_spaces`](#tab_spaces).
 
-## `fn_parameter_post_comment_alignment`
+## `post_comment_alignment`
 
-Alignment of comments after function parameters
+Alignment of post comments
 
 - **Default value**: `SameIndent`
 - **Possible values**: `SameIndent`, `SingleSpace`
 - **Stable**: No
-
-#### `SameIndent` (default):
-
-Each comment has the same indentation.
-
-```rust
-fn foo(
-    a: usize, // Cat
-    b: usize, // Dog
-    c: f32,   // Bird
-) {
-}
-```
 
 #### `SingleSpace`:
 
@@ -1281,6 +1268,19 @@ fn foo(
     a: usize, // Cat
     b: usize, // Dog
     c: f32, // Bird
+) {
+}
+```
+
+#### `SameIndent` (default):
+
+Each comment has the same indentation.
+
+```rust
+fn foo(
+    a: usize, // Cat
+    b: usize, // Dog
+    c: f32,   // Bird
 ) {
 }
 ```
