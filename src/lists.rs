@@ -440,7 +440,7 @@ pub(crate) fn write_list<T: AsRef<ListItem>>(
                     // See test: `struct_lits_visual_multiline.rs`
                     true
                 } else if starts_with_newline(comment) {
-                    // If the comment starts with a newline.
+                    // If the comment starts with a newline,
                     // it is a standalone comment and not a post comment.
                     false
                 } else if formatting.config.wrap_comments() {
