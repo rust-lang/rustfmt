@@ -742,13 +742,10 @@ impl<'a> CommentRewrite<'a> {
                 &item_fmt,
                 self.max_width.saturating_sub(ib.indent),
             ) {
-                Some(s) => {
-                    let r = Self::join_block(
-                        &s,
-                        &format!("{}{}", self.comment_line_separator, ib.line_start),
-                    );
-                    self.result.push_str(&r)
-                }
+                Some(s) => self.result.push_str(&Self::join_block(
+                    &s,
+                    &format!("{}{}", self.comment_line_separator, ib.line_start),
+                )),
                 None => self.result.push_str(&Self::join_block(
                     &ib.original_block_as_string(),
                     &self.comment_line_separator,
