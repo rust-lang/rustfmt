@@ -2,4 +2,6 @@
 fn main() {
     let h1 = 0xCaFE_5ea7;
     let h2 = 0xCAFE_F00Du32;
+    let h3 = -0xCaFE_5ea7;
+    let h4 = -0xCAFE_F00Di32;
 }
