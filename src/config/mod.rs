@@ -81,8 +81,8 @@ create_config! {
         "Format the bodies of declarative macro definitions";
     skip_macro_invocations: SkipMacroInvocations, false,
         "Skip formatting the bodies of macros invoked with the following names.";
-    fn_parameter_post_comment_alignment: FnParameterPostCommentAlignmentConfig, false,
-        "Alignment of comments after function parameters";
+    post_comment_alignment: PostCommentAlignmentConfig, false,
+        "Alignment of post comments";
     hex_literal_case: HexLiteralCaseConfig, true, "Format hexadecimal integer literals";
     float_literal_trailing_zero: FloatLiteralTrailingZeroConfig, false,
         "Add or remove trailing zero in floating-point literals";
@@ -785,7 +785,7 @@ format_strings = false
 format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
-fn_parameter_post_comment_alignment = "SameIndent"
+post_comment_alignment = "SingleSpace"
 hex_literal_case = "Preserve"
 float_literal_trailing_zero = "Preserve"
 empty_item_single_line = true
@@ -879,7 +879,7 @@ format_strings = false
 format_macro_matchers = false
 format_macro_bodies = true
 skip_macro_invocations = []
-fn_parameter_post_comment_alignment = "SameIndent"
+post_comment_alignment = "SingleSpace"
 hex_literal_case = "Preserve"
 float_literal_trailing_zero = "Preserve"
 empty_item_single_line = true

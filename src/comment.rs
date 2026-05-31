@@ -742,10 +742,13 @@ impl<'a> CommentRewrite<'a> {
                 &item_fmt,
                 self.max_width.saturating_sub(ib.indent),
             ) {
-                Some(s) => self.result.push_str(&Self::join_block(
-                    &s,
-                    &format!("{}{}", self.comment_line_separator, ib.line_start),
-                )),
+                Some(s) => {
+                    let r = Self::join_block(
+                        &s,
+                        &format!("{}{}", self.comment_line_separator, ib.line_start),
+                    );
+                    self.result.push_str(&r)
+                }
                 None => self.result.push_str(&Self::join_block(
                     &ib.original_block_as_string(),
                     &self.comment_line_separator,
@@ -1091,7 +1094,10 @@ fn light_rewrite_comment(
 /// Trims comment characters and possibly a single space from the left of a string.
 /// Does not trim all whitespace. If a single space is trimmed from the left of the string,
 /// this function returns true.
-fn left_trim_comment_line<'a>(line: &'a str, style: &CommentStyle<'_>) -> (&'a str, bool) {
+pub(crate) fn left_trim_comment_line<'a>(
+    line: &'a str,
+    style: &CommentStyle<'_>,
+) -> (&'a str, bool) {
     if line.starts_with("//! ")
         || line.starts_with("/// ")
         || line.starts_with("/*! ")
