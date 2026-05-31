@@ -252,7 +252,7 @@ where
 }
 
 // Format a list of commented items into a string.
-pub(crate) fn write_list<'a, T: AsRef<ListItem> + 'a>(
+pub(crate) fn write_list<T: AsRef<ListItem>>(
     items: Vec<T>,
     formatting: &ListFormatting<'_>,
 ) -> RewriteResult {
