@@ -10,10 +10,7 @@ use crate::config::{Config, IndentStyle};
 use crate::config::{PostCommentAlignment, lists::*};
 use crate::rewrite::{ExceedsMaxWidthError, RewriteContext, RewriteError, RewriteResult};
 use crate::shape::{Indent, Shape};
-use crate::utils::{
-    count_newlines, first_line_width, last_line_width, mk_sp, starts_with_newline,
-    unicode_str_width,
-};
+use crate::utils::{count_newlines, mk_sp, starts_with_newline, unicode_str_width};
 use crate::visitor::SnippetProvider;
 
 pub(crate) struct ListFormatting<'a> {
@@ -491,7 +488,7 @@ pub(crate) fn write_list<T: AsRef<ListItem>>(
                 )
             };
 
-            let mut formatted_comment = rewrite_post_comment()?;
+            let formatted_comment = rewrite_post_comment()?;
 
             if !starts_with_newline(comment) {
                 match formatting.config.post_comment_alignment() {
