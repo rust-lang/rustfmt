@@ -73,9 +73,7 @@ fn wrap_reorderable_items(
     list_items: Vec<ListItem>,
     shape: Shape,
 ) -> RewriteResult {
-    let fmt = ListFormatting::new(shape, context.config)
-        .separator("")
-        .align_comments(false);
+    let fmt = ListFormatting::new(shape, context.config).separator("");
     write_list(list_items, &fmt)
 }
 

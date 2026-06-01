@@ -29,8 +29,6 @@ pub(crate) struct ListFormatting<'a> {
     preserve_newline: bool,
     // Nested import lists get some special handling for the "Mixed" list type
     nested: bool,
-    // Whether comments should be visually aligned.
-    align_comments: bool,
     config: &'a Config,
 }
 
@@ -45,7 +43,6 @@ impl<'a> ListFormatting<'a> {
             ends_with_newline: true,
             preserve_newline: false,
             nested: false,
-            align_comments: true,
             config,
         }
     }
@@ -82,11 +79,6 @@ impl<'a> ListFormatting<'a> {
 
     pub(crate) fn nested(mut self, nested: bool) -> Self {
         self.nested = nested;
-        self
-    }
-
-    pub(crate) fn align_comments(mut self, align_comments: bool) -> Self {
-        self.align_comments = align_comments;
         self
     }
 
@@ -507,32 +499,9 @@ pub(crate) fn write_list<T: AsRef<ListItem>>(
                         result.push(' ');
                     }
                     PostCommentAlignment::SameIndent => {
-                        if formatting.align_comments {
-                            let mut comment_alignment = post_comment_alignment(
-                                item_max_width,
-                                unicode_str_width(inner_item),
-                            );
-                            if first_line_width(&formatted_comment)
-                                + last_line_width(&result)
-                                + comment_alignment
-                                + 1
-                                > formatting.config.max_width()
-                            {
-                                formatted_comment = rewrite_post_comment()?;
-                                comment_alignment = post_comment_alignment(
-                                    item_max_width,
-                                    unicode_str_width(inner_item),
-                                );
-                            }
-                            for _ in 0..=comment_alignment {
-                                result.push(' ');
-                            }
-                        }
-                        // An additional space for the missing trailing separator (or
-                        // if we skipped alignment above).
-                        if !formatting.align_comments
-                            || (last && !separate && !formatting.separator.is_empty())
-                        {
+                        let comment_alignment =
+                            post_comment_alignment(item_max_width, unicode_str_width(inner_item));
+                        for _ in 0..=comment_alignment {
                             result.push(' ');
                         }
                     }
@@ -956,7 +925,6 @@ pub(crate) fn struct_lit_formatting<'a>(
         ends_with_newline,
         preserve_newline: true,
         nested: false,
-        align_comments: true,
         config: context.config,
     }
 }
