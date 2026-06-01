@@ -421,6 +421,22 @@ pub(crate) fn write_list<T: AsRef<ListItem>>(
                 let offset = formatting.shape.indent + overhead;
                 let comment_shape = Shape::legacy(width, offset);
 
+                fn is_block_comment_multiline_or_normalized(
+                    comment: &str,
+                    config: &Config,
+                ) -> bool {
+                    if comment.trim().contains('\n') {
+                        let style = crate::comment::comment_style(comment.trim_start(), false);
+                        style.is_block_comment()
+                    } else {
+                        let style = crate::comment::comment_style(
+                            comment.trim_start(),
+                            config.normalize_comments(),
+                        );
+                        style.is_block_comment()
+                    }
+                }
+
                 let block_style = if !formatting.ends_with_newline && last {
                     // Does not end with a new line,
                     // and is the last item. Ex. `a: usize, /* Hello */ }`
@@ -455,29 +471,10 @@ pub(crate) fn write_list<T: AsRef<ListItem>>(
                             item_max_width + 1 + longest_comment_length + overhead
                         }
                     };
-                    if line_length > formatting.config.max_width() {
-                        true
-                    } else if comment.trim().contains('\n') {
-                        let style = crate::comment::comment_style(comment.trim_start(), false);
-                        style.is_block_comment()
-                    } else {
-                        let style = crate::comment::comment_style(
-                            comment.trim_start(),
-                            formatting.config.normalize_comments(),
-                        );
-                        style.is_block_comment()
-                    }
+                    line_length > formatting.config.max_width()
+                        || is_block_comment_multiline_or_normalized(comment, formatting.config)
                 } else {
-                    if comment.trim().contains('\n') {
-                        let style = crate::comment::comment_style(comment.trim_start(), false);
-                        style.is_block_comment()
-                    } else {
-                        let style = crate::comment::comment_style(
-                            comment.trim_start(),
-                            formatting.config.normalize_comments(),
-                        );
-                        style.is_block_comment()
-                    }
+                    is_block_comment_multiline_or_normalized(comment, formatting.config)
                 };
 
                 rewrite_comment(
