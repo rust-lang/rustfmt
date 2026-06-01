@@ -458,10 +458,10 @@ pub(crate) fn write_list<T: AsRef<ListItem>>(
                     let line_length = match formatting.config.post_comment_alignment() {
                         PostCommentAlignment::SingleSpace => {
                             // line indentation
+                            // + alignment and length of current code line
                             // + one space between
                             // + length of current comment line
-                            // + alignment and length of comment
-                            indent_str_width + 1 + longest_comment_length + overhead
+                            indent_str_width + overhead + 1 + longest_comment_length
                         }
                         PostCommentAlignment::SameIndent => {
                             // length of longest code line
