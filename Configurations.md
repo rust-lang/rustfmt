@@ -1255,8 +1255,8 @@ See also: [`tab_spaces`](#tab_spaces).
 
 Alignment of post comments
 
-- **Default value**: `SameIndent`
-- **Possible values**: `SameIndent`, `SingleSpace`
+- **Default value**: `SingleSpace`
+- **Possible values**: `SingleSpace`, `SameIndent`
 - **Stable**: No
 
 #### `SingleSpace`:
