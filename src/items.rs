@@ -2618,10 +2618,14 @@ fn rewrite_fn_base(
                 // the closing parenthesis of the param and the arrow '->' is considered.
                 let mut sig_length = result.len() + indent.width() + ret_str_len + 1;
 
-                // If there is no where-clause, take into account the space after the return type
-                // and the brace.
+                // Account for the trailing syntax that will be placed on the same line
+                // after the return type.
                 if where_clause.predicates.is_empty() {
-                    sig_length += 2;
+                    sig_length += match fn_brace_style {
+                        FnBraceStyle::None => 1,     // 1 = `;`
+                        FnBraceStyle::SameLine => 2, // 2 = ` {`
+                        FnBraceStyle::NextLine => 0,
+                    };
                 }
 
                 sig_length > context.config.max_width()
