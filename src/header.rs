@@ -16,7 +16,7 @@ use crate::comment::{combine_strs_with_missing_comments, contains_comment};
 use crate::rewrite::RewriteContext;
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
-use crate::utils::rewrite_ident;
+use crate::utils::{format_impl_restriction, rewrite_ident};
 
 pub(crate) fn format_header(
     context: &RewriteContext<'_>,
@@ -120,6 +120,19 @@ impl<'a> HeaderPart<'a> {
         };
 
         Self::new(snippet, vis.span)
+    }
+
+    pub(crate) fn impl_restriction(
+        context: &RewriteContext<'_>,
+        impl_restriction: &ast::ImplRestriction,
+    ) -> Self {
+        match impl_restriction.kind {
+            ast::RestrictionKind::Unrestricted => Self::empty(),
+            ast::RestrictionKind::Restricted { .. } => {
+                let restriction = format_impl_restriction(context, impl_restriction);
+                Self::new(restriction, impl_restriction.span)
+            }
+        }
     }
 
     pub(crate) fn constness(constness: ast::Const) -> Self {
