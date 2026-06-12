@@ -78,20 +78,21 @@ pub(crate) fn format_impl_restriction(
     context: &RewriteContext<'_>,
     impl_restriction: &ImplRestriction,
 ) -> String {
-    format_restriction("impl", context, &impl_restriction.kind)
+    format_restriction("impl", context, &impl_restriction.kind, false)
 }
 
 pub(crate) fn format_mut_restriction(
     context: &RewriteContext<'_>,
     mut_restriction: &MutRestriction,
 ) -> String {
-    format_restriction("mut", context, &mut_restriction.kind)
+    format_restriction("mut", context, &mut_restriction.kind, true)
 }
 
 fn format_restriction(
     kw: &'static str,
     context: &RewriteContext<'_>,
     restriction: &RestrictionKind,
+    trailing_space: bool,
 ) -> String {
     match restriction {
         RestrictionKind::Unrestricted => String::new(),
@@ -110,7 +111,11 @@ fn format_restriction(
             let path = itertools::join(segments_iter, "::");
             let in_str = if *shorthand { "" } else { "in " };
 
-            format!("{kw}({in_str}{path}) ")
+            if trailing_space {
+                format!("{kw}({in_str}{path}) ")
+            } else {
+                format!("{kw}({in_str}{path})")
+            }
         }
     }
 }
