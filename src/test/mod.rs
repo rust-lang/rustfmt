@@ -49,6 +49,8 @@ const FILE_SKIP_LIST: &[&str] = &[
     "cfg_mod/bar.rs",
     "cfg_mod/foo.rs",
     "cfg_mod/wasm32.rs",
+    // Empty child modules with 2027-specific expectations.
+    "reorder_modules_2027",
     "skip/foo.rs",
 ];
 
@@ -482,6 +484,23 @@ fn self_tests() {
     }
 
     assert_eq!(warnings, 0, "Rustfmt's code generated {warnings} warnings");
+}
+
+#[test]
+fn reorder_modules_2027_tests() {
+    init_log();
+    run_test_with(&TestSetting::default(), || {
+        let files = vec![
+            PathBuf::from("tests/source/reorder_modules_2027/disabled_style_edition_2027.rs"),
+            PathBuf::from("tests/source/reorder_modules_2027/enabled_style_edition_2027.rs"),
+            PathBuf::from("tests/target/reorder_modules_2027/disabled_style_edition_2027.rs"),
+            PathBuf::from("tests/target/reorder_modules_2027/enabled_style_edition_2027.rs"),
+        ];
+        let (_reports, count, fails) = check_files(files, &None);
+
+        println!("Ran {count} reorder_modules_2027 tests.");
+        assert_eq!(fails, 0, "{fails} reorder_modules_2027 tests failed");
+    });
 }
 
 #[test]
