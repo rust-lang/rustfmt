@@ -1057,7 +1057,7 @@ Value for [`use_small_heuristics`](#use_small_heuristics) for use in code blocks
 
 - **Default value**: `"Default"`
 - **Possible values**: `"Default"`, `"Off"`, `"Max"`
-- **Stable**: No (tracking issue: [#FIXME](https://github.com/rust-lang/rustfmt/issues/FIXME))
+- **Stable**: No (tracking issue: [#6942](https://github.com/rust-lang/rustfmt/issues/6942))
 
 ## `format_generated_files`
 
