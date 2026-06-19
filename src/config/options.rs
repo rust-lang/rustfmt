@@ -748,7 +748,7 @@ fn style_edition_comparisons() {
     assert!(StyleEdition::Edition2024 == StyleEdition::Edition2024);
     assert!(StyleEdition::Edition2024 < StyleEdition::Edition2027);
 
-    // Style Edition 2024
+    // Style Edition 2027
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2015);
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2018);
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2021);
