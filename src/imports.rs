@@ -262,12 +262,24 @@ fn flatten_use_trees(
 ) -> Vec<UseTree> {
     // Return non-sorted single occurrence of the use-trees text string;
     // order is by first occurrence of the use-tree.
-    use_trees
-        .into_iter()
-        .flat_map(|tree| tree.flatten(import_granularity))
-        .map(UseTree::nest_trailing_self)
-        .unique()
-        .collect()
+
+    // if import granularity is item, we should avoid nesting trailing self
+    // to not introduce List segments.
+    if import_granularity == ImportGranularity::Item {
+        use_trees
+            .into_iter()
+            .flat_map(|tree| tree.flatten(import_granularity))
+            .map(UseTree::flatten_trailing_self)
+            .unique()
+            .collect()
+    } else {
+        use_trees
+            .into_iter()
+            .flat_map(|tree| tree.flatten(import_granularity))
+            .map(UseTree::nest_trailing_self)
+            .unique()
+            .collect()
+    }
 }
 
 impl fmt::Debug for UseTree {
@@ -764,6 +776,64 @@ impl UseTree {
                 style_edition,
             });
         }
+        self
+    }
+
+    /// If this tree ends in `::self` or `::{self}`, flattens trailing self
+    /// into the parent ident segment, preserving aliases for the `self` segment.
+    fn flatten_trailing_self(mut self) -> UseTree {
+        let [
+            ..,
+            // the parent segment can not have an alias with Rust code that
+            // parses, but we check for it using the None pattern anyway to
+            // avoid manipulating ill-formed UseTree's.
+            UseSegment {
+                kind: UseSegmentKind::Ident(_, None),
+                ..
+            },
+            UseSegment {
+                kind: last_segment_kind @ (UseSegmentKind::Slf(..) | UseSegmentKind::List(..)),
+                ..
+            },
+        ] = self.path.as_slice()
+        else {
+            return self;
+        };
+
+        // pre-check to make sure the last List segment contains only
+        // a single Slf segment inside
+        if let UseSegmentKind::List(ref trees) = last_segment_kind {
+            if trees.len() != 1
+                || trees[0].path.len() != 1
+                || !matches!(trees[0].path[0].kind, UseSegmentKind::Slf(_))
+            {
+                return self;
+            }
+        }
+
+        let self_segment = self.path.pop().unwrap();
+        let parent_segment = self.path.last_mut().unwrap();
+
+        let self_alias = match self_segment.kind {
+            UseSegmentKind::Slf(slf_alias) => slf_alias,
+            UseSegmentKind::List(mut inner_trees) => {
+                let mut inner_tree = inner_trees.pop().unwrap();
+                let UseSegmentKind::Slf(slf_alias) = inner_tree.path.pop().unwrap().kind else {
+                    // pre-checked for List above
+                    unreachable!();
+                };
+                slf_alias
+            }
+            // checked in function entry above
+            _ => unreachable!(),
+        };
+
+        let UseSegmentKind::Ident(_, ref mut parent_alias) = parent_segment.kind else {
+            // checked in function entry above
+            unreachable!();
+        };
+
+        *parent_alias = self_alias;
         self
     }
 }
