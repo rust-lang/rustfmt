@@ -7,7 +7,7 @@ use regex::Regex;
 use rustc_ast::ast;
 use rustc_ast::visit;
 use rustc_span::{BytePos, DUMMY_SP, Ident, Span, symbol};
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::attr::filter_inline_attrs;
 use crate::comment::{
@@ -1912,6 +1912,7 @@ impl Rewrite for ast::FieldDef {
     }
 }
 
+#[tracing::instrument(level = "TRACE", skip_all)]
 pub(crate) fn rewrite_struct_field(
     context: &RewriteContext<'_>,
     field: &ast::FieldDef,
@@ -1930,6 +1931,8 @@ pub(crate) fn rewrite_struct_field(
     let type_annotation_spacing = type_annotation_spacing(context.config);
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
+    trace!(prefix);
+
     let attrs_str = field.attrs.rewrite_result(context, shape)?;
     let attrs_extendable = field.ident.is_none() && is_attributes_extendable(&attrs_str);
     let missing_span = if field.attrs.is_empty() {
@@ -1942,6 +1945,7 @@ pub(crate) fn rewrite_struct_field(
     } else {
         ""
     });
+
     // Try to put everything on a single line.
     let attr_prefix = combine_strs_with_missing_comments(
         context,
@@ -1951,6 +1955,12 @@ pub(crate) fn rewrite_struct_field(
         shape,
         attrs_extendable,
     )?;
+
+    trace!(
+        attrs_str,
+        attrs_extendable, spacing, attr_prefix, "try to put everything into single line"
+    );
+
     let overhead = trimmed_last_line_width(&attr_prefix);
     let lhs_offset = lhs_max_width.saturating_sub(overhead);
     for _ in 0..lhs_offset {

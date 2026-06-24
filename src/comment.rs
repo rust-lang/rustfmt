@@ -151,6 +151,7 @@ pub(crate) fn is_last_comment_block(s: &str) -> bool {
 /// recovered. If `allow_extend` is true and there is no comment between the two
 /// strings, then they will be put on a single line as long as doing so does not
 /// exceed max width.
+#[tracing::instrument(level = "TRACE", skip_all, fields(prev_str = prev_str, next_str = next_str))]
 pub(crate) fn combine_strs_with_missing_comments(
     context: &RewriteContext<'_>,
     prev_str: &str,
@@ -159,14 +160,12 @@ pub(crate) fn combine_strs_with_missing_comments(
     shape: Shape,
     allow_extend: bool,
 ) -> RewriteResult {
-    trace!(
-        "combine_strs_with_missing_comments `{}` `{}` {:?} {:?}",
-        prev_str, next_str, span, shape
-    );
-
     let mut result =
         String::with_capacity(prev_str.len() + next_str.len() + shape.indent.width() + 128);
     result.push_str(prev_str);
+
+    trace!(result, "initial result pushing `prev_str`");
+
     let mut allow_one_line = !prev_str.contains('\n') && !next_str.contains('\n');
     let first_sep =
         if prev_str.is_empty() || next_str.is_empty() || trimmed_last_line_width(prev_str) == 0 {
@@ -174,17 +173,22 @@ pub(crate) fn combine_strs_with_missing_comments(
         } else {
             " "
         };
+    trace!(first_sep);
+
     let mut one_line_width =
         last_line_width(prev_str) + first_line_width(next_str) + first_sep.len();
 
     let config = context.config;
     let indent = shape.indent;
     let missing_comment = rewrite_missing_comment(span, shape, context)?;
+    trace!(missing_comment);
 
     if missing_comment.is_empty() {
         if allow_extend && one_line_width <= shape.width {
+            trace!("missing_comment.is_empty() |> allow_extend && one_line_width <= shape.width");
             result.push_str(first_sep);
         } else if !prev_str.is_empty() {
+            trace!("missing_comment.is_empty() |> !prev_str.is_empty()");
             result.push_str(&indent.to_string_with_newline(config))
         }
         result.push_str(next_str);
@@ -218,12 +222,19 @@ pub(crate) fn combine_strs_with_missing_comments(
     result.push_str(&missing_comment);
 
     let second_sep = if missing_comment.is_empty() || next_str.is_empty() {
+        trace!(r#"second_sep :: missing_comment.is_empty() || next_str.is_empty()"#);
+
         Cow::from("")
     } else if missing_comment.starts_with("//") {
+        trace!(r#"second_sep :: missing_comment.starts_with("//")"#);
+
         indent.to_string_with_newline(config)
     } else {
         one_line_width += missing_comment.len() + first_sep.len() + 1;
         allow_one_line &= !missing_comment.starts_with("//") && !missing_comment.contains('\n');
+
+        trace!("second_sep :: missing_comment = `{}`", missing_comment);
+
         if prefer_same_line && allow_one_line && one_line_width <= shape.width {
             Cow::from(" ")
         } else {
@@ -1007,6 +1018,7 @@ fn is_table_item(mut s: &str) -> bool {
 
 /// Given the span, rewrite the missing comment inside it if available.
 /// Note that the given span must only include comments (or leading/trailing whitespaces).
+#[tracing::instrument(level = "TRACE", skip_all)]
 pub(crate) fn rewrite_missing_comment(
     span: Span,
     shape: Shape,
@@ -1014,9 +1026,13 @@ pub(crate) fn rewrite_missing_comment(
 ) -> RewriteResult {
     let missing_snippet = context.snippet(span);
     let trimmed_snippet = missing_snippet.trim();
+
+    trace!(missing_snippet, trimmed_snippet);
+
     // check the span starts with a comment
     let pos = trimmed_snippet.find('/');
     if !trimmed_snippet.is_empty() && pos.is_some() {
+        trace!("!trimmed_snippet.is_empty() && pos.is_some()");
         rewrite_comment(trimmed_snippet, false, shape, context.config)
     } else {
         Ok(String::new())

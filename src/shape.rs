@@ -72,10 +72,12 @@ impl Indent {
         self.to_string_inner(config, 1)
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all)]
     pub(crate) fn to_string_with_newline(&self, config: &Config) -> Cow<'static, str> {
         self.to_string_inner(config, 0)
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(offset = offset))]
     fn to_string_inner(&self, config: &Config, offset: usize) -> Cow<'static, str> {
         let (num_tabs, num_spaces) = if config.hard_tabs() {
             (self.block_indent / config.tab_spaces(), self.alignment)
