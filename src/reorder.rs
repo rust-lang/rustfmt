@@ -70,12 +70,10 @@ fn compare_items(a: &ast::Item, b: &ast::Item, context: &RewriteContext<'_>) -> 
 
 fn wrap_reorderable_items(
     context: &RewriteContext<'_>,
-    list_items: &[ListItem],
+    list_items: Vec<ListItem>,
     shape: Shape,
 ) -> RewriteResult {
-    let fmt = ListFormatting::new(shape, context.config)
-        .separator("")
-        .align_comments(false);
+    let fmt = ListFormatting::new(shape, context.config).separator("");
     write_list(list_items, &fmt)
 }
 
@@ -160,7 +158,7 @@ fn rewrite_reorderable_or_regroupable_items(
                             }
                         })
                         .collect();
-                    wrap_reorderable_items(context, &item_vec, nested_shape)
+                    wrap_reorderable_items(context, item_vec, nested_shape)
                 })
                 .collect::<Result<Vec<_>, RewriteError>>()?;
 
@@ -185,7 +183,7 @@ fn rewrite_reorderable_or_regroupable_items(
             item_pair_vec.sort_by(|a, b| compare_items(a.1, b.1, context));
             let item_vec: Vec<_> = item_pair_vec.into_iter().map(|pair| pair.0).collect();
 
-            wrap_reorderable_items(context, &item_vec, shape)
+            wrap_reorderable_items(context, item_vec, shape)
         }
     }
 }
