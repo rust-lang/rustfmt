@@ -1368,7 +1368,6 @@ where
                 match chr {
                     '"' => {
                         if sharps == 0 {
-                            char_kind = FullCodeCharKind::Normal;
                             CharClassesStatus::Normal
                         } else if is_raw_string_suffix(&mut self.base, sharps) {
                             CharClassesStatus::RawStringSuffix(sharps)
