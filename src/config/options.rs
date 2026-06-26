@@ -483,6 +483,10 @@ pub enum Edition {
     #[doc_hint = "2024"]
     /// Edition 2024.
     Edition2024,
+    #[value = "2027"]
+    #[doc_hint = "2027"]
+    /// Edition 2027.
+    Edition2027,
 }
 
 impl Default for Edition {
@@ -498,6 +502,8 @@ impl From<Edition> for rustc_span::edition::Edition {
             Edition::Edition2018 => Self::Edition2018,
             Edition::Edition2021 => Self::Edition2021,
             Edition::Edition2024 => Self::Edition2024,
+            // FIXME: rustc doesn't have an edition 2027 yet.
+            Edition::Edition2027 => Self::Edition2024,
         }
     }
 }
@@ -509,6 +515,7 @@ impl From<Edition> for StyleEdition {
             Edition::Edition2018 => StyleEdition::Edition2018,
             Edition::Edition2021 => StyleEdition::Edition2021,
             Edition::Edition2024 => StyleEdition::Edition2024,
+            Edition::Edition2027 => StyleEdition::Edition2027,
         }
     }
 }
@@ -767,7 +774,7 @@ fn style_edition_comparisons() {
     assert!(StyleEdition::Edition2024 == StyleEdition::Edition2024);
     assert!(StyleEdition::Edition2024 < StyleEdition::Edition2027);
 
-    // Style Edition 2024
+    // Style Edition 2027
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2015);
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2018);
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2021);

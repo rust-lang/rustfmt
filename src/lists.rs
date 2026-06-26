@@ -198,7 +198,7 @@ impl ListItem {
         }
 
         fn empty_result(s: &RewriteResult) -> bool {
-            !matches!(*s, Ok(ref s) if !s.is_empty())
+            !matches!(*s, Ok(ref s) | Err(RewriteError::InlineComment(ref s)) if !s.is_empty())
         }
 
         !(empty(&self.pre_comment) && empty_result(&self.item) && empty(&self.post_comment))
@@ -285,7 +285,18 @@ where
     let indent_str = &formatting.shape.indent.to_string(formatting.config);
     while let Some((i, item)) = iter.next() {
         let item = item.as_ref();
-        let inner_item = item.item.as_ref().or_else(|err| Err(err.clone()))?;
+        let inner_item = match item.item.as_ref() {
+            Ok(item) => item,
+            Err(RewriteError::InlineComment(item)) => {
+                // Keep the original contents and recover, allowing the subsequent items to be
+                // formatted while keeping the original formatting of this item.
+                // This is currently only relevant to or-patterns with comments in between patterns.
+                // We gate this under future edition 2027 because the amount of code that needs to
+                // be reformatted in the wild is quite high.
+                item
+            }
+            Err(err) => return Err(err.clone()),
+        };
         let first = i == 0;
         let last = iter.peek().is_none();
         let mut separate = match sep_place {
