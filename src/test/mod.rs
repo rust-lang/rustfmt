@@ -49,6 +49,8 @@ const FILE_SKIP_LIST: &[&str] = &[
     "cfg_mod/bar.rs",
     "cfg_mod/foo.rs",
     "cfg_mod/wasm32.rs",
+    // Empty files cannot declare nightly-only 2027 style edition inline.
+    "empty_file_style_edition_2027.rs",
     "skip/foo.rs",
 ];
 
@@ -482,6 +484,25 @@ fn self_tests() {
     }
 
     assert_eq!(warnings, 0, "Rustfmt's code generated {warnings} warnings");
+}
+
+#[nightly_only_test]
+#[test]
+fn empty_file_style_edition_2027_tests() {
+    init_log();
+    run_test_with(&TestSetting::default(), || {
+        let files = vec![
+            PathBuf::from("tests/source/empty_file_style_edition_2027.rs"),
+            PathBuf::from("tests/target/empty_file_style_edition_2027.rs"),
+        ];
+        let (_reports, count, fails) = check_files(files, &None);
+
+        println!("Ran {count} empty_file_style_edition_2027 tests.");
+        assert_eq!(
+            fails, 0,
+            "{fails} empty_file_style_edition_2027 tests failed"
+        );
+    });
 }
 
 #[test]
