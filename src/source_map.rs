@@ -5,9 +5,11 @@ use rustc_span::{BytePos, Span};
 
 use crate::comment::FindUncommented;
 use crate::config::file_lines::LineRange;
+use crate::utils::mk_sp;
 use crate::visitor::SnippetProvider;
 
 pub(crate) trait SpanUtils {
+    fn subspan(&self, original: Span, needle: &str) -> Span;
     fn span_after(&self, original: Span, needle: &str) -> BytePos;
     fn span_after_last(&self, original: Span, needle: &str) -> BytePos;
     fn span_before(&self, original: Span, needle: &str) -> BytePos;
@@ -26,6 +28,12 @@ pub(crate) trait LineRangeUtils {
 }
 
 impl SpanUtils for SnippetProvider {
+    fn subspan(&self, original: Span, needle: &str) -> Span {
+        let lo = self.span_before(original, needle);
+        let hi = lo + BytePos(needle.len() as u32);
+        mk_sp(lo, hi)
+    }
+
     fn span_after(&self, original: Span, needle: &str) -> BytePos {
         self.opt_span_after(original, needle).unwrap_or_else(|| {
             panic!(
