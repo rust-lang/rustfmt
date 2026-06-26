@@ -25,17 +25,17 @@ struct MyTuple(
 
 struct MyTuple(
     #[cfg(unix)] // some comment
-    pub  u64,
-    #[cfg(not(unix))] /*block comment */ pub(crate)  u32,
+    pub u64,
+    #[cfg(not(unix))] /*block comment */ pub(crate) u32,
 );
 
 struct MyTuple(
     /// Doc Comments
     /* TODO note to add more to Doc Comments */
-    pub  u32,
+    pub u32,
     /// Doc Comments
     // TODO note
-    pub(crate)  u64,
+    pub(crate) u64,
 );
 
 struct MyStruct {

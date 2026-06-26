@@ -344,13 +344,17 @@ impl UseTree {
         let vis = self.visibility.as_ref().map_or(Cow::from(""), |vis| {
             crate::utils::format_visibility(context, vis)
         });
+        let vis_separator = if vis.is_empty() { "" } else { " " };
         let use_str = self
-            .rewrite_result(context, shape.offset_left(vis.len(), self.span())?)
+            .rewrite_result(
+                context,
+                shape.offset_left(vis.len() + vis_separator.len(), self.span())?,
+            )
             .map(|s| {
                 if s.is_empty() {
                     s
                 } else {
-                    format!("{}use {};", vis, s)
+                    format!("{vis}{vis_separator}use {s};")
                 }
             })?;
         match self.attrs {
