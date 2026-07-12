@@ -11,7 +11,7 @@ use tracing_subscriber::EnvFilter;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read, Write, stdout};
+use std::io::{self, Read, Write, stdout, BufRead};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -69,6 +69,11 @@ enum Operation {
     ConfigOutputCurrent { path: Option<String> },
     /// No file specified, read from stdin
     Stdin { input: String },
+    /// No file specified, read from stdin streamingly
+    StdinStream {
+        start_marker: String,
+        end_marker: String,
+    },
 }
 
 /// Rustfmt operations errors.
@@ -166,6 +171,18 @@ fn make_opts() -> Options {
         "config",
         "Set options from command line. These settings take priority over .rustfmt.toml",
         "[key1=val1,key2=val2...]",
+    );
+    opts.optopt(
+        "",
+        "start-marker",
+        "Start marker for streaming formatting",
+        "[Marker string]",
+    );
+    opts.optopt(
+        "",
+        "end-marker",
+        "End marker for streaming formatting",
+        "[Marker string]",
     );
     opts.optopt(
         "",
@@ -268,6 +285,9 @@ fn execute(opts: &Options) -> Result<i32> {
             Ok(0)
         }
         Operation::Stdin { input } => format_string(input, options),
+        Operation::StdinStream { start_marker, end_marker } => {
+            format_stdin_stream(start_marker, end_marker, options)
+        }
         Operation::Format {
             files,
             minimal_config_path,
@@ -326,6 +346,50 @@ fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
         0
     };
     Ok(exit_code)
+}
+
+fn format_stdin_stream(
+    start_marker: String,
+    end_marker: String,
+    options: GetOptsOptions,
+) -> Result<i32> {
+    let stdin = io::stdin();
+    let mut reader = stdin.lock();
+    let mut line = String::new();
+    let mut in_chunk = false;
+    let mut buffer = String::new();
+
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line)?;
+        if bytes_read == 0 {
+            break; // EOF
+        }
+
+        let trimmed = line.trim_end_matches(&['\r', '\n'][..]);
+        if !in_chunk {
+            if trimmed == start_marker {
+                in_chunk = true;
+                buffer.clear();
+            }
+        } else {
+            if trimmed == end_marker {
+                in_chunk = false;
+                match format_string(buffer.clone(), options.clone()) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        eprintln!("Error formatting chunk: {e:#}");
+                    }
+                }
+                println!("{}", end_marker);
+                io::stdout().flush()?;
+            } else {
+                buffer.push_str(&line);
+            }
+        }
+    }
+
+    Ok(0)
 }
 
 fn format(
@@ -516,6 +580,9 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
         if minimal_config_path.is_some() {
             return Err(OperationError::MinimalPathWithStdin);
         }
+        if let (Some(start_marker), Some(end_marker)) = (matches.opt_str("start-marker"), matches.opt_str("end-marker")) {
+            return Ok(Operation::StdinStream { start_marker, end_marker });
+        }
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer)?;
 
@@ -548,6 +615,8 @@ struct GetOptsOptions {
     unstable_features: bool,
     error_on_unformatted: Option<bool>,
     print_misformatted_file_names: bool,
+    start_marker: Option<String>,
+    end_marker: Option<String>,
 }
 
 impl GetOptsOptions {
@@ -644,6 +713,23 @@ impl GetOptsOptions {
 
         if matches.opt_present("files-with-diff") {
             options.print_misformatted_file_names = true;
+        }
+
+        options.start_marker = matches.opt_str("start-marker");
+        options.end_marker = matches.opt_str("end-marker");
+
+        if (options.start_marker.is_some() && options.end_marker.is_none())
+            || (options.start_marker.is_none() && options.end_marker.is_some())
+        {
+            return Err(format_err!(
+                "Both `--start-marker` and `--end-marker` must be specified for streaming formatting"
+            ));
+        }
+
+        if options.start_marker.is_some() && !matches.free.is_empty() {
+            return Err(format_err!(
+                "Cannot specify files with streaming formatting"
+            ));
         }
 
         if !rust_nightly {

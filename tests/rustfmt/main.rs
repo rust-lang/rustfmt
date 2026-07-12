@@ -274,3 +274,34 @@ fn rustfmt_allow_not_a_dir_errors() {
     assert_eq!(stdout, "");
     assert_eq!(stderr, "");
 }
+
+#[test]
+fn rustfmt_streaming_formatting() {
+    let rustfmt_exe = env!("CARGO_BIN_EXE_rustfmt");
+    let mut cmd = Command::new(rustfmt_exe);
+    cmd.args(&["--start-marker", "START-CHUNK", "--end-marker", "END-CHUNK"]);
+    cmd.stdin(std::process::Stdio::piped());
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+
+    let mut child = cmd.spawn().expect("failed to spawn rustfmt");
+
+    // Write multiple chunks to stdin
+    {
+        use std::io::Write;
+        let mut stdin = child.stdin.take().expect("failed to open stdin");
+        stdin.write_all(b"START-CHUNK\nfn foo(  x:i32,y : u32  ) {}\nEND-CHUNK\n").unwrap();
+        stdin.write_all(b"START-CHUNK\nfn bar(  ) -> bool   {false}\nEND-CHUNK\n").unwrap();
+    }
+
+    let output = child.wait_with_output().expect("failed to wait on child");
+    let stdout = String::from_utf8(output.stdout).expect("utf-8");
+    let stderr = String::from_utf8(output.stderr).expect("utf-8");
+
+    assert!(stdout.contains("fn foo(x: i32, y: u32) {"));
+    assert!(stdout.contains("fn bar() -> bool {"));
+    assert!(stdout.contains("false"));
+    assert!(stdout.contains("END-CHUNK"));
+    assert!(stderr.is_empty(), "actual stderr:\n{}", stderr);
+}
+
