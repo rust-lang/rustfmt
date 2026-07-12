@@ -278,7 +278,9 @@ fn rustfmt_allow_not_a_dir_errors() {
 #[test]
 fn rustfmt_streaming_formatting() {
     let rustfmt_exe = env!("CARGO_BIN_EXE_rustfmt");
+    let temp_dir = tempfile::tempdir().unwrap();
     let mut cmd = Command::new(rustfmt_exe);
+    cmd.current_dir(temp_dir.path());
     cmd.args(&["--start-marker", "START-CHUNK", "--end-marker", "END-CHUNK"]);
     cmd.stdin(std::process::Stdio::piped());
     cmd.stdout(std::process::Stdio::piped());
