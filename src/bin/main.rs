@@ -11,7 +11,7 @@ use tracing_subscriber::EnvFilter;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read, Write, stdout, BufRead};
+use std::io::{self, BufRead, Read, Write, stdout};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -285,9 +285,10 @@ fn execute(opts: &Options) -> Result<i32> {
             Ok(0)
         }
         Operation::Stdin { input } => format_string(input, options),
-        Operation::StdinStream { start_marker, end_marker } => {
-            format_stdin_stream(start_marker, end_marker, options)
-        }
+        Operation::StdinStream {
+            start_marker,
+            end_marker,
+        } => format_stdin_stream(start_marker, end_marker, options),
         Operation::Format {
             files,
             minimal_config_path,
@@ -580,8 +581,14 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
         if minimal_config_path.is_some() {
             return Err(OperationError::MinimalPathWithStdin);
         }
-        if let (Some(start_marker), Some(end_marker)) = (matches.opt_str("start-marker"), matches.opt_str("end-marker")) {
-            return Ok(Operation::StdinStream { start_marker, end_marker });
+        if let (Some(start_marker), Some(end_marker)) = (
+            matches.opt_str("start-marker"),
+            matches.opt_str("end-marker"),
+        ) {
+            return Ok(Operation::StdinStream {
+                start_marker,
+                end_marker,
+            });
         }
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer)?;
@@ -722,7 +729,8 @@ impl GetOptsOptions {
             || (options.start_marker.is_none() && options.end_marker.is_some())
         {
             return Err(format_err!(
-                "Both `--start-marker` and `--end-marker` must be specified for streaming formatting"
+                "Both `--start-marker` and `--end-marker` must be \
+                 specified for streaming formatting"
             ));
         }
 

@@ -290,8 +290,12 @@ fn rustfmt_streaming_formatting() {
     {
         use std::io::Write;
         let mut stdin = child.stdin.take().expect("failed to open stdin");
-        stdin.write_all(b"START-CHUNK\nfn foo(  x:i32,y : u32  ) {}\nEND-CHUNK\n").unwrap();
-        stdin.write_all(b"START-CHUNK\nfn bar(  ) -> bool   {false}\nEND-CHUNK\n").unwrap();
+        stdin
+            .write_all(b"START-CHUNK\nfn foo(  x:i32,y : u32  ) {}\nEND-CHUNK\n")
+            .unwrap();
+        stdin
+            .write_all(b"START-CHUNK\nfn bar(  ) -> bool   {false}\nEND-CHUNK\n")
+            .unwrap();
     }
 
     let output = child.wait_with_output().expect("failed to wait on child");
@@ -304,4 +308,3 @@ fn rustfmt_streaming_formatting() {
     assert!(stdout.contains("END-CHUNK"));
     assert!(stderr.is_empty(), "actual stderr:\n{}", stderr);
 }
-
