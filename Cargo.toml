@@ -63,6 +63,7 @@ semver = "1.0.21"
 
 [dev-dependencies]
 tempfile = "3.23.0"
+insta = { version = "1.48.0", features = ["filters"] }
 
 # Rustc dependencies are loaded from the sysroot, Cargo doesn't know about them.
 
