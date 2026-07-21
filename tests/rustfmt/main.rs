@@ -125,19 +125,22 @@ fn rustfmt_usage_text() {
 }
 
 #[test]
-fn mod_resolution_error_multiple_candidate_files() {
+fn check_mode_mod_resolution_error_uses_formatting_prefix() {
     // See also https://github.com/rust-lang/rustfmt/issues/5167
     let default_path = Path::new("tests/mod-resolver/issue-5167/src/a.rs");
     let secondary_path = Path::new("tests/mod-resolver/issue-5167/src/a/mod.rs");
     let error_message = format!(
-        "file for module found at both {:?} and {:?}",
+        concat!(
+            "Error formatting files: failed to resolve mod `a`: ",
+            "file for module found at both {:?} and {:?}"
+        ),
         default_path.canonicalize().unwrap(),
         secondary_path.canonicalize().unwrap(),
     );
 
-    let args = ["tests/mod-resolver/issue-5167/src/lib.rs"];
+    let args = ["--check", "tests/mod-resolver/issue-5167/src/lib.rs"];
     let (_stdout, stderr) = rustfmt(&args);
-    assert!(stderr.contains(&error_message))
+    assert_eq!(stderr.trim(), error_message)
 }
 
 #[test]
