@@ -333,7 +333,7 @@ impl FormattingError {
 
     pub(crate) fn is_internal(&self) -> bool {
         match self.kind {
-            ErrorKind::LineOverflow(..)
+            ErrorKind::LineOverflow { .. }
             | ErrorKind::TrailingWhitespace
             | ErrorKind::IoError(_)
             | ErrorKind::ParseError
@@ -356,7 +356,13 @@ impl FormattingError {
     // (space, target)
     pub(crate) fn format_len(&self) -> (usize, usize) {
         match self.kind {
-            ErrorKind::LineOverflow(found, max) => (max, found - max),
+            ErrorKind::LineOverflow {
+                overflow_start_byte,
+                ..
+            } => (
+                overflow_start_byte,
+                self.line_buffer.len() - overflow_start_byte,
+            ),
             ErrorKind::TrailingWhitespace
             | ErrorKind::DeprecatedAttr
             | ErrorKind::BadAttr
@@ -566,8 +572,13 @@ impl<'a> FormatLines<'a> {
             }
 
             // Check for any line width errors we couldn't correct.
-            let error_kind = ErrorKind::LineOverflow(self.line_len, self.config.max_width());
-            if self.line_len > self.config.max_width()
+            let max_width = self.config.max_width();
+            let error_kind = ErrorKind::LineOverflow {
+                total_line_width: self.line_len,
+                max_width,
+                overflow_start_byte: self.byte_offset_at_col(max_width),
+            };
+            if self.line_len > max_width
                 && !self.is_skipped_line()
                 && self.should_report_error(kind, &error_kind)
             {
@@ -602,6 +613,22 @@ impl<'a> FormatLines<'a> {
         }
     }
 
+    /// Inverse of `Self::char`'s column accounting: walk `line_buffer` with
+    /// the same rule (tab = `tab_spaces` cols, every other char = 1 col) and
+    /// return the byte offset where the accumulated column count first reaches
+    /// `target_col`. Returns `line_buffer.len()` if the line is shorter.
+    fn byte_offset_at_col(&self, target_col: usize) -> usize {
+        let tab_spaces = self.config.tab_spaces();
+        let mut col = 0;
+        for (idx, ch) in self.line_buffer.char_indices() {
+            if col >= target_col {
+                return idx;
+            }
+            col += if ch == '\t' { tab_spaces } else { 1 };
+        }
+        self.line_buffer.len()
+    }
+
     fn push_err(&mut self, kind: ErrorKind, is_comment: bool, is_string: bool) {
         self.errors.push(FormattingError {
             line: self.cur_line,
@@ -623,7 +650,7 @@ impl<'a> FormatLines<'a> {
         };
 
         match error_kind {
-            ErrorKind::LineOverflow(..) => {
+            ErrorKind::LineOverflow { .. } => {
                 self.config.error_on_line_overflow() && allow_error_report
             }
             ErrorKind::TrailingWhitespace | ErrorKind::LostComment => allow_error_report,
