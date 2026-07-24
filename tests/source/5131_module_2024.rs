@@ -1,18 +1,37 @@
-// rustfmt-imports_granularity: One
+// rustfmt-imports_granularity: Module
+// rustfmt-style_edition: 2024
 
-pub use foo::x;
-pub use foo::x as x2;
-pub use foo::y;
-use bar::a;
-use bar::b;
-use bar::b::f;
-use bar::b::f as f2;
-use bar::b::g;
-use bar::c;
-use bar::d::e;
-use bar::d::e as e2;
-use qux::h;
-use qux::i;
+#![allow(dead_code)]
+
+mod a {
+    pub mod b {
+        pub struct Data {
+            pub a: i32,
+        }
+    }
+
+    use crate::a::b::Data;
+    use crate::a::b::Data as Data2;
+
+    pub fn data(a: i32) -> Data {
+        Data { a }
+    }
+
+    pub fn data2(a: i32) -> Data2 {
+        Data2 { a }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        pub fn test() {
+            data(1);
+            data2(1);
+        }
+    }
+}
 
 mod indent4 {
     use column_____________________________________________________________________________________102::{
@@ -69,6 +88,41 @@ mod indent4 {
         bar::baz::Baz,
         Foo2,
         bar::Bar2,
+    };
+
+    // Check that the behavior when "{" exceeds the max column.
+    //
+    // Note that `shape.offset_left(4)?.sub_width(1)?;` in
+    // `rewrite_reorderable_or_regroupable_items()` replaces the max column 100 by 99.
+
+    use x::column______________________________________________________________________________098::{
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
+    };
+
+    use x::column__Only_the_last_one_wraps_due_to_brace_______________________________________097::{
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
+    };
+
+    use x::column_____________________________________________________________________________096::{
+        Foo,
+        bar::Bar,
+        bar::baz::Baz,
+        Foo2,
+        bar::Bar2,
+    };
+
+    // Test for top-level `UseSegmentKind::List`.
+    use {
+        a,
+        column_____________________________________________________________________________________102,
     };
 }
 
