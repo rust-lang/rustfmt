@@ -73,7 +73,7 @@ pub(crate) fn rewrite_string<'a>(
 
     // Strip line breaks.
     // With this regex applied, all remaining whitespaces are significant
-    let strip_line_breaks_re = Regex::new(r"([^\\](\\\\)*)\\[\n\r][[:space:]]*").unwrap();
+    let strip_line_breaks_re = Regex::new(r"(?m)(^|[^\\])(\\\\)*(\\[\n\r][[:space:]]*)+").unwrap();
     let stripped_str = strip_line_breaks_re.replace_all(orig, "$1");
 
     let graphemes = UnicodeSegmentation::graphemes(&*stripped_str, false).collect::<Vec<&str>>();
