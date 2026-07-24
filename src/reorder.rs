@@ -110,7 +110,7 @@ fn rewrite_reorderable_or_regroupable_items(
             let cloned = normalized_items.clone();
             // Add comments before merging.
             let list_items = itemize_list(
-                context.snippet_provider,
+                context,
                 cloned.iter(),
                 "",
                 ";",
@@ -169,7 +169,7 @@ fn rewrite_reorderable_or_regroupable_items(
         }
         _ => {
             let list_items = itemize_list(
-                context.snippet_provider,
+                context,
                 reorderable_items.iter(),
                 "",
                 ";",
