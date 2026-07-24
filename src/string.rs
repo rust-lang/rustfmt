@@ -169,6 +169,7 @@ fn detect_url(s: &[&str], index: usize) -> Option<usize> {
         || split.contains("http://")
         || split.contains("ftp://")
         || split.contains("file://")
+        || split.contains("./")
     {
         match s[index..].iter().position(|g| is_whitespace(g)) {
             Some(pos) => Some(index + pos - 1),
