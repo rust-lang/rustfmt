@@ -51,13 +51,7 @@ fn main() {
         return Ok(None);
     };
 
-    let Stmt::Expr(
-        Expr::Call(ExprCall {
-            args: some_args, ..
-        }),
-        _,
-    ) = last_stmt
-    else {
+    let Stmt::Expr(Expr::Call(ExprCall { args: some_args, .. }), _) = last_stmt else {
         return Err(Error::new(
             last_stmt.span(),
             "expected last expression to be `Some(match (..) { .. })`",
