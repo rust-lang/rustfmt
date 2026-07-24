@@ -71,7 +71,7 @@ use crate::rewrite::{
     ExceedsMaxWidthError, Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult,
 };
 use crate::shape::Shape;
-use crate::source_map::SpanUtils;
+use crate::source_map::{LineRangeUtils, SpanUtils};
 use crate::utils::{
     self, filtered_str_fits, first_line_width, last_line_extendable, last_line_width, mk_sp,
     rewrite_ident, trimmed_last_line_width, wrap_str,
@@ -104,11 +104,31 @@ fn format_chain_item(
         // only when item.rewrite_result() returns RewriteError::ExceedsMaxWidth.
         // It may be inappropriate to call format_overflow_style on other RewriteError
         // since the current approach retries formatting if allow_overflow is true
-        item.rewrite_result(context, rewrite_shape)
+        rewrite_chain_item(item, context, rewrite_shape)
             .or_else(|_| format_overflow_style(item.span, context).unknown_error())
     } else {
-        item.rewrite_result(context, rewrite_shape)
+        rewrite_chain_item(item, context, rewrite_shape)
     }
+}
+
+/// Attempts to rewrite the chain item if it is covered by the selected file lines.
+fn rewrite_chain_item(
+    item: &ChainItem,
+    context: &RewriteContext<'_>,
+    rewrite_shape: Shape,
+) -> RewriteResult {
+    // Don't attempt to format the item if its outside the selected range of lines,
+    // since doing so will cause `rewrite_result` to produce an error that will then
+    // cause us to bail out of rewriting the chain as a whole.
+    if !context
+        .config
+        .file_lines()
+        .intersects(&context.psess.lookup_line_range(item.span))
+    {
+        return Ok(context.snippet(item.span).to_owned());
+    }
+
+    item.rewrite_result(context, rewrite_shape)
 }
 
 fn get_block_child_shape(
@@ -555,25 +575,29 @@ impl Rewrite for Chain {
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
         debug!("rewrite chain {:?} {:?}", self, shape);
 
-        let mut formatter = match context.config.indent_style() {
-            IndentStyle::Block => {
-                Box::new(ChainFormatterBlock::new(self)) as Box<dyn ChainFormatter>
-            }
-            IndentStyle::Visual => {
-                Box::new(ChainFormatterVisual::new(self)) as Box<dyn ChainFormatter>
-            }
-        };
+        let first = self.children.first().unwrap_or(&self.parent);
+        let last = self.children.last().unwrap_or(&self.parent);
+        let children_span = mk_sp(first.span.lo(), last.span.hi());
+        let full_span = self.parent.span.with_hi(children_span.hi());
+
+        let partial_chain = !context
+            .config
+            .file_lines()
+            .contains(&context.psess.lookup_line_range(full_span));
+
+        let mut formatter =
+            match context.config.indent_style() {
+                IndentStyle::Block => Box::new(ChainFormatterBlock::new(self, partial_chain))
+                    as Box<dyn ChainFormatter>,
+                IndentStyle::Visual => Box::new(ChainFormatterVisual::new(self, partial_chain))
+                    as Box<dyn ChainFormatter>,
+            };
 
         formatter.format_root(&self.parent, context, shape)?;
         if let Some(result) = formatter.pure_root() {
             return wrap_str(result, context.config.max_width(), shape)
                 .max_width_error(shape.width, self.parent.span);
         }
-
-        let first = self.children.first().unwrap_or(&self.parent);
-        let last = self.children.last().unwrap_or(&self.parent);
-        let children_span = mk_sp(first.span.lo(), last.span.hi());
-        let full_span = self.parent.span.with_hi(children_span.hi());
 
         // Decide how to layout the rest of the chain.
         let child_shape = formatter.child_shape(context, shape, children_span)?;
@@ -642,10 +666,15 @@ struct ChainFormatterShared<'a> {
     child_count: usize,
     // Whether elements are allowed to overflow past the max_width limit
     allow_overflow: bool,
+    // Whether we are formatting only part of the chain and should preserve
+    // the original grouping of unselected items.
+    partial_chain: bool,
+    // End position of the current root rewrite in the original source.
+    root_span_end: BytePos,
 }
 
 impl<'a> ChainFormatterShared<'a> {
-    fn new(chain: &'a Chain) -> ChainFormatterShared<'a> {
+    fn new(chain: &'a Chain, partial_chain: bool) -> ChainFormatterShared<'a> {
         ChainFormatterShared {
             children: &chain.children,
             rewrites: Vec::with_capacity(chain.children.len() + 1),
@@ -653,6 +682,8 @@ impl<'a> ChainFormatterShared<'a> {
             child_count: chain.children.len(),
             // TODO(calebcartwright)
             allow_overflow: false,
+            partial_chain,
+            root_span_end: chain.parent.span.hi(),
         }
     }
 
@@ -736,19 +767,20 @@ impl<'a> ChainFormatterShared<'a> {
         }
         .saturating_sub(almost_total);
 
-        let all_in_one_line = !self.children.iter().any(ChainItem::is_comment)
+        let all_in_one_line = !self.partial_chain
+            && !self.children.iter().any(ChainItem::is_comment)
             && self.rewrites.iter().all(|s| !s.contains('\n'))
             && one_line_budget > 0;
         let last_shape = if all_in_one_line {
             shape.sub_width(last.tries, last.span)?
-        } else if extendable {
+        } else if extendable && !self.partial_chain {
             child_shape.sub_width(last.tries, last.span)?
         } else {
             child_shape.sub_width(shape.rhs_overhead(context.config) + last.tries, last.span)?
         };
 
         let mut last_subexpr_str = None;
-        if all_in_one_line || extendable {
+        if all_in_one_line || (extendable && !self.partial_chain) {
             // First we try to 'overflow' the last child and see if it looks better than using
             // vertical layout.
             let one_line_shape = if context.use_block_indent() {
@@ -830,14 +862,34 @@ impl<'a> ChainFormatterShared<'a> {
         let mut result = rewrite_iter.next().unwrap().clone();
         let children_iter = self.children.iter();
         let iter = rewrite_iter.zip(children_iter);
+        let mut prev_span_end = self.root_span_end;
 
         for (rewrite, chain_item) in iter {
+            let original_gap = context.snippet(mk_sp(prev_span_end, chain_item.span.lo()));
+            let item_is_selected = context
+                .config
+                .file_lines()
+                .intersects(&context.psess.lookup_line_range(chain_item.span));
+
             match chain_item.kind {
+                ChainItemKind::Comment(..) if !item_is_selected => {}
                 ChainItemKind::Comment(_, CommentPosition::Back) => result.push(' '),
                 ChainItemKind::Comment(_, CommentPosition::Top) => result.push_str(&connector),
+
+                // If we're only formatting part of the chain, we need to preserve the layout of
+                // any items not covered by the selected lines.
+                _ if self.partial_chain => {
+                    if item_is_selected {
+                        result.push_str(&connector);
+                    } else {
+                        result.push_str(original_gap);
+                    }
+                }
+
                 _ => result.push_str(&connector),
             }
             result.push_str(rewrite);
+            prev_span_end = chain_item.span.hi();
         }
 
         Ok(result)
@@ -851,9 +903,9 @@ struct ChainFormatterBlock<'a> {
 }
 
 impl<'a> ChainFormatterBlock<'a> {
-    fn new(chain: &'a Chain) -> ChainFormatterBlock<'a> {
+    fn new(chain: &'a Chain, partial_chain: bool) -> ChainFormatterBlock<'a> {
         ChainFormatterBlock {
-            shared: ChainFormatterShared::new(chain),
+            shared: ChainFormatterShared::new(chain, partial_chain),
             root_ends_with_block: false,
         }
     }
@@ -866,18 +918,21 @@ impl<'a> ChainFormatter for ChainFormatterBlock<'a> {
         context: &RewriteContext<'_>,
         shape: Shape,
     ) -> Result<(), RewriteError> {
-        let mut root_rewrite: String = parent.rewrite_result(context, shape)?;
+        let mut root_rewrite: String = rewrite_chain_item(parent, context, shape)?;
 
         let mut root_ends_with_block = parent.kind.is_block_like(context, &root_rewrite);
         let tab_width = context.config.tab_spaces().saturating_sub(shape.offset);
 
-        while root_rewrite.len() <= tab_width && !root_rewrite.contains('\n') {
+        while !self.shared.partial_chain
+            && root_rewrite.len() <= tab_width
+            && !root_rewrite.contains('\n')
+        {
             let item = &self.shared.children[0];
             if let ChainItemKind::Comment(..) = item.kind {
                 break;
             }
             let shape = shape.offset_left(root_rewrite.len(), item.span)?;
-            match &item.rewrite_result(context, shape) {
+            match &rewrite_chain_item(item, context, shape) {
                 Ok(rewrite) => root_rewrite.push_str(rewrite),
                 Err(_) => break,
             }
@@ -939,9 +994,9 @@ struct ChainFormatterVisual<'a> {
 }
 
 impl<'a> ChainFormatterVisual<'a> {
-    fn new(chain: &'a Chain) -> ChainFormatterVisual<'a> {
+    fn new(chain: &'a Chain, partial_chain: bool) -> ChainFormatterVisual<'a> {
         ChainFormatterVisual {
-            shared: ChainFormatterShared::new(chain),
+            shared: ChainFormatterShared::new(chain, partial_chain),
             offset: 0,
         }
     }
@@ -955,7 +1010,7 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
         shape: Shape,
     ) -> Result<(), RewriteError> {
         let parent_shape = shape.visual_indent(0);
-        let mut root_rewrite = parent.rewrite_result(context, parent_shape)?;
+        let mut root_rewrite = rewrite_chain_item(parent, context, parent_shape)?;
         let multiline = root_rewrite.contains('\n');
         self.offset = if multiline {
             last_line_width(&root_rewrite).saturating_sub(shape.used_width())
@@ -963,7 +1018,9 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
             trimmed_last_line_width(&root_rewrite)
         };
 
-        if !multiline || parent.kind.is_block_like(context, &root_rewrite) {
+        if !self.shared.partial_chain
+            && (!multiline || parent.kind.is_block_like(context, &root_rewrite))
+        {
             let item = &self.shared.children[0];
             if let ChainItemKind::Comment(..) = item.kind {
                 self.shared.rewrites.push(root_rewrite);
@@ -972,13 +1029,13 @@ impl<'a> ChainFormatter for ChainFormatterVisual<'a> {
             let child_shape = parent_shape
                 .visual_indent(self.offset)
                 .sub_width(self.offset, item.span)?;
-            let rewrite = item.rewrite_result(context, child_shape)?;
+            let rewrite = rewrite_chain_item(item, context, child_shape)?;
             if filtered_str_fits(&rewrite, context.config.max_width(), shape) {
                 root_rewrite.push_str(&rewrite);
             } else {
                 // We couldn't fit in at the visual indent, try the last
                 // indent.
-                let rewrite = item.rewrite_result(context, parent_shape)?;
+                let rewrite = rewrite_chain_item(item, context, parent_shape)?;
                 root_rewrite.push_str(&rewrite);
                 self.offset = 0;
             }
