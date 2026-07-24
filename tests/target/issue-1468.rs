@@ -14,13 +14,13 @@ fn issue1468() {
                 return (
                     DecoderResult::Malformed(1, 0),
                     unread_handle_trail.unread(),
-                    handle.written(),
+                    handle.written()
                 );
             }
             return (
                 DecoderResult::Malformed(2, 0),
                 unread_handle_trail.consumed(),
-                handle.written(),
+                handle.written()
             );
         } else {
             unreachable!();
