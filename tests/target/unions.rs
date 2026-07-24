@@ -163,18 +163,18 @@ fn foo() {
 union Foo {
     aaaaa: u32, // a
 
-    b: u32,  // b
+    b: u32, // b
     cc: u32, // cc
 
     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: u32, // 1
-    yy: u32,  // comment2
+    yy: u32, // comment2
     zzz: u32, // comment3
 
     aaaaaa: u32, // comment4
-    bb: u32,     // comment5
+    bb: u32, // comment5
     // separate
     dd: u32, // comment7
-    c: u32,  // comment6
+    c: u32, // comment6
 
     aaaaaaa: u32, /* multi
                    * line
