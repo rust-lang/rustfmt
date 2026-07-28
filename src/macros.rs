@@ -431,17 +431,8 @@ pub(crate) fn rewrite_macro_def(
     };
 
     let mut header = if def.macro_rules {
-        let macro_rules_hi = context.snippet_provider.span_after(span, "macro_rules");
-        let bang_hi = context
-            .snippet_provider
-            .span_after(span.with_lo(macro_rules_hi), "!");
-        let header_span = span.with_hi(bang_hi);
-        let separator_span = mk_sp(macro_rules_hi, bang_hi - BytePos(1));
-        let header_snippet = if contains_comment(context.snippet(separator_span)) {
-            context.snippet(header_span)
-        } else {
-            "macro_rules!"
-        };
+        let pos = context.snippet_provider.span_after(span, "!");
+        vec![HeaderPart::new("macro_rules!", span.with_hi(pos))]
         vec![HeaderPart::new(header_snippet, header_span)]
     } else {
         let macro_lo = context.snippet_provider.span_before(span, "macro");
