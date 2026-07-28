@@ -4,14 +4,13 @@ macro_rules! say_hello {
     };
 }
 
-macro_rules /* comment */ ! say_goodbye {
+macro_rules! say_goodbye {
     () => {
         println!("Goodbye!")
     };
 }
 
-macro_rules // comment
-! do_nothing {
+macro_rules! do_nothing {
     () => {};
 }
 

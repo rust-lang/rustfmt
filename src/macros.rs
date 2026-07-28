@@ -433,7 +433,6 @@ pub(crate) fn rewrite_macro_def(
     let mut header = if def.macro_rules {
         let pos = context.snippet_provider.span_after(span, "!");
         vec![HeaderPart::new("macro_rules!", span.with_hi(pos))]
-        vec![HeaderPart::new(header_snippet, header_span)]
     } else {
         let macro_lo = context.snippet_provider.span_before(span, "macro");
         let macro_hi = macro_lo + BytePos("macro".len() as u32);
