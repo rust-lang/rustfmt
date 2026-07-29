@@ -2128,9 +2128,9 @@ fn rewrite_static(
             )
         })
         .map_or("".into(), |x| format!("{x}"));
-    let colon = colon_spaces(context.config);
+    let (before_colon, after_colon) = type_annotation_spacing(context.config);
     let mut prefix = format!(
-        "{}{}{}{} {}{}{}{}",
+        "{}{}{}{} {}{}{}{}:",
         format_visibility(context, static_parts.vis),
         static_parts.defaultness.map_or("", format_defaultness),
         format_safety(static_parts.safety),
@@ -2138,12 +2138,17 @@ fn rewrite_static(
         format_mutability(static_parts.mutability),
         rewrite_ident(context, static_parts.ident),
         generics,
-        colon
+        before_colon
     );
 
-    // 2 = " =".len()
+    let ty_offset = if static_parts.expr_opt.is_some() {
+        " =".len()
+    } else {
+        ";".len()
+    } + after_colon.len();
+    let shape = Shape::indented(offset.block_only(), context.config);
     let ty_shape = Shape::indented(offset.block_only(), context.config)
-        .offset_left_opt(last_line_width(&prefix) + 2)?;
+        .offset_left_opt(last_line_width(&prefix) + ty_offset)?;
     let ty_str = match static_parts.ty.rewrite(context, ty_shape) {
         Some(ty_str) => ty_str,
         None => {
@@ -2161,12 +2166,25 @@ fn rewrite_static(
         }
     };
 
+    let prefix_with_ty = if is_single_line(&ty_str) {
+        format!("{prefix}{after_colon}{ty_str}")
+    } else {
+        rewrite_assign_rhs(
+            context,
+            &prefix,
+            &*static_parts.ty,
+            &RhsAssignKind::Ty,
+            shape.offset_left_opt(2).unwrap(),
+        )
+        .unwrap()
+    };
+
     if let Some(expr) = static_parts.expr_opt {
         let comments_lo = context.snippet_provider.span_after(static_parts.span, "=");
         let expr_lo = expr.span.lo();
         let comments_span = mk_sp(comments_lo, expr_lo);
 
-        let lhs = format!("{prefix}{ty_str} =");
+        let lhs = format!("{prefix_with_ty} =");
 
         // 1 = ;
         let remaining_width = context.budget(offset.block_indent + 1);
@@ -2184,7 +2202,7 @@ fn rewrite_static(
         .map(|res| recover_comment_removed(res, static_parts.span, context))
         .map(|s| if s.ends_with(';') { s } else { s + ";" })
     } else {
-        Some(format!("{prefix}{ty_str};"))
+        Some(format!("{prefix_with_ty};"))
     }
 }
 
