@@ -622,6 +622,9 @@ impl GetOptsOptions {
             .collect::<Result<HashMap<_, _>, _>>()?;
 
         options.check = matches.opt_present("check");
+        if options.check && options.inline_config.contains_key("emit_mode") {
+            return Err(format_err!("Invalid to use `emit_mode` and `--check`"));
+        }
         if let Some(ref emit_str) = matches.opt_str("emit") {
             if options.check {
                 return Err(format_err!("Invalid to use `--emit` and `--check`"));

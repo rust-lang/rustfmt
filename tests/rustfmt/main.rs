@@ -1,7 +1,7 @@
 //! Integration tests for rustfmt.
 
 use std::env;
-use std::fs::{File, remove_file};
+use std::fs::{File, read_to_string, remove_file, write};
 use std::path::Path;
 use std::process::Command;
 
@@ -378,4 +378,26 @@ fn rustfmt_allow_not_a_dir_errors() {
     // Should pass without any errors
     assert_eq!(stdout, "");
     assert_eq!(stderr, "");
+}
+
+#[test]
+fn check_rejects_emit_mode_from_inline_config() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let source_path = temp_dir.path().join("source.rs");
+    let source = "fn main(){println!(\"hello\");}\n";
+    write(&source_path, source).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rustfmt"))
+        .args([
+            "--check",
+            "--config",
+            "emit_mode=files",
+            source_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("emit_mode"));
+    assert_eq!(read_to_string(source_path).unwrap(), source);
 }
