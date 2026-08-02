@@ -2141,14 +2141,23 @@ fn rewrite_static(
         before_colon
     );
 
+    let style_edition = context.config.style_edition();
+    if style_edition <= StyleEdition::Edition2024 {
+        prefix.push_str(after_colon);
+    }
+
     let after_ty_offset = if static_parts.expr_opt.is_some() {
         " =".len()
     } else {
         ";".len()
     };
     let shape = Shape::indented(offset.block_only(), context.config);
-    let ty_shape =
-        shape.offset_left_opt(last_line_width(&prefix) + after_colon.len() + after_ty_offset)?;
+    let ty_shape = if style_edition <= StyleEdition::Edition2024 {
+        // 2 = " =".len()
+        shape.offset_left_opt(last_line_width(&prefix) + 2)?
+    } else {
+        shape.offset_left_opt(last_line_width(&prefix) + after_colon.len() + after_ty_offset)?
+    };
     let ty_str = match static_parts.ty.rewrite(context, ty_shape) {
         Some(ty_str) => ty_str,
         None => {
@@ -2166,17 +2175,21 @@ fn rewrite_static(
         }
     };
 
-    let prefix_with_ty = if is_single_line(&ty_str) {
-        format!("{prefix}{after_colon}{ty_str}")
+    let prefix_with_ty = if style_edition <= StyleEdition::Edition2024 {
+        format!("{prefix}{ty_str}")
     } else {
-        rewrite_assign_rhs(
-            context,
-            &prefix,
-            &*static_parts.ty,
-            &RhsAssignKind::Ty,
-            shape.offset_left_opt(after_ty_offset)?,
-        )
-        .ok()?
+        if is_single_line(&ty_str) {
+            format!("{prefix}{after_colon}{ty_str}")
+        } else {
+            rewrite_assign_rhs(
+                context,
+                &prefix,
+                &*static_parts.ty,
+                &RhsAssignKind::Ty,
+                shape.offset_left_opt(after_ty_offset)?,
+            )
+            .ok()?
+        }
     };
 
     if let Some(expr) = static_parts.expr_opt {
