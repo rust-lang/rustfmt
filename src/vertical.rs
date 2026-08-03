@@ -222,7 +222,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     }
 
     let mut items = itemize_list(
-        context.snippet_provider,
+        context,
         fields.iter(),
         "}",
         ",",

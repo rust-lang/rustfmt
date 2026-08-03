@@ -222,7 +222,7 @@ fn rewrite_match_arms(
         .chain(repeat(true));
     let beginning_verts = collect_beginning_verts(context, arms);
     let items = itemize_list(
-        context.snippet_provider,
+        context,
         arms.iter()
             .zip(is_last_iter)
             .zip(beginning_verts.into_iter())
