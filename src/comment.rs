@@ -256,7 +256,7 @@ fn identify_comment(
     config: &Config,
     is_doc_comment: bool,
 ) -> RewriteResult {
-    let style = comment_style(orig, false);
+    let style = comment_style(orig.trim_start(), false);
 
     // Computes the byte length of line taking into account a newline if the line is part of a
     // paragraph.
