@@ -246,6 +246,13 @@ fn mod_resolution_error_multiple_candidate_files() {
 }
 
 #[test]
+fn check_mode_error_uses_formatting_prefix() {
+    let args = ["--check", "tests/mod-resolver/issue-5167/src/lib.rs"];
+    let (_stdout, stderr) = rustfmt(&args);
+    assert!(stderr.contains("Error formatting files:"))
+}
+
+#[test]
 fn mod_resolution_error_sibling_module_not_found() {
     let args = ["tests/mod-resolver/module-not-found/sibling_module/lib.rs"];
     let (_stdout, stderr) = rustfmt(&args);

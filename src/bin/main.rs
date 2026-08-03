@@ -408,7 +408,7 @@ fn format_and_emit_report<T: Write>(session: &mut Session<'_, T>, input: Input) 
             }
         }
         Err(msg) => {
-            eprintln!("Error writing files: {msg}");
+            eprintln!("Error formatting files: {msg}");
             session.add_operational_error();
         }
     }
