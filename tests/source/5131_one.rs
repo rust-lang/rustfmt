@@ -13,3 +13,4 @@ use bar::d::e;
 use bar::d::e as e2;
 use qux::h;
 use qux::i;
+use qux::i as j;
