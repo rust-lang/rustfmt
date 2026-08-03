@@ -108,13 +108,20 @@ fn get_inner_expr<'a>(
         if !needs_block(block, label, prefix, context) {
             // block.stmts.len() == 1 except with `|| {{}}`;
             // https://github.com/rust-lang/rustfmt/issues/3844
-            if let Some(expr) = block.stmts.first().and_then(stmt_expr) {
+            if let Some(expr) = iter_stmts_without_empty(&block).next().and_then(stmt_expr) {
                 return get_inner_expr(expr, prefix, context);
             }
         }
     }
 
     expr
+}
+
+fn iter_stmts_without_empty(block: &ast::Block) -> impl Iterator<Item = &ast::Stmt> {
+    block
+        .stmts
+        .iter()
+        .filter(|stmt| !matches!(stmt.kind, ast::StmtKind::Empty))
 }
 
 // Figure out if a block is necessary.
@@ -129,7 +136,7 @@ fn needs_block(
     });
 
     is_unsafe_block(block)
-        || block.stmts.len() > 1
+        || iter_stmts_without_empty(&block).count() > 1
         || has_attributes
         || block_contains_comment(context, block)
         || prefix.contains('\n')
