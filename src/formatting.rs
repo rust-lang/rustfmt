@@ -318,6 +318,10 @@ pub(crate) struct FormattingError {
     is_comment: bool,
     is_string: bool,
     pub(crate) line_buffer: String,
+    // Byte offset in `line_buffer` where a `LineOverflow` annotation begins.
+    // The widths in `LineOverflow` are visual columns (a tab counts as
+    // `tab_spaces`), so they can't be used to index into the buffer.
+    overflow_start: usize,
 }
 
 impl FormattingError {
@@ -328,6 +332,7 @@ impl FormattingError {
             kind,
             is_string: false,
             line_buffer: psess.span_to_first_line_string(span),
+            overflow_start: 0,
         }
     }
 
@@ -353,10 +358,13 @@ impl FormattingError {
         }
     }
 
-    // (space, target)
+    // (annotation start, annotation length) in bytes of `line_buffer`
     pub(crate) fn format_len(&self) -> (usize, usize) {
         match self.kind {
-            ErrorKind::LineOverflow(found, max) => (max, found - max),
+            ErrorKind::LineOverflow(..) => (
+                self.overflow_start,
+                self.line_buffer.len() - self.overflow_start,
+            ),
             ErrorKind::TrailingWhitespace
             | ErrorKind::DeprecatedAttr
             | ErrorKind::BadAttr
@@ -603,13 +611,36 @@ impl<'a> FormatLines<'a> {
     }
 
     fn push_err(&mut self, kind: ErrorKind, is_comment: bool, is_string: bool) {
+        let overflow_start = match kind {
+            ErrorKind::LineOverflow(..) => self.overflow_start(),
+            _ => 0,
+        };
         self.errors.push(FormattingError {
             line: self.cur_line,
             kind,
             is_comment,
             is_string,
             line_buffer: self.line_buffer.clone(),
+            overflow_start,
         });
+    }
+
+    /// Returns the byte offset in `line_buffer` of the first character that extends past
+    /// `max_width`, counting a tab as `tab_spaces` columns like `line_len` does.
+    fn overflow_start(&self) -> usize {
+        let max_width = self.config.max_width();
+        let mut width = 0;
+        for (offset, c) in self.line_buffer.char_indices() {
+            width += if c == '\t' {
+                self.config.tab_spaces()
+            } else {
+                1
+            };
+            if width > max_width {
+                return offset;
+            }
+        }
+        self.line_buffer.len()
     }
 
     fn should_report_error(&self, char_kind: FullCodeCharKind, error_kind: &ErrorKind) -> bool {

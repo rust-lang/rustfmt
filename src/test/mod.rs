@@ -262,7 +262,11 @@ fn warning_tests() {
 
     for file in &files {
         let snapshot_name = file.file_stem().unwrap().to_str().unwrap();
-        let (parsing_errors, _, report) = format_file(file, config.clone());
+        let mut config = config.clone();
+        for (key, val) in read_significant_comments(file) {
+            config.override_value(&key, &val);
+        }
+        let (parsing_errors, _, report) = format_file(file, config);
         assert!(!parsing_errors, "{} failed to parse", file.display());
         assert!(
             report.has_warnings(),
