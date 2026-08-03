@@ -50,3 +50,9 @@ use c;
 use d;
 
 use {library1, library2 as lib2, library3};
+
+#[my_attribute]
+use a::{b::c,d::e,d::f};
+
+/// Some doc comment
+use a::{b::c,d::e,d::f};
