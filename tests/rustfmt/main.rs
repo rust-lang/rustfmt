@@ -309,6 +309,27 @@ fn dont_emit_ICE() {
 }
 
 #[test]
+fn dont_panic_on_line_overflow_with_multibyte_chars() {
+    // See also https://github.com/rust-lang/rustfmt/issues/6850
+    let args = [
+        "--config",
+        "error_on_line_overflow=true,error_on_unformatted=true",
+        "tests/cargo-fmt/source/issue_6850/src/main.rs",
+    ];
+
+    let (_stdout, stderr) = rustfmt(&args);
+    assert!(stderr.contains(
+        "line formatted, but exceeded maximum width (maximum: 100 (see `max_width` option), found: 126)"
+    ));
+
+    let panic_re = regex::Regex::new("thread.*panicked").unwrap();
+    assert!(
+        !panic_re.is_match(&stderr),
+        "rustfmt panicked instead of reporting line overflow:\n{stderr}"
+    );
+}
+
+#[test]
 fn rustfmt_emits_error_when_control_brace_style_is_always_next_line() {
     // See also https://github.com/rust-lang/rustfmt/issues/5912
     let args = [
