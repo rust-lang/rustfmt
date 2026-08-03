@@ -1,3 +1,5 @@
+// rustfmt-show_parse_errors: false
+
 fn main() {
     if true {
         println!("answer: {}", a_func();
@@ -8,4 +10,4 @@ fn main() {
 
 fn a_func() -> i32 {
     42
-} 
+}
