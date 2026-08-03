@@ -47,7 +47,7 @@ Where to put a binary operator when a binary expression goes multiline.
 
 - **Default value**: `"Front"`
 - **Possible values**: `"Front"`, `"Back"`
-- **Stable**: No (tracking issue: [#3368](https://github.com/rust-lang/rustfmt/issues/3368))
+- **Stable**: Yes
 
 #### `"Front"` (default):
 
