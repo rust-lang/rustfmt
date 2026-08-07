@@ -1074,16 +1074,26 @@ fn light_rewrite_comment(
             // `*` in `/*`.
             let first_non_whitespace = l.find(|c| !char::is_whitespace(c));
             let left_trimmed = if let Some(fnw) = first_non_whitespace {
-                if l.as_bytes()[fnw] == b'*' && fnw > 0 {
-                    &l[fnw - 1..]
+                if l.as_bytes()[fnw] == b'*' {
+                    Cow::Owned(format!(" {}", &l[fnw..]))
                 } else {
-                    &l[fnw..]
+                    Cow::Borrowed(&l[fnw..])
                 }
             } else {
-                ""
+                Cow::Borrowed("")
             };
+
             // Preserve markdown's double-space line break syntax in doc comment.
-            trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment)
+            match left_trimmed {
+                Cow::Borrowed(left_trimmed) => Cow::Borrowed(trim_end_unless_two_whitespaces(
+                    left_trimmed,
+                    is_doc_comment,
+                )),
+                Cow::Owned(left_trimmed) => {
+                    let trimmed = trim_end_unless_two_whitespaces(&left_trimmed, is_doc_comment);
+                    Cow::Owned(trimmed.to_string())
+                }
+            }
         })
         .join(&format!("\n{}", offset.to_string(config)))
 }
