@@ -503,25 +503,86 @@ fn add_targets(target_paths: &[cargo_metadata::Target], targets: &mut BTreeSet<T
     }
 }
 
-fn expand_response_file_args(args: &[OsString]) -> Result<Vec<OsString>, io::Error> {
+fn expand_args_file_args(args: &[OsString]) -> Result<Vec<OsString>, io::Error> {
+    let mut options_enabled = true;
+    expand_args_file_args_inner(args, 0, &mut options_enabled)
+}
+
+fn expand_args_file_args_inner(
+    args: &[OsString],
+    depth: usize,
+    options_enabled: &mut bool,
+) -> Result<Vec<OsString>, io::Error> {
+    const MAX_ARGS_FILE_DEPTH: usize = 16;
+    if depth > MAX_ARGS_FILE_DEPTH {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("argument files cannot be nested more than {MAX_ARGS_FILE_DEPTH} levels"),
+        ));
+    }
+
     let mut expanded = Vec::new();
-    for arg in args {
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        if !*options_enabled {
+            expanded.push(arg.clone());
+            expanded.extend(args.cloned());
+            break;
+        }
         let arg = arg.to_str().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "rustfmt response-file arguments must be valid UTF-8",
+                "rustfmt argument-file arguments must be valid UTF-8",
             )
         })?;
-        if let Some(arg) = arg.strip_prefix("@@") {
-            expanded.push(OsString::from(format!("@{arg}")));
-        } else if let Some(path) = arg.strip_prefix('@') {
-            let contents = fs::read_to_string(path).map_err(|e| {
+        if arg == "--" {
+            *options_enabled = false;
+            expanded.push(OsString::from(arg));
+            expanded.extend(args.cloned());
+            break;
+        }
+        let path = if arg == "--args-file" {
+            Some(
+                args.next()
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::InvalidInput, "`--args-file` requires a path")
+                    })?
+                    .to_str()
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "argument-file paths must be valid UTF-8",
+                        )
+                    })?
+                    .to_owned(),
+            )
+        } else {
+            arg.strip_prefix("--args-file=").map(str::to_owned)
+        };
+
+        if let Some(path) = path {
+            if path.is_empty() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "`--args-file` requires a path",
+                ));
+            }
+            let contents = fs::read_to_string(&path).map_err(|e| {
                 io::Error::new(
                     e.kind(),
                     format!("failed to load argument file `{path}`: {e}"),
                 )
             })?;
-            expanded.extend(contents.lines().map(OsString::from));
+            let nested = contents.lines().map(OsString::from).collect::<Vec<_>>();
+            expanded.extend(expand_args_file_args_inner(
+                &nested,
+                depth + 1,
+                options_enabled,
+            )?);
+            if !*options_enabled {
+                expanded.extend(args.cloned());
+                break;
+            }
         } else {
             expanded.push(OsString::from(arg));
         }
@@ -529,25 +590,25 @@ fn expand_response_file_args(args: &[OsString]) -> Result<Vec<OsString>, io::Err
     Ok(expanded)
 }
 
-fn write_response_file(args: &[OsString]) -> Result<NamedTempFile, io::Error> {
-    let mut response_file = NamedTempFile::new()?;
-    for arg in expand_response_file_args(args)? {
+fn write_args_file(args: &[OsString]) -> Result<NamedTempFile, io::Error> {
+    let mut args_file = NamedTempFile::new()?;
+    for arg in expand_args_file_args(args)? {
         let arg = arg.to_str().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "rustfmt response-file arguments must be valid UTF-8",
+                "rustfmt argument-file arguments must be valid UTF-8",
             )
         })?;
         if arg.contains('\n') || arg.contains('\r') {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "rustfmt response-file arguments cannot contain newlines",
+                "rustfmt argument-file arguments cannot contain newlines",
             ));
         }
-        writeln!(response_file, "{arg}")?;
+        writeln!(args_file, "{arg}")?;
     }
-    response_file.flush()?;
-    Ok(response_file)
+    args_file.flush()?;
+    Ok(args_file)
 }
 
 #[cfg(windows)]
@@ -582,7 +643,7 @@ fn command_line_program_len(program: &Path) -> usize {
 }
 
 #[cfg(windows)]
-fn should_use_response_file(program: &Path, args: &[OsString]) -> bool {
+fn should_use_args_file(program: &Path, args: &[OsString]) -> bool {
     const WINDOWS_COMMAND_LINE_LIMIT: usize = 32_767;
 
     let command_line_len = command_line_program_len(program).saturating_add(
@@ -594,7 +655,7 @@ fn should_use_response_file(program: &Path, args: &[OsString]) -> bool {
 }
 
 #[cfg(not(windows))]
-fn should_use_response_file(_program: &Path, _args: &[OsString]) -> bool {
+fn should_use_args_file(_program: &Path, _args: &[OsString]) -> bool {
     false
 }
 
@@ -642,16 +703,14 @@ fn run_rustfmt(
         ]);
         args.extend(fmt_args.iter().map(OsString::from));
 
-        let response_file = should_use_response_file(&rustfmt, &args)
-            .then(|| write_response_file(&args))
+        let args_file = should_use_args_file(&rustfmt, &args)
+            .then(|| write_args_file(&args))
             .transpose()?;
 
         let mut command = Command::new(rustfmt);
         command.stdout(stdout);
-        if let Some(response_file) = response_file.as_ref() {
-            let mut response_arg = OsString::from("@");
-            response_arg.push(response_file.path());
-            command.arg(response_arg);
+        if let Some(args_file) = args_file.as_ref() {
+            command.arg("--args-file").arg(args_file.path());
         } else {
             command.args(&args);
         }

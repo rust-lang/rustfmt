@@ -43,41 +43,40 @@ fn rustfmt(args: &[&str]) -> (String, String) {
 }
 
 #[test]
-fn response_file() {
+fn args_file() {
     let temp_dir = tempfile::tempdir().unwrap();
-    let source = temp_dir.path().join("response file.rs");
+    let source = temp_dir.path().join("args file.rs");
     fs::write(&source, "fn main () {}\n").unwrap();
 
-    let mut response_file = tempfile::NamedTempFile::new().unwrap();
+    let mut args_file = tempfile::NamedTempFile::new().unwrap();
     write!(
-        response_file,
+        args_file,
         "--quiet\r\n--emit\r\nstdout\r\n--edition\r\n2021\r\n{}\r\n",
         source.display()
     )
     .unwrap();
 
-    let response_arg = format!("@{}", response_file.path().display());
-    let (stdout, stderr) = rustfmt(&[&response_arg]);
+    let (stdout, stderr) = rustfmt(&["--args-file", args_file.path().to_str().unwrap()]);
     assert_eq!(stdout, "fn main() {}\n");
     assert_eq!(stderr, "");
 }
 
 #[test]
-fn missing_response_file() {
-    let (stdout, stderr) = rustfmt(&["@missing-rustfmt-response-file"]);
+fn missing_args_file() {
+    let (stdout, stderr) = rustfmt(&["--args-file", "missing-rustfmt-args-file"]);
     assert!(
-        stdout.contains("failed to load argument file `missing-rustfmt-response-file`:")
-            || stderr.contains("failed to load argument file `missing-rustfmt-response-file`:")
+        stdout.contains("failed to load argument file `missing-rustfmt-args-file`:")
+            || stderr.contains("failed to load argument file `missing-rustfmt-args-file`:")
     );
 }
 
 #[test]
-fn doubled_at_sign_formats_a_literal_at_path() {
+fn at_sign_path_remains_an_ordinary_file_name() {
     let temp_dir = tempfile::tempdir().unwrap();
     fs::write(temp_dir.path().join("@source.rs"), "fn main () {}\n").unwrap();
 
     let (stdout, stderr) = rustfmt_with_extra(
-        &["--quiet", "--emit", "stdout", "@@source.rs"],
+        &["--quiet", "--emit", "stdout", "@source.rs"],
         temp_dir.path().to_str(),
         &[],
     );
@@ -203,6 +202,9 @@ fn rustfmt_usage_text() {
                             priority over .rustfmt.toml
             --style-edition [2015|2018|2021|2024]
                             The edition of the Style Guide.
+            --args-file PATH
+                            Read command-line arguments from a UTF-8 file, one
+                            argument per line
         -v, --verbose       Print verbose output
         -q, --quiet         Print less output
         -V, --version       Show version information
@@ -253,6 +255,9 @@ fn rustfmt_nightly_usage_text() {
                             priority over .rustfmt.toml
             --style-edition [2015|2018|2021|2024]
                             The edition of the Style Guide.
+            --args-file PATH
+                            Read command-line arguments from a UTF-8 file, one
+                            argument per line
             --unstable-features 
                             Enables unstable features. Only available on nightly
                             channel.

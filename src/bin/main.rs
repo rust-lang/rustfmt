@@ -173,6 +173,12 @@ fn make_opts() -> Options {
         "The edition of the Style Guide.",
         "[2015|2018|2021|2024]",
     );
+    opts.optmulti(
+        "",
+        "args-file",
+        "Read command-line arguments from a UTF-8 file, one argument per line",
+        "PATH",
+    );
 
     if is_nightly {
         opts.optflag(
@@ -222,7 +228,7 @@ fn is_nightly() -> bool {
 
 // Returned i32 is an exit code
 fn execute(opts: &Options) -> Result<i32> {
-    let args = expand_response_files(env::args().skip(1))?;
+    let args = expand_args_files(env::args().skip(1))?;
     let matches = opts.parse(args)?;
     let options = GetOptsOptions::from_matches(&matches)?;
 
@@ -276,15 +282,61 @@ fn execute(opts: &Options) -> Result<i32> {
     }
 }
 
-fn expand_response_files(args: impl IntoIterator<Item = String>) -> Result<Vec<String>> {
+fn expand_args_files(args: impl IntoIterator<Item = String>) -> Result<Vec<String>> {
+    let mut options_enabled = true;
+    expand_args_files_inner(args, 0, &mut options_enabled)
+}
+
+fn expand_args_files_inner(
+    args: impl IntoIterator<Item = String>,
+    depth: usize,
+    options_enabled: &mut bool,
+) -> Result<Vec<String>> {
+    const MAX_ARGS_FILE_DEPTH: usize = 16;
+    if depth > MAX_ARGS_FILE_DEPTH {
+        return Err(format_err!(
+            "argument files cannot be nested more than {MAX_ARGS_FILE_DEPTH} levels"
+        ));
+    }
+
     let mut expanded = Vec::new();
-    for arg in args {
-        if let Some(arg) = arg.strip_prefix("@@") {
-            expanded.push(format!("@{arg}"));
-        } else if let Some(path) = arg.strip_prefix('@') {
-            let contents = fs::read_to_string(path)
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        if !*options_enabled {
+            expanded.push(arg);
+            expanded.extend(args);
+            break;
+        }
+        if arg == "--" {
+            *options_enabled = false;
+            expanded.push(arg);
+            expanded.extend(args);
+            break;
+        }
+        let path = if arg == "--args-file" {
+            Some(
+                args.next()
+                    .ok_or_else(|| format_err!("`--args-file` requires a path"))?,
+            )
+        } else {
+            arg.strip_prefix("--args-file=").map(str::to_owned)
+        };
+
+        if let Some(path) = path {
+            if path.is_empty() {
+                return Err(format_err!("`--args-file` requires a path"));
+            }
+            let contents = fs::read_to_string(&path)
                 .map_err(|e| format_err!("failed to load argument file `{path}`: {e}"))?;
-            expanded.extend(contents.lines().map(str::to_owned));
+            expanded.extend(expand_args_files_inner(
+                contents.lines().map(str::to_owned),
+                depth + 1,
+                options_enabled,
+            )?);
+            if !*options_enabled {
+                expanded.extend(args);
+                break;
+            }
         } else {
             expanded.push(arg);
         }
@@ -831,31 +883,62 @@ mod test {
     }
 
     #[test]
-    fn response_files_are_expanded_once() {
-        let mut response_file = NamedTempFile::new().unwrap();
-        writeln!(
-            response_file,
-            "--edition\r\n2021\r\n\r\n@nested-response-file"
-        )
+    fn args_files_are_expanded() {
+        let mut args_file = NamedTempFile::new().unwrap();
+        writeln!(args_file, "--edition\r\n2021\r\n\r\n@ordinary-source-file").unwrap();
+
+        let args = expand_args_files([
+            "--args-file".to_owned(),
+            args_file.path().display().to_string(),
+        ])
         .unwrap();
-
-        let args = expand_response_files([format!("@{}", response_file.path().display())]).unwrap();
-        assert_eq!(args, ["--edition", "2021", "", "@nested-response-file"]);
+        assert_eq!(args, ["--edition", "2021", "", "@ordinary-source-file"]);
     }
 
     #[test]
-    fn doubled_at_sign_escapes_response_file_expansion() {
-        let args = expand_response_files(["@@source.rs".to_owned()]).unwrap();
-        assert_eq!(args, ["@source.rs"]);
+    fn args_file_equals_syntax_is_supported() {
+        let mut args_file = NamedTempFile::new().unwrap();
+        writeln!(args_file, "--check").unwrap();
+
+        let args =
+            expand_args_files([format!("--args-file={}", args_file.path().display())]).unwrap();
+        assert_eq!(args, ["--check"]);
     }
 
     #[test]
-    fn missing_response_file_is_an_error() {
-        let error = expand_response_files(["@missing-response-file".to_owned()]).unwrap_err();
+    fn args_file_after_option_terminator_is_a_file_name() {
+        let args = expand_args_files([
+            "--".to_owned(),
+            "--args-file".to_owned(),
+            "source.rs".to_owned(),
+        ])
+        .unwrap();
+        assert_eq!(args, ["--", "--args-file", "source.rs"]);
+    }
+
+    #[test]
+    fn option_terminator_in_args_file_stops_outer_expansion() {
+        let mut args_file = NamedTempFile::new().unwrap();
+        writeln!(args_file, "--").unwrap();
+
+        let args = expand_args_files([
+            "--args-file".to_owned(),
+            args_file.path().display().to_string(),
+            "--args-file".to_owned(),
+            "source.rs".to_owned(),
+        ])
+        .unwrap();
+        assert_eq!(args, ["--", "--args-file", "source.rs"]);
+    }
+
+    #[test]
+    fn missing_args_file_is_an_error() {
+        let error = expand_args_files(["--args-file".to_owned(), "missing-args-file".to_owned()])
+            .unwrap_err();
         assert!(
             error
                 .to_string()
-                .starts_with("failed to load argument file `missing-response-file`:")
+                .starts_with("failed to load argument file `missing-args-file`:")
         );
     }
 

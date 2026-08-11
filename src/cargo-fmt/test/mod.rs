@@ -119,18 +119,35 @@ fn windows_command_line_length_matches_rust_quoting() {
 }
 
 #[test]
-fn response_file_arguments_are_expanded_once() {
+fn argument_file_arguments_are_expanded() {
     use std::io::Write;
 
-    let mut response_file = tempfile::NamedTempFile::new().unwrap();
-    writeln!(response_file, "--check\r\n@nested-response-file").unwrap();
+    let mut args_file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(args_file, "--check\r\n@ordinary-source-file").unwrap();
 
-    let args = expand_response_file_args(&[
-        OsString::from(format!("@{}", response_file.path().display())),
-        OsString::from("@@literal"),
+    let args = expand_args_file_args(&[
+        OsString::from("--args-file"),
+        args_file.path().as_os_str().to_owned(),
     ])
     .unwrap();
-    assert_eq!(args, ["--check", "@nested-response-file", "@literal"]);
+    assert_eq!(args, ["--check", "@ordinary-source-file"]);
+}
+
+#[test]
+fn argument_file_terminator_stops_outer_expansion() {
+    use std::io::Write;
+
+    let mut args_file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(args_file, "--").unwrap();
+
+    let args = expand_args_file_args(&[
+        OsString::from("--args-file"),
+        args_file.path().as_os_str().to_owned(),
+        OsString::from("--args-file"),
+        OsString::from("source.rs"),
+    ])
+    .unwrap();
+    assert_eq!(args, ["--", "--args-file", "source.rs"]);
 }
 
 #[test]

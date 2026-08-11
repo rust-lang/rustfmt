@@ -85,10 +85,8 @@ The easiest way to run rustfmt against a project is with `cargo fmt`. `cargo fmt
 single-crate projects and [cargo workspaces](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html).
 Please see `cargo fmt --help` for usage information.
 
-Rustfmt can read command-line arguments from a response file using `@path`. The response file must
-be UTF-8 encoded and contain one argument per line. Response files are expanded once, so an
-argument beginning with `@` inside a response file is treated literally. On the command line, use
-`@@` to pass a literal argument beginning with `@`.
+Rustfmt can read command-line arguments from a file using `--args-file <path>`. Argument files must
+be UTF-8 encoded and contain one argument per line.
 
 You can specify the path to your own `rustfmt` binary for cargo to use by setting the`RUSTFMT` 
 environment variable. This was added in v1.4.22, so you must have this version or newer to leverage this feature (`cargo fmt --version`)
