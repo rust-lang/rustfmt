@@ -342,12 +342,14 @@ impl FormattingError {
         }
     }
 
-    pub(crate) fn msg_suffix(&self) -> &str {
+    pub(crate) fn msg_suffix(&self) -> Option<&str> {
         if self.is_comment || self.is_string {
-            "set `error_on_unformatted = false` to suppress \
-             the warning against comments or string literals\n"
+            Some(
+                "set `error_on_unformatted = false` to suppress \
+             the warning against comments or string literals",
+            )
         } else {
-            ""
+            None
         }
     }
 

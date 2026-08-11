@@ -2106,28 +2106,44 @@ fn rewrite_static(
     static_parts: &StaticParts<'_>,
     offset: Indent,
 ) -> Option<String> {
-    // For now, if this static (or const) has generics, then bail.
+    // For now, if this static (or const) has a where clause, then bail.
     if static_parts
         .generics
-        .is_some_and(|g| !g.params.is_empty() || !g.where_clause.is_empty())
+        .is_some_and(|g| !g.where_clause.is_empty())
     {
         return None;
     }
-
+    let generics = static_parts
+        .generics
+        .and_then(|g| {
+            format_generics(
+                context,
+                &g,
+                context.config.brace_style(),
+                BracePos::None,
+                offset,
+                // make a span that starts right after `const x<n>`
+                mk_sp(static_parts.ident.span.hi(), static_parts.ty.span.lo()),
+                offset.block_indent,
+            )
+        })
+        .map_or("".into(), |x| format!("{x}"));
     let colon = colon_spaces(context.config);
     let mut prefix = format!(
-        "{}{}{}{} {}{}{}",
+        "{}{}{}{} {}{}{}{}",
         format_visibility(context, static_parts.vis),
         static_parts.defaultness.map_or("", format_defaultness),
         format_safety(static_parts.safety),
         static_parts.prefix,
         format_mutability(static_parts.mutability),
         rewrite_ident(context, static_parts.ident),
-        colon,
+        generics,
+        colon
     );
+
     // 2 = " =".len()
-    let ty_shape =
-        Shape::indented(offset.block_only(), context.config).offset_left_opt(prefix.len() + 2)?;
+    let ty_shape = Shape::indented(offset.block_only(), context.config)
+        .offset_left_opt(last_line_width(&prefix) + 2)?;
     let ty_str = match static_parts.ty.rewrite(context, ty_shape) {
         Some(ty_str) => ty_str,
         None => {
@@ -2361,7 +2377,14 @@ impl Rewrite for ast::Param {
 
             Ok(result)
         } else {
-            self.ty.rewrite_result(context, shape)
+            combine_strs_with_missing_comments(
+                context,
+                &param_attrs_result,
+                &self.ty.rewrite_result(context, shape)?,
+                span,
+                shape,
+                !has_multiple_attr_lines && !has_doc_comments,
+            )
         }
     }
 }
@@ -2873,7 +2896,7 @@ fn rewrite_params(
         context
             .config
             .fn_params_layout()
-            .to_list_tactic(param_items.len()),
+            .to_list_tactic(context.config.style_edition(), param_items.len()),
         Separator::Comma,
         one_line_budget,
     );

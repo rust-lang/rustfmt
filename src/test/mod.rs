@@ -249,6 +249,46 @@ fn system_tests() {
     });
 }
 
+// Check formatting-specific warning/error emissions against snapshots.
+#[test]
+fn warning_tests() {
+    init_log();
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let manifest_dir_filter = regex::escape(manifest_dir.to_string_lossy().as_ref());
+    let files = get_test_files(Path::new("tests/warning/source"), true);
+    let mut config = Config::default();
+    config.set().error_on_line_overflow(true);
+    config.set().error_on_unformatted(true);
+
+    for file in &files {
+        let snapshot_name = file.file_stem().unwrap().to_str().unwrap();
+        let (parsing_errors, _, report) = format_file(file, config.clone());
+        assert!(!parsing_errors, "{} failed to parse", file.display());
+        assert!(
+            report.has_warnings(),
+            "{} did not emit a warning or error",
+            file.display()
+        );
+        let warning = FormatReportFormatterBuilder::new(&report)
+            .build()
+            .to_string();
+
+        insta::with_settings!({
+            snapshot_path => manifest_dir.join("tests/warning/snapshots"),
+            prepend_module_to_snapshot => false,
+            omit_expression => true,
+            filters => vec![
+                (manifest_dir_filter.as_str(), "$$DIR"),
+                (r"\r\n", "\n"),
+                (r"\\", "/"),
+            ],
+            strip_ansi_escape_codes => true,
+        }, {
+            insta::assert_snapshot!(snapshot_name, warning);
+        });
+    }
+}
+
 // Do the same for tests/coverage-source directory.
 // The only difference is the coverage mode.
 #[test]
