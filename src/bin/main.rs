@@ -10,7 +10,7 @@ use tracing_subscriber::EnvFilter;
 
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, Read, Write, stdout};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -222,7 +222,8 @@ fn is_nightly() -> bool {
 
 // Returned i32 is an exit code
 fn execute(opts: &Options) -> Result<i32> {
-    let matches = opts.parse(env::args().skip(1))?;
+    let args = expand_response_files(env::args().skip(1))?;
+    let matches = opts.parse(args)?;
     let options = GetOptsOptions::from_matches(&matches)?;
 
     match determine_operation(&matches)? {
@@ -273,6 +274,22 @@ fn execute(opts: &Options) -> Result<i32> {
             minimal_config_path,
         } => format(files, minimal_config_path, &options),
     }
+}
+
+fn expand_response_files(args: impl IntoIterator<Item = String>) -> Result<Vec<String>> {
+    let mut expanded = Vec::new();
+    for arg in args {
+        if let Some(arg) = arg.strip_prefix("@@") {
+            expanded.push(format!("@{arg}"));
+        } else if let Some(path) = arg.strip_prefix('@') {
+            let contents = fs::read_to_string(path)
+                .map_err(|e| format_err!("failed to load argument file `{path}`: {e}"))?;
+            expanded.extend(contents.lines().map(str::to_owned));
+        } else {
+            expanded.push(arg);
+        }
+    }
+    Ok(expanded)
 }
 
 fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
@@ -807,9 +824,39 @@ fn emit_mode_from_emit_str(emit_str: &str) -> Result<EmitMode> {
 mod test {
     use super::*;
     use rustfmt_config_proc_macro::nightly_only_test;
+    use tempfile::NamedTempFile;
 
     fn get_config<O: CliOptions>(path: Option<&Path>, options: Option<O>) -> Config {
         load_config(path, options).unwrap().0
+    }
+
+    #[test]
+    fn response_files_are_expanded_once() {
+        let mut response_file = NamedTempFile::new().unwrap();
+        writeln!(
+            response_file,
+            "--edition\r\n2021\r\n\r\n@nested-response-file"
+        )
+        .unwrap();
+
+        let args = expand_response_files([format!("@{}", response_file.path().display())]).unwrap();
+        assert_eq!(args, ["--edition", "2021", "", "@nested-response-file"]);
+    }
+
+    #[test]
+    fn doubled_at_sign_escapes_response_file_expansion() {
+        let args = expand_response_files(["@@source.rs".to_owned()]).unwrap();
+        assert_eq!(args, ["@source.rs"]);
+    }
+
+    #[test]
+    fn missing_response_file_is_an_error() {
+        let error = expand_response_files(["@missing-response-file".to_owned()]).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .starts_with("failed to load argument file `missing-response-file`:")
+        );
     }
 
     #[nightly_only_test]

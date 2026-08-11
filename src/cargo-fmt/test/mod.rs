@@ -104,6 +104,35 @@ fn multiple_packages_grouped() {
     assert_eq!(4, o.packages.len());
 }
 
+#[cfg(windows)]
+#[test]
+fn windows_command_line_length_matches_rust_quoting() {
+    use std::ffi::OsStr;
+
+    assert_eq!(command_line_arg_len(OsStr::new("plain")), 6);
+    assert_eq!(command_line_arg_len(OsStr::new("")), 3);
+    assert_eq!(command_line_arg_len(OsStr::new("has space")), 12);
+    assert_eq!(command_line_arg_len(OsStr::new(r#"a\"b"#)), 7);
+    assert_eq!(command_line_arg_len(OsStr::new(r#"a \"b"#)), 10);
+    assert_eq!(command_line_arg_len(OsStr::new(r#"a \"#)), 7);
+    assert_eq!(command_line_program_len(Path::new("rustfmt")), 9);
+}
+
+#[test]
+fn response_file_arguments_are_expanded_once() {
+    use std::io::Write;
+
+    let mut response_file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(response_file, "--check\r\n@nested-response-file").unwrap();
+
+    let args = expand_response_file_args(&[
+        OsString::from(format!("@{}", response_file.path().display())),
+        OsString::from("@@literal"),
+    ])
+    .unwrap();
+    assert_eq!(args, ["--check", "@nested-response-file", "@literal"]);
+}
+
 #[test]
 fn empty_packages_1() {
     assert!(

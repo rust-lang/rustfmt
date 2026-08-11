@@ -1,6 +1,8 @@
 // Integration tests for cargo-fmt.
 
 use std::env;
+#[cfg(windows)]
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -37,6 +39,41 @@ fn cargo_fmt(args: &[&str]) -> (String, String) {
         ),
         Err(e) => panic!("failed to run `{cmd:?} {args:?}`: {e}"),
     }
+}
+
+#[cfg(windows)]
+#[rustfmt_only_ci_test]
+#[test]
+fn cargo_fmt_uses_response_file_for_long_command_lines() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let source_dir = temp_dir.path().join("src");
+    fs::create_dir(&source_dir).unwrap();
+
+    let mut manifest = String::from(
+        "[package]\nname = \"response-file-test\"\nversion = \"0.1.0\"\n\
+         edition = \"2021\"\nautobins = false\n",
+    );
+    for index in 0..500 {
+        let file_name = format!("response_file_target_with_a_long_name_{index:04}.rs");
+        fs::write(source_dir.join(&file_name), "fn main() {}\n").unwrap();
+        manifest.push_str(&format!(
+            "\n[[bin]]\nname = \"response-file-target-{index:04}\"\npath = \"src/{file_name}\"\n"
+        ));
+    }
+    let manifest_path = temp_dir.path().join("Cargo.toml");
+    fs::write(&manifest_path, manifest).unwrap();
+    let response_file = temp_dir.path().join("rustfmt.args");
+    fs::write(&response_file, "--check\n").unwrap();
+    let response_arg = format!("@{}", response_file.display());
+
+    let (stdout, stderr) = cargo_fmt(&[
+        "--manifest-path",
+        manifest_path.to_str().unwrap(),
+        "--",
+        &response_arg,
+    ]);
+    assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
 }
 
 macro_rules! assert_that {

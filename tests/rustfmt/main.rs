@@ -1,7 +1,8 @@
 //! Integration tests for rustfmt.
 
 use std::env;
-use std::fs::{File, remove_file};
+use std::fs::{self, File, remove_file};
+use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 
@@ -39,6 +40,49 @@ fn rustfmt_with_extra(
 
 fn rustfmt(args: &[&str]) -> (String, String) {
     rustfmt_with_extra(args, None, &[])
+}
+
+#[test]
+fn response_file() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let source = temp_dir.path().join("response file.rs");
+    fs::write(&source, "fn main () {}\n").unwrap();
+
+    let mut response_file = tempfile::NamedTempFile::new().unwrap();
+    write!(
+        response_file,
+        "--quiet\r\n--emit\r\nstdout\r\n--edition\r\n2021\r\n{}\r\n",
+        source.display()
+    )
+    .unwrap();
+
+    let response_arg = format!("@{}", response_file.path().display());
+    let (stdout, stderr) = rustfmt(&[&response_arg]);
+    assert_eq!(stdout, "fn main() {}\n");
+    assert_eq!(stderr, "");
+}
+
+#[test]
+fn missing_response_file() {
+    let (stdout, stderr) = rustfmt(&["@missing-rustfmt-response-file"]);
+    assert!(
+        stdout.contains("failed to load argument file `missing-rustfmt-response-file`:")
+            || stderr.contains("failed to load argument file `missing-rustfmt-response-file`:")
+    );
+}
+
+#[test]
+fn doubled_at_sign_formats_a_literal_at_path() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    fs::write(temp_dir.path().join("@source.rs"), "fn main () {}\n").unwrap();
+
+    let (stdout, stderr) = rustfmt_with_extra(
+        &["--quiet", "--emit", "stdout", "@@source.rs"],
+        temp_dir.path().to_str(),
+        &[],
+    );
+    assert_eq!(stdout, "fn main() {}\n");
+    assert_eq!(stderr, "");
 }
 
 macro_rules! assert_that {

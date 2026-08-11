@@ -6,6 +6,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::ffi::OsString;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
@@ -15,6 +16,12 @@ use std::str;
 
 use cargo_metadata::Edition;
 use clap::{CommandFactory, Parser};
+use tempfile::NamedTempFile;
+
+#[cfg(windows)]
+use std::ffi::OsStr;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 
 #[path = "test/mod.rs"]
 #[cfg(test)]
@@ -165,15 +172,17 @@ fn execute() -> i32 {
     }
 }
 
-fn rustfmt_command() -> Command {
-    let rustfmt = match env::var_os("RUSTFMT") {
+fn rustfmt_path() -> PathBuf {
+    match env::var_os("RUSTFMT") {
         Some(rustfmt) => PathBuf::from(rustfmt),
         None => env::current_exe()
             .expect("current executable path invalid")
             .with_file_name("rustfmt"),
-    };
+    }
+}
 
-    Command::new(rustfmt)
+fn rustfmt_command() -> Command {
+    Command::new(rustfmt_path())
 }
 
 fn convert_message_format_to_rustfmt_args(
@@ -494,6 +503,101 @@ fn add_targets(target_paths: &[cargo_metadata::Target], targets: &mut BTreeSet<T
     }
 }
 
+fn expand_response_file_args(args: &[OsString]) -> Result<Vec<OsString>, io::Error> {
+    let mut expanded = Vec::new();
+    for arg in args {
+        let arg = arg.to_str().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "rustfmt response-file arguments must be valid UTF-8",
+            )
+        })?;
+        if let Some(arg) = arg.strip_prefix("@@") {
+            expanded.push(OsString::from(format!("@{arg}")));
+        } else if let Some(path) = arg.strip_prefix('@') {
+            let contents = fs::read_to_string(path).map_err(|e| {
+                io::Error::new(
+                    e.kind(),
+                    format!("failed to load argument file `{path}`: {e}"),
+                )
+            })?;
+            expanded.extend(contents.lines().map(OsString::from));
+        } else {
+            expanded.push(OsString::from(arg));
+        }
+    }
+    Ok(expanded)
+}
+
+fn write_response_file(args: &[OsString]) -> Result<NamedTempFile, io::Error> {
+    let mut response_file = NamedTempFile::new()?;
+    for arg in expand_response_file_args(args)? {
+        let arg = arg.to_str().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "rustfmt response-file arguments must be valid UTF-8",
+            )
+        })?;
+        if arg.contains('\n') || arg.contains('\r') {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "rustfmt response-file arguments cannot contain newlines",
+            ));
+        }
+        writeln!(response_file, "{arg}")?;
+    }
+    response_file.flush()?;
+    Ok(response_file)
+}
+
+#[cfg(windows)]
+fn command_line_arg_len(arg: &OsStr) -> usize {
+    let arg = arg.encode_wide().collect::<Vec<_>>();
+    let quoted = arg.is_empty() || arg.iter().any(|&c| c == b' ' as u16 || c == b'\t' as u16);
+    let mut len = arg.len().saturating_add(usize::from(quoted) * 2);
+    let mut backslashes = 0usize;
+
+    for &c in &arg {
+        if c == b'\\' as u16 {
+            backslashes += 1;
+        } else {
+            if c == b'"' as u16 {
+                len = len.saturating_add(backslashes).saturating_add(1);
+            }
+            backslashes = 0;
+        }
+    }
+    if quoted {
+        len = len.saturating_add(backslashes);
+    }
+
+    // Account for the separator before this argument.
+    len.saturating_add(1)
+}
+
+#[cfg(windows)]
+fn command_line_program_len(program: &Path) -> usize {
+    // Rust always surrounds argv[0] with quotes on Windows.
+    program.as_os_str().encode_wide().count().saturating_add(2)
+}
+
+#[cfg(windows)]
+fn should_use_response_file(program: &Path, args: &[OsString]) -> bool {
+    const WINDOWS_COMMAND_LINE_LIMIT: usize = 32_767;
+
+    let command_line_len = command_line_program_len(program).saturating_add(
+        args.iter()
+            .map(|arg| command_line_arg_len(arg))
+            .sum::<usize>(),
+    );
+    command_line_len >= WINDOWS_COMMAND_LINE_LIMIT
+}
+
+#[cfg(not(windows))]
+fn should_use_response_file(_program: &Path, _args: &[OsString]) -> bool {
+    false
+}
+
 fn run_rustfmt(
     targets: &BTreeSet<Target>,
     fmt_args: &[String],
@@ -527,19 +631,38 @@ fn run_rustfmt(
             println!();
         }
 
-        let mut command = rustfmt_command()
-            .stdout(stdout)
-            .args(files)
-            .args(["--edition", edition.as_str()])
-            .args(fmt_args)
-            .spawn()
-            .map_err(|e| match e.kind() {
-                io::ErrorKind::NotFound => io::Error::new(
-                    io::ErrorKind::Other,
-                    "Could not run rustfmt, please make sure it is in your PATH.",
-                ),
-                _ => e,
-            })?;
+        let rustfmt = rustfmt_path();
+        let mut args = files
+            .iter()
+            .map(|file| file.as_os_str().to_owned())
+            .collect::<Vec<_>>();
+        args.extend([
+            OsString::from("--edition"),
+            OsString::from(edition.as_str()),
+        ]);
+        args.extend(fmt_args.iter().map(OsString::from));
+
+        let response_file = should_use_response_file(&rustfmt, &args)
+            .then(|| write_response_file(&args))
+            .transpose()?;
+
+        let mut command = Command::new(rustfmt);
+        command.stdout(stdout);
+        if let Some(response_file) = response_file.as_ref() {
+            let mut response_arg = OsString::from("@");
+            response_arg.push(response_file.path());
+            command.arg(response_arg);
+        } else {
+            command.args(&args);
+        }
+
+        let mut command = command.spawn().map_err(|e| match e.kind() {
+            io::ErrorKind::NotFound => io::Error::new(
+                io::ErrorKind::Other,
+                "Could not run rustfmt, please make sure it is in your PATH.",
+            ),
+            _ => e,
+        })?;
 
         status.push(command.wait()?);
     }
