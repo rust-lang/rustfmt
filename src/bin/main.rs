@@ -328,6 +328,7 @@ fn expand_args_files_inner(
             }
             let contents = fs::read_to_string(&path)
                 .map_err(|e| format_err!("failed to load argument file `{path}`: {e}"))?;
+            let contents = contents.strip_prefix('\u{feff}').unwrap_or(&contents);
             expanded.extend(expand_args_files_inner(
                 contents.lines().map(str::to_owned),
                 depth + 1,
@@ -902,6 +903,19 @@ mod test {
 
         let args =
             expand_args_files([format!("--args-file={}", args_file.path().display())]).unwrap();
+        assert_eq!(args, ["--check"]);
+    }
+
+    #[test]
+    fn args_file_accepts_utf8_bom() {
+        let mut args_file = NamedTempFile::new().unwrap();
+        args_file.write_all(b"\xEF\xBB\xBF--check\n").unwrap();
+
+        let args = expand_args_files([
+            "--args-file".to_owned(),
+            args_file.path().display().to_string(),
+        ])
+        .unwrap();
         assert_eq!(args, ["--check"]);
     }
 

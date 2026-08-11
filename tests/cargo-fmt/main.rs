@@ -63,7 +63,7 @@ fn cargo_fmt_uses_args_file_for_long_command_lines() {
     let manifest_path = temp_dir.path().join("Cargo.toml");
     fs::write(&manifest_path, manifest).unwrap();
     let args_file = temp_dir.path().join("rustfmt.args");
-    fs::write(&args_file, "--check\n").unwrap();
+    fs::write(&args_file, b"\xEF\xBB\xBF--check\n").unwrap();
 
     let (stdout, stderr) = cargo_fmt(&[
         "--manifest-path",

@@ -573,6 +573,7 @@ fn expand_args_file_args_inner(
                     format!("failed to load argument file `{path}`: {e}"),
                 )
             })?;
+            let contents = contents.strip_prefix('\u{feff}').unwrap_or(&contents);
             let nested = contents.lines().map(OsString::from).collect::<Vec<_>>();
             expanded.extend(expand_args_file_args_inner(
                 &nested,

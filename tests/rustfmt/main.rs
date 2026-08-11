@@ -49,6 +49,7 @@ fn args_file() {
     fs::write(&source, "fn main () {}\n").unwrap();
 
     let mut args_file = tempfile::NamedTempFile::new().unwrap();
+    args_file.write_all(b"\xEF\xBB\xBF").unwrap();
     write!(
         args_file,
         "--quiet\r\n--emit\r\nstdout\r\n--edition\r\n2021\r\n{}\r\n",

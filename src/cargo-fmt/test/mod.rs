@@ -134,6 +134,21 @@ fn argument_file_arguments_are_expanded() {
 }
 
 #[test]
+fn argument_file_accepts_utf8_bom() {
+    use std::io::Write;
+
+    let mut args_file = tempfile::NamedTempFile::new().unwrap();
+    args_file.write_all(b"\xEF\xBB\xBF--check\n").unwrap();
+
+    let args = expand_args_file_args(&[
+        OsString::from("--args-file"),
+        args_file.path().as_os_str().to_owned(),
+    ])
+    .unwrap();
+    assert_eq!(args, ["--check"]);
+}
+
+#[test]
 fn argument_file_terminator_stops_outer_expansion() {
     use std::io::Write;
 
