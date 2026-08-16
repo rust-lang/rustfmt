@@ -339,8 +339,7 @@ fn rewrite_macro_inner(
         }
         Delimiter::Brace => {
             // For macro invocations with braces, always put a space between
-            // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
-            // anything in between the braces (for now).
+            // the `macro_name!` and `{ /* macro_body */ }`.
             let snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
             match trim_left_preserve_layout(snippet, shape.indent, context.config) {
                 Some(macro_body) => Ok(format!("{macro_name} {macro_body}")),
