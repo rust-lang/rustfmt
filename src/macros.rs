@@ -38,7 +38,7 @@ use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{
     NodeIdExt, filtered_str_fits, indent_next_line, is_empty_line, mk_sp,
-    remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout,
+    remove_trailing_white_spaces, rewrite_ident, trim_left_preserve_layout_macros,
 };
 use crate::visitor::FmtVisitor;
 
@@ -136,7 +136,7 @@ fn return_macro_parse_failure_fallback(
         })
         .unwrap_or(false);
     if is_like_block_indent_style {
-        return trim_left_preserve_layout(context.snippet(span), indent, context.config)
+        return trim_left_preserve_layout_macros(context.snippet(span), indent, context.config)
             .macro_error(MacroErrorKind::Unknown, span);
     }
 
@@ -339,10 +339,9 @@ fn rewrite_macro_inner(
         }
         Delimiter::Brace => {
             // For macro invocations with braces, always put a space between
-            // the `macro_name!` and `{ /* macro_body */ }` but skip modifying
-            // anything in between the braces (for now).
+            // the `macro_name!` and `{ /* macro_body */ }`.
             let snippet = context.snippet(mac.span()).trim_start_matches(|c| c != '{');
-            match trim_left_preserve_layout(snippet, shape.indent, context.config) {
+            match trim_left_preserve_layout_macros(snippet, shape.indent, context.config) {
                 Some(macro_body) => Ok(format!("{macro_name} {macro_body}")),
                 None => Ok(format!("{macro_name} {snippet}")),
             }
