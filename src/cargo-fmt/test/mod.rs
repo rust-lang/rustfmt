@@ -139,3 +139,49 @@ fn empty_packages_4() {
             .is_err()
     );
 }
+
+#[test]
+fn rustfmt_files_are_split_at_the_command_line_limit() {
+    let rustfmt = Path::new("rustfmt");
+    let fixed_args = [OsString::from("--edition"), OsString::from("2021")];
+    let files = [
+        Path::new("first.rs"),
+        Path::new("second.rs"),
+        Path::new("third.rs"),
+    ];
+    let two_file_limit = command_line_program_len(rustfmt)
+        + fixed_args
+            .iter()
+            .map(|arg| command_line_arg_len(arg))
+            .sum::<usize>()
+        + files[..2]
+            .iter()
+            .map(|file| command_line_arg_len(file.as_os_str()))
+            .sum::<usize>();
+
+    let batches = rustfmt_file_batches(rustfmt, &files, &fixed_args, two_file_limit);
+
+    assert_eq!(batches, vec![vec![files[0], files[1]], vec![files[2]]]);
+}
+
+#[test]
+fn rustfmt_file_batching_keeps_an_oversized_file() {
+    let rustfmt = Path::new("rustfmt");
+    let files = [Path::new("a-file-that-is-longer-than-the-limit.rs")];
+
+    let batches = rustfmt_file_batches(rustfmt, &files, &[], 1);
+
+    assert_eq!(batches, vec![vec![files[0]]]);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_command_line_length_matches_rust_quoting() {
+    assert_eq!(command_line_arg_len(OsStr::new("plain")), 6);
+    assert_eq!(command_line_arg_len(OsStr::new("")), 3);
+    assert_eq!(command_line_arg_len(OsStr::new("has space")), 12);
+    assert_eq!(command_line_arg_len(OsStr::new(r#"a\"b"#)), 7);
+    assert_eq!(command_line_arg_len(OsStr::new(r#"a \"b"#)), 10);
+    assert_eq!(command_line_arg_len(OsStr::new(r#"a \"#)), 7);
+    assert_eq!(command_line_program_len(Path::new("rustfmt")), 9);
+}

@@ -6,6 +6,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
@@ -165,15 +166,17 @@ fn execute() -> i32 {
     }
 }
 
-fn rustfmt_command() -> Command {
-    let rustfmt = match env::var_os("RUSTFMT") {
+fn rustfmt_path() -> PathBuf {
+    match env::var_os("RUSTFMT") {
         Some(rustfmt) => PathBuf::from(rustfmt),
         None => env::current_exe()
             .expect("current executable path invalid")
             .with_file_name("rustfmt"),
-    };
+    }
+}
 
-    Command::new(rustfmt)
+fn rustfmt_command() -> Command {
+    Command::new(rustfmt_path())
 }
 
 fn convert_message_format_to_rustfmt_args(
@@ -494,6 +497,92 @@ fn add_targets(target_paths: &[cargo_metadata::Target], targets: &mut BTreeSet<T
     }
 }
 
+#[cfg(windows)]
+fn command_line_arg_len(arg: &OsStr) -> usize {
+    use std::os::windows::ffi::OsStrExt;
+
+    let arg = arg.encode_wide().collect::<Vec<_>>();
+    let quoted = arg.is_empty() || arg.iter().any(|&c| c == b' ' as u16 || c == b'\t' as u16);
+    let mut len = arg.len().saturating_add(usize::from(quoted) * 2);
+    let mut backslashes = 0usize;
+
+    for &c in &arg {
+        if c == b'\\' as u16 {
+            backslashes += 1;
+        } else {
+            if c == b'"' as u16 {
+                len = len.saturating_add(backslashes).saturating_add(1);
+            }
+            backslashes = 0;
+        }
+    }
+    if quoted {
+        len = len.saturating_add(backslashes);
+    }
+
+    // Account for the separator before this argument.
+    len.saturating_add(1)
+}
+
+#[cfg(not(windows))]
+fn command_line_arg_len(arg: &OsStr) -> usize {
+    arg.to_string_lossy()
+        .encode_utf16()
+        .count()
+        .saturating_add(1)
+}
+
+#[cfg(windows)]
+fn command_line_program_len(program: &Path) -> usize {
+    use std::os::windows::ffi::OsStrExt;
+
+    // Rust always surrounds argv[0] with quotes on Windows.
+    program.as_os_str().encode_wide().count().saturating_add(2)
+}
+
+#[cfg(not(windows))]
+fn command_line_program_len(program: &Path) -> usize {
+    program
+        .as_os_str()
+        .to_string_lossy()
+        .encode_utf16()
+        .count()
+        .saturating_add(2)
+}
+
+fn rustfmt_file_batches<'a>(
+    rustfmt: &Path,
+    files: &[&'a Path],
+    fixed_args: &[OsString],
+    command_line_limit: usize,
+) -> Vec<Vec<&'a Path>> {
+    let fixed_len = command_line_program_len(rustfmt).saturating_add(
+        fixed_args
+            .iter()
+            .map(|arg| command_line_arg_len(arg))
+            .sum::<usize>(),
+    );
+    let mut batches = vec![];
+    let mut batch = vec![];
+    let mut batch_len = fixed_len;
+
+    for &file in files {
+        let file_len = command_line_arg_len(file.as_os_str());
+        if !batch.is_empty() && batch_len.saturating_add(file_len) > command_line_limit {
+            batches.push(batch);
+            batch = vec![];
+            batch_len = fixed_len;
+        }
+        batch.push(file);
+        batch_len = batch_len.saturating_add(file_len);
+    }
+    if !batch.is_empty() {
+        batches.push(batch);
+    }
+
+    batches
+}
+
 fn run_rustfmt(
     targets: &BTreeSet<Target>,
     fmt_args: &[String],
@@ -511,37 +600,55 @@ fn run_rustfmt(
             h
         });
 
+    #[cfg(windows)]
+    // Windows limits CreateProcess command lines to 32 KiB. Like go fmt, leave
+    // headroom for command-line construction details.
+    const COMMAND_LINE_LIMIT: usize = 30 << 10;
+    #[cfg(not(windows))]
+    const COMMAND_LINE_LIMIT: usize = usize::MAX;
+
+    let rustfmt = rustfmt_path();
     let mut status = vec![];
     for (edition, files) in by_edition {
-        let stdout = if verbosity == Verbosity::Quiet {
-            std::process::Stdio::null()
-        } else {
-            std::process::Stdio::inherit()
-        };
+        let fixed_args = [
+            OsString::from("--edition"),
+            OsString::from(edition.as_str()),
+        ]
+        .into_iter()
+        .chain(fmt_args.iter().map(OsString::from))
+        .collect::<Vec<_>>();
+        let files = files.iter().map(|file| file.as_path()).collect::<Vec<_>>();
 
-        if verbosity == Verbosity::Verbose {
-            print!("rustfmt");
-            print!(" --edition {edition}");
-            fmt_args.iter().for_each(|f| print!(" {}", f));
-            files.iter().for_each(|f| print!(" {}", f.display()));
-            println!();
+        for batch in rustfmt_file_batches(&rustfmt, &files, &fixed_args, COMMAND_LINE_LIMIT) {
+            let stdout = if verbosity == Verbosity::Quiet {
+                std::process::Stdio::null()
+            } else {
+                std::process::Stdio::inherit()
+            };
+
+            if verbosity == Verbosity::Verbose {
+                print!("rustfmt");
+                print!(" --edition {edition}");
+                fmt_args.iter().for_each(|f| print!(" {}", f));
+                batch.iter().for_each(|f| print!(" {}", f.display()));
+                println!();
+            }
+
+            let mut command = Command::new(&rustfmt)
+                .stdout(stdout)
+                .args(batch)
+                .args(&fixed_args)
+                .spawn()
+                .map_err(|e| match e.kind() {
+                    io::ErrorKind::NotFound => io::Error::new(
+                        io::ErrorKind::Other,
+                        "Could not run rustfmt, please make sure it is in your PATH.",
+                    ),
+                    _ => e,
+                })?;
+
+            status.push(command.wait()?);
         }
-
-        let mut command = rustfmt_command()
-            .stdout(stdout)
-            .args(files)
-            .args(["--edition", edition.as_str()])
-            .args(fmt_args)
-            .spawn()
-            .map_err(|e| match e.kind() {
-                io::ErrorKind::NotFound => io::Error::new(
-                    io::ErrorKind::Other,
-                    "Could not run rustfmt, please make sure it is in your PATH.",
-                ),
-                _ => e,
-            })?;
-
-        status.push(command.wait()?);
     }
 
     Ok(status
