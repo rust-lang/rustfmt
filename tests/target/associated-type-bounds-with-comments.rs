@@ -9,9 +9,6 @@
 // Out of scope: a comment after bounds with no `where` clause at all (#6815)
 // — that region has no span computed for it, so it needs separate handling.
 
-trait Bound {}
-impl Bound for () {}
-
 // P1: between the ident/generics and the `:`.
 trait P1 {
     type A // line
@@ -205,7 +202,6 @@ trait P5NoBounds {
 // max_width. `combine_strs_with_missing_comments` already measures the whole
 // prefix, so it must be given the item shape, not the bounds-offset shape,
 // or the prefix is charged twice and the line breaks early.
-trait SomeModeratelyLongTraitName {}
 trait ColonCommentWidth {
     type AssociatedTypeWithLongName: /* comment */ SomeModeratelyLongTraitName
     where
@@ -252,12 +248,6 @@ trait GatP5 {
 }
 
 // Impl associated type: shared rewrite_ty/where-clause path.
-trait ImplTarget {
-    type A<U>
-    where
-        U: Copy;
-}
-struct S;
 impl ImplTarget for S {
     type A<U>
     // line, impl assoc type
