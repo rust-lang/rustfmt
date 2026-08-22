@@ -164,11 +164,29 @@ impl OutputWriter {
         match &mut self.terminal {
             Some(ref mut t) => {
                 if let Some(color) = color {
-                    t.fg(color).unwrap();
+                    match t.fg(color) {
+                        // If writing to a broken pipe, there is no reason to continue.
+                        // Any other error is unexpected, however.
+                        Err(term::Error::Io(e)) if e.kind() == io::ErrorKind::BrokenPipe => {
+                            std::process::exit(1);
+                        },
+                        Err(e) => panic!("write failed: unexpected error: {:?}", e),
+                        _ => {},
+                    };
                 }
-                writeln!(t, "{msg}").unwrap();
+                match writeln!(t, "{msg}") {
+                    Err(e) if e.kind() == io::ErrorKind::BrokenPipe => std::process::exit(1),
+                    Err(e) => panic!("write failed: unexpected error: {:?}", e),
+                    _ => {}
+                }
                 if color.is_some() {
-                    t.reset().unwrap();
+                    match t.reset() {
+                        Err(term::Error::Io(e)) if e.kind() == io::ErrorKind::BrokenPipe => {
+                            std::process::exit(1);
+                        },
+                        Err(e) => panic!("write failed: unexpected error: {:?}", e),
+                        _ => {},
+                    };
                 }
             }
             None => println!("{msg}"),
