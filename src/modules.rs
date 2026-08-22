@@ -92,10 +92,36 @@ pub(crate) enum ModuleResolutionErrorKind {
 #[derive(Clone)]
 enum SubModKind<'a, 'ast> {
     /// `mod foo;`
+    ///
+    /// Can optionally specify a path attribute to explicitly set the module path.
+    /// ```ignore
+    /// mod foo; // resolves to `./foo.rs` or `./foo/mod.rs`
+    ///
+    /// #[path = "baz.rs"]
+    /// mod foo; // explicitly resolves to `./baz.rs`
+    /// ```
     External(PathBuf, DirectoryOwnership, Module<'ast>),
-    /// `mod foo;` with multiple sources.
+    /// `mod foo;` with multiple `#[cfg_attr]` sources.
+    ///
+    /// ```ignore
+    /// #[cfg_attr(unix, path = "unix.rs")]
+    /// #[cfg_attr(not(unix), path = "not_unix.rs")]
+    /// mod foo; // explicitly resolves to both `./unix.rs` and `./not_unix.rs`
+    /// ```
     MultiExternal(Vec<(PathBuf, DirectoryOwnership, Module<'ast>)>),
     /// `mod foo {}`
+    ///
+    /// Can optionally specify a path attribute that changes resolution for nested modules.
+    /// ```ignore
+    /// mod foo {
+    ///     mod baz; // resolves to `./foo/baz.rs` or `./foo/baz/mod.rs`
+    /// }
+    ///
+    /// #[path = "bar"]
+    /// mod foo {
+    ///     mod baz; // resolves to  `./bar/baz.rs` or `./bar/baz/mod.rs`
+    /// }
+    /// ```
     Internal(&'a ast::Item),
 }
 
