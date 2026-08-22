@@ -80,3 +80,19 @@ fn fallback_and_try_to_resolve_external_submod_relative_to_current_dir_path() {
         ],
     )
 }
+
+#[test]
+fn inline_modules_with_path_attributes() {
+    verify_mod_resolution(
+        "tests/mod-resolver/inline_module_with_path_attribute/main.rs",
+        &[
+            "tests/mod-resolver/inline_module_with_path_attribute/bravo/charlie.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/bravo/echo/foxtrot/mod.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/bravo/hotel/india/juliet.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/bravo/hotel/india/lima.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/mike/november.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/oscar/papa.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/tango.rs",
+        ],
+    )
+}
