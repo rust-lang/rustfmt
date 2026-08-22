@@ -96,3 +96,21 @@ fn inline_modules_with_path_attributes() {
         ],
     )
 }
+
+#[test]
+fn cfg_attr_path_on_inline_module() {
+    verify_mod_resolution(
+        "tests/mod-resolver/issue-7038/lib.rs",
+        &[
+            "tests/mod-resolver/issue-7038/meow/wasm/dog/woof.rs",
+            "tests/mod-resolver/issue-7038/meow/wasm/mrrp.rs",
+            "tests/mod-resolver/issue-7038/meow/wasm/y.rs",
+            "tests/mod-resolver/issue-7038/meow_unix/dog/woof.rs",
+            "tests/mod-resolver/issue-7038/meow_unix/mrrp.rs",
+            "tests/mod-resolver/issue-7038/meow_unix/y.rs",
+            "tests/mod-resolver/issue-7038/meow_windows/dog/woof.rs",
+            "tests/mod-resolver/issue-7038/meow_windows/mrrp/mod.rs",
+            "tests/mod-resolver/issue-7038/meow_windows/y.rs",
+        ],
+    )
+}
