@@ -799,7 +799,7 @@ fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<Format
 
         debug!("Testing '{}'...", file_name.display());
 
-        match idempotent_check(&file_name, opt_config) {
+        match idempotent_check(&file_name, opt_config, &sig_comments) {
             Ok(ref report) if report.has_warnings() => {
                 print!("{}", FormatReportFormatterBuilder::new(report).build());
                 fails += 1;
@@ -846,6 +846,10 @@ fn print_mismatches<T: Fn(u32) -> String>(
 
 fn read_config(filename: &Path) -> Config {
     let sig_comments = read_significant_comments(filename);
+    config_from_comments(filename, &sig_comments)
+}
+
+fn config_from_comments(filename: &Path, sig_comments: &HashMap<String, String>) -> Config {
     let (edition, style_edition, version) = get_editions_from_comments(&sig_comments);
     // Look for a config file. If there is a 'config' property in the significant comments, use
     // that. Otherwise, if there are no significant comments at all, look for a config file with
@@ -866,7 +870,7 @@ fn read_config(filename: &Path) -> Config {
         )
     };
 
-    for (key, val) in &sig_comments {
+    for (key, val) in sig_comments {
         if key != "target" && key != "config" && key != "unstable" {
             config.override_value(key, val);
         }
@@ -910,14 +914,14 @@ fn get_editions_from_comments(
 fn idempotent_check(
     filename: &PathBuf,
     opt_config: &Option<PathBuf>,
+    sig_comments: &HashMap<String, String>,
 ) -> Result<FormatReport, IdempotentCheckError> {
-    let sig_comments = read_significant_comments(filename);
     let config = if let Some(ref config_file_path) = opt_config {
-        let (edition, style_edition, version) = get_editions_from_comments(&sig_comments);
+        let (edition, style_edition, version) = get_editions_from_comments(sig_comments);
         Config::from_toml_path(config_file_path, edition, style_edition, version)
             .expect("`rustfmt.toml` not found")
     } else {
-        read_config(filename)
+        config_from_comments(filename, sig_comments)
     };
     let (parsing_errors, source_file, format_report) = format_file(filename, config);
     if parsing_errors {
