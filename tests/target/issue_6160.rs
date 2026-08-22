@@ -1,0 +1,1 @@
+pub/* (crate) */ trait MyTrait {}
