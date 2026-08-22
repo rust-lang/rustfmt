@@ -1769,19 +1769,19 @@ fn rewrite_ty<R: Rewrite>(
     if let Some(bounds) = generic_bounds_opt {
         if !bounds.is_empty() {
             // 2 = `: `
-            let shape = Shape::indented(indent, context.config);
-            let shape = shape.offset_left(result.len() + 2, span)?;
+            let item_shape = Shape::indented(indent, context.config);
+            let shape = item_shape.offset_left(result.len() + 2, span)?;
             let type_bounds = bounds.rewrite_result(context, shape)?;
 
             // The bounds rewrite only covers the bounds themselves, so comments
             // around the `:` would otherwise be dropped. Recover them on either
             // side of the colon, keeping the exact `: ` layout when there are none.
             let bounds_lo = bounds[0].span().lo();
-            let colon_pos = context
+            let colon_lo = context
                 .snippet_provider
-                .span_after(mk_sp(generics.span.hi(), bounds_lo), ":");
-            let before_colon = mk_sp(generics.span.hi(), colon_pos - BytePos(1));
-            let after_colon = mk_sp(colon_pos, bounds_lo);
+                .span_before(mk_sp(generics.span.hi(), bounds_lo), ":");
+            let before_colon = mk_sp(generics.span.hi(), colon_lo);
+            let after_colon = mk_sp(colon_lo + BytePos(1), bounds_lo);
 
             if contains_comment(context.snippet(before_colon)) {
                 result = combine_strs_with_missing_comments(
@@ -1789,7 +1789,7 @@ fn rewrite_ty<R: Rewrite>(
                     &result,
                     ":",
                     before_colon,
-                    shape,
+                    item_shape,
                     true,
                 )?;
             } else {
@@ -1802,7 +1802,7 @@ fn rewrite_ty<R: Rewrite>(
                     &result,
                     &type_bounds,
                     after_colon,
-                    shape,
+                    item_shape,
                     true,
                 )?;
             } else {
