@@ -808,7 +808,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // So here we need to take a minimum between the two.
         let lo = std::cmp::min(attrs_end + 1, first_line);
         self.push_rewrite_inner(item_span, None);
-        let hi = self.line_number + 1;
+        let hi = self.psess.line_of_byte_pos(item_span.hi());
         self.skipped_range.borrow_mut().push((lo, hi));
     }
 
