@@ -608,46 +608,26 @@ pub(crate) fn remove_trailing_white_spaces(text: &str) -> String {
 }
 
 /// Indent each line according to the specified `indent`.
-/// e.g.
-///
-/// ```rust,compile_fail
-/// foo!{
-/// x,
-/// y,
-/// foo(
-///     a,
-///     b,
-///     c,
-/// ),
-/// }
-/// ```
-///
-/// will become
-///
-/// ```rust,compile_fail
-/// foo!{
-///     x,
-///     y,
-///     foo(
-///         a,
-///         b,
-///         c,
-///     ),
-/// }
-/// ```
 pub(crate) fn trim_left_preserve_layout(
     orig: &str,
     indent: Indent,
     config: &Config,
 ) -> Option<String> {
     let mut lines = LineClasses::new(orig);
-    let first_line = lines.next().map(|(_, s)| s.trim_end().to_owned())?;
+    let (first_line_kind, first_line) = lines.next()?;
+
+    // If a macro delimiter and a string start, `"`, is in the same line, then skip trimming
+    // altogether.
+    if first_line_kind == FullCodeCharKind::StartString {
+        return Some(orig.to_string());
+    }
+
+    let first_line = first_line.trim_end().to_owned();
     let mut trimmed_lines = Vec::with_capacity(16);
 
-    let mut veto_trim = false;
+    let mut vetoed = false;
     let min_prefix_space_width = lines
         .filter_map(|(kind, line)| {
-            let mut trimmed = true;
             let prefix_space_width = if is_empty_line(&line) {
                 None
             } else {
@@ -659,14 +639,13 @@ pub(crate) fn trim_left_preserve_layout(
                 || (config.style_edition() >= StyleEdition::Edition2024
                     && kind == FullCodeCharKind::InStringCommented))
                 && !line.ends_with('\\');
-            let line = if veto_trim || new_veto_trim_value {
-                veto_trim = new_veto_trim_value;
-                trimmed = false;
-                line
+
+            if vetoed || new_veto_trim_value {
+                vetoed = new_veto_trim_value;
+                trimmed_lines.push((false, line, prefix_space_width));
             } else {
-                line.trim().to_owned()
-            };
-            trimmed_lines.push((trimmed, line, prefix_space_width));
+                trimmed_lines.push((true, line.trim().to_owned(), prefix_space_width));
+            }
 
             // Because there is a veto against trimming and indenting lines within a string,
             // such lines should not be taken into account when computing the minimum.
@@ -687,18 +666,20 @@ pub(crate) fn trim_left_preserve_layout(
             + "\n"
             + &trimmed_lines
                 .iter()
-                .map(
-                    |&(trimmed, ref line, prefix_space_width)| match prefix_space_width {
-                        _ if !trimmed => line.to_owned(),
-                        Some(original_indent_width) => {
-                            let new_indent_width = indent.width()
-                                + original_indent_width.saturating_sub(min_prefix_space_width);
-                            let new_indent = Indent::from_width(config, new_indent_width);
-                            format!("{}{}", new_indent.to_string(config), line)
-                        }
-                        None => String::new(),
-                    },
-                )
+                .map(|&(trimmed, ref line, prefix_space_width)| {
+                    if !trimmed {
+                        return line.to_owned();
+                    }
+
+                    if let Some(original_indent_width) = prefix_space_width {
+                        let new_indent_width = indent.width()
+                            + original_indent_width.saturating_sub(min_prefix_space_width);
+                        let new_indent = Indent::from_width(config, new_indent_width);
+                        return format!("{}{}", new_indent.to_string(config), line);
+                    }
+
+                    String::new()
+                })
                 .collect::<Vec<_>>()
                 .join("\n"),
     )
