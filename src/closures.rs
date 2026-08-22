@@ -310,7 +310,7 @@ fn rewrite_closure_fn_decl(
     let ret_str = fn_decl.output.rewrite_result(context, param_shape)?;
 
     let param_items = itemize_list(
-        context.snippet_provider,
+        context,
         fn_decl.inputs.iter(),
         "|",
         ",",
