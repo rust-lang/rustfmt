@@ -11,3 +11,11 @@ use crate::lexer;
 use crate::lexer;
 use crate::lexer::{self};
 use crate::lexer::{self, tokens::TokenData};
+
+use crate::{b::c, d::e, d::f};
+#[cfg(unix)]
+use crate::{b::c, d::e, d::f};
+#[cfg(windows)]
+use crate::{b::c, d::e, d::f};
+// my comment
+use crate::b;
