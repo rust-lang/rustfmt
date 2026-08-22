@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -1075,6 +1076,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             is_if_else_block: Cell::new(false),
             is_loop_block: Cell::new(false),
             force_one_line_chain: Cell::new(false),
+            overflow_rewrite_cache: RefCell::new(HashMap::new()),
             snippet_provider: self.snippet_provider,
             macro_rewrite_failure: Cell::new(false),
             is_macro_def: self.is_macro_def,
