@@ -37,8 +37,13 @@ fn check_fmt_base(
         }
     }
 
-    let output =
-        run_command_with_output_and_env("cargo", &["test", test_args], current_dir, &env)?.output;
+    let output = run_command_with_output_and_env(
+        "cargo",
+        &["test", "--locked", test_args],
+        current_dir,
+        &env,
+    )?
+    .output;
     if ["build failed", "test result: FAILED."]
         .iter()
         .any(|needle| output.contains(needle))
@@ -83,7 +88,7 @@ fn check_fmt_base(
     }
 
     // This command allows to ensure that no source file was modified while running the tests.
-    run_command_with_env("cargo", &["test", test_args], current_dir, &env)
+    run_command_with_env("cargo", &["test", "--locked", test_args], current_dir, &env)
 }
 
 fn show_head(integration: &str) -> Result<(), String> {
