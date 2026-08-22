@@ -586,7 +586,7 @@ impl<'a> FormatLines<'a> {
             self.whitespace_start = Some(self.line_len);
         }
         self.line_len += if c == '\t' {
-            self.config.tab_spaces()
+            self.config.tab_spaces() - self.line_len % self.config.tab_spaces()
         } else {
             1
         };
