@@ -55,7 +55,7 @@ pub(crate) fn format_visibility(
     vis: &Visibility,
 ) -> Cow<'static, str> {
     match vis.kind {
-        VisibilityKind::Public => Cow::from("pub "),
+        VisibilityKind::Public => Cow::from("pub"),
         VisibilityKind::Inherited => Cow::from(""),
         VisibilityKind::Restricted { ref path, .. } => {
             let Path { ref segments, .. } = **path;
@@ -69,7 +69,7 @@ pub(crate) fn format_visibility(
             let path = segments_iter.collect::<Vec<_>>().join("::");
             let in_str = if is_keyword(&path) { "" } else { "in " };
 
-            Cow::from(format!("pub({in_str}{path}) "))
+            Cow::from(format!("pub({in_str}{path})"))
         }
     }
 }
