@@ -1,3 +1,4 @@
+// rustfmt-edition: 2027
 // rustfmt-normalize_comments: true
 // Match expressions.
 
@@ -633,5 +634,16 @@ fn issue_4109() {
             #[allow(unsafe_code)]
             unsafe {}
         }
+    }
+}
+
+fn issue_4119() {
+    match () {
+        () => {}
+        () // Comment
+| () => {
+            println!("Foo");
+        }
+        () => {}
     }
 }

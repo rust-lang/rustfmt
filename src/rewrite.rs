@@ -57,6 +57,13 @@ pub(crate) enum RewriteError {
     #[error("Failed to format given macro{} at: {span:?}", kind)]
     MacroFailure { kind: MacroErrorKind, span: Span },
 
+    /// This failure will normally happen when an or-pattern has comments in between its elements.
+    ///
+    /// We will keep the original code, report an error, but recover and format code that comes
+    /// later properly.
+    #[error("Formatting was skipped due to a comment that would have been removed.")]
+    InlineComment(String),
+
     /// Format failure that does not fit to above categories.
     #[error("An unknown error occurred during formatting.")]
     Unknown,
