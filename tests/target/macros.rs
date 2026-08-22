@@ -30,7 +30,7 @@ fn main() {
     kaas!(
         // comments
         a, // post macro
-        b  // another
+        b // another
     );
 
     trailingcomma!(a, b, c,);
@@ -1050,7 +1050,7 @@ x! {()}
 f!(match a {
     4 => &[
         (3, false), // Missing
-        (4, true)   // I-frame
+        (4, true) // I-frame
     ][..],
 });
 
