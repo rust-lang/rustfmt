@@ -186,6 +186,9 @@ pub(crate) fn format_expr(
                     // not the `ast::Block` node we're about to rewrite. To prevent dropping inner
                     // attributes call `rewrite_block` directly.
                     // See https://github.com/rust-lang/rustfmt/issues/6158
+
+                    // Shrink the shape by `"const ".len()` before rewriting the block
+                    let shape = shape.offset_left(6, expr.span)?;
                     rewrite_block(block, Some(&expr.attrs), opt_label, context, shape)?
                 }
                 _ => anon_const.rewrite_result(context, shape)?,
