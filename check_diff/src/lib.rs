@@ -580,7 +580,7 @@ pub fn build_rustfmt_from_src<T: AsRef<str>>(
     info!("Building rustfmt from source");
     let Ok(_) = Command::new("cargo")
         .current_dir(dir)
-        .args(["build", "-q", "--release", "--bin", "rustfmt"])
+        .args(["build", "--locked", "-q", "--release", "--bin", "rustfmt"])
         .output()
     else {
         return Err(CheckDiffError::FailedSourceBuild(
