@@ -5,6 +5,7 @@ use rustc_ast::ast::{
     self, Attribute, ImplRestriction, MetaItem, MetaItemInner, MetaItemKind, MutRestriction,
     NodeId, Path, RestrictionKind, Visibility, VisibilityKind,
 };
+use rustc_ast::visit;
 use rustc_ast_pretty::pprust;
 use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
 use unicode_width::UnicodeWidthStr;
@@ -344,6 +345,33 @@ pub(crate) fn semicolon_for_expr(context: &RewriteContext<'_>, expr: &ast::Expr)
     }
 }
 
+/// Does this `loop` evaluate to something other than `()`?
+///
+/// `loop { break v }` evaluates to `v`, so the trailing semicolon is what
+/// discards that value. Removing it leaves a bare expression statement,
+/// which rustc requires to be `()`
+fn loop_breaks_with_value(expr: &ast::Expr) -> bool {
+    struct BreakWithValue(bool);
+
+    impl<'ast> visit::Visitor<'ast> for BreakWithValue {
+        fn visit_expr(&mut self, ex: &'ast ast::Expr) {
+            match ex.kind {
+                ast::ExprKind::Break(_, Some(_)) => self.0 = true,
+                _ => {
+                    visit::walk_expr(self, ex);
+                }
+            }
+        }
+    }
+
+    let ast::ExprKind::Loop(ref block, ..) = expr.kind else {
+        return false;
+    };
+    let mut finder = BreakWithValue(false);
+    visit::walk_block(&mut finder, block);
+    finder.0
+}
+
 #[inline]
 pub(crate) fn semicolon_for_stmt(
     context: &RewriteContext<'_>,
@@ -352,14 +380,13 @@ pub(crate) fn semicolon_for_stmt(
 ) -> bool {
     match stmt.kind {
         ast::StmtKind::Semi(ref expr) => match expr.kind {
-            ast::ExprKind::While(..) | ast::ExprKind::Loop(..) | ast::ExprKind::ForLoop { .. } => {
-                false
-            }
+            ast::ExprKind::While(..) | ast::ExprKind::ForLoop { .. } => false,
             ast::ExprKind::Break(..) | ast::ExprKind::Continue(..) | ast::ExprKind::Ret(..) => {
                 // The only time we can skip the semi-colon is if the config option is set to false
                 // **and** this is the last expr (even though any following exprs are unreachable)
                 context.config.trailing_semicolon() || !is_last_expr
             }
+            ast::ExprKind::Loop(..) => loop_breaks_with_value(expr),
             _ => true,
         },
         ast::StmtKind::Expr(..) => false,
