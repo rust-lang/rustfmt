@@ -12,7 +12,9 @@ use rustc_span::{
     symbol::{self, sym},
 };
 
-use crate::comment::combine_strs_with_missing_comments;
+use crate::comment::{
+    FindUncommented, combine_strs_with_missing_comments, contains_comment, rewrite_missing_comment,
+};
 use crate::config::ImportGranularity;
 use crate::config::lists::*;
 use crate::config::{Edition, IndentStyle, StyleEdition};
@@ -346,12 +348,40 @@ impl UseTree {
         });
         let use_str = self
             .rewrite_result(context, shape.offset_left(vis.len(), self.span())?)
-            .map(|s| {
+            .and_then(|s| {
                 if s.is_empty() {
-                    s
-                } else {
-                    format!("{}use {};", vis, s)
+                    return Ok(s);
                 }
+
+                let lhs = format!("{vis}use {s}");
+                if self.span.is_dummy() || self.has_comment() {
+                    return Ok(format!("{lhs};"));
+                }
+
+                let lo = self.span.hi();
+                let snippet = context
+                    .snippet_provider
+                    .span_to_snippet(mk_sp(lo, context.snippet_provider.end_pos()))
+                    .unwrap_or_default();
+
+                if let Some(semi_offset) = snippet.find_uncommented(";") {
+                    let between = &snippet[..semi_offset];
+                    if contains_comment(between) {
+                        let span = mk_sp(lo, lo + BytePos(semi_offset as u32));
+                        let comment = rewrite_missing_comment(span, shape, context)?;
+                        if !comment.is_empty() {
+                            let indent = shape.indent.to_string(context.config);
+                            let one_line = format!("{lhs}; {comment}");
+                            if !comment.contains('\n') && one_line.len() <= shape.width {
+                                return Ok(one_line);
+                            } else {
+                                return Ok(format!("{lhs};\n{indent}{comment}"));
+                            }
+                        }
+                    }
+                }
+
+                Ok(format!("{lhs};"))
             })?;
         match self.attrs {
             Some(ref attrs) if !attrs.is_empty() => {
