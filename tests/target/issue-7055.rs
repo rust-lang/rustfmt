@@ -17,7 +17,7 @@ fn main() {
     .go();
 }
 
-fn second_issue() {
+fn removes_trailing_whitespace() {
     const {
         S::new("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     }
