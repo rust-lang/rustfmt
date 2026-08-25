@@ -1,3 +1,5 @@
+// rustfmt-style_edition: 2027
+
 struct S;
 
 impl S {
