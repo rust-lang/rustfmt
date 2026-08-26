@@ -180,6 +180,14 @@ pub(crate) fn format_expr(
             .unknown_error()
             .and_then(|control_flow| control_flow.rewrite_result(context, shape)),
         ast::ExprKind::ConstBlock(ref anon_const) => {
+            // 6 = "const ". The keyword sits on the first line of the rewrite, so the
+            // block has that many fewer columns to work with. Gated because widening
+            // the block by six columns is stable formatting on earlier style editions.
+            let shape = if context.config.style_edition() >= StyleEdition::Edition2027 {
+                shape.offset_left_opt(6).unwrap_or(shape)
+            } else {
+                shape
+            };
             let rewrite = match anon_const.value.kind {
                 ast::ExprKind::Block(ref block, opt_label) => {
                     // Inner attributes are associated with the `ast::ExprKind::ConstBlock` node,
