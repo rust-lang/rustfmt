@@ -380,7 +380,7 @@ where
         (comment, tactic)
     } else {
         let items = itemize_list(
-            context.snippet_provider,
+            context,
             inputs,
             ")",
             ",",

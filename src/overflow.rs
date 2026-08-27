@@ -625,7 +625,7 @@ impl<'a> Context<'a> {
         debug!("items: {:?}", self.items);
 
         let items = itemize_list(
-            self.context.snippet_provider,
+            self.context,
             self.items.iter(),
             self.suffix,
             ",",
