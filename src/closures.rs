@@ -200,6 +200,9 @@ fn rewrite_closure_expr(
     context: &RewriteContext<'_>,
     shape: Shape,
 ) -> RewriteResult {
+    /// Does the subexpression have its own "block" braces or does it need to be
+    /// wrapped in block braces when it is on multiple lines?
+    /// (The Rust style guide recommends braces for multiline closures)
     fn allow_multi_line(expr: &ast::Expr) -> bool {
         match expr.kind {
             ast::ExprKind::Match(..)
@@ -207,7 +210,12 @@ fn rewrite_closure_expr(
             | ast::ExprKind::Block(..)
             | ast::ExprKind::TryBlock(..)
             | ast::ExprKind::Loop(..)
-            | ast::ExprKind::Struct(..) => true,
+            | ast::ExprKind::Struct(..)
+            // Closures do not come with builtin braces, however formatted
+            // *multiline* closures (which is all we will be dealing with here) do.
+            //
+            // This avoids pathological O(2^N) behavior where nested closures keep backtracking.
+            | ast::ExprKind::Closure(..) => true,
 
             ast::ExprKind::AddrOf(_, _, ref expr)
             | ast::ExprKind::Try(ref expr)
