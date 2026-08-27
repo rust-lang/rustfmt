@@ -12,9 +12,6 @@ use rustc_span::{
     symbol::{self, sym},
 };
 
-use crate::comment::{
-    FindUncommented, combine_strs_with_missing_comments, contains_comment, rewrite_missing_comment,
-};
 use crate::config::ImportGranularity;
 use crate::config::lists::*;
 use crate::config::{Edition, IndentStyle, StyleEdition};
@@ -28,6 +25,13 @@ use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
 use crate::utils::{is_same_visibility, mk_sp, rewrite_ident};
 use crate::visitor::FmtVisitor;
+use crate::{
+    comment::{
+        FindUncommented, combine_strs_with_missing_comments, contains_comment,
+        is_last_comment_block, rewrite_missing_comment,
+    },
+    utils::{first_line_width, last_line_width},
+};
 
 /// Returns a name imported by a `use` declaration.
 /// E.g., returns `Ordering` for `std::cmp::Ordering` and `self` for `std::cmp::self`.
@@ -364,24 +368,53 @@ impl UseTree {
                     .span_to_snippet(mk_sp(lo, context.snippet_provider.end_pos()))
                     .unwrap_or_default();
 
-                if let Some(semi_offset) = snippet.find_uncommented(";") {
-                    let between = &snippet[..semi_offset];
-                    if contains_comment(between) {
-                        let span = mk_sp(lo, lo + BytePos(semi_offset as u32));
-                        let comment = rewrite_missing_comment(span, shape, context)?;
-                        if !comment.is_empty() {
-                            let indent = shape.indent.to_string(context.config);
-                            let one_line = format!("{lhs}; {comment}");
-                            if !comment.contains('\n') && one_line.len() <= shape.width {
-                                return Ok(one_line);
-                            } else {
-                                return Ok(format!("{lhs};\n{indent}{comment}"));
-                            }
-                        }
-                    }
+                let Some(semi_offset) = snippet.find_uncommented(";") else {
+                    return Ok(format!("{lhs};"));
+                };
+
+                let between = &snippet[..semi_offset];
+                if !contains_comment(between) {
+                    return Ok(format!("{lhs};"));
                 }
 
-                Ok(format!("{lhs};"))
+                let span = mk_sp(lo, lo + BytePos(semi_offset as u32));
+                let comment = rewrite_missing_comment(span, shape, context)?;
+                if comment.is_empty() {
+                    return Ok(format!("{lhs};"));
+                }
+
+                let indent = shape.indent.to_string(context.config);
+                let is_block = is_last_comment_block(&comment);
+
+                let prefer_same_line = if let Some(pos) = between.find('/') {
+                    !between[..pos].contains('\n')
+                } else {
+                    !between.contains('\n')
+                };
+
+                let lhs_last_width = if lhs.contains('\n') {
+                    last_line_width(&lhs)
+                } else {
+                    shape.indent.width() + lhs.len()
+                };
+                let semi_len = if is_block && !comment.contains('\n') {
+                    1
+                } else {
+                    0
+                };
+                let one_line_width = lhs_last_width + 1 + first_line_width(&comment) + semi_len;
+
+                let sep = if prefer_same_line && one_line_width <= context.config.max_width() {
+                    " ".to_string()
+                } else {
+                    format!("\n{indent}")
+                };
+
+                if is_block {
+                    Ok(format!("{lhs}{sep}{comment};"))
+                } else {
+                    Ok(format!("{lhs}{sep}{comment}\n{indent};"))
+                }
             })?;
         match self.attrs {
             Some(ref attrs) if !attrs.is_empty() => {
