@@ -894,6 +894,9 @@ impl<'a> CommentRewrite<'a> {
                 self.result.pop();
             }
             if self.code_block_attr.is_some() && self.is_prev_line_multi_line {
+                if self.result.ends_with(' ') {
+                    self.result.pop();
+                }
                 self.result.push_str(&self.comment_line_separator);
             }
             self.result.push_str(line);
