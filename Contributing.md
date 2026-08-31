@@ -9,6 +9,15 @@ or file new issues specifically to get help.
 All contributors are expected to follow our [Code of
 Conduct](CODE_OF_CONDUCT.md).
 
+
+## LLM policy
+
+rustfmt follows the same [LLM usage policy] as `rust-lang/rust`. Please read it before using LLM
+assistance when participating in `rust-lang/rustfmt`.
+
+[LLM usage policy]: https://forge.rust-lang.org/policies/llm-usage.html
+
+
 ## Test and file issues
 
 It would be really useful to have people use rustfmt on their projects and file
