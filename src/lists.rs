@@ -617,6 +617,8 @@ pub(crate) fn extract_post_comment(
     separator: &str,
     is_last: bool,
 ) -> Option<String> {
+    use std::borrow::Cow;
+
     let white_space: &[_] = &[' ', '\t'];
 
     // Cleanup post-comment: strip separators and whitespace.
@@ -632,21 +634,41 @@ pub(crate) fn extract_post_comment(
         false
     };
 
-    let post_snippet_trimmed = if post_snippet.starts_with(|c| c == ',' || c == ':') {
-        post_snippet[1..].trim_matches(white_space)
+    let separator_index = post_snippet.find_uncommented(separator);
+
+    let post_snippet_trimmed: Cow<'_, _> = if post_snippet.starts_with(|c| c == ',' || c == ':') {
+        post_snippet[1..].trim_matches(white_space).into()
     } else if let Some(stripped) = post_snippet.strip_prefix(separator) {
-        stripped.trim_matches(white_space)
+        stripped.trim_matches(white_space).into()
     } else if last_inline_comment_ends_with_separator {
         // since we're on the last item it's fine to keep any trailing separators in comments
-        post_snippet.trim_matches(white_space)
+        post_snippet.trim_matches(white_space).into()
     }
     // not comment or over two lines
     else if post_snippet.ends_with(separator)
         && (!post_snippet.trim().starts_with("//") || post_snippet.trim().contains('\n'))
     {
-        post_snippet[..(post_snippet.len() - 1)].trim_matches(white_space)
+        post_snippet[..(post_snippet.len() - 1)]
+            .trim_matches(white_space)
+            .into()
+    }
+    // We have a weird edge case with the last element of the list: A trailing
+    // separator may appear in the middle of our post snippet. This happens when
+    // there is is a comment both before and after the separator. For non-final
+    // elements of the list, the post snippet stops at the separator, but for the
+    // final list item the post snippet contains everything after the item, which
+    // may include a trailing separator between the comments.
+    //
+    // To handle this, we have to rewrite the post snippet to remove the extraneous
+    // separator, otherwise we'll duplicate the sparator when laying out the list.
+    else if is_last && separator_index.is_some() {
+        let separator_index = separator_index.unwrap();
+        let mut snippet_without_separator = String::with_capacity(post_snippet.len());
+        snippet_without_separator.push_str(&post_snippet[..separator_index]);
+        snippet_without_separator.push_str(&post_snippet[separator_index + separator.len()..]);
+        snippet_without_separator.into()
     } else {
-        post_snippet
+        post_snippet.into()
     };
     // FIXME(#3441): post_snippet includes 'const' now
     // it should not include here
@@ -654,7 +676,7 @@ pub(crate) fn extract_post_comment(
     if !post_snippet_trimmed.is_empty()
         && (removed_newline_snippet.starts_with("//") || removed_newline_snippet.starts_with("/*"))
     {
-        Some(post_snippet_trimmed.to_owned())
+        Some(post_snippet_trimmed.into_owned())
     } else {
         None
     }
@@ -699,7 +721,7 @@ pub(crate) fn get_comment_end(
             ),
             // Potential *single* line comment.
             (_, Some(j)) if j > separator_index => j + 1,
-            _ => post_snippet.len(),
+            _ => separator_index + 1,
         }
     } else if let Some(newline_index) = newline_index {
         // Match arms may not have trailing comma. In any case, for match arms,
