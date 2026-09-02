@@ -193,7 +193,12 @@ enum ChainItemKind {
         ThinVec<Box<ast::Expr>>,
     ),
     StructField(symbol::Ident),
-    TupleField(symbol::Ident, bool),
+    /// Tuple field access like `foo.1`.
+    TupleField {
+        field: symbol::Ident,
+        /// Whether this is a nested tuple access, like `.2` in `foo.1.2`.
+        is_nested: bool,
+    },
     Await,
     Use,
     Yield,
@@ -206,7 +211,7 @@ impl ChainItemKind {
             ChainItemKind::Parent { expr, .. } => utils::is_block_expr(context, expr, reps),
             ChainItemKind::MethodCall(..)
             | ChainItemKind::StructField(..)
-            | ChainItemKind::TupleField(..)
+            | ChainItemKind::TupleField { .. }
             | ChainItemKind::Await
             | ChainItemKind::Use
             | ChainItemKind::Yield
@@ -214,13 +219,15 @@ impl ChainItemKind {
         }
     }
 
-    fn is_tup_field_access(expr: &ast::Expr) -> bool {
-        match expr.kind {
-            ast::ExprKind::Field(_, ref field) => {
-                field.name.as_str().chars().all(|c| c.is_digit(10))
-            }
+    fn is_tup_field_access_expr(expr: &ast::Expr) -> bool {
+        match &expr.kind {
+            ast::ExprKind::Field(_, right) => Self::is_tup_field_ident(right),
             _ => false,
         }
+    }
+
+    fn is_tup_field_ident(field: &symbol::Ident) -> bool {
+        field.name.as_str().chars().all(|c| c.is_ascii_digit())
     }
 
     fn from_ast(
@@ -228,47 +235,44 @@ impl ChainItemKind {
         expr: &ast::Expr,
         is_postfix_receiver: bool,
     ) -> (ChainItemKind, Span) {
-        let (kind, span) = match expr.kind {
-            ast::ExprKind::MethodCall(ref call) => {
-                let types = if let Some(ref generic_args) = call.seg.args {
-                    if let ast::GenericArgs::AngleBracketed(ref data) = **generic_args {
-                        data.args
-                            .iter()
-                            .filter_map(|x| match x {
-                                ast::AngleBracketedArg::Arg(ref generic_arg) => {
-                                    Some(generic_arg.clone())
-                                }
-                                _ => None,
-                            })
-                            .collect::<Vec<_>>()
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
+        let (kind, span) = match &expr.kind {
+            ast::ExprKind::MethodCall(call) => {
+                let types = match call.seg.args.as_deref() {
+                    Some(ast::GenericArgs::AngleBracketed(data)) => data
+                        .args
+                        .iter()
+                        .filter_map(|x| match x {
+                            ast::AngleBracketedArg::Arg(generic_arg) => Some(generic_arg.clone()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>(),
+                    _ => vec![],
                 };
                 let span = mk_sp(call.receiver.span.hi(), expr.span.hi());
                 let kind = ChainItemKind::MethodCall(call.seg.clone(), types, call.args.clone());
                 (kind, span)
             }
-            ast::ExprKind::Field(ref nested, field) => {
-                let kind = if Self::is_tup_field_access(expr) {
-                    ChainItemKind::TupleField(field, Self::is_tup_field_access(nested))
+            ast::ExprKind::Field(nested, field) => {
+                let kind = if Self::is_tup_field_ident(field) {
+                    ChainItemKind::TupleField {
+                        field: *field,
+                        is_nested: Self::is_tup_field_access_expr(nested),
+                    }
                 } else {
-                    ChainItemKind::StructField(field)
+                    ChainItemKind::StructField(*field)
                 };
                 let span = mk_sp(nested.span.hi(), field.span.hi());
                 (kind, span)
             }
-            ast::ExprKind::Await(ref nested, _) => {
+            ast::ExprKind::Await(nested, _) => {
                 let span = mk_sp(nested.span.hi(), expr.span.hi());
                 (ChainItemKind::Await, span)
             }
-            ast::ExprKind::Use(ref nested, _) => {
+            ast::ExprKind::Use(nested, _) => {
                 let span = mk_sp(nested.span.hi(), expr.span.hi());
                 (ChainItemKind::Use, span)
             }
-            ast::ExprKind::Yield(ast::YieldKind::Postfix(ref nested)) => {
+            ast::ExprKind::Yield(ast::YieldKind::Postfix(nested)) => {
                 let span = mk_sp(nested.span.hi(), expr.span.hi());
                 (ChainItemKind::Yield, span)
             }
@@ -309,14 +313,14 @@ impl Rewrite for ChainItem {
                 Self::rewrite_method_call(segment.ident, types, exprs, self.span, context, shape)?
             }
             ChainItemKind::StructField(ident) => format!(".{}", rewrite_ident(context, ident)),
-            ChainItemKind::TupleField(ident, nested) => format!(
+            ChainItemKind::TupleField { field, is_nested } => format!(
                 "{}.{}",
-                if nested && context.config.style_edition() <= StyleEdition::Edition2021 {
+                if is_nested && context.config.style_edition() <= StyleEdition::Edition2021 {
                     " "
                 } else {
                     ""
                 },
-                rewrite_ident(context, ident)
+                rewrite_ident(context, field)
             ),
             ChainItemKind::Await => ".await".to_owned(),
             ChainItemKind::Use => ".use".to_owned(),
