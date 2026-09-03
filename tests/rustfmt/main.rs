@@ -298,6 +298,7 @@ fn dont_emit_ICE() {
         "tests/target/issue_6082.rs",
         "tests/target/issue_6069.rs",
         "tests/target/issue-6105.rs",
+        "tests/target/issue_7034.rs",
     ];
 
     let panic_re = regex::Regex::new("thread.*panicked").unwrap();
