@@ -22,6 +22,7 @@ allow-unauthenticated = [
     "UO-*",
     "unstable-language-feature",
     "unstable-option",
+    "X-*",
 ]
 
 # ------------------------------------------------------------------------------
