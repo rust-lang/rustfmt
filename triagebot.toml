@@ -13,11 +13,15 @@ allow-unauthenticated = [
     "E-*",
     "F-*",
     "I-*",
-    "S-*",
-    "SO-*",
-    "UO-*",
+    "needs-rfc",
     "needs-triage",
     "regression-*",
+    "S-*",
+    "SO-*",
+    "T-*",
+    "UO-*",
+    "unstable-language-feature",
+    "unstable-option",
 ]
 
 # ------------------------------------------------------------------------------
