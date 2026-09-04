@@ -588,7 +588,19 @@ impl Rewrite for Chain {
         formatter.format_last_child(context, shape, child_shape)?;
 
         let result = formatter.join_rewrites(context, child_shape)?;
-        wrap_str(result, context.config.max_width(), shape).max_width_error(shape.width, full_span)
+        let max_width = if context.config.style_edition() >= StyleEdition::Edition2027 {
+            // Keep formatting the chain when a nested expression contains an unavoidable,
+            // pre-existing overflow, but do not allow the rewrite to make it any wider.
+            crate::comment::filter_normal_code(context.snippet(full_span))
+                .lines()
+                .map(utils::unicode_str_width)
+                .max()
+                .unwrap_or(0)
+                .max(context.config.max_width())
+        } else {
+            context.config.max_width()
+        };
+        wrap_str(result, max_width, shape).max_width_error(shape.width, full_span)
     }
 }
 
