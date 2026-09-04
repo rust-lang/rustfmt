@@ -1764,15 +1764,53 @@ fn rewrite_ty<R: Rewrite>(
         result.push_str(&generics_str);
     }
 
+    // Default keeps today's behavior when there are no bounds, so comments between
+    // the ident and `where` are still recovered.
+    let mut span_end_before_where = generics.span.hi();
+
     if let Some(bounds) = generic_bounds_opt {
         if !bounds.is_empty() {
             // 2 = `: `
-            let shape = Shape::indented(indent, context.config);
-            let shape = shape.offset_left(result.len() + 2, span)?;
-            let type_bounds = bounds
-                .rewrite_result(context, shape)
-                .map(|s| format!(": {}", s))?;
-            result.push_str(&type_bounds);
+            let item_shape = Shape::indented(indent, context.config);
+            let shape = item_shape.offset_left(result.len() + 2, span)?;
+            let type_bounds = bounds.rewrite_result(context, shape)?;
+
+            // The bounds rewrite only covers the bounds themselves, so comments
+            // around the `:` would otherwise be dropped. Recover them on either
+            // side of the colon, keeping the exact `: ` layout when there are none.
+            let bounds_lo = bounds[0].span().lo();
+            let colon_lo = context
+                .snippet_provider
+                .span_before(mk_sp(generics.span.hi(), bounds_lo), ":");
+            let before_colon = mk_sp(generics.span.hi(), colon_lo);
+            let after_colon = mk_sp(colon_lo + BytePos(1), bounds_lo);
+
+            if contains_comment(context.snippet(before_colon)) {
+                result = combine_strs_with_missing_comments(
+                    context,
+                    &result,
+                    ":",
+                    before_colon,
+                    item_shape,
+                    true,
+                )?;
+            } else {
+                result.push(':');
+            }
+
+            if contains_comment(context.snippet(after_colon)) {
+                result = combine_strs_with_missing_comments(
+                    context,
+                    &result,
+                    &type_bounds,
+                    after_colon,
+                    item_shape,
+                    true,
+                )?;
+            } else {
+                result.push_str(&format!(" {}", type_bounds));
+            }
+            span_end_before_where = bounds[bounds.len() - 1].span().hi();
         }
     }
 
@@ -1789,7 +1827,7 @@ fn rewrite_ty<R: Rewrite>(
         false,
         "=",
         None,
-        generics.span.hi(),
+        span_end_before_where,
         option,
     )?;
     result.push_str(&before_where_clause_str);
