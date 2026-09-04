@@ -1,5 +1,8 @@
 // rustfmt-style_edition: 2027
 // rustfmt-reorder_modules: false
+// Skip-children (nightly-only) because empty files changed format in 2027
+// rustfmt-unstable: true
+// rustfmt-skip_children: true
 
 mod x86;
 mod v0s;
