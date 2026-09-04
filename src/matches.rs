@@ -286,6 +286,15 @@ fn rewrite_match_arm(
                 .sub_width(7 + label_len, arm.span)?
                 .offset_left(pipe_offset, arm.span)?
         }
+        ast::ExprKind::Block(block, None)
+            if is_unsafe_block(block)
+                && context.config.style_edition() >= StyleEdition::Edition2027 =>
+        {
+            // 12 = ` => unsafe {`
+            shape
+                .sub_width(12, arm.span)?
+                .offset_left(pipe_offset, arm.span)?
+        }
         _ => {
             // 5 = ` => {`
             shape
