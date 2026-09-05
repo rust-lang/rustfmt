@@ -535,9 +535,11 @@ pub(crate) fn rewrite_match_body(
             body_shape.width,
         );
 
+        let enforce_empty_block_width =
+            is_empty_block && context.config.style_edition() >= StyleEdition::Edition2027;
         match rewrite {
             Ok(ref body_str)
-                if is_block
+                if (is_block && !enforce_empty_block_width)
                     || (!body_str.contains('\n')
                         && unicode_str_width(body_str) <= body_shape.width) =>
             {
