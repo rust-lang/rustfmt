@@ -1347,6 +1347,24 @@ where
     }
 }
 
+/// Returns `true` if the `r` just consumed opens a raw string literal, i.e. the run of
+/// `#`s that follows it ends in a `"`. Peeking a single `#` is not enough to tell a raw
+/// string apart from a raw identifier such as `r#struct`.
+fn is_raw_string_prefix<T>(iter: &mut MultiPeek<T>) -> bool
+where
+    T: Iterator,
+    T::Item: RichChar,
+{
+    while let Some(c) = iter.peek() {
+        match c.get_char() {
+            '#' => continue,
+            '"' => return true,
+            _ => return false,
+        }
+    }
+    false
+}
+
 fn is_raw_string_suffix<T>(iter: &mut MultiPeek<T>, count: u32) -> bool
 where
     T: Iterator,
@@ -1430,7 +1448,13 @@ where
             CharClassesStatus::LitCharEscape => CharClassesStatus::LitChar,
             CharClassesStatus::Normal => match chr {
                 'r' => match self.base.peek().map(RichChar::get_char) {
-                    Some('#') | Some('"') => {
+                    Some('"') => {
+                        char_kind = FullCodeCharKind::InString;
+                        CharClassesStatus::RawStringPrefix(0)
+                    }
+                    // `r#` opens a raw string only if the `#`s end in a `"`; otherwise
+                    // this is a raw identifier like `r#struct` and stays normal code.
+                    Some('#') if is_raw_string_prefix(&mut self.base) => {
                         char_kind = FullCodeCharKind::InString;
                         CharClassesStatus::RawStringPrefix(0)
                     }
