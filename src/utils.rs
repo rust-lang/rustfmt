@@ -51,23 +51,6 @@ pub(crate) fn is_same_visibility(a: &Visibility, b: &Visibility) -> bool {
     }
 }
 
-/// Trims trailing whitespace from every line, not just the end of the input.
-/// Snippets copied from the source can span lines, and rustfmt rejects
-/// trailing whitespace in its own output.
-fn trim_lines_end(snippet: &str) -> Cow<'_, str> {
-    if snippet.lines().any(|line| line.ends_with([' ', '\t'])) {
-        Cow::from(
-            snippet
-                .lines()
-                .map(str::trim_end)
-                .collect::<Vec<_>>()
-                .join("\n"),
-        )
-    } else {
-        Cow::from(snippet.trim_end())
-    }
-}
-
 // Uses Cow to avoid allocating in the common cases.
 pub(crate) fn format_visibility(
     context: &RewriteContext<'_>,
@@ -77,13 +60,11 @@ pub(crate) fn format_visibility(
         VisibilityKind::Public => Cow::from("pub "),
         VisibilityKind::Inherited => Cow::from(""),
         VisibilityKind::Restricted { ref path, .. } => {
-            // A comment can sit anywhere inside the parens, e.g.
-            // `pub(crate /* why */)`. The path on its own cannot round-trip
-            // one, so fall back to the source when a comment is present.
-            if let Some(snippet) = context.snippet_provider.span_to_snippet(vis.span) {
-                if contains_comment(snippet) {
-                    return Cow::from(format!("{} ", trim_lines_end(snippet)));
-                }
+            // FIXME: we should properly handle comments here, but for now
+            // return the span unchanged.
+            let snippet = context.snippet(vis.span);
+            if contains_comment(snippet) {
+                return Cow::from(format!("{snippet} "));
             }
 
             let Path { ref segments, .. } = **path;

@@ -21,9 +21,11 @@ struct S {
     pub(crate /* field */) field: u32,
 }
 
-// Trailing whitespace inside the parens must not reach the output.
-pub(crate /* block */   
-   ) fn trailing_ws() {}
+// Multi-line comments are kept as-is too.
+pub(crate /* multi
+   line */) fn multi_line_block() {}
 
-pub(crate //  line   
+pub(crate //  line
 ) fn line_comment() {}
+
+pub(in /* one */ foo::bar /* two */) fn two_comments() {}
