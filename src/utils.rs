@@ -9,7 +9,9 @@ use rustc_ast_pretty::pprust;
 use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
 use unicode_width::UnicodeWidthStr;
 
-use crate::comment::{CharClasses, FullCodeCharKind, LineClasses, filter_normal_code};
+use crate::comment::{
+    CharClasses, FullCodeCharKind, LineClasses, contains_comment, filter_normal_code,
+};
 use crate::config::{Config, StyleEdition};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
@@ -49,6 +51,23 @@ pub(crate) fn is_same_visibility(a: &Visibility, b: &Visibility) -> bool {
     }
 }
 
+/// Trims trailing whitespace from every line, not just the end of the input.
+/// Snippets copied from the source can span lines, and rustfmt rejects
+/// trailing whitespace in its own output.
+fn trim_lines_end(snippet: &str) -> Cow<'_, str> {
+    if snippet.lines().any(|line| line.ends_with([' ', '\t'])) {
+        Cow::from(
+            snippet
+                .lines()
+                .map(str::trim_end)
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    } else {
+        Cow::from(snippet.trim_end())
+    }
+}
+
 // Uses Cow to avoid allocating in the common cases.
 pub(crate) fn format_visibility(
     context: &RewriteContext<'_>,
@@ -58,6 +77,15 @@ pub(crate) fn format_visibility(
         VisibilityKind::Public => Cow::from("pub "),
         VisibilityKind::Inherited => Cow::from(""),
         VisibilityKind::Restricted { ref path, .. } => {
+            // A comment can sit anywhere inside the parens, e.g.
+            // `pub(crate /* why */)`. The path on its own cannot round-trip
+            // one, so fall back to the source when a comment is present.
+            if let Some(snippet) = context.snippet_provider.span_to_snippet(vis.span) {
+                if contains_comment(snippet) {
+                    return Cow::from(format!("{} ", trim_lines_end(snippet)));
+                }
+            }
+
             let Path { ref segments, .. } = **path;
             let mut segments_iter = segments.iter().map(|seg| rewrite_ident(context, seg.ident));
             if path.is_global() {
