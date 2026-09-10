@@ -497,7 +497,7 @@ impl ItemizedBlock {
             // of the new line_start. We update the indent because it effects the max width
             // of each formatted line.
             line_start = itemized_block_quote_start(line, line_start, 2);
-            indent = line_start.len();
+            indent = line_start.len().min(line.len());
         }
         Some(ItemizedBlock {
             lines: vec![line[indent..].to_string()],
