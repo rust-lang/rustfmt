@@ -229,8 +229,8 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             &visitor.buffer
         );
 
-        // For some reason, the source_map does not include terminating
-        // newlines so we must add one on for each file. This is sad.
+        // The source map does not include terminating newlines, so normalize the file ending.
+        // Style Edition 2027 and later leave an empty formatted buffer empty.
         let num_newlines = count_newlines(&visitor.buffer);
         if self
             .config

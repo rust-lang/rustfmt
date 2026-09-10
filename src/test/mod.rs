@@ -51,6 +51,8 @@ const FILE_SKIP_LIST: &[&str] = &[
     "cfg_mod/wasm32.rs",
     // Empty files cannot declare nightly-only 2027 style edition inline.
     "empty_file_style_edition_2027.rs",
+    // A newline-only file cannot declare nightly-only 2027 style edition inline.
+    "newline_only_file_style_edition_2027.rs",
     // Empty child modules are covered by reorder_modules_empty_2027_tests.
     "reorder_modules/disabled_style_edition_2027.rs",
     "reorder_modules/enabled_style_edition_2027.rs",
@@ -549,6 +551,25 @@ fn empty_file_style_edition_2027_tests() {
         assert_eq!(
             fails, 0,
             "{fails} empty_file_style_edition_2027 tests failed"
+        );
+    });
+}
+
+#[nightly_only_test]
+#[test]
+fn newline_only_file_style_edition_2027_tests() {
+    init_log();
+    run_test_with(&TestSetting::default(), || {
+        let files = vec![
+            PathBuf::from("tests/source/newline_only_file_style_edition_2027.rs"),
+            PathBuf::from("tests/target/newline_only_file_style_edition_2027.rs"),
+        ];
+        let (_reports, count, fails) = check_files(files, &None);
+
+        println!("Ran {count} newline_only_file_style_edition_2027 tests.");
+        assert_eq!(
+            fails, 0,
+            "{fails} newline_only_file_style_edition_2027 tests failed"
         );
     });
 }

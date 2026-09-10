@@ -15,7 +15,7 @@ use crate::create_emitter;
 #[cfg(test)]
 use crate::formatting::FileRecord;
 
-// Append a newline to the end of each file.
+// Append a final newline, except when Style Edition 2027 or later produces an empty buffer.
 pub(crate) fn append_newline(s: &mut String, style_edition: StyleEdition) {
     if style_edition >= StyleEdition::Edition2027 && s.is_empty() {
         return;
