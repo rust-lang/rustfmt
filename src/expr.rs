@@ -294,6 +294,7 @@ pub(crate) fn format_expr(
         ast::ExprKind::MacCall(ref mac) => {
             rewrite_macro(mac, context, shape, MacroPosition::Expression).or_else(|_| {
                 wrap_str(
+                    context.config.style_edition(),
                     context.snippet(expr.span).to_owned(),
                     context.config.max_width(),
                     shape,
@@ -1364,6 +1365,7 @@ pub(crate) fn rewrite_literal(
         token::LitKind::Integer => rewrite_int_lit(context, token_lit, span, shape),
         token::LitKind::Float => rewrite_float_lit(context, token_lit, span, shape),
         _ => wrap_str(
+            context.config.style_edition(),
             context.snippet(span).to_owned(),
             context.config.max_width(),
             shape,
@@ -1384,8 +1386,13 @@ fn rewrite_string_lit(context: &RewriteContext<'_>, span: Span, shape: Shape) ->
         {
             return Ok(string_lit.to_owned());
         } else {
-            return wrap_str(string_lit.to_owned(), context.config.max_width(), shape)
-                .max_width_error(shape.width, span);
+            return wrap_str(
+                context.config.style_edition(),
+                string_lit.to_owned(),
+                context.config.max_width(),
+                shape,
+            )
+            .max_width_error(shape.width, span);
         }
     }
 
@@ -1420,6 +1427,7 @@ fn rewrite_int_lit(
         };
         if let Some(hex_lit) = hex_lit {
             return wrap_str(
+                context.config.style_edition(),
                 format!(
                     "0x{}{}",
                     hex_lit,
@@ -1433,6 +1441,7 @@ fn rewrite_int_lit(
     }
 
     wrap_str(
+        context.config.style_edition(),
         context.snippet(span).to_owned(),
         context.config.max_width(),
         shape,
@@ -1451,6 +1460,7 @@ fn rewrite_float_lit(
         FloatLiteralTrailingZero::Preserve
     ) {
         return wrap_str(
+            context.config.style_edition(),
             context.snippet(span).to_owned(),
             context.config.max_width(),
             shape,
@@ -1492,6 +1502,7 @@ fn rewrite_float_lit(
         ""
     };
     wrap_str(
+        context.config.style_edition(),
         format!(
             "{}{}{}{}{}",
             integer_part,
@@ -2353,7 +2364,12 @@ fn choose_rhs<R: Rewrite>(
 
             match (orig_rhs, new_rhs) {
                 (Ok(ref orig_rhs), Ok(ref new_rhs))
-                    if !filtered_str_fits(&new_rhs, context.config.max_width(), new_shape) =>
+                    if !filtered_str_fits(
+                        context.config.style_edition(),
+                        &new_rhs,
+                        context.config.max_width(),
+                        new_shape,
+                    ) =>
                 {
                     Ok(format!("{before_space_str}{orig_rhs}"))
                 }
