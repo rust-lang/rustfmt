@@ -8,14 +8,15 @@
 use std::borrow::Cow;
 
 use rustc_ast as ast;
-use rustc_span::Span;
 use rustc_span::symbol::Ident;
+use rustc_span::{DUMMY_SP, Span};
 use tracing::debug;
 
 use crate::comment::{combine_strs_with_missing_comments, contains_comment};
 use crate::rewrite::RewriteContext;
 use crate::shape::Shape;
-use crate::utils::rewrite_ident;
+use crate::source_map::SpanUtils;
+use crate::utils::{format_impl_restriction, rewrite_ident};
 
 pub(crate) fn format_header(
     context: &RewriteContext<'_>,
@@ -68,6 +69,23 @@ pub(crate) struct HeaderPart<'a> {
 }
 
 impl<'a> HeaderPart<'a> {
+    /// Create a new empty HeaderPart with a DUMMY_SP.
+    /// Because the snippet is empty these will be skipped when calling `format_header`.
+    fn empty() -> Self {
+        Self::new("", DUMMY_SP)
+    }
+
+    /// Find the `keyword` for the header within the given `span`
+    pub(crate) fn keyword(
+        context: &RewriteContext<'_>,
+        span: Span,
+        keyword: impl Into<Cow<'a, str>>,
+    ) -> Self {
+        let snippet = keyword.into();
+        let span = context.snippet_provider.subspan(span, &snippet);
+        Self::new(snippet, span)
+    }
+
     pub(crate) fn new(snippet: impl Into<Cow<'a, str>>, span: Span) -> Self {
         Self {
             snippet: snippet.into(),
@@ -102,5 +120,40 @@ impl<'a> HeaderPart<'a> {
         };
 
         Self::new(snippet, vis.span)
+    }
+
+    pub(crate) fn impl_restriction(
+        context: &RewriteContext<'_>,
+        impl_restriction: &ast::ImplRestriction,
+    ) -> Self {
+        match impl_restriction.kind {
+            ast::RestrictionKind::Unrestricted => Self::empty(),
+            ast::RestrictionKind::Restricted { .. } => {
+                let restriction = format_impl_restriction(context, impl_restriction);
+                Self::new(restriction, impl_restriction.span)
+            }
+        }
+    }
+
+    pub(crate) fn constness(constness: ast::Const) -> Self {
+        match constness {
+            ast::Const::No => Self::empty(),
+            ast::Const::Yes(span) => Self::new("const", span),
+        }
+    }
+
+    pub(crate) fn safety(safety: ast::Safety) -> Self {
+        match safety {
+            ast::Safety::Default => Self::empty(),
+            ast::Safety::Unsafe(span) => Self::new("unsafe", span),
+            ast::Safety::Safe(span) => Self::new("safe", span),
+        }
+    }
+
+    pub(crate) fn auto(context: &RewriteContext<'_>, span: Span, is_auto: ast::IsAuto) -> Self {
+        match is_auto {
+            ast::IsAuto::No => Self::empty(),
+            ast::IsAuto::Yes => Self::keyword(context, span, "auto"),
+        }
     }
 }
