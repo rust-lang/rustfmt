@@ -229,15 +229,15 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             &visitor.buffer
         );
 
-        // For some reason, the source_map does not include terminating
-        // newlines so we must add one on for each file. This is sad.
+        // The source map does not include terminating newlines, so normalize the file ending.
+        // Style Edition 2027 and later leave an empty formatted buffer empty.
         let num_newlines = count_newlines(&visitor.buffer);
         if self
             .config
             .file_lines()
             .contains_line(&path, num_newlines + 1)
         {
-            source_file::append_newline(&mut visitor.buffer);
+            source_file::append_newline(&mut visitor.buffer, self.config.style_edition());
         }
 
         format_lines(
