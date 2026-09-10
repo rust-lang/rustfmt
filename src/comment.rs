@@ -764,6 +764,14 @@ impl<'a> CommentRewrite<'a> {
                             .doc_comment_code_block_width()
                             .min(config.max_width());
                         config.set().max_width(comment_max_width);
+                        if let Some(comment_use_small_heuristics) = config
+                            .doc_comment_code_block_small_heuristics()
+                            .to_heuristics()
+                        {
+                            config
+                                .set()
+                                .use_small_heuristics(comment_use_small_heuristics);
+                        }
                         if let Some(s) =
                             crate::format_code_block(&self.code_block_buffer, &config, false)
                         {
@@ -1066,16 +1074,26 @@ fn light_rewrite_comment(
             // `*` in `/*`.
             let first_non_whitespace = l.find(|c| !char::is_whitespace(c));
             let left_trimmed = if let Some(fnw) = first_non_whitespace {
-                if l.as_bytes()[fnw] == b'*' && fnw > 0 {
-                    &l[fnw - 1..]
+                if l.as_bytes()[fnw] == b'*' {
+                    Cow::Owned(format!(" {}", &l[fnw..]))
                 } else {
-                    &l[fnw..]
+                    Cow::Borrowed(&l[fnw..])
                 }
             } else {
-                ""
+                Cow::Borrowed("")
             };
+
             // Preserve markdown's double-space line break syntax in doc comment.
-            trim_end_unless_two_whitespaces(left_trimmed, is_doc_comment)
+            match left_trimmed {
+                Cow::Borrowed(left_trimmed) => Cow::Borrowed(trim_end_unless_two_whitespaces(
+                    left_trimmed,
+                    is_doc_comment,
+                )),
+                Cow::Owned(left_trimmed) => {
+                    let trimmed = trim_end_unless_two_whitespaces(&left_trimmed, is_doc_comment);
+                    Cow::Owned(trimmed.to_string())
+                }
+            }
         })
         .join(&format!("\n{}", offset.to_string(config)))
 }
@@ -1329,6 +1347,24 @@ where
     }
 }
 
+/// Returns `true` if the `r` just consumed opens a raw string literal, i.e. the run of
+/// `#`s that follows it ends in a `"`. Peeking a single `#` is not enough to tell a raw
+/// string apart from a raw identifier such as `r#struct`.
+fn is_raw_string_prefix<T>(iter: &mut MultiPeek<T>) -> bool
+where
+    T: Iterator,
+    T::Item: RichChar,
+{
+    while let Some(c) = iter.peek() {
+        match c.get_char() {
+            '#' => continue,
+            '"' => return true,
+            _ => return false,
+        }
+    }
+    false
+}
+
 fn is_raw_string_suffix<T>(iter: &mut MultiPeek<T>, count: u32) -> bool
 where
     T: Iterator,
@@ -1412,7 +1448,13 @@ where
             CharClassesStatus::LitCharEscape => CharClassesStatus::LitChar,
             CharClassesStatus::Normal => match chr {
                 'r' => match self.base.peek().map(RichChar::get_char) {
-                    Some('#') | Some('"') => {
+                    Some('"') => {
+                        char_kind = FullCodeCharKind::InString;
+                        CharClassesStatus::RawStringPrefix(0)
+                    }
+                    // `r#` opens a raw string only if the `#`s end in a `"`; otherwise
+                    // this is a raw identifier like `r#struct` and stays normal code.
+                    Some('#') if is_raw_string_prefix(&mut self.base) => {
                         char_kind = FullCodeCharKind::InString;
                         CharClassesStatus::RawStringPrefix(0)
                     }
