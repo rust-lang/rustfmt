@@ -1,6 +1,7 @@
 // A generic trait to abstract the rewriting of an element (of the AST).
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use rustc_span::Span;
@@ -14,6 +15,21 @@ use crate::skip::SkipContext;
 use crate::visitor::SnippetProvider;
 
 pub(crate) type RewriteResult = Result<String, RewriteError>;
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub(crate) struct OverflowRewriteKey {
+    span_lo: u32,
+    span_hi: u32,
+    width: usize,
+    block_indent: usize,
+    alignment: usize,
+    offset: usize,
+    inside_macro: bool,
+    use_block: bool,
+    is_if_else_block: bool,
+    is_loop_block: bool,
+    force_one_line_chain: bool,
+}
 pub(crate) trait Rewrite {
     /// Rewrite self into shape.
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String>;
@@ -118,6 +134,7 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) is_loop_block: Cell<bool>,
     // When rewriting chain, veto going multi line except the last element
     pub(crate) force_one_line_chain: Cell<bool>,
+    pub(crate) overflow_rewrite_cache: RefCell<HashMap<OverflowRewriteKey, RewriteResult>>,
     pub(crate) snippet_provider: &'a SnippetProvider,
     // Used for `format_snippet`
     pub(crate) macro_rewrite_failure: Cell<bool>,
@@ -145,6 +162,36 @@ impl Drop for InsideMacroGuard {
 }
 
 impl<'a> RewriteContext<'a> {
+    pub(crate) fn rewrite_cached_overflow(
+        &self,
+        span: Span,
+        shape: Shape,
+        rewrite: impl FnOnce() -> RewriteResult,
+    ) -> RewriteResult {
+        let key = OverflowRewriteKey {
+            span_lo: span.lo().0,
+            span_hi: span.hi().0,
+            width: shape.width,
+            block_indent: shape.indent.block_indent,
+            alignment: shape.indent.alignment,
+            offset: shape.offset,
+            inside_macro: self.inside_macro(),
+            use_block: self.use_block.get(),
+            is_if_else_block: self.is_if_else_block(),
+            is_loop_block: self.is_loop_block(),
+            force_one_line_chain: self.force_one_line_chain.get(),
+        };
+        if let Some(result) = self.overflow_rewrite_cache.borrow().get(&key) {
+            return result.clone();
+        }
+
+        let result = rewrite();
+        self.overflow_rewrite_cache
+            .borrow_mut()
+            .insert(key, result.clone());
+        result
+    }
+
     pub(crate) fn snippet(&self, span: Span) -> &str {
         self.snippet_provider.span_to_snippet(span).unwrap()
     }
