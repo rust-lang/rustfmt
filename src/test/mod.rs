@@ -53,10 +53,10 @@ const FILE_SKIP_LIST: &[&str] = &[
     "empty_file_style_edition_2027.rs",
     // A newline-only file cannot declare nightly-only 2027 style edition inline.
     "newline_only_file_style_edition_2027.rs",
-    // Empty child modules are covered by reorder_modules_empty_2027_tests.
+    // These roots are tested with child traversal disabled by
+    // reorder_modules_style_edition_2027_tests.
     "reorder_modules/disabled_style_edition_2027.rs",
     "reorder_modules/enabled_style_edition_2027.rs",
-    "reorder_modules_empty_2027",
     "skip/foo.rs",
 ];
 
@@ -653,19 +653,37 @@ fn format_files_find_new_files_via_cfg_select() {
 
 #[nightly_only_test]
 #[test]
-fn reorder_modules_empty_2027_tests() {
+fn reorder_modules_style_edition_2027_tests() {
     init_log();
     run_test_with(&TestSetting::default(), || {
-        let files = vec![
-            PathBuf::from("tests/source/reorder_modules_empty_2027/disabled.rs"),
-            PathBuf::from("tests/source/reorder_modules_empty_2027/enabled.rs"),
-            PathBuf::from("tests/target/reorder_modules_empty_2027/disabled.rs"),
-            PathBuf::from("tests/target/reorder_modules_empty_2027/enabled.rs"),
+        let test_cases = [
+            (
+                "disabled_style_edition_2027.rs",
+                "tests/config/reorder_modules_disabled_style_edition_2027.toml",
+            ),
+            (
+                "enabled_style_edition_2027.rs",
+                "tests/config/reorder_modules_enabled_style_edition_2027.toml",
+            ),
         ];
-        let (_reports, count, fails) = check_files(files, &None);
+        let mut count = 0;
+        let mut fails = 0;
 
-        println!("Ran {count} reorder_modules_empty_2027 tests.");
-        assert_eq!(fails, 0, "{fails} reorder_modules_empty_2027 tests failed");
+        for (test_file, config_file) in test_cases {
+            let files = vec![
+                PathBuf::from("tests/source/reorder_modules").join(test_file),
+                PathBuf::from("tests/target/reorder_modules").join(test_file),
+            ];
+            let (_, case_count, case_fails) = check_files(files, &Some(PathBuf::from(config_file)));
+            count += case_count;
+            fails += case_fails;
+        }
+
+        println!("Ran {count} reorder_modules_style_edition_2027 tests.");
+        assert_eq!(
+            fails, 0,
+            "{fails} reorder_modules_style_edition_2027 tests failed"
+        );
     });
 }
 
