@@ -634,7 +634,7 @@ impl<'a> Context<'a> {
             |item| item.rewrite_result(self.context, self.nested_shape),
             span.lo(),
             span.hi(),
-            true,
+            self.items.len() > 1,
         );
         let mut list_items: Vec<_> = items.collect();
 
