@@ -343,15 +343,21 @@ fn is_valid_linebreak(input: &[&str], pos: usize) -> bool {
         return true;
     }
     let is_punctuation = is_punctuation(input[pos]);
-    if is_punctuation && !is_part_of_type(input, pos) {
+    if is_punctuation && !is_double_punctuation(input, pos) {
         return true;
     }
     false
 }
 
-fn is_part_of_type(input: &[&str], pos: usize) -> bool {
-    input.get(pos..=pos + 1) == Some(&[":", ":"])
-        || input.get(pos.saturating_sub(1)..=pos) == Some(&[":", ":"])
+fn is_double_punctuation(input: &[&str], pos: usize) -> bool {
+    input
+        .get(pos..=pos + 1)
+        .map(|slice| slice.iter().all(|cha| is_punctuation(cha)))
+        .unwrap_or(false)
+        || input
+            .get(pos.saturating_sub(1)..=pos)
+            .map(|slice| slice.iter().all(|cha| is_punctuation(cha)))
+            .unwrap_or(false)
 }
 
 fn is_new_line(grapheme: &str) -> bool {
