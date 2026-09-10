@@ -426,6 +426,10 @@ impl<'a> FmtVisitor<'a> {
     ) -> Option<(String, FnBraceStyle)> {
         let context = self.get_context();
 
+        if out_of_file_lines_range!(self, span) {
+            return Some((context.snippet(span).to_owned(), FnBraceStyle::None));
+        }
+
         let mut fn_brace_style = newline_for_brace(self.config, &fn_sig.generics.where_clause);
         let (result, _, force_newline_brace) =
             rewrite_fn_base(&context, indent, ident, fn_sig, span, fn_brace_style).ok()?;
