@@ -49,9 +49,8 @@ const FILE_SKIP_LIST: &[&str] = &[
     "cfg_mod/bar.rs",
     "cfg_mod/foo.rs",
     "cfg_mod/wasm32.rs",
-    // Empty files cannot declare nightly-only 2027 style edition inline.
+    // Empty and newline-only files cannot declare nightly-only 2027 style edition inline.
     "empty_file_style_edition_2027.rs",
-    // A newline-only file cannot declare nightly-only 2027 style edition inline.
     "newline_only_file_style_edition_2027.rs",
     // These roots are tested with child traversal disabled by
     // reorder_modules_style_edition_2027_tests.
@@ -538,38 +537,22 @@ fn self_tests() {
 
 #[nightly_only_test]
 #[test]
-fn empty_file_style_edition_2027_tests() {
+fn empty_files_style_edition_2027_tests() {
     init_log();
     run_test_with(&TestSetting::default(), || {
         let files = vec![
             PathBuf::from("tests/source/empty_file_style_edition_2027.rs"),
-            PathBuf::from("tests/target/empty_file_style_edition_2027.rs"),
-        ];
-        let (_reports, count, fails) = check_files(files, &None);
-
-        println!("Ran {count} empty_file_style_edition_2027 tests.");
-        assert_eq!(
-            fails, 0,
-            "{fails} empty_file_style_edition_2027 tests failed"
-        );
-    });
-}
-
-#[nightly_only_test]
-#[test]
-fn newline_only_file_style_edition_2027_tests() {
-    init_log();
-    run_test_with(&TestSetting::default(), || {
-        let files = vec![
             PathBuf::from("tests/source/newline_only_file_style_edition_2027.rs"),
-            PathBuf::from("tests/target/newline_only_file_style_edition_2027.rs"),
         ];
-        let (_reports, count, fails) = check_files(files, &None);
+        let config = Some(PathBuf::from(
+            "tests/config/empty_file_style_edition_2027.toml",
+        ));
+        let (_reports, count, fails) = check_files(files, &config);
 
-        println!("Ran {count} newline_only_file_style_edition_2027 tests.");
+        println!("Ran {count} empty_files_style_edition_2027 tests.");
         assert_eq!(
             fails, 0,
-            "{fails} newline_only_file_style_edition_2027 tests failed"
+            "{fails} empty_files_style_edition_2027 tests failed"
         );
     });
 }
