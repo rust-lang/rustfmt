@@ -6,14 +6,11 @@ use std::iter::Peekable;
 use rustc_span::{BytePos, Span};
 
 use crate::comment::{FindUncommented, find_comment_end, rewrite_comment};
-use crate::config::lists::*;
 use crate::config::{Config, IndentStyle};
+use crate::config::{PostCommentAlignment, lists::*};
 use crate::rewrite::{ExceedsMaxWidthError, RewriteContext, RewriteError, RewriteResult};
 use crate::shape::{Indent, Shape};
-use crate::utils::{
-    count_newlines, first_line_width, last_line_width, mk_sp, starts_with_newline,
-    unicode_str_width,
-};
+use crate::utils::{count_newlines, mk_sp, starts_with_newline, unicode_str_width};
 use crate::visitor::SnippetProvider;
 
 pub(crate) struct ListFormatting<'a> {
@@ -29,8 +26,6 @@ pub(crate) struct ListFormatting<'a> {
     preserve_newline: bool,
     // Nested import lists get some special handling for the "Mixed" list type
     nested: bool,
-    // Whether comments should be visually aligned.
-    align_comments: bool,
     config: &'a Config,
 }
 
@@ -45,7 +40,6 @@ impl<'a> ListFormatting<'a> {
             ends_with_newline: true,
             preserve_newline: false,
             nested: false,
-            align_comments: true,
             config,
         }
     }
@@ -82,11 +76,6 @@ impl<'a> ListFormatting<'a> {
 
     pub(crate) fn nested(mut self, nested: bool) -> Self {
         self.nested = nested;
-        self
-    }
-
-    pub(crate) fn align_comments(mut self, align_comments: bool) -> Self {
-        self.align_comments = align_comments;
         self
     }
 
@@ -144,15 +133,6 @@ impl ListItem {
 
     pub(crate) fn inner_as_ref(&self) -> &str {
         self.item.as_ref().map_or("", |s| s)
-    }
-
-    pub(crate) fn is_different_group(&self) -> bool {
-        self.inner_as_ref().contains('\n')
-            || self.pre_comment.is_some()
-            || self
-                .post_comment
-                .as_ref()
-                .map_or(false, |s| s.contains('\n'))
     }
 
     pub(crate) fn is_multiline(&self) -> bool {
@@ -261,11 +241,10 @@ where
 }
 
 // Format a list of commented items into a string.
-pub(crate) fn write_list<I, T>(items: I, formatting: &ListFormatting<'_>) -> RewriteResult
-where
-    I: IntoIterator<Item = T> + Clone,
-    T: AsRef<ListItem>,
-{
+pub(crate) fn write_list<T: AsRef<ListItem>>(
+    items: Vec<T>,
+    formatting: &ListFormatting<'_>,
+) -> RewriteResult {
     let tactic = formatting.tactic;
     let sep_len = formatting.separator.len();
 
@@ -273,9 +252,9 @@ where
     // will be a trailing separator.
     let mut trailing_separator = formatting.needs_trailing_separator();
     let mut result = String::with_capacity(128);
-    let cloned_items = items.clone();
+    let item_max_width =
+        max_width_of_item_with_post_comment(items.iter().map(|item| item.as_ref()));
     let mut iter = items.into_iter().enumerate().peekable();
-    let mut item_max_width: Option<usize> = None;
     let sep_place =
         SeparatorPlace::from_tactic(formatting.separator_place, tactic, formatting.separator);
     let mut prev_item_had_post_comment = false;
@@ -283,6 +262,7 @@ where
 
     let mut line_len = 0;
     let indent_str = &formatting.shape.indent.to_string(formatting.config);
+    let indent_str_width = unicode_str_width(indent_str);
     while let Some((i, item)) = iter.next() {
         let item = item.as_ref();
         let inner_item = item.item.as_ref().or_else(|err| Err(err.clone()))?;
@@ -303,7 +283,7 @@ where
         };
         let mut item_last_line_width = unicode_str_width(item_last_line) + item_sep_len;
         if item_last_line.starts_with(&**indent_str) {
-            item_last_line_width -= unicode_str_width(indent_str);
+            item_last_line_width -= indent_str_width;
         }
 
         if !item.is_substantial() {
@@ -396,7 +376,6 @@ where
                     result.push(' ')
                 }
             }
-            item_max_width = None;
         }
 
         if separate && sep_place.is_front() && !first {
@@ -425,35 +404,77 @@ where
 
         if tactic != DefinitiveListTactic::Horizontal && item.post_comment.is_some() {
             let comment = item.post_comment.as_ref().unwrap();
-            let overhead = last_line_width(&result) + first_line_width(comment.trim());
 
-            let rewrite_post_comment = |item_max_width: &mut Option<usize>| {
-                if item_max_width.is_none() && !last && !inner_item.contains('\n') {
-                    *item_max_width = Some(max_width_of_item_with_post_comment(
-                        &cloned_items,
-                        i,
-                        overhead,
-                        formatting.config.max_width(),
-                    ));
-                }
+            let rewrite_post_comment = || {
                 let overhead = if starts_with_newline(comment) {
                     0
-                } else if let Some(max_width) = *item_max_width {
-                    max_width + 2
                 } else {
-                    // 1 = space between item and comment.
-                    item_last_line_width + 1
+                    match formatting.config.post_comment_alignment() {
+                        PostCommentAlignment::SingleSpace => {
+                            // 1 = space between item and comment.
+                            item_last_line_width + 1
+                        }
+                        PostCommentAlignment::SameIndent => 3,
+                    }
                 };
                 let width = formatting.shape.width.checked_sub(overhead).unwrap_or(1);
                 let offset = formatting.shape.indent + overhead;
                 let comment_shape = Shape::legacy(width, offset);
 
+                fn is_block_comment_multiline_or_normalized(
+                    comment: &str,
+                    config: &Config,
+                ) -> bool {
+                    if comment.trim().contains('\n') {
+                        let style = crate::comment::comment_style(comment.trim_start(), false);
+                        style.is_block_comment()
+                    } else {
+                        let style = crate::comment::comment_style(
+                            comment.trim_start(),
+                            config.normalize_comments(),
+                        );
+                        style.is_block_comment()
+                    }
+                }
+
                 let block_style = if !formatting.ends_with_newline && last {
+                    // Does not end with a new line,
+                    // and is the last item. Ex. `a: usize, /* Hello */ }`
+                    // There is an item after the comment which means
+                    // this comment must be block style to preserve the code.
+                    // See test: `struct_lits_visual_multiline.rs`
                     true
                 } else if starts_with_newline(comment) {
+                    // If the comment starts with a newline,
+                    // it is a standalone comment and not a post comment.
                     false
+                } else if formatting.config.wrap_comments() {
+                    let longest_comment_length = comment
+                        .trim()
+                        .lines()
+                        .map(|line| unicode_str_width(line))
+                        .max()
+                        .unwrap_or(0);
+                    let line_length = match formatting.config.post_comment_alignment() {
+                        PostCommentAlignment::SingleSpace => {
+                            // line indentation
+                            // + alignment and length of current code line
+                            // + one space between
+                            // + length of current comment line
+                            indent_str_width + overhead + 1 + longest_comment_length
+                        }
+                        PostCommentAlignment::SameIndent => {
+                            // length of longest code line
+                            // + one space between
+                            // + length of longest comment line
+                            // + alignment
+                            item_max_width + 1 + longest_comment_length + overhead
+                        }
+                    };
+                    line_length > formatting.config.max_width()
+                        || is_block_comment_multiline_or_normalized(comment, formatting.config)
                 } else {
-                    comment.trim().contains('\n') || unicode_str_width(comment.trim()) > width
+                    is_block_comment_multiline_or_normalized(comment, formatting.config)
                 };
 
                 rewrite_comment(
@@ -464,47 +485,26 @@ where
                 )
             };
 
-            let mut formatted_comment = rewrite_post_comment(&mut item_max_width)?;
+            let formatted_comment = rewrite_post_comment()?;
 
             if !starts_with_newline(comment) {
-                if formatting.align_comments {
-                    let mut comment_alignment =
-                        post_comment_alignment(item_max_width, unicode_str_width(inner_item));
-                    if first_line_width(&formatted_comment)
-                        + last_line_width(&result)
-                        + comment_alignment
-                        + 1
-                        > formatting.config.max_width()
-                    {
-                        item_max_width = None;
-                        formatted_comment = rewrite_post_comment(&mut item_max_width)?;
-                        comment_alignment =
-                            post_comment_alignment(item_max_width, unicode_str_width(inner_item));
-                    }
-                    for _ in 0..=comment_alignment {
+                match formatting.config.post_comment_alignment() {
+                    PostCommentAlignment::SingleSpace => {
                         result.push(' ');
                     }
-                }
-                // An additional space for the missing trailing separator (or
-                // if we skipped alignment above).
-                if !formatting.align_comments
-                    || (last
-                        && item_max_width.is_some()
-                        && !separate
-                        && !formatting.separator.is_empty())
-                {
-                    result.push(' ');
+                    PostCommentAlignment::SameIndent => {
+                        let comment_alignment =
+                            post_comment_alignment(item_max_width, unicode_str_width(inner_item));
+                        for _ in 0..=comment_alignment {
+                            result.push(' ');
+                        }
+                    }
                 }
             } else {
                 result.push('\n');
                 result.push_str(indent_str);
             }
-            if formatted_comment.contains('\n') {
-                item_max_width = None;
-            }
             result.push_str(&formatted_comment);
-        } else {
-            item_max_width = None;
         }
 
         if formatting.preserve_newline
@@ -512,7 +512,6 @@ where
             && tactic == DefinitiveListTactic::Vertical
             && item.new_lines
         {
-            item_max_width = None;
             result.push('\n');
         }
 
@@ -523,41 +522,17 @@ where
     Ok(result)
 }
 
-fn max_width_of_item_with_post_comment<I, T>(
-    items: &I,
-    i: usize,
-    overhead: usize,
-    max_budget: usize,
-) -> usize
-where
-    I: IntoIterator<Item = T> + Clone,
-    T: AsRef<ListItem>,
-{
-    let mut max_width = 0;
-    let mut first = true;
-    for item in items.clone().into_iter().skip(i) {
-        let item = item.as_ref();
-        let inner_item_width = unicode_str_width(item.inner_as_ref());
-        if !first
-            && (item.is_different_group()
-                || item.post_comment.is_none()
-                || inner_item_width + overhead > max_budget)
-        {
-            return max_width;
-        }
-        if max_width < inner_item_width {
-            max_width = inner_item_width;
-        }
-        if item.new_lines {
-            return max_width;
-        }
-        first = false;
-    }
-    max_width
+fn max_width_of_item_with_post_comment<'a>(items: impl Iterator<Item = &'a ListItem>) -> usize {
+    items
+        .filter(|item| item.post_comment.is_some())
+        .filter_map(|item| item.inner_as_ref().lines().last())
+        .map(|item| unicode_str_width(item))
+        .max()
+        .unwrap_or(0)
 }
 
-fn post_comment_alignment(item_max_width: Option<usize>, inner_item_width: usize) -> usize {
-    item_max_width.unwrap_or(0).saturating_sub(inner_item_width)
+fn post_comment_alignment(item_max_width: usize, inner_item_width: usize) -> usize {
+    item_max_width.saturating_sub(inner_item_width)
 }
 
 pub(crate) struct ListItems<'a, I, F1, F2, F3>
@@ -944,7 +919,6 @@ pub(crate) fn struct_lit_formatting<'a>(
         ends_with_newline,
         preserve_newline: true,
         nested: false,
-        align_comments: true,
         config: context.config,
     }
 }
