@@ -62,9 +62,18 @@ impl<'a> Display for FormatReportFormatter<'a> {
                 if error.is_internal() {
                     title = title.id("internal");
                 }
+
+                let line_indicator = if let (_, 0) = error.format_len() {
+                    // When we have a zero width span we don't create an annotiation.
+                    // As a result, we need to manually add the line number where the error occured
+                    format!(":{}", error.line)
+                } else {
+                    String::new()
+                };
+
                 let snippet = Snippet::source(&error.line_buffer)
                     .line_start(error.line)
-                    .path(format!("{file}:{}", error.line))
+                    .path(format!("{file}{line_indicator}"))
                     .fold(false)
                     .annotations(annotation(error));
                 let mut group = title.element(snippet);
