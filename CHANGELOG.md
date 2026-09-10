@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- (Style Edition 2027) Properly format closures with wrapped parameters and an explicit return type instead of leaving the enclosing expression unformatted. Issue: [#7012](https://github.com/rust-lang/rustfmt/issues/7012).
+
 
 ## [1.10.0] 2026-07-21
 
