@@ -1764,6 +1764,10 @@ fn rewrite_ty<R: Rewrite>(
         result.push_str(&generics_str);
     }
 
+    // The bounds are written out here, so anything the `where` clause treats as a
+    // missing comment has to start after them, not after the generics.
+    let mut span_end_before_where = generics.span.hi();
+
     if let Some(bounds) = generic_bounds_opt {
         if !bounds.is_empty() {
             // 2 = `: `
@@ -1773,6 +1777,7 @@ fn rewrite_ty<R: Rewrite>(
                 .rewrite_result(context, shape)
                 .map(|s| format!(": {}", s))?;
             result.push_str(&type_bounds);
+            span_end_before_where = bounds.last().unwrap().span().hi();
         }
     }
 
@@ -1789,7 +1794,7 @@ fn rewrite_ty<R: Rewrite>(
         false,
         "=",
         None,
-        generics.span.hi(),
+        span_end_before_where,
         option,
     )?;
     result.push_str(&before_where_clause_str);
