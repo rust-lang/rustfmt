@@ -21,7 +21,11 @@ pub(crate) struct ListFormatting<'a> {
     separator: &'a str,
     trailing_separator: SeparatorTactic,
     separator_place: SeparatorPlace,
+    // The shape available to a list item, including any width reserved for its separator.
     shape: Shape,
+    // Overrides the item shape for pre-comments. The item shape may reserve space for a separator,
+    // which is not part of a preceding comment.
+    pre_comment_shape: Option<Shape>,
     // Non-expressions, e.g., items, will have a new line at the end of the list.
     // Important for comment styles.
     ends_with_newline: bool,
@@ -42,6 +46,7 @@ impl<'a> ListFormatting<'a> {
             trailing_separator: SeparatorTactic::Never,
             separator_place: SeparatorPlace::Back,
             shape,
+            pre_comment_shape: None,
             ends_with_newline: true,
             preserve_newline: false,
             nested: false,
@@ -67,6 +72,11 @@ impl<'a> ListFormatting<'a> {
 
     pub(crate) fn separator_place(mut self, separator_place: SeparatorPlace) -> Self {
         self.separator_place = separator_place;
+        self
+    }
+
+    pub(crate) fn pre_comment_shape(mut self, pre_comment_shape: Shape) -> Self {
+        self.pre_comment_shape = Some(pre_comment_shape);
         self
     }
 
@@ -366,8 +376,8 @@ where
             // Block style in non-vertical mode.
             let block_mode = tactic == DefinitiveListTactic::Horizontal;
             // Width restriction is only relevant in vertical mode.
-            let comment =
-                rewrite_comment(comment, block_mode, formatting.shape, formatting.config)?;
+            let comment_shape = formatting.pre_comment_shape.unwrap_or(formatting.shape);
+            let comment = rewrite_comment(comment, block_mode, comment_shape, formatting.config)?;
             result.push_str(&comment);
 
             if !inner_item.is_empty() {
@@ -941,6 +951,7 @@ pub(crate) fn struct_lit_formatting<'a>(
         },
         separator_place: SeparatorPlace::Back,
         shape,
+        pre_comment_shape: None,
         ends_with_newline,
         preserve_newline: true,
         nested: false,

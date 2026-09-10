@@ -214,6 +214,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
 ) -> Option<String> {
     // 1 = ","
     let item_shape = Shape::indented(offset, context.config).sub_width_opt(1)?;
+    let pre_comment_shape = Shape::indented(offset, context.config);
     let (mut field_prefix_max_width, field_prefix_min_width) =
         struct_field_prefix_max_min_width(context, fields, item_shape);
     let max_diff = field_prefix_max_width.saturating_sub(field_prefix_min_width);
@@ -265,6 +266,7 @@ fn rewrite_aligned_items_inner<T: AlignedItem>(
     let fmt = ListFormatting::new(item_shape, context.config)
         .tactic(tactic)
         .trailing_separator(separator_tactic)
+        .pre_comment_shape(pre_comment_shape)
         .preserve_newline(true);
     write_list(&items, &fmt).ok()
 }
