@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
@@ -367,7 +368,7 @@ impl Config {
             current = fs::canonicalize(current)?;
 
             loop {
-                match get_toml_path(&current) {
+                match get_toml_path(&current, &CONFIG_FILE_NAMES) {
                     Ok(Some(path)) => return Ok(Some(path)),
                     Err(e) => return Err(e),
                     _ => (),
@@ -381,7 +382,7 @@ impl Config {
 
             // If nothing was found, check in the home directory.
             if let Some(home_dir) = dirs::home_dir() {
-                if let Some(path) = get_toml_path(&home_dir)? {
+                if let Some(path) = get_toml_path(&home_dir, &CONFIG_FILE_NAMES)? {
                     return Ok(Some(path));
                 }
             }
@@ -389,7 +390,7 @@ impl Config {
             // If none was found there either, check in the user's configuration directory.
             if let Some(mut config_dir) = dirs::config_dir() {
                 config_dir.push("rustfmt");
-                if let Some(path) = get_toml_path(&config_dir)? {
+                if let Some(path) = get_toml_path(&config_dir, &CONFIG_FILE_NAMES)? {
                     return Ok(Some(path));
                 }
             }
@@ -494,10 +495,9 @@ pub fn load_config<O: CliOptions>(
 // Check for the presence of known config file names (`rustfmt.toml`, `.rustfmt.toml`) in `dir`
 //
 // Return the path if a config file exists, empty if no file exists, and Error for IO errors
-fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
-    const CONFIG_FILE_NAMES: [&str; 2] = [".rustfmt.toml", "rustfmt.toml"];
-    for config_file_name in &CONFIG_FILE_NAMES {
-        let config_file = dir.join(config_file_name);
+fn get_toml_path(dir: &Path, file_names: &[impl AsRef<OsStr>]) -> Result<Option<PathBuf>, Error> {
+    for config_file_name in file_names {
+        let config_file = dir.join(config_file_name.as_ref());
         match fs::metadata(&config_file) {
             // Only return if it's a file to handle the unlikely situation of a directory named
             // `rustfmt.toml`.
@@ -506,12 +506,10 @@ fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
             // `NotFound` => file not found
             // `NotADirectory` => rare case where expected directory is a file
             // Otherwise, return the error
-            Err(e) => {
-                if !matches!(e.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) {
-                    let ctx = format!("Failed to get metadata for config file {:?}", &config_file);
-                    let err = anyhow::Error::new(e).context(ctx);
-                    return Err(Error::new(ErrorKind::Other, err));
-                }
+            Err(e) if !matches!(e.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) => {
+                let ctx = format!("Failed to get metadata for config file {:?}", config_file);
+                let err = anyhow::Error::new(e).context(ctx);
+                return Err(Error::new(ErrorKind::Other, err));
             }
             _ => {}
         }
@@ -535,7 +533,7 @@ fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
     match options.config_path() {
         Some(path) if !path.exists() => config_path_not_found(path.to_str().unwrap()),
         Some(path) if path.is_dir() => {
-            let config_file_path = get_toml_path(path)?;
+            let config_file_path = get_toml_path(path, &CONFIG_FILE_NAMES)?;
             if config_file_path.is_some() {
                 Ok(config_file_path)
             } else {
@@ -549,6 +547,8 @@ fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
         None => Ok(None),
     }
 }
+
+const CONFIG_FILE_NAMES: [&str; 2] = [".rustfmt.toml", "rustfmt.toml"];
 
 #[cfg(test)]
 mod test {
