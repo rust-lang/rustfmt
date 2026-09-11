@@ -346,6 +346,59 @@ fn rustfmt_error_improvement_regarding_invalid_toml() {
 }
 
 #[test]
+fn config_path_walks_parent_directories_with_dir_name() {
+    let src_dir = "tests/config/issue_4660/inner_lib/src";
+    let src_file = src_dir.to_owned() + "/lib.rs";
+    let args = ["--config-path", src_dir, &src_file];
+    let (stdout, stderr) = rustfmt(&args);
+
+    assert_eq!(
+        stderr,
+        format!(
+            "Error: unable to find a config file for the given path: `{}`\n",
+            Path::new(src_dir).display(),
+        )
+    );
+    assert_eq!(stdout, "");
+}
+
+#[test]
+fn config_path_walks_parent_directories_with_toml_name() {
+    let toml_name = ".rustfmt.unstable.toml";
+    let src_name = "main.rs";
+    let src_dir = "tests/config/issue_4660/inner_bin/src";
+
+    let toml_file = [src_dir, toml_name].join("/");
+    let args = [
+        "--config-path",
+        &[src_dir, toml_name].join("/"),
+        &[src_dir, src_name].join("/"),
+    ];
+    let (stdout, stderr) = rustfmt(&args);
+
+    assert_eq!(
+        stderr,
+        format!(
+            "Error: unable to find a config file for the given path: `{}`\n",
+            Path::new(&toml_file).display(),
+        )
+    );
+    assert_eq!(stdout, "");
+
+    let args = ["--config-path", toml_name, src_name];
+    let (stdout, stderr) = rustfmt_with_extra(&args, Some(src_dir), &[]);
+
+    assert_eq!(
+        stderr,
+        format!(
+            "Error: unable to find a config file for the given path: `{}`\n",
+            Path::new(toml_name).display(),
+        )
+    );
+    assert_eq!(stdout, "");
+}
+
+#[test]
 fn rustfmt_allow_not_a_dir_errors() {
     // See also https://github.com/rust-lang/rustfmt/pull/6624
 
