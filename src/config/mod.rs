@@ -355,50 +355,7 @@ impl Config {
         style_edition: Option<StyleEdition>,
         version: Option<Version>,
     ) -> Result<(Config, Option<PathBuf>), Error> {
-        /// Try to find a project file in the given directory and its parents.
-        /// Returns the path of the nearest project file if one exists,
-        /// or `None` if no project file was found.
-        fn resolve_project_file(dir: &Path) -> Result<Option<PathBuf>, Error> {
-            let mut current = if dir.is_relative() {
-                env::current_dir()?.join(dir)
-            } else {
-                dir.to_path_buf()
-            };
-
-            current = fs::canonicalize(current)?;
-
-            loop {
-                match get_toml_path(&current, &CONFIG_FILE_NAMES) {
-                    Ok(Some(path)) => return Ok(Some(path)),
-                    Err(e) => return Err(e),
-                    _ => (),
-                }
-
-                // If the current directory has no parent, we're done searching.
-                if !current.pop() {
-                    break;
-                }
-            }
-
-            // If nothing was found, check in the home directory.
-            if let Some(home_dir) = dirs::home_dir() {
-                if let Some(path) = get_toml_path(&home_dir, &CONFIG_FILE_NAMES)? {
-                    return Ok(Some(path));
-                }
-            }
-
-            // If none was found there either, check in the user's configuration directory.
-            if let Some(mut config_dir) = dirs::config_dir() {
-                config_dir.push("rustfmt");
-                if let Some(path) = get_toml_path(&config_dir, &CONFIG_FILE_NAMES)? {
-                    return Ok(Some(path));
-                }
-            }
-
-            Ok(None)
-        }
-
-        match resolve_project_file(dir)? {
+        match resolve_project_file(dir, &CONFIG_FILE_NAMES, true)? {
             None => Ok((
                 Config::default_for_possible_style_edition(style_edition, edition, version),
                 None,
@@ -454,6 +411,57 @@ impl Config {
             }
         }
     }
+}
+
+/// Try to find a project file in the given directory and its parents.
+/// Returns the path of the nearest project file if one exists,
+/// or `None` if no project file was found.
+fn resolve_project_file(
+    dir: &Path,
+    file_names: &[impl AsRef<OsStr>],
+    user_dirs: bool,
+) -> Result<Option<PathBuf>, Error> {
+    let mut current = if dir.is_relative() {
+        env::current_dir()?.join(dir)
+    } else {
+        dir.to_path_buf()
+    };
+
+    current = fs::canonicalize(current)?;
+
+    loop {
+        match get_toml_path(&current, file_names) {
+            Ok(Some(path)) => return Ok(Some(path)),
+            Err(e) => return Err(e),
+            _ => (),
+        }
+
+        // If the current directory has no parent, we're done searching.
+        if !current.pop() {
+            break;
+        }
+    }
+
+    if !user_dirs {
+        return Ok(None);
+    }
+
+    // If nothing was found, check in the home directory.
+    if let Some(home_dir) = dirs::home_dir() {
+        if let Some(path) = get_toml_path(&home_dir, file_names)? {
+            return Ok(Some(path));
+        }
+    }
+
+    // If none was found there either, check in the user's configuration directory.
+    if let Some(mut config_dir) = dirs::config_dir() {
+        config_dir.push("rustfmt");
+        if let Some(path) = get_toml_path(&config_dir, file_names)? {
+            return Ok(Some(path));
+        }
+    }
+
+    Ok(None)
 }
 
 /// Loads a config by checking the client-supplied options and if appropriate, the
