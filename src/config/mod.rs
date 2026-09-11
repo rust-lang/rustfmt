@@ -539,19 +539,23 @@ fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
     // Read the config_path and convert to parent dir if a file is provided.
     // If a config file cannot be found from the given path, return error.
     match options.config_path() {
-        Some(path) if !path.exists() => config_path_not_found(path.to_str().unwrap()),
-        Some(path) if path.is_dir() => {
-            let config_file_path = get_toml_path(path, &CONFIG_FILE_NAMES)?;
+        Some(path) => {
+            let config_file_path =
+                if path.as_os_str().as_encoded_bytes().last() == Some(&b'/') || path.is_dir() {
+                    // If the path is a known directory, we interpret itself as the base directory.
+                    resolve_project_file(path, &CONFIG_FILE_NAMES, false)
+                } else if let Some((dir, file)) = path.parent().zip(path.file_name()) {
+                    // Otherwise, we search for the file's base name in its parent directory.
+                    resolve_project_file(dir, &[file], false)
+                } else {
+                    Ok(None)
+                }?;
             if config_file_path.is_some() {
                 Ok(config_file_path)
             } else {
                 config_path_not_found(path.to_str().unwrap())
             }
         }
-        Some(path) => Ok(Some(
-            // Canonicalize only after checking above that the `path.exists()`.
-            path.canonicalize()?,
-        )),
         None => Ok(None),
     }
 }
