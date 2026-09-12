@@ -1,0 +1,27 @@
+[alias]
+rustfmt-clippy = """
+clippy -- --no-deps
+--allow clippy::all
+--deny clippy::correctness
+--deny clippy::char_lit_as_u8
+--deny clippy::four_forward_slashes
+--deny clippy::non_minimal_cfg
+--deny clippy::print_literal
+--deny clippy::same_item_push
+--deny clippy::single_char_add_str
+--deny clippy::to_string_in_format_args
+--deny clippy::unconditional_recursion
+"""
+rustfmt-clippy-fix = """
+clippy --fix
+--allow clippy::all
+--deny clippy::correctness
+--deny clippy::char_lit_as_u8
+--deny clippy::four_forward_slashes
+--deny clippy::non_minimal_cfg
+--deny clippy::print_literal
+--deny clippy::same_item_push
+--deny clippy::single_char_add_str
+--deny clippy::to_string_in_format_args
+--deny clippy::unconditional_recursion
+"""
