@@ -69,3 +69,8 @@ insta = { version = "1.48.0", features = ["filters"] }
 [package.metadata.rust-analyzer]
 # This package uses #[feature(rustc_private)]
 rustc_private = true
+
+[lints.clippy]
+# Ensures that `cargo clippy` will never return any errors
+# See rustfmt-clippy alias in .cargo/config.toml for lints used for rustfmt development
+all = "allow"
