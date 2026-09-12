@@ -158,12 +158,6 @@ pub(crate) fn rewrite_chain(
     chain.rewrite_result(context, shape)
 }
 
-#[derive(Debug)]
-enum CommentPosition {
-    Back,
-    Top,
-}
-
 /// Information about an expression in a chain.
 struct SubExpr {
     expr: ast::Expr,
@@ -204,7 +198,10 @@ enum ChainItemKind {
     Await,
     Use,
     Yield,
-    Comment(String, CommentPosition),
+    /// A comment within a chain, e.g. `parent. item /* comment */.rest`.
+    /// The bool is whether this comment should be on the same line as the previous item in the
+    /// chain.
+    Comment(String, bool),
 }
 
 impl ChainItemKind {
@@ -341,9 +338,9 @@ impl ChainItem {
         ChainItem { kind, tries, span }
     }
 
-    fn comment(span: Span, comment: String, pos: CommentPosition) -> ChainItem {
+    fn comment(span: Span, comment: String, on_same_line: bool) -> ChainItem {
         ChainItem {
-            kind: ChainItemKind::Comment(comment, pos),
+            kind: ChainItemKind::Comment(comment, on_same_line),
             tries: 0,
             span,
         }
@@ -436,7 +433,7 @@ impl Chain {
                 children.push(ChainItem::comment(
                     post_comment_span,
                     trimmed_snippet.trim().to_owned(),
-                    CommentPosition::Back,
+                    true,
                 ));
                 *prev_span_end = post_comment_span.hi();
             }
@@ -475,7 +472,7 @@ impl Chain {
                         children.push(ChainItem::comment(
                             pre_comment_span,
                             pre_comment.to_owned(),
-                            CommentPosition::Top,
+                            false,
                         ));
                     }
                 }
@@ -838,8 +835,8 @@ impl<'a> ChainFormatterShared<'a> {
 
         for (rewrite, chain_item) in iter {
             match chain_item.kind {
-                ChainItemKind::Comment(_, CommentPosition::Back) => result.push(' '),
-                ChainItemKind::Comment(_, CommentPosition::Top) => result.push_str(&connector),
+                ChainItemKind::Comment(_, true) => result.push_str(" "),
+                ChainItemKind::Comment(_, false) => result.push_str(&connector),
                 _ => result.push_str(&connector),
             }
             result.push_str(rewrite);
