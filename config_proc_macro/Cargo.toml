@@ -21,3 +21,8 @@ serde = { version = "1.0.160", features = ["derive"] }
 [features]
 default = []
 debug-with-rustfmt = []
+
+[lints.clippy]
+# Ensures that `cargo clippy` will never return any errors
+# See rustfmt-clippy alias in .cargo/config.toml for lints used for rustfmt development
+all = "allow"

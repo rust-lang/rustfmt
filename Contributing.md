@@ -17,6 +17,22 @@ assistance when participating in `rust-lang/rustfmt`.
 
 [LLM usage policy]: https://forge.rust-lang.org/policies/llm-usage.html
 
+## Linting
+
+This project supports linting via
+[`clippy`](https://doc.rust-lang.org/stable/clippy/index.html). Due how to how
+this project is setup this is achieved through aliases:
+
+    # run `cargo clippy` on `rustfmt`
+    $ cargo rustfmt-clippy
+    # run `cargo clippy --fix` on `rustfmt`
+    $ cargo rustfmt-clippy-fix
+
+Linting is done per-package basis, so to lint a package outside of the root
+one you need to run from within the directory:
+
+    $ cd ./config_proc_macro
+    $ cargo rustfmt-clippy
 
 ## Test and file issues
 
