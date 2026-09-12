@@ -346,6 +346,46 @@ fn rustfmt_error_improvement_regarding_invalid_toml() {
 }
 
 #[test]
+fn config_path_walks_parent_directories_with_dir_name() {
+    let src_dir = "tests/config/issue_4660/inner_lib/src";
+    let src_file = src_dir.to_owned() + "/lib.rs";
+    let args = ["--config-path", src_dir, &src_file];
+    let (stdout, stderr) = rustfmt(&args);
+
+    assert_eq!(stderr, "");
+    // Due to `disable_all_formatting = true` in `tests/config/issue_4660/inner_lib/rustfmt.toml`,
+    // the source file should not be modified.
+    assert_eq!(stdout, "");
+}
+
+#[test]
+fn config_path_walks_parent_directories_with_toml_name() {
+    let toml_name = ".rustfmt.unstable.toml";
+    let src_name = "main.rs";
+    let src_dir = "tests/config/issue_4660/inner_bin/src";
+
+    let args = [
+        "--config-path",
+        &[src_dir, toml_name].join("/"),
+        &[src_dir, src_name].join("/"),
+    ];
+    let (stdout, stderr) = rustfmt(&args);
+
+    assert_eq!(stderr, "");
+    // Due to `disable_all_formatting = true` in `tests/config/issue_4660/inner_bin/.rustfmt.unstable.toml`,
+    // the source file should not be modified.
+    assert_eq!(stdout, "");
+
+    let args = ["--config-path", toml_name, src_name];
+    let (stdout, stderr) = rustfmt_with_extra(&args, Some(src_dir), &[]);
+
+    assert_eq!(stderr, "");
+    // Due to `disable_all_formatting = true` in `tests/config/issue_4660/inner_bin/.rustfmt.unstable.toml`,
+    // the source file should not be modified.
+    assert_eq!(stdout, "");
+}
+
+#[test]
 fn rustfmt_allow_not_a_dir_errors() {
     // See also https://github.com/rust-lang/rustfmt/pull/6624
 

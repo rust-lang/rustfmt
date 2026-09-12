@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Read};
 use std::path::{Path, PathBuf};
@@ -354,50 +355,7 @@ impl Config {
         style_edition: Option<StyleEdition>,
         version: Option<Version>,
     ) -> Result<(Config, Option<PathBuf>), Error> {
-        /// Try to find a project file in the given directory and its parents.
-        /// Returns the path of the nearest project file if one exists,
-        /// or `None` if no project file was found.
-        fn resolve_project_file(dir: &Path) -> Result<Option<PathBuf>, Error> {
-            let mut current = if dir.is_relative() {
-                env::current_dir()?.join(dir)
-            } else {
-                dir.to_path_buf()
-            };
-
-            current = fs::canonicalize(current)?;
-
-            loop {
-                match get_toml_path(&current) {
-                    Ok(Some(path)) => return Ok(Some(path)),
-                    Err(e) => return Err(e),
-                    _ => (),
-                }
-
-                // If the current directory has no parent, we're done searching.
-                if !current.pop() {
-                    break;
-                }
-            }
-
-            // If nothing was found, check in the home directory.
-            if let Some(home_dir) = dirs::home_dir() {
-                if let Some(path) = get_toml_path(&home_dir)? {
-                    return Ok(Some(path));
-                }
-            }
-
-            // If none was found there either, check in the user's configuration directory.
-            if let Some(mut config_dir) = dirs::config_dir() {
-                config_dir.push("rustfmt");
-                if let Some(path) = get_toml_path(&config_dir)? {
-                    return Ok(Some(path));
-                }
-            }
-
-            Ok(None)
-        }
-
-        match resolve_project_file(dir)? {
+        match resolve_project_file(dir, &CONFIG_FILE_NAMES, true)? {
             None => Ok((
                 Config::default_for_possible_style_edition(style_edition, edition, version),
                 None,
@@ -455,6 +413,57 @@ impl Config {
     }
 }
 
+/// Try to find a project file in the given directory and its parents.
+/// Returns the path of the nearest project file if one exists,
+/// or `None` if no project file was found.
+fn resolve_project_file(
+    dir: &Path,
+    file_names: &[impl AsRef<OsStr>],
+    user_dirs: bool,
+) -> Result<Option<PathBuf>, Error> {
+    let mut current = if dir.is_relative() {
+        env::current_dir()?.join(dir)
+    } else {
+        dir.to_path_buf()
+    };
+
+    current = fs::canonicalize(current)?;
+
+    loop {
+        match get_toml_path(&current, file_names) {
+            Ok(Some(path)) => return Ok(Some(path)),
+            Err(e) => return Err(e),
+            _ => (),
+        }
+
+        // If the current directory has no parent, we're done searching.
+        if !current.pop() {
+            break;
+        }
+    }
+
+    if !user_dirs {
+        return Ok(None);
+    }
+
+    // If nothing was found, check in the home directory.
+    if let Some(home_dir) = dirs::home_dir() {
+        if let Some(path) = get_toml_path(&home_dir, file_names)? {
+            return Ok(Some(path));
+        }
+    }
+
+    // If none was found there either, check in the user's configuration directory.
+    if let Some(mut config_dir) = dirs::config_dir() {
+        config_dir.push("rustfmt");
+        if let Some(path) = get_toml_path(&config_dir, file_names)? {
+            return Ok(Some(path));
+        }
+    }
+
+    Ok(None)
+}
+
 /// Loads a config by checking the client-supplied options and if appropriate, the
 /// file system (including searching the file system for overrides).
 pub fn load_config<O: CliOptions>(
@@ -494,10 +503,9 @@ pub fn load_config<O: CliOptions>(
 // Check for the presence of known config file names (`rustfmt.toml`, `.rustfmt.toml`) in `dir`
 //
 // Return the path if a config file exists, empty if no file exists, and Error for IO errors
-fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
-    const CONFIG_FILE_NAMES: [&str; 2] = [".rustfmt.toml", "rustfmt.toml"];
-    for config_file_name in &CONFIG_FILE_NAMES {
-        let config_file = dir.join(config_file_name);
+fn get_toml_path(dir: &Path, file_names: &[impl AsRef<OsStr>]) -> Result<Option<PathBuf>, Error> {
+    for config_file_name in file_names {
+        let config_file = dir.join(config_file_name.as_ref());
         match fs::metadata(&config_file) {
             // Only return if it's a file to handle the unlikely situation of a directory named
             // `rustfmt.toml`.
@@ -506,12 +514,10 @@ fn get_toml_path(dir: &Path) -> Result<Option<PathBuf>, Error> {
             // `NotFound` => file not found
             // `NotADirectory` => rare case where expected directory is a file
             // Otherwise, return the error
-            Err(e) => {
-                if !matches!(e.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) {
-                    let ctx = format!("Failed to get metadata for config file {:?}", &config_file);
-                    let err = anyhow::Error::new(e).context(ctx);
-                    return Err(Error::new(ErrorKind::Other, err));
-                }
+            Err(e) if !matches!(e.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) => {
+                let ctx = format!("Failed to get metadata for config file {:?}", config_file);
+                let err = anyhow::Error::new(e).context(ctx);
+                return Err(Error::new(ErrorKind::Other, err));
             }
             _ => {}
         }
@@ -533,22 +539,28 @@ fn config_path(options: &dyn CliOptions) -> Result<Option<PathBuf>, Error> {
     // Read the config_path and convert to parent dir if a file is provided.
     // If a config file cannot be found from the given path, return error.
     match options.config_path() {
-        Some(path) if !path.exists() => config_path_not_found(path.to_str().unwrap()),
-        Some(path) if path.is_dir() => {
-            let config_file_path = get_toml_path(path)?;
+        Some(path) => {
+            let config_file_path =
+                if path.as_os_str().as_encoded_bytes().last() == Some(&b'/') || path.is_dir() {
+                    // If the path is a known directory, we interpret itself as the base directory.
+                    resolve_project_file(path, &CONFIG_FILE_NAMES, false)
+                } else if let Some((dir, file)) = path.parent().zip(path.file_name()) {
+                    // Otherwise, we search for the file's base name in its parent directory.
+                    resolve_project_file(dir, &[file], false)
+                } else {
+                    Ok(None)
+                }?;
             if config_file_path.is_some() {
                 Ok(config_file_path)
             } else {
                 config_path_not_found(path.to_str().unwrap())
             }
         }
-        Some(path) => Ok(Some(
-            // Canonicalize only after checking above that the `path.exists()`.
-            path.canonicalize()?,
-        )),
         None => Ok(None),
     }
 }
+
+const CONFIG_FILE_NAMES: [&str; 2] = [".rustfmt.toml", "rustfmt.toml"];
 
 #[cfg(test)]
 mod test {
