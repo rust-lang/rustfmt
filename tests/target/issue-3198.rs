@@ -21,7 +21,7 @@ impl TestTrait {
 
     fn baz_post(
         self: X<'a, 'b>, /* Important comment1 */
-        a: i32,          /* Important comment2 */
+        a: i32, /* Important comment2 */
     ) {
     }
 
@@ -37,8 +37,8 @@ impl TestTrait {
 
     fn baz_tree_post(
         self: X<'a, 'b>, /* Important comment1 */
-        a: i32,          /* Important comment2 */
-        b: i32,          /* Important comment3 */
+        a: i32, /* Important comment2 */
+        b: i32, /* Important comment3 */
     ) {
     }
 

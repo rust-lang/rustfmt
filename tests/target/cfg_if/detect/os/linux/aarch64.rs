@@ -27,16 +27,16 @@ fn detect_features() -> cache::Initializer {
 ///
 /// [hwcap]: https://github.com/torvalds/linux/blob/master/arch/arm64/include/uapi/asm/hwcap.h
 struct AtHwcap {
-    fp: bool,    // 0
+    fp: bool, // 0
     asimd: bool, // 1
     // evtstrm: bool, // 2
-    aes: bool,     // 3
-    pmull: bool,   // 4
-    sha1: bool,    // 5
-    sha2: bool,    // 6
-    crc32: bool,   // 7
+    aes: bool, // 3
+    pmull: bool, // 4
+    sha1: bool, // 5
+    sha2: bool, // 6
+    crc32: bool, // 7
     atomics: bool, // 8
-    fphp: bool,    // 9
+    fphp: bool, // 9
     asimdhp: bool, // 10
     // cpuid: bool, // 11
     asimdrdm: bool, // 12
