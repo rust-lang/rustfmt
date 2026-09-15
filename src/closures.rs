@@ -348,7 +348,16 @@ fn rewrite_closure_fn_decl(
         prefix.push_str(&ret_str);
     }
     // 1 = space between `|...|` and body.
-    let extra_offset = last_line_width(&prefix) + 1;
+    let last_line = last_line_width(&prefix) + 1;
+    let extra_offset =
+        if prefix.contains('\n') && context.config.style_edition() >= StyleEdition::Edition2027 {
+            // The return type was pushed onto a line of its own, so `last_line_width` measures
+            // from column zero. Callers apply this offset on top of `shape`, so subtract the
+            // width already accounted for by `shape` to avoid counting the indent twice.
+            last_line.saturating_sub(shape.used_width())
+        } else {
+            last_line
+        };
 
     Ok((prefix, extra_offset))
 }
