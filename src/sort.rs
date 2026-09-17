@@ -155,7 +155,7 @@ pub(crate) fn version_sort(a: &str, b: &str) -> std::cmp::Ordering {
                         std::cmp::Ordering::Equal => {
                             continue;
                         }
-                        order @ _ => return order,
+                        order => return order,
                     }
                 }
                 (
@@ -182,7 +182,7 @@ pub(crate) fn version_sort(a: &str, b: &str) -> std::cmp::Ordering {
                         }
                         continue;
                     }
-                    order @ _ => return order,
+                    order => return order,
                 },
             },
         }
