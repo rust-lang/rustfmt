@@ -49,6 +49,13 @@ const FILE_SKIP_LIST: &[&str] = &[
     "cfg_mod/bar.rs",
     "cfg_mod/foo.rs",
     "cfg_mod/wasm32.rs",
+    // Empty and newline-only files cannot declare nightly-only 2027 style edition inline.
+    "empty_file_style_edition_2027.rs",
+    "newline_only_file_style_edition_2027.rs",
+    // These roots are tested with child traversal disabled by
+    // reorder_modules_style_edition_2027_tests.
+    "reorder_modules/disabled_style_edition_2027.rs",
+    "reorder_modules/enabled_style_edition_2027.rs",
     "skip/foo.rs",
 ];
 
@@ -528,6 +535,28 @@ fn self_tests() {
     assert_eq!(warnings, 0, "Rustfmt's code generated {warnings} warnings");
 }
 
+#[nightly_only_test]
+#[test]
+fn empty_files_style_edition_2027_tests() {
+    init_log();
+    run_test_with(&TestSetting::default(), || {
+        let files = vec![
+            PathBuf::from("tests/source/empty_file_style_edition_2027.rs"),
+            PathBuf::from("tests/source/newline_only_file_style_edition_2027.rs"),
+        ];
+        let config = Some(PathBuf::from(
+            "tests/config/empty_file_style_edition_2027.toml",
+        ));
+        let (_reports, count, fails) = check_files(files, &config);
+
+        println!("Ran {count} empty_files_style_edition_2027 tests.");
+        assert_eq!(
+            fails, 0,
+            "{fails} empty_files_style_edition_2027 tests failed"
+        );
+    });
+}
+
 #[test]
 fn format_files_find_new_files_via_cfg_if() {
     init_log();
@@ -602,6 +631,42 @@ fn format_files_find_new_files_via_cfg_select() {
             "Should have uncovered an extra file (format_me_please_x.rs) via lib.rs"
         );
         assert!(handle_result(write_result, None).is_ok());
+    });
+}
+
+#[nightly_only_test]
+#[test]
+fn reorder_modules_style_edition_2027_tests() {
+    init_log();
+    run_test_with(&TestSetting::default(), || {
+        let test_cases = [
+            (
+                "disabled_style_edition_2027.rs",
+                "tests/config/reorder_modules_disabled_style_edition_2027.toml",
+            ),
+            (
+                "enabled_style_edition_2027.rs",
+                "tests/config/reorder_modules_enabled_style_edition_2027.toml",
+            ),
+        ];
+        let mut count = 0;
+        let mut fails = 0;
+
+        for (test_file, config_file) in test_cases {
+            let files = vec![
+                PathBuf::from("tests/source/reorder_modules").join(test_file),
+                PathBuf::from("tests/target/reorder_modules").join(test_file),
+            ];
+            let (_, case_count, case_fails) = check_files(files, &Some(PathBuf::from(config_file)));
+            count += case_count;
+            fails += case_fails;
+        }
+
+        println!("Ran {count} reorder_modules_style_edition_2027 tests.");
+        assert_eq!(
+            fails, 0,
+            "{fails} reorder_modules_style_edition_2027 tests failed"
+        );
     });
 }
 
