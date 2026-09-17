@@ -12,3 +12,7 @@ fn documented_with_verylongtype() {
     // on the type when `wrap_comments = true`
 }
 
+/// So many stars ************************************************************************
+fn documented_with_many_stars() {
+    // # don't break consecutive punctuations
+}
