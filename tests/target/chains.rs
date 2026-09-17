@@ -304,3 +304,9 @@ fn issue_3034() {
     disallowed_headers.iter().any(|header| *header == name)
         || disallowed_header_prefixes.iter().any(|prefix| name.starts_with(prefix))
 }
+
+fn issue_6121() {
+    let _ = foo // some comment
+        .bar // some other comment
+        .buz;
+}
