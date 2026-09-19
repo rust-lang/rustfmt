@@ -348,10 +348,7 @@ fn is_valid_linebreak(input: &[&str], pos: usize) -> bool {
         return true;
     }
     let is_punctuation = is_punctuation(input[pos]);
-    if is_punctuation && !is_part_of_type(input, pos) {
-        return true;
-    }
-    false
+    is_punctuation && !is_part_of_type(input, pos)
 }
 
 fn is_part_of_type(input: &[&str], pos: usize) -> bool {

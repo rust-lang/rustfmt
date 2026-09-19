@@ -928,11 +928,7 @@ impl MacroArgParser {
             }
         }
 
-        if force_space_before(&self.start_tok.kind) {
-            return true;
-        }
-
-        false
+        force_space_before(&self.start_tok.kind)
     }
 
     /// Returns a collection of parsed macro def's arguments.
