@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: insert_final_newline must not be false
+
+root = true
+
+[*.rs]
+insert_final_newline = false

@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: Invalid value javascript-or-something-idk
+
+root = true
+
+[*.rs]
+charset = javascript-or-something-idk

@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: Invalid value mrrrp
+
+root = true
+
+[*.rs]
+tab_width = mrrrp

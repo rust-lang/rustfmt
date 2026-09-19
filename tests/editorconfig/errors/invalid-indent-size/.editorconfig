@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: Invalid value garbage
+
+root = true
+
+[*.rs]
+indent_size = garbage
