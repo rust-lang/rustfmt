@@ -50,6 +50,7 @@ impl<'a> FmtVisitor<'a> {
             None,
             Some(item.vis.clone()),
             Some(item.span.lo()),
+            Some(item.span.hi()),
             Some(item.attrs.clone()),
         )
         .rewrite_top_level(&self.get_context(), shape)
@@ -377,7 +378,33 @@ impl UseTree {
                     allow_extend,
                 )
             }
-            _ => Ok(use_str),
+            _ => {
+                let original = context.snippet(self.span);
+                let Some(comment_start) = original.find('/') else {
+                    return Ok(use_str);
+                };
+                let Some(comment_end) = original.rfind(';') else {
+                    return Ok(use_str);
+                };
+                let Some(semicolon) = use_str.rfind(';') else {
+                    return Ok(use_str);
+                };
+                if use_str[..semicolon].contains('/') {
+                    return Ok(use_str);
+                }
+                let comment_span = mk_sp(
+                    self.span.lo() + BytePos(comment_start as u32),
+                    self.span.lo() + BytePos(comment_end as u32),
+                );
+                combine_strs_with_missing_comments(
+                    context,
+                    &use_str[..semicolon],
+                    &use_str[semicolon..],
+                    comment_span,
+                    shape,
+                    false,
+                )
+            }
         }
     }
 
@@ -426,10 +453,11 @@ impl UseTree {
         list_item: Option<ListItem>,
         visibility: Option<ast::Visibility>,
         opt_lo: Option<BytePos>,
+        opt_hi: Option<BytePos>,
         attrs: Option<ast::AttrVec>,
     ) -> UseTree {
         let span = if let Some(lo) = opt_lo {
-            mk_sp(lo, a.hi_span().hi())
+            mk_sp(lo, opt_hi.unwrap_or_else(|| a.hi_span().hi()))
         } else {
             a.span()
         };
@@ -501,7 +529,7 @@ impl UseTree {
                     list.iter()
                         .zip(items)
                         .map(|(t, list_item)| {
-                            Self::from_ast(context, &t.0, Some(list_item), None, None, None)
+                            Self::from_ast(context, &t.0, Some(list_item), None, None, None, None)
                         })
                         .collect(),
                 );
