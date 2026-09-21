@@ -417,7 +417,8 @@ fn format_function_type(
         )
     };
     if output.is_empty()
-        || last_line_width(&args, context.config.tab_spaces()) + first_line_width(&output)
+        || last_line_width(&args, context.config.tab_spaces())
+            + first_line_width(&output, context.config.tab_spaces())
             <= shape.width
     {
         Ok(format!("{args}{output}"))
@@ -489,7 +490,7 @@ impl Rewrite for ast::WherePredicate {
         let pred_start = self.span.lo();
         let line_len = last_line_width(&attrs_str, context.config.tab_spaces())
             + 1
-            + first_line_width(&pred_str);
+            + first_line_width(&pred_str, context.config.tab_spaces());
         if let Some(last_attr) = self.attrs.last().filter(|last_attr| {
             contains_comment(context.snippet(mk_sp(last_attr.span.hi(), pred_start)))
         }) {

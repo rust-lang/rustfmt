@@ -2587,7 +2587,7 @@ fn rewrite_fn_base(
     } else {
         result.push_str(&param_str);
         let used_width = last_line_used_width(&result, indent.width(), context.config.tab_spaces())
-            + first_line_width(&ret_str);
+            + first_line_width(&ret_str, self.get_context().config.tab_spaces());
         // Put the closing brace on the next line if it overflows the max width.
         // 1 = `)`
         let closing_paren_overflow_max_width =

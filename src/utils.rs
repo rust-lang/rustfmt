@@ -255,8 +255,10 @@ pub(crate) fn is_attributes_extendable(attrs_str: &str) -> bool {
 
 /// The width of the first line in s.
 #[inline]
-pub(crate) fn first_line_width(s: &str) -> usize {
-    unicode_str_width(s.splitn(2, '\n').next().unwrap_or(""))
+pub(crate) fn first_line_width(s: &str, tab_spaces: usize) -> usize {
+    let first_line = s.splitn(2, '\n').next().unwrap_or("");
+    let (prefix_width, prefix_end) = get_prefix_space_width_and_end(first_line, tab_spaces);
+    prefix_width + unicode_str_width(&first_line[prefix_end..])
 }
 
 /// The width of the last line in s.
@@ -474,7 +476,7 @@ pub(crate) fn filtered_str_fits(
     let snippet = &filter_normal_code(snippet);
     if !snippet.is_empty() {
         // First line must fits with `shape.width`.
-        if first_line_width(snippet) > shape.width {
+        if first_line_width(snippet, tab_spaces) > shape.width {
             return false;
         }
         // If the snippet does not include newline, we are done.
@@ -778,6 +780,13 @@ pub(crate) fn unicode_str_width(s: &str) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn first_line_width_is_tab_aware() {
+        assert_eq!(first_line_width("\tfoo", 4), 7);
+        assert_eq!(first_line_width("  \tfoo", 8), 13);
+        assert_eq!(first_line_width("\tfoo\nbar", 4), 7);
+    }
 
     #[test]
     fn test_remove_trailing_white_spaces() {

@@ -782,7 +782,8 @@ impl<'a> ChainFormatterShared<'a> {
                     // 1. The entire chain fits in a single line except the last child.
                     // 2. `last_child_str.lines().count() >= 5`.
                     let line_count = rw.lines().count();
-                    let could_fit_single_line = first_line_width(&rw) <= one_line_budget;
+                    let could_fit_single_line =
+                        first_line_width(&rw, context.config.tab_spaces()) <= one_line_budget;
                     if could_fit_single_line && line_count >= 5 {
                         last_subexpr_str = Some(rw);
                         self.fits_single_line = all_in_one_line;

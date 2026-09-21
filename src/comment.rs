@@ -175,7 +175,7 @@ pub(crate) fn combine_strs_with_missing_comments(
             " "
         };
     let mut one_line_width = last_line_width(prev_str, context.config.tab_spaces())
-        + first_line_width(next_str)
+        + first_line_width(next_str, context.config.tab_spaces())
         + first_sep.len();
 
     let config = context.config;
@@ -209,7 +209,7 @@ pub(crate) fn combine_strs_with_missing_comments(
         Cow::from("")
     } else {
         let one_line_width = last_line_width(prev_str, context.config.tab_spaces())
-            + first_line_width(&missing_comment)
+            + first_line_width(&missing_comment, context.config.tab_spaces())
             + 1;
         if prefer_same_line && one_line_width <= shape.width {
             Cow::from(" ")

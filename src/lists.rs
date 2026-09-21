@@ -426,7 +426,7 @@ where
         if tactic != DefinitiveListTactic::Horizontal && item.post_comment.is_some() {
             let comment = item.post_comment.as_ref().unwrap();
             let overhead = last_line_width(&result, formatting.config.tab_spaces())
-                + first_line_width(comment.trim());
+                + first_line_width(comment.trim(), formatting.config.tab_spaces());
 
             let rewrite_post_comment = |item_max_width: &mut Option<usize>| {
                 if item_max_width.is_none() && !last && !inner_item.contains('\n') {
@@ -471,7 +471,7 @@ where
                 if formatting.align_comments {
                     let mut comment_alignment =
                         post_comment_alignment(item_max_width, unicode_str_width(inner_item));
-                    if first_line_width(&formatted_comment)
+                    if first_line_width(&formatted_comment, formatting.config.tab_spaces())
                         + last_line_width(&result, formatting.config.tab_spaces())
                         + comment_alignment
                         + 1

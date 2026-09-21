@@ -553,7 +553,9 @@ pub(crate) fn rewrite_match_body(
         {
             combine_next_line_body(next_line_str)
         }
-        (Ok(ref orig_str), _) if extend && first_line_width(orig_str) <= orig_budget => {
+        (Ok(ref orig_str), _)
+            if extend && first_line_width(orig_str, context.config.tab_spaces()) <= orig_budget =>
+        {
             combine_orig_body(orig_str)
         }
         (Ok(ref orig_str), Ok(ref next_line_str)) if orig_str.contains('\n') => {

@@ -684,7 +684,7 @@ impl<'a> Context<'a> {
         let extend_width = if items_str.is_empty() {
             2
         } else {
-            first_line_width(items_str) + 1
+            first_line_width(items_str, self.context.config.tab_spaces()) + 1
         };
         let nested_indent_str = self
             .nested_shape

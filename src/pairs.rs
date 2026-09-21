@@ -91,7 +91,7 @@ fn rewrite_pairs_one_line<T: Rewrite>(
     let last_rewrite = last.rewrite(context, cur_shape)?;
     result.push_str(&last_rewrite);
 
-    if first_line_width(&result) > shape.width {
+    if first_line_width(&result, context.config.tab_spaces()) > shape.width {
         return None;
     }
 
@@ -218,7 +218,7 @@ where
         if !rhs_result.contains('\n') || allow_same_line {
             let one_line_width = last_line_width(&lhs_result, tab_spaces)
                 + pp.infix.len()
-                + first_line_width(rhs_result)
+                + first_line_width(rhs_result, context.config.tab_spaces())
                 + pp.suffix.len();
             if one_line_width <= shape.width {
                 return Ok(format!(
