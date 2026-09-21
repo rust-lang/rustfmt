@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### Added
+- rustfmt now has unstable support for [.editorconfig](https://editorconfig.org/), enabled with `--unstable-features --use-editorconfig`.
+  The following `.editorconfig` options are respected when applied to Rust source files:
+
+  ```ini
+  [*.rs]
+  # These three options cannot be modified, as they do not have corresponding rustfmt options.
+  # If they are present at all, they are required to take on certain values:
+  # Required to be utf-8 or utf-8-bom.
+  charset = utf-8
+  # Required to be true.
+  trim_trailing_whitespace = true
+  # Required to be true.
+  insert_final_newline = true
+
+  # These options correspond to existing stable rustfmt options.
+  # Corresponds to hard_tabs (spaces => false, tabs => true).
+  indent_style = spaces
+  # Corresponds to tab_spaces.
+  indent_size = 3
+  # Alternatively, this combination sets tab_spaces via tab_width:
+  indent_size = tab
+  tab_width = 3
+  # Corresponds to newline_style (lf => "unix", crlf => "windows", cr is unsupported).
+  newline_style = lf
+  # Corresponds to max_width.
+  max_line_len = 100
+  ```
+
+  Note that only the configuration for the entry point (e.g. `main.rs`, `lib.rs`, or integration tests) is respected, but not for child modules.
+  Use a `[*.rs]` section in your .editorconfig to avoid surprises.
+  There is no dedicated support in `cargo-fmt`; use `cargo fmt -- --unstable-features --use-editorconfig` to pass the option through to rustfmt.
 
 ## [1.10.0] 2026-07-21
 
