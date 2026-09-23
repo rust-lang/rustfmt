@@ -290,10 +290,23 @@ fn rewrite_match_arm(
             if is_unsafe_block(block)
                 && context.config.style_edition() >= StyleEdition::Edition2027 =>
         {
-            // 12 = ` => unsafe {`
-            shape
-                .sub_width(12, arm.span)?
-                .offset_left(pipe_offset, arm.span)?
+            let is_empty_block = is_empty_block(
+                context,
+                block,
+                Some(&arm.body.as_ref().unknown_error()?.attrs),
+            );
+
+            if is_empty_block {
+                // 13 = ` => unsafe {}`
+                shape
+                    .sub_width(13, arm.span)?
+                    .offset_left(pipe_offset, arm.span)?
+            } else {
+                // 12 = ` => unsafe {`
+                shape
+                    .sub_width(12, arm.span)?
+                    .offset_left(pipe_offset, arm.span)?
+            }
         }
         _ => {
             // 5 = ` => {`
