@@ -1,6 +1,6 @@
-use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
+use std::{borrow::Cow, vec};
 
 use core::hash::{Hash, Hasher};
 
@@ -130,7 +130,13 @@ pub(crate) struct UseTree {
 
 impl PartialEq for UseTree {
     fn eq(&self, other: &UseTree) -> bool {
+        // We bail out attributes because we cannot safely merge attributes.
+        // We bail out comments because we cannot safely merge comments.
         self.path == other.path
+            && !self.has_attrs()
+            && !other.has_attrs()
+            && !self.has_comment()
+            && !other.has_comment()
     }
 }
 impl Eq for UseTree {}
@@ -233,13 +239,19 @@ pub(crate) fn normalize_use_trees_with_granularity(
 
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
-        if use_tree.contains_comment() || use_tree.attrs.is_some() {
+        if use_tree.contains_comment() || use_tree.has_attrs_disallow_outer_style() {
             result.push(use_tree);
             continue;
         }
+        let attrs = use_tree.attrs.clone();
+        let result_buf = if attrs.is_some() {
+            &mut vec![]
+        } else {
+            &mut result
+        };
 
         for mut flattened in use_tree.flatten(import_granularity) {
-            if let Some(tree) = result
+            if let Some(tree) = result_buf
                 .iter_mut()
                 .find(|tree| tree.share_prefix(&flattened, merge_by))
             {
@@ -249,8 +261,18 @@ pub(crate) fn normalize_use_trees_with_granularity(
                 if merge_by == SharedPrefix::Module {
                     flattened = flattened.nest_trailing_self();
                 }
-                result.push(flattened);
+                result_buf.push(flattened);
             }
+        }
+        if let Some(attrs) = attrs {
+            let result_buf: Vec<_> = result_buf
+                .drain(..)
+                .map(|mut use_tree| {
+                    use_tree.attrs = Some(attrs.clone());
+                    use_tree
+                })
+                .collect();
+            result.extend(result_buf);
         }
     }
     result
@@ -386,11 +408,11 @@ impl UseTree {
     // use-statements. This should not be a problem, though, since we have
     // already tried to extract comment and observed that there are no comment
     // around the given use item, and the span will not be used afterward.
-    fn from_path(path: Vec<UseSegment>, span: Span) -> UseTree {
+    fn from_path(path: Vec<UseSegment>, span: Span, list_item: Option<ListItem>) -> UseTree {
         UseTree {
             path,
             span,
-            list_item: None,
+            list_item,
             visibility: None,
             attrs: None,
         }
@@ -559,7 +581,7 @@ impl UseTree {
 
         // Remove foo::{} or self without attributes.
         match last.kind {
-            _ if self.attrs.is_some() => (),
+            _ if self.has_attrs() => (),
             UseSegmentKind::List(ref list) if list.is_empty() => {
                 self.path = vec![];
                 return self;
@@ -657,6 +679,17 @@ impl UseTree {
         self.has_comment() || self.path.iter().any(|path| path.contains_comment())
     }
 
+    fn has_attrs(&self) -> bool {
+        self.attrs.is_some()
+    }
+
+    fn has_attrs_disallow_outer_style(&self) -> bool {
+        !self.attrs.iter().flatten().all(|attr| match &attr.kind {
+            ast::AttrKind::Normal(attr) => attr.item.is_valid_for_outer_style(),
+            ast::AttrKind::DocComment(..) => false,
+        })
+    }
+
     fn same_visibility(&self, other: &UseTree) -> bool {
         match (&self.visibility, &other.visibility) {
             (
@@ -682,7 +715,8 @@ impl UseTree {
     fn share_prefix(&self, other: &UseTree, shared_prefix: SharedPrefix) -> bool {
         if self.path.is_empty()
             || other.path.is_empty()
-            || self.attrs.is_some()
+            || self.has_attrs()
+            || other.has_attrs()
             || self.contains_comment()
             || !self.same_visibility(other)
         {
@@ -696,8 +730,10 @@ impl UseTree {
         }
     }
 
+    /// The main tree-flattening process.
     fn flatten(self, import_granularity: ImportGranularity) -> Vec<UseTree> {
-        if self.path.is_empty() || self.contains_comment() {
+        if self.path.is_empty() || self.contains_comment() || self.has_attrs_disallow_outer_style()
+        {
             return vec![self];
         }
         match &self.path.clone().last().unwrap().kind {
@@ -716,7 +752,7 @@ impl UseTree {
                         result.push(UseTree {
                             path: new_path,
                             span: self.span,
-                            list_item: None,
+                            list_item: flattened.list_item.clone(),
                             visibility: self.visibility.clone(),
                             // only retain attributes for `ImportGranularity::Item`
                             attrs: match import_granularity {
@@ -758,7 +794,11 @@ impl UseTree {
         {
             let self_segment = self.path.pop().unwrap();
             let style_edition = self_segment.style_edition;
-            let kind = UseSegmentKind::List(vec![UseTree::from_path(vec![self_segment], DUMMY_SP)]);
+            let kind = UseSegmentKind::List(vec![UseTree::from_path(
+                vec![self_segment],
+                DUMMY_SP,
+                self.list_item.clone(),
+            )]);
             self.path.push(UseSegment {
                 kind,
                 style_edition,
@@ -783,7 +823,7 @@ fn merge_rest(
             let mut list = list.clone();
             merge_use_trees_inner(
                 &mut list,
-                UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
+                UseTree::from_path(b[len..].to_vec(), DUMMY_SP, None),
                 merge_by,
             );
             let mut new_path = b[..len].to_vec();
@@ -808,6 +848,7 @@ fn merge_rest(
                 style_edition,
             }],
             DUMMY_SP,
+            None,
         )];
         match rest {
             [
@@ -816,7 +857,7 @@ fn merge_rest(
                     ..
                 },
             ] => list.extend(rest_list.clone()),
-            _ => list.push(UseTree::from_path(rest.to_vec(), DUMMY_SP)),
+            _ => list.push(UseTree::from_path(rest.to_vec(), DUMMY_SP, None)),
         }
         return Some(vec![
             b[0].clone(),
@@ -829,8 +870,8 @@ fn merge_rest(
         len -= 1;
     }
     let mut list = vec![
-        UseTree::from_path(a[len..].to_vec(), DUMMY_SP),
-        UseTree::from_path(b[len..].to_vec(), DUMMY_SP),
+        UseTree::from_path(a[len..].to_vec(), DUMMY_SP, None),
+        UseTree::from_path(b[len..].to_vec(), DUMMY_SP, None),
     ];
     list.sort();
     list.dedup();
