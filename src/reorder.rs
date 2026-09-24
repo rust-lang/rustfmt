@@ -137,7 +137,31 @@ fn rewrite_reorderable_or_regroupable_items(
             };
 
             if context.config.reorder_imports() {
-                regrouped_items.iter_mut().for_each(|items| items.sort())
+                if context.config.group_imports() == GroupImportsTactic::StdExternalCrate {
+                    // Sort the first group by core -> alloc -> std.
+                    regrouped_items[0].sort_by(|a, b| {
+                        if let (UseSegmentKind::Ident(a_id, _), UseSegmentKind::Ident(b_id, _)) =
+                            (&a.path[0].kind, &b.path[0].kind)
+                        {
+                            match (a_id.as_ref(), b_id.as_ref()) {
+                                ("core", "alloc") | ("core", "std") | ("alloc", "std") => {
+                                    return Ordering::Less;
+                                }
+                                ("alloc", "core") | ("std", "core") | ("std", "alloc") => {
+                                    return Ordering::Greater;
+                                }
+                                _ => {}
+                            }
+                        }
+                        a.cmp(b)
+                    });
+                    regrouped_items
+                        .iter_mut()
+                        .skip(1)
+                        .for_each(|items| items.sort());
+                } else {
+                    regrouped_items.iter_mut().for_each(|items| items.sort());
+                }
             }
 
             // 4 = "use ", 1 = ";"
