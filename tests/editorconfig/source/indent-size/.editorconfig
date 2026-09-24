@@ -1,0 +1,4 @@
+root = true
+
+[*.rs]
+indent_size = 7

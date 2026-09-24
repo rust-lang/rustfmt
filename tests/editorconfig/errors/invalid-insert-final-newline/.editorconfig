@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: Invalid value *biscuits*
+
+root = true
+
+[*.rs]
+insert_final_newline = *biscuits*

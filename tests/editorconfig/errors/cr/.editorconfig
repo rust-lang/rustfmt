@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: 'end_of_line=cr' is not supported
+
+root = true
+
+[*.rs]
+end_of_line = cr

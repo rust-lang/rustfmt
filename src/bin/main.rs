@@ -192,6 +192,11 @@ fn make_opts() -> Options {
             "skip-children",
             "Don't reformat child modules (unstable).",
         );
+        opts.optflag(
+            "",
+            "use-editorconfig",
+            "Respect .editorconfig settings for Rust source files.",
+        );
     }
 
     opts.optflag("v", "verbose", "Print verbose output");
@@ -255,7 +260,7 @@ fn execute(opts: &Options) -> Result<i32> {
             let file = PathBuf::from(path);
             let file = file.canonicalize().unwrap_or(file);
 
-            let (config, _) = load_config(Some(file.parent().unwrap()), Some(options))?;
+            let (config, _) = load_config(Some(&file), Some(options))?;
             let toml = config.all_options().to_toml()?;
             io::stdout().write_all(toml.as_bytes())?;
 
@@ -349,8 +354,7 @@ fn format(
         } else {
             // Check the file directory if the config-path could not be read or not provided
             if config_path.is_none() {
-                let (local_config, config_path) =
-                    load_config(Some(file.parent().unwrap()), Some(options.clone()))?;
+                let (local_config, config_path) = load_config(Some(&file), Some(options.clone()))?;
                 if local_config.verbose() == Verbosity::Verbose {
                     if let Some(path) = config_path {
                         println!(
@@ -531,6 +535,7 @@ struct GetOptsOptions {
     quiet: bool,
     verbose: bool,
     config_path: Option<PathBuf>,
+    use_editorconfig: bool,
     inline_config: HashMap<String, String>,
     emit_mode: Option<EmitMode>,
     backup: bool,
@@ -568,6 +573,9 @@ impl GetOptsOptions {
                 if let Some(ref file_lines) = matches.opt_str("file-lines") {
                     options.file_lines = file_lines.parse()?;
                 }
+                if matches.opt_present("use-editorconfig") {
+                    options.use_editorconfig = true;
+                }
             } else {
                 let mut unstable_options = vec![];
                 if matches.opt_present("skip-children") {
@@ -578,6 +586,9 @@ impl GetOptsOptions {
                 }
                 if matches.opt_present("file-lines") {
                     unstable_options.push("`--file-lines`");
+                }
+                if matches.opt_present("use-editorconfig") {
+                    unstable_options.push("`--use-editorconfig`");
                 }
                 if !unstable_options.is_empty() {
                     let s = if unstable_options.len() == 1 { "" } else { "s" };
@@ -765,6 +776,10 @@ impl CliOptions for GetOptsOptions {
             .get("version")
             .map(|version| Version::from_str(version).ok())
             .flatten()
+    }
+
+    fn use_editorconfig(&self) -> bool {
+        self.unstable_features && self.use_editorconfig
     }
 }
 

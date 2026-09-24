@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: Invalid value *paws*
+
+root = true
+
+[*.rs]
+trim_trailing_whitespace = *paws*

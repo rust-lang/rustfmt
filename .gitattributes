@@ -5,3 +5,4 @@ tests/source/configs/enum_discrim_align_threshold/40.rs -text
 tests/target/issue-3494/crlf.rs -text
 tests/target/comment_crlf_newline.rs -text
 tests/target/configs/enum_discrim_align_threshold/40.rs -text
+tests/editorconfig/target/eol-crlf/main.rs -text
