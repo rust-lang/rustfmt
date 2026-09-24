@@ -4,6 +4,7 @@ macro_rules! m {
     () => ();
     ( $ x : ident ) => ();
     ( $ m1 : ident , $ m2 : ident , $ x : ident ) => ();
+    ( $ m1 : ident , $ m2 : ident , $ x : ident , ) => ();
     ( $($beginning:ident),*;$middle:ident;$($end:ident),* ) => ();
     ( $($beginning: ident),*; $middle: ident; $($end: ident),*; $($beginning: ident),*; $middle: ident; $($end: ident),* ) => {};
     ( $ name : ident ( $ ( $ dol : tt $ var : ident ) * ) $ ( $ body : tt ) * ) => ();
