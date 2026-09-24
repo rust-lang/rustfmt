@@ -1,12 +1,10 @@
 // rustfmt-imports_granularity: One
 
-pub use foo::{x, x as x2, y};
 use {
     bar::{
         a,
-        b::{self, f, f as f2, g},
-        c,
-        d::{e, e as e2},
+        b::{self as B, f},
     },
+    baz::{c as x, c as y},
     qux::{h, i, i as j},
 };
