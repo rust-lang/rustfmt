@@ -21,6 +21,17 @@ fn build_parser<'a>(context: &RewriteContext<'a>, tokens: TokenStream) -> Parser
     build_stream_parser(context.psess.inner(), tokens)
 }
 
+fn starts_with_ref_lifetime(parser: &Parser<'_>) -> bool {
+    let mut offset = 0;
+    while matches!(
+        parser.look_ahead(offset, |token| token.kind),
+        TokenKind::And | TokenKind::AndAnd
+    ) {
+        offset += 1;
+    }
+    offset > 0 && parser.look_ahead(offset, |token| token.is_lifetime())
+}
+
 fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
     macro_rules! parse_macro_arg {
         ($macro_arg:ident, $nt_kind:expr, $try_parse:expr, $then:expr) => {
@@ -59,12 +70,14 @@ fn parse_macro_arg<'a, 'b: 'a>(parser: &'a mut Parser<'b>) -> Option<MacroArg> {
         |parser: &mut Parser<'b>| parser.parse_ty(),
         |x: Box<ast::Ty>| Some(x)
     );
-    parse_macro_arg!(
-        Pat,
-        NonterminalKind::Pat(PatParam { inferred: false }),
-        |parser: &mut Parser<'b>| parser.parse_pat_no_top_alt(None, None),
-        |x: ast::Pat| Some(Box::new(x))
-    );
+    if !starts_with_ref_lifetime(parser) {
+        parse_macro_arg!(
+            Pat,
+            NonterminalKind::Pat(PatParam { inferred: false }),
+            |parser: &mut Parser<'b>| parser.parse_pat_no_top_alt(None, None),
+            |x: ast::Pat| Some(Box::new(x))
+        );
+    }
     // `parse_item` returns `Option<Box<ast::Item>>`.
     parse_macro_arg!(
         Item,
