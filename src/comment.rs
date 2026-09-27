@@ -141,9 +141,18 @@ pub(crate) fn comment_style(orig: &str, normalize_comments: bool) -> CommentStyl
     }
 }
 
-/// Returns true if the last line of the passed string finishes with a block-comment.
+/// Returns true if the last non-whitespace character finishes a block comment.
+///
+/// Uses `CharClasses` so a line comment that merely ends with the characters
+/// `*/` (e.g. `// ends with */`) is not treated as a block comment.
 pub(crate) fn is_last_comment_block(s: &str) -> bool {
-    s.trim_end().ends_with("*/")
+    let mut last_non_ws = None;
+    for (kind, c) in CharClasses::new(s.chars()) {
+        if !c.is_whitespace() {
+            last_non_ws = Some((kind, c));
+        }
+    }
+    matches!(last_non_ws, Some((FullCodeCharKind::EndComment, '/')))
 }
 
 /// Combine `prev_str` and `next_str` into a single `String`. `span` may contain
@@ -2183,5 +2192,29 @@ fn main() {
                 "The following line shouldn't be classified as a list item: {line}"
             );
         }
+    }
+
+    #[test]
+    fn test_is_last_comment_block() {
+        assert!(is_last_comment_block("/* block */"));
+        assert!(is_last_comment_block("/* multiline
+comment */"));
+        assert!(is_last_comment_block("// line
+/* block */"));
+        assert!(is_last_comment_block("/* block */
+   "));
+        assert!(is_last_comment_block("use std; /* block */"));
+
+        assert!(!is_last_comment_block("/* block */ use std;"));
+        assert!(!is_last_comment_block("// line"));
+        assert!(!is_last_comment_block("// comment ending in */"));
+        assert!(!is_last_comment_block("// first
+// second */"));
+        assert!(!is_last_comment_block("/* block */
+// line"));
+        assert!(!is_last_comment_block("\"/* string */\""));
+        assert!(!is_last_comment_block(""));
+        assert!(!is_last_comment_block("   
+  "));
     }
 }

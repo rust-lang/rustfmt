@@ -12,7 +12,10 @@ use rustc_span::{
     symbol::{self, sym},
 };
 
-use crate::comment::combine_strs_with_missing_comments;
+use crate::comment::{
+    FindUncommented, combine_strs_with_missing_comments, contains_comment,
+    is_last_comment_block, rewrite_missing_comment,
+};
 use crate::config::ImportGranularity;
 use crate::config::lists::*;
 use crate::config::{Edition, IndentStyle, StyleEdition};
@@ -24,7 +27,9 @@ use crate::shape::Shape;
 use crate::sort::version_sort;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
-use crate::utils::{is_same_visibility, mk_sp, rewrite_ident};
+use crate::utils::{
+    first_line_width, is_same_visibility, last_line_width, mk_sp, rewrite_ident,
+};
 use crate::visitor::FmtVisitor;
 
 /// Returns a name imported by a `use` declaration.
@@ -346,11 +351,76 @@ impl UseTree {
         });
         let use_str = self
             .rewrite_result(context, shape.offset_left(vis.len(), self.span())?)
-            .map(|s| {
+            .and_then(|s| {
                 if s.is_empty() {
-                    s
+                    return Ok(s);
+                }
+
+                let lhs = format!("{vis}use {s}");
+                // Merged/flattened trees are rebuilt with DUMMY_SP and have no
+                // trailing source text to scan for comments.
+                if self.span == DUMMY_SP || self.has_comment() {
+                    return Ok(format!("{lhs};"));
+                }
+
+                let lo = self.span.hi();
+                let Some(snippet) = context
+                    .snippet_provider
+                    .span_to_snippet(mk_sp(lo, context.snippet_provider.end_pos()))
+                else {
+                    return Ok(format!("{lhs};"));
+                };
+
+                let Some(semi_offset) = snippet.find_uncommented(";") else {
+                    return Ok(format!("{lhs};"));
+                };
+
+                let between = &snippet[..semi_offset];
+                if !contains_comment(between) {
+                    return Ok(format!("{lhs};"));
+                }
+
+                let span = mk_sp(lo, lo + BytePos(semi_offset as u32));
+                let comment = rewrite_missing_comment(span, shape, context)?;
+                if comment.is_empty() {
+                    return Ok(format!("{lhs};"));
+                }
+
+                let indent = shape.indent.to_string(context.config);
+                let is_block = is_last_comment_block(&comment);
+
+                // Keep the comment where it was written relative to the path:
+                // same line if it started on the same line, otherwise below.
+                let prefer_same_line = if let Some(pos) = between.find('/') {
+                    !between[..pos].contains('\n')
                 } else {
-                    format!("{}use {};", vis, s)
+                    !between.contains('\n')
+                };
+
+                let lhs_last_width = if lhs.contains('\n') {
+                    last_line_width(&lhs, context.config.tab_spaces())
+                } else {
+                    shape.indent.width() + lhs.len()
+                };
+                // Block comments can share a line with the trailing `;`.
+                let semi_len = if is_block && !comment.contains('\n') {
+                    1
+                } else {
+                    0
+                };
+                let one_line_width = lhs_last_width + 1 + first_line_width(&comment) + semi_len;
+
+                let sep = if prefer_same_line && one_line_width <= context.config.max_width() {
+                    " ".to_string()
+                } else {
+                    format!("\n{indent}")
+                };
+
+                if is_block {
+                    Ok(format!("{lhs}{sep}{comment};"))
+                } else {
+                    // Line comments must keep `;` on the following line.
+                    Ok(format!("{lhs}{sep}{comment}\n{indent};"))
                 }
             })?;
         match self.attrs {
