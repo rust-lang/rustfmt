@@ -544,7 +544,14 @@ impl Chain {
     fn convert_try(expr: &ast::Expr, context: &RewriteContext<'_>) -> ast::Expr {
         match &expr.kind {
             ast::ExprKind::MacCall(mac) if context.config.use_try_shorthand() => {
-                convert_try_mac(mac, context).unwrap_or(expr.clone())
+                convert_try_mac(mac, context)
+                    .map(|mut converted| {
+                        if let ast::ExprKind::Try(inner) = &mut converted.kind {
+                            inner.span = inner.span.with_hi(mac.args.dspan.close.hi());
+                        }
+                        converted
+                    })
+                    .unwrap_or(expr.clone())
             }
             _ => expr.clone(),
         }

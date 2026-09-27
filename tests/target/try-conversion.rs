@@ -26,3 +26,8 @@ fn issue1291() {
         )
     })?;
 }
+
+fn issue7101() {
+    let _ = root? /* this is a comment*/
+        .bar;
+}

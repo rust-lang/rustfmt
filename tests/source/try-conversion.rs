@@ -16,3 +16,7 @@ fn issue1291() {
                 name)
     }));
 }
+
+fn issue7101() {
+    let _ = r#try!(root)/* this is a comment*/.bar;
+}
