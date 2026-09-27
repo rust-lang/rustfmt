@@ -571,6 +571,16 @@ impl UseTree {
             _ => (),
         }
 
+        // Keep normalization for synthetic trees while preserving source-level trailing self.
+        if self.visibility.is_none() && self.attrs.is_none() {
+            if let UseSegmentKind::Slf(None) = last.kind {
+                if let Some(second_last) = self.path.pop() {
+                    self.path.push(second_last);
+                    return self;
+                }
+            }
+        }
+
         // Normalise foo::self as bar -> foo as bar.
         if let UseSegmentKind::Slf(_) = last.kind {
             if let Some(UseSegment {
