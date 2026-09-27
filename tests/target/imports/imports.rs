@@ -27,7 +27,7 @@ use rustc_ast::{self};
 use Foo::{Bar, Baz};
 use {Bar /* comment */, /* Pre-comment! */ Foo};
 
-use std::io;
+use std::io::self;
 use std::io::{self};
 
 mod Foo {
