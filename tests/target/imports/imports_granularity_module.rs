@@ -60,3 +60,5 @@ use d;
 use library1;
 use library2 as lib2;
 use library3;
+
+use std::sync::Arc;
