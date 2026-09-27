@@ -783,9 +783,14 @@ mod test {
     fn test_filtered_str_fits_counts_leading_tabs() {
         let shape = Shape::legacy(4, Indent::empty());
         assert!(!filtered_str_fits("	foo", 4, 4, shape));
-        assert!(!filtered_str_fits("foo
+        assert!(!filtered_str_fits(
+            "foo
 	bar
-baz", 4, 4, shape));
+baz",
+            4,
+            4,
+            shape
+        ));
     }
 
     #[test]
