@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 use std::str::{Chars, FromStr};
 use std::thread;
 
-use crate::config::{Color, Config, EmitMode, FileName, NewlineStyle};
+use crate::config::{Color, Config, EmitMode, FileLines, FileName, NewlineStyle, Range};
 use crate::formatting::{ReportedErrors, SourceFile};
 use crate::rustfmt_diff::{DiffLine, Mismatch, ModifiedChunk, OutputWriter, make_diff, print_diff};
 use crate::source_file;
@@ -246,6 +246,73 @@ fn system_tests() {
             "Expected a minimum of {} system tests to be executed",
             300
         )
+    });
+}
+
+fn file_lines_from_diff(file: &Path, source: &str, target: &str) -> FileLines {
+    let ranges = make_diff(target, source, 0)
+        .into_iter()
+        .filter_map(|mismatch| {
+            let lines = mismatch
+                .lines
+                .iter()
+                .filter(|line| matches!(line, DiffLine::Resulting(_)))
+                .count();
+            (lines > 0).then(|| {
+                Range::new(
+                    mismatch.line_number_orig as usize,
+                    mismatch.line_number_orig as usize + lines - 1,
+                )
+            })
+        })
+        .collect();
+
+    FileLines::from_ranges(HashMap::from([(FileName::Real(file.to_owned()), ranges)]))
+}
+
+fn file_lines_idempotent_check(filename: &PathBuf) -> Result<(), IdempotentCheckError> {
+    let sig_comments = read_significant_comments(filename);
+    let target = get_target(filename, sig_comments.get("target").map(String::as_str));
+    let source = fs::read_to_string(filename).expect("failed to read source");
+    let expected = fs::read_to_string(target).expect("failed to read target");
+
+    let mut config = read_config(filename);
+    config
+        .set()
+        .file_lines(file_lines_from_diff(filename, &source, &expected));
+    let (parsing_errors, output, _) = format_file(filename, config);
+    if parsing_errors {
+        return Err(IdempotentCheckError::Parse);
+    }
+
+    let mut write_result = HashMap::new();
+    for (name, text) in output {
+        if let FileName::Real(name) = name {
+            write_result.insert(name, text);
+        }
+    }
+    handle_result(write_result, sig_comments.get("target").map(String::as_str)).map(|_| ())
+}
+
+#[test]
+fn file_lines_system_tests() {
+    init_log();
+    run_test_with(&TestSetting::default(), || {
+        const FILES: &[&str] = &[
+            "tests/source/configs/format_macro_matchers/false.rs",
+            "tests/source/configs/format_macro_bodies/false.rs",
+            "tests/source/configs/format_macro_bodies/true.rs",
+            "tests/source/issue-5260.rs",
+        ];
+
+        let mut failures = 0;
+        for filename in FILES {
+            if file_lines_idempotent_check(&PathBuf::from(filename)).is_err() {
+                failures += 1;
+            }
+        }
+
+        assert_eq!(failures, 0, "{failures} --file-lines system tests failed");
     });
 }
 
