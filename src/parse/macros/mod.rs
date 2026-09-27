@@ -1,6 +1,6 @@
 use rustc_ast::ast;
 use rustc_ast::token::{Delimiter, NonterminalKind, NtExprKind::*, NtPatKind::*, TokenKind};
-use rustc_ast::tokenstream::TokenStream;
+use rustc_ast::tokenstream::{TokenStream, TokenTree};
 use rustc_parse::MACRO_ARGUMENTS;
 use rustc_parse::parser::{AllowConstBlockItems, ForceCollect, Parser, Recovery};
 use rustc_session::parse::ParseSess;
@@ -103,6 +103,18 @@ pub(crate) fn parse_macro_args(
     style: Delimiter,
     forced_bracket: bool,
 ) -> Option<ParsedMacroArgs> {
+    // Parsing through the Rust AST drops empty angle brackets from macro invocations.
+    // Fall back to the original tokens so macro-sensitive punctuation is preserved.
+    if tokens
+        .iter()
+        .zip(tokens.iter().skip(1))
+        .any(|(left, right)| {
+            matches!(left, TokenTree::Token(token, _) if token.kind == TokenKind::Lt)
+                && matches!(right, TokenTree::Token(token, _) if token.kind == TokenKind::Gt)
+        })
+    {
+        return None;
+    }
     let mut parser = build_parser(context, tokens);
     let mut args = Vec::new();
     let mut vec_with_semi = false;
