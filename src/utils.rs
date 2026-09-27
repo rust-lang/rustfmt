@@ -474,7 +474,7 @@ pub(crate) fn filtered_str_fits(
     let snippet = &filter_normal_code(snippet);
     if !snippet.is_empty() {
         // First line must fits with `shape.width`.
-        if first_line_width(snippet) > shape.width {
+        if last_line_width(snippet.lines().next().unwrap_or(""), tab_spaces) > shape.width {
             return false;
         }
         // If the snippet does not include newline, we are done.
@@ -485,7 +485,7 @@ pub(crate) fn filtered_str_fits(
         if snippet
             .lines()
             .skip(1)
-            .any(|line| unicode_str_width(line) > max_width)
+            .any(|line| last_line_width(line, tab_spaces) > max_width)
         {
             return false;
         }
@@ -778,6 +778,15 @@ pub(crate) fn unicode_str_width(s: &str) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_filtered_str_fits_counts_leading_tabs() {
+        let shape = Shape::legacy(4, Indent::empty());
+        assert!(!filtered_str_fits("	foo", 4, 4, shape));
+        assert!(!filtered_str_fits("foo
+	bar
+baz", 4, 4, shape));
+    }
 
     #[test]
     fn test_remove_trailing_white_spaces() {
