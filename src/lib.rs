@@ -388,6 +388,12 @@ fn format_code_block(
         .snippet
         .rfind('}')
         // trim whitespace when using `fn_single_line=true`
+        // ```
+        //                        | `block_len` starts at the index of `}`
+        // fn main { some_func(); }
+        //                      | remove whitespace to move it to the index of `;`
+        // ```
+        // aka, strip off any whitespace between the end of the code and the `}`
         .map(|i| {
             formatted.snippet[..i]
                 .strip_suffix(char::is_whitespace)
