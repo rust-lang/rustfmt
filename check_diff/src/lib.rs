@@ -79,6 +79,37 @@ impl FromStr for StyleEdition {
     }
 }
 
+/// Configure which release channel to use when compiling rustfmt
+#[derive(Debug, Clone, Copy)]
+pub enum ReleaseChannel {
+    Stable,
+    Beta,
+    Nightly,
+}
+
+impl ReleaseChannel {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Stable => "stable",
+            Self::Beta => "beta",
+            Self::Nightly => "nightly",
+        }
+    }
+}
+
+impl FromStr for ReleaseChannel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "stable" => Ok(Self::Stable),
+            "beta" => Ok(Self::Beta),
+            "nightly" => Ok(Self::Nightly),
+            _ => Err(format!("Invalid release channel {s}")),
+        }
+    }
+}
+
 pub enum FormatCodeError {
     // IO Error when running code formatter
     Io(std::io::Error),
@@ -496,7 +527,7 @@ pub fn git_remote_add(url: &str) -> Result<(), GitError> {
 
 pub fn git_fetch(branch_name: &str) -> Result<(), GitError> {
     let git_cmd = Command::new("git")
-        .args(["fetch", "feature", branch_name])
+        .args(["fetch", "--depth", "1", "feature", branch_name])
         .output()?;
 
     // if the git command does not return successfully,
@@ -572,15 +603,18 @@ pub fn build_rustfmt_from_src<T: AsRef<str>>(
     edition: Edition,
     style_edition: StyleEdition,
     config: Option<&[T]>,
+    release_channel: ReleaseChannel,
 ) -> Result<RustfmtRunner, CheckDiffError> {
     // Because we're building standalone binaries we need to set the dynamic library path
     // so each rustfmt binary can find it's runtime dependencies.
     let dynamic_library_path = get_dynamic_library_path(dir)?;
+    let release_channel = release_channel.as_str();
 
-    info!("Building rustfmt from source");
+    info!("Building {} rustfmt from source", release_channel);
     let Ok(_) = Command::new("cargo")
+        .env("CFG_RELEASE_CHANNEL", release_channel)
         .current_dir(dir)
-        .args(["build", "-q", "--release", "--bin", "rustfmt"])
+        .args(["build", "--locked", "-q", "--release", "--bin", "rustfmt"])
         .output()
     else {
         return Err(CheckDiffError::FailedSourceBuild(
@@ -611,13 +645,15 @@ pub fn compile_rustfmt<T: AsRef<str>>(
     style_edition: StyleEdition,
     commit_hash: Option<String>,
     config: Option<&[T]>,
+    release_channel: ReleaseChannel,
 ) -> Result<DiffChecker<RustfmtRunner, RustfmtRunner>, CheckDiffError> {
     const RUSTFMT_REPO: &str = "https://github.com/rust-lang/rustfmt.git";
+    let checkout_ref = commit_hash.as_ref().unwrap_or(&feature_branch);
 
     clone_git_repo(RUSTFMT_REPO, dest)?;
     change_directory_to_path(dest)?;
     git_remote_add(remote_repo_url.as_str())?;
-    git_fetch(feature_branch.as_str())?;
+    git_fetch(checkout_ref.as_str())?;
 
     let cargo_version = get_cargo_version()?;
     info!("Compiling with {}", cargo_version);
@@ -627,12 +663,10 @@ pub fn compile_rustfmt<T: AsRef<str>>(
         edition,
         style_edition,
         config,
+        release_channel,
     )?;
     let should_detach = commit_hash.is_some();
-    git_switch(
-        commit_hash.as_ref().unwrap_or(&feature_branch),
-        should_detach,
-    )?;
+    git_switch(checkout_ref, should_detach)?;
 
     let target_runner = build_rustfmt_from_src(
         dest.join("target_rustfmt"),
@@ -640,6 +674,7 @@ pub fn compile_rustfmt<T: AsRef<str>>(
         edition,
         style_edition,
         config,
+        release_channel,
     )?;
     info!("SOURCE_BIN {}", source_runner.get_binary_version()?);
     let dynamic_library_path_env_var = dynamic_library_path_env_var_name();

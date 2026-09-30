@@ -6,6 +6,7 @@ use rustc_ast::ast::{
     NodeId, Path, RestrictionKind, Visibility, VisibilityKind,
 };
 use rustc_ast_pretty::pprust;
+use rustc_feature::is_builtin_attr_name;
 use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
 use unicode_width::UnicodeWidthStr;
 
@@ -116,11 +117,11 @@ fn format_restriction(
 }
 
 #[inline]
-pub(crate) fn format_coro(coroutine_kind: &ast::CoroutineKind) -> &'static str {
-    match coroutine_kind {
-        ast::CoroutineKind::Async { .. } => "async ",
-        ast::CoroutineKind::Gen { .. } => "gen ",
-        ast::CoroutineKind::AsyncGen { .. } => "async gen ",
+pub(crate) fn format_coro(coroutine_marker: ast::CoroutineMarker) -> &'static str {
+    match coroutine_marker.kind {
+        ast::CoroutineKind::Async => "async ",
+        ast::CoroutineKind::Gen => "gen ",
+        ast::CoroutineKind::AsyncGen => "async gen ",
     }
 }
 
@@ -260,15 +261,17 @@ pub(crate) fn first_line_width(s: &str) -> usize {
 
 /// The width of the last line in s.
 #[inline]
-pub(crate) fn last_line_width(s: &str) -> usize {
-    unicode_str_width(s.rsplitn(2, '\n').next().unwrap_or(""))
+pub(crate) fn last_line_width(s: &str, tab_spaces: usize) -> usize {
+    let last_line = s.rsplitn(2, '\n').next().unwrap_or("");
+    let (prefix_width, prefix_end) = get_prefix_space_width_and_end(last_line, tab_spaces);
+    prefix_width + unicode_str_width(&last_line[prefix_end..])
 }
 
 /// The total used width of the last line.
 #[inline]
-pub(crate) fn last_line_used_width(s: &str, offset: usize) -> usize {
+pub(crate) fn last_line_used_width(s: &str, offset: usize, tab_spaces: usize) -> usize {
     if s.contains('\n') {
-        last_line_width(s)
+        last_line_width(s, tab_spaces)
     } else {
         offset + unicode_str_width(s)
     }
@@ -325,6 +328,13 @@ pub(crate) fn contains_skip(attrs: &[Attribute]) -> bool {
     attrs
         .iter()
         .any(|a| a.meta().map_or(false, |a| is_skip(&a)))
+}
+
+#[inline]
+pub(crate) fn contains_custom_attributes(attrs: &[Attribute]) -> bool {
+    attrs
+        .iter()
+        .any(|a| a.name().is_some_and(|name| !is_builtin_attr_name(name)))
 }
 
 #[inline]
@@ -442,15 +452,25 @@ macro_rules! skip_out_of_file_lines_range_visitor {
 
 // Wraps String in an Option. Returns Some when the string adheres to the
 // Rewrite constraints defined for the Rewrite trait and None otherwise.
-pub(crate) fn wrap_str(s: String, max_width: usize, shape: Shape) -> Option<String> {
-    if filtered_str_fits(&s, max_width, shape) {
+pub(crate) fn wrap_str(
+    s: String,
+    max_width: usize,
+    tab_spaces: usize,
+    shape: Shape,
+) -> Option<String> {
+    if filtered_str_fits(&s, max_width, tab_spaces, shape) {
         Some(s)
     } else {
         None
     }
 }
 
-pub(crate) fn filtered_str_fits(snippet: &str, max_width: usize, shape: Shape) -> bool {
+pub(crate) fn filtered_str_fits(
+    snippet: &str,
+    max_width: usize,
+    tab_spaces: usize,
+    shape: Shape,
+) -> bool {
     let snippet = &filter_normal_code(snippet);
     if !snippet.is_empty() {
         // First line must fits with `shape.width`.
@@ -471,7 +491,7 @@ pub(crate) fn filtered_str_fits(snippet: &str, max_width: usize, shape: Shape) -
         }
         // A special check for the last line, since the caller may
         // place trailing characters on this line.
-        if last_line_width(snippet) > shape.used_width() + shape.width {
+        if last_line_width(snippet, tab_spaces) > shape.used_width() + shape.width {
             return false;
         }
     }
@@ -651,7 +671,8 @@ pub(crate) fn trim_left_preserve_layout(
             let prefix_space_width = if is_empty_line(&line) {
                 None
             } else {
-                Some(get_prefix_space_width(config, &line))
+                let (prefix_width, _) = get_prefix_space_width_and_end(&line, config.tab_spaces());
+                Some(prefix_width)
             };
 
             // just InString{Commented} in order to allow the start of a string to be indented
@@ -727,16 +748,17 @@ pub(crate) fn is_empty_line(s: &str) -> bool {
     s.is_empty() || s.chars().all(char::is_whitespace)
 }
 
-fn get_prefix_space_width(config: &Config, s: &str) -> usize {
+fn get_prefix_space_width_and_end(s: &str, tab_spaces: usize) -> (usize, usize) {
     let mut width = 0;
-    for c in s.chars() {
+
+    for (i, c) in s.char_indices() {
         match c {
             ' ' => width += 1,
-            '\t' => width += config.tab_spaces(),
-            _ => return width,
+            '\t' => width += tab_spaces,
+            _ => return (width, i),
         }
     }
-    width
+    (width, s.len())
 }
 
 pub(crate) trait NodeIdExt {

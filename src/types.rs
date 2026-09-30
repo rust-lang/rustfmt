@@ -313,19 +313,14 @@ fn rewrite_segment(
     Ok(result)
 }
 
-fn format_function_type<'a, I>(
-    inputs: I,
+fn format_function_type(
+    inputs: &[ast::Param],
     output: &FnRetTy,
     variadic: bool,
     span: Span,
     context: &RewriteContext<'_>,
     shape: Shape,
-) -> RewriteResult
-where
-    I: ExactSizeIterator,
-    <I as Iterator>::Item: Deref,
-    <I::Item as Deref>::Target: Rewrite + Spanned + 'a,
-{
+) -> RewriteResult {
     debug!("format_function_type {:#?}", shape);
 
     let ty_shape = match context.config.indent_style() {
@@ -381,7 +376,7 @@ where
     } else {
         let items = itemize_list(
             context.snippet_provider,
-            inputs,
+            inputs.iter(),
             ")",
             ",",
             |arg| arg.span().lo(),
@@ -421,7 +416,10 @@ where
             shape.block().indent.to_string_with_newline(context.config),
         )
     };
-    if output.is_empty() || last_line_width(&args) + first_line_width(&output) <= shape.width {
+    if output.is_empty()
+        || last_line_width(&args, context.config.tab_spaces()) + first_line_width(&output)
+            <= shape.width
+    {
         Ok(format!("{args}{output}"))
     } else {
         Ok(format!(
@@ -489,7 +487,9 @@ impl Rewrite for ast::WherePredicate {
         let mut result = String::with_capacity(attrs_str.len() + pred_str.len() + 1);
         result.push_str(&attrs_str);
         let pred_start = self.span.lo();
-        let line_len = last_line_width(&attrs_str) + 1 + first_line_width(&pred_str);
+        let line_len = last_line_width(&attrs_str, context.config.tab_spaces())
+            + 1
+            + first_line_width(&pred_str);
         if let Some(last_attr) = self.attrs.last().filter(|last_attr| {
             contains_comment(context.snippet(mk_sp(last_attr.span.hi(), pred_start)))
         }) {
@@ -563,14 +563,9 @@ fn rewrite_generic_args(
                 overflow::rewrite_with_angle_brackets(context, "", args.iter(), shape, span)
             }
         }
-        ast::GenericArgs::Parenthesized(ref data) => format_function_type(
-            data.inputs.iter().map(|x| &**x),
-            &data.output,
-            false,
-            data.span,
-            context,
-            shape,
-        ),
+        ast::GenericArgs::Parenthesized(ref data) => {
+            format_function_type(&data.inputs, &data.output, false, data.span, context, shape)
+        }
         ast::GenericArgs::ParenthesizedElided(..) => Ok("(..)".to_owned()),
     }
 }
@@ -588,7 +583,7 @@ fn rewrite_bounded_lifetime(
         Ok(result)
     } else {
         let colon = type_bound_colon(context);
-        let overhead = last_line_width(&result) + colon.len();
+        let overhead = last_line_width(&result, context.config.tab_spaces()) + colon.len();
         let shape = shape.sub_width(overhead, span)?;
         let result = format!(
             "{}{}{}",
@@ -905,7 +900,7 @@ impl Rewrite for ast::Ty {
                         true,
                     )?;
                 } else {
-                    let used_width = last_line_width(&result);
+                    let used_width = last_line_width(&result, context.config.tab_spaces());
                     let budget = shape
                         .width
                         .checked_sub(used_width)
@@ -1129,10 +1124,10 @@ fn rewrite_fn_ptr(
     };
 
     let rewrite = format_function_type(
-        fn_ptr.decl.inputs.iter(),
+        &fn_ptr.decl.inputs,
         &fn_ptr.decl.output,
         fn_ptr.decl.c_variadic(),
-        span,
+        fn_ptr.decl_span,
         context,
         func_ty_shape,
     )?;

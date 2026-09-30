@@ -140,8 +140,6 @@ fn rustfmt_usage_text() {
                             input file path
             --edition [2015|2018|2021|2024]
                             Rust edition to use
-            --style-edition [2015|2018|2021|2024]
-                            The edition of the Style Guide (unstable).
             --color [always|never|auto]
                             Use colored output (if supported)
             --print-config [default|minimal|current] PATH
@@ -190,8 +188,6 @@ fn rustfmt_nightly_usage_text() {
                             input file path
             --edition [2015|2018|2021|2024]
                             Rust edition to use
-            --style-edition [2015|2018|2021|2024]
-                            The edition of the Style Guide (unstable).
             --color [always|never|auto]
                             Use colored output (if supported)
             --print-config [default|minimal|current] PATH
@@ -347,6 +343,37 @@ fn rustfmt_error_improvement_regarding_invalid_toml() {
     let expected_error_message = format!("The file `{}` failed to parse", toml_path.display());
 
     assert!(stderr.contains(&expected_error_message));
+}
+
+#[test]
+fn config_path_walks_parent_directories_with_dir_name() {
+    let src_dir = "tests/config/issue_4660/inner_lib/src";
+    let src_file = src_dir.to_owned() + "/lib.rs";
+    let args = ["--config-path", src_dir, "--check", &src_file];
+    let (stdout, stderr) = rustfmt(&args);
+
+    assert_eq!(stderr, "");
+    // Due to `disable_all_formatting = true` in `tests/config/issue_4660/inner_lib/rustfmt.toml`,
+    // the source file should not be modified.
+    assert_eq!(stdout, "");
+}
+
+#[test]
+fn config_path_does_not_walk_parent_directories_with_toml_name() {
+    let src_dir = "tests/config/issue_4660/inner_bin/src";
+    let toml_file = src_dir.to_owned() + "/.rustfmt.unstable.toml";
+    let src_file = src_dir.to_owned() + "/main.rs";
+    let args = ["--config-path", &toml_file, "--check", &src_file];
+    let (stdout, stderr) = rustfmt(&args);
+
+    assert_eq!(
+        stderr,
+        format!(
+            "Error: unable to find a config file for the given path: `{}`\n",
+            Path::new(&toml_file).display(),
+        )
+    );
+    assert_eq!(stdout, "");
 }
 
 #[test]

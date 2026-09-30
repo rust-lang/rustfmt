@@ -19,7 +19,7 @@ use crate::{
 };
 
 use rustfmt_config_proc_macro::nightly_only_test;
-use tracing::{debug, warn};
+use tracing::debug;
 
 mod configuration_snippet;
 mod mod_resolver;
@@ -42,8 +42,8 @@ const FILE_SKIP_LIST: &[&str] = &[
     "issue-3253/foo.rs",
     "issue-3253/bar.rs",
     "issue-3253/paths",
-    // This directory is directly tested by format_files_find_new_files_via_cfg_match
-    "cfg_match",
+    // This directory is directly tested by format_files_find_new_files_via_cfg_select
+    "cfg_select",
     // These files and directory are a part of modules defined inside `cfg_attr(..)`.
     "cfg_mod/dir",
     "cfg_mod/bar.rs",
@@ -256,11 +256,12 @@ fn warning_tests() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let manifest_dir_filter = regex::escape(manifest_dir.to_string_lossy().as_ref());
     let files = get_test_files(Path::new("tests/warning/source"), true);
-    let mut config = Config::default();
-    config.set().error_on_line_overflow(true);
-    config.set().error_on_unformatted(true);
 
     for file in &files {
+        let mut config = read_config(file);
+        config.set().error_on_line_overflow(true);
+        config.set().error_on_unformatted(true);
+
         let snapshot_name = file.file_stem().unwrap().to_str().unwrap();
         let (parsing_errors, _, report) = format_file(file, config.clone());
         assert!(!parsing_errors, "{} failed to parse", file.display());
@@ -485,7 +486,7 @@ fn self_tests() {
         files.push(path);
     }
     // for crates that need to be included but lies outside src
-    let external_crates = vec!["check_diff", "config_proc_macro"];
+    let external_crates = vec!["check_diff", "config_proc_macro", "ci"];
     for external_crate in external_crates {
         let mut path = PathBuf::from(external_crate);
         path.push("src");
@@ -503,6 +504,9 @@ fn self_tests() {
         for file in search_files {
             files.push(file);
         }
+
+        let mut tests_files = get_test_files(&PathBuf::from(external_crate).join("tests"), true);
+        files.append(&mut tests_files);
     }
     files.push(PathBuf::from("src/lib.rs"));
 
@@ -563,15 +567,15 @@ fn format_files_find_new_files_via_cfg_if() {
 }
 
 #[test]
-fn format_files_find_new_files_via_cfg_match() {
+fn format_files_find_new_files_via_cfg_select() {
     init_log();
     run_test_with(&TestSetting::default(), || {
-        // We load these two files into the same session to test cfg_match!
+        // We load these two files into the same session to test cfg_select!
         // transparent mod discovery, and to ensure that it does not suffer
         // from a similar issue as cfg_if! support did with issue-4656.
         let files = vec![
-            Path::new("tests/source/cfg_match/lib2.rs"),
-            Path::new("tests/source/cfg_match/lib.rs"),
+            Path::new("tests/source/cfg_select/lib2.rs"),
+            Path::new("tests/source/cfg_select/lib.rs"),
         ];
 
         let config = Config::default();
@@ -626,7 +630,9 @@ fn stdin_parser_panic_caught() {
     // See issue #3239.
     for text in ["{", "}"].iter().cloned().map(String::from) {
         let mut buf = vec![];
-        let mut session = Session::new(Default::default(), Some(&mut buf));
+        let mut config = Config::default();
+        config.set().show_parse_errors(false);
+        let mut session = Session::new(config, Some(&mut buf));
         let _ = session.format(Input::Text(text));
 
         assert!(session.has_parsing_errors());
@@ -794,6 +800,15 @@ fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<Format
             continue;
         }
 
+        if sig_comments.contains_key("stable") && is_nightly_channel!() {
+            debug!(
+                "Skipping '{}' because nightly introduces formatting changes. \
+                 Formatting should be stable on the `stable` channel.",
+                file_name.display()
+            );
+            continue;
+        }
+
         debug!("Testing '{}'...", file_name.display());
 
         match idempotent_check(&file_name, opt_config) {
@@ -864,11 +879,8 @@ fn read_config(filename: &Path) -> Config {
     };
 
     for (key, val) in &sig_comments {
-        if key != "target" && key != "config" && key != "unstable" {
+        if key != "target" && key != "config" && key != "unstable" && key != "stable" {
             config.override_value(key, val);
-            if config.is_default(key) {
-                warn!("Default value {} used explicitly for {}", val, key);
-            }
         }
     }
 
@@ -1191,7 +1203,8 @@ fn rustfmt() -> PathBuf {
     assert!(
         me.is_file() || me.with_extension("exe").is_file(),
         "{}",
-        "no rustfmt bin, try running `cargo build` or `cargo build --release` before testing"
+        "no rustfmt bin, try running `cargo build --locked` or `cargo build --locked --release` \
+        before testing"
     );
     me
 }
