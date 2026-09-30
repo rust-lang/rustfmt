@@ -603,13 +603,8 @@ impl Rewrite for Chain {
         } else {
             context.config.max_width()
         };
-        wrap_str(
-            result,
-            max_width,
-            context.config.tab_spaces(),
-            shape,
-        )
-        .max_width_error(shape.width, full_span)
+        wrap_str(result, max_width, context.config.tab_spaces(), shape)
+            .max_width_error(shape.width, full_span)
     }
 }
 
