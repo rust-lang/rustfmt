@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: trim_trailing_whitespace must not be false
+
+root = true
+
+[*.rs]
+trim_trailing_whitespace = false

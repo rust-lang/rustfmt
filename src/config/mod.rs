@@ -8,6 +8,8 @@ use thiserror::Error;
 
 use crate::config::config_type::ConfigType;
 #[allow(unreachable_pub)]
+pub use crate::config::editorconfig::editorconfig_configuration_for;
+#[allow(unreachable_pub)]
 pub use crate::config::file_lines::{FileLines, FileName, Range};
 #[allow(unreachable_pub)]
 pub use crate::config::macro_names::MacroSelector;
@@ -20,6 +22,7 @@ pub(crate) mod config_type;
 #[allow(unreachable_pub)]
 pub(crate) mod options;
 
+pub(crate) mod editorconfig;
 pub(crate) mod file_lines;
 #[allow(unreachable_pub)]
 pub(crate) mod lists;
@@ -461,25 +464,31 @@ fn config_from_user_dirs() -> Result<Option<PathBuf>, Error> {
 
 /// Loads a config by checking the client-supplied options and if appropriate, the
 /// file system (including searching the file system for overrides).
+/// `file_path` is either a directory name, in which case the config is loaded only
+/// from the applicable rustfmt.toml.
+/// If it is a path to a Rust file, and the options request this, it may additionally
+/// load the config from the .editorconfig file.
 pub fn load_config<O: CliOptions>(
-    file_path: Option<&Path>,
+    file_or_directory: Option<&Path>,
     options: Option<O>,
 ) -> Result<(Config, Option<PathBuf>), Error> {
-    let (over_ride, edition, style_edition, version) = match options {
+    let (over_ride, edition, style_edition, version, use_editorconfig) = match options {
         Some(ref opts) => (
             config_path(opts)?,
             opts.edition(),
             opts.style_edition(),
             opts.version(),
+            opts.use_editorconfig(),
         ),
-        None => (None, None, None, None),
+        None => (None, None, None, None, false),
     };
+    let config_dir = file_or_directory.and_then(|f| if f.is_file() { f.parent() } else { Some(f) });
 
     let result = if let Some(over_ride) = over_ride {
         Config::from_toml_path(over_ride.as_ref(), edition, style_edition, version)
             .map(|p| (p, Some(over_ride.to_owned())))
-    } else if let Some(file_path) = file_path {
-        Config::from_resolved_toml_path(file_path, edition, style_edition, version)
+    } else if let Some(config_dir) = config_dir {
+        Config::from_resolved_toml_path(config_dir, edition, style_edition, version)
     } else {
         Ok((
             Config::default_for_possible_style_edition(style_edition, edition, version),
@@ -487,7 +496,22 @@ pub fn load_config<O: CliOptions>(
         ))
     };
 
+    let editorconfig = if use_editorconfig && file_or_directory.is_some_and(|f| f.is_file()) {
+        if let Some(file) = file_or_directory {
+            editorconfig_configuration_for(&file)
+                .map_err(|e| Error::other(format!("Invalid .editorconfig: {e}")))?
+        } else {
+            unreachable!()
+        }
+    } else {
+        None
+    };
+
     result.map(|(mut c, p)| {
+        if let Some(editorconfig) = editorconfig {
+            c = c.fill_from_partial_config(editorconfig);
+        }
+
         if let Some(options) = options {
             options.apply_to(&mut c);
         }

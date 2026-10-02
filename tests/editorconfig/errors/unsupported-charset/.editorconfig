@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: Invalid charset 'latin1'
+
+root = true
+
+[*.rs]
+charset = latin1

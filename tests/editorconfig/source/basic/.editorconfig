@@ -1,0 +1,8 @@
+root = true
+
+# Default Rust settings
+[*.rs]
+indent_size = 4
+indent_style = space
+end_of_line = lf
+charset = utf-8
