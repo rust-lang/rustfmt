@@ -1,0 +1,3 @@
+reorder_modules = false
+skip_children = true
+style_edition = "2027"
