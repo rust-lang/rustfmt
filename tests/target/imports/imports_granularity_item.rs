@@ -43,3 +43,21 @@ use b::{
     /* Before b::l group */ l::{self, m, n::o, p::*},
     q,
 };
+
+use c::a::b;
+#[cfg(unix)]
+use c::a::b;
+#[cfg(windows)]
+use c::a::b;
+use c::c::d;
+#[cfg(unix)]
+use c::c::d;
+#[cfg(windows)]
+use c::c::d;
+use c::c::e;
+#[cfg(unix)]
+use c::c::e;
+#[cfg(windows)]
+use c::c::e;
+// my comment
+use c::a::b;

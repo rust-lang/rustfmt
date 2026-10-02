@@ -13,9 +13,11 @@ pub use a::t;
 use b::c::d;
 use b::{self};
 
-use foo::e;
 #[cfg(test)]
-use foo::{a::b, c::d};
+use foo::a::b;
+#[cfg(test)]
+use foo::c::d;
+use foo::e;
 
 use bar::{
     // comment
@@ -60,3 +62,9 @@ use d;
 use library1;
 use library2 as lib2;
 use library3;
+
+#[my_attribute]
+use a::{b::c, d::e, d::f};
+
+/// Some doc comment
+use a::{b::c, d::e, d::f};
