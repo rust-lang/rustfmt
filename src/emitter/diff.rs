@@ -34,7 +34,7 @@ impl Emitter for DiffEmitter {
                     mismatch,
                     |line_num| format!("Diff in {}:{}:", filename, line_num),
                     &self.config,
-                );
+                )?;
             }
         } else if original_text != formatted_text {
             // This occurs when the only difference between the original and formatted values
@@ -109,7 +109,7 @@ mod tests {
         assert_eq!(
             String::from_utf8(writer).unwrap(),
             format!("{bin_file}\n{lib_file}\n"),
-        )
+        );
     }
 
     #[test]

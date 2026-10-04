@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 use std::fmt;
-use std::io;
-use std::io::Write;
+use std::io::{self, Write};
 
 use crate::config::{Color, Config, Verbosity};
 
@@ -145,6 +144,13 @@ pub(crate) struct OutputWriter {
     terminal: Option<Box<dyn term::Terminal<Output = io::Stdout>>>,
 }
 
+fn term_to_io_error(e: term::Error) -> io::Error {
+    match e {
+        term::Error::Io(e) => e,
+        other => io::Error::new(io::ErrorKind::Other, other),
+    }
+}
+
 impl OutputWriter {
     // Create a new OutputWriter instance based on the caller's preference
     // for colorized output and the capabilities of the terminal.
@@ -160,18 +166,23 @@ impl OutputWriter {
     // Write output in the optionally specified color. The output is written
     // in the specified color if this OutputWriter instance contains a
     // Terminal in its `terminal` field.
-    pub(crate) fn writeln(&mut self, msg: &str, color: Option<term::color::Color>) {
+    pub(crate) fn writeln(
+        &mut self,
+        msg: &str,
+        color: Option<term::color::Color>,
+    ) -> io::Result<()> {
         match &mut self.terminal {
             Some(ref mut t) => {
                 if let Some(color) = color {
-                    t.fg(color).unwrap();
+                    t.fg(color).map_err(term_to_io_error)?;
                 }
-                writeln!(t, "{msg}").unwrap();
+                writeln!(t, "{msg}")?;
                 if color.is_some() {
-                    t.reset().unwrap();
+                    t.reset().map_err(term_to_io_error)?;
                 }
+                Ok(())
             }
-            None => println!("{msg}"),
+            None => writeln!(io::stdout(), "{msg}"),
         }
     }
 }
@@ -245,7 +256,11 @@ pub(crate) fn make_diff(expected: &str, actual: &str, context_size: usize) -> Ve
     results
 }
 
-pub(crate) fn print_diff<F>(diff: Vec<Mismatch>, get_section_title: F, config: &Config)
+pub(crate) fn print_diff<F>(
+    diff: Vec<Mismatch>,
+    get_section_title: F,
+    config: &Config,
+) -> io::Result<()>
 where
     F: Fn(u32) -> String,
 {
@@ -260,23 +275,24 @@ where
 
     for mismatch in diff {
         let title = get_section_title(mismatch.line_number_orig);
-        writer.writeln(&title, None);
+        writer.writeln(&title, None)?;
 
         for line in mismatch.lines {
             match line {
                 DiffLine::Context(ref str) => {
-                    writer.writeln(&format!(" {str}{line_terminator}"), None)
+                    writer.writeln(&format!(" {str}{line_terminator}"), None)?;
                 }
                 DiffLine::Expected(ref str) => writer.writeln(
                     &format!("+{str}{line_terminator}"),
                     Some(term::color::GREEN),
-                ),
+                )?,
                 DiffLine::Resulting(ref str) => {
-                    writer.writeln(&format!("-{str}{line_terminator}"), Some(term::color::RED))
+                    writer.writeln(&format!("-{str}{line_terminator}"), Some(term::color::RED))?;
                 }
             }
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]

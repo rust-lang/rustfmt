@@ -223,7 +223,7 @@ fn no_case_insensitive_path_collisions() {
 // `print_diff` selects the approach not used.
 fn write_message(msg: &str) {
     let mut writer = OutputWriter::new(Color::Auto);
-    writer.writeln(msg, None);
+    writer.writeln(msg, None).unwrap();
 }
 
 // Integration tests. The files in `tests/source` are formatted and compared
@@ -835,7 +835,7 @@ fn print_mismatches_default_message(result: HashMap<PathBuf, Vec<Mismatch>>) {
     for (file_name, diff) in result {
         let mismatch_msg_formatter =
             |line_num| format!("\nMismatch at {}:{}:", file_name.display(), line_num);
-        print_diff(diff, &mismatch_msg_formatter, &Default::default());
+        print_diff(diff, &mismatch_msg_formatter, &Default::default()).unwrap();
     }
 
     if let Some(mut t) = term::stdout() {
@@ -848,7 +848,7 @@ fn print_mismatches<T: Fn(u32) -> String>(
     mismatch_msg_formatter: T,
 ) {
     for (_file_name, diff) in result {
-        print_diff(diff, &mismatch_msg_formatter, &Default::default());
+        print_diff(diff, &mismatch_msg_formatter, &Default::default()).unwrap();
     }
 
     if let Some(mut t) = term::stdout() {
