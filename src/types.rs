@@ -929,16 +929,18 @@ impl Rewrite for ast::Ty {
                         .rewrite_result(context, Shape::legacy(budget, shape.indent + 1))
                         .map(|ty_str| format!("({})", ty_str));
                 }
-                let (ty, _, _, _, _) = unwrap_parens(
-                    context,
-                    ty.as_ref(),
-                    shape,
-                    self.span,
-                    |ty: &ast::Ty| match &ty.kind {
-                        ast::TyKind::Paren(nested) => Some(nested),
-                        _ => None,
-                    },
-                )?;
+                let ty = if context.config.style_edition() < StyleEdition::Edition2027 {
+                    ty
+                } else {
+                    let (ty, _, _, _, _) =
+                        unwrap_parens(context, ty.as_ref(), shape, self.span, |ty: &ast::Ty| {
+                            match &ty.kind {
+                                ast::TyKind::Paren(nested) => Some(nested),
+                                _ => None,
+                            }
+                        })?;
+                    ty
+                };
 
                 // 2 = ()
                 if let Some(sh) = shape.sub_width_opt(2) {
