@@ -1,2 +1,3 @@
-// rustfmt-newline_style: Windows
-// FooBar
+//@ rustfmt-newline_style: Windows
+// Foo
+struct Bar;
