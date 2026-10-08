@@ -1,0 +1,5 @@
+# rustfmt-expect: Invalid .editorconfig
+
+[{asdjk...iiid}]
+charsetutf-8
+?????%%

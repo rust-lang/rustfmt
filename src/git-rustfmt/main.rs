@@ -98,6 +98,9 @@ impl CliOptions for NullOptions {
     fn version(&self) -> Option<Version> {
         unreachable!();
     }
+    fn use_editorconfig(&self) -> bool {
+        unreachable!()
+    }
 }
 
 fn uncommitted_files() -> Vec<String> {

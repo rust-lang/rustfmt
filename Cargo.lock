@@ -252,6 +252,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ec4rs"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b31a881d38439026e3d5dd938ab20328d36e23caca8fd5981c42e4b677f5842"
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -583,6 +589,7 @@ dependencies = [
  "clap-cargo",
  "diff",
  "dirs",
+ "ec4rs",
  "getopts",
  "ignore",
  "insta",

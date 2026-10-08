@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: Invalid value invalid
+
+root = true
+
+[*.rs]
+end_of_line = invalid

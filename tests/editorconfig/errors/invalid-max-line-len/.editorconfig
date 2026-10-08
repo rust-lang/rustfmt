@@ -1,0 +1,6 @@
+# rustfmt-expect: Invalid .editorconfig: Invalid value uwu
+
+root = true
+
+[*.rs]
+max_line_length = uwu

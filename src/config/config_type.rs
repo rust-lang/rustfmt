@@ -100,7 +100,7 @@ macro_rules! create_config {
         // specify all properties of `Config`.
         // We first parse into `PartialConfig`, then create a default `Config`
         // and overwrite the properties with corresponding values from `PartialConfig`.
-        #[derive(Deserialize, Serialize, Clone)]
+        #[derive(Deserialize, Serialize, Clone, Default)]
         #[allow(unreachable_pub)]
         pub struct PartialConfig {
             $(pub $i: Option<<$ty as StyleEditionDefault>::ConfigType>),+
@@ -244,18 +244,26 @@ macro_rules! create_config {
                 CliConfigWasSet(self)
             }
 
-            fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Config {
-            $(
-                if let Some(option_value) = parsed.$i {
-                    let option_stable = self.$i.3;
-                    if $crate::config::config_type::is_stable_option_and_value(
-                        stringify!($i), option_stable, &option_value
-                    ) {
-                        self.$i.1 = true;
-                        self.$i.2 = option_value;
+            /// Like `Self::fill_from_parsed_config`, but does not do any extra magic besides
+            /// filling in all config values defined in the given partial config.
+            #[allow(unreachable_pub)]
+            pub fn fill_from_partial_config(mut self, partial: PartialConfig) -> Config {
+                $(
+                    if let Some(option_value) = partial.$i {
+                        let option_stable = self.$i.3;
+                        if $crate::config::config_type::is_stable_option_and_value(
+                            stringify!($i), option_stable, &option_value
+                        ) {
+                            self.$i.1 = true;
+                            self.$i.2 = option_value;
+                        }
                     }
-                }
-            )+
+                )+
+                self
+            }
+
+            fn fill_from_parsed_config(mut self, parsed: PartialConfig, dir: &Path) -> Config {
+                self = self.fill_from_partial_config(parsed);
                 self.set_heuristics();
                 self.set_ignore(dir);
                 self.set_merge_imports();

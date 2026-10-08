@@ -217,6 +217,8 @@ fn rustfmt_nightly_usage_text() {
                             whitespaces (unstable).
             --skip-children 
                             Don't reformat child modules (unstable).
+            --use-editorconfig 
+                            Respect .editorconfig settings for Rust source files.
         -v, --verbose       Print verbose output
         -q, --quiet         Print less output
         -V, --version       Show version information
