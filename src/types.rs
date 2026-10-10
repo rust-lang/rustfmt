@@ -9,6 +9,7 @@ use crate::config::lists::*;
 use crate::config::{IndentStyle, StyleEdition, TypeDensity};
 use crate::expr::{
     ExprType, RhsAssignKind, format_expr, rewrite_assign_rhs, rewrite_tuple, rewrite_unary_prefix,
+    unwrap_parens,
 };
 use crate::lists::{
     ListFormatting, ListItem, Separator, definitive_tactic, itemize_list, write_list,
@@ -928,6 +929,18 @@ impl Rewrite for ast::Ty {
                         .rewrite_result(context, Shape::legacy(budget, shape.indent + 1))
                         .map(|ty_str| format!("({})", ty_str));
                 }
+                let ty = if context.config.style_edition() < StyleEdition::Edition2027 {
+                    ty
+                } else {
+                    let (ty, _, _, _, _) =
+                        unwrap_parens(context, ty.as_ref(), shape, self.span, |ty: &ast::Ty| {
+                            match &ty.kind {
+                                ast::TyKind::Paren(nested) => Some(nested),
+                                _ => None,
+                            }
+                        })?;
+                    ty
+                };
 
                 // 2 = ()
                 if let Some(sh) = shape.sub_width_opt(2) {
