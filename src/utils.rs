@@ -10,7 +10,9 @@ use rustc_feature::is_builtin_attr_name;
 use rustc_span::{BytePos, LocalExpnId, Span, Symbol, SyntaxContext, sym, symbol};
 use unicode_width::UnicodeWidthStr;
 
-use crate::comment::{CharClasses, FullCodeCharKind, LineClasses, filter_normal_code};
+use crate::comment::{
+    CharClasses, FullCodeCharKind, LineClasses, contains_comment, filter_normal_code,
+};
 use crate::config::{Config, StyleEdition};
 use crate::rewrite::RewriteContext;
 use crate::shape::{Indent, Shape};
@@ -59,6 +61,13 @@ pub(crate) fn format_visibility(
         VisibilityKind::Public => Cow::from("pub "),
         VisibilityKind::Inherited => Cow::from(""),
         VisibilityKind::Restricted { ref path, .. } => {
+            // FIXME: we should properly handle comments here, but for now
+            // return the span unchanged.
+            let snippet = context.snippet(vis.span);
+            if contains_comment(snippet) {
+                return Cow::from(format!("{snippet} "));
+            }
+
             let Path { ref segments, .. } = **path;
             let mut segments_iter = segments.iter().map(|seg| rewrite_ident(context, seg.ident));
             if path.is_global() {
