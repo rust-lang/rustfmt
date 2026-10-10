@@ -26,7 +26,10 @@ pub(crate) fn parse_items_from_cfg_select<'a>(
     })) {
         Ok(Ok(items)) => Ok(items),
         Ok(err @ Err(_)) => err,
-        Err(..) => Err("failed to parse cfg_select!"),
+        Err(..) => {
+            psess.inner().dcx().reset_err_count();
+            Err("failed to parse cfg_select!")
+        }
     }
 }
 
@@ -47,8 +50,14 @@ fn parse_items_from_cfg_select_inner<'a>(
         if !parser.eat_keyword(exp!(Underscore)) {
             parser.parse_attr_item(ForceCollect::No).map_err(|e| {
                 e.cancel();
+                parser.psess.dcx().reset_err_count();
                 "Failed to parse attr item"
             })?;
+
+            if parser.psess.dcx().has_errors().is_some() {
+                parser.psess.dcx().reset_err_count();
+                return Err("cfg_select! predicate parsed with recovery");
+            }
         }
 
         if !parser.eat(exp!(FatArrow)) {
@@ -63,7 +72,13 @@ fn parse_items_from_cfg_select_inner<'a>(
             let item = match parser
                 .parse_item(ForceCollect::No, AllowConstBlockItems::DoesNotMatter)
             {
-                Ok(Some(item_ptr)) => *item_ptr,
+                Ok(Some(item_ptr)) => {
+                    if parser.psess.dcx().has_errors().is_some() {
+                        parser.psess.dcx().reset_err_count();
+                        return Err("cfg_select! item parsed with recovery");
+                    }
+                    *item_ptr
+                }
                 Ok(None) => {
                     // Advance the parser by at least one token to prevent an infinite loop
                     parser.bump();
