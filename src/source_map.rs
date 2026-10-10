@@ -65,7 +65,7 @@ impl SpanUtils for SnippetProvider {
             offset += additional_offset + needle.len();
         }
 
-        original.lo() + BytePos(offset as u32 - 1)
+        original.lo() + BytePos(offset as u32 - needle.len() as u32)
     }
 
     fn opt_span_after(&self, original: Span, needle: &str) -> Option<BytePos> {
