@@ -4,7 +4,9 @@ use rustc_ast::ast::{self, FnRetTy, Mutability, Term};
 use rustc_span::{BytePos, Pos, Span, symbol::kw};
 use tracing::debug;
 
-use crate::comment::{combine_strs_with_missing_comments, contains_comment};
+use crate::comment::{
+    combine_strs_with_missing_comments, comment_style, contains_comment, rewrite_missing_comment,
+};
 use crate::config::lists::*;
 use crate::config::{IndentStyle, StyleEdition, TypeDensity};
 use crate::expr::{
@@ -24,6 +26,7 @@ use crate::spanned::Spanned;
 use crate::utils::{
     colon_spaces, extra_offset, first_line_width, format_extern, format_mutability,
     format_range_end, last_line_extendable, last_line_width, mk_sp, rewrite_ident,
+    unicode_str_width,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -924,31 +927,32 @@ impl Rewrite for ast::Ty {
                         .width
                         .checked_sub(2)
                         .max_width_error(shape.width, self.span())?;
-                    return ty
-                        .rewrite_result(context, Shape::legacy(budget, shape.indent + 1))
-                        .map(|ty_str| format!("({})", ty_str));
-                }
-
-                // 2 = ()
-                if let Some(sh) = shape.sub_width_opt(2) {
-                    if let Ok(ref s) = ty.rewrite_result(context, sh) {
-                        if !s.contains('\n') {
-                            return Ok(format!("({s})"));
+                    ty.rewrite_result(context, Shape::legacy(budget, shape.indent + 1))
+                        .map(|ty_str| format!("({})", ty_str))
+                } else if context.config.style_edition() < StyleEdition::Edition2027 {
+                    // 2 = ()
+                    if let Some(sh) = shape.sub_width_opt(2) {
+                        if let Ok(ref s) = ty.rewrite_result(context, sh) {
+                            if !s.contains('\n') {
+                                return Ok(format!("({s})"));
+                            }
                         }
                     }
-                }
 
-                let indent_str = shape.indent.to_string_with_newline(context.config);
-                let shape = shape
-                    .block_indent(context.config.tab_spaces())
-                    .with_max_width(context.config);
-                let rw = ty.rewrite_result(context, shape)?;
-                Ok(format!(
-                    "({}{}{})",
-                    shape.to_string_with_newline(context.config),
-                    rw,
-                    indent_str
-                ))
+                    let indent_str = shape.indent.to_string_with_newline(context.config);
+                    let shape = shape
+                        .block_indent(context.config.tab_spaces())
+                        .with_max_width(context.config);
+                    let rw = ty.rewrite_result(context, shape)?;
+                    Ok(format!(
+                        "({}{}{})",
+                        shape.to_string_with_newline(context.config),
+                        rw,
+                        indent_str
+                    ))
+                } else {
+                    rewrite_paren(context, ty, shape, self.span())
+                }
             }
             ast::TyKind::Slice(ref ty) => {
                 let budget = shape
@@ -1356,4 +1360,127 @@ pub(crate) fn rewrite_bound_params(
     } else {
         Some(result)
     }
+}
+
+fn rewrite_paren(
+    context: &RewriteContext<'_>,
+    ty: &ast::Ty,
+    shape: Shape,
+    outer_span: Span,
+) -> RewriteResult {
+    // (/* comment */ Type /* comment */)
+    //  ^------------^    ^------------^
+    //     pre_span         post_span
+    // +1 for the opening paren
+    let pre_span = mk_sp(outer_span.lo() + BytePos(1), ty.span().lo());
+    // -1 for the closing paren
+    let post_span = mk_sp(ty.span().hi(), outer_span.hi() - BytePos(1));
+    let pre_comment = rewrite_missing_comment(pre_span, shape, context)?;
+    let post_comment = rewrite_missing_comment(post_span, shape, context)?;
+
+    // Try fit on a single line, 2 is the width of `(` + `)`
+    if let Some(single_line_rw) = shape.sub_width_opt(2).and_then(|sh| {
+        ty.rewrite(context, sh).and_then(|rw| {
+            combine_with_comments_single_line(context, &rw, &pre_comment, &post_comment, sh)
+        })
+    }) {
+        return Ok(format!("({single_line_rw})"));
+    }
+
+    let nested_shape = shape
+        .block_indent(context.config.tab_spaces())
+        .with_max_width(context.config);
+    combine_with_comments_multiline(context, ty, pre_span, post_span, nested_shape).and_then(|rw| {
+        Ok(format!(
+            "({}{}{})",
+            nested_shape.to_string_with_newline(context.config),
+            rw,
+            shape.indent.to_string_with_newline(context.config)
+        ))
+    })
+}
+
+fn combine_with_comments_single_line(
+    context: &RewriteContext<'_>,
+    content: &str,
+    pre_comment: &str,
+    post_comment: &str,
+    shape: Shape,
+) -> Option<String> {
+    let pre_comment_end_width = last_line_width(pre_comment, context.config.tab_spaces());
+    let comment_is_line_comment = |c: &str| -> bool {
+        !c.is_empty() && comment_style(c, context.config.normalize_comments()).is_line_comment()
+    };
+    let post_comment_start_width = first_line_width(post_comment);
+    let content_width = unicode_str_width(content);
+    let sep = " ";
+    let pre_sep = if pre_comment.is_empty() { "" } else { sep };
+    let post_sep = if post_comment.is_empty() { "" } else { sep };
+
+    let nestled_width = pre_comment_end_width
+        + content_width
+        + post_comment_start_width
+        + pre_sep.len()
+        + post_sep.len();
+
+    // don't allow pre-comment line comments, so we don't comment out our expression, e.g.
+    // avoid: `(// some comment\nmy_expr)` -> `(// some comment my expr)`
+    // similarly for post-comments, so we don't comment out the closing `)`, e.g.
+    // avoid: `(my_expr // some comment\n)` -> `(my expr // some comment)`
+    let can_nestle = !comment_is_line_comment(pre_comment)
+        && !comment_is_line_comment(post_comment)
+        && nestled_width <= shape.width;
+    if can_nestle {
+        Some(format!(
+            "{pre_comment}{pre_sep}{content}{post_sep}{post_comment}"
+        ))
+    } else {
+        None
+    }
+}
+
+fn combine_with_comments_multiline<R: Rewrite>(
+    context: &RewriteContext<'_>,
+    item: &R,
+    pre_comment_span: Span,
+    post_comment_span: Span,
+    nested_shape: Shape,
+) -> RewriteResult {
+    let same_line_sep = " ";
+
+    let nested_indent_str = nested_shape.to_string_with_newline(context.config);
+    let content = item.rewrite_result(context, nested_shape)?;
+    let content_width = unicode_str_width(&content);
+    let pre_comment = rewrite_missing_comment(pre_comment_span, nested_shape, context)?;
+    let pre_comment_style = comment_style(&pre_comment, context.config.normalize_comments());
+    let pre_comment_end_width = last_line_width(&pre_comment, context.config.tab_spaces());
+    let post_comment = rewrite_missing_comment(post_comment_span, nested_shape, context)?;
+    let post_comment_start_width = first_line_width(&post_comment);
+
+    // the function assumes we can't fit the comment on a single line, so if both comments are
+    // non-empty, then at least one of them needs to be on a separate line
+    Ok(if !post_comment.is_empty() && !pre_comment.is_empty() {
+        if !pre_comment_style.is_line_comment()
+            && pre_comment_end_width + content_width + same_line_sep.len() < nested_shape.width
+        {
+            // nestle pre-comment
+            format!("{pre_comment}{same_line_sep}{content}{nested_indent_str}{post_comment}")
+        } else if post_comment.is_empty()
+            || content_width + same_line_sep.len() + post_comment_start_width <= nested_shape.width
+        {
+            // nested post-comment
+            format!("{pre_comment}{nested_indent_str}{content}{same_line_sep}{post_comment}")
+        } else {
+            // can't nestle_anything
+            format!("{pre_comment}{nested_indent_str}{content}{nested_indent_str}{post_comment}")
+        }
+    // again, if we assume we can't fit the expr+comment on one line _and_ at least one of the
+    // comments is empty, then we need to place the non-empty comment on a separate line
+    } else if !pre_comment.is_empty() && post_comment.is_empty() {
+        format!("{pre_comment}{nested_indent_str}{content}")
+    } else if pre_comment.is_empty() && !post_comment.is_empty() {
+        format!("{content}{nested_indent_str}{post_comment}")
+    } else {
+        format!("{content}")
+    })
 }
