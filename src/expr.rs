@@ -1593,6 +1593,12 @@ pub(crate) fn can_be_overflowed_expr(
         | ast::ExprKind::While(..) => {
             context.config.combine_control_expr() && context.use_block_indent() && args_len == 1
         }
+        ast::ExprKind::Lit(lit) => {
+            context.config.style_edition() >= StyleEdition::Edition2027
+                && args_len == 1
+                && lit.kind == LitKind::Str
+                && lit.symbol.as_str().contains('\n')
+        }
 
         // Handle always block-like expressions
         ast::ExprKind::Gen(..)
