@@ -5,6 +5,6 @@ cfg_if::cfg_if! {
 }
 
 fn main() {
-    foo!(1   +   2);
+    foo!(1 + 2);
     foo!(1 + 2);
 }
