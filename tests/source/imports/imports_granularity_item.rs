@@ -32,3 +32,11 @@ use b::v::{
 };
 use b::t::{/* Before b::t::self */ self};
 use b::c;
+
+use c::{a::b, c::d, c::e};
+#[cfg(unix)]
+use c::{a::b, c::d, c::e};
+#[cfg(windows)]
+use c::{a::b, c::d, c::e};
+// my comment
+use c::a::b;

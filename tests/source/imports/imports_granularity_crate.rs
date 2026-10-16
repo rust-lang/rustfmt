@@ -63,3 +63,13 @@ use b::v::{
 };
 use b::t::{/* Before b::t::self */ self};
 use b::c;
+
+// https://github.com/rust-lang/rustfmt/issues/6666
+#[cfg(true)]
+use a::{b::c, d::e, d::f};
+
+#[my_attribute]
+use a::{b::c,d::e,d::f};
+
+/// Some doc comment
+use a::{b::c,d::e,d::f};
