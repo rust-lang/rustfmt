@@ -1629,15 +1629,36 @@ fn format_cfg_select(
                 }
             };
 
-            crate::matches::rewrite_match_body(
-                context,
-                &arm.expr,
-                &predicate_str,
-                nested_shape,
-                false,
-                arm.arrow.span,
-                last_arm.is_some_and(|la| la == arm),
-            )
+            match arm.double_block_inner() {
+                // FIXME(ytmimi) The formatting for the `$predicate => {{}}` case isn't very robust.
+                // There's the potential that we'll lose comments in between the predicate, the `=>`
+                // and the body. We also don't handle comments like `{/*comment*/{}/*comment*/}`.
+                // The `rewrite_match_body` branch also handles `control_brace_style` better.
+                // That said, it helps fix <https://github.com/rust-lang/rustfmt/issues/7045>.
+                Some(expr) => {
+                    let offset = predicate_str.len() + " => {".len();
+                    let nested_shape = nested_shape.offset_left(offset, arm.span())?;
+                    let trailing_comma = if arm.trailing_comma.is_some() {
+                        ","
+                    } else {
+                        ""
+                    };
+                    let body = expr
+                        .rewrite_result(context, nested_shape)
+                        .map(|rw| format!("{{{rw}}}"))?;
+
+                    Ok(format!("{predicate_str} => {body}{trailing_comma}"))
+                }
+                None => crate::matches::rewrite_match_body(
+                    context,
+                    &arm.expr,
+                    &predicate_str,
+                    nested_shape,
+                    false,
+                    arm.arrow.span,
+                    last_arm.is_some_and(|la| la == arm),
+                ),
+            }
         },
         // Start Span after the opening delimiter. For example,
         // ```
