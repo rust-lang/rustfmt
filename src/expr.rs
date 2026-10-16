@@ -1660,14 +1660,15 @@ pub(crate) fn span_ends_with_comma(context: &RewriteContext<'_>, span: Span) -> 
     result
 }
 
-pub(crate) fn rewrite_paren(
+/// Remove any unnecessary nested parentheses from the expression. Parentheses are unnecessary when
+/// they contain only whitespace.
+pub(crate) fn unwrap_parens<'a, R: Rewrite + Spanned>(
     context: &RewriteContext<'_>,
-    mut subexpr: &ast::Expr,
+    mut subexpr: &'a R,
     shape: Shape,
     mut span: Span,
-) -> RewriteResult {
-    debug!("rewrite_paren, shape: {:?}", shape);
-
+    nested_getter: fn(&R) -> Option<&R>,
+) -> Result<(&'a R, Span, Span, String, String), RewriteError> {
     // Extract comments within parens.
     let mut pre_span;
     let mut post_span;
@@ -1677,14 +1678,14 @@ pub(crate) fn rewrite_paren(
     loop {
         // 1 = "(" or ")"
         pre_span = mk_sp(span.lo() + BytePos(1), subexpr.span().lo());
-        post_span = mk_sp(subexpr.span.hi(), span.hi() - BytePos(1));
+        post_span = mk_sp(subexpr.span().hi(), span.hi() - BytePos(1));
         pre_comment = rewrite_missing_comment(pre_span, shape, context)?;
         post_comment = rewrite_missing_comment(post_span, shape, context)?;
 
         // Remove nested parens if there are no comments.
-        if let ast::ExprKind::Paren(ref subsubexpr) = subexpr.kind {
+        if let Some(subsubexpr) = nested_getter(&subexpr) {
             if remove_nested_parens && pre_comment.is_empty() && post_comment.is_empty() {
-                span = subexpr.span;
+                span = subexpr.span();
                 subexpr = subsubexpr;
                 continue;
             }
@@ -1692,6 +1693,27 @@ pub(crate) fn rewrite_paren(
 
         break;
     }
+    Ok((subexpr, pre_span, post_span, pre_comment, post_comment))
+}
+
+pub(crate) fn rewrite_paren(
+    context: &RewriteContext<'_>,
+    subexpr: &ast::Expr,
+    shape: Shape,
+    span: Span,
+) -> RewriteResult {
+    debug!("rewrite_paren, shape: {:?}", shape);
+
+    let (subexpr, pre_span, post_span, pre_comment, post_comment) = unwrap_parens(
+        context,
+        subexpr,
+        shape,
+        span,
+        |expr: &ast::Expr| match &expr.kind {
+            ast::ExprKind::Paren(subsubexpr) => Some(subsubexpr),
+            _ => None,
+        },
+    )?;
 
     // 1 = `(` and `)`
     let sub_shape = shape.offset_left(1, span)?.sub_width(1, span)?;
