@@ -1,5 +1,3 @@
-use std::panic::{AssertUnwindSafe, catch_unwind};
-
 use rustc_ast::ast;
 use rustc_ast::token::TokenKind;
 use rustc_parse::exp;
@@ -9,14 +7,16 @@ use rustc_span::symbol::kw;
 use crate::parse::macros::build_stream_parser;
 use crate::parse::session::ParseSess;
 
+use super::{SyntheticParseFailure, try_synthetic_parse};
+
 pub(crate) fn parse_cfg_if<'a>(
     psess: &'a ParseSess,
     mac: &'a ast::MacCall,
 ) -> Result<Vec<ast::Item>, &'static str> {
-    match catch_unwind(AssertUnwindSafe(|| parse_cfg_if_inner(psess, mac))) {
-        Ok(Ok(items)) => Ok(items),
-        Ok(err @ Err(_)) => err,
-        Err(..) => Err("failed to parse cfg_if!"),
+    match try_synthetic_parse(psess, || parse_cfg_if_inner(psess, mac)) {
+        Ok(res) => res,
+        Err(SyntheticParseFailure::Recovered) => Err("cfg_if! parsed with recovery"),
+        Err(SyntheticParseFailure::Panicked) => Err("failed to parse cfg_if!"),
     }
 }
 

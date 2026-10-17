@@ -2,8 +2,6 @@
 //! https://doc.rust-lang.org/nightly/reference/conditional-compilation.html#the-cfg_select-macro
 //! ) for grammar.
 
-use std::panic::{AssertUnwindSafe, catch_unwind};
-
 use rustc_ast::ast;
 use rustc_ast::token;
 use rustc_ast::token::{Token, TokenKind};
@@ -17,23 +15,16 @@ use crate::parse::macros::build_stream_parser;
 use crate::parse::session::ParseSess;
 use crate::spanned::Spanned;
 
-// NB: parser recovery can return `Ok(expr)` (or other non-terminals) and still emit errors. We need
-// to properly reset the shared error count.
+use super::{SyntheticParseFailure, try_synthetic_parse};
 
 pub(crate) fn parse_items_from_cfg_select<'a>(
     psess: &'a ParseSess,
     mac: &'a ast::MacCall,
 ) -> Result<Vec<ast::Item>, &'static str> {
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        parse_items_from_cfg_select_inner(psess, mac)
-    }));
-    let dcx = psess.inner().dcx();
-    let recovered = dcx.has_errors().is_some();
-    dcx.reset_err_count();
-    match result {
-        Ok(Ok(_)) if recovered => Err("cfg_select! parsed with recovery"),
+    match try_synthetic_parse(psess, || parse_items_from_cfg_select_inner(psess, mac)) {
         Ok(res) => res,
-        Err(..) => Err("failed to parse cfg_select!"),
+        Err(SyntheticParseFailure::Recovered) => Err("cfg_select! parsed with recovery"),
+        Err(SyntheticParseFailure::Panicked) => Err("failed to parse cfg_select!"),
     }
 }
 
@@ -165,18 +156,14 @@ pub(crate) fn parse_cfg_select_arms(
     psess: &ParseSess,
     ts: TokenStream,
 ) -> Option<Vec<CfgSelectArm>> {
-    let result = catch_unwind(AssertUnwindSafe(|| parse_cfg_select_arms_inner(psess, ts)));
-    let dcx = psess.inner().dcx();
-    let recovered = dcx.has_errors().is_some();
-    dcx.reset_err_count();
-    match result {
-        Ok(Some(_)) if recovered => {
-            debug!("cfg_select! arms parsed with recovery");
+    match try_synthetic_parse(psess, || parse_cfg_select_arms_inner(psess, ts)) {
+        Ok(res) => res,
+        Err(SyntheticParseFailure::Panicked) => {
+            debug!("failed to parse cfg_select! arms");
             None
         }
-        Ok(arms) => arms,
-        Err(..) => {
-            debug!("failed to parse cfg_select! arms");
+        Err(SyntheticParseFailure::Recovered) => {
+            debug!("cfg_select! arms parsed with recovery");
             None
         }
     }

@@ -168,5 +168,51 @@ pub(crate) fn parse_expr(
     tokens: TokenStream,
 ) -> Option<Box<ast::Expr>> {
     let mut parser = build_parser(context, tokens);
+    // FIXME(jieyouxu): double-check error count leak
     parser.parse_expr().ok()
+}
+
+/// Synthetic parse failures. See [`try_synthetic_parse`].
+enum SyntheticParseFailure {
+    Panicked,
+    Recovered,
+}
+
+/// Attempt to _synthetically_ parse with `synthetic_parse`. This is used for macros where we try to
+/// parse as known non-macro Rust syntax to format macro contents that _look_ like valid non-macro
+/// Rust syntax.
+///
+/// * If `synthetic_parse` panics, we will catch the panic and map that to
+///   [`SyntheticParseFailure::Panicked`].
+/// * If we encounter a parser recovery, we will map that to [`SyntheticParseFailure::Recovered`].
+///
+/// In either case, we reset shared error count state.
+fn try_synthetic_parse<R, P>(
+    psess: &crate::parse::session::ParseSess,
+    synthetic_parse: P,
+) -> Result<R, SyntheticParseFailure>
+where
+    P: FnOnce() -> R,
+{
+    let dcx = psess.inner().dcx();
+
+    // Indicative of an error count leak elsewhere.
+    debug_assert_eq!(
+        dcx.err_count(),
+        0,
+        "dcx error count should be 0 before calling `try_synthetic_parse`"
+    );
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(synthetic_parse));
+
+    let recovered = dcx.has_errors().is_some();
+
+    // We need to reset error count to prevent shared state from leaking.
+    dcx.reset_err_count();
+
+    match result {
+        Ok(_) if recovered => Err(SyntheticParseFailure::Recovered),
+        Ok(value) => Ok(value),
+        Err(..) => Err(SyntheticParseFailure::Panicked),
+    }
 }
