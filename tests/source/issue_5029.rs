@@ -47,3 +47,24 @@ fn main() {
         08090a0b 0c0d0e0f
     ");
 }
+
+// Default settings: `fn_call_width` is 60. `max_width` is 100.
+// First line string length is 59. Line length is 98.
+pub const ABCDEFGHIJKLMN: &str = foo!("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456
+    next_line
+");
+
+// First line string length is 60. Line length is 98.
+pub const ABCDEFGHIJKLM: &str = foo!("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567
+    next_line
+");
+
+// First line string length is 59. Line length is 99.
+pub const ABCDEFGHIJKLMNO: &str = foo!("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456
+    next_line
+");
+
+// First line string length is 60. Line length is 99.
+pub const ABCDEFGHIJKLMN: &str = foo!("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567
+    next_line
+");
