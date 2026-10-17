@@ -1676,14 +1676,24 @@ pub(crate) fn rewrite_paren(
     let remove_nested_parens = context.config.remove_nested_parens();
     loop {
         // 1 = "(" or ")"
-        pre_span = mk_sp(span.lo() + BytePos(1), subexpr.span().lo());
+        let pre_span_hi = subexpr
+            .attrs
+            .first()
+            .map(|a| a.span())
+            .unwrap_or_else(|| subexpr.span())
+            .lo();
+        pre_span = mk_sp(span.lo() + BytePos(1), pre_span_hi);
         post_span = mk_sp(subexpr.span.hi(), span.hi() - BytePos(1));
         pre_comment = rewrite_missing_comment(pre_span, shape, context)?;
         post_comment = rewrite_missing_comment(post_span, shape, context)?;
 
-        // Remove nested parens if there are no comments.
+        // Remove nested parens if there are no comments and no attributes.
         if let ast::ExprKind::Paren(ref subsubexpr) = subexpr.kind {
-            if remove_nested_parens && pre_comment.is_empty() && post_comment.is_empty() {
+            if remove_nested_parens
+                && pre_comment.is_empty()
+                && post_comment.is_empty()
+                && subexpr.attrs.is_empty()
+            {
                 span = subexpr.span;
                 subexpr = subsubexpr;
                 continue;
