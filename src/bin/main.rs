@@ -96,6 +96,8 @@ pub enum OperationError {
     /// An unknown print-config option was requested.
     #[error("Unknown print-config option: `{0}`.")]
     UnknownPrintConfigTopic(String),
+    #[error("The `--print-config=minimal` option requires an output path to write to")]
+    MinimalPathNoPath,
     /// Attempt to generate a minimal config from standard input.
     #[error("The `--print-config=minimal` option doesn't work with standard input.")]
     MinimalPathWithStdin,
@@ -490,23 +492,20 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
     }
     let mut free_matches = matches.free.iter();
 
-    let mut minimal_config_path = None;
-    if let Some(kind) = matches.opt_str("print-config") {
-        let path = free_matches.next().cloned();
-        match kind.as_str() {
-            "default" => return Ok(Operation::ConfigOutputDefault { path }),
-            "current" => return Ok(Operation::ConfigOutputCurrent { path }),
-            "minimal" => {
-                minimal_config_path = path;
-                if minimal_config_path.is_none() {
-                    eprintln!("WARNING: PATH required for `--print-config minimal`.");
+    let minimal_config_path = match matches.opt_str("print-config") {
+        None => None,
+        Some(kind) => {
+            let path = free_matches.next().cloned();
+            match kind.as_str() {
+                "default" => return Ok(Operation::ConfigOutputDefault { path }),
+                "current" => return Ok(Operation::ConfigOutputCurrent { path }),
+                "minimal" => Some(path.ok_or(OperationError::MinimalPathNoPath)?),
+                _ => {
+                    return Err(OperationError::UnknownPrintConfigTopic(kind));
                 }
             }
-            _ => {
-                return Err(OperationError::UnknownPrintConfigTopic(kind));
-            }
         }
-    }
+    };
 
     if matches.opt_present("version") {
         return Ok(Operation::Version);
