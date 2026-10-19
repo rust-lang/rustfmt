@@ -842,13 +842,16 @@ impl<'a> CommentRewrite<'a> {
         // 1) wrap_comments = true is configured
         // 2) The comment is not the start of a markdown header doc comment
         // 3) The comment width exceeds the shape's width
-        // 4) No URLS were found in the comment
+        // 4) No URLs were found in the comment
+        // 5) No doc links were found (e.g. `](fn@...)`, `](some/path/...)`)
+        // 6) The comment is not a table item
         // If this changes, the documentation in ../Configurations.md#wrap_comments
         // should be changed accordingly.
         let should_wrap_comment = self.fmt.config.wrap_comments()
             && !is_markdown_header_doc_comment
             && unicode_str_width(line) > self.fmt.shape.width
             && !has_url(line)
+            && !is_doc_link(line)
             && !is_table_item(line);
 
         if should_wrap_comment {
@@ -977,6 +980,28 @@ fn trim_custom_comment_prefix(s: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Returns `true` if the given string includes link destination.
+/// The pattern is (e.g. `](<disambiguator>@...)`, `](some/path/...)`)
+fn is_doc_link(s: &str) -> bool {
+    let mut rest = s;
+
+    while let Some(start) = rest.find("](") {
+        let after = &rest[start + 2..];
+
+        if let Some(end) = after.find(')') {
+            let dest = &after[..end];
+
+            if dest.contains('@') || dest.contains('/') {
+                return true;
+            }
+            rest = &after[end + 1..];
+        } else {
+            break;
+        }
+    }
+    false
 }
 
 /// Returns `true` if the given string MAY include URLs or alike.
