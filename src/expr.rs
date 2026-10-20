@@ -1971,6 +1971,19 @@ pub(crate) fn struct_lit_field_separator(config: &Config) -> &str {
     colon_spaces(config)
 }
 
+pub(crate) fn rewrite_field_prefix(
+    context: &RewriteContext<'_>,
+    field: &ast::ExprField,
+    shape: Shape,
+) -> RewriteResult {
+    let mut attrs_str = field.attrs.rewrite_result(context, shape)?;
+    if !attrs_str.is_empty() {
+        attrs_str.push_str(&shape.indent.to_string_with_newline(context.config));
+    }
+    let name = context.snippet(field.ident.span);
+    Ok(attrs_str + name)
+}
+
 pub(crate) fn rewrite_field(
     context: &RewriteContext<'_>,
     field: &ast::ExprField,
@@ -1980,13 +1993,10 @@ pub(crate) fn rewrite_field(
     if contains_skip(&field.attrs) {
         return Ok(context.snippet(field.span()).to_owned());
     }
-    let mut attrs_str = field.attrs.rewrite_result(context, shape)?;
-    if !attrs_str.is_empty() {
-        attrs_str.push_str(&shape.indent.to_string_with_newline(context.config));
-    };
+    let prefix = rewrite_field_prefix(context, field, shape)?;
     let name = context.snippet(field.ident.span);
     if field.is_shorthand {
-        Ok(attrs_str + name)
+        Ok(prefix)
     } else {
         let mut separator = String::from(struct_lit_field_separator(context.config));
         for _ in 0..prefix_max_width.saturating_sub(name.len()) {
@@ -2005,9 +2015,9 @@ pub(crate) fn rewrite_field(
                     && context.config.use_field_init_shorthand()
                     && !context.inside_macro() =>
             {
-                Ok(attrs_str + name)
+                Ok(prefix)
             }
-            Ok(e) => Ok(format!("{attrs_str}{name}{separator}{e}")),
+            Ok(e) => Ok(format!("{prefix}{separator}{e}")),
             Err(_) => {
                 let expr_offset = shape.indent.block_indent(context.config);
                 let expr = field
@@ -2015,9 +2025,8 @@ pub(crate) fn rewrite_field(
                     .rewrite_result(context, Shape::indented(expr_offset, context.config));
                 expr.map(|s| {
                     format!(
-                        "{}{}:\n{}{}",
-                        attrs_str,
-                        name,
+                        "{}:\n{}{}",
+                        prefix,
                         expr_offset.to_string(context.config),
                         s
                     )

@@ -8,7 +8,7 @@ use rustc_span::{BytePos, Span};
 
 use crate::comment::combine_strs_with_missing_comments;
 use crate::config::lists::*;
-use crate::expr::rewrite_field;
+use crate::expr::{rewrite_field, rewrite_field_prefix};
 use crate::items::{rewrite_struct_field, rewrite_struct_field_prefix};
 use crate::lists::{
     ListFormatting, ListItem, Separator, definitive_tactic, itemize_list, write_list,
@@ -17,9 +17,7 @@ use crate::rewrite::{Rewrite, RewriteContext, RewriteResult};
 use crate::shape::{Indent, Shape};
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
-use crate::utils::{
-    contains_skip, is_attributes_extendable, mk_sp, rewrite_ident, trimmed_last_line_width,
-};
+use crate::utils::{contains_skip, is_attributes_extendable, mk_sp, trimmed_last_line_width};
 
 pub(crate) trait AlignedItem {
     fn skip(&self) -> bool;
@@ -81,21 +79,7 @@ impl AlignedItem for ast::ExprField {
     }
 
     fn rewrite_prefix(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
-        let attrs_str = self.attrs.rewrite_result(context, shape)?;
-        let name = rewrite_ident(context, self.ident);
-        let missing_span = if self.attrs.is_empty() {
-            mk_sp(self.span.lo(), self.span.lo())
-        } else {
-            mk_sp(self.attrs.last().unwrap().span.hi(), self.span.lo())
-        };
-        combine_strs_with_missing_comments(
-            context,
-            &attrs_str,
-            name,
-            missing_span,
-            shape,
-            is_attributes_extendable(&attrs_str),
-        )
+        rewrite_field_prefix(context, self, shape)
     }
 
     fn rewrite_aligned_item(
