@@ -73,8 +73,8 @@ use crate::rewrite::{
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
 use crate::utils::{
-    self, filtered_str_fits, first_line_width, last_line_extendable, last_line_width, mk_sp,
-    rewrite_ident, trimmed_last_line_width, wrap_str,
+    self, filtered_str_fits, filtered_str_fits_without_strings, first_line_width,
+    last_line_extendable, last_line_width, mk_sp, rewrite_ident, trimmed_last_line_width, wrap_str,
 };
 
 use thin_vec::ThinVec;
@@ -569,42 +569,39 @@ impl Rewrite for Chain {
         };
 
         formatter.format_root(&self.parent, context, shape)?;
-        if let Some(result) = formatter.pure_root() {
-            return wrap_str(
+        let (result, full_span) = if let Some(result) = formatter.pure_root() {
+            (result, self.parent.span)
+        } else {
+            let first = self.children.first().unwrap_or(&self.parent);
+            let last = self.children.last().unwrap_or(&self.parent);
+            let children_span = mk_sp(first.span.lo(), last.span.hi());
+            let full_span = self.parent.span.with_hi(children_span.hi());
+
+            // Decide how to layout the rest of the chain.
+            let child_shape = formatter.child_shape(context, shape, children_span)?;
+
+            formatter.format_children(context, child_shape)?;
+            formatter.format_last_child(context, shape, child_shape)?;
+
+            (formatter.join_rewrites(context, child_shape)?, full_span)
+        };
+        let result = if context.config.style_edition() >= StyleEdition::Edition2027 {
+            filtered_str_fits_without_strings(
+                &result,
+                context.config.max_width(),
+                context.config.tab_spaces(),
+                shape,
+            )
+            .then_some(result)
+        } else {
+            wrap_str(
                 result,
                 context.config.max_width(),
                 context.config.tab_spaces(),
                 shape,
             )
-            .max_width_error(shape.width, self.parent.span);
-        }
-
-        let first = self.children.first().unwrap_or(&self.parent);
-        let last = self.children.last().unwrap_or(&self.parent);
-        let children_span = mk_sp(first.span.lo(), last.span.hi());
-        let full_span = self.parent.span.with_hi(children_span.hi());
-
-        // Decide how to layout the rest of the chain.
-        let child_shape = formatter.child_shape(context, shape, children_span)?;
-
-        formatter.format_children(context, child_shape)?;
-        formatter.format_last_child(context, shape, child_shape)?;
-
-        let result = formatter.join_rewrites(context, child_shape)?;
-        let max_width = if context.config.style_edition() >= StyleEdition::Edition2027 {
-            // Keep formatting the chain when a nested expression contains an unavoidable,
-            // pre-existing overflow, but do not allow the rewrite to make it any wider.
-            crate::comment::filter_normal_code(context.snippet(full_span))
-                .lines()
-                .map(utils::unicode_str_width)
-                .max()
-                .unwrap_or(0)
-                .max(context.config.max_width())
-        } else {
-            context.config.max_width()
         };
-        wrap_str(result, max_width, context.config.tab_spaces(), shape)
-            .max_width_error(shape.width, full_span)
+        result.max_width_error(shape.width, full_span)
     }
 }
 
