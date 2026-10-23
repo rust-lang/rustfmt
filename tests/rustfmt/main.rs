@@ -370,8 +370,11 @@ fn dont_emit_ICE() {
     let panic_re = regex::Regex::new("thread.*panicked").unwrap();
     for file in files {
         let args = [file];
-        let (_stdout, stderr, _) = rustfmt(&args);
+
+        let (_stdout, stderr, exit_code) = rustfmt(&args);
+
         assert!(!panic_re.is_match(&stderr));
+        assert_eq!(exit_code, 0);
     }
 }
 
