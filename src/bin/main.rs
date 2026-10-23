@@ -93,14 +93,6 @@ pub enum OperationError {
     /// An unknown help topic was requested.
     #[error("Unknown help topic: `{0}`.")]
     UnknownHelpTopic(String),
-    /// An unknown print-config option was requested.
-    #[error("Unknown print-config option: `{0}`.")]
-    UnknownPrintConfigTopic(String),
-    #[error("The `--print-config=minimal` option requires an output path to write to")]
-    MinimalPathNoPath,
-    /// Attempt to generate a minimal config from standard input.
-    #[error("The `--print-config=minimal` option doesn't work with standard input.")]
-    MinimalPathWithStdin,
     /// An io error during reading or writing.
     #[error("{0}")]
     IoError(IoError),
@@ -108,6 +100,21 @@ pub enum OperationError {
     /// supported with standard input.
     #[error("Emit mode {0} not supported with standard output.")]
     StdinBadEmit(EmitMode),
+    #[error(transparent)]
+    PrintConfig(PrintConfigError),
+}
+
+// Errors related to the '--print-config' option.
+#[derive(Error, Debug)]
+pub enum PrintConfigError {
+    /// An unknown print-config option was requested.
+    #[error("Unknown print-config option: `{0}`.")]
+    UnknownOption(String),
+    #[error("The `--print-config=minimal` option requires an output path to write to")]
+    MinimalPathNoPath,
+    /// Attempt to generate a minimal config from standard input.
+    #[error("The `--print-config=minimal` option doesn't work with standard input.")]
+    MinimalPathWithStdin,
 }
 
 impl From<IoError> for OperationError {
@@ -499,9 +506,13 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
             match kind.as_str() {
                 "default" => return Ok(Operation::ConfigOutputDefault { path }),
                 "current" => return Ok(Operation::ConfigOutputCurrent { path }),
-                "minimal" => Some(path.ok_or(OperationError::MinimalPathNoPath)?),
+                "minimal" => Some(path.ok_or(OperationError::PrintConfig(
+                    PrintConfigError::MinimalPathNoPath,
+                ))?),
                 _ => {
-                    return Err(OperationError::UnknownPrintConfigTopic(kind));
+                    return Err(OperationError::PrintConfig(
+                        PrintConfigError::UnknownOption(kind),
+                    ));
                 }
             }
         }
@@ -523,7 +534,9 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
     // if no file argument is supplied, read from stdin
     if files.is_empty() {
         if minimal_config_path.is_some() {
-            return Err(OperationError::MinimalPathWithStdin);
+            return Err(OperationError::PrintConfig(
+                PrintConfigError::MinimalPathWithStdin,
+            ));
         }
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer)?;
