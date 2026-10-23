@@ -843,7 +843,7 @@ impl<'a> CommentRewrite<'a> {
         // 2) The comment is not the start of a markdown header doc comment
         // 3) The comment width exceeds the shape's width
         // 4) No URLs were found in the comment
-        // 5) No doc links were found (e.g. `](fn@...)`, `](some/path/...)`)
+        // 5) No doc links were found (the pattern is `](...)`)
         // 6) The comment is not a table item
         // If this changes, the documentation in ../Configurations.md#wrap_comments
         // should be changed accordingly.
@@ -983,23 +983,11 @@ fn trim_custom_comment_prefix(s: &str) -> String {
 }
 
 /// Returns `true` if the given string includes link destination.
-/// The pattern is (e.g. `](<disambiguator>@...)`, `](some/path/...)`)
+/// The pattern is `](...)`
 fn is_doc_link(s: &str) -> bool {
-    let mut rest = s;
-
-    while let Some(start) = rest.find("](") {
-        let after = &rest[start + 2..];
-
-        if let Some(end) = after.find(')') {
-            let dest = &after[..end];
-
-            if dest.contains('@') || dest.contains('/') {
-                return true;
-            }
-            rest = &after[end + 1..];
-        } else {
-            break;
-        }
+    if let Some(start) = s.find("](") {
+        let after = &s[start + 2..];
+        return after.contains(')');
     }
     false
 }

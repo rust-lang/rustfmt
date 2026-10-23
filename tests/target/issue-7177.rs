@@ -1,6 +1,4 @@
-//@ rustfmt-config: issue-7177.toml
 //@ rustfmt-wrap_comments: true
-//@ rustfmt-unstable_features: true
 
 pub fn queue_user_requested_email_otp() {}
 pub fn queue_user_requested_email_otp_abc() {}
