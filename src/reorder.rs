@@ -115,7 +115,10 @@ fn rewrite_reorderable_or_regroupable_items(
                 "",
                 ";",
                 |item| item.span().lo(),
-                |item| item.opt_hi.unwrap_or_else(|| item.span().hi()),
+                |item| {
+                    item.commented_span
+                        .map_or_else(|| item.span().hi(), |span| span.hi())
+                },
                 |_item| Ok("".to_owned()),
                 span.lo(),
                 span.hi(),
