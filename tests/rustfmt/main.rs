@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use rustfmt_config_proc_macro::{nightly_only_test, stable_only_test};
+use rustfmt_config_proc_macro::{nightly_only_test, stable_only_test, rustfmt_only_ci_test};
 
 /// Run the rustfmt executable with environment vars set and return its output.
 /// If `input` is given, it is piped to the executable's stdin.
@@ -112,6 +112,7 @@ fn print_config_errors_minimal_without_input_file() {
     assert_eq!(exit_code, 1);
 }
 
+#[rustfmt_only_ci_test]
 #[test]
 fn print_config_writes_to_file() {
     let out_file = tempfile::tempdir().unwrap().keep().join("minimal.toml");
