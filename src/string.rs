@@ -151,6 +151,7 @@ pub(crate) fn rewrite_string<'a>(
 
     result.push_str(fmt.closer);
     wrap_str(
+        fmt.config.style_edition(),
         result,
         fmt.config.max_width(),
         fmt.config.tab_spaces(),

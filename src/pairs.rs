@@ -104,6 +104,7 @@ fn rewrite_pairs_one_line<T: Rewrite>(
     }
 
     wrap_str(
+        context.config.style_edition(),
         result,
         context.config.max_width(),
         context.config.tab_spaces(),
