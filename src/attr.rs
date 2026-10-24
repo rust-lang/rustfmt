@@ -368,7 +368,7 @@ fn rewrite_normal_attr(
                         args.iter(),
                         shape_close,
                         mk_sp(path.span.hi(), span.hi()),
-                        context.config.fn_call_width(),
+                        context.config.attr_fn_like_width(),
                         if trailing_comma {
                             Some(SeparatorTactic::Always)
                         } else {
