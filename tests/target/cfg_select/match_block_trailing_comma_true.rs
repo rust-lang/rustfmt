@@ -7,7 +7,7 @@ cfg_select! {
 }
 
 cfg_select! {
-    _ => {{ b }}
+    _ => {{ b }},
 }
 
 cfg_select! {
@@ -33,11 +33,11 @@ cfg_select! {
 }
 
 cfg_select! {
-    _ => {{ h }} // line comment
+    _ => {{ h }}, // line comment
 }
 
 cfg_select! {
-    _ => {{ i }} /* block comment */
+    _ => {{ i }}, /* block comment */
 }
 
 cfg_select! {
@@ -60,7 +60,7 @@ cfg_select! {
 // Mixed
 
 cfg_select! {
-    _ => {{ n }}
+    _ => {{ n }},
     _ => unsafe { .. },
 }
 
@@ -86,13 +86,15 @@ cfg_select! {
 }
 
 cfg_select! {
-    _ => {{ double_brace_no_comma_100_cols_______________________________________________________ }}
+    _ => {{
+        double_brace_no_comma_100_cols_______________________________________________________
+    }},
 }
 
 cfg_select! {
     _ => {{
         double_brace_no_comma_101_cols________________________________________________________
-    }}
+    }},
 }
 
 cfg_select! {
