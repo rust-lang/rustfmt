@@ -80,3 +80,37 @@ fn fallback_and_try_to_resolve_external_submod_relative_to_current_dir_path() {
         ],
     )
 }
+
+#[test]
+fn inline_modules_with_path_attributes() {
+    verify_mod_resolution(
+        "tests/mod-resolver/inline_module_with_path_attribute/main.rs",
+        &[
+            "tests/mod-resolver/inline_module_with_path_attribute/bravo/charlie.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/bravo/echo/foxtrot/mod.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/bravo/hotel/india/juliet.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/bravo/hotel/india/lima.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/mike/november.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/oscar/papa.rs",
+            "tests/mod-resolver/inline_module_with_path_attribute/tango.rs",
+        ],
+    )
+}
+
+#[test]
+fn cfg_attr_path_on_inline_module() {
+    verify_mod_resolution(
+        "tests/mod-resolver/issue-7038/lib.rs",
+        &[
+            "tests/mod-resolver/issue-7038/meow/wasm/dog/woof.rs",
+            "tests/mod-resolver/issue-7038/meow/wasm/mrrp.rs",
+            "tests/mod-resolver/issue-7038/meow/wasm/y.rs",
+            "tests/mod-resolver/issue-7038/meow_unix/dog/woof.rs",
+            "tests/mod-resolver/issue-7038/meow_unix/mrrp.rs",
+            "tests/mod-resolver/issue-7038/meow_unix/y.rs",
+            "tests/mod-resolver/issue-7038/meow_windows/dog/woof.rs",
+            "tests/mod-resolver/issue-7038/meow_windows/mrrp/mod.rs",
+            "tests/mod-resolver/issue-7038/meow_windows/y.rs",
+        ],
+    )
+}
