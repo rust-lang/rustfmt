@@ -328,6 +328,67 @@ impl Rewrite for ast::MetaItem {
     }
 }
 
+fn rewrite_normal_attr(
+    context: &RewriteContext<'_>,
+    snippet: &str,
+    shape_open: Shape,
+    shape_close: Shape,
+    attr: &ast::AttrItem,
+    wrap_args: impl Fn(String) -> String,
+) -> RewriteResult {
+    if context.config.style_edition() <= StyleEdition::Edition2024 {
+        Ok(snippet.to_owned())
+    } else {
+        // NOTE: comments are skipped for now
+        // for now it's fine since we return early if the snippet contains comments
+
+        let ast::AttrItem {
+            unsafety: _,
+            span,
+            path,
+            args,
+        } = attr;
+        let path_str = rewrite_path(context, PathContext::Type, &None, path, shape_open)?;
+        match args {
+            ast::AttrArgs::Empty => Ok(wrap_args(path_str)),
+            ast::AttrArgs::Delimited(DelimArgs {
+                dspan: _,
+                delim: delim @ Delimiter::Parenthesis,
+                tokens,
+            }) => {
+                if let Some(ParsedMacroArgs {
+                    vec_with_semi: _,
+                    trailing_comma,
+                    args,
+                }) = parse_macro_args(context, tokens.clone(), *delim, false)
+                {
+                    Ok(overflow::rewrite_with_parens(
+                        context,
+                        &path_str,
+                        args.iter(),
+                        shape_close,
+                        mk_sp(path.span.hi(), span.hi()),
+                        context.config.fn_call_width(),
+                        if trailing_comma {
+                            Some(SeparatorTactic::Always)
+                        } else {
+                            Some(SeparatorTactic::Never)
+                        },
+                    )
+                    .map_or_else(|_| snippet.to_owned(), wrap_args))
+                } else {
+                    Ok(snippet.to_owned())
+                }
+            }
+            ast::AttrArgs::Eq { eq_span: _, expr } => {
+                let expr = expr.rewrite_result(context, shape_open)?;
+                Ok(wrap_args(format!("{path_str} = {expr}")))
+            }
+            _ => Ok(snippet.to_owned()),
+        }
+    }
+}
+
 impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
@@ -385,60 +446,19 @@ impl Rewrite for ast::Attribute {
                     .rewrite_result(context, shape)
                     .map_or_else(|_| snippet.to_owned(), wrap_args))
             } else if let AttrKind::Normal(attr) = &self.kind {
-                if context.config.style_edition() <= StyleEdition::Edition2024 {
-                    Ok(snippet.to_owned())
-                } else {
-                    // NOTE: comments are skipped for now
-                    // for now it's fine since we return early if the snippet contains comments
+                // 1 = `[`
+                let shape_open = shape.offset_left(prefix.len() + 1, self.span)?;
 
-                    // 1 = `[`
-                    let shape = shape.offset_left(prefix.len() + 1, self.span)?;
-                    let ast::AttrItem {
-                        unsafety: _,
-                        span,
-                        path,
-                        args,
-                    } = &attr.item;
-                    let path_str = rewrite_path(context, PathContext::Type, &None, path, shape)?;
-                    match args {
-                        ast::AttrArgs::Empty => Ok(wrap_args(path_str)),
-                        ast::AttrArgs::Delimited(DelimArgs {
-                            dspan: _,
-                            delim: delim @ Delimiter::Parenthesis,
-                            tokens,
-                        }) => {
-                            if let Some(ParsedMacroArgs {
-                                vec_with_semi: _,
-                                trailing_comma,
-                                args,
-                            }) = parse_macro_args(context, tokens.clone(), *delim, false)
-                            {
-                                Ok(overflow::rewrite_with_parens(
-                                    context,
-                                    &path_str,
-                                    args.iter(),
-                                    // 1 = "]"
-                                    shape.sub_width(1, self.span)?,
-                                    mk_sp(path.span.hi(), span.hi()),
-                                    context.config.fn_call_width(),
-                                    if trailing_comma {
-                                        Some(SeparatorTactic::Always)
-                                    } else {
-                                        Some(SeparatorTactic::Never)
-                                    },
-                                )
-                                .map_or_else(|_| snippet.to_owned(), wrap_args))
-                            } else {
-                                Ok(snippet.to_owned())
-                            }
-                        }
-                        ast::AttrArgs::Eq { eq_span: _, expr } => {
-                            let expr = expr.rewrite_result(context, shape)?;
-                            Ok(wrap_args(format!("{path_str} = {expr}")))
-                        }
-                        _ => Ok(snippet.to_owned()),
-                    }
-                }
+                // 1 = "]"
+                let shape_close = shape_open.sub_width(1, self.span)?;
+                rewrite_normal_attr(
+                    context,
+                    snippet,
+                    shape_open,
+                    shape_close,
+                    &attr.item,
+                    wrap_args,
+                )
             } else {
                 Ok(snippet.to_owned())
             }
