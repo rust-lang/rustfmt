@@ -7,7 +7,7 @@ cfg_select! {
 }
 
 cfg_select! {
-    _ => {{ x }}
+    _ => {{ x }},
 }
 
 cfg_select! {
@@ -33,11 +33,11 @@ cfg_select! {
 }
 
 cfg_select! {
-    _ => {{ x }} // line comment
+    _ => {{ x }}, // line comment
 }
 
 cfg_select! {
-    _ => {{ x }} /* block comment */
+    _ => {{ x }}, /* block comment */
 }
 
 cfg_select! {
@@ -60,7 +60,7 @@ cfg_select! {
 // Mixed
 
 cfg_select! {
-    _ => {{ x }}
+    _ => {{ x }},
     _ => unsafe { .. },
 }
 
@@ -85,13 +85,15 @@ cfg_select! {
 }
 
 cfg_select! {
-    _ => {{ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx }}
+    _ => {{
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    }},
 }
 
 cfg_select! {
     _ => {{
         yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
-    }}
+    }},
 }
 
 cfg_select! {
