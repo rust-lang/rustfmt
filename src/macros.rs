@@ -1718,7 +1718,9 @@ fn rewrite_cfg_select_arm(
                     )?)
                 };
 
-                let trailing_comma = if arm.trailing_comma.is_some() {
+                let trailing_comma = if arm.trailing_comma.is_some()
+                    || context.config.match_block_trailing_comma()
+                {
                     ","
                 } else {
                     ""
