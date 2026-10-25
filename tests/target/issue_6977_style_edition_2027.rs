@@ -1,4 +1,4 @@
-// rustfmt-style_edition: 2027
+//@ rustfmt-style_edition: 2027
 
 fn main() {
     some_struct.foo(format!(
