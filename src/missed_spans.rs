@@ -274,7 +274,7 @@ impl<'a> FmtVisitor<'a> {
 
         let comment_shape = Shape::indented(comment_indent, self.config).comment(self.config);
 
-        if on_same_line {
+        if on_same_line && subslice.starts_with("//") {
             match subslice.find('\n') {
                 None => {
                     self.push_str(subslice);
