@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use rustfmt_config_proc_macro::{nightly_only_test, stable_only_test, rustfmt_only_ci_test};
+use rustfmt_config_proc_macro::{nightly_only_test, rustfmt_only_ci_test, stable_only_test};
 
 /// Run the rustfmt executable with environment vars set and return its output.
 /// If `input` is given, it is piped to the executable's stdin.
