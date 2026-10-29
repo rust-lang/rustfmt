@@ -1066,7 +1066,7 @@ fn trim_end_unless_two_whitespaces(s: &str, is_doc_comment: bool) -> &str {
 }
 
 /// Trims whitespace and aligns to indent, but otherwise does not change comments.
-fn light_rewrite_comment(
+pub(crate) fn light_rewrite_comment(
     orig: &str,
     offset: Indent,
     config: &Config,
