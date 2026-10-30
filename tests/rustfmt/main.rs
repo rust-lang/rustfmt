@@ -587,7 +587,7 @@ fn cfg_select_parser_recovery_ice_7087() {
 
 #[test]
 fn test_args_file_all_args() {
-    let src_file = Path::new("tests/rustfmt/sources/args_file/src/space_indents.rs");
+    let src_file = Path::new("tests/rustfmt/sources/args_file/space_indents.rs");
     let args_file = Path::new("tests/rustfmt/sources/args_file/args_full_tab_indent");
     let args = &[
         &format!("@{}", args_file.to_str().unwrap()),
@@ -606,7 +606,7 @@ fn test_args_file_all_args() {
 
 #[test]
 fn test_args_file_merge_with_cmd_args() {
-    let src_file = Path::new("tests/rustfmt/sources/args_file/src/space_indents.rs");
+    let src_file = Path::new("tests/rustfmt/sources/args_file/space_indents.rs");
     let args_file = Path::new("tests/rustfmt/sources/args_file/args_tab_indent");
     let args = &[
         "--check",
@@ -627,8 +627,8 @@ fn test_args_file_merge_with_cmd_args() {
 
 #[test]
 fn test_args_file_multiple_files_merged() {
-    let first_src_file = Path::new("tests/rustfmt/sources/args_file/src/space_indents.rs");
-    let second_src_file = Path::new("tests/rustfmt/sources/args_file/src/hex_lowercase.rs");
+    let first_src_file = Path::new("tests/rustfmt/sources/args_file/space_indents.rs");
+    let second_src_file = Path::new("tests/rustfmt/sources/args_file/hex_lowercase.rs");
     let first_args_file = Path::new("tests/rustfmt/sources/args_file/args_tab_indent");
     let second_args_file = Path::new("tests/rustfmt/sources/args_file/args_hex_uppercase");
     let args = &[
@@ -656,7 +656,7 @@ fn test_args_file_multiple_files_merged() {
 
 #[test]
 fn test_args_file_carriage_return() {
-    let src_file = Path::new("tests/rustfmt/sources/args_file/src/space_indents.rs");
+    let src_file = Path::new("tests/rustfmt/sources/args_file/space_indents.rs");
     let args_file = Path::new("tests/rustfmt/sources/args_file/args_full_carriage_return");
     let args = &[
         &format!("@{}", args_file.to_str().unwrap()),
