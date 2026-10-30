@@ -212,7 +212,15 @@ impl Rewrite for ast::AssocItemConstraint {
                 .width
                 .checked_sub(result.len())
                 .max_width_error(shape.width, self.span)?;
-            let shape = Shape::legacy(budget, shape.indent + result.len());
+            let shape = if context.config.style_edition() >= StyleEdition::Edition2027 {
+                Shape {
+                    width: budget,
+                    indent: shape.indent,
+                    offset: result.len(),
+                }
+            } else {
+                Shape::legacy(budget, shape.indent + result.len())
+            };
             let gen_str = rewrite_generic_args(gen_args, context, shape, gen_args.span())?;
             result.push_str(&gen_str);
         }
@@ -228,7 +236,16 @@ impl Rewrite for ast::AssocItemConstraint {
             .width
             .checked_sub(result.len())
             .max_width_error(shape.width, self.span)?;
-        let shape = Shape::legacy(budget, shape.indent + result.len());
+        let shape = if context.config.style_edition() >= StyleEdition::Edition2027 {
+            Shape {
+                width: budget,
+                indent: shape.indent,
+                offset: result.len(),
+            }
+        } else {
+            Shape::legacy(budget, shape.indent + result.len())
+        };
+
         let rewrite = self.kind.rewrite_result(context, shape)?;
         result.push_str(&rewrite);
 
