@@ -1,7 +1,9 @@
 use rustc_span::{BytePos, Pos, Span};
 use tracing::debug;
 
-use crate::comment::{CodeCharKind, CommentCodeSlices, is_last_comment_block, rewrite_comment};
+use crate::comment::{
+    CodeCharKind, CommentCodeSlices, is_last_comment_block, light_rewrite_comment, rewrite_comment,
+};
 use crate::config::FileName;
 use crate::config::StyleEdition;
 use crate::config::file_lines::FileLines;
@@ -274,7 +276,7 @@ impl<'a> FmtVisitor<'a> {
 
         let comment_shape = Shape::indented(comment_indent, self.config).comment(self.config);
 
-        if on_same_line {
+        if on_same_line && subslice.starts_with("//") {
             match subslice.find('\n') {
                 None => {
                     self.push_str(subslice);
@@ -295,6 +297,28 @@ impl<'a> FmtVisitor<'a> {
                             .unwrap_or_else(|_| String::from(other_lines));
                     self.push_str(&comment_str);
                 }
+            }
+        } else if self.config.style_edition() < StyleEdition::Edition2027
+            && on_same_line
+            && !self.config.wrap_comments()
+            && !self.config.normalize_comments()
+        {
+            // Trailing block comments historically had each continuation line trimmed
+            // independently, with the first line preserved, which resulted in broken block
+            // comments when the first line was rewritten into a line comment independently
+            // of the continuation lines. This preserves the original behavior for older
+            // editions in the cases where rustfmt was producing valid code.
+            if let Some((first_line, other_lines)) = subslice.split_once('\n') {
+                self.push_str(first_line);
+                self.push_str(&comment_indent.to_string_with_newline(self.config));
+                self.push_str(&light_rewrite_comment(
+                    other_lines,
+                    comment_indent,
+                    self.config,
+                    false,
+                ));
+            } else {
+                self.push_str(subslice);
             }
         } else {
             let comment_str = rewrite_comment(subslice, false, comment_shape, self.config)
