@@ -40,6 +40,29 @@ fn module_prefix(path: &[UseSegment]) -> &[UseSegment] {
     &path[..(path.len() - 1).max(1)]
 }
 
+/// Rewrites a path ending in an aliased `self` (e.g., flattened from
+/// `use a::{self as b};`) to the equivalent `a as b`. Used for One-level
+/// imports_granularity.
+fn collapse_trailing_self_alias(path: &mut Vec<UseSegment>) {
+    if path.len() < 2 {
+        return;
+    }
+
+    let alias = match &path.last().unwrap().kind {
+        UseSegmentKind::Slf(Some(alias)) => alias.clone(),
+        _ => return,
+    };
+    let prev = path.len() - 2;
+    match &mut path[prev].kind {
+        UseSegmentKind::Ident(_, a @ None)
+        | UseSegmentKind::Super(a @ None)
+        | UseSegmentKind::Crate(a @ None) => *a = Some(alias),
+        _ => return,
+    }
+
+    path.pop();
+}
+
 impl<'a> FmtVisitor<'a> {
     pub(crate) fn format_import(&mut self, item: &ast::Item, tree: &ast::UseTree) {
         let span = item.span();
@@ -231,6 +254,12 @@ pub(crate) fn normalize_use_trees_with_granularity(
         ImportGranularity::One => SharedPrefix::One,
     };
 
+    let use_trees = if merge_by == SharedPrefix::One {
+        nest_aliased_root_imports(use_trees)
+    } else {
+        use_trees
+    };
+
     let mut result = Vec::with_capacity(use_trees.len());
     for use_tree in use_trees {
         if use_tree.contains_comment() || use_tree.attrs.is_some() {
@@ -254,6 +283,61 @@ pub(crate) fn normalize_use_trees_with_granularity(
         }
     }
     result
+}
+
+/// Flattens the given use trees and rewrites an aliased import of a module
+/// root as the `self` import it is short for (`use a as b;` becomes
+/// `a::{self as b}`) whenever the same batch imports something deeper from
+/// that root.
+///
+/// A root import changes representation when it is merged into a deeper path,
+/// so merging the original form may not be stable (as in, a future run could
+/// reformat the same use statement again). Doing this canonicalization ahead
+/// of time gives a consistent result across runs. Used for One-level
+/// imports_granularity.
+fn nest_aliased_root_imports(use_trees: Vec<UseTree>) -> Vec<UseTree> {
+    let mut flattened = Vec::with_capacity(use_trees.len());
+    for use_tree in use_trees {
+        if use_tree.contains_comment() || use_tree.attrs.is_some() {
+            flattened.push(use_tree);
+        } else {
+            flattened.append(&mut use_tree.flatten(ImportGranularity::One));
+        }
+    }
+
+    for i in 0..flattened.len() {
+        let tree = &flattened[i];
+        if tree.path.len() != 1 || tree.attrs.is_some() || tree.contains_comment() {
+            continue;
+        }
+        if !matches!(tree.path[0].kind, UseSegmentKind::Ident(_, Some(_))) {
+            continue;
+        }
+        let has_deeper_import = flattened.iter().enumerate().any(|(j, other)| {
+            j != i
+                && other.path.len() > 1
+                && other.attrs.is_none()
+                && !other.contains_comment()
+                && other.path[0].equal_except_alias(&flattened[i].path[0])
+                && flattened[i].same_visibility(other)
+        });
+        if !has_deeper_import {
+            continue;
+        }
+
+        // Move the alias from the root over to a trailing `self` segment.
+        let root = &mut flattened[i].path[0];
+        let style_edition = root.style_edition;
+        let alias = match &mut root.kind {
+            UseSegmentKind::Ident(_, alias) => alias.take(),
+            _ => None,
+        };
+        flattened[i].path.push(UseSegment {
+            kind: UseSegmentKind::Slf(alias),
+            style_edition,
+        });
+    }
+    flattened
 }
 
 fn flatten_use_trees(
@@ -713,6 +797,12 @@ impl UseTree {
                     for flattened in &mut nested_use_tree.clone().flatten(import_granularity) {
                         let mut new_path = prefix.to_vec();
                         new_path.append(&mut flattened.path);
+                        // `use a::{self as b};` is equivalent to `use a as b;`.
+                        // Normalize to the latter so that merging treats both
+                        // forms the same way.
+                        if import_granularity == ImportGranularity::One {
+                            collapse_trailing_self_alias(&mut new_path);
+                        }
                         result.push(UseTree {
                             path: new_path,
                             span: self.span,
@@ -775,7 +865,14 @@ fn merge_rest(
     merge_by: SharedPrefix,
 ) -> Option<Vec<UseSegment>> {
     if a.len() == len && b.len() == len {
-        return None;
+        if a[len - 1] == b[len - 1] {
+            return None;
+        }
+
+        // The paths only differ by the alias of the last segment, e.g.,
+        // `foo::bar` and `foo::bar as baz`. These are distinct imports, so
+        // keep both in a list: `foo::{bar, bar as baz}`.
+        len -= 1;
     }
     if a.len() != len && b.len() != len {
         let style_edition = a[len].style_edition;
@@ -819,7 +916,9 @@ fn merge_rest(
             _ => list.push(UseTree::from_path(rest.to_vec(), DUMMY_SP)),
         }
         return Some(vec![
-            b[0].clone(),
+            // The alias of the common segment (if any) has moved to the
+            // `self` item in the list; drop it from the root.
+            common.remove_alias(),
             UseSegment {
                 kind: UseSegmentKind::List(list),
                 style_edition,
@@ -857,11 +956,24 @@ fn merge_use_trees_inner(trees: &mut Vec<UseTree>, use_tree: UseTree, merge_by: 
             // tree `use_tree` should be merge.
             // In other cases `similarity` won't be used, so set it to `0` as a dummy value.
             let similarity = if merge_by == SharedPrefix::One {
-                tree.path
+                let similarity = tree
+                    .path
                     .iter()
                     .zip(&use_tree.path)
                     .take_while(|(a, b)| a.equal_except_alias(b))
-                    .count()
+                    .count();
+                // Single-segment trees that only differ by alias, e.g., `foo`
+                // and `foo as bar`, import distinct names that must not be
+                // merged into each other.
+                if similarity == 1
+                    && tree.path.len() == 1
+                    && use_tree.path.len() == 1
+                    && tree.path != use_tree.path
+                {
+                    0
+                } else {
+                    similarity
+                }
             } else {
                 0
             };
@@ -1431,6 +1543,35 @@ mod test {
             ["b", "a::ac::{aca, acb}", "a::{aa::*, ab}"],
             ["{a::{aa::*, ab, ac::{aca, acb}}, b}"]
         );
+
+        // aliases should not be dropped when merging (#6027)
+        test_merge!(One, ["a::b", "a::b as c"], ["a::{b, b as c}"]);
+
+        test_merge!(One, ["a::b as c", "a::b"], ["a::{b as c, b}"]);
+
+        test_merge!(One, ["a::z", "a::b", "a::b as c"], ["a::{b, b as c, z}"]);
+
+        test_merge!(One, ["a", "a as b"], ["{a, a as b}"]);
+
+        test_merge!(One, ["a as b", "a as c"], ["{a as b, a as c}"]);
+
+        test_merge!(One, ["a::b as c", "a::b as d"], ["a::{b as c, b as d}"]);
+
+        // the alias of a shared root is rewritten as `self as alias`,
+        // regardless of which side of the merge it appears on
+        test_merge!(One, ["a as x", "a::b"], ["a::{self as x, b}"]);
+
+        test_merge!(One, ["a::b", "a as x"], ["a::{self as x, b}"]);
+
+        // an aliased root and a deeper path under the same root should merge
+        // to the same result regardless of their order
+        test_merge!(One, ["a", "a as b", "a::c"], ["a::{self, self as b, c}"]);
+
+        test_merge!(One, ["a as b", "a", "a::c"], ["a::{self, self as b, c}"]);
+
+        test_merge!(One, ["a::c", "a", "a as b"], ["a::{self, self as b, c}"]);
+
+        test_merge!(One, ["a::c", "a as b", "a"], ["a::{self, self as b, c}"]);
     }
 
     #[test]
