@@ -397,8 +397,7 @@ fn assert_output(source: &Path, expected_filename: &Path) {
         .expect("Failed reading target");
 
     if let Some(diff) = Diff::from_output(&expected_text, &output) {
-        let mut failures = HashMap::new();
-        failures.insert(source.to_owned(), diff);
+        let failures = HashMap::from([(source.to_owned(), diff)]);
         print_mismatches_default_message(failures);
         panic!("Text does not match expected output");
     }
@@ -443,8 +442,7 @@ fn assert_stdin_output(
 
     let output = String::from_utf8(buf).unwrap();
     if let Some(diff) = Diff::from_output(&expected_text, &output) {
-        let mut failures = HashMap::new();
-        failures.insert(source.to_owned(), diff);
+        let failures = HashMap::from([(source.to_owned(), diff)]);
         print_mismatches_default_message(failures);
         panic!("Text does not match expected output");
     }
@@ -553,7 +551,7 @@ fn format_files_find_new_files_via_cfg_if() {
             mem::swap(&mut session.source_file, &mut source_file);
 
             for (filename, text) in source_file {
-                if let FileName::Real(ref filename) = filename {
+                if let FileName::Real(filename) = filename {
                     write_result.insert(filename.to_owned(), text);
                 }
             }
@@ -563,7 +561,7 @@ fn format_files_find_new_files_via_cfg_if() {
             write_result.len(),
             "Should have uncovered an extra file (format_me_please.rs) via lib.rs"
         );
-        assert!(handle_result(write_result, None).is_ok());
+        assert!(compare_result(write_result, None).is_ok());
     });
 }
 
@@ -592,7 +590,7 @@ fn format_files_find_new_files_via_cfg_select() {
             mem::swap(&mut session.source_file, &mut source_file);
 
             for (filename, text) in source_file {
-                if let FileName::Real(ref filename) = filename {
+                if let FileName::Real(filename) = filename {
                     write_result.insert(filename.to_owned(), text);
                 }
             }
@@ -602,7 +600,7 @@ fn format_files_find_new_files_via_cfg_select() {
             write_result.len(),
             "Should have uncovered an extra file (format_me_please_x.rs) via lib.rs"
         );
-        assert!(handle_result(write_result, None).is_ok());
+        assert!(compare_result(write_result, None).is_ok());
     });
 }
 
@@ -843,8 +841,8 @@ fn check_files(files: Vec<PathBuf>, opt_config: &Option<PathBuf>) -> (Vec<Format
         debug!("Testing '{}'...", file_name.display());
 
         match idempotent_check(&file_name, opt_config) {
-            Ok(ref report) if report.has_warnings() => {
-                print!("{}", FormatReportFormatterBuilder::new(report).build());
+            Ok(report) if report.has_warnings() => {
+                print!("{}", FormatReportFormatterBuilder::new(&report).build());
                 fails += 1;
             }
             Ok(report) => reports.push(report),
@@ -1016,7 +1014,7 @@ fn idempotent_check(
     opt_config: &Option<PathBuf>,
 ) -> Result<FormatReport, IdempotentCheckError> {
     let sig_comments = read_significant_comments(filename).expect("config should be valid");
-    let config = if let Some(ref config_file_path) = opt_config {
+    let config = if let Some(config_file_path) = opt_config {
         let (edition, style_edition, version) = get_editions_from_comments(&sig_comments);
         Config::from_toml_path(config_file_path, edition, style_edition, version)
             .expect("`rustfmt.toml` not found")
@@ -1030,14 +1028,14 @@ fn idempotent_check(
 
     let mut write_result = HashMap::new();
     for (filename, text) in source_file {
-        if let FileName::Real(ref filename) = filename {
+        if let FileName::Real(filename) = filename {
             write_result.insert(filename.to_owned(), text);
         }
     }
 
-    let target = sig_comments.get("target").map(|x| &(*x)[..]);
+    let target = sig_comments.get("target").map(String::as_str);
 
-    handle_result(write_result, target).map(|_| format_report)
+    compare_result(write_result, target).map(|_| format_report)
 }
 
 // Reads test config file using the supplied (optional) file name. If there's no file name or the
@@ -1126,9 +1124,13 @@ fn read_significant_comments(file_name: &Path) -> Result<HashMap<String, String>
         .collect()
 }
 
-// Compares output to input.
-// TODO: needs a better name, more explanation.
-fn handle_result(
+// compares the formatted result to an expected target by diffing each output against `target`.
+// If `target` is None then each formatted result is compared against:
+//  - tests/target/..., if the formatted result is from tests/source..., otherwise,
+//  - the original source of the result, i.e. an idempotence test
+// If the `RUSTC_BLESS` environment variable is set and there is a diff, then the formatted text
+// will be written to the target file.
+fn compare_result(
     result: HashMap<PathBuf, String>,
     target: Option<&str>,
 ) -> Result<(), IdempotentCheckError> {
@@ -1137,12 +1139,11 @@ fn handle_result(
     for (file_name, fmt_text) in result {
         // If file is in tests/source, compare to file with same name in tests/target.
         let target = get_target(&file_name, target);
-        let open_error = format!("couldn't open target {target:?}");
-        let mut f = fs::File::open(&target).expect(&open_error);
+        let mut f = fs::File::open(&target).expect(&format!("couldn't open target {target:?}"));
 
         let mut text = String::new();
-        let read_error = format!("failed reading target {target:?}");
-        f.read_to_string(&mut text).expect(&read_error);
+        f.read_to_string(&mut text)
+            .expect(&format!("failed reading target {target:?}"));
 
         if let Some(diff) = Diff::from_output(&text, &fmt_text) {
             if std::env::var_os("RUSTC_BLESS").is_some_and(|v| v != "0") {
@@ -1153,11 +1154,9 @@ fn handle_result(
         }
     }
 
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(IdempotentCheckError::Mismatches(failures))
-    }
+    failures
+        .is_empty()
+        .ok_or(IdempotentCheckError::Mismatches(failures))
 }
 
 // Maps source file paths to their target paths.
@@ -1174,11 +1173,9 @@ fn get_target(file_name: &Path, target: Option<&str>) -> PathBuf {
                 target_file_name.push(c.as_os_str());
             }
         }
-        if let Some(replace_name) = target {
-            target_file_name.with_file_name(replace_name)
-        } else {
-            target_file_name
-        }
+        target
+            .map(|t| target_file_name.with_file_name(t))
+            .unwrap_or(target_file_name)
     } else {
         // This is either and idempotence check or a self check.
         file_name.to_owned()
