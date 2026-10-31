@@ -51,6 +51,11 @@ const FILE_SKIP_LIST: &[&str] = &[
     "cfg_mod/foo.rs",
     "cfg_mod/wasm32.rs",
     "skip/foo.rs",
+    // empty file formatting relies on native line endings
+    #[cfg(windows)]
+    "empty_file.rs",
+    #[cfg(not(windows))]
+    "empty_file_windows.rs",
 ];
 
 fn init_log() {
