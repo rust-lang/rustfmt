@@ -435,6 +435,44 @@ macro_rules! create_config {
                 )+
             }
 
+            /// Reduce `max_width` by `delta` saturating on underflow. See `adjust_max_width`.
+            #[allow(unreachable_pub)]
+            pub fn reduce_max_width(&mut self, delta: usize) {
+                self.adjust_max_width(-(delta.min(isize::MAX as usize) as isize));
+            }
+
+            /// Increase `max_width` by `delta` saturating on overflow. See `adjust_max_width`.
+            #[allow(unreachable_pub)]
+            pub fn increase_max_width(&mut self, delta: usize) {
+                self.adjust_max_width(delta.min(isize::MAX as usize) as isize);
+            }
+
+            /// Adjust `max_width` by `delta` in a forked config (example: macro body at zero
+            /// indent). In particular:
+            ///
+            /// - Width options not set explicitly are recomputed from new `max_width` via
+            ///   heuristics.
+            /// - Explicit widths will keep their value but capped at the new `max_width`.
+            ///
+            /// A later increase in `max_width` will _not_ restore a previously capped value.
+            fn adjust_max_width(&mut self, delta: isize) {
+                let max_width = self.max_width.2.saturating_add_signed(delta);
+                self.max_width.2 = max_width;
+
+                self.array_width.2 = self.array_width.2.min(max_width);
+                self.attr_fn_like_width.2 = self.attr_fn_like_width.2.min(max_width);
+                self.chain_width.2 = self.chain_width.2.min(max_width);
+                self.fn_call_width.2 = self.fn_call_width.2.min(max_width);
+                self.single_line_if_else_max_width.2 =
+                    self.single_line_if_else_max_width.2.min(max_width);
+                self.single_line_let_else_max_width.2 =
+                    self.single_line_let_else_max_width.2.min(max_width);
+                self.struct_lit_width.2 = self.struct_lit_width.2.min(max_width);
+                self.struct_variant_width.2 = self.struct_variant_width.2.min(max_width);
+
+                self.set_heuristics();
+            }
+
             fn set_width_heuristics(&mut self, heuristics: WidthHeuristics) {
                 let max_width = self.max_width.2;
                 let get_width_value = |
