@@ -690,6 +690,37 @@ mod test {
     }
 
     #[test]
+    fn test_adjust_max_width() {
+        // Regression tests for #7147, where we didn't handle overflows / integral cast outside of
+        // range properly.
+
+        // Reduce with huge amount saturates to zero instead of wraparound.
+        let mut config = Config::default();
+        config.reduce_max_width(usize::MAX);
+        assert_eq!(config.max_width(), 0);
+
+        // Increase with huge amount saturates instead of wraparound.
+        let mut config = Config::default();
+        config.set().max_width(usize::MAX - 1);
+        config.increase_max_width(2);
+        assert_eq!(config.max_width(), usize::MAX);
+    }
+
+    #[test]
+    fn test_reduce_max_width_limits_explicit_widths() {
+        let toml = r#"
+            max_width = 100
+            chain_width = 72
+            fn_call_width = 100
+        "#;
+        let mut config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        config.reduce_max_width(8);
+        assert_eq!(config.max_width(), 92);
+        assert_eq!(config.chain_width(), 72);
+        assert_eq!(config.fn_call_width(), 92);
+    }
+
+    #[test]
     fn test_config_used_to_toml() {
         let config = Config::default();
 
