@@ -282,7 +282,8 @@ fn rewrite_segment(
     };
 
     if let Some(ref args) = segment.args {
-        let generics_str = rewrite_generic_args(args, context, shape, mk_sp(*span_lo, span_hi))?;
+        let mut generics_str =
+            rewrite_generic_args(args, context, shape, mk_sp(*span_lo, span_hi))?;
         match **args {
             // If we're in a macro ctx then we don't want to remove the `::` even if the args
             // are empty since they could be required tokens.
@@ -305,9 +306,22 @@ fn rewrite_segment(
                 result.push_str(separator);
 
                 // Update position of last bracket.
-                *span_lo = context
+                let after_lt = context
                     .snippet_provider
                     .span_after(mk_sp(*span_lo, span_hi), "<");
+
+                // An empty argument list is rebuilt from the AST, which does not retain comments
+                // sitting between the angle brackets: `Foo</*c*/>` would turn into `Foo<>`. Rewrite
+                // from the source instead when there is a comment to keep.
+                if data.args.is_empty() {
+                    if let Some(snippet) =
+                        angle_bracketed_args_with_comment(context, mk_sp(after_lt, span_hi))
+                    {
+                        generics_str = snippet;
+                    }
+                }
+
+                *span_lo = after_lt;
             }
             _ => (),
         }
@@ -315,6 +329,35 @@ fn rewrite_segment(
     }
 
     Ok(result)
+}
+
+/// Returns the source of an empty, angle bracketed argument list when it contains a comment, e.g.
+/// `</*c*/>`. The AST does not retain comments that sit between the angle brackets, so rewriting
+/// the argument list from scratch would remove them.
+fn angle_bracketed_args_with_comment(context: &RewriteContext<'_>, span: Span) -> Option<String> {
+    let snippet = context.snippet(span);
+    let (closing, has_comment) = find_closing_angle_bracket(snippet)?;
+    has_comment.then(|| format!("<{}>", &snippet[..closing]))
+}
+
+/// Finds the `>` that closes the angle brackets, and tells whether a comment comes before it. An
+/// empty argument list can only contain whitespace and comments between its brackets.
+fn find_closing_angle_bracket(snippet: &str) -> Option<(usize, bool)> {
+    let bytes = snippet.as_bytes();
+    let mut has_comment = false;
+    let mut idx = 0;
+    while idx < bytes.len() {
+        if bytes[idx..].starts_with(b"/*") {
+            has_comment = true;
+            let end = bytes[idx + 2..].windows(2).position(|w| w == b"*/")?;
+            idx += end + 4;
+        } else if bytes[idx] == b'>' {
+            return Some((idx, has_comment));
+        } else {
+            idx += 1;
+        }
+    }
+    None
 }
 
 fn format_function_type(
