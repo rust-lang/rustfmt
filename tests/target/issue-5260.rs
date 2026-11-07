@@ -11,3 +11,9 @@ fn documented_with_verylongtype() {
     // # We're using a long type link, rustfmt should not break line
     // on the type when `wrap_comments = true`
 }
+
+/// So many stars
+/// ************************************************************************
+fn documented_with_many_stars() {
+    // # don't break consecutive punctuations
+}
