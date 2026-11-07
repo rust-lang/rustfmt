@@ -435,6 +435,69 @@ macro_rules! create_config {
                 )+
             }
 
+            /// Reduces the maximum width of the configuration.
+            ///
+            /// This method is intended to be used when creating a forked
+            /// configuration for a particular formatting context in which the
+            /// total available width needs to be reduced. This reduces the
+            /// size of max_width, and recalculates all other properties
+            /// affected by small heuristics. Properties set explicitly keep
+            /// their value, limited to the new max_width.
+            ///
+            /// As an example use case, this method is used when formatting
+            /// arms within a declarative macro.
+            #[allow(unreachable_pub)]
+            pub fn reduce_max_width(&mut self, delta: usize) {
+                self.adjust_max_width(-(delta.min(isize::MAX as usize) as isize));
+            }
+
+            /// Increases the maximum width of the configuration.
+            ///
+            /// This method is intended to be used when creating a forked
+            /// configuration for a particular formatting context in which the
+            /// total available width needs to be increased. This increases the
+            /// size of max_width, and recalculates all other properties
+            /// affected by small heuristics. Properties set explicitly keep
+            /// their value.
+            ///
+            /// As an example use case, this method is used when formatting
+            /// arms within a declarative macro.
+            #[allow(unreachable_pub)]
+            pub fn increase_max_width(&mut self, delta: usize) {
+                self.adjust_max_width(delta.min(isize::MAX as usize) as isize);
+            }
+
+            /// Adjusts the maximum width of the configuration.
+            ///
+            /// This method is intended to be used when creating a forked
+            /// configuration for a particular formatting context in which the
+            /// total available width needs to change. This adjusts the size of
+            /// max_width, and recalculates all other properties affected by
+            /// small heuristics. Properties set explicitly keep their value,
+            /// limited to the new max_width.
+            ///
+            /// As an example use case, this method is used when formatting
+            /// arms within a declarative macro.
+            fn adjust_max_width(&mut self, delta: isize) {
+                // NB: we need to either saturate or report an error (or some kind of testable
+                // warning). I picked to saturate here.
+                let max_width = self.max_width.2.saturating_add_signed(delta);
+                self.max_width.2 = max_width;
+
+                self.array_width.2 = self.array_width.2.min(max_width);
+                self.attr_fn_like_width.2 = self.attr_fn_like_width.2.min(max_width);
+                self.chain_width.2 = self.chain_width.2.min(max_width);
+                self.fn_call_width.2 = self.fn_call_width.2.min(max_width);
+                self.single_line_if_else_max_width.2 =
+                    self.single_line_if_else_max_width.2.min(max_width);
+                self.single_line_let_else_max_width.2 =
+                    self.single_line_let_else_max_width.2.min(max_width);
+                self.struct_lit_width.2 = self.struct_lit_width.2.min(max_width);
+                self.struct_variant_width.2 = self.struct_variant_width.2.min(max_width);
+
+                self.set_heuristics();
+            }
+
             fn set_width_heuristics(&mut self, heuristics: WidthHeuristics) {
                 let max_width = self.max_width.2;
                 let get_width_value = |
