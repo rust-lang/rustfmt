@@ -4,6 +4,7 @@ use thin_vec::thin_vec;
 use tracing::debug;
 
 use crate::attr::get_attrs_from_stmt;
+use crate::comment::{combine_strs_with_missing_comments, contains_comment};
 use crate::config::StyleEdition;
 use crate::config::lists::*;
 use crate::expr::{block_contains_comment, is_simple_block, is_unsafe_block, rewrite_cond};
@@ -35,6 +36,7 @@ pub(crate) fn rewrite_closure(
     coroutine_marker: &Option<ast::CoroutineMarker>,
     movability: ast::Movability,
     fn_decl: &ast::FnDecl,
+    fn_decl_span: Span,
     body: &ast::Expr,
     span: Span,
     context: &RewriteContext<'_>,
@@ -66,9 +68,15 @@ pub(crate) fn rewrite_closure(
         }
 
         let result = match fn_decl.output {
-            ast::FnRetTy::Default(_) if !context.inside_macro() => {
-                try_rewrite_without_block(body, &prefix, context, shape, body_shape)
-            }
+            ast::FnRetTy::Default(_) if !context.inside_macro() => try_rewrite_without_block(
+                body,
+                &prefix,
+                context,
+                fn_decl_span,
+                span,
+                shape,
+                body_shape,
+            ),
             _ => Err(RewriteError::Unknown),
         };
 
@@ -77,7 +85,16 @@ pub(crate) fn rewrite_closure(
             rewrite_closure_block(body, &prefix, context, body_shape)
         })
     } else {
-        rewrite_closure_expr(body, &prefix, context, body_shape).or_else(|_| {
+        rewrite_closure_expr(
+            body,
+            &prefix,
+            context,
+            fn_decl_span,
+            body_shape,
+            span,
+            shape,
+        )
+        .or_else(|_| {
             // The closure originally had a non-block expression, but we can't fit on
             // one line, so we'll insert a block.
             rewrite_closure_with_block(body, &prefix, context, body_shape)
@@ -89,6 +106,8 @@ fn try_rewrite_without_block(
     expr: &ast::Expr,
     prefix: &str,
     context: &RewriteContext<'_>,
+    fn_decl_span: Span,
+    closure_span: Span,
     shape: Shape,
     body_shape: Shape,
 ) -> RewriteResult {
@@ -97,7 +116,15 @@ fn try_rewrite_without_block(
     if is_block_closure_forced(context, expr) {
         rewrite_closure_with_block(expr, prefix, context, shape)
     } else {
-        rewrite_closure_expr(expr, prefix, context, body_shape)
+        rewrite_closure_expr(
+            expr,
+            prefix,
+            context,
+            fn_decl_span,
+            body_shape,
+            closure_span,
+            shape,
+        )
     }
 }
 
@@ -200,7 +227,10 @@ fn rewrite_closure_expr(
     expr: &ast::Expr,
     prefix: &str,
     context: &RewriteContext<'_>,
-    shape: Shape,
+    decl_span: Span,
+    body_shape: Shape,
+    closure_span: Span,
+    closure_shape: Shape,
 ) -> RewriteResult {
     fn allow_multi_line(expr: &ast::Expr) -> bool {
         match expr.kind {
@@ -224,7 +254,7 @@ fn rewrite_closure_expr(
     // unless it is a block-like expression or we are inside macro call.
     let veto_multiline = (!allow_multi_line(expr) && !context.inside_macro())
         || context.config.force_multiline_blocks();
-    expr.rewrite_result(context, shape)
+    expr.rewrite_result(context, body_shape)
         .and_then(|rw| {
             if veto_multiline && rw.contains('\n') {
                 Err(RewriteError::Unknown)
@@ -232,7 +262,21 @@ fn rewrite_closure_expr(
                 Ok(rw)
             }
         })
-        .map(|rw| format!("{} {}", prefix, rw))
+        .and_then(|rw| {
+            let gap_span = closure_span.with_lo(decl_span.hi()).with_hi(expr.span.lo());
+            if contains_comment(context.snippet(gap_span)) {
+                combine_strs_with_missing_comments(
+                    context,
+                    prefix,
+                    &rw,
+                    gap_span,
+                    closure_shape,
+                    true,
+                )
+            } else {
+                return Ok(format!("{prefix} {rw}"));
+            }
+        })
 }
 
 // Rewrite closure whose body is block.
@@ -371,7 +415,7 @@ pub(crate) fn rewrite_last_closure(
             movability,
             ref fn_decl,
             ref body,
-            fn_decl_span: _,
+            fn_decl_span,
             fn_arg_span: _,
         } = **closure;
         let body = match body.kind {
@@ -413,7 +457,15 @@ pub(crate) fn rewrite_last_closure(
                             // If the expression can fit in a single line, we need not force block
                             // closure.  However, if the closure has a return type, then we must
                             // keep the blocks.
-                            match rewrite_closure_expr(body, &prefix, context, shape) {
+                            match rewrite_closure_expr(
+                                body,
+                                &prefix,
+                                context,
+                                fn_decl_span,
+                                body_shape,
+                                expr.span,
+                                shape,
+                            ) {
                                 Ok(single_line_body_str)
                                     if !single_line_body_str.contains('\n') =>
                                 {
