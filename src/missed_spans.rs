@@ -247,6 +247,7 @@ impl<'a> FmtVisitor<'a> {
 
         let fix_indent = last_char.map_or(true, |rev_c| ['{', '\n'].contains(&rev_c));
         let mut on_same_line = false;
+        let is_line_comment = subslice.starts_with("//");
 
         let comment_indent = if fix_indent {
             if let Some('{') = last_char {
@@ -257,6 +258,7 @@ impl<'a> FmtVisitor<'a> {
             self.block_indent
         } else if self.config.style_edition() >= StyleEdition::Edition2024
             && !snippet.starts_with('\n')
+            && (is_line_comment || self.config.style_edition() == StyleEdition::Edition2024)
         {
             // The comment appears on the same line as the previous formatted code.
             // Assuming that comment is logically associated with that code, we want to keep it on
