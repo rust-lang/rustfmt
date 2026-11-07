@@ -1,17 +1,23 @@
 //! Format attributes and meta items.
 
+use rustc_ast::AttrKind;
+use rustc_ast::DelimArgs;
 use rustc_ast::HasAttrs;
 use rustc_ast::ast;
+use rustc_ast::token::Delimiter;
 use rustc_span::{Span, symbol::sym};
 use tracing::debug;
 
 use self::doc_comment::DocCommentFormatter;
+use crate::StyleEdition;
 use crate::comment::{CommentStyle, contains_comment, rewrite_doc_comment};
 use crate::config::IndentStyle;
 use crate::config::lists::*;
 use crate::expr::rewrite_literal;
 use crate::lists::{ListFormatting, Separator, definitive_tactic, itemize_list, write_list};
 use crate::overflow;
+use crate::parse::macros::ParsedMacroArgs;
+use crate::parse::macros::parse_macro_args;
 use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::Shape;
 use crate::source_map::SpanUtils;
@@ -322,6 +328,67 @@ impl Rewrite for ast::MetaItem {
     }
 }
 
+fn rewrite_normal_attr(
+    context: &RewriteContext<'_>,
+    snippet: &str,
+    shape_open: Shape,
+    shape_close: Shape,
+    attr: &ast::AttrItem,
+    wrap_args: impl Fn(String) -> String,
+) -> RewriteResult {
+    if context.config.style_edition() <= StyleEdition::Edition2024 {
+        Ok(snippet.to_owned())
+    } else {
+        // NOTE: comments are skipped for now
+        // for now it's fine since we return early if the snippet contains comments
+
+        let ast::AttrItem {
+            unsafety: _,
+            span,
+            path,
+            args,
+        } = attr;
+        let path_str = rewrite_path(context, PathContext::Type, &None, path, shape_open)?;
+        match args {
+            ast::AttrArgs::Empty => Ok(wrap_args(path_str)),
+            ast::AttrArgs::Delimited(DelimArgs {
+                dspan: _,
+                delim: delim @ Delimiter::Parenthesis,
+                tokens,
+            }) => {
+                if let Some(ParsedMacroArgs {
+                    vec_with_semi: _,
+                    trailing_comma,
+                    args,
+                }) = parse_macro_args(context, tokens.clone(), *delim, false)
+                {
+                    Ok(overflow::rewrite_with_parens(
+                        context,
+                        &path_str,
+                        args.iter(),
+                        shape_close,
+                        mk_sp(path.span.hi(), span.hi()),
+                        context.config.attr_fn_like_width(),
+                        if trailing_comma {
+                            Some(SeparatorTactic::Always)
+                        } else {
+                            Some(SeparatorTactic::Never)
+                        },
+                    )
+                    .map_or_else(|_| snippet.to_owned(), wrap_args))
+                } else {
+                    Ok(snippet.to_owned())
+                }
+            }
+            ast::AttrArgs::Eq { eq_span: _, expr } => {
+                let expr = expr.rewrite_result(context, shape_open)?;
+                Ok(wrap_args(format!("{path_str} = {expr}")))
+            }
+            _ => Ok(snippet.to_owned()),
+        }
+    }
+}
+
 impl Rewrite for ast::Attribute {
     fn rewrite(&self, context: &RewriteContext<'_>, shape: Shape) -> Option<String> {
         self.rewrite_result(context, shape).ok()
@@ -341,6 +408,16 @@ impl Rewrite for ast::Attribute {
             if should_skip || contains_comment(snippet) {
                 return Ok(snippet.to_owned());
             }
+
+            let wrap_args = |rw| match &self.kind {
+                ast::AttrKind::Normal(normal_attr) => match normal_attr.item.unsafety {
+                    // For #![feature(unsafe_attributes)]
+                    // See https://github.com/rust-lang/rust/issues/123757
+                    ast::Safety::Unsafe(_) => format!("{}[unsafe({})]", prefix, rw),
+                    _ => format!("{}[{}]", prefix, rw),
+                },
+                _ => format!("{}[{}]", prefix, rw),
+            };
 
             if let Some(ref meta) = self.meta() {
                 // This attribute is possibly a doc attribute needing normalization to a doc comment
@@ -365,18 +442,23 @@ impl Rewrite for ast::Attribute {
 
                 // 1 = `[`
                 let shape = shape.offset_left(prefix.len() + 1, self.span)?;
-                Ok(meta.rewrite_result(context, shape).map_or_else(
-                    |_| snippet.to_owned(),
-                    |rw| match &self.kind {
-                        ast::AttrKind::Normal(normal_attr) => match normal_attr.item.unsafety {
-                            // For #![feature(unsafe_attributes)]
-                            // See https://github.com/rust-lang/rust/issues/123757
-                            ast::Safety::Unsafe(_) => format!("{}[unsafe({})]", prefix, rw),
-                            _ => format!("{}[{}]", prefix, rw),
-                        },
-                        _ => format!("{}[{}]", prefix, rw),
-                    },
-                ))
+                Ok(meta
+                    .rewrite_result(context, shape)
+                    .map_or_else(|_| snippet.to_owned(), wrap_args))
+            } else if let AttrKind::Normal(attr) = &self.kind {
+                // 1 = `[`
+                let shape_open = shape.offset_left(prefix.len() + 1, self.span)?;
+
+                // 1 = "]"
+                let shape_close = shape_open.sub_width(1, self.span)?;
+                rewrite_normal_attr(
+                    context,
+                    snippet,
+                    shape_open,
+                    shape_close,
+                    &attr.item,
+                    wrap_args,
+                )
             } else {
                 Ok(snippet.to_owned())
             }
