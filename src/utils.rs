@@ -471,7 +471,10 @@ pub(crate) fn filtered_str_fits(
     tab_spaces: usize,
     shape: Shape,
 ) -> bool {
-    let snippet = &filter_normal_code(snippet);
+    str_fits(&filter_normal_code(snippet), max_width, tab_spaces, shape)
+}
+
+fn str_fits(snippet: &str, max_width: usize, tab_spaces: usize, shape: Shape) -> bool {
     if !snippet.is_empty() {
         // First line must fits with `shape.width`.
         if first_line_width(snippet) > shape.width {
@@ -496,6 +499,24 @@ pub(crate) fn filtered_str_fits(
         }
     }
     true
+}
+
+pub(crate) fn filtered_str_fits_without_strings(
+    snippet: &str,
+    max_width: usize,
+    tab_spaces: usize,
+    shape: Shape,
+) -> bool {
+    let code: String = CharClasses::new(snippet.chars())
+        .filter_map(|(kind, c)| {
+            if c == '\n' || !kind.is_comment() && !kind.is_string() {
+                Some(c)
+            } else {
+                None
+            }
+        })
+        .collect();
+    str_fits(&code, max_width, tab_spaces, shape)
 }
 
 #[inline]
@@ -778,6 +799,39 @@ pub(crate) fn unicode_str_width(s: &str) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_chain_width_keeps_code_before_comments() {
+        let shape = Shape::legacy(20, Indent::empty());
+        for snippet in [
+            "call(\n    an_identifier_that_exceeds_the_width // comment\n)",
+            "call(\n    an_identifier_that_exceeds_the_width /* comment */\n)",
+            "call(\n    r#an_identifier_that_exceeds_the_width // comment\n)",
+            "call(\n    /* comment */ an_identifier_that_exceeds_the_width\n)",
+            "call(\n    字符字符字符字符字符字符字符字符字符字符 // comment\n)",
+            "an_identifier_that_exceeds_the_width(\n    \"text\"\n)",
+            "call(\n    \"text\"\n).an_identifier_that_exceeds_the_width()",
+        ] {
+            assert!(!filtered_str_fits_without_strings(snippet, 20, 4, shape));
+        }
+    }
+
+    #[test]
+    fn test_chain_width_allows_string_overflow() {
+        let shape = Shape::legacy(20, Indent::empty());
+        for snippet in [
+            "call(\n    \"a string literal that exceeds the width\"\n)",
+            "call(\n    \"a string literal that exceeds the width\" // comment\n)",
+            "call(\n    r#\"a raw string literal that exceeds the width\"#\n)",
+            "call(\n    b\"a byte string literal that exceeds the width\"\n)",
+            "call(\n    \"a string containing // and /* text */\"\n)",
+            "call(\n    \"a string with \\\"escaped quotes\\\" that exceeds the width\"\n)",
+            "call(\n    \"字符字符字符字符字符字符字符字符字符字符\"\n)",
+            "call(\n    // a comment that exceeds the width\n)",
+        ] {
+            assert!(filtered_str_fits_without_strings(snippet, 20, 4, shape));
+        }
+    }
 
     #[test]
     fn test_remove_trailing_white_spaces() {
