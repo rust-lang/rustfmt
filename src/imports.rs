@@ -19,7 +19,7 @@ use crate::config::{Edition, IndentStyle, StyleEdition};
 use crate::lists::{
     ListFormatting, ListItem, Separator, definitive_tactic, itemize_list, write_list,
 };
-use crate::rewrite::{Rewrite, RewriteContext, RewriteErrorExt, RewriteResult};
+use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult};
 use crate::shape::Shape;
 use crate::sort::version_sort;
 use crate::source_map::SpanUtils;
@@ -1111,8 +1111,8 @@ impl Rewrite for UseSegment {
                     // 1 = "{" and "}"
                     shape
                         .offset_left_opt(1)
-                        .and_then(|s| s.sub_width_opt(1))
-                        .unknown_error()?,
+                        .unknown_error()?
+                        .saturating_sub_width(1),
                 )?
             }
         })
@@ -1126,18 +1126,109 @@ impl Rewrite for UseTree {
 
     // This does NOT format attributes and visibility or add a trailing `;`.
     fn rewrite_result(&self, context: &RewriteContext<'_>, mut shape: Shape) -> RewriteResult {
-        let mut result = String::with_capacity(256);
-        let mut iter = self.path.iter().peekable();
-        while let Some(segment) = iter.next() {
-            let segment_str = segment.rewrite_result(context, shape)?;
-            result.push_str(&segment_str);
-            if iter.peek().is_some() {
-                result.push_str("::");
-                // 2 = "::"
-                shape = shape.offset_left(2 + segment_str.len(), self.span())?;
+        if context.config.style_edition() >= StyleEdition::Edition2024 {
+            fn proceed(
+                context: &RewriteContext<'_>,
+                span: &Span,
+                shape: &Shape,
+                curr_segment: &UseSegment,
+                curr_segment_is_allow_overflow: bool,
+                next_segment: Option<&&UseSegment>,
+            ) -> Result<(String, Shape), RewriteError> {
+                let mut rewritten_segment = curr_segment.rewrite_result(context, shape.clone())?;
+                if next_segment.is_some() {
+                    rewritten_segment.push_str("::");
+                }
+                // If `next_segment` is a list, we should check overflow with `curr_segment` with
+                // open brace: `...::curr_segment{`. So, 1 will be added to a shape.
+                let reserved_room_for_brace = match next_segment.map(|s| &s.kind) {
+                    Some(UseSegmentKind::List(_)) => "{".len(),
+                    _ => 0,
+                };
+                let next_shape = if matches!(&curr_segment.kind, UseSegmentKind::List(_)) {
+                    // This is the last segment and we won't use `next_shape`. Return `shape`
+                    // unchanged.
+                    shape.clone()
+                } else if curr_segment_is_allow_overflow {
+                    // If the segment follows `use ` or newline, force to consume the segment with
+                    // overflow.
+
+                    let s = shape.offset_left_maybe_overflow(rewritten_segment.len());
+                    if s.width == 0 {
+                        // We have to to commit current segment in this line. Make a room for next
+                        // round.
+                        s.add_width(reserved_room_for_brace)
+                    } else {
+                        s.clone()
+                    }
+                } else {
+                    let Some(ret) = shape.offset_left_opt(rewritten_segment.len()) else {
+                        return Err(RewriteError::ExceedsMaxWidth {
+                            configured_width: shape.width,
+                            span: span.clone(),
+                        });
+                    };
+                    // Check that there is a room for the next "{". If not, return an error for
+                    // retry with newline.
+                    if ret.offset_left_opt(reserved_room_for_brace).is_none() {
+                        return Err(RewriteError::ExceedsMaxWidth {
+                            configured_width: shape.width,
+                            span: span.clone(),
+                        });
+                    }
+                    ret
+                };
+                Ok((rewritten_segment, next_shape))
             }
+
+            let shape_top_level = shape.clone();
+            let mut result = String::with_capacity(256);
+            let mut is_first = true;
+            let mut iter = self.path.iter().peekable();
+            let span = self.span();
+            while let Some(segment) = iter.next() {
+                let allow_overflow = is_first;
+                is_first = false;
+                match proceed(context, &span, &shape, segment, allow_overflow, iter.peek()) {
+                    Ok((rewritten_segment, next_shape)) => {
+                        result.push_str(&rewritten_segment);
+                        shape = next_shape;
+                        continue;
+                    }
+                    Err(RewriteError::ExceedsMaxWidth { .. }) => {
+                        // If the first `proceed()` failed with no room, retry with newline.
+                    }
+                    Err(e) => {
+                        // Abort otherwise.
+                        return Err(e);
+                    }
+                }
+                result.push_str("\n");
+                result.push_str(&" ".repeat(shape.indent.block_indent + 4));
+                shape = shape_top_level.clone();
+                let allow_overflow = true;
+                let (rewritten_segment, next_shape) =
+                    proceed(context, &span, &shape, segment, allow_overflow, iter.peek())?;
+                result.push_str(&rewritten_segment);
+                shape = next_shape;
+            }
+            Ok(result)
+        } else {
+            let mut result = String::with_capacity(256);
+            let mut iter = self.path.iter().peekable();
+            while let Some(segment) = iter.next() {
+                let segment_str = segment.rewrite_result(context, shape)?;
+                result.push_str(&segment_str);
+                if iter.peek().is_some() {
+                    result.push_str("::");
+                    // 2 = "::"
+                    shape = shape
+                        .offset_left_opt(2 + segment_str.len())
+                        .max_width_error(shape.width, self.span())?;
+                }
+            }
+            Ok(result)
         }
-        Ok(result)
     }
 }
 
