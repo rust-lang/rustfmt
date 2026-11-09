@@ -260,9 +260,16 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         self.report
             .add_non_formatted_ranges(visitor.skipped_range.borrow().clone());
 
+        let original_text = source_file::original_text(
+            &path,
+            snippet_provider.entire_snippet(),
+            self.config.newline_style(),
+        )
+        .map_err(|e| io_error_with_path(&path, e))?;
+
         self.handler.handle_formatted_file(
-            &self.psess,
             path,
+            &original_text,
             visitor.buffer.to_owned(),
             &mut self.report,
         )
@@ -273,8 +280,8 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
 trait FormatHandler {
     fn handle_formatted_file(
         &mut self,
-        psess: &ParseSess,
         path: FileName,
+        original_text: &str,
         result: String,
         report: &mut FormatReport,
     ) -> Result<(), ErrorKind>;
@@ -284,26 +291,15 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
     // Called for each formatted file.
     fn handle_formatted_file(
         &mut self,
-        psess: &ParseSess,
         path: FileName,
+        original_text: &str,
         result: String,
         report: &mut FormatReport,
     ) -> Result<(), ErrorKind> {
         if let Some(ref mut out) = self.out {
-            match source_file::write_file(
-                Some(psess),
-                &path,
-                &result,
-                out,
-                &mut *self.emitter,
-                self.config.newline_style(),
-            ) {
+            match source_file::write_file(&path, original_text, &result, out, &mut *self.emitter) {
                 Ok(ref result) if result.has_diff => report.add_diff(),
-                Err(e) => {
-                    // Create a new error with path_str to help users see which files failed
-                    let err_msg = format!("{path}: {e}");
-                    return Err(io::Error::new(e.kind(), err_msg).into());
-                }
+                Err(e) => return Err(io_error_with_path(&path, e).into()),
                 _ => {}
             }
         }
@@ -311,6 +307,11 @@ impl<'b, T: Write + 'b> FormatHandler for Session<'b, T> {
         self.source_file.push((path, result));
         Ok(())
     }
+}
+
+// Create a new error with the path to help users see which files failed.
+fn io_error_with_path(path: &FileName, e: io::Error) -> io::Error {
+    io::Error::new(e.kind(), format!("{path}: {e}"))
 }
 
 pub(crate) struct FormattingError {
