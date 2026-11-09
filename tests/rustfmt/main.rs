@@ -672,3 +672,70 @@ fn test_args_file_carriage_return() {
     );
     assert_eq!(exit_code, 1);
 }
+
+/// Write `contents` to a new temporary file and return its path.
+///
+/// The file is written here rather than committed to `tests/` so that its line
+/// endings can't be changed by git.
+fn write_temp_source_file(contents: &str) -> std::path::PathBuf {
+    let path = tempfile::tempdir().unwrap().keep().join("lib.rs");
+    std::fs::write(&path, contents).unwrap();
+    path
+}
+
+#[test]
+fn newline_style_auto_reports_mixed_line_endings() {
+    // See also https://github.com/rust-lang/rustfmt/issues/7238
+    let src_file = write_temp_source_file("fn main() {\r\n    blah() // no CR!\n}\r\n");
+    let args = &["--check", src_file.to_str().unwrap()];
+
+    let (stdout, stderr, exit_code) = rustfmt(args);
+
+    assert_eq!(stderr, "");
+    assert!(
+        stdout.contains("Incorrect newline style"),
+        "expected newline style error, got: {stdout}"
+    );
+    assert_eq!(exit_code, 1);
+}
+
+#[test]
+fn newline_style_auto_accepts_windows_line_endings() {
+    let src_file = write_temp_source_file("fn main() {\r\n    blah()\r\n}\r\n");
+    let args = &["--check", src_file.to_str().unwrap()];
+
+    let (stdout, stderr, exit_code) = rustfmt(args);
+
+    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
+    assert_eq!(exit_code, 0);
+}
+
+#[test]
+fn newline_style_auto_keeps_windows_line_endings_when_formatting() {
+    // See also https://github.com/rust-lang/rustfmt/issues/4097
+    let src_file = write_temp_source_file("fn main()   {\r\n    blah()\r\n}\r\n");
+    let args = &[src_file.to_str().unwrap()];
+
+    let (stdout, stderr, exit_code) = rustfmt(args);
+
+    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
+    assert_eq!(exit_code, 0);
+    assert_eq!(
+        std::fs::read_to_string(&src_file).unwrap(),
+        "fn main() {\r\n    blah()\r\n}\r\n"
+    );
+}
+
+#[test]
+fn newline_style_auto_ignores_byte_order_mark() {
+    let src_file = write_temp_source_file("\u{feff}fn main() {}\n");
+    let args = &["--check", src_file.to_str().unwrap()];
+
+    let (stdout, stderr, exit_code) = rustfmt(args);
+
+    assert_eq!(stderr, "");
+    assert_eq!(stdout, "");
+    assert_eq!(exit_code, 0);
+}
