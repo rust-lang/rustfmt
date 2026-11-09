@@ -53,15 +53,25 @@ pub(crate) fn original_text(
 ) -> Result<String, io::Error> {
     // SourceFile's in the SourceMap will always have Unix-style line endings
     // See: https://github.com/rust-lang/rustfmt/issues/3850
-    // So if the user has explicitly overridden the rustfmt `newline_style`
-    // config and `filename` is FileName::Real, then we must check the file system
-    // to get the original file value in order to detect newline_style conflicts.
-    // Otherwise, if newline_style has been left as the default value, use the
-    // source from the parse session source map instead of hitting the file
-    // system. This also supports getting original text for `FileName::Stdin`.
+    // So when `filename` is FileName::Real we must check the file system to get
+    // the original file value, both to detect the newline style for
+    // `NewlineStyle::Auto` and to detect newline_style conflicts.
+    // For `FileName::Stdin` the original input is only available from the
+    // source map.
     match filename {
-        FileName::Real(path) if newline_style != NewlineStyle::Auto => fs::read_to_string(path),
-        _ => Ok(snippet.to_owned()),
+        FileName::Real(path) => {
+            let text = fs::read_to_string(path)?;
+            if newline_style != NewlineStyle::Auto {
+                return Ok(text);
+            }
+            // The source map also strips a leading byte order mark. Keep ignoring
+            // it here so that `Auto` only starts reporting newline differences.
+            match text.strip_prefix('\u{feff}') {
+                Some(text) => Ok(text.to_owned()),
+                None => Ok(text),
+            }
+        }
+        FileName::Stdin => Ok(snippet.to_owned()),
     }
 }
 

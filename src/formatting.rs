@@ -248,10 +248,19 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
             &self.report,
         );
 
+        let original_text = source_file::original_text(
+            &path,
+            snippet_provider.entire_snippet(),
+            self.config.newline_style(),
+        )
+        .map_err(|e| io_error_with_path(&path, e))?;
+
+        // Use the original text rather than the source map snippet, since the
+        // snippet never contains `\r\n` line endings.
         apply_newline_style(
             self.config.newline_style(),
             &mut visitor.buffer,
-            snippet_provider.entire_snippet(),
+            &original_text,
         );
 
         if visitor.macro_rewrite_failure {
@@ -259,13 +268,6 @@ impl<'a, T: FormatHandler + 'a> FormatContext<'a, T> {
         }
         self.report
             .add_non_formatted_ranges(visitor.skipped_range.borrow().clone());
-
-        let original_text = source_file::original_text(
-            &path,
-            snippet_provider.entire_snippet(),
-            self.config.newline_style(),
-        )
-        .map_err(|e| io_error_with_path(&path, e))?;
 
         self.handler.handle_formatted_file(
             path,
