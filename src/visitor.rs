@@ -137,6 +137,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             let leading_ws_len = snippet.len() - snippet.trim_start().len();
             let leading_newlines = count_newlines(&snippet[..leading_ws_len]);
             let newline_count = count_newlines(snippet);
+            let use_2027_style = self.config.style_edition() >= StyleEdition::Edition2027;
             let snippet = snippet.trim();
             if !snippet.is_empty() {
                 // FIXME(calebcartwright 2021-01-03) - This exists strictly to maintain legacy
@@ -147,7 +148,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.format_missing(stmt.span().hi());
                 } else {
                     if original_starts_with_newline {
-                        self.push_vertical_spaces(leading_newlines);
+                        if use_2027_style {
+                            self.push_vertical_spaces(leading_newlines);
+                        } else {
+                            self.push_str("\n");
+                        }
                     }
 
                     self.push_str(&self.block_indent.to_string(self.config));
@@ -155,7 +160,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                 }
             } else if include_empty_semi {
                 self.push_str(";");
-            } else {
+            } else if use_2027_style {
                 let line_suffix = self
                     .snippet_provider
                     .span_to_snippet(mk_sp(stmt.span().hi(), self.snippet_provider.end_pos()))

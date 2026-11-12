@@ -1,6 +1,6 @@
+//@ rustfmt-style_edition: 2027
 fn a() {
     let v1 = 1;
-    ;
 
     let v2 = 2;
 }
@@ -8,34 +8,28 @@ fn a() {
 fn b() {
     let v1 = 1;
 
-    ;
     let v2 = 2;
 }
 
 fn c() {
     let v1 = 1;
 
-    ; // comment
+    // comment
 }
 
 fn d() {
     let v1 = 1;
 
-
-
-    ; // comment
+    // comment
     let v2 = 2;
 }
 
 fn e() {
-
     let v1 = 1;
 
-    
-    ; let v2 = 2;
+    let v2 = 2;
 
-
-    ; // comment
+    // comment
     let v3 = 3;
 }
 
@@ -43,23 +37,20 @@ fn f() {
     let v1 = 1;
 
     {
-
-        ; // comment
-
-        
+        // comment
     }
 }
 
 fn g() {
     let v1 = 1;
 
-    /* comment */ ;
+    /* comment */
     let v2 = 2;
 }
 
 fn h() {
     let v1 = 1;
-    /* comment */ ;
+    /* comment */
     let v2 = 2;
 }
 
@@ -68,7 +59,6 @@ fn i() {
 
     /* multi
      * line */
-    ;
     let v2 = 2;
 }
 
@@ -76,6 +66,5 @@ fn j() {
     let v1 = 1;
 
     // prefix comment
-    ;
     let v2 = 2;
 }

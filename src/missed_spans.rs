@@ -245,7 +245,8 @@ impl<'a> FmtVisitor<'a> {
             .rev()
             .find(|rev_c| ![' ', '\t'].contains(rev_c));
         // A removed empty statement should not make the following comment look same-line.
-        let preceded_by_empty_stmt = is_empty_stmt_snippet(&snippet[..offset]);
+        let preceded_by_empty_stmt = self.config.style_edition() >= StyleEdition::Edition2027
+            && is_empty_stmt_snippet(&snippet[..offset]);
 
         let fix_indent =
             preceded_by_empty_stmt || last_char.map_or(true, |rev_c| ['{', '\n'].contains(&rev_c));
