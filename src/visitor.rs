@@ -134,6 +134,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             let original_starts_with_newline = snippet
                 .find(|c| c != ' ')
                 .map_or(false, |i| starts_with_newline(&snippet[i..]));
+            let leading_ws_len = snippet.len() - snippet.trim_start().len();
+            let leading_newlines = count_newlines(&snippet[..leading_ws_len]);
             let newline_count = count_newlines(snippet);
             let snippet = snippet.trim();
             if !snippet.is_empty() {
@@ -145,7 +147,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
                     self.format_missing(stmt.span().hi());
                 } else {
                     if original_starts_with_newline {
-                        self.push_str("\n");
+                        self.push_vertical_spaces(leading_newlines);
                     }
 
                     self.push_str(&self.block_indent.to_string(self.config));

@@ -49,3 +49,33 @@ fn f() {
         
     }
 }
+
+fn g() {
+    let v1 = 1;
+
+    /* comment */ ;
+    let v2 = 2;
+}
+
+fn h() {
+    let v1 = 1;
+    /* comment */ ;
+    let v2 = 2;
+}
+
+fn i() {
+    let v1 = 1;
+
+    /* multi
+     * line */
+    ;
+    let v2 = 2;
+}
+
+fn j() {
+    let v1 = 1;
+
+    // prefix comment
+    ;
+    let v2 = 2;
+}
