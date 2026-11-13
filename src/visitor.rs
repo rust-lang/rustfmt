@@ -879,6 +879,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         );
         visitor.skip_context.update(ctx.skip_context.clone());
         visitor.set_parent_context(ctx);
+        visitor.in_function_body = ctx.in_function_body.get();
+        visitor.function_return_type = ctx.function_return_type.get();
+        visitor.function_block_depth = ctx.function_block_depth.get();
         visitor
     }
 
