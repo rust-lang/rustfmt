@@ -11,21 +11,18 @@ fn foo() {
 }
 
 fn bar() -> i32 {
-    return if true { 1 } else { 2 };
+    return if true { return 1; } else { return 2; };
 }
 
 fn baz() -> Result<i32, &str> {
     return Ok(42);
 }
 
-fn empty_body() {
-    return;
-}
+fn empty_body() { return; }
 
 fn unit_return() -> () {
     let x = 1;
     println!("{}", x);
-    return;
 }
 
 fn early_return(x: i32) -> i32 {
@@ -66,7 +63,14 @@ extern "C" fn extern_fn() -> i32 {
 }
 
 // Single-line functions
-fn single_line_expr() -> i32 { return 42; }
-fn single_line_unit() { println!("hi"); return; }
+fn single_line_expr() -> i32 {
+    return 42;
+}
+fn single_line_unit() {
+    println!("hi");
+    return;
+}
 fn single_line_empty() { return; }
-fn single_line_never() -> ! { panic!() }
+fn single_line_never() -> ! {
+    panic!()
+}

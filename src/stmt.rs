@@ -147,8 +147,7 @@ fn format_stmt(
                 && !matches!(
                     ex.kind,
                     ast::ExprKind::Ret(..) | ast::ExprKind::Break(..) | ast::ExprKind::Continue(..)
-                )
-            {
+                ) {
                 // Prepend "return " to the expression and add semicolon
                 let shape = shape.sub_width("return ".len(), ex.span())?;
                 format_expr(ex, expr_type, context, shape).map(|s| format!("return {s};"))

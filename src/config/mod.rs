@@ -171,7 +171,8 @@ create_config! {
     use_field_init_shorthand: UseFieldInitShorthand, true, "Use field initialization shorthand if \
         possible";
     force_explicit_abi: ForceExplicitAbi, true, "Always print the abi for extern items";
-    force_explicit_return: ForceExplicitReturn, false, "Force explicit return statements in function bodies";
+    force_explicit_return: ForceExplicitReturn, false, "Force explicit return statements \
+        in function bodies";
     condense_wildcard_suffixes: CondenseWildcardSuffixes, false, "Replace strings of _ wildcards \
         by a single .. in tuple patterns";
 

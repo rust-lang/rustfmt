@@ -259,12 +259,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             && self.function_return_type == FunctionReturnType::Unit
             && self.config.force_explicit_return();
         if should_add_unit_return {
-            let last_stmt_is_return = b.stmts.last().map_or(false, |stmt| {
-                match stmt.kind {
-                    ast::StmtKind::Expr(ref ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
-                    ast::StmtKind::Semi(ref ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
-                    _ => false,
-                }
+            let last_stmt_is_return = b.stmts.last().map_or(false, |stmt| match stmt.kind {
+                ast::StmtKind::Expr(ref ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
+                ast::StmtKind::Semi(ref ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
+                _ => false,
             });
             if !last_stmt_is_return && !b.stmts.is_empty() {
                 // Add newline and indent before return

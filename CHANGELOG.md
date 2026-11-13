@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- New `force_explicit_return` configuration option to force explicit `return` statements in function bodies [#7155](https://github.com/rust-lang/rustfmt/issues/7155)
+
 <!-- These changes will be available on the stable released channel alongside Rust 1.101 -->
 ## [1.12.0] 2026-12-24
 

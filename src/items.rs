@@ -25,7 +25,8 @@ use crate::lists::{ListFormatting, Separator, definitive_tactic, itemize_list, w
 use crate::macros::{MacroPosition, rewrite_macro};
 use crate::overflow;
 use crate::rewrite::{
-    ExceedsMaxWidthError, FunctionReturnType, Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult,
+    ExceedsMaxWidthError, FunctionReturnType, Rewrite, RewriteContext, RewriteError,
+    RewriteErrorExt, RewriteResult,
 };
 use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
