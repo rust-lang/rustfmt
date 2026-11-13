@@ -69,3 +69,4 @@ extern "C" fn extern_fn() -> i32 {
 fn single_line_expr() -> i32 { return 42; }
 fn single_line_unit() { println!("hi"); return; }
 fn single_line_empty() { return; }
+fn single_line_never() -> ! { panic!() }
