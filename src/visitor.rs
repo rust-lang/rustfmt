@@ -457,7 +457,14 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // Determine return type for force_explicit_return
         let return_type = match fd.output {
             ast::FnRetTy::Default(..) => FunctionReturnType::Unit,
-            ast::FnRetTy::Ty(..) => FunctionReturnType::NonUnit,
+            ast::FnRetTy::Ty(ref ty) => {
+                // Check for diverging function (return type `!`)
+                if matches!(ty.kind, ast::TyKind::Never) {
+                    FunctionReturnType::Never
+                } else {
+                    FunctionReturnType::NonUnit
+                }
+            }
         };
 
         if let Some((fn_str, fn_brace_style)) = rewrite {

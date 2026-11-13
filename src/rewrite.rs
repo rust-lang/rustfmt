@@ -107,6 +107,7 @@ impl<T> RewriteErrorExt<T> for Option<T> {
 pub(crate) enum FunctionReturnType {
     Unit,
     NonUnit,
+    Never,
 }
 
 #[derive(Clone)]

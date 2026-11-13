@@ -514,6 +514,7 @@ impl<'a> FmtVisitor<'a> {
         let res = Stmt::from_ast_node(stmt, true).rewrite(&context, self.shape())?;
 
         // For unit return types with force_explicit_return, add return; after the statement
+        // unless the statement is already an explicit return
         let res = if return_type == FunctionReturnType::Unit
             && context.in_function_body_block.get()
             && context.config.force_explicit_return()

@@ -139,7 +139,10 @@ fn format_stmt(
             let expr_str = if is_last_expr
                 && context.in_function_body.get()
                 && context.in_function_body_block.get()
-                && context.function_return_type.get() == FunctionReturnType::NonUnit
+                && matches!(
+                    context.function_return_type.get(),
+                    FunctionReturnType::NonUnit
+                )
                 && context.config.force_explicit_return()
                 && !matches!(
                     ex.kind,
