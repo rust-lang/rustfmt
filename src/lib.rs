@@ -3,6 +3,8 @@
 #![warn(unreachable_pub)]
 #![recursion_limit = "256"]
 #![allow(clippy::match_like_matches_macro)]
+#![allow(clippy::bool_to_int_with_if)]
+#![allow(clippy::needless_pass_by_value)]
 
 // N.B. these crates are loaded from the sysroot, so they need extern crate.
 extern crate rustc_ast;
