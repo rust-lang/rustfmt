@@ -260,11 +260,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             && self.config.force_explicit_return();
         if should_add_unit_return {
             let last_stmt_is_return = b.stmts.last().map_or(false, |stmt| {
-                matches!(
-                    stmt.kind,
-                    ast::StmtKind::Expr(ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
-                        | ast::StmtKind::Semi(ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
-                )
+                match stmt.kind {
+                    ast::StmtKind::Expr(ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
+                    ast::StmtKind::Semi(ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
+                    _ => false,
+                }
             });
             if !last_stmt_is_return && !b.stmts.is_empty() {
                 // Add newline and indent before return

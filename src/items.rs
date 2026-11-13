@@ -515,14 +515,15 @@ impl<'a> FmtVisitor<'a> {
 
         // For unit return types with force_explicit_return, add return; after the statement
         // unless the statement is already an explicit return
+        let is_explicit_return = match stmt.kind {
+            ast::StmtKind::Expr(ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
+            ast::StmtKind::Semi(ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
+            _ => false,
+        };
         let res = if return_type == FunctionReturnType::Unit
             && context.in_function_body_block.get()
             && context.config.force_explicit_return()
-            && !matches!(
-                stmt.kind,
-                ast::StmtKind::Expr(ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
-                    | ast::StmtKind::Semi(ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
-            )
+            && !is_explicit_return
         {
             // Check if the statement already ends with a semicolon
             let needs_semi = matches!(stmt.kind, ast::StmtKind::Expr(..));
