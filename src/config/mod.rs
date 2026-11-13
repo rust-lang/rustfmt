@@ -171,6 +171,7 @@ create_config! {
     use_field_init_shorthand: UseFieldInitShorthand, true, "Use field initialization shorthand if \
         possible";
     force_explicit_abi: ForceExplicitAbi, true, "Always print the abi for extern items";
+    force_explicit_return: ForceExplicitReturn, false, "Force explicit return statements in function bodies";
     condense_wildcard_suffixes: CondenseWildcardSuffixes, false, "Replace strings of _ wildcards \
         by a single .. in tuple patterns";
 
@@ -820,6 +821,7 @@ merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false
 force_explicit_abi = true
+force_explicit_return = false
 condense_wildcard_suffixes = false
 color = "Auto"
 required_version = "{}"
@@ -913,6 +915,7 @@ merge_derives = true
 use_try_shorthand = false
 use_field_init_shorthand = false
 force_explicit_abi = true
+force_explicit_return = false
 condense_wildcard_suffixes = false
 color = "Auto"
 required_version = "{}"
