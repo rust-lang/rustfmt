@@ -943,6 +943,41 @@ extern {
 }
 ```
 
+## `force_explicit_return`
+
+Force explicit return statements in function bodies
+
+- **Default value**: `false`
+- **Possible values**: `true`, `false`
+- **Stable**: No
+
+**Note:** When enabled, implicit returns (the last expression in a function body without a semicolon) are converted to explicit `return` statements. For functions returning `()`, a `return;` statement is added at the end of the function body if not already present.
+
+#### `true`:
+
+```rust
+fn add_one(x: u32) -> u32 {
+    return x + 1;
+}
+
+fn foo() {
+    println!("hello");
+    return;
+}
+```
+
+#### `false` (default):
+
+```rust
+fn add_one(x: u32) -> u32 {
+    x + 1
+}
+
+fn foo() {
+    println!("hello");
+}
+```
+
 ## `force_multiline_blocks`
 
 Force multiline closure and match arm bodies to be wrapped in a block
