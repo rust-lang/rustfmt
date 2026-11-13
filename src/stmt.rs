@@ -4,7 +4,7 @@ use rustc_span::Span;
 use crate::comment::recover_comment_removed;
 use crate::config::StyleEdition;
 use crate::expr::{ExprType, format_expr, is_simple_block};
-use crate::rewrite::{Rewrite, RewriteContext, RewriteError, RewriteResult};
+use crate::rewrite::{FunctionReturnType, Rewrite, RewriteContext, RewriteError, RewriteResult};
 use crate::shape::Shape;
 use crate::source_map::LineRangeUtils;
 use crate::spanned::Spanned;
@@ -133,7 +133,24 @@ fn format_stmt(
             };
 
             let shape = shape.sub_width(suffix.len(), ex.span())?;
-            format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
+
+            // Handle force_explicit_return for non-unit return types
+            let expr_str = if is_last_expr
+                && context.in_function_body.get()
+                && context.function_return_type.get() == FunctionReturnType::NonUnit
+                && context.config.force_explicit_return()
+                && !matches!(
+                    ex.kind,
+                    ast::ExprKind::Ret(..) | ast::ExprKind::Break(..) | ast::ExprKind::Continue(..)
+                )
+            {
+                // Prepend "return " to the expression and add semicolon
+                let shape = shape.sub_width("return ".len(), ex.span())?;
+                format_expr(ex, expr_type, context, shape).map(|s| format!("return {s};"))
+            } else {
+                format_expr(ex, expr_type, context, shape).map(|s| s + suffix)
+            };
+            expr_str
         }
         ast::StmtKind::MacCall(..) | ast::StmtKind::Item(..) | ast::StmtKind::Empty => {
             Err(RewriteError::Unknown)
