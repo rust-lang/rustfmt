@@ -105,8 +105,11 @@ impl<T> RewriteErrorExt<T> for Option<T> {
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum FunctionReturnType {
+    /// Function returns `()` (unit type)
     Unit,
+    /// Function returns a concrete type (e.g., `i32`, `String`)
     NonUnit,
+    /// Function never returns (diverging, `!` type)
     Never,
 }
 
