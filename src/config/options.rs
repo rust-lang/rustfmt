@@ -721,6 +721,7 @@ config_option_with_style_edition_default!(
     UseTryShorthand, bool, _ => false;
     UseFieldInitShorthand, bool, _ => false;
     ForceExplicitAbi, bool, _ => true;
+    ForceExplicitReturn, bool, _ => false;
     CondenseWildcardSuffixes, bool, _ => false;
 
     // Control options (changes the operation of rustfmt, rather than the formatting)
