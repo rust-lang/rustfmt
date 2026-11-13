@@ -262,8 +262,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             let last_stmt_is_return = b.stmts.last().map_or(false, |stmt| {
                 matches!(
                     stmt.kind,
-                    ast::StmtKind::Expr(ref ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
-                        | ast::StmtKind::Semi(ref ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
+                    ast::StmtKind::Expr(ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
+                        | ast::StmtKind::Semi(ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
                 )
             });
             if !last_stmt_is_return && !b.stmts.is_empty() {

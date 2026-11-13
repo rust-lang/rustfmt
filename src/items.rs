@@ -520,8 +520,8 @@ impl<'a> FmtVisitor<'a> {
             && context.config.force_explicit_return()
             && !matches!(
                 stmt.kind,
-                ast::StmtKind::Expr(ref ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
-                    | ast::StmtKind::Semi(ref ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
+                ast::StmtKind::Expr(ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
+                    | ast::StmtKind::Semi(ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
             )
         {
             // Check if the statement already ends with a semicolon
