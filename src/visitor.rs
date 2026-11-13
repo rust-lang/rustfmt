@@ -19,7 +19,7 @@ use crate::items::{
 use crate::macros::{MacroPosition, macro_style, rewrite_macro, rewrite_macro_def};
 use crate::modules::Module;
 use crate::parse::session::ParseSess;
-use crate::rewrite::{Rewrite, RewriteContext};
+use crate::rewrite::{FunctionReturnType, Rewrite, RewriteContext};
 use crate::shape::{Indent, Shape};
 use crate::skip::{SkipContext, is_skip_attr};
 use crate::source_map::{LineRangeUtils, SpanUtils};
@@ -81,6 +81,9 @@ pub(crate) struct FmtVisitor<'a> {
     pub(crate) config: &'a Config,
     pub(crate) is_if_else_block: bool,
     pub(crate) is_loop_block: bool,
+    // Track function body state for force_explicit_return
+    pub(crate) in_function_body: bool,
+    pub(crate) function_return_type: FunctionReturnType,
     pub(crate) snippet_provider: &'a SnippetProvider,
     pub(crate) line_number: usize,
     /// List of 1-based line ranges which were annotated with skip
@@ -241,6 +244,30 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
 
         self.walk_block_stmts(b);
+
+        // Handle force_explicit_return for unit return types
+        // Add "return;" at the end if not already present
+        let should_add_unit_return = self.in_function_body
+            && self.function_return_type == FunctionReturnType::Unit
+            && self.config.force_explicit_return();
+        if should_add_unit_return {
+            let last_stmt_is_return = b.stmts.last().map_or(false, |stmt| {
+                matches!(
+                    stmt.kind,
+                    ast::StmtKind::Expr(ref ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
+                        | ast::StmtKind::Semi(ref ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
+                )
+            });
+            if !last_stmt_is_return && !b.stmts.is_empty() {
+                // Add newline and indent before return
+                self.push_str("\n");
+                self.push_str(&self.block_indent.to_string(self.config));
+                self.push_str("return;");
+            } else if !last_stmt_is_return && b.stmts.is_empty() {
+                // Empty function body, just add return;
+                self.push_str("return;");
+            }
+        }
 
         if let Some(stmt) = b.stmts.last() {
             if self.add_semi_on_last_block_stmt(stmt) {
@@ -415,10 +442,16 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             _ => unreachable!(),
         };
 
+        // Determine return type for force_explicit_return
+        let return_type = match fd.output {
+            ast::FnRetTy::Default(..) => FunctionReturnType::Unit,
+            ast::FnRetTy::Ty(..) => FunctionReturnType::NonUnit,
+        };
+
         if let Some((fn_str, fn_brace_style)) = rewrite {
             self.format_missing_with_indent(source!(self, s).lo());
 
-            if let Some(rw) = self.single_line_fn(&fn_str, block, inner_attrs) {
+            if let Some(rw) = self.single_line_fn(&fn_str, block, inner_attrs, return_type) {
                 self.push_str(&rw);
                 self.last_pos = s.hi();
                 return;
@@ -437,7 +470,17 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             self.format_missing(source!(self, block.span).lo());
         }
 
-        self.visit_block(block, inner_attrs, true)
+        // Set function body context for force_explicit_return
+        let prev_in_function_body = self.in_function_body;
+        let prev_function_return_type = self.function_return_type;
+        self.in_function_body = true;
+        self.function_return_type = return_type;
+
+        self.visit_block(block, inner_attrs, true);
+
+        // Restore function body context
+        self.in_function_body = prev_in_function_body;
+        self.function_return_type = prev_function_return_type;
     }
 
     pub(crate) fn visit_item(&mut self, item: &ast::Item) {
@@ -848,6 +891,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             config,
             is_if_else_block: false,
             is_loop_block: false,
+            in_function_body: false,
+            function_return_type: FunctionReturnType::Unit,
             snippet_provider,
             line_number: 0,
             skipped_range: Rc::new(RefCell::new(vec![])),
@@ -1072,9 +1117,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             config: self.config,
             inside_macro: Rc::new(Cell::new(false)),
             use_block: Cell::new(false),
-            is_if_else_block: Cell::new(false),
-            is_loop_block: Cell::new(false),
+            is_if_else_block: Cell::new(self.is_if_else_block),
+            is_loop_block: Cell::new(self.is_loop_block),
             force_one_line_chain: Cell::new(false),
+            in_function_body: Cell::new(self.in_function_body),
+            function_return_type: Cell::new(self.function_return_type),
             snippet_provider: self.snippet_provider,
             macro_rewrite_failure: Cell::new(false),
             is_macro_def: self.is_macro_def,
