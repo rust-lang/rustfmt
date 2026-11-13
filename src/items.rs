@@ -25,7 +25,7 @@ use crate::lists::{ListFormatting, Separator, definitive_tactic, itemize_list, w
 use crate::macros::{MacroPosition, rewrite_macro};
 use crate::overflow;
 use crate::rewrite::{
-    ExceedsMaxWidthError, Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult,
+    ExceedsMaxWidthError, FunctionReturnType, Rewrite, RewriteContext, RewriteError, RewriteErrorExt, RewriteResult,
 };
 use crate::shape::{Indent, Shape};
 use crate::source_map::{LineRangeUtils, SpanUtils};
@@ -483,18 +483,25 @@ impl<'a> FmtVisitor<'a> {
         fn_str: &str,
         block: &ast::Block,
         inner_attrs: Option<&[ast::Attribute]>,
+        return_type: FunctionReturnType,
     ) -> Option<String> {
         if fn_str.contains('\n') || inner_attrs.map_or(false, |a| !a.is_empty()) {
             return None;
         }
 
-        let context = self.get_context();
+        let mut context = self.get_context();
+        context.in_function_body.replace(true);
+        context.function_return_type.replace(return_type);
 
         if self.config.empty_item_single_line()
             && is_empty_block(&context, block, None)
             && self.block_indent.width() + fn_str.len() + 3 <= self.config.max_width()
             && !last_line_contains_single_line_comment(fn_str)
         {
+            // For empty function body with unit return type and force_explicit_return, add return;
+            if return_type == FunctionReturnType::Unit && context.config.force_explicit_return() {
+                return Some(format!("{fn_str} {{ return; }}"));
+            }
             return Some(format!("{fn_str} {{}}"));
         }
 
@@ -502,8 +509,25 @@ impl<'a> FmtVisitor<'a> {
             return None;
         }
 
-        let res = Stmt::from_ast_node(block.stmts.first()?, true)
-            .rewrite(&self.get_context(), self.shape())?;
+        let stmt = block.stmts.first()?;
+        let res = Stmt::from_ast_node(stmt, true).rewrite(&context, self.shape())?;
+
+        // For unit return types with force_explicit_return, add return; after the statement
+        let res = if return_type == FunctionReturnType::Unit
+            && context.config.force_explicit_return()
+            && !matches!(
+                stmt.kind,
+                ast::StmtKind::Expr(ref ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
+                    | ast::StmtKind::Semi(ref ex) if matches!(ex.kind, ast::ExprKind::Ret(..))
+            )
+        {
+            // Check if the statement already ends with a semicolon
+            let needs_semi = matches!(stmt.kind, ast::StmtKind::Expr(..));
+            let semi = if needs_semi { ";" } else { "" };
+            format!("{res}{semi} return;")
+        } else {
+            res
+        };
 
         let width = self.block_indent.width() + fn_str.len() + res.len() + 5;
         if !res.contains('\n') && width <= self.config.max_width() {
