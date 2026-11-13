@@ -103,6 +103,12 @@ impl<T> RewriteErrorExt<T> for Option<T> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum FunctionReturnType {
+    Unit,
+    NonUnit,
+}
+
 #[derive(Clone)]
 pub(crate) struct RewriteContext<'a> {
     pub(crate) psess: &'a ParseSess,
@@ -118,6 +124,9 @@ pub(crate) struct RewriteContext<'a> {
     pub(crate) is_loop_block: Cell<bool>,
     // When rewriting chain, veto going multi line except the last element
     pub(crate) force_one_line_chain: Cell<bool>,
+    // Track function body state for force_explicit_return
+    pub(crate) in_function_body: Cell<bool>,
+    pub(crate) function_return_type: Cell<FunctionReturnType>,
     pub(crate) snippet_provider: &'a SnippetProvider,
     // Used for `format_snippet`
     pub(crate) macro_rewrite_failure: Cell<bool>,
