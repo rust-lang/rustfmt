@@ -261,8 +261,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if should_add_unit_return {
             let last_stmt_is_return = b.stmts.last().map_or(false, |stmt| {
                 match stmt.kind {
-                    ast::StmtKind::Expr(ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
-                    ast::StmtKind::Semi(ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
+                    ast::StmtKind::Expr(ref ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
+                    ast::StmtKind::Semi(ref ex) => matches!(ex.kind, ast::ExprKind::Ret(..)),
                     _ => false,
                 }
             });
