@@ -298,6 +298,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         if is_function_body_block {
             self.in_function_body_block = false;
         }
+    }
 
     fn close_block(&mut self, span: Span, unindent_comment: bool) {
         let config = self.config;
