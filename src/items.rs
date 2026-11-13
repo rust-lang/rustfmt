@@ -492,6 +492,7 @@ impl<'a> FmtVisitor<'a> {
         let mut context = self.get_context();
         context.in_function_body.replace(true);
         context.function_return_type.replace(return_type);
+        context.function_block_depth.replace(1);
 
         if self.config.empty_item_single_line()
             && is_empty_block(&context, block, None)
@@ -514,6 +515,7 @@ impl<'a> FmtVisitor<'a> {
 
         // For unit return types with force_explicit_return, add return; after the statement
         let res = if return_type == FunctionReturnType::Unit
+            && context.function_block_depth.get() == 1
             && context.config.force_explicit_return()
             && !matches!(
                 stmt.kind,

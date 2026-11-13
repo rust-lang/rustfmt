@@ -127,6 +127,7 @@ pub(crate) struct RewriteContext<'a> {
     // Track function body state for force_explicit_return
     pub(crate) in_function_body: Cell<bool>,
     pub(crate) function_return_type: Cell<FunctionReturnType>,
+    pub(crate) function_block_depth: Cell<u32>,
     pub(crate) snippet_provider: &'a SnippetProvider,
     // Used for `format_snippet`
     pub(crate) macro_rewrite_failure: Cell<bool>,

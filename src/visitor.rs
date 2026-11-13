@@ -1138,6 +1138,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             force_one_line_chain: Cell::new(false),
             in_function_body: Cell::new(self.in_function_body),
             function_return_type: Cell::new(self.function_return_type),
+            function_block_depth: Cell::new(self.function_block_depth),
             snippet_provider: self.snippet_provider,
             macro_rewrite_failure: Cell::new(false),
             is_macro_def: self.is_macro_def,
