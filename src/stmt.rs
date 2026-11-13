@@ -135,10 +135,10 @@ fn format_stmt(
             let shape = shape.sub_width(suffix.len(), ex.span())?;
 
             // Handle force_explicit_return for non-unit return types
-            // Only at top-level function body (depth 1)
+            // Only at top-level function body block
             let expr_str = if is_last_expr
                 && context.in_function_body.get()
-                && context.function_block_depth.get() == 1
+                && context.in_function_body_block.get()
                 && context.function_return_type.get() == FunctionReturnType::NonUnit
                 && context.config.force_explicit_return()
                 && !matches!(

@@ -84,7 +84,7 @@ pub(crate) struct FmtVisitor<'a> {
     // Track function body state for force_explicit_return
     pub(crate) in_function_body: bool,
     pub(crate) function_return_type: FunctionReturnType,
-    pub(crate) function_block_depth: u32,
+    pub(crate) in_function_body_block: bool,
     pub(crate) snippet_provider: &'a SnippetProvider,
     pub(crate) line_number: usize,
     /// List of 1-based line ranges which were annotated with skip
@@ -237,10 +237,10 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.last_pos = self.last_pos + brace_compensation;
         self.block_indent = self.block_indent.block_indent(self.config);
 
-        // Track block depth for force_explicit_return
-        let is_function_body_block = self.in_function_body && self.function_block_depth == 0;
-        if self.in_function_body {
-            self.function_block_depth += 1;
+        // Track whether this is the function body block (first block in function)
+        let is_function_body_block = self.in_function_body && !self.in_function_body_block;
+        if is_function_body_block {
+            self.in_function_body_block = true;
         }
 
         self.push_str("{");
@@ -254,7 +254,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.walk_block_stmts(b);
 
         // Handle force_explicit_return for unit return types
-        // Only add "return;" at the top-level function body block (depth 1 after increment)
+        // Only add "return;" at the top-level function body block
         let should_add_unit_return = is_function_body_block
             && self.function_return_type == FunctionReturnType::Unit
             && self.config.force_explicit_return();
@@ -294,9 +294,9 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         }
         self.last_pos = source!(self, b.span).hi();
 
-        // Decrement block depth when exiting
-        if self.in_function_body {
-            self.function_block_depth -= 1;
+        // Reset function body block flag when exiting
+        if is_function_body_block {
+            self.in_function_body_block = false;
         }
 
     fn close_block(&mut self, span: Span, unindent_comment: bool) {
@@ -485,17 +485,17 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // Set function body context for force_explicit_return
         let prev_in_function_body = self.in_function_body;
         let prev_function_return_type = self.function_return_type;
-        let prev_function_block_depth = self.function_block_depth;
+        let prev_in_function_body_block = self.in_function_body_block;
         self.in_function_body = true;
         self.function_return_type = return_type;
-        self.function_block_depth = 0;
+        self.in_function_body_block = false;
 
         self.visit_block(block, inner_attrs, true);
 
         // Restore function body context
         self.in_function_body = prev_in_function_body;
         self.function_return_type = prev_function_return_type;
-        self.function_block_depth = prev_function_block_depth;
+        self.in_function_body_block = prev_in_function_body_block;
     }
 
     pub(crate) fn visit_item(&mut self, item: &ast::Item) {
@@ -881,7 +881,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         visitor.set_parent_context(ctx);
         visitor.in_function_body = ctx.in_function_body.get();
         visitor.function_return_type = ctx.function_return_type.get();
-        visitor.function_block_depth = ctx.function_block_depth.get();
+        visitor.in_function_body_block = ctx.in_function_body_block.get();
         visitor
     }
 
@@ -911,7 +911,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             is_loop_block: false,
             in_function_body: false,
             function_return_type: FunctionReturnType::Unit,
-            function_block_depth: 0,
+            in_function_body_block: false,
             snippet_provider,
             line_number: 0,
             skipped_range: Rc::new(RefCell::new(vec![])),
@@ -1141,7 +1141,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             force_one_line_chain: Cell::new(false),
             in_function_body: Cell::new(self.in_function_body),
             function_return_type: Cell::new(self.function_return_type),
-            function_block_depth: Cell::new(self.function_block_depth),
+            in_function_body_block: Cell::new(self.in_function_body_block),
             snippet_provider: self.snippet_provider,
             macro_rewrite_failure: Cell::new(false),
             is_macro_def: self.is_macro_def,
