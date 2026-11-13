@@ -84,6 +84,7 @@ pub(crate) struct FmtVisitor<'a> {
     // Track function body state for force_explicit_return
     pub(crate) in_function_body: bool,
     pub(crate) function_return_type: FunctionReturnType,
+    pub(crate) function_block_depth: u32,
     pub(crate) snippet_provider: &'a SnippetProvider,
     pub(crate) line_number: usize,
     /// List of 1-based line ranges which were annotated with skip
@@ -235,6 +236,13 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
 
         self.last_pos = self.last_pos + brace_compensation;
         self.block_indent = self.block_indent.block_indent(self.config);
+
+        // Track block depth for force_explicit_return
+        let is_function_body_block = self.in_function_body && self.function_block_depth == 0;
+        if self.in_function_body {
+            self.function_block_depth += 1;
+        }
+
         self.push_str("{");
         self.trim_spaces_after_opening_brace(b, inner_attrs);
 
@@ -246,8 +254,8 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         self.walk_block_stmts(b);
 
         // Handle force_explicit_return for unit return types
-        // Add "return;" at the end if not already present
-        let should_add_unit_return = self.in_function_body
+        // Only add "return;" at the top-level function body block (depth 1 after increment)
+        let should_add_unit_return = is_function_body_block
             && self.function_return_type == FunctionReturnType::Unit
             && self.config.force_explicit_return();
         if should_add_unit_return {
@@ -285,7 +293,11 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             self.close_block(missing_span, self.unindent_comment_on_closing_brace(b));
         }
         self.last_pos = source!(self, b.span).hi();
-    }
+
+        // Decrement block depth when exiting
+        if self.in_function_body {
+            self.function_block_depth -= 1;
+        }
 
     fn close_block(&mut self, span: Span, unindent_comment: bool) {
         let config = self.config;
@@ -473,14 +485,17 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
         // Set function body context for force_explicit_return
         let prev_in_function_body = self.in_function_body;
         let prev_function_return_type = self.function_return_type;
+        let prev_function_block_depth = self.function_block_depth;
         self.in_function_body = true;
         self.function_return_type = return_type;
+        self.function_block_depth = 0;
 
         self.visit_block(block, inner_attrs, true);
 
         // Restore function body context
         self.in_function_body = prev_in_function_body;
         self.function_return_type = prev_function_return_type;
+        self.function_block_depth = prev_function_block_depth;
     }
 
     pub(crate) fn visit_item(&mut self, item: &ast::Item) {
@@ -893,6 +908,7 @@ impl<'b, 'a: 'b> FmtVisitor<'a> {
             is_loop_block: false,
             in_function_body: false,
             function_return_type: FunctionReturnType::Unit,
+            function_block_depth: 0,
             snippet_provider,
             line_number: 0,
             skipped_range: Rc::new(RefCell::new(vec![])),
