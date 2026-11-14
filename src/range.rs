@@ -55,6 +55,7 @@ pub(crate) fn rewrite_range(
                 context,
                 shape,
                 context.config.binop_separator(),
+                false,
             )
         }
         (None, Some(rhs)) => {
