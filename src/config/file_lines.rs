@@ -138,7 +138,7 @@ impl Range {
         if self.is_empty() || other.is_empty() {
             false
         } else {
-            self.hi + 1 == other.lo || other.hi + 1 == self.lo
+            self.hi.checked_add(1) == Some(other.lo) || other.hi.checked_add(1) == Some(self.lo)
         }
     }
 
@@ -302,6 +302,11 @@ pub enum FileLinesError {
     Json(json::Error),
     #[error("Can't canonicalize {0}")]
     CannotCanonicalize(FileName),
+    #[error(
+        "Invalid line range {lo}..{hi}: ranges are 1-based and the lower bound must not exceed \
+         the upper bound"
+    )]
+    InvalidRange { lo: usize, hi: usize },
 }
 
 // This impl is needed for `Config::override_value` to work for use in tests.
@@ -329,6 +334,9 @@ pub struct JsonSpan {
 impl JsonSpan {
     fn into_tuple(self) -> Result<(FileName, Range), FileLinesError> {
         let (lo, hi) = self.range;
+        if lo == 0 || hi == 0 || lo > hi {
+            return Err(FileLinesError::InvalidRange { lo, hi });
+        }
         let canonical = canonicalize_path_string(&self.file)
             .ok_or(FileLinesError::CannotCanonicalize(self.file))?;
         Ok((canonical, Range::new(lo, hi)))
@@ -380,6 +388,8 @@ mod test {
         assert!(Range::new(1, 2).adjacent_to(Range::new(0, 0)));
         assert!(Range::new(1, 2).adjacent_to(Range::new(3, 10)));
         assert!(!Range::new(1, 3).adjacent_to(Range::new(5, 5)));
+        assert!(!Range::new(1, 1).adjacent_to(Range::new(3, usize::MAX)));
+        assert!(!Range::new(0, 0).adjacent_to(Range::new(2, usize::MAX)));
     }
 
     #[test]
@@ -413,7 +423,7 @@ mod test {
     }
 
     use super::json::{self, json};
-    use super::{FileLines, FileName};
+    use super::{FileLines, FileName, JsonSpan};
     use std::{collections::HashMap, path::PathBuf};
 
     #[test]
@@ -443,6 +453,40 @@ mod test {
                 {"file": "src/main.rs", "range": [1, 3]},
                 {"file": "src/main.rs", "range": [5, 7]},
             ]}
+        );
+    }
+
+    #[test]
+    fn file_lines_rejects_invalid_ranges() {
+        for range in ["[0,0]", "[0,1]", "[1,0]", "[2,1]"] {
+            let file_lines = format!(r#"[{{"file":"stdin","range":{range}}}]"#);
+            let error = file_lines.parse::<FileLines>().unwrap_err();
+            assert!(
+                matches!(&error, super::FileLinesError::InvalidRange { .. }),
+                "unexpected error: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn file_lines_handles_maximum_upper_bound() {
+        let input = format!(
+            r#"[{{"file":"stdin","range":[1,1]}},{{"file":"stdin","range":[3,{}]}}]"#,
+            usize::MAX
+        );
+        let file_lines = input.parse::<FileLines>().unwrap();
+        assert_eq!(
+            file_lines.to_json_spans(),
+            vec![
+                JsonSpan {
+                    file: FileName::Stdin,
+                    range: (1, 1),
+                },
+                JsonSpan {
+                    file: FileName::Stdin,
+                    range: (3, usize::MAX),
+                },
+            ]
         );
     }
 }
