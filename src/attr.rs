@@ -87,9 +87,13 @@ fn format_derive(
             // attribute is not parseable, none of the attributes will be
             // reformatted.
             let item_spans = attr.meta_item_list().map(|meta_item_list| {
-                meta_item_list
-                    .into_iter()
-                    .map(|meta_item_inner| meta_item_inner.span())
+                meta_item_list.into_iter().map(|meta_item_inner| {
+                    // Try to format the path, if it fails, fallback to the original
+                    let formatted = meta_item_inner
+                        .rewrite(context, shape)
+                        .unwrap_or_else(|| context.snippet(meta_item_inner.span()).to_owned());
+                    (meta_item_inner.span(), formatted)
+                })
             })?;
 
             let items = itemize_list(
@@ -97,9 +101,9 @@ fn format_derive(
                 item_spans,
                 ")",
                 ",",
-                |span| span.lo(),
-                |span| span.hi(),
-                |span| Ok(context.snippet(*span).to_owned()),
+                |(span, _)| span.lo(),
+                |(span, _)| span.hi(),
+                |(_, data)| Ok(data.to_string()),
                 // We update derive attribute spans to start after the opening '('
                 // This helps us focus parsing to just what's inside #[derive(...)]
                 context.snippet_provider.span_after(attr.span, "("),
