@@ -239,23 +239,6 @@ impl ParseSess {
             Arc::clone(source_file.src.as_ref().unwrap()),
         )
     }
-
-    pub(crate) fn get_original_snippet(&self, filename: &FileName) -> Option<Arc<String>> {
-        let rustc_filename = match filename {
-            FileName::Real(path) => rustc_span::FileName::Real(
-                self.raw_psess
-                    .source_map()
-                    .path_mapping()
-                    .to_real_filename(self.raw_psess.source_map().working_dir(), path),
-            ),
-            FileName::Stdin => rustc_span::FileName::Custom("stdin".to_owned()),
-        };
-
-        self.raw_psess
-            .source_map()
-            .get_source_file(&rustc_filename)
-            .and_then(|source_file| source_file.src.clone())
-    }
 }
 
 // Methods that should be restricted within the parse module.

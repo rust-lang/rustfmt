@@ -1,12 +1,9 @@
 use std::fs;
 use std::io::{self, Write};
-use std::path::Path;
-use std::sync::Arc;
 
 use crate::NewlineStyle;
 use crate::config::FileName;
 use crate::emitter::{self, Emitter};
-use crate::parse::session::ParseSess;
 
 #[cfg(test)]
 use crate::config::Config;
@@ -33,59 +30,64 @@ where
 
     emitter.emit_header(out)?;
     for (filename, text) in source_file {
-        write_file(
-            None,
-            filename,
-            text,
-            out,
-            &mut *emitter,
-            config.newline_style(),
-        )?;
+        let original_text = match filename {
+            FileName::Real(path) => fs::read_to_string(path)?,
+            FileName::Stdin => panic!("cannot format `{filename}` and emit to files"),
+        };
+        write_file(filename, &original_text, text, out, &mut *emitter)?;
     }
     emitter.emit_footer(out)?;
 
     Ok(())
 }
 
-pub(crate) fn write_file<T>(
-    psess: Option<&ParseSess>,
+/// Returns the text of `filename` that the formatted output should be compared
+/// against.
+///
+/// `snippet` is the file's source text as stored in the parse session's source
+/// map.
+pub(crate) fn original_text(
     filename: &FileName,
+    snippet: &str,
+    newline_style: NewlineStyle,
+) -> Result<String, io::Error> {
+    // SourceFile's in the SourceMap will always have Unix-style line endings
+    // See: https://github.com/rust-lang/rustfmt/issues/3850
+    // So when `filename` is FileName::Real we must check the file system to get
+    // the original file value, both to detect the newline style for
+    // `NewlineStyle::Auto` and to detect newline_style conflicts.
+    // For `FileName::Stdin` the original input is only available from the
+    // source map.
+    match filename {
+        FileName::Real(path) => {
+            let text = fs::read_to_string(path)?;
+            if newline_style != NewlineStyle::Auto {
+                return Ok(text);
+            }
+            // The source map also strips a leading byte order mark. Keep ignoring
+            // it here so that `Auto` only starts reporting newline differences.
+            match text.strip_prefix('\u{feff}') {
+                Some(text) => Ok(text.to_owned()),
+                None => Ok(text),
+            }
+        }
+        FileName::Stdin => Ok(snippet.to_owned()),
+    }
+}
+
+pub(crate) fn write_file<T>(
+    filename: &FileName,
+    original_text: &str,
     formatted_text: &str,
     out: &mut T,
     emitter: &mut dyn Emitter,
-    newline_style: NewlineStyle,
 ) -> Result<emitter::EmitterResult, io::Error>
 where
     T: Write,
 {
-    fn ensure_real_path(filename: &FileName) -> &Path {
-        match *filename {
-            FileName::Real(ref path) => path,
-            _ => panic!("cannot format `{filename}` and emit to files"),
-        }
-    }
-
-    // SourceFile's in the SourceMap will always have Unix-style line endings
-    // See: https://github.com/rust-lang/rustfmt/issues/3850
-    // So if the user has explicitly overridden the rustfmt `newline_style`
-    // config and `filename` is FileName::Real, then we must check the file system
-    // to get the original file value in order to detect newline_style conflicts.
-    // Otherwise, parse session is around (cfg(not(test))) and newline_style has been
-    // left as the default value, then try getting source from the parse session
-    // source map instead of hitting the file system. This also supports getting
-    // original text for `FileName::Stdin`.
-    let original_text = if newline_style != NewlineStyle::Auto && *filename != FileName::Stdin {
-        Arc::new(fs::read_to_string(ensure_real_path(filename))?)
-    } else {
-        match psess.and_then(|psess| psess.get_original_snippet(filename)) {
-            Some(ori) => ori,
-            None => Arc::new(fs::read_to_string(ensure_real_path(filename))?),
-        }
-    };
-
     let formatted_file = emitter::FormattedFile {
         filename,
-        original_text: original_text.as_str(),
+        original_text,
         formatted_text,
     };
 
