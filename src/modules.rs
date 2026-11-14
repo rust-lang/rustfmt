@@ -92,11 +92,49 @@ pub(crate) enum ModuleResolutionErrorKind {
 #[derive(Clone)]
 enum SubModKind<'a, 'ast> {
     /// `mod foo;`
+    ///
+    /// Can optionally specify a path attribute to explicitly set the module path.
+    /// ```ignore
+    /// mod foo; // resolves to `./foo.rs` or `./foo/mod.rs`
+    ///
+    /// #[path = "baz.rs"]
+    /// mod foo; // explicitly resolves to `./baz.rs`
+    /// ```
     External(PathBuf, DirectoryOwnership, Module<'ast>),
-    /// `mod foo;` with multiple sources.
+    /// `mod foo;` with multiple `#[cfg_attr]` sources.
+    ///
+    /// ```ignore
+    /// #[cfg_attr(unix, path = "unix.rs")]
+    /// #[cfg_attr(not(unix), path = "not_unix.rs")]
+    /// mod foo; // explicitly resolves to both `./unix.rs` and `./not_unix.rs`
+    /// ```
     MultiExternal(Vec<(PathBuf, DirectoryOwnership, Module<'ast>)>),
     /// `mod foo {}`
+    ///
+    /// Can optionally specify a path attribute that changes resolution for nested modules.
+    /// ```ignore
+    /// mod foo {
+    ///     mod baz; // resolves to `./foo/baz.rs` or `./foo/baz/mod.rs`
+    /// }
+    ///
+    /// #[path = "bar"]
+    /// mod foo {
+    ///     mod baz; // resolves to  `./bar/baz.rs` or `./bar/baz/mod.rs`
+    /// }
+    /// ```
     Internal(&'a ast::Item),
+    /// `mod foo {}` with multiple `#[cfg_attr]` sources.
+    ///
+    /// ```ignore
+    /// #[cfg_attr(unix, path = "unix")]
+    /// #[cfg_attr(not(unix), path = "not_unix")]
+    /// mod foo {
+    ///     // explicitly resolves to `./unix/baz.rs` or `./unix/baz/mod.rs`
+    ///     // and `./not_unix/baz.rs` or `./not_unix/baz/mod.rs`
+    ///     mod baz;
+    /// }
+    /// ```
+    MultiInternal(Vec<PathBuf>),
 }
 
 impl<'ast, 'psess, 'c> ModResolver<'ast, 'psess> {
@@ -282,7 +320,24 @@ impl<'ast, 'psess, 'c> ModResolver<'ast, 'psess> {
             self.find_external_module(item.kind.ident().unwrap(), &item.attrs, sub_mod)
         } else {
             // An internal module (`mod foo { /* ... */ }`);
-            Ok(Some(SubModKind::Internal(item)))
+            let mut path_visitor = visitor::PathVisitor::default();
+            for attr in item.attrs.iter() {
+                if let Some(meta) = attr.meta() {
+                    path_visitor.visit_meta_item(&meta)
+                }
+            }
+
+            let cfg_attr_paths = path_visitor
+                .paths()
+                .iter()
+                .map(|path| self.directory.path.join(path))
+                .collect::<Vec<_>>();
+
+            if cfg_attr_paths.is_empty() {
+                Ok(Some(SubModKind::Internal(item)))
+            } else {
+                Ok(Some(SubModKind::MultiInternal(cfg_attr_paths)))
+            }
         }
     }
 
@@ -332,6 +387,16 @@ impl<'ast, 'psess, 'c> ModResolver<'ast, 'psess> {
                         ownership: directory_ownership,
                     };
                     self.visit_sub_mod_after_directory_update(sub_mod, Some(directory))?;
+                }
+                Ok(())
+            }
+            SubModKind::MultiInternal(cfg_attr_paths) => {
+                for path in cfg_attr_paths {
+                    let directory = Directory {
+                        path: path,
+                        ownership: DirectoryOwnership::UnownedViaBlock,
+                    };
+                    self.visit_sub_mod_after_directory_update(sub_mod.clone(), Some(directory))?;
                 }
                 Ok(())
             }
