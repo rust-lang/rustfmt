@@ -3303,35 +3303,38 @@ Note that no wrapping will happen if:
 2. A URL was found in the comment
 3. An inline link like fragment was found in the comment
 
-- **Default value**: `false`
-- **Possible values**: `true`, `false`
+- **Default value**: `"Off"`
+- **Possible values**: `"Off"` (alias `false`), `"All"` (alias `true`), `"Doc"`, `"Normal"`
 - **Stable**: No (tracking issue: [#3347](https://github.com/rust-lang/rustfmt/issues/3347))
 
-#### `false` (default):
+#### `"Off"` (default):
+
+Can also be specified as `wrap_comments = false`.
 
 ```rust
-// Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-// sed do eiusmod tempor incididunt ut labore et dolore
-// magna aliqua. Ut enim ad minim veniam, quis nostrud
-// exercitation ullamco laboris nisi ut aliquip ex ea
-// commodo consequat.
+// # This comment looks like a very long header (it starts with a '#'). Had it been a doc comment it would not have been wrapped, because wrapping a markdown header breaks it. But because it is a normal comment, it will be.
 
 // Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 
 // Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 
 /// # This doc comment is a very long header (it starts with a '#'). Had it not been a header it would have been wrapped. But because it is a header, it will not be. That is because wrapping a markdown header breaks it.
+///
+/// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+///
+/// Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 struct Foo {}
 ```
 
-#### `true`:
+#### `"All"`:
+
+Can also be specified as `wrap_comments = true`.
 
 ```rust
-// Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-// sed do eiusmod tempor incididunt ut labore et dolore
-// magna aliqua. Ut enim ad minim veniam, quis nostrud
-// exercitation ullamco laboris nisi ut aliquip ex ea
-// commodo consequat.
+// # This comment looks like a very long header (it starts
+// with a '#'). Had it been a doc comment it would not have
+// been wrapped, because wrapping a markdown header breaks
+// it. But because it is a normal comment, it will be.
 
 // Lorem ipsum dolor sit amet, consectetur adipiscing elit,
 // sed do eiusmod tempor incididunt ut labore et dolore
@@ -3342,6 +3345,59 @@ struct Foo {}
 // Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 
 /// # This doc comment is a very long header (it starts with a '#'). Had it not been a header it would have been wrapped. But because it is a header, it will not be. That is because wrapping a markdown header breaks it.
+///
+/// Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+/// sed do eiusmod tempor incididunt ut labore et dolore
+/// magna aliqua. Ut enim ad minim veniam, quis nostrud
+/// exercitation ullamco laboris nisi ut aliquip ex ea
+/// commodo consequat.
+///
+/// Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+struct Foo {}
+```
+
+#### `"Doc"`:
+
+```rust
+// # This comment looks like a very long header (it starts with a '#'). Had it been a doc comment it would not have been wrapped, because wrapping a markdown header breaks it. But because it is a normal comment, it will be.
+
+// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+// Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+/// # This doc comment is a very long header (it starts with a '#'). Had it not been a header it would have been wrapped. But because it is a header, it will not be. That is because wrapping a markdown header breaks it.
+///
+/// Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+/// sed do eiusmod tempor incididunt ut labore et dolore
+/// magna aliqua. Ut enim ad minim veniam, quis nostrud
+/// exercitation ullamco laboris nisi ut aliquip ex ea
+/// commodo consequat.
+///
+/// Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+struct Foo {}
+```
+
+#### `"Normal"`:
+
+```rust
+// # This comment looks like a very long header (it starts
+// with a '#'). Had it been a doc comment it would not have
+// been wrapped, because wrapping a markdown header breaks
+// it. But because it is a normal comment, it will be.
+
+// Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+// sed do eiusmod tempor incididunt ut labore et dolore
+// magna aliqua. Ut enim ad minim veniam, quis nostrud
+// exercitation ullamco laboris nisi ut aliquip ex ea
+// commodo consequat.
+
+// Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+/// # This doc comment is a very long header (it starts with a '#'). Had it not been a header it would have been wrapped. But because it is a header, it will not be. That is because wrapping a markdown header breaks it.
+///
+/// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+///
+/// Information on the lorem ipsum can be found at the following url: https://en.wikipedia.org/wiki/Lorem_ipsum. Its text is: lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 struct Foo {}
 ```
 
