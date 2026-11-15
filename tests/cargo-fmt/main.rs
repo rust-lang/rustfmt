@@ -9,6 +9,10 @@ use rustfmt_config_proc_macro::rustfmt_only_ci_test;
 
 /// Run the cargo-fmt executable and return its output.
 fn cargo_fmt(args: &[&str]) -> (String, String) {
+    cargo_fmt_with_env(args, &[])
+}
+
+fn cargo_fmt_with_env(args: &[&str], envs: &[(&str, &str)]) -> (String, String) {
     let mut bin_dir = env::current_exe().unwrap();
     bin_dir.pop(); // chop off test exe name
 
@@ -31,7 +35,12 @@ fn cargo_fmt(args: &[&str]) -> (String, String) {
     paths.insert(0, bin_dir);
     let new_path = env::join_paths(paths).unwrap();
 
-    match Command::new(&cmd).args(args).env("PATH", new_path).output() {
+    match Command::new(&cmd)
+        .args(args)
+        .env("PATH", new_path)
+        .envs(envs.iter().copied())
+        .output()
+    {
         Ok(output) => (
             String::from_utf8(output.stdout).expect("utf-8"),
             String::from_utf8(output.stderr).expect("utf-8"),
