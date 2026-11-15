@@ -6,6 +6,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::ffi::OsString;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
@@ -15,6 +16,7 @@ use std::str;
 
 use cargo_metadata::Edition;
 use clap::{CommandFactory, Parser};
+use tempfile::NamedTempFile;
 
 #[path = "test/mod.rs"]
 #[cfg(test)]
@@ -532,9 +534,12 @@ fn run_rustfmt(
             println!();
         }
 
+        let (files, files_overflow, _tmpfile) = build_file_args(&files)?;
+
         let mut command = rustfmt_command()
             .stdout(stdout)
             .args(files)
+            .args(files_overflow)
             .args(["--edition", edition.as_str()])
             .args(fmt_args)
             .spawn()
@@ -574,4 +579,78 @@ fn get_cargo_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Me
             }
         }
     }
+}
+
+// Total length of file arguments after which we should avoid passing files as arguments to
+// `rustfmt` and instead write them to a `@path` file. We do this because if the filename list is
+// sufficiently long it can reach command line length limits when trying to pass them as arguments.
+// But this "length" is platform dependent.
+//
+// On Windows the length is 32,767 UTF-16 **characters** (see `lpCommandLine` parameter to
+// `CreateProcessA`), this argument is a single string, so it includes arguments and any
+// quoting/escaping characters as well as spaces.
+//
+// Under POSIX this is `ARG_MAX` **bytes**, so at least `_POSIX_ARG_MAX` (=4096), in practice this
+// will commonly be >100KiB. In POSIX this limit also includes the length of all environment
+// variables, i.e. the length of argv[] and envp[].
+//
+// So, since Windows and POSIX define this widely differently, pick 24,000 as a value that should
+// easily underestimate the limit. Since we're overestimating, and don't expect a large number of
+// non-file args to `rustfmt`, we just ignore the length of those other args in our calculation.
+const FILE_ARGS_LEN_MAX: usize = 24_000;
+const FILE_ARGS_LEN_ENV_VAR: &'static str = "_RUSTFMT_FILE_ARGS_LEN_MAX";
+
+fn build_file_args<'a, 'b>(
+    files: &'b [&'a PathBuf],
+) -> Result<(&'b [&'a PathBuf], Vec<PathBuf>, Option<NamedTempFile>), io::Error> {
+    let file_args_bytes_max = env::var(FILE_ARGS_LEN_ENV_VAR)
+        .ok()
+        // swallow parsing errors: this is for internal use only, and we pass fixed values
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(FILE_ARGS_LEN_MAX);
+
+    let mut file_args_len = 0;
+    let mut overflow_index = None;
+    for (i, file) in files.iter().enumerate() {
+        // rough approximation: assume OsStr::len as a cheap approximation of the character count of
+        // the string. More accurate values could be obtained by encoding via `std::ffi` (but this
+        // is more expensive for not much gain).
+        // Add `1` to account for the space separating args in the string in Windows.
+        file_args_len += file.as_os_str().len() + 1;
+        if file_args_len >= file_args_bytes_max {
+            overflow_index = Some(i);
+            break;
+        }
+    }
+    let Some(overflow_index) = overflow_index else {
+        // args all fit in command line
+        return Ok((files, vec![], None));
+    };
+
+    let mut files_overflow: Vec<PathBuf> = vec![];
+    let at_file = NamedTempFile::new()?;
+    for file in files.iter().skip(overflow_index) {
+        match file.as_os_str().to_str() {
+            None => {
+                // not sure we can actually get here: since `cargo` doesn't support non UTF-8 names
+                // in paths
+                files_overflow.push(file.to_path_buf())
+            }
+            Some(s) if s.contains('\n') => {
+                // Args are read line-by-line from `@path` so filenames containing a newline should
+                // not be written there, so pass them separately as plain args. Edge case: what if
+                // you have _lots_ of such filenames, then we could go over the limit. Solution: 1)
+                // maybe don't to that, 2) we hope our overestimating of the limit leaves enough
+                // space
+                files_overflow.push(file.to_path_buf())
+            }
+            Some(s) => write!(at_file.as_file(), "{s}\n")?,
+        };
+    }
+
+    let mut at_file_path = OsString::from("@");
+    at_file_path.push(at_file.path().as_os_str());
+    files_overflow.push(PathBuf::from(at_file_path));
+
+    Ok((&files[..overflow_index], files_overflow, Some(at_file)))
 }

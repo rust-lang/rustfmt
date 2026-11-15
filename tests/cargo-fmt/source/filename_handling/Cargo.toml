@@ -1,0 +1,6 @@
+[package]
+name = "filename_handling"
+
+[lib]
+name = "filename_handling"
+path = "src/file_with\nnewline.rs"

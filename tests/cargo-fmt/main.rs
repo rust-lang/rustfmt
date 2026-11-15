@@ -136,3 +136,29 @@ fn cargo_fmt_emits_error_on_line_overflow_true() {
         "line formatted, but exceeded maximum width (maximum: 100 (see `max_width` option)"
     ))
 }
+
+#[rustfmt_only_ci_test]
+#[test]
+fn cargo_fmt_accepts_files_with_newlines_when_using_at_files() {
+    let expected_modified_files = [
+        "tests/cargo-fmt/source/filename_handling/src/file_with\nnewline.rs",
+        "tests/cargo-fmt/source/filename_handling/src/normal_file.rs",
+    ];
+    let args = [
+        "--check",
+        "--manifest-path",
+        "tests/cargo-fmt/source/filename_handling/Cargo.toml",
+    ];
+
+    // set a low limit to force the exercising the '@path' logic
+    let envs = [("_RUSTFMT_FILE_ARGS_LEN_MAX", "1")];
+    let (stdout, stderr) = cargo_fmt_with_env(&args, &envs);
+
+    for file in expected_modified_files {
+        let path = Path::new(file).canonicalize().unwrap();
+        assert!(
+            stdout.contains(&format!("Diff in {}", path.display())),
+            "expected to see diff in {file}\nstdout={stdout}\nstderr={stderr}",
+        );
+    }
+}
