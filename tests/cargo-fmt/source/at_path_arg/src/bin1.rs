@@ -1,0 +1,3 @@
+fn needs_formatting(
+) {
+}
