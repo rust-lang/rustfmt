@@ -137,17 +137,44 @@ fn cargo_fmt_emits_error_on_line_overflow_true() {
     ))
 }
 
+#[cfg(not(windows))]
 #[rustfmt_only_ci_test]
 #[test]
 fn cargo_fmt_accepts_files_with_newlines_when_using_at_files() {
+    use std::fs;
+    // windows doesn't like file paths with newlines in them, so we can't just write files out
+    // under tests/cargo-fmt/source. So write them to a tempdir instead.
+    let tempdir = tempfile::tempdir().unwrap();
+    let cargo_toml_path = tempdir.path().join("Cargo.toml");
+    let cargo_toml_contents = r#"
+[package]
+name = "filename_handling"
+
+[lib]
+name = "filename_handling"
+path = "src/file_with\nnewline.rs"
+"#;
+
+    let file_with_newline_path = tempdir.path().join(
+        "src/file_with
+newline.rs",
+    );
+    let normal_file_path = tempdir.path().join("src/normal_file.rs");
+
+    fs::create_dir_all(file_with_newline_path.parent().unwrap()).unwrap();
+    fs::write(&cargo_toml_path, cargo_toml_contents).unwrap();
+    // write content that will be trivially formatted (trim excessive newlines)
+    fs::write(&file_with_newline_path, format!("mod normal_file;\n\n\n")).unwrap();
+    fs::write(&normal_file_path, "\n\n\n").unwrap();
+
     let expected_modified_files = [
-        "tests/cargo-fmt/source/filename_handling/src/file_with\nnewline.rs",
-        "tests/cargo-fmt/source/filename_handling/src/normal_file.rs",
+        file_with_newline_path.to_str().unwrap(),
+        normal_file_path.to_str().unwrap(),
     ];
     let args = [
         "--check",
         "--manifest-path",
-        "tests/cargo-fmt/source/filename_handling/Cargo.toml",
+        cargo_toml_path.to_str().unwrap(),
     ];
 
     // set a low limit to force the exercising the '@path' logic
