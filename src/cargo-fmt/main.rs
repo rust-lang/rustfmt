@@ -598,16 +598,17 @@ fn get_cargo_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Me
 // easily underestimate the limit. Since we're overestimating, and don't expect a large number of
 // non-file args to `rustfmt`, we just ignore the length of those other args in our calculation.
 const FILE_ARGS_LEN_MAX: usize = 24_000;
-const FILE_ARGS_LEN_ENV_VAR: &'static str = "_RUSTFMT_FILE_ARGS_LEN_MAX";
 
 fn build_file_args<'a, 'b>(
     files: &'b [&'a PathBuf],
 ) -> Result<(&'b [&'a PathBuf], Vec<PathBuf>, Option<NamedTempFile>), io::Error> {
-    let file_args_bytes_max = env::var(FILE_ARGS_LEN_ENV_VAR)
-        .ok()
-        // swallow parsing errors: this is for internal use only, and we pass fixed values
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(FILE_ARGS_LEN_MAX);
+    let file_args_bytes_max = cfg_select! {
+        test => env::var("_RUSTFMT_FILE_ARGS_LEN_MAX")
+            .ok()
+            .map(|s| s.parse::<usize>().unwrap())
+            .unwrap_or(FILE_ARGS_LEN_MAX),
+        _ => FILE_ARGS_LEN_MAX,
+    };
 
     let mut file_args_len = 0;
     let mut overflow_index = None;
