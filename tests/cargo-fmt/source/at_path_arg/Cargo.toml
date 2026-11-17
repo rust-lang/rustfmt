@@ -1,0 +1,13 @@
+[package]
+name = "filename_handling"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "bin1"
+path = "src/bin1.rs"
+
+[[bin]]
+name = "bin2"
+path = "src/bin2.rs"

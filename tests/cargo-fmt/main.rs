@@ -137,13 +137,13 @@ fn cargo_fmt_emits_error_on_line_overflow_true() {
     ))
 }
 
+// Win32 prohibits newline characters in file paths, while POSIX only discourages them (since
+// POSIX.1-2024)
 #[cfg(not(windows))]
 #[rustfmt_only_ci_test]
 #[test]
-fn cargo_fmt_accepts_files_with_newlines_when_using_at_files() {
+fn cargo_fmt_errors_when_passing_file_with_newline_to_at_file() {
     use std::fs;
-    // windows doesn't like file paths with newlines in them, so we can't just write files out
-    // under tests/cargo-fmt/source. So write them to a tempdir instead.
     let tempdir = tempfile::tempdir().unwrap();
     let cargo_toml_path = tempdir.path().join("Cargo.toml");
     let cargo_toml_contents = r#"
@@ -159,18 +159,11 @@ path = "src/file_with\nnewline.rs"
         "src/file_with
 newline.rs",
     );
-    let normal_file_path = tempdir.path().join("src/normal_file.rs");
 
     fs::create_dir_all(file_with_newline_path.parent().unwrap()).unwrap();
     fs::write(&cargo_toml_path, cargo_toml_contents).unwrap();
-    // write content that will be trivially formatted (trim excessive newlines)
-    fs::write(&file_with_newline_path, format!("mod normal_file;\n\n\n")).unwrap();
-    fs::write(&normal_file_path, "\n\n\n").unwrap();
+    fs::File::create(&file_with_newline_path).unwrap();
 
-    let expected_modified_files = [
-        file_with_newline_path.to_str().unwrap(),
-        normal_file_path.to_str().unwrap(),
-    ];
     let args = [
         "--check",
         "--manifest-path",
@@ -181,11 +174,41 @@ newline.rs",
     let envs = [("_RUSTFMT_FILE_ARGS_LEN_MAX", "1")];
     let (stdout, stderr) = cargo_fmt_with_env(&args, &envs);
 
+    assert!(
+        stderr.contains(&format!(
+            "refusing to pass file path containing newline as arg, file: {}",
+            file_with_newline_path.canonicalize().unwrap().display(),
+        )),
+        "expected to see error message containing file {}\nstdout={stdout}\nstderr={stderr}",
+        file_with_newline_path.display(),
+    );
+}
+
+#[rustfmt_only_ci_test]
+#[test]
+fn cargo_fmt_arg_passing_via_at_path() {
+    let expected_modified_files = [
+        "tests/cargo-fmt/source/at_path_arg/src/lib.rs",
+        "tests/cargo-fmt/source/at_path_arg/src/bin1.rs",
+        "tests/cargo-fmt/source/at_path_arg/src/bin2.rs",
+        "tests/cargo-fmt/source/at_path_arg/src/other.rs",
+    ];
+    let args = [
+        "--check",
+        "--manifest-path",
+        "tests/cargo-fmt/source/at_path_arg/Cargo.toml",
+    ];
+
+    // set a low limit to force the exercising the '@path' logic
+    let envs = [("_RUSTFMT_FILE_ARGS_LEN_MAX", "1")];
+    let (stdout, stderr) = cargo_fmt_with_env(&args, &envs);
+
     for file in expected_modified_files {
         let path = Path::new(file).canonicalize().unwrap();
         assert!(
             stdout.contains(&format!("Diff in {}", path.display())),
-            "expected to see diff in {file}\nstdout={stdout}\nstderr={stderr}",
+            "Expected stdout to contain diff for file {}\nstdout={stdout}\nstderr={stderr}",
+            path.display(),
         );
     }
 }

@@ -284,7 +284,7 @@ fn format_crate(
     let targets = get_targets(strategy, manifest_path)?;
 
     // Currently only bin and lib files get formatted.
-    run_rustfmt(&targets, &rustfmt_args, verbosity)
+    run_rustfmt(targets, &rustfmt_args, verbosity)
 }
 
 /// Target uses a `path` field for equality and hashing.
@@ -502,19 +502,19 @@ fn add_targets(target_paths: &[cargo_metadata::Target], targets: &mut BTreeSet<T
 }
 
 fn run_rustfmt(
-    targets: &BTreeSet<Target>,
+    targets: BTreeSet<Target>,
     fmt_args: &[String],
     verbosity: Verbosity,
 ) -> Result<i32, io::Error> {
     let by_edition = targets
-        .iter()
+        .into_iter()
         .inspect(|t| {
             if verbosity == Verbosity::Verbose {
                 println!("[{} ({})] {:?}", t.kind, t.edition, t.path)
             }
         })
         .fold(BTreeMap::new(), |mut h, t| {
-            h.entry(&t.edition).or_insert_with(Vec::new).push(&t.path);
+            h.entry(t.edition).or_insert_with(Vec::new).push(t.path);
             h
         });
 
@@ -534,12 +534,11 @@ fn run_rustfmt(
             println!();
         }
 
-        let (files, files_overflow, _tmpfile) = build_file_args(&files)?;
+        let (file_args, _tmpfile) = build_file_args(files)?;
 
         let mut command = rustfmt_command()
             .stdout(stdout)
-            .args(files)
-            .args(files_overflow)
+            .args(file_args)
             .args(["--edition", edition.as_str()])
             .args(fmt_args)
             .spawn()
@@ -600,50 +599,55 @@ fn get_cargo_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Me
 const FILE_ARGS_LEN_MAX: usize = 24_000;
 
 fn build_file_args<'a, 'b>(
-    files: &'b [&'a PathBuf],
-) -> Result<(&'b [&'a PathBuf], Vec<PathBuf>, Option<NamedTempFile>), io::Error> {
-    let file_args_bytes_max = cfg_select! {
+    files: Vec<PathBuf>,
+) -> Result<(Vec<PathBuf>, Option<NamedTempFile>), io::Error> {
+    let file_args_len_max = cfg_select! {
         test => env::var("_RUSTFMT_FILE_ARGS_LEN_MAX")
-            .ok()
             .map(|s| s.parse::<usize>().unwrap())
             .unwrap_or(FILE_ARGS_LEN_MAX),
         _ => FILE_ARGS_LEN_MAX,
     };
 
-    let mut file_args_len = 0;
-    let mut overflow_index = None;
-    for (i, file) in files.iter().enumerate() {
-        // rough approximation: assume OsStr::len as a cheap approximation of the character count of
-        // the string. More accurate values could be obtained by encoding via `std::ffi` (but this
-        // is more expensive for not much gain).
-        // Add `1` to account for the space separating args in the string in Windows.
-        file_args_len += file.as_os_str().len() + 1;
-        if file_args_len >= file_args_bytes_max {
-            overflow_index = Some(i);
-            break;
-        }
-    }
-    let Some(overflow_index) = overflow_index else {
+    let file_args_too_long = files
+        .iter()
+        .try_fold(0, |acc, file| {
+            // rough approximation: assume OsStr::len as a cheap approximation of the character
+            // count of the string. More accurate values could be obtained by encoding via
+            // `std::ffi` (but this is more expensive for not much gain). Add `1` to account for the
+            // space separating args in the string in Windows.
+            let next = acc + file.as_os_str().len() + 1;
+            (next < file_args_len_max).then_some(next)
+        })
+        .is_some();
+    if !file_args_too_long {
         // args all fit in command line
-        return Ok((files, vec![], None));
+        return Ok((files, None));
     };
 
-    let mut files_overflow: Vec<PathBuf> = vec![];
     let at_file = NamedTempFile::new()?;
-    for file in files.iter().skip(overflow_index) {
+    for file in files.iter() {
         match file.as_os_str().to_str() {
             None => {
-                // not sure we can actually get here: since `cargo` doesn't support non UTF-8 names
-                // in paths
-                files_overflow.push(file.to_path_buf())
+                // not sure we can actually get here: `files` is taken from targets generated from
+                // `cargo metadata` and `cargo` doesn't support non UTF-8 names in paths
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "cannot parse filename with non-UTF-8 character, file: {}",
+                        file.display()
+                    ),
+                ));
             }
             Some(s) if s.contains('\n') => {
                 // Args are read line-by-line from `@path` so filenames containing a newline should
-                // not be written there, so pass them separately as plain args. Edge case: what if
-                // you have _lots_ of such filenames, then we could go over the limit. Solution: 1)
-                // maybe don't to that, 2) we hope our overestimating of the limit leaves enough
-                // space
-                files_overflow.push(file.to_path_buf())
+                // not be written there
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "refusing to pass file path containing newline as arg, file: {}",
+                        file.display()
+                    ),
+                ));
             }
             Some(s) => write!(at_file.as_file(), "{s}\n")?,
         };
@@ -651,7 +655,6 @@ fn build_file_args<'a, 'b>(
 
     let mut at_file_path = OsString::from("@");
     at_file_path.push(at_file.path().as_os_str());
-    files_overflow.push(PathBuf::from(at_file_path));
 
-    Ok((&files[..overflow_index], files_overflow, Some(at_file)))
+    Ok((vec![PathBuf::from(at_file_path)], Some(at_file)))
 }
