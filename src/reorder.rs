@@ -133,7 +133,10 @@ fn rewrite_reorderable_or_regroupable_items(
                 GroupImportsTactic::Preserve | GroupImportsTactic::One => {
                     vec![normalized_items]
                 }
-                GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
+                GroupImportsTactic::StdExternalCrate => {
+                    group_imports_std_external_crate(normalized_items)
+                }
+                GroupImportsTactic::ExternalCrate => group_imports_external_crate(normalized_items),
             };
 
             if context.config.reorder_imports() {
@@ -196,7 +199,7 @@ fn contains_macro_use_attr(item: &ast::Item) -> bool {
 
 /// Divides imports into three groups, corresponding to standard, external
 /// and local imports. Sorts each subgroup.
-fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
+fn group_imports_std_external_crate(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
     let mut std_imports = Vec::new();
     let mut external_imports = Vec::new();
     let mut local_imports = Vec::new();
@@ -220,6 +223,30 @@ fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
     }
 
     vec![std_imports, external_imports, local_imports]
+}
+
+/// Divides imports into two groups, corresponding to external crates
+/// and local imports. Sorts each subgroup.
+fn group_imports_external_crate(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
+    let mut external_imports = Vec::new();
+    let mut local_imports = Vec::new();
+
+    for ut in uts.into_iter() {
+        if ut.path.is_empty() {
+            external_imports.push(ut);
+            continue;
+        }
+        match &ut.path[0].kind {
+            UseSegmentKind::Ident(..) => external_imports.push(ut),
+            UseSegmentKind::Slf(_) | UseSegmentKind::Super(_) | UseSegmentKind::Crate(_) => {
+                local_imports.push(ut)
+            }
+            // These are probably illegal here
+            UseSegmentKind::Glob | UseSegmentKind::List(_) => external_imports.push(ut),
+        }
+    }
+
+    vec![external_imports, local_imports]
 }
 
 /// A simplified version of `ast::ItemKind`.
