@@ -1,3 +1,4 @@
+use crate::config::WrapComments;
 use crate::config::file_lines::FileLines;
 use crate::config::macro_names::MacroSelectors;
 use crate::config::options::{IgnoreList, WidthHeuristics};
@@ -62,6 +63,12 @@ impl ConfigType for WidthHeuristics {
 impl ConfigType for IgnoreList {
     fn doc_hint() -> String {
         String::from("[<string>,..]")
+    }
+}
+
+impl ConfigType for WrapComments {
+    fn doc_hint() -> String {
+        "[ Off (false) | All (true) | Doc | Normal ]".to_owned()
     }
 }
 

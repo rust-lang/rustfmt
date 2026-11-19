@@ -280,7 +280,7 @@ impl<'a> FmtVisitor<'a> {
         // broken code.
         let can_preserve_first_line = subslice.starts_with("//")
             || (self.config.style_edition() == StyleEdition::Edition2024
-                && !self.config.wrap_comments()
+                && !self.config.wrap_comments().is_normal()
                 && !self.config.normalize_comments());
 
         if on_same_line && can_preserve_first_line {

@@ -15,6 +15,7 @@ use crate::config::Config;
 use crate::config::file_lines::FileLines;
 use crate::config::lists::*;
 use crate::config::macro_names::MacroSelectors;
+use crate::config::wrap_comments::WrapComments;
 
 #[config_type]
 pub enum NewlineStyle {
@@ -648,7 +649,7 @@ config_option_with_style_edition_default!(
     SingleLineLetElseMaxWidth, usize, _ => 50;
 
     // Comments. macros, and strings
-    WrapComments, bool, _ => false;
+    WrapCommentsConfig, WrapComments, _ => WrapComments::Off;
     FormatCodeInDocComments, bool, _ => false;
     DocCommentCodeBlockWidth, usize, _ => 100;
     DocUseSmallHeuristics, DocCodeHeuristics, _ => DocCodeHeuristics::Inherit;
