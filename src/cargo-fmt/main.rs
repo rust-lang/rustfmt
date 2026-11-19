@@ -529,6 +529,7 @@ fn run_rustfmt(
         let (file_args, _tmpfile) = build_file_args(files)?;
 
         if verbosity == Verbosity::Verbose {
+            // Note: the test cargo_fmt_arg_passing_via_at_path relies on the format of this output
             print!("rustfmt");
             print!(" --edition {edition}");
             fmt_args.iter().for_each(|f| print!(" {}", f));
@@ -606,6 +607,7 @@ fn build_file_args<'a, 'b>(
     files: Vec<PathBuf>,
 ) -> Result<(Vec<PathBuf>, Option<NamedTempFile>), io::Error> {
     let file_args_len_max = env::var("_RUSTFMT_FILE_ARGS_LEN_MAX")
+        // unwrap: this variable is for internal use only, and should only be set for testing
         .map(|s| s.parse::<usize>().unwrap())
         .unwrap_or(FILE_ARGS_LEN_MAX);
 

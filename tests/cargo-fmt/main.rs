@@ -166,6 +166,7 @@ newline.rs",
 
     let args = [
         "--check",
+        "--verbose",
         "--manifest-path",
         cargo_toml_path.to_str().unwrap(),
     ];
@@ -195,6 +196,7 @@ fn cargo_fmt_arg_passing_via_at_path() {
     ];
     let args = [
         "--check",
+        "--verbose",
         "--manifest-path",
         "tests/cargo-fmt/source/at_path_arg/Cargo.toml",
     ];
@@ -211,4 +213,13 @@ fn cargo_fmt_arg_passing_via_at_path() {
             path.display(),
         );
     }
+    let rustfmt_args_line = stdout
+        .lines()
+        .find(|l| l.starts_with("rustfmt "))
+        .expect("expected be a line logging args to rustfmt in stdout\nstdout={stdout}");
+
+    assert!(
+        rustfmt_args_line.contains(" @"),
+        "expected an argument starting with '@' passed to rustfmt"
+    );
 }
