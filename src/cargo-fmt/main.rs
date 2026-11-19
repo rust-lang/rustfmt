@@ -539,6 +539,10 @@ fn run_rustfmt(
         let mut command = rustfmt_command()
             .stdout(stdout)
             .args(file_args)
+            // NOTE: edge case, we determine 'file_args' fits within the args limit, but then
+            // following args are enough to overflow things and error out. Since we underestimate
+            // the limit, and expect a relatively small number of args here, this should be very
+            // unlikely
             .args(["--edition", edition.as_str()])
             .args(fmt_args)
             .spawn()
@@ -619,6 +623,7 @@ fn build_file_args<'a, 'b>(
             (next < file_args_len_max).then_some(next)
         })
         .is_some();
+
     if !file_args_too_long {
         // args all fit in command line
         return Ok((files, None));

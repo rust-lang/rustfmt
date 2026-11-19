@@ -64,7 +64,6 @@ tempfile = "3.23.0"
 
 [dev-dependencies]
 indoc = "2.0.8"
-tempfile = "3.23.0"
 insta = { version = "1.48.0", features = ["filters"] }
 
 # Rustc dependencies are loaded from the sysroot, Cargo doesn't know about them.
