@@ -213,13 +213,8 @@ fn cargo_fmt_arg_passing_via_at_path() {
             path.display(),
         );
     }
-    let rustfmt_args_line = stdout
-        .lines()
-        .find(|l| l.starts_with("rustfmt "))
-        .expect("expected be a line logging args to rustfmt in stdout\nstdout={stdout}");
-
     assert!(
-        rustfmt_args_line.contains(" @"),
+        stdout.contains("rustfmt --edition 2015 --check @"),
         "expected an argument starting with '@' passed to rustfmt"
     );
 }

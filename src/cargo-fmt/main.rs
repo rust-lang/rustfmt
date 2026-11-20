@@ -606,22 +606,29 @@ const FILE_ARGS_LEN_MAX: usize = 24_000;
 fn build_file_args<'a, 'b>(
     files: Vec<PathBuf>,
 ) -> Result<(Vec<PathBuf>, Option<NamedTempFile>), io::Error> {
-    let file_args_len_max = env::var("_RUSTFMT_FILE_ARGS_LEN_MAX")
-        // unwrap: this variable is for internal use only, and should only be set for testing
-        .map(|s| s.parse::<usize>().unwrap())
-        .unwrap_or(FILE_ARGS_LEN_MAX);
+    let file_args_len_max = if option_env!("RUSTFMT_CI").is_some() {
+        env::var("_RUSTFMT_FILE_ARGS_LEN_MAX")
+            // unwrap: this variable is for internal use only, and should only be set for testing
+            .map(|s| s.parse::<usize>().unwrap())
+            .unwrap_or(FILE_ARGS_LEN_MAX)
+    } else {
+        FILE_ARGS_LEN_MAX
+    };
 
-    let mut args_len = 0;
-    let file_args_fit = files.iter().all(|file| {
+    let mut file_args_len = 0;
+    for file in files.iter() {
         // rough approximation: assume OsStr::len as a cheap approximation of the character
         // count of the string. More accurate values could be obtained by encoding via
         // `std::ffi` (but this is more expensive for not much gain). Add `1` to account for the
         // space separating args in the string in Windows.
-        args_len += file.as_os_str().len() + 1;
-        args_len < file_args_len_max
-    });
+        file_args_len += file.as_os_str().len() + 1;
 
-    if file_args_fit {
+        if file_args_len >= file_args_len_max {
+            break;
+        }
+    }
+
+    if file_args_len < file_args_len_max {
         // args all fit in command line
         return Ok((files, None));
     };
