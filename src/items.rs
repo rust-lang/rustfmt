@@ -1794,6 +1794,10 @@ fn rewrite_ty<R: Rewrite>(
         result.push_str(&generics_str);
     }
 
+    // The bounds are written out here, so anything the `where` clause treats as a
+    // missing comment has to start after them, not after the generics.
+    let mut span_end_before_where = generics.span.hi();
+
     if let Some(bounds) = generic_bounds_opt {
         if !bounds.is_empty() {
             // 2 = `: `
@@ -1803,6 +1807,7 @@ fn rewrite_ty<R: Rewrite>(
                 .rewrite_result(context, shape)
                 .map(|s| format!(": {}", s))?;
             result.push_str(&type_bounds);
+            span_end_before_where = bounds.last().unwrap().span().hi();
         }
     }
 
@@ -1819,7 +1824,7 @@ fn rewrite_ty<R: Rewrite>(
         false,
         "=",
         None,
-        generics.span.hi(),
+        span_end_before_where,
         option,
     )?;
     result.push_str(&before_where_clause_str);
@@ -2720,27 +2725,33 @@ fn rewrite_fn_base(
         }
 
         // Comment between return type and the end of the decl.
-        let snippet_lo = fd.output.span().hi();
         if where_clause.predicates.is_empty() {
+            let snippet_lo = fd.output.span().hi();
             let snippet_hi = span.hi();
             let snippet = context.snippet(mk_sp(snippet_lo, snippet_hi));
-            // Try to preserve the layout of the original snippet.
-            let original_starts_with_newline = snippet
-                .find(|c| c != ' ')
-                .map_or(false, |i| starts_with_newline(&snippet[i..]));
-            let original_ends_with_newline = snippet
-                .rfind(|c| c != ' ')
-                .map_or(false, |i| snippet[i..].ends_with('\n'));
-            let snippet = snippet.trim();
-            if !snippet.is_empty() {
-                result.push(if original_starts_with_newline {
-                    '\n'
-                } else {
-                    ' '
-                });
-                result.push_str(snippet);
-                if original_ends_with_newline {
-                    force_new_line_for_brace = true;
+            let remove_empty_where = context.config.style_edition() >= StyleEdition::Edition2027
+                && where_clause.has_where_token
+                && !contains_comment(snippet);
+
+            if !remove_empty_where {
+                // Try to preserve the layout of the original snippet.
+                let original_starts_with_newline = snippet
+                    .find(|c| c != ' ')
+                    .map_or(false, |i| starts_with_newline(&snippet[i..]));
+                let original_ends_with_newline = snippet
+                    .rfind(|c| c != ' ')
+                    .map_or(false, |i| snippet[i..].ends_with('\n'));
+                let snippet = snippet.trim();
+                if !snippet.is_empty() {
+                    result.push(if original_starts_with_newline {
+                        '\n'
+                    } else {
+                        ' '
+                    });
+                    result.push_str(snippet);
+                    if original_ends_with_newline {
+                        force_new_line_for_brace = true;
+                    }
                 }
             }
         }

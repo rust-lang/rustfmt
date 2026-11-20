@@ -6,7 +6,6 @@ use io::Error as IoError;
 use thiserror::Error;
 
 use rustfmt_nightly as rustfmt;
-use tracing_subscriber::EnvFilter;
 
 use std::collections::HashMap;
 use std::env;
@@ -26,13 +25,16 @@ const BUG_REPORT_URL: &str = "https://github.com/rust-lang/rustfmt/issues/new?la
 
 // N.B. these crates are loaded from the sysroot, so they need extern crate.
 extern crate rustc_driver;
+extern crate rustc_session;
+
+use rustc_session::EarlyDiagCtxt;
+use rustc_session::config::ErrorOutputType;
 
 fn main() {
     rustc_driver::install_ice_hook(BUG_REPORT_URL, |_| ());
 
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_env("RUSTFMT_LOG"))
-        .init();
+    setup_tracing();
+
     let opts = make_opts();
 
     let exit_code = match execute(&opts) {
@@ -50,6 +52,24 @@ fn main() {
     // NOTE: this immediately terminates the process without doing any cleanup,
     // so make sure to finish all necessary cleanup before this is called.
     std::process::exit(exit_code);
+}
+
+fn setup_tracing() {
+    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_tree::HierarchicalLayer;
+
+    let layer = HierarchicalLayer::default()
+        .with_writer(std::io::stderr)
+        .with_targets(true)
+        .with_bracketed_fields(true)
+        .with_indent_amount(2);
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_env("RUSTFMT_LOG"))
+        .with(layer)
+        .init();
 }
 
 /// Rustfmt operations.
@@ -77,12 +97,6 @@ pub enum OperationError {
     /// An unknown help topic was requested.
     #[error("Unknown help topic: `{0}`.")]
     UnknownHelpTopic(String),
-    /// An unknown print-config option was requested.
-    #[error("Unknown print-config option: `{0}`.")]
-    UnknownPrintConfigTopic(String),
-    /// Attempt to generate a minimal config from standard input.
-    #[error("The `--print-config=minimal` option doesn't work with standard input.")]
-    MinimalPathWithStdin,
     /// An io error during reading or writing.
     #[error("{0}")]
     IoError(IoError),
@@ -90,6 +104,21 @@ pub enum OperationError {
     /// supported with standard input.
     #[error("Emit mode {0} not supported with standard output.")]
     StdinBadEmit(EmitMode),
+    #[error(transparent)]
+    PrintConfig(PrintConfigError),
+}
+
+// Errors related to the '--print-config' option.
+#[derive(Error, Debug)]
+pub enum PrintConfigError {
+    /// An unknown print-config option was requested.
+    #[error("Unknown print-config option: `{0}`.")]
+    UnknownOption(String),
+    #[error("The `--print-config=minimal` option requires an output path to write to")]
+    MinimalPathNoPath,
+    /// Attempt to generate a minimal config from standard input.
+    #[error("The `--print-config=minimal` option doesn't work with standard input.")]
+    MinimalPathWithStdin,
 }
 
 impl From<IoError> for OperationError {
@@ -216,7 +245,13 @@ fn is_nightly() -> bool {
 
 // Returned i32 is an exit code
 fn execute(opts: &Options) -> Result<i32> {
-    let matches = opts.parse(env::args().skip(1))?;
+    let early_dcx = EarlyDiagCtxt::new(ErrorOutputType::default());
+    let cmdline_args = env::args().skip(1).collect::<Vec<String>>();
+    // if we saw a `@path` arg, read arguments from that file and merge them with the other
+    // arguments.
+    let args = rustc_driver::args::arg_expand_all(&early_dcx, &cmdline_args);
+
+    let matches = opts.parse(&args)?;
     let options = GetOptsOptions::from_matches(&matches)?;
 
     match determine_operation(&matches)? {
@@ -423,7 +458,11 @@ fn print_usage_to_stdout(opts: &Options, reason: &str) {
         format!("{reason}\n\n")
     };
     let msg = format!("{sep}Format Rust code\n\nusage: rustfmt [options] <file>...");
-    println!("{}", opts.usage(&msg));
+    print!("{}", opts.usage(&msg));
+    println!(
+        "    @path               Read newline separated options from the file at `path`. \
+        Can be specified more than once."
+    );
 }
 
 fn print_help_file_lines() {
@@ -474,23 +513,24 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
     }
     let mut free_matches = matches.free.iter();
 
-    let mut minimal_config_path = None;
-    if let Some(kind) = matches.opt_str("print-config") {
-        let path = free_matches.next().cloned();
-        match kind.as_str() {
-            "default" => return Ok(Operation::ConfigOutputDefault { path }),
-            "current" => return Ok(Operation::ConfigOutputCurrent { path }),
-            "minimal" => {
-                minimal_config_path = path;
-                if minimal_config_path.is_none() {
-                    eprintln!("WARNING: PATH required for `--print-config minimal`.");
+    let minimal_config_path = match matches.opt_str("print-config") {
+        None => None,
+        Some(kind) => {
+            let path = free_matches.next().cloned();
+            match kind.as_str() {
+                "default" => return Ok(Operation::ConfigOutputDefault { path }),
+                "current" => return Ok(Operation::ConfigOutputCurrent { path }),
+                "minimal" => Some(path.ok_or(OperationError::PrintConfig(
+                    PrintConfigError::MinimalPathNoPath,
+                ))?),
+                _ => {
+                    return Err(OperationError::PrintConfig(
+                        PrintConfigError::UnknownOption(kind),
+                    ));
                 }
             }
-            _ => {
-                return Err(OperationError::UnknownPrintConfigTopic(kind));
-            }
         }
-    }
+    };
 
     if matches.opt_present("version") {
         return Ok(Operation::Version);
@@ -508,7 +548,9 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
     // if no file argument is supplied, read from stdin
     if files.is_empty() {
         if minimal_config_path.is_some() {
-            return Err(OperationError::MinimalPathWithStdin);
+            return Err(OperationError::PrintConfig(
+                PrintConfigError::MinimalPathWithStdin,
+            ));
         }
         let mut buffer = String::new();
         io::stdin().read_to_string(&mut buffer)?;
