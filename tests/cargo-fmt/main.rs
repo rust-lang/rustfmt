@@ -218,3 +218,39 @@ fn cargo_fmt_arg_passing_via_at_path() {
         "expected an argument starting with '@' passed to rustfmt"
     );
 }
+
+#[rustfmt_only_ci_test]
+#[test]
+fn cargo_fmt_no_at_path_when_args_fit() {
+    let args = [
+        "--check",
+        "--verbose",
+        "--manifest-path",
+        "tests/cargo-fmt/source/at_path_arg/Cargo.toml",
+    ];
+
+    // note: depends on discovery ordering, which depends on 'cargo metadata' ordering
+    let expected_rustfmt_args = format!(
+        "rustfmt --edition 2015 --check {} {} {}",
+        Path::new("tests/cargo-fmt/source/at_path_arg/src/bin1.rs")
+            .canonicalize()
+            .unwrap()
+            .display(),
+        Path::new("tests/cargo-fmt/source/at_path_arg/src/bin2.rs")
+            .canonicalize()
+            .unwrap()
+            .display(),
+        Path::new("tests/cargo-fmt/source/at_path_arg/src/lib.rs")
+            .canonicalize()
+            .unwrap()
+            .display(),
+    );
+
+    let envs = [("_RUSTFMT_FILE_ARGS_LEN_MAX", "10000")];
+    let (stdout, stderr) = cargo_fmt_with_env(&args, &envs);
+
+    assert!(
+        stdout.contains(&expected_rustfmt_args),
+        "expected stdout to contain {expected_rustfmt_args}\nstdout={stdout}\nstderr={stderr}"
+    );
+}

@@ -603,12 +603,12 @@ fn get_cargo_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Me
 // non-file args to `rustfmt`, we just ignore the length of those other args in our calculation.
 const FILE_ARGS_LEN_MAX: usize = 24_000;
 
-fn build_file_args<'a, 'b>(
+fn build_file_args(
     files: Vec<PathBuf>,
 ) -> Result<(Vec<PathBuf>, Option<NamedTempFile>), io::Error> {
     let file_args_len_max = if option_env!("RUSTFMT_CI").is_some() {
         env::var("_RUSTFMT_FILE_ARGS_LEN_MAX")
-            // unwrap: this variable is for internal use only, and should only be set for testing
+            // unwrap: branch is only reachable in testing
             .map(|s| s.parse::<usize>().unwrap())
             .unwrap_or(FILE_ARGS_LEN_MAX)
     } else {
@@ -623,12 +623,12 @@ fn build_file_args<'a, 'b>(
         // space separating args in the string in Windows.
         file_args_len += file.as_os_str().len() + 1;
 
-        if file_args_len >= file_args_len_max {
+        if file_args_len > file_args_len_max {
             break;
         }
     }
 
-    if file_args_len < file_args_len_max {
+    if file_args_len <= file_args_len_max {
         // args all fit in command line
         return Ok((files, None));
     };
