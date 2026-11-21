@@ -690,6 +690,191 @@ mod test {
     }
 
     #[test]
+    fn test_adjust_max_width() {
+        // Regression tests for #7147, where we didn't handle overflows / integral cast outside of
+        // range properly.
+
+        // Reduce with huge amount saturates to zero instead of wraparound.
+        let mut config = Config::default();
+        config.reduce_max_width(usize::MAX);
+        assert_eq!(config.max_width(), 0);
+
+        // Increase with huge amount saturates instead of wraparound.
+        let mut config = Config::default();
+        config.set().max_width(usize::MAX - 1);
+        config.increase_max_width(2);
+        assert_eq!(config.max_width(), usize::MAX);
+    }
+
+    #[test]
+    fn test_reduce_max_width_heuristics_default() {
+        // Reducing `max_width` does not change unset width settings that participate in
+        // `use_small_heuristics` if the value of `max_width` is equal to the default value.
+        let toml = r#"
+            use_small_heuristics = "Default"
+        "#;
+        let mut config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        config.reduce_max_width(8);
+        assert_eq!(config.array_width(), 60);
+        assert_eq!(config.attr_fn_like_width(), 70);
+        assert_eq!(config.chain_width(), 60);
+        assert_eq!(config.fn_call_width(), 60);
+        assert_eq!(config.single_line_if_else_max_width(), 50);
+        assert_eq!(config.single_line_let_else_max_width(), 50);
+        assert_eq!(config.struct_lit_width(), 18);
+        assert_eq!(config.struct_variant_width(), 35);
+    }
+
+    #[test]
+    fn test_reduce_max_width_heuristics_default_small_max_width() {
+        // Reducing `max_width` does not change unset width settings that participate in
+        // `use_small_heuristics` if the value of `max_width` is less than the default value.
+        let toml = r#"
+            use_small_heuristics = "Default"
+            max_width = 50
+        "#;
+        let mut config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        config.reduce_max_width(8);
+        assert_eq!(config.array_width(), 60);
+        assert_eq!(config.attr_fn_like_width(), 70);
+        assert_eq!(config.chain_width(), 60);
+        assert_eq!(config.fn_call_width(), 60);
+        assert_eq!(config.single_line_if_else_max_width(), 50);
+        assert_eq!(config.single_line_let_else_max_width(), 50);
+        assert_eq!(config.struct_lit_width(), 18);
+        assert_eq!(config.struct_variant_width(), 35);
+    }
+
+    #[test]
+    fn test_reduce_max_width_heuristics_default_large_max_width() {
+        // Reducing `max_width` scales unset width settings that participate in
+        // `use_small_heuristics` if the value of `max_width` is greater than the default value.
+        let toml = r#"
+            use_small_heuristics = "Default"
+            max_width = 200
+        "#;
+        let mut config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        config.reduce_max_width(8);
+        assert_eq!(config.array_width(), 114);
+        assert_eq!(config.attr_fn_like_width(), 133);
+        assert_eq!(config.chain_width(), 114);
+        assert_eq!(config.fn_call_width(), 114);
+        assert_eq!(config.single_line_if_else_max_width(), 95);
+        assert_eq!(config.single_line_let_else_max_width(), 95);
+        assert_eq!(config.struct_lit_width(), 34);
+        assert_eq!(config.struct_variant_width(), 67);
+    }
+
+    #[test]
+    fn test_reduce_max_width_heuristics_off() {
+        // Reducing `max_width` leaves unset width settings that participate in
+        // `use_small_heuristics` unchanged if `use_small_heuristics` is set to `Off`.
+        for max_width in [50, 100, 200] {
+            let toml = formatdoc! {r#"
+                use_small_heuristics = "Off"
+                max_width = {max_width}
+            "#};
+            let mut config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+            config.reduce_max_width(8);
+            assert_eq!(config.array_width(), usize::MAX);
+            assert_eq!(config.attr_fn_like_width(), usize::MAX);
+            assert_eq!(config.chain_width(), usize::MAX);
+            assert_eq!(config.fn_call_width(), usize::MAX);
+            assert_eq!(config.single_line_if_else_max_width(), 0);
+            assert_eq!(config.single_line_let_else_max_width(), 0);
+            assert_eq!(config.struct_lit_width(), 0);
+            assert_eq!(config.struct_variant_width(), 0);
+        }
+    }
+
+    #[test]
+    fn test_reduce_max_width_heuristics_max() {
+        // Reducing `max_width` sets unset width settings that participate in
+        // `use_small_heuristics` to the adjusted value of `max_width` if `use_small_heuristics` is
+        // set to `Max`.
+        for max_width in [50, 100, 200] {
+            let toml = formatdoc! {r#"
+                use_small_heuristics = "Max"
+                max_width = {max_width}
+            "#};
+            let mut config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+            config.reduce_max_width(8);
+            assert_eq!(config.array_width(), max_width - 8);
+            assert_eq!(config.attr_fn_like_width(), max_width - 8);
+            assert_eq!(config.chain_width(), max_width - 8);
+            assert_eq!(config.fn_call_width(), max_width - 8);
+            assert_eq!(config.single_line_if_else_max_width(), max_width - 8);
+            assert_eq!(config.single_line_let_else_max_width(), max_width - 8);
+            assert_eq!(config.struct_lit_width(), max_width - 8);
+            assert_eq!(config.struct_variant_width(), max_width - 8);
+        }
+    }
+
+    #[test]
+    fn test_reduce_max_width_keeps_explicit_widths() {
+        // Reducing `max_width` preserves explicitly set width settings that participate in
+        // `use_small_heuristics` as long as they do not exceed the adjusted value of `max_width`.
+        for use_small_heuristics in ["Default", "Off", "Max"] {
+            for max_width in [50, 100, 200] {
+                let toml = formatdoc! {r#"
+                    use_small_heuristics = "{use_small_heuristics}"
+                    max_width = {max_width}
+                    array_width = 5
+                    attr_fn_like_width = 10
+                    chain_width = 15
+                    fn_call_width = 20
+                    single_line_if_else_max_width = 25
+                    single_line_let_else_max_width = 30
+                    struct_lit_width = 35
+                    struct_variant_width = 40
+                "#};
+                let mut config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+                config.reduce_max_width(8);
+                assert_eq!(config.array_width(), 5);
+                assert_eq!(config.attr_fn_like_width(), 10);
+                assert_eq!(config.chain_width(), 15);
+                assert_eq!(config.fn_call_width(), 20);
+                assert_eq!(config.single_line_if_else_max_width(), 25);
+                assert_eq!(config.single_line_let_else_max_width(), 30);
+                assert_eq!(config.struct_lit_width(), 35);
+                assert_eq!(config.struct_variant_width(), 40);
+            }
+        }
+    }
+
+    #[test]
+    fn test_reduce_max_width_caps_explicit_widths() {
+        // Reducing `max_width` caps explicitly set width settings that participate in
+        // `use_small_heuristics` if they are above the adjusted value of `max_width`.
+        for use_small_heuristics in ["Default", "Off", "Max"] {
+            for max_width in [50, 100, 200] {
+                let toml = formatdoc! {r#"
+                    use_small_heuristics = "{use_small_heuristics}"
+                    max_width = {max_width}
+                    array_width = {max_width}
+                    attr_fn_like_width = {max_width}
+                    chain_width = {max_width}
+                    fn_call_width = {max_width}
+                    single_line_if_else_max_width = {max_width}
+                    single_line_let_else_max_width = {max_width}
+                    struct_lit_width = {max_width}
+                    struct_variant_width = {max_width}
+                "#};
+                let mut config = Config::from_toml(&toml, Path::new("./rustfmt.toml")).unwrap();
+                config.reduce_max_width(8);
+                assert_eq!(config.array_width(), max_width - 8);
+                assert_eq!(config.attr_fn_like_width(), max_width - 8);
+                assert_eq!(config.chain_width(), max_width - 8);
+                assert_eq!(config.fn_call_width(), max_width - 8);
+                assert_eq!(config.single_line_if_else_max_width(), max_width - 8);
+                assert_eq!(config.single_line_let_else_max_width(), max_width - 8);
+                assert_eq!(config.struct_lit_width(), max_width - 8);
+                assert_eq!(config.struct_variant_width(), max_width - 8);
+            }
+        }
+    }
+
+    #[test]
     fn test_config_used_to_toml() {
         let config = Config::default();
 
