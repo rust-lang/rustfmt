@@ -9,7 +9,7 @@ use rustc_ast::visit;
 use rustc_span::{BytePos, DUMMY_SP, Ident, Span, symbol};
 use tracing::debug;
 
-use crate::attr::filter_inline_attrs;
+use crate::attr::{filter_inline_attrs, rewrite_attrs_with_doc_comment_shape};
 use crate::comment::{
     FindUncommented, combine_strs_with_missing_comments, contains_comment, is_last_comment_block,
     recover_comment_removed, recover_missing_comment_in_span, rewrite_missing_comment,
@@ -1963,7 +1963,14 @@ pub(crate) fn rewrite_struct_field(
     let type_annotation_spacing = type_annotation_spacing(context.config);
     let prefix = rewrite_struct_field_prefix(context, field)?;
 
-    let attrs_str = field.attrs.rewrite_result(context, shape)?;
+    // `shape` has its width reduced by 1 to account for the trailing comma after the field,
+    // which does not apply to doc comments preceding the field.
+    let attrs_str = rewrite_attrs_with_doc_comment_shape(
+        &field.attrs,
+        context,
+        shape,
+        shape.with_max_width(context.config),
+    )?;
     let attrs_extendable = field.ident.is_none() && is_attributes_extendable(&attrs_str);
     let missing_span = if field.attrs.is_empty() {
         mk_sp(field.span.lo(), field.span.lo())
