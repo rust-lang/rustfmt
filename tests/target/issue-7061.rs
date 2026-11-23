@@ -80,3 +80,76 @@ fn break_inside_closure() {
         break;
     };
 }
+
+fn nested_deeply_for_loop() {
+    for x in 0..3 {
+        for y in 0..3 {
+            do_thing(x, y);
+        }
+    }
+}
+
+fn nested_deeply_while_loop() {
+    while outer_cond() {
+        while inner_cond() {
+            do_thing()
+        }
+    }
+}
+
+// test cases for continue
+fn test_continue() {
+    loop {
+        continue;
+    }
+}
+
+fn labeled_continue() {
+    'outer: loop {
+        loop {
+            continue 'outer;
+        }
+    }
+}
+
+fn continue_and_break_with_value() {
+    loop {
+        if some_condn() {
+            continue;
+        }
+        break 5;
+    };
+}
+
+//test cases for return
+fn test_return() {
+    loop {
+        return;
+    }
+}
+
+fn test_return_with_value() -> i32 {
+    loop {
+        return 5;
+    }
+}
+
+fn return_and_break() -> i32 {
+    loop {
+        if some_condn() {
+            return 5;
+        }
+        break 5;
+    };
+
+    return 5;
+}
+
+fn return_and_break_type2() -> i32 {
+    loop {
+        if some_condn() {
+            return 5;
+        }
+        break 5;
+    }
+}
