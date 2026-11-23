@@ -12,8 +12,7 @@ struct S {
 
 fn struct_lit() -> S {
     S {
-        /// This line is 80 columns long, so rustfmt shouldn't wrap it:
-        /// aaaaaaaa
+        /// This line is 80 columns long, so rustfmt shouldn't wrap it: aaaaaaaa
         x: 1,
         /// This line is 81 columns long, so rustfmt should wrap it:
         /// aaaaaaaaaaaa
