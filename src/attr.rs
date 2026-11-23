@@ -328,58 +328,71 @@ impl Rewrite for ast::Attribute {
     }
 
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
-        let snippet = context.snippet(self.span);
-        if self.is_doc_comment() {
-            rewrite_doc_comment(snippet, shape.comment(context.config), context.config)
-        } else {
-            let should_skip = self
-                .name()
-                .map(|s| context.skip_context.attributes.skip(s.as_str()))
-                .unwrap_or(false);
-            let prefix = attr_prefix(self);
+        rewrite_attr_with_doc_comment_shape(self, context, shape, shape)
+    }
+}
 
-            if should_skip || contains_comment(snippet) {
-                return Ok(snippet.to_owned());
+fn rewrite_attr_with_doc_comment_shape(
+    attr: &ast::Attribute,
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    doc_comment_shape: Shape,
+) -> RewriteResult {
+    let snippet = context.snippet(attr.span);
+    if attr.is_doc_comment() {
+        rewrite_doc_comment(
+            snippet,
+            doc_comment_shape.comment(context.config),
+            context.config,
+        )
+    } else {
+        let should_skip = attr
+            .name()
+            .map(|s| context.skip_context.attributes.skip(s.as_str()))
+            .unwrap_or(false);
+        let prefix = attr_prefix(attr);
+
+        if should_skip || contains_comment(snippet) {
+            return Ok(snippet.to_owned());
+        }
+
+        if let Some(ref meta) = attr.meta() {
+            // This attribute is possibly a doc attribute needing normalization to a doc comment
+            if context.config.normalize_doc_attributes() && meta.has_name(sym::doc) {
+                if let Some(ref literal) = meta.value_str() {
+                    let comment_style = match attr.style {
+                        ast::AttrStyle::Inner => CommentStyle::Doc,
+                        ast::AttrStyle::Outer => CommentStyle::TripleSlash,
+                    };
+
+                    let literal_str = literal.as_str();
+                    let doc_comment_formatter =
+                        DocCommentFormatter::new(literal_str, comment_style);
+                    let doc_comment = format!("{doc_comment_formatter}");
+                    return rewrite_doc_comment(
+                        &doc_comment,
+                        doc_comment_shape.comment(context.config),
+                        context.config,
+                    );
+                }
             }
 
-            if let Some(ref meta) = self.meta() {
-                // This attribute is possibly a doc attribute needing normalization to a doc comment
-                if context.config.normalize_doc_attributes() && meta.has_name(sym::doc) {
-                    if let Some(ref literal) = meta.value_str() {
-                        let comment_style = match self.style {
-                            ast::AttrStyle::Inner => CommentStyle::Doc,
-                            ast::AttrStyle::Outer => CommentStyle::TripleSlash,
-                        };
-
-                        let literal_str = literal.as_str();
-                        let doc_comment_formatter =
-                            DocCommentFormatter::new(literal_str, comment_style);
-                        let doc_comment = format!("{doc_comment_formatter}");
-                        return rewrite_doc_comment(
-                            &doc_comment,
-                            shape.comment(context.config),
-                            context.config,
-                        );
-                    }
-                }
-
-                // 1 = `[`
-                let shape = shape.offset_left(prefix.len() + 1, self.span)?;
-                Ok(meta.rewrite_result(context, shape).map_or_else(
-                    |_| snippet.to_owned(),
-                    |rw| match &self.kind {
-                        ast::AttrKind::Normal(normal_attr) => match normal_attr.item.unsafety {
-                            // For #![feature(unsafe_attributes)]
-                            // See https://github.com/rust-lang/rust/issues/123757
-                            ast::Safety::Unsafe(_) => format!("{}[unsafe({})]", prefix, rw),
-                            _ => format!("{}[{}]", prefix, rw),
-                        },
+            // 1 = `[`
+            let shape = shape.offset_left(prefix.len() + 1, attr.span)?;
+            Ok(meta.rewrite_result(context, shape).map_or_else(
+                |_| snippet.to_owned(),
+                |rw| match &attr.kind {
+                    ast::AttrKind::Normal(normal_attr) => match normal_attr.item.unsafety {
+                        // For #![feature(unsafe_attributes)]
+                        // See https://github.com/rust-lang/rust/issues/123757
+                        ast::Safety::Unsafe(_) => format!("{}[unsafe({})]", prefix, rw),
                         _ => format!("{}[{}]", prefix, rw),
                     },
-                ))
-            } else {
-                Ok(snippet.to_owned())
-            }
+                    _ => format!("{}[{}]", prefix, rw),
+                },
+            ))
+        } else {
+            Ok(snippet.to_owned())
         }
     }
 }
@@ -390,101 +403,78 @@ impl Rewrite for [ast::Attribute] {
     }
 
     fn rewrite_result(&self, context: &RewriteContext<'_>, shape: Shape) -> RewriteResult {
-        if self.is_empty() {
-            return Ok(String::new());
+        rewrite_attrs_with_doc_comment_shape(self, context, shape, shape)
+    }
+}
+
+/// Rewrites `attrs` using `shape` for regular attributes and `doc_comment_shape` for doc comments
+/// (including `#[doc = "..."]` when `normalize_doc_attributes = true`).
+pub(crate) fn rewrite_attrs_with_doc_comment_shape(
+    mut attrs: &[ast::Attribute],
+    context: &RewriteContext<'_>,
+    shape: Shape,
+    doc_comment_shape: Shape,
+) -> RewriteResult {
+    if attrs.is_empty() {
+        return Ok(String::new());
+    }
+
+    let mut result = String::new();
+
+    // Determine if the source text is annotated with `#[rustfmt::skip::attributes(derive)]`
+    // or `#![rustfmt::skip::attributes(derive)]`
+    let skip_derives = context.skip_context.attributes.skip("derive");
+
+    // This is not just a simple map because we need to handle doc comments
+    // (where we take as many doc comment attributes as possible) and possibly
+    // merging derives into a single attribute.
+    loop {
+        if attrs.is_empty() {
+            return Ok(result);
         }
 
-        // The current remaining attributes.
-        let mut attrs = self;
-        let mut result = String::new();
-
-        // Determine if the source text is annotated with `#[rustfmt::skip::attributes(derive)]`
-        // or `#![rustfmt::skip::attributes(derive)]`
-        let skip_derives = context.skip_context.attributes.skip("derive");
-
-        // This is not just a simple map because we need to handle doc comments
-        // (where we take as many doc comment attributes as possible) and possibly
-        // merging derives into a single attribute.
-        loop {
-            if attrs.is_empty() {
-                return Ok(result);
-            }
-
-            // Handle doc comments.
-            let (doc_comment_len, doc_comment_str) =
-                rewrite_initial_doc_comments(context, attrs, shape)?;
-            if doc_comment_len > 0 {
-                let doc_comment_str = doc_comment_str.expect("doc comments, but no result");
-                result.push_str(&doc_comment_str);
-
-                let missing_span = attrs
-                    .get(doc_comment_len)
-                    .map(|next| mk_sp(attrs[doc_comment_len - 1].span.hi(), next.span.lo()));
-                if let Some(missing_span) = missing_span {
-                    let snippet = context.snippet(missing_span);
-                    let (mla, mlb) = has_newlines_before_after_comment(snippet);
-                    let comment = crate::comment::recover_missing_comment_in_span(
-                        missing_span,
-                        shape.with_max_width(context.config),
-                        context,
-                        0,
-                    )?;
-                    let comment = if comment.is_empty() {
-                        format!("\n{mlb}")
-                    } else {
-                        format!("{mla}{comment}\n{mlb}")
-                    };
-                    result.push_str(&comment);
-                    result.push_str(&shape.indent.to_string(context.config));
-                }
-
-                attrs = &attrs[doc_comment_len..];
-
-                continue;
-            }
-
-            // Handle derives if we will merge them.
-            if !skip_derives && context.config.merge_derives() && is_derive(&attrs[0]) {
-                let derives = take_while_with_pred(context, attrs, is_derive);
-                let derive_str = format_derive(derives, shape, context).unknown_error()?;
-                result.push_str(&derive_str);
-
-                let missing_span = attrs
-                    .get(derives.len())
-                    .map(|next| mk_sp(attrs[derives.len() - 1].span.hi(), next.span.lo()));
-                if let Some(missing_span) = missing_span {
-                    let comment = crate::comment::recover_missing_comment_in_span(
-                        missing_span,
-                        shape.with_max_width(context.config),
-                        context,
-                        0,
-                    )?;
-                    result.push_str(&comment);
-                    if let Some(next) = attrs.get(derives.len()) {
-                        if next.is_doc_comment() {
-                            let snippet = context.snippet(missing_span);
-                            let (_, mlb) = has_newlines_before_after_comment(snippet);
-                            result.push_str(mlb);
-                        }
-                    }
-                    result.push('\n');
-                    result.push_str(&shape.indent.to_string(context.config));
-                }
-
-                attrs = &attrs[derives.len()..];
-
-                continue;
-            }
-
-            // If we get here, then we have a regular attribute, just handle one
-            // at a time.
-
-            let formatted_attr = attrs[0].rewrite_result(context, shape)?;
-            result.push_str(&formatted_attr);
+        // Handle doc comments.
+        let (doc_comment_len, doc_comment_str) =
+            rewrite_initial_doc_comments(context, attrs, doc_comment_shape)?;
+        if doc_comment_len > 0 {
+            let doc_comment_str = doc_comment_str.expect("doc comments, but no result");
+            result.push_str(&doc_comment_str);
 
             let missing_span = attrs
-                .get(1)
-                .map(|next| mk_sp(attrs[0].span.hi(), next.span.lo()));
+                .get(doc_comment_len)
+                .map(|next| mk_sp(attrs[doc_comment_len - 1].span.hi(), next.span.lo()));
+            if let Some(missing_span) = missing_span {
+                let snippet = context.snippet(missing_span);
+                let (mla, mlb) = has_newlines_before_after_comment(snippet);
+                let comment = crate::comment::recover_missing_comment_in_span(
+                    missing_span,
+                    shape.with_max_width(context.config),
+                    context,
+                    0,
+                )?;
+                let comment = if comment.is_empty() {
+                    format!("\n{mlb}")
+                } else {
+                    format!("{mla}{comment}\n{mlb}")
+                };
+                result.push_str(&comment);
+                result.push_str(&shape.indent.to_string(context.config));
+            }
+
+            attrs = &attrs[doc_comment_len..];
+
+            continue;
+        }
+
+        // Handle derives if we will merge them.
+        if !skip_derives && context.config.merge_derives() && is_derive(&attrs[0]) {
+            let derives = take_while_with_pred(context, attrs, is_derive);
+            let derive_str = format_derive(derives, shape, context).unknown_error()?;
+            result.push_str(&derive_str);
+
+            let missing_span = attrs
+                .get(derives.len())
+                .map(|next| mk_sp(attrs[derives.len() - 1].span.hi(), next.span.lo()));
             if let Some(missing_span) = missing_span {
                 let comment = crate::comment::recover_missing_comment_in_span(
                     missing_span,
@@ -493,7 +483,7 @@ impl Rewrite for [ast::Attribute] {
                     0,
                 )?;
                 result.push_str(&comment);
-                if let Some(next) = attrs.get(1) {
+                if let Some(next) = attrs.get(derives.len()) {
                     if next.is_doc_comment() {
                         let snippet = context.snippet(missing_span);
                         let (_, mlb) = has_newlines_before_after_comment(snippet);
@@ -504,8 +494,41 @@ impl Rewrite for [ast::Attribute] {
                 result.push_str(&shape.indent.to_string(context.config));
             }
 
-            attrs = &attrs[1..];
+            attrs = &attrs[derives.len()..];
+
+            continue;
         }
+
+        // If we get here, then we have a regular attribute, just handle one
+        // at a time.
+
+        let formatted_attr =
+            rewrite_attr_with_doc_comment_shape(&attrs[0], context, shape, doc_comment_shape)?;
+        result.push_str(&formatted_attr);
+
+        let missing_span = attrs
+            .get(1)
+            .map(|next| mk_sp(attrs[0].span.hi(), next.span.lo()));
+        if let Some(missing_span) = missing_span {
+            let comment = crate::comment::recover_missing_comment_in_span(
+                missing_span,
+                shape.with_max_width(context.config),
+                context,
+                0,
+            )?;
+            result.push_str(&comment);
+            if let Some(next) = attrs.get(1) {
+                if next.is_doc_comment() {
+                    let snippet = context.snippet(missing_span);
+                    let (_, mlb) = has_newlines_before_after_comment(snippet);
+                    result.push_str(mlb);
+                }
+            }
+            result.push('\n');
+            result.push_str(&shape.indent.to_string(context.config));
+        }
+
+        attrs = &attrs[1..];
     }
 }
 
