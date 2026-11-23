@@ -1,9 +1,4 @@
-//@ rustfmt-file_lines: [{"file":"tests/source/file-lines/issue-4053/closure-binding.rs","range":[11,11]}]
-//@ rustfmt-edition: 2021
-//@ rustfmt-style_edition: 2024
-//@ rustfmt-use_small_heuristics: Max
-//@ rustfmt-newline_style: Unix
-//@ rustfmt-wrap_comments: true
+//@ rustfmt-file_lines: [{"file":"tests/source/file-lines/issue-4053/closure-binding.rs","range":[6,6]}]
 
 fn GenerateBindingsImpl() {
     catch_unwind(|| {
