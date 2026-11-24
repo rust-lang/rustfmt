@@ -1,0 +1,11 @@
+# disable end-of-line conversions, so we can preserve CRLF in some test files
+source/issue-3494/crlf.rs -text
+source/comment_crlf_newline.rs -text
+target/issue-3494/crlf.rs -text
+target/comment_crlf_newline.rs -text
+target/format_strings/issue-3263.rs -text
+target/issue-3265.rs -text
+target/issue-2810.rs -text
+target/issue-2728.rs -text
+target/issue-2641.rs -text
+target/preserves_carriage_return_for_windows.rs -text
