@@ -6,6 +6,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::ffi::OsString;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
@@ -15,6 +16,7 @@ use std::str;
 
 use cargo_metadata::Edition;
 use clap::{CommandFactory, Parser};
+use tempfile::NamedTempFile;
 
 #[path = "test/mod.rs"]
 #[cfg(test)]
@@ -282,7 +284,7 @@ fn format_crate(
     let targets = get_targets(strategy, manifest_path)?;
 
     // Currently only bin and lib files get formatted.
-    run_rustfmt(&targets, &rustfmt_args, verbosity)
+    run_rustfmt(targets, &rustfmt_args, verbosity)
 }
 
 /// Target uses a `path` field for equality and hashing.
@@ -500,19 +502,19 @@ fn add_targets(target_paths: &[cargo_metadata::Target], targets: &mut BTreeSet<T
 }
 
 fn run_rustfmt(
-    targets: &BTreeSet<Target>,
+    targets: BTreeSet<Target>,
     fmt_args: &[String],
     verbosity: Verbosity,
 ) -> Result<i32, io::Error> {
     let by_edition = targets
-        .iter()
+        .into_iter()
         .inspect(|t| {
             if verbosity == Verbosity::Verbose {
                 println!("[{} ({})] {:?}", t.kind, t.edition, t.path)
             }
         })
         .fold(BTreeMap::new(), |mut h, t| {
-            h.entry(&t.edition).or_insert_with(Vec::new).push(&t.path);
+            h.entry(t.edition).or_insert_with(Vec::new).push(t.path);
             h
         });
 
@@ -524,17 +526,24 @@ fn run_rustfmt(
             std::process::Stdio::inherit()
         };
 
+        let (file_args, _tmpfile) = build_file_args(files)?;
+
         if verbosity == Verbosity::Verbose {
+            // Note: the test cargo_fmt_arg_passing_via_at_path relies on the format of this output
             print!("rustfmt");
             print!(" --edition {edition}");
             fmt_args.iter().for_each(|f| print!(" {}", f));
-            files.iter().for_each(|f| print!(" {}", f.display()));
+            file_args.iter().for_each(|f| print!(" {}", f.display()));
             println!();
         }
 
         let mut command = rustfmt_command()
             .stdout(stdout)
-            .args(files)
+            .args(file_args)
+            // NOTE: edge case, we determine 'file_args' fits within the args limit, but then
+            // following args are enough to overflow things and error out. Since we underestimate
+            // the limit, and expect a relatively small number of args here, this should be very
+            // unlikely
             .args(["--edition", edition.as_str()])
             .args(fmt_args)
             .spawn()
@@ -574,4 +583,87 @@ fn get_cargo_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Me
             }
         }
     }
+}
+
+// Total length of file arguments after which we should avoid passing files as arguments to
+// `rustfmt` and instead write them to a `@path` file. We do this because if the filename list is
+// sufficiently long it can reach command line length limits when trying to pass them as arguments.
+// But this "length" is platform dependent.
+//
+// On Windows the length is 32,767 UTF-16 **characters** (see `lpCommandLine` parameter to
+// `CreateProcessA`), this argument is a single string, so it includes arguments and any
+// quoting/escaping characters as well as spaces.
+//
+// Under POSIX this is `ARG_MAX` **bytes**, so at least `_POSIX_ARG_MAX` (=4096), in practice this
+// will commonly be >100KiB. In POSIX this limit also includes the length of all environment
+// variables, i.e. the length of argv[] and envp[].
+//
+// So, since Windows and POSIX define this widely differently, pick 24,000 as a value that should
+// easily underestimate the limit. Since we're overestimating, and don't expect a large number of
+// non-file args to `rustfmt`, we just ignore the length of those other args in our calculation.
+const FILE_ARGS_LEN_MAX: usize = 24_000;
+
+fn build_file_args(
+    files: Vec<PathBuf>,
+) -> Result<(Vec<PathBuf>, Option<NamedTempFile>), io::Error> {
+    let file_args_len_max = if option_env!("RUSTFMT_CI").is_some() {
+        env::var("_RUSTFMT_FILE_ARGS_LEN_MAX")
+            // unwrap: branch is only reachable in testing
+            .map(|s| s.parse::<usize>().unwrap())
+            .unwrap_or(FILE_ARGS_LEN_MAX)
+    } else {
+        FILE_ARGS_LEN_MAX
+    };
+
+    let mut file_args_len = 0;
+    for file in files.iter() {
+        // rough approximation: assume OsStr::len as a cheap approximation of the character
+        // count of the string. More accurate values could be obtained by encoding via
+        // `std::ffi` (but this is more expensive for not much gain). Add `1` to account for the
+        // space separating args in the string in Windows.
+        file_args_len += file.as_os_str().len() + 1;
+
+        if file_args_len > file_args_len_max {
+            break;
+        }
+    }
+
+    if file_args_len <= file_args_len_max {
+        // args all fit in command line
+        return Ok((files, None));
+    };
+
+    let at_file = NamedTempFile::new()?;
+    for file in files.iter() {
+        match file.as_os_str().to_str() {
+            None => {
+                // not sure we can actually get here: `files` is taken from targets generated from
+                // `cargo metadata` and `cargo` doesn't support non UTF-8 names in paths
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "cannot parse filename with non-UTF-8 character, file: {}",
+                        file.display()
+                    ),
+                ));
+            }
+            Some(s) if s.contains('\n') => {
+                // Args are read line-by-line from `@path` so filenames containing a newline should
+                // not be written there
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "refusing to pass file path containing newline as arg, file: {}",
+                        file.display()
+                    ),
+                ));
+            }
+            Some(s) => write!(at_file.as_file(), "{s}\n")?,
+        };
+    }
+
+    let mut at_file_path = OsString::from("@");
+    at_file_path.push(at_file.path().as_os_str());
+
+    Ok((vec![PathBuf::from(at_file_path)], Some(at_file)))
 }
