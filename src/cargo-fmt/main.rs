@@ -9,7 +9,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -633,12 +633,12 @@ fn build_file_args(
         return Ok((files, None));
     };
 
-    let at_file = NamedTempFile::new()?;
+    let mut writer = BufWriter::new(NamedTempFile::new()?);
     for file in files.iter() {
         match file.as_os_str().to_str() {
             None => {
-                // not sure we can actually get here: `files` is taken from targets generated from
-                // `cargo metadata` and `cargo` doesn't support non UTF-8 names in paths
+                // not sure we can actually get here: `files` is taken from targets generated
+                // from `cargo metadata` and `cargo` doesn't support non UTF-8 names in paths
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
                     format!(
@@ -648,8 +648,8 @@ fn build_file_args(
                 ));
             }
             Some(s) if s.contains('\n') => {
-                // Args are read line-by-line from `@path` so filenames containing a newline should
-                // not be written there
+                // Args are read line-by-line from `@path` so filenames containing a newline
+                // should not be written there
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
                     format!(
@@ -658,9 +658,11 @@ fn build_file_args(
                     ),
                 ));
             }
-            Some(s) => write!(at_file.as_file(), "{s}\n")?,
+            Some(s) => write!(writer, "{s}\n")?,
         };
     }
+    // Flush and remove the `BufWriter` so we can pass ownership of the temp file to the caller.
+    let at_file = writer.into_inner()?;
 
     let mut at_file_path = OsString::from("@");
     at_file_path.push(at_file.path().as_os_str());
