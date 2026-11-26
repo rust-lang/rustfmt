@@ -257,7 +257,7 @@ fn rustfmt_nightly_usage_text() {
                             Recursively searches the given path for the
                             rustfmt.toml config file. If not found reverts to the
                             input file path
-            --edition [2015|2018|2021|2024]
+            --edition [2015|2018|2021|2024|future]
                             Rust edition to use
             --color [always|never|auto]
                             Use colored output (if supported)

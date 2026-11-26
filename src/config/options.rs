@@ -489,6 +489,11 @@ pub enum Edition {
     #[doc_hint = "2024"]
     /// Edition 2024.
     Edition2024,
+    #[value = "future"]
+    #[doc_hint = "future"]
+    #[unstable_variant]
+    /// Edition future.
+    EditionFuture,
 }
 
 impl Default for Edition {
@@ -504,6 +509,7 @@ impl From<Edition> for rustc_span::edition::Edition {
             Edition::Edition2018 => Self::Edition2018,
             Edition::Edition2021 => Self::Edition2021,
             Edition::Edition2024 => Self::Edition2024,
+            Edition::EditionFuture => Self::EditionFuture,
         }
     }
 }
@@ -515,6 +521,10 @@ impl From<Edition> for StyleEdition {
             Edition::Edition2018 => StyleEdition::Edition2018,
             Edition::Edition2021 => StyleEdition::Edition2021,
             Edition::Edition2024 => StyleEdition::Edition2024,
+            // TODO(ytmimi) When `Edition::Edition2027` is available we need to map that to
+            // `StyleEdition::Edition2027` and create a new `StyleEdition::EditionFuture`
+            // So we can map `Edition::EditionFuture => StyleEdition::EditionFuture`.
+            Edition::EditionFuture => StyleEdition::Edition2027,
         }
     }
 }
@@ -574,23 +584,14 @@ impl From<StyleEdition> for rustc_span::edition::Edition {
             StyleEdition::Edition2021 => Self::Edition2021,
             StyleEdition::Edition2024 => Self::Edition2024,
             // TODO: should update to Edition2027 when it becomes available
-            StyleEdition::Edition2027 => Self::Edition2024,
+            StyleEdition::Edition2027 => Self::EditionFuture,
         }
     }
 }
 
 impl PartialOrd for StyleEdition {
     fn partial_cmp(&self, other: &StyleEdition) -> Option<std::cmp::Ordering> {
-        // FIXME(ytmimi): Update `StyleEdition::Edition2027` logic when
-        // `rustc_span::edition::Edition::Edition2027` becomes available in the compiler
-        match (self, other) {
-            (Self::Edition2027, Self::Edition2027) => Some(std::cmp::Ordering::Equal),
-            (_, Self::Edition2027) => Some(std::cmp::Ordering::Less),
-            (Self::Edition2027, _) => Some(std::cmp::Ordering::Greater),
-            (Self::Edition2015 | Self::Edition2018 | Self::Edition2021 | Self::Edition2024, _) => {
-                rustc_span::edition::Edition::partial_cmp(&(*self).into(), &(*other).into())
-            }
-        }
+        rustc_span::edition::Edition::partial_cmp(&(*self).into(), &(*other).into())
     }
 }
 
@@ -779,4 +780,40 @@ fn style_edition_comparisons() {
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2021);
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2024);
     assert!(StyleEdition::Edition2027 == StyleEdition::Edition2027);
+}
+
+#[test]
+fn editions_to_style_editions() {
+    // Test that rustfmt's `Edition` correctly maps to `StyleEdition`
+    assert_eq!(StyleEdition::Edition2015, Edition::Edition2015.into());
+    assert_eq!(StyleEdition::Edition2018, Edition::Edition2018.into());
+    assert_eq!(StyleEdition::Edition2021, Edition::Edition2021.into());
+    assert_eq!(StyleEdition::Edition2024, Edition::Edition2024.into());
+    // TODO(ytmimi) map StyleEdition::Edition2027 to Edition::Edition2027
+    // when that becomes available.
+    assert_eq!(StyleEdition::Edition2027, Edition::EditionFuture.into());
+
+    // Test that rust-lang/rust's `Edition` correctly maps to `StyleEdition`
+    assert_eq!(
+        rustc_span::edition::Edition::Edition2015,
+        StyleEdition::Edition2015.into()
+    );
+    assert_eq!(
+        rustc_span::edition::Edition::Edition2018,
+        StyleEdition::Edition2018.into()
+    );
+    assert_eq!(
+        rustc_span::edition::Edition::Edition2021,
+        StyleEdition::Edition2021.into()
+    );
+    assert_eq!(
+        rustc_span::edition::Edition::Edition2024,
+        StyleEdition::Edition2024.into()
+    );
+    // TODO(ytmimi) map `StyleEdition::Edition2027` to `rustc_span::edition::Edition::Edition2027`
+    // when that becomes available.
+    assert_eq!(
+        rustc_span::edition::Edition::EditionFuture,
+        StyleEdition::Edition2027.into()
+    );
 }

@@ -163,7 +163,11 @@ fn make_opts() -> Options {
         "",
         "edition",
         "Rust edition to use",
-        "[2015|2018|2021|2024]",
+        if is_nightly {
+            "[2015|2018|2021|2024|future]"
+        } else {
+            "[2015|2018|2021|2024]"
+        },
     );
     opts.optopt(
         "",
@@ -813,6 +817,7 @@ fn edition_from_edition_str(edition_str: &str) -> Result<Edition> {
         "2018" => Ok(Edition::Edition2018),
         "2021" => Ok(Edition::Edition2021),
         "2024" => Ok(Edition::Edition2024),
+        "future" => Ok(Edition::EditionFuture),
         _ => Err(format_err!("Invalid value for `--edition`")),
     }
 }

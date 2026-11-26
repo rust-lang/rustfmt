@@ -950,6 +950,14 @@ make_backup = false
         assert_eq!(edition2018, edition2021);
     }
 
+    #[test]
+    fn editon_future_sets_style_edition_2027() {
+        // Setting `edition=future` without specifying `style_edition` will set `style_edition=2027`
+        let toml = r#"edition = "future""#;
+        let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        assert_eq!(config.style_edition(), StyleEdition::Edition2027)
+    }
+
     #[stable_only_test]
     #[test]
     fn test_as_not_nightly_channel() {
