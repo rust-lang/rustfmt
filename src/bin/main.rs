@@ -199,7 +199,11 @@ fn make_opts() -> Options {
         "",
         "style-edition",
         "The edition of the Style Guide.",
-        "[2015|2018|2021|2024]",
+        if is_nightly {
+            "[2015|2018|2021|2024|2027]"
+        } else {
+            "[2015|2018|2021|2024]"
+        },
     );
 
     if is_nightly {

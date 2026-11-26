@@ -274,7 +274,7 @@ fn rustfmt_nightly_usage_text() {
             --config [key1=val1,key2=val2...]
                             Set options from command line. These settings take
                             priority over .rustfmt.toml
-            --style-edition [2015|2018|2021|2024]
+            --style-edition [2015|2018|2021|2024|2027]
                             The edition of the Style Guide.
             --unstable-features 
                             Enables unstable features. Only available on nightly
