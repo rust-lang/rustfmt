@@ -1,0 +1,8 @@
+# Do not resolve to very new artifacts to reduce likelihood of fresh supply
+# chain compromises. This applies also to `cargo update` run by Renovate
+# lockfile maintenance.
+#
+# To force a fresh release (e.g. a security fix), re-resolve with
+# `CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE=allow`.
+[registry]
+global-min-publish-age = "7 days"
