@@ -37,6 +37,7 @@ allow-unauthenticated = [
 new_issue = true
 exclude_labels = [
     "C-tracking-issue",
+    "C-discussion",
 ]
 
 # By default, we will tag merged PRs with `release-notes`; they can be removed
