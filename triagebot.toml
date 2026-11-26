@@ -13,17 +13,20 @@ allow-unauthenticated = [
     "E-*",
     "F-*",
     "I-*",
-    "llm-assisted",
-    "needs-rfc",
-    "needs-triage",
-    "regression-*",
+    "O-*",
     "S-*",
     "SO-*",
     "T-*",
     "UO-*",
+    "X-*",
+    "beta-nominated",
+    "llm-assisted",
+    "needs-*",
+    "new-unstable-option",
+    "regression-*",
+    "stable-nominated",
     "unstable-language-feature",
     "unstable-option",
-    "X-*",
 ]
 
 # ------------------------------------------------------------------------------
@@ -34,6 +37,7 @@ allow-unauthenticated = [
 new_issue = true
 exclude_labels = [
     "C-tracking-issue",
+    "C-discussion",
 ]
 
 # By default, we will tag merged PRs with `release-notes`; they can be removed
@@ -64,6 +68,17 @@ trigger_files = [
 [autolabel."A-meta"]
 trigger_files = [
     "triagebot.toml",
+]
+
+[autolabel."A-dependencies"]
+trigger_files = [
+    "Cargo.lock",
+    "Cargo.toml",
+]
+
+[autolabel."A-diff-check"]
+trigger_files = [
+    "diff_check",
 ]
 
 # ------------------------------------------------------------------------------
