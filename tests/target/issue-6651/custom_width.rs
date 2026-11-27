@@ -19,3 +19,14 @@ macro_rules! long {
         m!(aaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccc, ddddddddddddddd);
     };
 }
+
+macro_rules! too_long {
+    () => {
+        m!(
+            aaaaaaaaaaaaaaaa,
+            bbbbbbbbbbbbbbbb,
+            cccccccccccccccc,
+            dddddddddddddddd
+        );
+    };
+}
