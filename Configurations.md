@@ -534,8 +534,14 @@ Note that this option may be soft-deprecated in the future once the [ignore](#ig
 Specifies which edition is used by the parser.
 
 - **Default value**: `"2015"`
-- **Possible values**: `"2015"`, `"2018"`, `"2021"`, `"2024"`
+- **Possible values**:
+  - Stable values: `"2015"`, `"2018"`, `"2021"`, `"2024"`
+  - Unstable values: `"future"`
 - **Stable**: Yes
+
+> [!NOTE]
+> Although `edition` is stable, the `"future"` value is permanently unstable since it is associated
+> with unstable language behavior in the compiler.
 
 The `edition` option determines the Rust language edition used for parsing the code. This is important for syntax compatibility but does not directly control formatting behavior (see [style_edition](#style_edition)).
 

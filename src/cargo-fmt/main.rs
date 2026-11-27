@@ -1,5 +1,6 @@
 // Inspired by Paul Woolcock's cargo-fmt (https://github.com/pwoolcoc/cargo-fmt/).
 
+#![feature(rustc_private)]
 #![deny(warnings)]
 #![allow(clippy::match_like_matches_macro)]
 
@@ -13,27 +14,25 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
+use std::sync::LazyLock;
 
 use cargo_metadata::Edition;
 use clap::{CommandFactory, Parser};
 use tempfile::NamedTempFile;
 
+use rustfmt_nightly::is_nightly_channel;
+
 #[path = "test/mod.rs"]
 #[cfg(test)]
 mod cargo_fmt_tests;
 
-const fn is_nightly() -> bool {
-    match option_env!("CFG_RELEASE_CHANNEL") {
-        None => true,
-        Some(c) => matches!(c.as_bytes(), b"nightly" | b"dev"),
+static MESSAGE_FORMATS: LazyLock<&str> = LazyLock::new(|| {
+    if is_nightly_channel!() {
+        "short|json|human"
+    } else {
+        "short|human"
     }
-}
-
-const MESSAGE_FORMATS: &str = if is_nightly() {
-    "short|json|human"
-} else {
-    "short|human"
-};
+});
 
 #[derive(Parser)]
 #[command(
@@ -72,7 +71,7 @@ pub struct Opts {
     #[arg(
         long = "message-format",
         value_name = "message-format",
-        help = format!("Specify message-format: {MESSAGE_FORMATS}")
+        help = format!("Specify message-format: {}", *MESSAGE_FORMATS)
     )]
     message_format: Option<String>,
 
@@ -204,7 +203,7 @@ fn convert_message_format_to_rustfmt_args(
             Ok(())
         }
         "json" => {
-            if !is_nightly() {
+            if !is_nightly_channel!() {
                 return Err(String::from(
                     "--message-format json is only supported in nightly builds",
                 ));
@@ -226,7 +225,8 @@ fn convert_message_format_to_rustfmt_args(
         "human" => Ok(()),
         _ => Err(format!(
             "invalid --message-format value: {message_format}. Allowed values are: \
-                {MESSAGE_FORMATS}"
+                {}",
+            *MESSAGE_FORMATS
         )),
     }
 }

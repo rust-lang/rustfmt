@@ -18,7 +18,8 @@ use getopts::{Matches, Options};
 
 use crate::rustfmt::{
     CliOptions, Color, Config, Edition, EmitMode, FileLines, FileName,
-    FormatReportFormatterBuilder, Input, Session, StyleEdition, Verbosity, Version, load_config,
+    FormatReportFormatterBuilder, Input, Session, StyleEdition, Verbosity, Version,
+    is_nightly_channel, load_config,
 };
 
 const BUG_REPORT_URL: &str = "https://github.com/rust-lang/rustfmt/issues/new?labels=bug";
@@ -143,7 +144,7 @@ fn make_opts() -> Options {
         "Run in 'check' mode. Exits with 0 if input is formatted correctly. Exits \
          with 1 and prints a diff if formatting is required.",
     );
-    let is_nightly = is_nightly();
+    let is_nightly = is_nightly_channel!();
     let emit_opts = if is_nightly {
         "[files|stdout|coverage|checkstyle|json]"
     } else {
@@ -162,7 +163,11 @@ fn make_opts() -> Options {
         "",
         "edition",
         "Rust edition to use",
-        "[2015|2018|2021|2024]",
+        if is_nightly {
+            "[2015|2018|2021|2024|future]"
+        } else {
+            "[2015|2018|2021|2024]"
+        },
     );
     opts.optopt(
         "",
@@ -194,7 +199,11 @@ fn make_opts() -> Options {
         "",
         "style-edition",
         "The edition of the Style Guide.",
-        "[2015|2018|2021|2024]",
+        if is_nightly {
+            "[2015|2018|2021|2024|2027]"
+        } else {
+            "[2015|2018|2021|2024]"
+        },
     );
 
     if is_nightly {
@@ -237,10 +246,6 @@ fn make_opts() -> Options {
     opts.optflagopt("h", "help", &help_topic_msg, "=TOPIC");
 
     opts
-}
-
-fn is_nightly() -> bool {
-    option_env!("CFG_RELEASE_CHANNEL").map_or(true, |c| c == "nightly" || c == "dev")
 }
 
 // Returned i32 is an exit code
@@ -507,7 +512,7 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
 
         return match topic.as_str() {
             "config" => Ok(Operation::Help(HelpOp::Config)),
-            "file-lines" if is_nightly() => Ok(Operation::Help(HelpOp::FileLines)),
+            "file-lines" if is_nightly_channel!() => Ok(Operation::Help(HelpOp::FileLines)),
             _ => Err(OperationError::UnknownHelpTopic(topic)),
         };
     }
@@ -595,7 +600,7 @@ impl GetOptsOptions {
             return Err(format_err!("Can't use both `--verbose` and `--quiet`"));
         }
 
-        let rust_nightly = is_nightly();
+        let rust_nightly = is_nightly_channel!();
 
         if rust_nightly {
             options.unstable_features = matches.opt_present("unstable-features");
@@ -816,6 +821,7 @@ fn edition_from_edition_str(edition_str: &str) -> Result<Edition> {
         "2018" => Ok(Edition::Edition2018),
         "2021" => Ok(Edition::Edition2021),
         "2024" => Ok(Edition::Edition2024),
+        "future" => Ok(Edition::EditionFuture),
         _ => Err(format_err!("Invalid value for `--edition`")),
     }
 }
