@@ -232,8 +232,12 @@ impl PartialConfig {
         version_override: Option<Version>,
         dir: &Path,
     ) -> Config {
+        let style_edition = self
+            .style_edition
+            .filter(|se| crate::is_nightly_channel!() || se.is_stable());
+
         Config::default_for_possible_style_edition(
-            style_edition_override.or(self.style_edition),
+            style_edition_override.or(style_edition),
             edition_override.or(self.edition),
             version_override.or(self.version),
         )
