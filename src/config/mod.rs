@@ -232,8 +232,12 @@ impl PartialConfig {
         version_override: Option<Version>,
         dir: &Path,
     ) -> Config {
+        let style_edition = self
+            .style_edition
+            .filter(|se| crate::is_nightly_channel!() || se.is_stable());
+
         Config::default_for_possible_style_edition(
-            style_edition_override.or(self.style_edition),
+            style_edition_override.or(style_edition),
             edition_override.or(self.edition),
             version_override.or(self.version),
         )
@@ -948,6 +952,30 @@ make_backup = false
         let edition2021 = get_edition_toml(StyleEdition::Edition2021);
         assert_eq!(edition2015, edition2018);
         assert_eq!(edition2018, edition2021);
+    }
+
+    #[stable_only_test]
+    #[test]
+    fn test_unstable_style_edition_in_toml_falls_back_on_stable() {
+        let toml = r#"
+            style_edition = "2027"
+            edition = "2024"
+        "#;
+        let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        assert_eq!(config.was_set().style_edition(), false);
+        assert_eq!(config.style_edition(), StyleEdition::Edition2024);
+    }
+
+    #[nightly_only_test]
+    #[test]
+    fn test_unstable_style_edition_in_toml_allowed_on_nightly() {
+        let toml = r#"
+            style_edition = "2027"
+            edition = "2024"
+        "#;
+        let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        assert_eq!(config.was_set().style_edition(), true);
+        assert_eq!(config.style_edition(), StyleEdition::Edition2027);
     }
 
     #[stable_only_test]

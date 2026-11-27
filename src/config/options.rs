@@ -12,6 +12,7 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::config::Config;
+use crate::config::config_type::ConfigType;
 use crate::config::file_lines::FileLines;
 use crate::config::lists::*;
 use crate::config::macro_names::MacroSelectors;
@@ -566,6 +567,12 @@ pub enum StyleEdition {
     Edition2027,
 }
 
+impl StyleEdition {
+    pub fn is_stable(self) -> bool {
+        self.stable_variant()
+    }
+}
+
 impl From<StyleEdition> for rustc_span::edition::Edition {
     fn from(edition: StyleEdition) -> Self {
         match edition {
@@ -779,4 +786,19 @@ fn style_edition_comparisons() {
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2021);
     assert!(StyleEdition::Edition2027 > StyleEdition::Edition2024);
     assert!(StyleEdition::Edition2027 == StyleEdition::Edition2027);
+}
+
+#[test]
+fn style_edition_stability() {
+    assert!(
+        [
+            StyleEdition::Edition2015,
+            StyleEdition::Edition2018,
+            StyleEdition::Edition2021,
+            StyleEdition::Edition2024,
+        ]
+        .iter()
+        .all(|se| se.is_stable())
+    );
+    assert!(!StyleEdition::Edition2027.is_stable());
 }
