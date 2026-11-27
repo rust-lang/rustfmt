@@ -455,10 +455,20 @@ impl<'a> Context<'a> {
                         }
                     }
 
-                    _ => expr.rewrite(self.context, shape),
+                    _ => self
+                        .context
+                        .rewrite_cached_overflow(expr.span, shape, || {
+                            expr.rewrite_result(self.context, shape)
+                        })
+                        .ok(),
                 }
             }
-            item => item.rewrite(self.context, shape),
+            item => self
+                .context
+                .rewrite_cached_overflow(item.span(), shape, || {
+                    item.rewrite_result(self.context, shape)
+                })
+                .ok(),
         };
 
         if let Some(rewrite) = rewrite {
