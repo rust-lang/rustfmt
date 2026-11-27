@@ -12,7 +12,7 @@ use rustc_ast::{ast, attr};
 use rustc_span::{Span, symbol::sym};
 
 use crate::StyleEdition;
-use crate::config::{Config, GroupImportsTactic};
+use crate::config::{Config, GroupImportsTactic, ImportGranularity};
 use crate::imports::{UseSegmentKind, UseTree, normalize_use_trees_with_granularity};
 use crate::items::{is_mod_decl, rewrite_extern_crate, rewrite_mod};
 use crate::lists::{ListFormatting, ListItem, itemize_list, write_list};
@@ -124,20 +124,53 @@ fn rewrite_reorderable_or_regroupable_items(
             for (item, list_item) in normalized_items.iter_mut().zip(list_items) {
                 item.list_item = Some(list_item.clone());
             }
-            normalized_items = normalize_use_trees_with_granularity(
-                normalized_items,
-                context.config.imports_granularity(),
-            );
+            let mut regrouped_items = Vec::new();
+            if context.config.group_imports() == GroupImportsTactic::StdExternalCrate {
+                let mut import_group = Vec::new();
+                for item in normalized_items {
+                    let list_item = item.list_item.as_ref();
+                    let starts_group = list_item.is_some_and(|item| item.pre_comment.is_some());
+                    let ends_group = list_item.is_some_and(|item| item.post_comment.is_some());
 
-            let mut regrouped_items = match context.config.group_imports() {
-                GroupImportsTactic::Preserve | GroupImportsTactic::One => {
-                    vec![normalized_items]
+                    if starts_group && !import_group.is_empty() {
+                        regroup_import_group(
+                            &mut regrouped_items,
+                            import_group,
+                            context.config.group_imports(),
+                            context.config.imports_granularity(),
+                            context.config.reorder_imports(),
+                        );
+                        import_group = Vec::new();
+                    }
+                    import_group.push(item);
+                    if ends_group {
+                        regroup_import_group(
+                            &mut regrouped_items,
+                            import_group,
+                            context.config.group_imports(),
+                            context.config.imports_granularity(),
+                            context.config.reorder_imports(),
+                        );
+                        import_group = Vec::new();
+                    }
                 }
-                GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
-            };
-
-            if context.config.reorder_imports() {
-                regrouped_items.iter_mut().for_each(|items| items.sort())
+                if !import_group.is_empty() {
+                    regroup_import_group(
+                        &mut regrouped_items,
+                        import_group,
+                        context.config.group_imports(),
+                        context.config.imports_granularity(),
+                        context.config.reorder_imports(),
+                    );
+                }
+            } else {
+                regroup_import_group(
+                    &mut regrouped_items,
+                    normalized_items,
+                    context.config.group_imports(),
+                    context.config.imports_granularity(),
+                    context.config.reorder_imports(),
+                );
             }
 
             // 4 = "use ", 1 = ";"
@@ -196,6 +229,58 @@ fn contains_macro_use_attr(item: &ast::Item) -> bool {
 
 /// Divides imports into three groups, corresponding to standard, external
 /// and local imports. Sorts each subgroup.
+fn regroup_import_group(
+    regrouped_items: &mut Vec<Vec<UseTree>>,
+    use_trees: Vec<UseTree>,
+    group_imports_tactic: GroupImportsTactic,
+    import_granularity: ImportGranularity,
+    reorder_imports: bool,
+) {
+    let mut use_trees = use_trees;
+    let leading_comment = use_trees
+        .first_mut()
+        .and_then(|tree| tree.list_item.as_mut())
+        .and_then(|item| {
+            item.pre_comment
+                .take()
+                .map(|comment| (comment, item.pre_comment_style))
+        });
+    let trailing_comment = use_trees
+        .last_mut()
+        .and_then(|tree| tree.list_item.as_mut())
+        .and_then(|item| item.post_comment.take());
+
+    let normalized_items = normalize_use_trees_with_granularity(use_trees, import_granularity);
+    let groups = match group_imports_tactic {
+        GroupImportsTactic::Preserve | GroupImportsTactic::One => vec![normalized_items],
+        GroupImportsTactic::StdExternalCrate => group_imports(normalized_items),
+    };
+    let mut groups: Vec<_> = groups
+        .into_iter()
+        .filter(|group| !group.is_empty())
+        .collect();
+    if reorder_imports {
+        groups.iter_mut().for_each(|group| group.sort());
+    }
+    if let Some((comment, style)) = leading_comment {
+        if let Some(tree) = groups.first_mut().and_then(|group| group.first_mut()) {
+            let item = tree
+                .list_item
+                .get_or_insert_with(|| ListItem::from_item(Ok(String::new())));
+            item.pre_comment = Some(comment);
+            item.pre_comment_style = style;
+        }
+    }
+    if let Some(comment) = trailing_comment {
+        if let Some(tree) = groups.last_mut().and_then(|group| group.last_mut()) {
+            tree.list_item
+                .get_or_insert_with(|| ListItem::from_item(Ok(String::new())))
+                .post_comment = Some(comment);
+        }
+    }
+    regrouped_items.extend(groups);
+}
+
 fn group_imports(uts: Vec<UseTree>) -> Vec<Vec<UseTree>> {
     let mut std_imports = Vec::new();
     let mut external_imports = Vec::new();
