@@ -2,7 +2,7 @@
 source: src/test/mod.rs
 ---
 error[internal]: left behind trailing whitespace
- --> tests/warning/source/trailing_whitespace_overflow.rs:2:2:37
+ --> tests/warning/source/trailing_whitespace_overflow.rs:2:37
   |
 2 | /// Overflowing trailing whitespace.               
   |                                     ^^^^^^^^^^^^^^^

@@ -2,7 +2,7 @@
 source: src/test/mod.rs
 ---
 error[internal]: left behind trailing whitespace
- --> tests/warning/source/unicode_trailing_whitespace.rs:1:1:41
+ --> tests/warning/source/unicode_trailing_whitespace.rs:1:41
   |
 1 | /// This doc comment ends in a snowman ☃   
   |                                         ^^^

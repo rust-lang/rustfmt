@@ -62,9 +62,13 @@ impl<'a> Display for FormatReportFormatter<'a> {
                 if error.is_internal() {
                     title = title.id("internal");
                 }
+                let path = match error.highlight {
+                    Some(_) => file.to_string(),
+                    None => format!("{file}:{}", error.line),
+                };
                 let snippet = Snippet::source(&error.line_buffer)
                     .line_start(error.line)
-                    .path(format!("{file}:{}", error.line))
+                    .path(path)
                     .fold(false)
                     .annotations(annotation(error));
                 let mut group = title.element(snippet);
