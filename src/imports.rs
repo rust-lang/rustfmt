@@ -227,7 +227,7 @@ pub(crate) fn normalize_use_trees_with_granularity(
         ImportGranularity::Item => return flatten_use_trees(use_trees, ImportGranularity::Item),
         ImportGranularity::Preserve => return use_trees,
         ImportGranularity::Crate => SharedPrefix::Crate,
-        ImportGranularity::Module => SharedPrefix::Module,
+        ImportGranularity::Module | ImportGranularity::ModuleCondensed => SharedPrefix::Module,
         ImportGranularity::One => SharedPrefix::One,
     };
 
@@ -253,7 +253,81 @@ pub(crate) fn normalize_use_trees_with_granularity(
             }
         }
     }
+
+    if import_granularity == ImportGranularity::ModuleCondensed {
+        condense_use_trees(&mut result);
+    }
+
     result
+}
+
+/// Merge singleton imports into parent modules' use-trees where it does't
+/// introduce nested braces.
+fn condense_use_trees(use_trees: &mut Vec<UseTree>) {
+    // The implementation uses a layer of indirection to avoid reordering the
+    // `use_trees` vector. Specifically, `use_trees_sorted` is a permutation of
+    // `0..use_trees.len()`. The elements of `use_trees_sorted` can be thought
+    // of as indices into the `use_trees` vector.
+    let mut use_trees_sorted = (0..use_trees.len()).collect::<Vec<_>>();
+
+    // Sort by path length to put singletons after the trees into which they
+    // may be absorbed.
+    use_trees_sorted.sort_by_key(|&index| use_trees[index].path.len());
+
+    // Search for singletons back-to-front to preserve the just mentioned
+    // relative order between absorbing trees and singletons. Note that a
+    // singleton that is found and merged into _some_ tree is `swap_remove`d
+    // from the `use_trees_sorted` vector.
+    for n in (0..use_trees_sorted.len()).rev() {
+        let index = use_trees_sorted[n];
+        let singleton = &use_trees[index];
+
+        if !singleton.is_singleton() || singleton.attrs.is_some() || singleton.contains_comment() {
+            continue;
+        }
+
+        let mut best_indirect_index_and_len = None;
+
+        // Search front-to-back for a tree to merge the singleton into. If
+        // multiple trees are equally good candidates, prefer the earliest one.
+        // Like above, these precautions help preserve the relative order
+        // between absorbing trees and singletons.
+        for curr_indirect_index in 0..n {
+            let curr_index = use_trees_sorted[curr_indirect_index];
+            let curr_tree = &use_trees[curr_index];
+            let curr_len = curr_tree.shared_prefix_len(singleton);
+            if best_indirect_index_and_len.map_or(false, |(_, best_len)| best_len >= curr_len) {
+                continue;
+            }
+            if curr_len < 1
+                || !curr_tree.is_singleton() && curr_len + 1 != curr_tree.path.len()
+                || curr_tree.attrs.is_some()
+                || curr_tree.contains_comment()
+                || !curr_tree.same_visibility(singleton)
+            {
+                continue;
+            }
+            best_indirect_index_and_len = Some((curr_indirect_index, curr_len));
+        }
+
+        if let Some((best_indirect_index, _)) = best_indirect_index_and_len {
+            let singleton_index = use_trees_sorted.swap_remove(n);
+            let singleton = use_trees.remove(singleton_index);
+
+            // `singleton` was removed from `use_trees`. So any indices larger
+            // than `singleton_index` must be decremented. Note that this could
+            // affect `best_index`. So the decrementing must occur before
+            // `best_index` is fetched from `use_trees_sorted`.
+            for index_ref in &mut use_trees_sorted {
+                if *index_ref >= singleton_index {
+                    *index_ref -= 1;
+                }
+            }
+
+            let best_index = use_trees_sorted[best_indirect_index];
+            use_trees[best_index].merge(&singleton, SharedPrefix::Crate);
+        }
+    }
 }
 
 fn flatten_use_trees(
@@ -694,6 +768,20 @@ impl UseTree {
                 SharedPrefix::One => true,
             }
         }
+    }
+
+    fn shared_prefix_len(&self, other: &UseTree) -> usize {
+        self.path
+            .iter()
+            .zip(other.path.iter())
+            .take_while(|(a, b)| a == b)
+            .count()
+    }
+
+    fn is_singleton(&self) -> bool {
+        self.path.last().map_or(false, |use_segment| {
+            !matches!(use_segment.kind, UseSegmentKind::List(_))
+        })
     }
 
     fn flatten(self, import_granularity: ImportGranularity) -> Vec<UseTree> {
@@ -1387,6 +1475,62 @@ mod test {
             Module,
             ["foo::{a::b, a::c, d::e, d::f}"],
             ["foo::a::{b, c}", "foo::d::{e, f}"]
+        );
+    }
+
+    #[test]
+    fn test_use_tree_merge_module_condensed() {
+        test_merge!(
+            ModuleCondensed,
+            ["foo::b", "foo::{a, c, d::e}"],
+            ["foo::{a, b, c, d::e}"]
+        );
+
+        test_merge!(
+            ModuleCondensed,
+            ["foo::{a::b, a::c, d::e, d::f}"],
+            ["foo::a::{b, c}", "foo::d::{e, f}"]
+        );
+    }
+
+    /// This test exercises the "prefer the earliest one" logic in [`condense_use_trees`]. In
+    /// particular, if this line:
+    /// ```
+    ///         for curr_index in 0..n {
+    /// ```
+    /// were changed to this line:
+    /// ```
+    ///         for curr_index in (0..n).rev() {
+    /// ```
+    /// the test would fail. An explanation follows.
+    ///
+    /// Note that [`condense_use_trees`]'s outer loop visits the trees back-to-front. So in this
+    /// test, `foo::e::f` will be the first singleton considered for merging.
+    ///
+    /// Next note that `foo::a::b` and `foo::c::d` are equally good candidates to absorb
+    /// `foo::e::f`. Because the earliest candidate (i.e., `foo::a::b`) is selected, we get the
+    /// following intermediate state:
+    /// ```
+    /// foo::{a::b, e::f};
+    /// foo::c::d;
+    /// ```
+    /// Then, when `foo::c::d` is visited by the outer loop, it will notice that this singleton can
+    /// be merged into `foo::{a::b, e::f}`, and we get the desired output.
+    ///
+    /// On the other hand, if `foo::c::d` were selected, we would get the following intermediate
+    /// state:
+    /// ```
+    /// foo::a::b;
+    /// foo::{c::d, e::f};
+    /// ```
+    /// From this state, no progress could be made, because the only singleton (`foo::a::b`) appears
+    /// before all trees that could absorb it.
+    #[test]
+    fn test_use_tree_merge_module_condensed_relative_order() {
+        test_merge!(
+            ModuleCondensed,
+            ["foo::a::b", "foo::c::d", "foo::e::f"],
+            ["foo::{a::b, c::d, e::f}"]
         );
     }
 
