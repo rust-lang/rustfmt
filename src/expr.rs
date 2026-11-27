@@ -280,6 +280,7 @@ pub(crate) fn format_expr(
             &cl.coroutine_marker,
             cl.movability,
             &cl.fn_decl,
+            cl.fn_decl_span,
             &cl.body,
             expr.span,
             context,
