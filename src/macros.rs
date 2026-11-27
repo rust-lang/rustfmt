@@ -1387,6 +1387,7 @@ impl MacroBranch {
         };
 
         if !filtered_str_fits(
+            config.style_edition(),
             &new_body_snippet.snippet,
             config.max_width(),
             context.config.tab_spaces(),
