@@ -684,7 +684,16 @@ impl GetOptsOptions {
         }
 
         if let Some(ref edition_str) = matches.opt_str("style-edition") {
-            options.style_edition = Some(style_edition_from_style_edition_str(edition_str)?);
+            let style_edition = style_edition_from_style_edition_str(edition_str)?;
+
+            if !rust_nightly && !style_edition.is_stable() {
+                return Err(format_err!(
+                    "Invalid value for `--style-edition` - `{style_edition}` is only available on \
+                    the nightly channel"
+                ));
+            }
+
+            options.style_edition = Some(style_edition);
         }
 
         if matches.opt_present("backup") {
