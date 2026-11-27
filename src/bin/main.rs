@@ -846,7 +846,7 @@ fn emit_mode_from_emit_str(emit_str: &str) -> Result<EmitMode> {
 #[allow(dead_code)]
 mod test {
     use super::*;
-    use rustfmt_config_proc_macro::nightly_only_test;
+    use rustfmt_config_proc_macro::{nightly_only_test, stable_only_test};
 
     fn get_config<O: CliOptions>(path: Option<&Path>, options: Option<O>) -> Config {
         load_config(path, options).unwrap().0
@@ -1051,5 +1051,29 @@ mod test {
         // FIXME: this test doesn't really exercise anything, since
         // `overflow_delimited_expr` is disabled by default in edition 2024.
         assert_eq!(config.overflow_delimited_expr(), true);
+    }
+
+    #[stable_only_test]
+    #[test]
+    fn unstable_style_edition_rejected_on_stable() {
+        let matches = make_opts().parse(["--style-edition=2027"]).unwrap();
+        assert!(
+            GetOptsOptions::from_matches(&matches)
+                .unwrap_err()
+                .to_string()
+                .contains("nightly")
+        );
+    }
+
+    #[nightly_only_test]
+    #[test]
+    fn unstable_style_edition_allowed_on_nightly() {
+        let matches = make_opts().parse(["--style-edition=2027"]).unwrap();
+        assert_eq!(
+            GetOptsOptions::from_matches(&matches)
+                .unwrap()
+                .style_edition,
+            Some(StyleEdition::Edition2027)
+        );
     }
 }

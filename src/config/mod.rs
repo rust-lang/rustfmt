@@ -952,6 +952,30 @@ make_backup = false
 
     #[stable_only_test]
     #[test]
+    fn test_unstable_style_edition_in_toml_falls_back_on_stable() {
+        let toml = r#"
+            style_edition = "2027"
+            edition = "2024"
+        "#;
+        let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        assert_eq!(config.was_set().style_edition(), false);
+        assert_eq!(config.style_edition(), StyleEdition::Edition2024);
+    }
+
+    #[nightly_only_test]
+    #[test]
+    fn test_unstable_style_edition_in_toml_allowed_on_nightly() {
+        let toml = r#"
+            style_edition = "2027"
+            edition = "2024"
+        "#;
+        let config = Config::from_toml(toml, Path::new("./rustfmt.toml")).unwrap();
+        assert_eq!(config.was_set().style_edition(), true);
+        assert_eq!(config.style_edition(), StyleEdition::Edition2027);
+    }
+
+    #[stable_only_test]
+    #[test]
     fn test_as_not_nightly_channel() {
         let mut config = Config::default();
         assert_eq!(config.was_set().unstable_features(), false);
