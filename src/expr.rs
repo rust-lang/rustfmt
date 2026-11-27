@@ -7,6 +7,7 @@ use rustc_ast::{ForLoopKind, MatchKind, ast, token};
 use rustc_span::{BytePos, Span};
 use tracing::debug;
 
+use crate::attr::rewrite_attrs_with_doc_comment_shape;
 use crate::chains::rewrite_chain;
 use crate::closures;
 use crate::comment::{
@@ -1998,7 +1999,12 @@ pub(crate) fn rewrite_field(
     if contains_skip(&field.attrs) {
         return Ok(context.snippet(field.span()).to_owned());
     }
-    let mut attrs_str = field.attrs.rewrite_result(context, shape)?;
+    let mut attrs_str = rewrite_attrs_with_doc_comment_shape(
+        &field.attrs,
+        context,
+        shape,
+        shape.with_max_width(context.config),
+    )?;
     if !attrs_str.is_empty() {
         attrs_str.push_str(&shape.indent.to_string_with_newline(context.config));
     };
