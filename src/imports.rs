@@ -12,7 +12,9 @@ use rustc_span::{
     symbol::{self, sym},
 };
 
-use crate::comment::combine_strs_with_missing_comments;
+use crate::comment::{
+    combine_strs_with_missing_comments, contains_comment, recover_missing_comment_in_span,
+};
 use crate::config::ImportGranularity;
 use crate::config::lists::*;
 use crate::config::{Edition, IndentStyle, StyleEdition};
@@ -24,7 +26,10 @@ use crate::shape::Shape;
 use crate::sort::version_sort;
 use crate::source_map::SpanUtils;
 use crate::spanned::Spanned;
-use crate::utils::{is_same_visibility, mk_sp, rewrite_ident};
+use crate::utils::{
+    is_same_visibility, last_line_contains_single_line_comment, last_line_used_width, mk_sp,
+    rewrite_ident,
+};
 use crate::visitor::FmtVisitor;
 
 /// Returns a name imported by a `use` declaration.
@@ -51,6 +56,7 @@ impl<'a> FmtVisitor<'a> {
             Some(item.vis.clone()),
             Some(item.span.lo()),
             Some(item.attrs.clone()),
+            Some(item.span),
         )
         .rewrite_top_level(&self.get_context(), shape)
         .ok();
@@ -126,6 +132,7 @@ pub(crate) struct UseTree {
     // Should we have another struct for top-level use items rather than reusing this?
     visibility: Option<ast::Visibility>,
     attrs: Option<ast::AttrVec>,
+    pub(crate) commented_span: Option<Span>,
 }
 
 impl PartialEq for UseTree {
@@ -350,9 +357,43 @@ impl UseTree {
                 if s.is_empty() {
                     s
                 } else {
-                    format!("{}use {};", vis, s)
+                    format!("{}use {}", vis, s)
                 }
             })?;
+
+        let mut use_str = use_str;
+        if !use_str.is_empty() {
+            if let Some(item_span) = self.commented_span {
+                let semi = context.snippet_provider.span_before_last(item_span, ";");
+                let get_span = mk_sp(self.span.hi(), semi);
+
+                let used_width = last_line_used_width(
+                    &use_str,
+                    shape.indent.width(),
+                    context.config.tab_spaces(),
+                ) + 1;
+
+                let comment =
+                    recover_missing_comment_in_span(get_span, shape, context, used_width)?;
+                use_str.push_str(&comment);
+
+                let line_width = last_line_used_width(
+                    &use_str,
+                    shape.indent.width(),
+                    context.config.tab_spaces(),
+                );
+
+                if line_width + 1 > context.config.max_width() {
+                    use_str.push_str(&shape.indent.to_string_with_newline(context.config));
+                }
+            }
+
+            if last_line_contains_single_line_comment(&use_str) {
+                use_str.push_str(&shape.indent.to_string_with_newline(context.config));
+            }
+            use_str.push(';');
+        }
+
         match self.attrs {
             Some(ref attrs) if !attrs.is_empty() => {
                 let attr_str = attrs.rewrite_result(context, shape)?;
@@ -393,6 +434,7 @@ impl UseTree {
             list_item: None,
             visibility: None,
             attrs: None,
+            commented_span: None,
         }
     }
 
@@ -413,6 +455,7 @@ impl UseTree {
                     } else {
                         Some(item.attrs.clone())
                     },
+                    Some(item.span),
                 )
                 .normalize(),
             ),
@@ -427,18 +470,26 @@ impl UseTree {
         visibility: Option<ast::Visibility>,
         opt_lo: Option<BytePos>,
         attrs: Option<ast::AttrVec>,
+        commented_span: Option<Span>,
     ) -> UseTree {
         let span = if let Some(lo) = opt_lo {
             mk_sp(lo, a.hi_span().hi())
         } else {
             a.span()
         };
+
+        let commented_span = commented_span.filter(|item_span| {
+            let semi = context.snippet_provider.span_before_last(*item_span, ";");
+            contains_comment(context.snippet(mk_sp(a.hi_span().hi(), semi)))
+        });
+
         let mut result = UseTree {
             path: vec![],
             span,
             list_item,
             visibility,
             attrs,
+            commented_span,
         };
 
         let leading_modsep =
@@ -501,7 +552,15 @@ impl UseTree {
                     list.iter()
                         .zip(items)
                         .map(|(t, list_item)| {
-                            Self::from_ast(context, &t.inner, Some(list_item), None, None, None)
+                            Self::from_ast(
+                                context,
+                                &t.inner,
+                                Some(list_item),
+                                None,
+                                None,
+                                None,
+                                None,
+                            )
                         })
                         .collect(),
                 );
@@ -651,6 +710,7 @@ impl UseTree {
 
     fn has_comment(&self) -> bool {
         self.list_item.as_ref().map_or(false, ListItem::has_comment)
+            || self.commented_span.is_some()
     }
 
     fn contains_comment(&self) -> bool {
@@ -723,6 +783,7 @@ impl UseTree {
                                 ImportGranularity::Item => self.attrs.clone(),
                                 _ => None,
                             },
+                            commented_span: None,
                         });
                     }
                 }
@@ -1263,6 +1324,7 @@ mod test {
                                 list_item: None,
                                 visibility: None,
                                 attrs: None,
+                                commented_span: None,
                             };
                         }
                         ' ' => {
@@ -1289,6 +1351,7 @@ mod test {
                     list_item: None,
                     visibility: None,
                     attrs: None,
+                    commented_span: None,
                 }
             }
 
